@@ -142,10 +142,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             var grainV1 = Client.GetGrain<IVersionUpgradeTestGrain>(0);
             Assert.Equal(1, await grainV1.GetVersion());
 
+            await StartSiloV2();
+
             // Change default to minimum version
             await ManagementGrain.SetSelectorStrategy(MinimumVersion.Singleton);
-
-            await StartSiloV2();
 
             // But only activate V1
             for (int i = 0; i < 100; i++)

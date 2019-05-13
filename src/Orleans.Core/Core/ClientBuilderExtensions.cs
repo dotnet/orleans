@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -110,7 +111,7 @@ namespace Orleans
         /// <param name="builder">The builder.</param>
         /// <param name="callback">The callback.</param>
         /// <remarks>
-        /// A <see cref="ClientInvokeCallback"/> ia a global pre-call interceptor.
+        /// A <see cref="ClientInvokeCallback"/> is a global pre-call interceptor.
         /// Synchronous callback made just before a message is about to be constructed and sent by a client to a grain.
         /// This call will be made from the same thread that constructs the message to be sent, so any thread-local settings
         /// such as <c>Orleans.RequestContext</c> will be picked up.
@@ -122,6 +123,15 @@ namespace Orleans
         public static IClientBuilder AddClientInvokeCallback(this IClientBuilder builder, ClientInvokeCallback callback)
         {
             builder.ConfigureServices(services => services.AddSingleton(callback));
+            return builder;
+        }
+
+        /// <summary>
+        /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
+        /// </summary>
+        public static IClientBuilder AddGatewayCountChangedHandler(this IClientBuilder builder, GatewayCountChangedHandler handler)
+        {
+            builder.ConfigureServices(services => services.AddSingleton(handler));
             return builder;
         }
 

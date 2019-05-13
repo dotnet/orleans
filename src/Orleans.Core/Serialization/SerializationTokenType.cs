@@ -2,15 +2,11 @@ namespace Orleans.Serialization
 {
     internal enum SerializationTokenType : byte
     {
-        #region Special values
-
         Null = 0,
         Reference = 1,      // Followed by uint byte offset from stream start of referred-to object
         Fallback = 2,       // .NET-serialized; followed by a ushort length and the serialized bytes
         True = 3,
         False = 4,
-        
-        #endregion
 
         // Type definers
 

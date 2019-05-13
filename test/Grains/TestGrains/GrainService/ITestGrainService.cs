@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Services;
 
@@ -20,5 +20,6 @@ namespace Tester
         Task<bool> HasStartedInBackground();
         Task<bool> HasInit();
         Task<string> GetServiceConfigProperty();
+        Task<string> EchoViaExtension(string what);
     }
 }

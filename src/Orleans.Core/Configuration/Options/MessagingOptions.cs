@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
@@ -33,7 +34,7 @@ namespace Orleans.Configuration
         public int MaxResendCount { get; set; }
 
         /// <summary>
-        /// The ResendOnTimeout attribute specifies whether the message should be automaticaly resend by the runtime when it times out on the sender.
+        /// The ResendOnTimeout attribute specifies whether the message should be automatically resend by the runtime when it times out on the sender.
         /// Default is false.
         /// </summary>
         public bool ResendOnTimeout { get; set; }
@@ -69,5 +70,11 @@ namespace Orleans.Configuration
         /// </summary>
         public bool PropagateActivityId { get; set; } = DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
         public const bool DEFAULT_PROPAGATE_E2E_ACTIVITY_ID = false;
+
+        /// <summary>
+        /// The LargeMessageWarningThreshold attribute specifies when to generate a warning trace message for large messages.
+        /// </summary>
+        public int LargeMessageWarningThreshold { get; set; } = DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD;
+        public const int DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
     }
 }

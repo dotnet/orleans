@@ -32,18 +32,16 @@ namespace Orleans.Statistics
         private readonly TimeSpan INITIALIZATION_TIMEOUT = TimeSpan.FromMinutes(1);
         private bool countersAvailable;
 
-        public long MemoryUsage { get { return GC.GetTotalMemory(false); } }
+        /// <inheritdoc />
+        private long MemoryUsage { get { return GC.GetTotalMemory(false); } }
 
-        ///
-        /// <summary>Amount of physical memory on the machine</summary>
-        ///
+        /// <inheritdoc />
         public long? TotalPhysicalMemory { get; private set; }
 
-        ///
-        /// <summary>Amount of memory available to processes running on the machine</summary>
-        ///
+        /// <inheritdoc />
         public long? AvailableMemory { get { return availableMemoryCounterPF != null ? Convert.ToInt64(availableMemoryCounterPF.NextValue()) : (long?)null; } }
 
+        /// <inheritdoc />
         public float? CpuUsage { get; private set; }
 
         private static string GCGenCollectionCount
@@ -160,8 +158,6 @@ namespace Orleans.Statistics
             cpuUsageTimer?.Dispose();
         }
 
-        #region Lifecycle
-
         public Task OnStart(CancellationToken ct)
         {
             if (!countersAvailable)
@@ -225,25 +221,19 @@ namespace Orleans.Statistics
 #endif
             IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_WORKERTHREADS, () =>
             {
-                int maXworkerThreads;
-                int maXcompletionPortThreads;
-                ThreadPool.GetMaxThreads(out maXworkerThreads, out maXcompletionPortThreads);
-                int workerThreads;
-                int completionPortThreads;
+                ThreadPool.GetMaxThreads(out var maXworkerThreads, out var maXcompletionPortThreads);
+
                 // GetAvailableThreads Retrieves the difference between the maximum number of thread pool threads
                 // and the number currently active.
                 // So max-Available is the actual number in use. If it goes beyond min, it means we are stressing the thread pool.
-                ThreadPool.GetAvailableThreads(out workerThreads, out completionPortThreads);
+                ThreadPool.GetAvailableThreads(out var workerThreads, out var completionPortThreads);
                 return maXworkerThreads - workerThreads;
             });
             IntValueStatistic.FindOrCreate(StatisticNames.RUNTIME_DOT_NET_THREADPOOL_INUSE_COMPLETIONPORTTHREADS, () =>
             {
-                int maxWorkerThreads;
-                int maxCompletionPortThreads;
-                ThreadPool.GetMaxThreads(out maxWorkerThreads, out maxCompletionPortThreads);
-                int workerThreads;
-                int completionPortThreads;
-                ThreadPool.GetAvailableThreads(out workerThreads, out completionPortThreads);
+                ThreadPool.GetMaxThreads(out var maxWorkerThreads, out var maxCompletionPortThreads);
+
+                ThreadPool.GetAvailableThreads(out var workerThreads, out var completionPortThreads);
                 return maxCompletionPortThreads - completionPortThreads;
             });
             return Task.CompletedTask;
@@ -265,7 +255,5 @@ namespace Orleans.Statistics
         {
             lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, this);
         }
-
-        #endregion Lifecycle
     }
 }

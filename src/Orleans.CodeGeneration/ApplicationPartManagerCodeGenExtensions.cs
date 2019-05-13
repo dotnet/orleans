@@ -16,7 +16,7 @@ namespace Orleans.Hosting
     public static class ApplicationPartManagerCodeGenExtensions
     {
         /// <summary>
-        /// Generates support code for the the provided assembly and adds it to the builder.
+        /// Generates support code for the provided assembly and adds it to the builder.
         /// </summary>
         /// <param name="manager">The builder.</param>
         /// <param name="loggerFactory">The optional logger factory, for outputting code generation diagnostics.</param>

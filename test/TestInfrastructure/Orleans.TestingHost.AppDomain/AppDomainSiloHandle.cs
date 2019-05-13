@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.Remoting;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 
@@ -18,14 +19,14 @@ namespace Orleans.TestingHost
         /// <summary> Get or set the AppDomain used by the silo </summary>
         public AppDomain AppDomain { get; set; }
 
-        /// <summary>Gets or sets a reference to the silo host that is marshable by reference.</summary>
+        /// <summary>Gets or sets a reference to the silo host that is marshallable by reference.</summary>
         public AppDomainSiloHost SiloHost { get; set; }
 
         /// <inheritdoc />
         public override bool IsActive => isActive;
 
         /// <summary>Creates a new silo in a remote app domain and returns a handle to it.</summary>
-        public static SiloHandle Create(
+        public static Task<SiloHandle> Create(
             string siloName,
             IList<IConfigurationSource> configurationSources)
         {
@@ -57,7 +58,7 @@ namespace Orleans.TestingHost
 
                 siloHost.Start();
 
-                var retValue = new AppDomainSiloHandle
+                SiloHandle retValue = new AppDomainSiloHandle
                 {
                     Name = siloName,
                     SiloHost = siloHost,
@@ -67,7 +68,7 @@ namespace Orleans.TestingHost
                     AppDomainTestHook = siloHost.AppDomainTestHook,
                 };
 
-                return retValue;
+                return Task.FromResult(retValue);
             }
             catch (Exception)
             {
@@ -77,9 +78,9 @@ namespace Orleans.TestingHost
         }
 
         /// <inheritdoc />
-        public override void StopSilo(bool stopGracefully)
+        public override Task StopSiloAsync(bool stopGracefully)
         {
-            if (!IsActive) return;
+            if (!IsActive) return Task.CompletedTask;
 
             if (stopGracefully)
             {
@@ -110,6 +111,12 @@ namespace Orleans.TestingHost
             }
 
             this.SiloHost = null;
+            return Task.CompletedTask;
+        }
+
+        public override Task StopSiloAsync(CancellationToken ct)
+        {
+            throw new NotImplementedException();
         }
 
         private void UnloadAppDomain()
@@ -134,7 +141,7 @@ namespace Orleans.TestingHost
 
             if (disposing)
             {
-                StopSilo(true);
+                StopSiloAsync(true).GetAwaiter().GetResult();
             }
             else
             {

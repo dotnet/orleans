@@ -5,7 +5,7 @@ namespace Orleans.Runtime.ConsistentRing
     internal interface IConsistentRingProvider
     {
         /// <summary>
-        /// Get the responsbility range of the current silo
+        /// Get the responsibility range of the current silo
         /// </summary>
         /// <returns></returns>
         IRingRange GetMyRange();

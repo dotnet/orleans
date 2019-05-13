@@ -55,7 +55,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Batch container that deliveres events from cached EventHub data associated with an orleans stream
+        /// Batch container that delivers events from cached EventHub data associated with an orleans stream
         /// </summary>
         /// <param name="eventHubMessage"></param>
         /// <param name="serializationManager"></param>

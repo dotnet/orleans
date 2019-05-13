@@ -685,7 +685,8 @@ namespace UnitTests.SchedulerTests
                 SiloAddress = SiloAddressUtils.NewLocalSiloAddress(23)
             };
             var grain = NonReentrentStressGrainWithoutState.Create(grainId, new GrainRuntime(Options.Create(new ClusterOptions()), silo, null, null, null, null, null, NullLoggerFactory.Instance));
-            await grain.OnActivateAsync();
+
+            await Task.Factory.StartNew(() => grain.OnActivateAsync(), CancellationToken.None, TaskCreationOptions.None, scheduler).Unwrap();
 
             Task wrapped = null;
             var wrapperDone = new TaskCompletionSource<bool>();
@@ -694,7 +695,7 @@ namespace UnitTests.SchedulerTests
             {
                 this.output.WriteLine("#0 - new Task - SynchronizationContext.Current={0} TaskScheduler.Current={1}",
                     SynchronizationContext.Current, TaskScheduler.Current);
-
+                
                 Task t1 = grain.Test1();
 
                 Action wrappedDoneAction = () => { wrappedDone.SetResult(true); };

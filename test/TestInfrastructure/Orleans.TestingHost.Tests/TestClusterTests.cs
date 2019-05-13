@@ -10,6 +10,146 @@ using Xunit.Abstractions;
 
 namespace Orleans.TestingHost.Tests
 {
+    public class T0
+    {
+        [Fact, TestCategory("Functional")]
+        public async Task CanInitialize()
+        {
+            var builder = new TestClusterBuilder(2);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+            var testCluster = builder.Build();
+
+            await testCluster.DeployAsync();
+        }
+    }
+
+    public class T1
+    {
+        [Fact, TestCategory("Functional")]
+        public async Task CanInitialize()
+        {
+            var builder = new TestClusterBuilder(2);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+            var testCluster = builder.Build();
+
+            await testCluster.DeployAsync();
+        }
+    }
+
+    public class T2
+    {
+        [Fact, TestCategory("Functional")]
+        public async Task CanInitialize()
+        {
+            var builder = new TestClusterBuilder(2);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+            var testCluster = builder.Build();
+
+            await testCluster.DeployAsync();
+        }
+    }
+
+    public class T3
+    {
+        [Fact, TestCategory("Functional")]
+        public async Task CanInitialize()
+        {
+            var builder = new TestClusterBuilder(2);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+            var testCluster = builder.Build();
+
+            await testCluster.DeployAsync();
+        }
+    }
+
+    public class T4
+    {
+        [Fact, TestCategory("Functional")]
+        public async Task CanInitialize()
+        {
+            var builder = new TestClusterBuilder(2);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+            var testCluster = builder.Build();
+
+            await testCluster.DeployAsync();
+        }
+    }
+
+    public class T5
+    {
+        [Fact, TestCategory("Functional")]
+        public async Task CanInitialize()
+        {
+            var builder = new TestClusterBuilder(2);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+            var testCluster = builder.Build();
+
+            await testCluster.DeployAsync();
+        }
+    }
+
+    public class T6
+    {
+        [Fact, TestCategory("Functional")]
+        public async Task CanInitialize()
+        {
+            var builder = new TestClusterBuilder(2);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+            var testCluster = builder.Build();
+
+            await testCluster.DeployAsync();
+        }
+    }
+
+    public class T7
+    {
+        [Fact, TestCategory("Functional")]
+        public async Task CanInitialize()
+        {
+            var builder = new TestClusterBuilder(2);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+            var testCluster = builder.Build();
+
+            await testCluster.DeployAsync();
+        }
+    }
+
+    public class T8
+    {
+        [Fact, TestCategory("Functional")]
+        public async Task CanInitialize()
+        {
+            var builder = new TestClusterBuilder(2);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+            var testCluster = builder.Build();
+
+            await testCluster.DeployAsync();
+        }
+    }
+
+    public class T9
+    {
+        [Fact, TestCategory("Functional")]
+        public async Task CanInitialize()
+        {
+            var builder = new TestClusterBuilder(2);
+            builder.Options.ServiceId = Guid.NewGuid().ToString();
+            builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
+            var testCluster = builder.Build();
+
+            await testCluster.DeployAsync();
+        }
+    }
+
     public class TestClusterTests : IDisposable
     {
         private readonly ITestOutputHelper output;

@@ -52,7 +52,7 @@ namespace Orleans.Transactions.AzureStorage
     /// General utility functions related to Azure storage.
     /// </summary>
     /// <remarks>
-    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constrants this class needs to have public visibility.
+    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constraints this class needs to have public visibility.
     /// </remarks>
     public static class AzureStorageUtils
     {
@@ -105,7 +105,7 @@ namespace Orleans.Transactions.AzureStorage
         /// <summary>
         /// Examine a storage exception, and if applicable extracts the HTTP status code, and REST error code if <c>getRESTErrors=true</c>.
         /// </summary>
-        /// <param name="e">Exeption to be examined.</param>
+        /// <param name="e">Exception to be examined.</param>
         /// <param name="httpStatusCode">Output HTTP status code if applicable, otherwise HttpStatusCode.Unused (306)</param>
         /// <param name="restStatus">When <c>getRESTErrors=true</c>, will output REST error code if applicable, otherwise <c>null</c></param>
         /// <param name="getRESTErrors">Whether REST error code should also be examined / extracted.</param>
@@ -211,54 +211,17 @@ namespace Orleans.Transactions.AzureStorage
 
         internal static void ValidateTableName(string tableName)
         {
-            // Table Name Rules: http://msdn.microsoft.com/en-us/library/dd179338.aspx
-
-            if (!(tableName.Length >= 3 && tableName.Length <= 63))
-            {
-                // Table names must be from 3 to 63 characters long.
-                throw new ArgumentException(String.Format("A table name must be from 3 through 63 characters long, while your tableName length is {0}, tableName is {1}.", tableName.Length, tableName), tableName);
-            }
-
-            if (Char.IsDigit(tableName.First()))
-            {
-                // Table names cannot begin with a numeric character.
-                throw new ArgumentException(String.Format("A table name cannot begin with a numeric character, while your tableName is {0}.", tableName), tableName);
-            }
-
-            if (!tableName.All(Char.IsLetterOrDigit))
-            {
-                // Table names may contain only alphanumeric characters.
-                throw new ArgumentException(String.Format("A table name can only contain alphanumeric characters, while your tableName is {0}.", tableName), tableName);
-            }
+            NameValidator.ValidateTableName(tableName);
         }
 
         internal static void ValidateContainerName(string containerName)
         {
-            // Container Name Rules: https://docs.microsoft.com/en-us/rest/api/storageservices/Naming-and-Referencing-Containers--Blobs--and-Metadata
+            NameValidator.ValidateContainerName(containerName);
+        }
 
-            if (!(containerName.Length >= 3 && containerName.Length <= 63))
-            {
-                // Container names must be from 3 to 63 characters long.
-                throw new ArgumentException(String.Format("A container name must be from 3 through 63 characters long, while your container name length is {0}, tableName is {1}.", containerName.Length, containerName), containerName);
-            }
-
-            if (!Char.IsLetterOrDigit(containerName.First()))
-            {
-                // Container names must start with a letter or number.
-                throw new ArgumentException(String.Format("A container name cannot begin with a numeric character, while your container name is {0}.", containerName), containerName);
-            }
-
-            if (!containerName.All(c => Char.IsLetterOrDigit(c) || c == '-'))
-            {
-                // Container names may contain only alphanumeric characters.
-                throw new ArgumentException(String.Format("A Container name can contain only letters, numbers, and the dash (-) character, while your container name is {0}.", containerName), containerName);
-            }
-
-            if (containerName.Any(Char.IsUpper))
-            {
-                // All letters in a container name must be lowercase. 
-                throw new ArgumentException(String.Format("All letters in a container name must be lowercase, while your container name is {0}.", containerName), containerName);
-            }
+        internal static void ValidateBlobName(string blobName)
+        {
+            NameValidator.ValidateBlobName(blobName);
         }
 
         /// <summary>

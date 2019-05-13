@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using System.Threading;
 
@@ -23,6 +24,12 @@ namespace Orleans
 
         // This is the reference implementation of the Jenkins hash.
         public static uint ComputeHash(byte[] data)
+        {
+            return ComputeHash(data.AsSpan());
+        }
+
+        // This is the reference implementation of the Jenkins hash.
+        public static uint ComputeHash(ReadOnlySpan<byte> data)
         {
             int len = data.Length;
             uint a = 0x9e3779b9;

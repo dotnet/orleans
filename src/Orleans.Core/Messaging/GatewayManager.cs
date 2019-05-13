@@ -27,12 +27,17 @@ namespace Orleans.Messaging
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly object lockable;
-
+        private readonly ClientMessageCenter messageCenter;
         private readonly GatewayOptions gatewayOptions;
         private bool gatewayRefreshCallInitiated;
 
-        public GatewayManager(GatewayOptions gatewayOptions, IGatewayListProvider gatewayListProvider, ILoggerFactory loggerFactory)
+        public GatewayManager(
+            ClientMessageCenter messageCenter,
+            GatewayOptions gatewayOptions,
+            IGatewayListProvider gatewayListProvider,
+            ILoggerFactory loggerFactory)
         {
+            this.messageCenter = messageCenter;
             this.gatewayOptions = gatewayOptions;
             knownDead = new Dictionary<Uri, DateTime>();
             rand = new SafeRandom();
@@ -274,6 +279,8 @@ namespace Orleans.Messaging
                             prevRefresh);
                 }
             }
+
+            this.messageCenter?.CleanupGatewayConnections(cachedLiveGateways);
         }
 
         public void Dispose()

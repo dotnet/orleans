@@ -76,8 +76,6 @@ namespace Orleans.Runtime
             timer = new Timer(HandleTimerCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
         }
 
-        #region IDisposable Members
-
         public void Dispose()
         {
             Dispose(true);
@@ -114,8 +112,6 @@ namespace Orleans.Runtime
                 }
             }
         }
-
-        #endregion
 
         private string GetFullName()
         {

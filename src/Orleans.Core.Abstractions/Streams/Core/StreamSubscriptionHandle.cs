@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 namespace Orleans.Streams
 {
     /// <summary>
-    /// Handle representing this subsription.
-    /// Consumer may serialize and store the handle in order to unsubsribe later, for example
+    /// Handle representing this subscription.
+    /// Consumer may serialize and store the handle in order to unsubscribe later, for example
     /// in another activation on this grain.
     /// </summary>
     [Serializable]
@@ -35,10 +35,15 @@ namespace Orleans.Streams
         /// </returns>
         public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> observer, StreamSequenceToken token = null);
 
-        #region IEquatable<StreamSubscriptionHandle<T>> Members
+        /// <summary>
+        /// Resume batch consumption from a subscription to a stream.
+        /// </summary>
+        /// <param name="observer">The batcj bserver object.</param>
+        /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
+        /// <returns>A promise with an updates subscription handle.
+        /// </returns>
+        public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncBatchObserver<T> observer, StreamSequenceToken token = null);
 
         public abstract bool Equals(StreamSubscriptionHandle<T> other);
-
-        #endregion
     }
 }

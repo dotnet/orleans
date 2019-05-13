@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.Reflection;
+using System;
 
 namespace Orleans.Configuration
 {
@@ -11,11 +11,11 @@ namespace Orleans.Configuration
         /// <summary>
         /// Externally registered serializers
         /// </summary>
-        public List<TypeInfo> SerializationProviders { get; set; } = new List<TypeInfo>();
+        public List<Type> SerializationProviders { get; set; } = new List<Type>();
 
         /// <summary>
         /// Serializer used if no serializer is found for a type.
         /// </summary>
-        public TypeInfo FallbackSerializationProvider { get; set; }
+        public Type FallbackSerializationProvider { get; set; }
     }
 }

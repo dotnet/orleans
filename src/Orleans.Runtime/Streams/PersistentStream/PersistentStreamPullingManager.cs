@@ -129,13 +129,11 @@ namespace Orleans.Streams
             Log(ErrorCode.PersistentStreamPullingManager_Stopped, "Stopped agents.");
         }
 
-        #region Management of queues
-
         /// <summary>
         /// Actions to take when the queue distribution changes due to a failure or a join.
         /// Since this pulling manager is system target and queue distribution change notifications
         /// are delivered to it as grain method calls, notifications are not reentrant. To simplify
-        /// notification handling we execute them serially, in a non-reentrant way.  We also supress
+        /// notification handling we execute them serially, in a non-reentrant way.  We also suppress
         /// and don't execute an older notification if a newer one was already delivered.
         /// </summary>
         public Task QueueDistributionChangeNotification()
@@ -322,8 +320,6 @@ namespace Orleans.Streams
                     PrintQueues(queuesToAgentsMap.Keys));
             }
         }
-
-        #endregion
 
         public async Task<object> ExecuteCommand(PersistentStreamProviderCommand command, object arg)
         {

@@ -22,7 +22,7 @@ namespace UnitTests.ActivationsLifeCycleTests
     public class ActivationCollectorTests : OrleansTestingBase, IDisposable
     {
         private static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromSeconds(10);
-        private static readonly TimeSpan DEFAULT_IDLE_TIMEOUT = DEFAULT_COLLECTION_QUANTUM;
+        private static readonly TimeSpan DEFAULT_IDLE_TIMEOUT = DEFAULT_COLLECTION_QUANTUM + TimeSpan.FromSeconds(1);
         private static readonly TimeSpan WAIT_TIME = DEFAULT_IDLE_TIMEOUT.Multiply(3.0);
 
         private TestCluster testCluster;
@@ -38,8 +38,9 @@ namespace UnitTests.ActivationsLifeCycleTests
                 var config = legacy.ClusterConfiguration;
                 config.Globals.CollectionQuantum = quantum;
                 config.Globals.Application.SetDefaultCollectionAgeLimit(collectionAgeLimit);
-                config.Globals.Application.SetCollectionAgeLimit(typeof(IdleActivationGcTestGrain2), TimeSpan.FromSeconds(10));
-                config.Globals.Application.SetCollectionAgeLimit(typeof(BusyActivationGcTestGrain2), TimeSpan.FromSeconds(10));
+                config.Globals.Application.SetCollectionAgeLimit(typeof(IdleActivationGcTestGrain2), DEFAULT_IDLE_TIMEOUT);
+                config.Globals.Application.SetCollectionAgeLimit(typeof(BusyActivationGcTestGrain2), DEFAULT_IDLE_TIMEOUT);
+                config.Globals.Application.SetCollectionAgeLimit(typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain), TimeSpan.FromSeconds(12));
             });
             testCluster = builder.Build();
             testCluster.Deploy();
@@ -48,7 +49,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private void Initialize(TimeSpan collectionAgeLimit)
         {
-            Initialize(collectionAgeLimit, collectionAgeLimit);
+            Initialize(collectionAgeLimit, DEFAULT_COLLECTION_QUANTUM);
         }
 
         private void Initialize()
@@ -248,36 +249,11 @@ namespace UnitTests.ActivationsLifeCycleTests
         }    
         
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
-        public async Task ActivationCollectorShouldNotCollectIdleActivationsIfDisabled()
-        {
-            Initialize();
-
-            const int grainCount = 1000;
-            var fullGrainTypeName = typeof(IdleActivationGcTestGrain1).FullName;
-
-            List<Task> tasks = new List<Task>();
-            logger.Info("ActivationCollectorShouldNotCollectIdleActivationsIfDisabled: activating {0} grains.", grainCount);
-            for (var i = 0; i < grainCount; ++i)
-            {
-                IIdleActivationGcTestGrain1 g = this.testCluster.GrainFactory.GetGrain<IIdleActivationGcTestGrain1>(Guid.NewGuid());
-                tasks.Add(g.Nop());
-            }
-            await Task.WhenAll(tasks);
-
-            int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
-            Assert.Equal(grainCount, activationsCreated);
-
-            logger.Info("ActivationCollectorShouldNotCollectIdleActivationsIfDisabled: grains activated; waiting {0} sec (activation GC idle timeout is {1} sec).", WAIT_TIME.TotalSeconds, DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await Task.Delay(WAIT_TIME);
-
-            int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
-            Assert.Equal(1000, activationsNotCollected);
-        }   
-        
-        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration()
         {
-            Initialize();
+            //make sure default value won't cause activation collection during wait time
+            var defaultCollectionAgeLimit = WAIT_TIME.Multiply(2);
+            Initialize(defaultCollectionAgeLimit);
 
             const int grainCount = 1000;
             var fullGrainTypeName = typeof(IdleActivationGcTestGrain2).FullName;
@@ -304,7 +280,9 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration()
         {
-            Initialize();
+            //make sure default value won't cause activation collection during wait time
+            var defaultCollectionAgeLimit = WAIT_TIME.Multiply(2);
+            Initialize(defaultCollectionAgeLimit);
 
             const int idleGrainCount = 500;
             const int busyGrainCount = 500;
@@ -518,6 +496,40 @@ namespace UnitTests.ActivationsLifeCycleTests
             int busyActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, busyGrainTypeName);
             Assert.Equal(0, idleActivationsNotCollected);
             Assert.Equal(busyGrainCount, busyActivationsNotCollected);
+        }
+
+        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
+        public async Task ActivationCollectorShouldCollectByCollectionSpecificAgeLimitForTwelveSeconds()
+        {
+            var waitTime = TimeSpan.FromSeconds(30);
+            var defaultCollectionAge = waitTime.Multiply(2);
+            //make sure defaultCollectionAge value won't cause activation collection in wait time
+            Initialize(defaultCollectionAge);
+
+            const int grainCount = 1000;
+
+            // CollectionAgeLimit = 12 seconds
+            var fullGrainTypeName = typeof(CollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain).FullName;
+
+            List<Task> tasks = new List<Task>();
+            logger.Info("ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: activating {0} grains.", grainCount);
+            for (var i = 0; i < grainCount; ++i)
+            {
+                ICollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain g = this.testCluster.GrainFactory.GetGrain<ICollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain>(Guid.NewGuid());
+                tasks.Add(g.Nop());
+            }
+            await Task.WhenAll(tasks);
+
+            int activationsCreated = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
+            Assert.Equal(grainCount, activationsCreated);
+
+            logger.Info("ActivationCollectorShouldCollectByCollectionSpecificAgeLimit: grains activated; waiting {0} sec (activation GC idle timeout is {1} sec).", WAIT_TIME.TotalSeconds, DEFAULT_IDLE_TIMEOUT.TotalSeconds);
+            
+            // Some time is required for GC to collect all of the Grains)
+            await Task.Delay(waitTime);
+
+            int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
+            Assert.Equal(0, activationsNotCollected);
         }
     }
 }

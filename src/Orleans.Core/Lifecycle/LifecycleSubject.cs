@@ -30,7 +30,13 @@ namespace Orleans
             this.subscribers = new ConcurrentDictionary<object, OrderedObserver>();
         }
 
-        public async Task OnStart(CancellationToken ct)
+        protected virtual void PerfMeasureOnStart(int? stage, TimeSpan timelapsed)
+        {
+            if (this.logger != null && this.logger.IsEnabled(LogLevel.Trace))
+                this.logger.Trace(ErrorCode.SiloStartPerfMeasure, $"Starting lifecycle stage {stage} took {timelapsed.TotalMilliseconds} Milliseconds");
+        }
+
+        public virtual async Task OnStart(CancellationToken ct)
         {
             if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
             try
@@ -47,7 +53,7 @@ namespace Orleans
                     Stopwatch stopWatch = Stopwatch.StartNew();
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStart)));
                     stopWatch.Stop();
-                    this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Starting lifecycle stage {this.highStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
+                    this.PerfMeasureOnStart(this.highStage, stopWatch.Elapsed);
                 }
             }
             catch (Exception ex)
@@ -58,7 +64,13 @@ namespace Orleans
             }
         }
 
-        public async Task OnStop(CancellationToken ct)
+        protected virtual void PerfMeasureOnStop(int? stage, TimeSpan timelapsed)
+        {
+            if (this.logger != null && this.logger.IsEnabled(LogLevel.Trace))
+                this.logger.Trace(ErrorCode.SiloStartPerfMeasure, $"Stopping lifecycle stage {stage} took {timelapsed.TotalMilliseconds} Milliseconds");
+        }
+
+        public virtual async Task OnStop(CancellationToken ct)
         {
             // if not started, do nothing
             if (!this.highStage.HasValue) return;
@@ -74,7 +86,7 @@ namespace Orleans
                     Stopwatch stopWatch = Stopwatch.StartNew();
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStop)));
                     stopWatch.Stop();
-                    this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Stopping lifecycle stage {this.highStage} took {stopWatch.ElapsedMilliseconds} Milliseconds");
+                    this.PerfMeasureOnStop(this.highStage, stopWatch.Elapsed);
                 }
                 catch (Exception ex)
                 {
@@ -83,7 +95,7 @@ namespace Orleans
             }
         }
 
-        public IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
+        public virtual IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
             if (observer == null) throw new ArgumentNullException(nameof(observer));
             if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");

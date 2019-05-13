@@ -56,8 +56,6 @@ namespace Tests.GeoClusterTests
         }
 
 
-        #region client wrappers
-
         public class ClientWrapper : ClientWrapperBase
         {
             public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
@@ -76,15 +74,13 @@ namespace Tests.GeoClusterTests
                 return toWait.GetResult();
             }
 
-            public void InjectMultiClusterConf(params string[] args)
+            public void InjectMultiClusterConf(string[] clusters, string comment = "", bool checkForLaggingSilos = true)
             {
-                systemManagement.InjectMultiClusterConfiguration(args).GetResult();
+                systemManagement.InjectMultiClusterConfiguration(clusters, comment, checkForLaggingSilos).GetResult();
             }
 
             IManagementGrain systemManagement;
         }
-
-        #endregion
 
         private Random random = new Random();
 
@@ -134,13 +130,11 @@ namespace Tests.GeoClusterTests
                 await WaitForLivenessToStabilizeAsync();
 
                 // Configure multicluster
-                clients[0].InjectMultiClusterConf(cluster0, cluster1);
+                clients[0].InjectMultiClusterConf(new string[] { cluster0, cluster1 });
                 await WaitForMultiClusterGossipToStabilizeAsync(false);
             });
         }
 
-
-        #region Test creation of independent grains
 
         private Task IndependentCreation()
         {
@@ -187,10 +181,6 @@ namespace Tests.GeoClusterTests
 
             return Task.CompletedTask;
         }
-
-        #endregion
-
-        #region Creation Race
 
         // This test is for the case where two different clusters are racing, 
         // trying to activate the same grain.   
@@ -349,10 +339,6 @@ namespace Tests.GeoClusterTests
             }
         }
 
-        #endregion Creation Race
-
-        #region Conflict Resolution
-
         // This test is used to test the case where two different clusters are racing, 
         // trying to activate the same grain, but inter-cluster communication is blocked
         // so they both activate an instance
@@ -505,9 +491,6 @@ namespace Tests.GeoClusterTests
             }
 
         }
-        #endregion
-
-        #region Helper methods 
 
         private List<GrainId> GetGrainsInClusterWithStatus(string clusterId, GrainDirectoryEntryStatus? status = null)
         {
@@ -675,5 +658,4 @@ namespace Tests.GeoClusterTests
 
 
     }
-    #endregion
 }

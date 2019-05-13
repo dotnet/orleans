@@ -16,13 +16,12 @@ namespace Orleans.Runtime
         private readonly LRU<IPEndPoint, Socket> cache;
         private readonly TimeSpan connectionTimeout;
         private readonly ILogger logger;
-        private const int MAX_SOCKETS = 200;
 
         internal SocketManager(IOptions<NetworkingOptions> options, ILoggerFactory loggerFactory)
         {
             var networkingOptions = options.Value;
             connectionTimeout = networkingOptions.OpenConnectionTimeout;
-            cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, networkingOptions.MaxSocketAge, SendingSocketCreator);
+            cache = new LRU<IPEndPoint, Socket>(networkingOptions.MaxSockets, networkingOptions.MaxSocketAge, SendingSocketCreator);
             this.logger = loggerFactory.CreateLogger<SocketManager>();
             cache.RaiseFlushEvent += FlushHandler;
         }

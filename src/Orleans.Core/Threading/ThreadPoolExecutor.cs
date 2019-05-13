@@ -39,15 +39,11 @@ namespace Orleans.Threading
             this.schedulerStatistics = schedulerStatistics;
             this.schedulerStageStatistics = schedulerStageStatistics;
             this.statisticsOptions = statisticsOptions;
-
-            workQueue = new ThreadPoolWorkQueue();
-
-            statistic = new ThreadPoolTrackingStatistic(options.Name, options.LoggerFactory, statisticsOptions, schedulerStageStatistics);
-
-            executingWorkTracker = new ExecutingWorkItemsTracker(this);
-
-            log = options.LoggerFactory.CreateLogger<ThreadPoolExecutor>();
-
+            this.workQueue = new ThreadPoolWorkQueue();
+            this.statistic = new ThreadPoolTrackingStatistic(options.Name, options.LoggerFactory, statisticsOptions, schedulerStageStatistics);
+            this.log = options.LoggerFactory.CreateLogger<ThreadPoolExecutor>();
+            this.executingWorkTracker = new ExecutingWorkItemsTracker(options, this.log);
+            
             options.CancellationTokenSource.Token.Register(Complete);
 
             for (var threadIndex = 0; threadIndex < options.DegreeOfParallelism; threadIndex++)
@@ -89,13 +85,22 @@ namespace Orleans.Threading
                     {
                         if (ShouldStop())
                         {
-                            return;
+                            break;
                         }
 
                         context.ExecuteWithFilters(workItem);
                     }
 
                     workQueue.WaitForWork();
+                }
+
+                if (options.DrainAfterCancel)
+                {
+                    // Give a chance to drain all pending items fast
+                    while (workQueue.TryDequeue(threadLocals, out var workItem))
+                    {
+                        context.ExecuteWithFilters(workItem);
+                    }
                 }
             }
             catch (Exception ex)
@@ -114,7 +119,7 @@ namespace Orleans.Threading
 
             bool ShouldStop()
             {
-                return context.CancellationTokenSource.IsCancellationRequested && !options.DrainAfterCancel;
+                return context.CancellationTokenSource.IsCancellationRequested;
             }
         }
 
@@ -214,10 +219,11 @@ namespace Orleans.Threading
 
             private readonly ILogger log;
 
-            public ExecutingWorkItemsTracker(ThreadPoolExecutor executor)
+            public ExecutingWorkItemsTracker(ThreadPoolExecutorOptions options, ILogger log)
             {
-                runningItems = new WorkItem[GetThreadSlot(executor.options.DegreeOfParallelism)];
-                log = executor.log;
+                if (options == null) throw new ArgumentNullException(nameof(options));
+                this.runningItems = new WorkItem[GetThreadSlot(options.DegreeOfParallelism)];
+                this.log = log ?? throw new ArgumentNullException(nameof(log));
             }
 
             public override void OnActionExecuting(ExecutionContext context)
@@ -238,7 +244,7 @@ namespace Orleans.Threading
                     if (workItem != null && workItem.IsFrozen())
                     {
                         frozen = true;
-                        log.Error(
+                        this.log.Error(
                             ErrorCode.ExecutorTurnTooLong,
                             string.Format(SR.WorkItem_LongExecutionTime, workItem.GetWorkItemStatus(true)));
                     }

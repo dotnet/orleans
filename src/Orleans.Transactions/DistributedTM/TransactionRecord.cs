@@ -1,4 +1,4 @@
-﻿using Orleans.Transactions.Abstractions;
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -26,8 +26,6 @@ namespace Orleans.Transactions
         {
         }
 
-        #region execution phase
-
         // a unique identifier for this transaction
         public Guid TransactionId;
 
@@ -47,6 +45,7 @@ namespace Orleans.Transactions
         // the state for this transaction, and the sequence number of this state
         public TState State;
         public long SequenceNumber;
+        public bool HasCopiedState;
 
         public void AddRead()
         {
@@ -57,23 +56,18 @@ namespace Orleans.Transactions
             NumberWrites++;
         }
 
-        #endregion
-
-        #region commit phase
-
         public CommitRole Role;
 
         // used for readonly and local commit
         public TaskCompletionSource<TransactionalStatus> PromiseForTA;
 
         // used for local and remote commit
-        public ITransactionParticipant TransactionManager;
+        public ParticipantId TransactionManager;
 
         // used for local commit
-        public List<ITransactionParticipant> WriteParticipants;
+        public List<ParticipantId> WriteParticipants;
         public int WaitCount;
         public DateTime WaitingSince;
-        public DateTime? LastConfirmationAttempt;
 
         // used for remote commit
         public DateTime? LastSent;
@@ -148,24 +142,20 @@ namespace Orleans.Transactions
             switch (Role)
             {
                 case CommitRole.NotYetDetermined:
-                    return $"ND";
+                    return $"ND tid={TransactionId} v{SequenceNumber}";
 
                 case CommitRole.ReadOnly:
-                    return $"RE";
+                    return $"RE tid={TransactionId} v{SequenceNumber}";
 
                 case CommitRole.LocalCommit:
-                    return $"LCE wc={WaitCount} rtb={ReadyToCommit}";
+                    return $"LCE tid={TransactionId} v{SequenceNumber} wc={WaitCount} rtb={ReadyToCommit}";
 
                 case CommitRole.RemoteCommit:
-                    return $"RCE pip={PrepareIsPersisted} ls={LastSent.HasValue} ro={IsReadOnly} rtb={ReadyToCommit}";
+                    return $"RCE tid={TransactionId} v{SequenceNumber} pip={PrepareIsPersisted} ls={LastSent.HasValue} ro={IsReadOnly} rtb={ReadyToCommit} tm={TransactionManager}";
 
                 default:
                     throw new NotSupportedException($"{Role} is not a supported CommitRole.");
             }
         }
-
-        #endregion
     }
-
-
 }

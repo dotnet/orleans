@@ -145,16 +145,15 @@ namespace Orleans
         private TGrainObserverInterface CreateObjectReferenceImpl<TGrainObserverInterface>(IAddressable obj) where TGrainObserverInterface : IAddressable
         {
             var interfaceType = typeof(TGrainObserverInterface);
-            var interfaceTypeInfo = interfaceType.GetTypeInfo();
-            if (!interfaceTypeInfo.IsInterface)
+            if (!interfaceType.IsInterface)
             {
                 throw new ArgumentException(
-                    $"The provided type parameter must be an interface. '{interfaceTypeInfo.FullName}' is not an interface.");
+                    $"The provided type parameter must be an interface. '{interfaceType.FullName}' is not an interface.");
             }
 
-            if (!interfaceTypeInfo.IsInstanceOfType(obj))
+            if (!interfaceType.IsInstanceOfType(obj))
             {
-                throw new ArgumentException($"The provided object must implement '{interfaceTypeInfo.FullName}'.", nameof(obj));
+                throw new ArgumentException($"The provided object must implement '{interfaceType.FullName}'.", nameof(obj));
             }
 
             IGrainMethodInvoker invoker;
@@ -169,11 +168,10 @@ namespace Orleans
 
         private IAddressable MakeGrainReferenceFromType(Type interfaceType, GrainId grainId)
         {
-            var typeInfo = interfaceType.GetTypeInfo();
             return GrainReference.FromGrainId(
                 grainId,
                 this.GrainReferenceRuntime,
-                typeInfo.IsGenericType ? TypeUtils.GenericTypeArgsString(typeInfo.UnderlyingSystemType.FullName) : null);
+                interfaceType.IsGenericType ? TypeUtils.GenericTypeArgsString(interfaceType.UnderlyingSystemType.FullName) : null);
         }
 
         private GrainClassData GetGrainClassData(Type interfaceType, string grainClassNamePrefix)
@@ -207,8 +205,6 @@ namespace Orleans
             var invokerType = this.typeCache.GetGrainMethodInvokerType(interfaceType);
             return (IGrainMethodInvoker)Activator.CreateInstance(invokerType);
         }
-
-        #region Interface Casting
 
         /// <summary>
         /// Casts the provided <paramref name="grain"/> to the specified interface
@@ -252,10 +248,6 @@ namespace Orleans
             var grainReferenceType = this.typeCache.GetGrainReferenceType(interfaceType);
             return GrainCasterFactory.CreateGrainReferenceCaster(interfaceType, grainReferenceType);
         }
-
-        #endregion
-
-        #region SystemTargets
 
         /// <summary>
         /// Gets a reference to the specified system target.
@@ -306,7 +298,5 @@ namespace Orleans
         /// <inheritdoc />
         public GrainReference GetGrain(GrainId grainId, string genericArguments)
             => GrainReference.FromGrainId(grainId, this.GrainReferenceRuntime, genericArguments);
-
-        #endregion
     }
 }

@@ -18,10 +18,11 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers;
+using Tester;
 
 namespace ServiceBus.Tests.StreamingTests
 {
-    [TestCategory("EventHub"), TestCategory("Streaming")]
+    [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHClientStreamTests : TestClusterPerTest
     {
         private const string StreamProviderName = "EventHubStreamProvider";
@@ -39,6 +40,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
+            TestUtils.CheckForEventHub();
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 AdjustConfig(legacy.ClusterConfiguration);
@@ -52,18 +54,22 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>b
-                    .Configure<EventHubOptions>(ob => ob.Configure(options =>
-                      {
-                          options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                          options.ConsumerGroup = EHConsumerGroup;
-                          options.Path = EHPath;
-                      }))
-                    .ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(EventHubCheckpointerFactory.CreateFactory, ob => ob.Configure(options =>
+                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        options.PersistInterval = TimeSpan.FromSeconds(10);
-                    })));
+                        b.Configure<EventHubOptions>(ob => ob.Configure(options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConsumerGroup = EHConsumerGroup;
+                            options.Path = EHPath;
+                        }));
+                        b.ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(
+                            EventHubCheckpointerFactory.CreateFactory,
+                            ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.PersistInterval = TimeSpan.FromSeconds(10);
+                            }));
+                    });
                 hostBuilder
                     .AddMemoryGrainStorage("PubSubStore");
             }
@@ -74,9 +80,8 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>
-                        b.Configure<EventHubOptions>(ob=>ob.Configure(
-                        options =>
+                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>b
+                        .Configure<EventHubOptions>(ob=>ob.Configure(options =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
@@ -85,14 +90,14 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task EHStreamProducerOnDroppedClientTest()
         {
             logger.Info("************************ EHStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task EHStreamConsumerOnDroppedClientTest()
         {
             logger.Info("************************ EHStreamConsumerOnDroppedClientTest *********************************");

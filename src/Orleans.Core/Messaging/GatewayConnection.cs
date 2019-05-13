@@ -14,6 +14,7 @@ namespace Orleans.Messaging
     /// </summary>
     internal class GatewayConnection : OutgoingMessageSender
     {
+        private int connectedCount;
         private readonly MessageFactory messageFactory;
         internal bool IsLive { get; private set; }
         internal ClientMessageCenter MsgCenter { get; private set; }
@@ -72,7 +73,6 @@ namespace Orleans.Messaging
             IsLive = false;
             receiver.Stop();
             base.Stop();
-            MsgCenter.RuntimeClient.BreakOutstandingMessagesToDeadSilo(Silo);
             Socket s;
             lock (Lockable)
             {
@@ -172,6 +172,7 @@ namespace Orleans.Messaging
                         Socket.EnableFastpath();
                         SocketManager.Connect(Socket, Silo.Endpoint, this.openConnectionTimeout);
                         NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
+                        Interlocked.Increment(ref this.connectedCount);
                         MsgCenter.OnGatewayConnectionOpen();
                         SocketManager.WriteConnectionPreamble(Socket, MsgCenter.ClientId);  // Identifies this client
                         Log.Info(ErrorCode.ProxyClient_Connected, "Connected to gateway at address {0} on trial {1}.", Address, i);
@@ -250,28 +251,42 @@ namespace Orleans.Messaging
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         protected override void OnMessageSerializationFailure(Message msg, Exception exc)
         {
-            // we only get here if we failed to serialise the msg (or any other catastrophic failure).
-            // Request msg fails to serialise on the sending silo, so we just enqueue a rejection msg.
-            Log.Warn(ErrorCode.ProxyClient_SerializationError, $"Unexpected error serializing message to gateway {Address}.", exc);
-            FailMessage(msg, $"Unexpected error serializing message to gateway {Address}. {exc}");
-            if (msg.Direction == Message.Directions.Request || msg.Direction == Message.Directions.OneWay)
-            {
-                return;
-            }
-
+            // we only get here if we failed to serialize the msg (or any other catastrophic failure).
+            // Request msg fails to serialize on the sender, so we just enqueue a rejection msg.
             // Response msg fails to serialize on the responding silo, so we try to send an error response back.
-            // if we failed sending an original response, turn the response body into an error and reply with it.
-            msg.Result = Message.ResponseTypes.Error;
-            msg.BodyObject = Response.ExceptionResponse(exc);
-            try
+            this.Log.LogWarning(
+                (int) ErrorCode.ProxyClient_SerializationError,
+                "Unexpected error serializing message {Message}: {Exception}",
+                msg,
+                exc);
+
+            msg.ReleaseBodyAndHeaderBuffers();
+            MessagingStatisticsGroup.OnFailedSentMessage(msg);
+
+            var retryCount = msg.RetryCount ?? 0;
+
+            if (msg.Direction == Message.Directions.Request)
             {
-                MsgCenter.SendMessage(msg);
+                this.MsgCenter.RejectMessage(msg, $"Unable to serialize message. Encountered exception: {exc?.GetType()}: {exc?.Message}", exc);
             }
-            catch (Exception ex)
+            else if (msg.Direction == Message.Directions.Response && retryCount < 1)
             {
-                // If we still can't serialize, drop the message on the floor
-                Log.Warn(ErrorCode.ProxyClient_DroppingMsg, "Unable to serialize message - DROPPING " + msg, ex);
-                msg.ReleaseBodyAndHeaderBuffers();
+                // if we failed sending an original response, turn the response body into an error and reply with it.
+                // unless we have already tried sending the response multiple times.
+                msg.Result = Message.ResponseTypes.Error;
+                msg.BodyObject = Response.ExceptionResponse(exc);
+                msg.RetryCount = retryCount + 1;
+                this.MsgCenter.SendMessage(msg);
+            }
+            else
+            {
+                this.Log.LogWarning(
+                    (int)ErrorCode.ProxyClient_DroppingMsg,
+                    "Gateway client is dropping message which failed during serialization: {Message}. Exception = {Exception}",
+                    msg,
+                    exc);
+
+                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }
 
@@ -321,7 +336,7 @@ namespace Orleans.Messaging
         {
             SocketManager.CloseSocket(socket);
             NetworkingStatisticsGroup.OnClosedGatewayDuplexSocket();
-            MsgCenter.OnGatewayConnectionClosed();
+            if (Interlocked.Decrement(ref this.connectedCount) == 0) MsgCenter.OnGatewayConnectionClosed();
         }
     }
 }

@@ -13,7 +13,7 @@ namespace Orleans.Transactions
     /// </summary>
     public interface ITransactionalStateStorageEvents<TState> where TState : class, new()
     {
-        void Prepare(long sequenceNumber, Guid transactionId, DateTime timestamp, ITransactionParticipant transactionManager, TState state);
+        void Prepare(long sequenceNumber, Guid transactionId, DateTime timestamp, ParticipantId transactionManager, TState state);
 
         void Read(DateTime timestamp);
 
@@ -21,31 +21,9 @@ namespace Orleans.Transactions
 
         void Confirm(long sequenceNumber);
 
-        void Commit(Guid transactionId, DateTime timestamp, List<ITransactionParticipant> writeParticipants);
+        void Commit(Guid transactionId, DateTime timestamp, List<ParticipantId> writeResources);
 
         void Collect(Guid transactionId);
-    }
-
-    /// <summary>
-    /// Metadata is stored in storage, as a JSON object
-    /// </summary>
-    [Serializable]
-    public class MetaData
-    {
-        public DateTime TimeStamp { get; set; }
-
-        public Dictionary<Guid, CommitRecord> CommitRecords { get; set; }
-
-        public static JsonSerializerSettings SerializerSettings { get; set; }
-    }
-
-    [Serializable]
-    [Immutable]
-    public class CommitRecord
-    {
-        public DateTime Timestamp { get; set; }
-
-        public List<ITransactionParticipant> WriteParticipants { get; set; }
     }
 
     /// <summary>
@@ -65,7 +43,8 @@ namespace Orleans.Transactions
 
         // follow-up actions, to be executed after storing this batch
         private List<Action> followUpActions;
-
+        private List<Func<Task<bool>>> storeConditions;
+        
         // counters for each type of event
         private int total = 0;
         private int prepare = 0;
@@ -75,82 +54,53 @@ namespace Orleans.Transactions
         private int collect = 0;
         private int cancel = 0;
 
-        public MetaData MetaData { get; private set; }
+        public TransactionalStateMetaData MetaData { get; private set; }
 
         public string ETag { get; set; }
 
         public int BatchSize => total;
-
         public override string ToString()
         {
             return $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
         }
 
-        public StorageBatch(TransactionalStorageLoadResponse<TState> loadresponse)
+        public StorageBatch(TransactionalStateMetaData metaData, string etag, long confirmUpTo, long cancelAbove)
         {
-            MetaData = ReadMetaData(loadresponse);
-            ETag = loadresponse.ETag;
-            confirmUpTo = loadresponse.CommittedSequenceId;
-            cancelAbove = loadresponse.PendingStates.LastOrDefault()?.SequenceId ?? loadresponse.CommittedSequenceId;
-            cancelAboveStart = cancelAbove;
+            this.MetaData = metaData ?? throw new ArgumentNullException(nameof(metaData));
+            this.ETag = etag;
+            this.confirmUpTo = confirmUpTo;
+            this.cancelAbove = cancelAbove;
+            this.cancelAboveStart = cancelAbove;
+            this.followUpActions = new List<Action>();
+            this.storeConditions = new List<Func<Task<bool>>>();
+            this.prepares = new SortedDictionary<long, PendingTransactionState<TState>>();
         }
 
         public StorageBatch(StorageBatch<TState> previous)
+            : this(previous.MetaData, previous.ETag, previous.confirmUpTo, previous.cancelAbove)
         {
-            MetaData = previous.MetaData;
-            confirmUpTo = previous.confirmUpTo;
-            cancelAbove = previous.cancelAbove;
-            cancelAboveStart = cancelAbove;
         }
 
-        private static MetaData ReadMetaData(TransactionalStorageLoadResponse<TState> loadresponse)
+        public StorageBatch(TransactionalStorageLoadResponse<TState> loadresponse)
+            : this(loadresponse.Metadata, loadresponse.ETag, loadresponse.CommittedSequenceId, loadresponse.PendingStates.LastOrDefault()?.SequenceId ?? loadresponse.CommittedSequenceId)
         {
-            if (string.IsNullOrEmpty(loadresponse.Metadata))
-            {
-                // this thing is fresh... did not exist in storage yet
-                return new MetaData()
-                {
-                    TimeStamp = default(DateTime),
-                    CommitRecords = new Dictionary<Guid, CommitRecord>(),
-                };
-            }
-            else
-            {
-                return JsonConvert.DeserializeObject<MetaData>(loadresponse.Metadata, MetaData.SerializerSettings);
-            }
         }
 
-        public Task<string> Store(ITransactionalStateStorage<TState> storage)
+        public async Task<string> Store(ITransactionalStateStorage<TState> storage)
         {
-            var jsonMetaData = JsonConvert.SerializeObject(MetaData, MetaData.SerializerSettings);
-
-            var list = new List<PendingTransactionState<TState>>();
-
-            if (prepares != null)
-            {
-                foreach (var kvp in prepares)
-                {
-                    list.Add(kvp.Value);
-                }
-            }
-
-            return storage.Store(ETag, jsonMetaData, list,
+            List<PendingTransactionState<TState>> list = this.prepares.Values.ToList();
+            return await storage.Store(ETag, this.MetaData, list,
                 (confirm > 0) ? confirmUpTo : (long?)null,
                 (cancelAbove < cancelAboveStart) ? cancelAbove : (long?)null);
         }
 
         public void RunFollowUpActions()
         {
-            if (followUpActions != null)
+            foreach (var action in followUpActions)
             {
-                foreach (var action in followUpActions)
-                {
-                    action();
-                }
+                action();
             }
         }
-
-        #region storage events
 
         public void Read(DateTime timestamp)
         {
@@ -164,7 +114,7 @@ namespace Orleans.Transactions
         }
 
         public void Prepare(long sequenceNumber, Guid transactionId, DateTime timestamp,
-          ITransactionParticipant transactionManager, TState state)
+          ParticipantId transactionManager, TState state)
         {
             prepare++;
             total++;
@@ -172,18 +122,12 @@ namespace Orleans.Transactions
             if (MetaData.TimeStamp < timestamp)
                 MetaData.TimeStamp = timestamp;
 
-            if (prepares == null)
-                prepares = new SortedDictionary<long, PendingTransactionState<TState>>();
-
-            var tmstring = (transactionManager == null) ? null :
-                JsonConvert.SerializeObject(transactionManager, MetaData.SerializerSettings);
-
-            prepares[sequenceNumber] = new PendingTransactionState<TState>
+            this.prepares[sequenceNumber] = new PendingTransactionState<TState>
             {
                 SequenceId = sequenceNumber,
                 TransactionId = transactionId.ToString(),
                 TimeStamp = timestamp,
-                TransactionManager = tmstring,
+                TransactionManager = transactionManager,
                 State = state
             };
 
@@ -198,10 +142,7 @@ namespace Orleans.Transactions
             cancel++;
             total++;
 
-            if (prepares != null)
-            {
-                prepares.Remove(sequenceNumber);
-            }
+            this.prepares.Remove(sequenceNumber);
 
             if (cancelAbove > sequenceNumber - 1)
             {
@@ -219,11 +160,11 @@ namespace Orleans.Transactions
             // remove all redundant prepare records that are superseded by a later confirmed state
             while (true)
             {
-                long? first = prepares?.FirstOrDefault().Value?.SequenceId;
+                long? first = this.prepares.Values.FirstOrDefault()?.SequenceId;
 
                 if (first.HasValue && first < confirmUpTo)
                 {
-                    prepares.Remove(first.Value);
+                    this.prepares.Remove(first.Value);
                 }
                 else
                 {
@@ -232,7 +173,7 @@ namespace Orleans.Transactions
             }
         }
 
-        public void Commit(Guid transactionId, DateTime timestamp, List<ITransactionParticipant> writeParticipants)
+        public void Commit(Guid transactionId, DateTime timestamp, List<ParticipantId> WriteParticipants)
         {
             commit++;
             total++;
@@ -240,7 +181,7 @@ namespace Orleans.Transactions
             MetaData.CommitRecords.Add(transactionId, new CommitRecord()
             {
                 Timestamp = timestamp,
-                WriteParticipants = writeParticipants
+                WriteParticipants = WriteParticipants
             });
         }
 
@@ -252,15 +193,23 @@ namespace Orleans.Transactions
             MetaData.CommitRecords.Remove(transactionId);
         }
 
-        #endregion
-
         public void FollowUpAction(Action action)
         {
-            if (followUpActions == null)
-            {
-                followUpActions = new List<Action>();
-            }
             followUpActions.Add(action);
+        }
+
+        public void AddStorePreCondition(Func<Task<bool>> action)
+        {
+            this.storeConditions.Add(action);
+        }
+
+        public async Task<bool> CheckStorePreConditions()
+        {
+            if (this.storeConditions.Count == 0)
+                return true;
+
+            bool[] results = await Task.WhenAll(this.storeConditions.Select(a => a.Invoke()));
+            return results.All(b => b);
         }
     }
 }

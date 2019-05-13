@@ -19,5 +19,17 @@ namespace Orleans.Hosting
                 options.Invariant = invariant;
             });
         }
+
+        public void Configure(object configuration, ISiloBuilder builder)
+        {
+            var reader = new GlobalConfigurationReader(configuration);
+            var connectionString = reader.GetPropertyValue<string>("DataConnectionStringForReminders");
+            var invariant = reader.GetPropertyValue<string>("AdoInvariantForReminders");
+            builder.UseAdoNetReminderService(options =>
+            {
+                options.ConnectionString = connectionString;
+                options.Invariant = invariant;
+            });
+        }
     }
 }

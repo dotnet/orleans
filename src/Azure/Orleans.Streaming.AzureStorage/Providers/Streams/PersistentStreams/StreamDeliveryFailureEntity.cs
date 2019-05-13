@@ -11,7 +11,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
     public class StreamDeliveryFailureEntity : TableEntity
     {
         /// <summary>
-        /// Id of the subscription on which this delivery failure occured.
+        /// Id of the subscription on which this delivery failure occurred.
         /// </summary>
         public Guid SubscriptionId { get; set; }
 
@@ -21,12 +21,12 @@ namespace Orleans.Providers.Streams.PersistentStreams
         public string StreamProviderName { get; set; }
 
         /// <summary>
-        /// Guid Id of the stream on which the failure occured.
+        /// Guid Id of the stream on which the failure occurred.
         /// </summary>
         public Guid StreamGuid { get; set; }
 
         /// <summary>
-        /// Namespace of the stream on which the failure occured.
+        /// Namespace of the stream on which the failure occurred.
         /// </summary>
         public string StreamNamespace { get; set; }
 

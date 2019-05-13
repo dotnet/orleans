@@ -11,7 +11,7 @@ namespace Orleans.Runtime
         public GenericGrainTypeData(Type activationType) :
             base(activationType)
         {
-            if (!activationType.GetTypeInfo().IsGenericTypeDefinition)
+            if (!activationType.IsGenericTypeDefinition)
                 throw new ArgumentException("Activation type is not generic: " + activationType.Name);
 
             this.activationType = activationType;

@@ -41,7 +41,7 @@ namespace Orleans.Runtime.MembershipService
             LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureStorageUtils.PrintStorageException);
 
             tableManager = await OrleansSiloInstanceManager.GetManager(
-                this.clusterId, options.ConnectionString, this.loggerFactory);
+                this.clusterId, options.ConnectionString, options.TableName, this.loggerFactory);
 
             // even if I am not the one who created the table, 
             // try to insert an initial table version if it is not already there,
@@ -57,6 +57,11 @@ namespace Orleans.Runtime.MembershipService
         public Task DeleteMembershipTableEntries(string clusterId)
         {
             return tableManager.DeleteTableEntries(clusterId);
+        }
+
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            return tableManager.CleanupDefunctSiloEntries(beforeDate);
         }
 
         public async Task<MembershipTableData> ReadRow(SiloAddress key)
@@ -258,7 +263,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             if (suspectingSilos.Count != suspectingTimes.Count)
-                throw new OrleansException(String.Format("SuspectingSilos.Length of {0} as read from Azure table is not eqaul to SuspectingTimes.Length of {1}", suspectingSilos.Count, suspectingTimes.Count));
+                throw new OrleansException(String.Format("SuspectingSilos.Length of {0} as read from Azure table is not equal to SuspectingTimes.Length of {1}", suspectingSilos.Count, suspectingTimes.Count));
 
             for (int i = 0; i < suspectingSilos.Count; i++)
                 parse.AddSuspector(suspectingSilos[i], suspectingTimes[i]);

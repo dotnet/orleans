@@ -8,6 +8,7 @@ namespace BenchmarkGrainInterfaces.Transaction
     {
         public int Succeeded { get; set; }
         public int Failed { get; set; }
+        public int Throttled { get; set; }
         public TimeSpan Elapsed { get; set; }
     }
 

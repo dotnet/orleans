@@ -33,6 +33,7 @@ namespace Orleans.Runtime.Configuration
     /// <summary>
     /// Data object holding Silo global configuration parameters.
     /// </summary>
+    [Obsolete("This type is obsolete and may be removed in a future release. Use configuration methods on ISiloHostBuilder to configure specific types.")]
     [Serializable]
     public class GlobalConfiguration : MessagingConfiguration
     {
@@ -165,7 +166,7 @@ namespace Orleans.Runtime.Configuration
         /// If a silo is suspected to be dead, but this attribute is set to "false", the suspicions will not propagated to the system and enforced,
         /// This parameter is intended for use only for testing and troubleshooting.
         /// In production, liveness should always be enabled.
-        /// Default is true (eanabled)
+        /// Default is true (enabled)
         /// </summary>
         public bool LivenessEnabled { get; set; }
         /// <summary>
@@ -181,7 +182,7 @@ namespace Orleans.Runtime.Configuration
         /// </summary>
         public TimeSpan DeathVoteExpirationTimeout { get; set; }
         /// <summary>
-        /// The number of seconds to periodically write in the membership table that this silo is alive. Used ony for diagnostics.
+        /// The number of seconds to periodically write in the membership table that this silo is alive. Used only for diagnostics.
         /// </summary>
         public TimeSpan IAmAliveTablePublishTimeout { get; set; }
         /// <summary>
@@ -244,8 +245,6 @@ namespace Orleans.Runtime.Configuration
             set => this.ClusterId = value;
         }
 
-        #region MultiClusterNetwork
-
         /// <summary>
         /// Whether this cluster is configured to be part of a multicluster network
         /// </summary>
@@ -287,8 +286,6 @@ namespace Orleans.Runtime.Configuration
         /// A list of connection strings for gossip channels.
         /// </summary>
         public IReadOnlyList<GossipChannelConfiguration> GossipChannels { get; set; }
-
-        #endregion
 
         /// <summary>
         /// Connection string for the underlying data provider for liveness and reminders. eg. Azure Storage, ZooKeeper, SQL Server, ect.
@@ -1020,10 +1017,9 @@ namespace Orleans.Runtime.Configuration
         public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {            
             Type providerType = typeof(T);
-            var providerTypeInfo = providerType.GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
-                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(providerType))
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
+                !typeof(Streams.IStreamProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
             ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
@@ -1049,13 +1045,12 @@ namespace Orleans.Runtime.Configuration
         public void RegisterStorageProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : IStorageProvider
         {
             Type providerType = typeof(T);
-            var providerTypeInfo = providerType.GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
                 !typeof(IStorageProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStorageProvider interface", "typeof(T)");
 
-            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
         }
 
         /// <summary>
@@ -1090,9 +1085,8 @@ namespace Orleans.Runtime.Configuration
         public void RegisterLogConsistencyProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : ILogConsistencyProvider
         {
             Type providerType = typeof(T);
-            var providerTypeInfo = providerType.GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
                 !typeof(ILogConsistencyProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements ILogConsistencyProvider interface", "typeof(T)");
 

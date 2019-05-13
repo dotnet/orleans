@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -42,6 +43,8 @@ namespace API
 
         private IClusterClient CreateClusterClient(IServiceProvider serviceProvider)
         {
+            var log = serviceProvider.GetService<ILogger<Startup>>();
+
             // TODO replace with your connection string
             const string connectionString = "YOUR_CONNECTION_STRING_HERE";
             var client = new ClientBuilder()
@@ -53,22 +56,15 @@ namespace API
                 })
                 .UseAzureStorageClustering(options => options.ConnectionString = connectionString)
                 .Build();
-            StartClientWithRetries(client).Wait();
-            return client;
-        }
 
-        private static async Task StartClientWithRetries(IClusterClient client)
-        {
-            for (var i=0; i<5; i++)
+            client.Connect(RetryFilter).GetAwaiter().GetResult();
+            return client;
+
+            async Task<bool> RetryFilter(Exception exception)
             {
-                try
-                {
-                    await client.Connect();
-                    return;
-                }
-                catch(Exception)
-                { }
-                await Task.Delay(TimeSpan.FromSeconds(5));
+                log?.LogWarning("Exception while attempting to connect to Orleans cluster: {Exception}", exception);
+                await Task.Delay(TimeSpan.FromSeconds(2));
+                return true;
             }
         }
     }

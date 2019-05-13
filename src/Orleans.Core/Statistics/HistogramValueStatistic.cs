@@ -5,7 +5,7 @@ using System.Text;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Abstract class for histgram value statistics, instantiate either HistogramValueStatistic or LinearHistogramValueStatistic
+    /// Abstract class for histogram value statistics, instantiate either HistogramValueStatistic or LinearHistogramValueStatistic
     /// </summary>
     internal abstract class HistogramValueStatistic
     {

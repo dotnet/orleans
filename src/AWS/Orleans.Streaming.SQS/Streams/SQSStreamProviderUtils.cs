@@ -14,7 +14,7 @@ namespace OrleansAWSUtils.Streams
     public class SQSStreamProviderUtils
     {
         /// <summary>
-        /// Async method to delete all used queques, for specific provider and clusterId
+        /// Async method to delete all used queues, for specific provider and clusterId
         /// </summary>
         /// <returns> Task object for this async method </returns>
         public static async Task DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, ILoggerFactory loggerFactory)

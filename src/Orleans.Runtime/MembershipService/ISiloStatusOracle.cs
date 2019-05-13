@@ -53,7 +53,7 @@ namespace Orleans.Runtime
         /// Get the status of a given silo. 
         /// This method returns an approximate view on the status of a given silo. 
         /// In particular, this oracle may think the given silo is alive, while it may already have failed.
-        /// If this oracle thinks the given silo is dead, it has been authoratively told so by ISiloDirectory.
+        /// If this oracle thinks the given silo is dead, it has been authoritatively told so by ISiloDirectory.
         /// </summary>
         /// <param name="siloAddress">A silo whose status we are interested in.</param>
         /// <returns>The status of a given silo.</returns>
@@ -63,7 +63,7 @@ namespace Orleans.Runtime
         /// Get the statuses of all silo. 
         /// This method returns an approximate view on the statuses of all silo.
         /// </summary>
-        /// <param name="onlyActive">Include only silo who are currently considered to be active. If false, inlude all.</param>
+        /// <param name="onlyActive">Include only silo who are currently considered to be active. If false, include all.</param>
         /// <returns>A list of silo statuses.</returns>
         Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false);
 
@@ -83,7 +83,7 @@ namespace Orleans.Runtime
         bool TryGetSiloName(SiloAddress siloAddress, out string siloName);
 
         /// <summary>
-        /// Determine if the current silo is valid for creating new activations on or for directoy lookups.
+        /// Determine if the current silo is valid for creating new activations on or for directory lookups.
         /// </summary>
         /// <returns>The silo so ask about.</returns>
         bool IsFunctionalDirectory(SiloAddress siloAddress);

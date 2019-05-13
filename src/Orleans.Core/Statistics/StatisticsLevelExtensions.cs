@@ -23,11 +23,9 @@ namespace Orleans.Runtime
 
         public static bool CollectQueueStats(this StatisticsLevel level) => level.IsVerbose2();
         
-        public const bool TRACK_DETAILED_STATS = false;
+        public static bool CollectDetailedThreadStatistics(this StatisticsLevel level) => level.CollectThreadTimeTrackingStats();
 
-        public static bool CollectDetailedThreadStatistics(this StatisticsLevel level) => TRACK_DETAILED_STATS && level.CollectThreadTimeTrackingStats();
-
-        public static bool CollectDetailedQueueStatistics(this StatisticsLevel level) => TRACK_DETAILED_STATS && level.CollectQueueStats();
+        public static bool CollectDetailedQueueStatistics(this StatisticsLevel level) => level.CollectQueueStats();
 
         public static bool CollectThreadTimeTrackingStats(this StatisticsLevel level) => level.IsVerbose2();
 

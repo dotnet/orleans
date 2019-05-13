@@ -1,7 +1,5 @@
-﻿using Orleans.Runtime;
 using System;
-using System.Collections.Generic;
-using System.Text;
+using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
@@ -15,7 +13,8 @@ namespace Orleans.Configuration
     {
         private readonly SimpleQueueCacheOptions options;
         private readonly string name;
-        public SimpleQueueCacheOptionsValidator(SimpleQueueCacheOptions options, string name)
+
+        private SimpleQueueCacheOptionsValidator(SimpleQueueCacheOptions options, string name)
         {
             this.options = options;
             this.name = name;
@@ -24,6 +23,12 @@ namespace Orleans.Configuration
         {
             if(options.CacheSize <= 0)
                 throw new OrleansConfigurationException($"{nameof(SimpleQueueCacheOptions)} on stream provider {this.name} is invalid. {nameof(SimpleQueueCacheOptions.CacheSize)} must be larger than zero");
+        }
+
+        public static IConfigurationValidator Create(IServiceProvider services, string name)
+        {
+            SimpleQueueCacheOptions queueCacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
+            return new SimpleQueueCacheOptionsValidator(queueCacheOptions, name);
         }
     }
 }

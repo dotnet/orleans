@@ -25,6 +25,11 @@ namespace Orleans
         Task DeleteMembershipTableEntries(string clusterId);
 
         /// <summary>
+        /// Delete all dead silo entries older than <paramref name="beforeDate"/>
+        /// </summary>
+        Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate);
+
+        /// <summary>
         /// Atomically reads the Membership Table information about a given silo.
         /// The returned MembershipTableData includes one MembershipEntry entry for a given silo and the 
         /// TableVersion for this table. The MembershipEntry and the TableVersion have to be read atomically.
@@ -63,7 +68,7 @@ namespace Orleans
         /// <summary>
         /// Atomically tries to update the MembershipEntry for one silo and also update the TableVersion.
         /// If operation succeeds, the following changes would be made to the table:
-        /// 1) The MembershipEntry for this silo will be updated to the new MembershipEntry (the old entry will be fully substitued by the new entry) 
+        /// 1) The MembershipEntry for this silo will be updated to the new MembershipEntry (the old entry will be fully substituted by the new entry) 
         /// 2) The eTag for the updated MembershipEntry will also be eTag with the new unique automatically generated eTag.
         /// 3) TableVersion.Version in the table will be updated to the new TableVersion.Version.
         /// 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag.
@@ -81,7 +86,7 @@ namespace Orleans
 
         /// <summary>
         /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
-        /// This operation should only update the IAmAlive collumn and not change other columns.
+        /// This operation should only update the IAmAlive column and not change other columns.
         /// This operation is a "dirty write" or "in place update" and is performed without etag validation. 
         /// With regards to eTags update:
         /// This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed ("dirty write").
@@ -95,12 +100,11 @@ namespace Orleans
     }
 
     /// <summary>
-    /// Membership table interface for grain based implementation.
+    /// Membership table interface for system target based implementation.
     /// </summary>
     [Unordered]
-    public interface IMembershipTableGrain : IGrainWithGuidKey, IMembershipTable
+    public interface IMembershipTableSystemTarget : IMembershipTable, ISystemTarget
     {
-        
     }
 
     [Serializable]

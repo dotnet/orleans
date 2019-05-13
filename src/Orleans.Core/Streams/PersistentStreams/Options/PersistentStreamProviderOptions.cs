@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using Orleans.Streams;
 
@@ -33,6 +33,9 @@ namespace Orleans.Configuration
 
     public class StreamPullingAgentOptions
     {
+        public int BatchContainerBatchSize { get; set; } = DEFAULT_BATCH_CONTAINER_BATCH_SIZE;
+        public static readonly int DEFAULT_BATCH_CONTAINER_BATCH_SIZE = 1;
+
         public TimeSpan GetQueueMsgsTimerPeriod { get; set; } = DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;
         public static readonly TimeSpan DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD = TimeSpan.FromMilliseconds(100);
 

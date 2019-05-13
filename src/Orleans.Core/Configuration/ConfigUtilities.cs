@@ -215,7 +215,7 @@ namespace Orleans.Runtime.Configuration
             return returnValue;
         }
 
-        internal static void ValidateSerializationProvider(TypeInfo type)
+        internal static void ValidateSerializationProvider(Type type)
         {
             if (type.IsClass == false)
             {
@@ -232,7 +232,7 @@ namespace Orleans.Runtime.Configuration
                 throw new FormatException(string.Format("The serialization provider type {0} is not public", type.FullName));
             }
 
-            if (type.IsGenericType && type.IsConstructedGenericType() == false)
+            if (type.IsGenericType && type.IsConstructedGenericType == false)
             {
                 throw new FormatException(string.Format("The serialization provider type {0} is generic and has a missing type parameter specification", type.FullName));
             }
@@ -349,6 +349,7 @@ namespace Orleans.Runtime.Configuration
             if (string.IsNullOrEmpty(addrOrHost))
             {
                 nodeIps = NetworkInterface.GetAllNetworkInterfaces()
+                            .Where(iface => iface.OperationalStatus == OperationalStatus.Up)
                             .SelectMany(iface => iface.GetIPProperties().UnicastAddresses)
                             .Select(addr => addr.Address)
                             .Where(addr => addr.AddressFamily == family && !IPAddress.IsLoopback(addr))
@@ -471,14 +472,12 @@ namespace Orleans.Runtime.Configuration
             sb.Append("     PerfCounterWriteInterval: ").Append(config.StatisticsPerfCountersWriteInterval).AppendLine();
             sb.Append("     LogWriteInterval: ").Append(config.StatisticsLogWriteInterval).AppendLine();
             sb.Append("     StatisticsCollectionLevel: ").Append(config.StatisticsCollectionLevel).AppendLine();
-#if TRACK_DETAILED_STATS
-            sb.Append("     TRACK_DETAILED_STATS: true").AppendLine();
-#endif
+
             return sb.ToString();
         }
 
         /// <summary>
-        /// Prints the the DataConnectionString,
+        /// Prints the DataConnectionString,
         /// without disclosing any credential info
         /// such as the Azure Storage AccountKey, SqlServer password or AWS SecretKey.
         /// </summary>
@@ -538,7 +537,7 @@ namespace Orleans.Runtime.Configuration
         public static string FindConfigFile(bool isSilo)
         {
             // Add directory containing Orleans binaries to the search locations for config files
-            defaultConfigDirs[0] = Path.GetDirectoryName(typeof(ConfigUtilities).GetTypeInfo().Assembly.Location);
+            defaultConfigDirs[0] = Path.GetDirectoryName(typeof(ConfigUtilities).Assembly.Location);
 
             var notFound = new List<string>();
             foreach (string dir in defaultConfigDirs)

@@ -35,7 +35,7 @@ namespace Orleans.Transactions.AzureStorage
     /// Utility class to encapsulate row-based access to Azure table storage.
     /// </summary>
     /// <remarks>
-    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constrants this class needs to have public visibility.
+    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constraints this class needs to have public visibility.
     /// </remarks>
     /// <typeparam name="T">Table data entry used by this table / manager.</typeparam>
     public class AzureTableDataManager<T> where T : class, ITableEntity, new()
@@ -189,7 +189,7 @@ namespace Orleans.Transactions.AzureStorage
         }
 
         /// <summary>
-        /// Inserts a data entry in the Azure table: creates a new one if does not exists or overwrites (without eTag) an already existing version (the "update in place" semantincs).
+        /// Inserts a data entry in the Azure table: creates a new one if does not exists or overwrites (without eTag) an already existing version (the "update in place" semantics).
         /// </summary>
         /// <param name="data">Data to be inserted or replaced in the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
@@ -572,8 +572,6 @@ namespace Orleans.Transactions.AzureStorage
             }
         }
 
-#region Internal functions
-
         internal async Task<Tuple<string, string>> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
         {
             const string operation = "InsertTableEntryConditionally";
@@ -737,8 +735,6 @@ namespace Orleans.Transactions.AzureStorage
                 Logger.Warn((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {0} for {1}, which took {2}.", TableName, operation, timeSpan);
             }
         }
-
-#endregion
 
         /// <summary>
         /// Helper functions for building table queries.

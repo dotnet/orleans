@@ -5,7 +5,7 @@ namespace BenchmarkGrainInterfaces.Transaction
 {
     public interface ITransactionGrain : IGrainWithIntegerKey
     {
-        [Transaction(TransactionOption.Required)]
+        [Transaction(TransactionOption.CreateOrJoin)]
         Task Run();
     }
 }

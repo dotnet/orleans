@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -80,12 +81,6 @@ namespace Orleans.Runtime.Messaging
         /// <inheritdoc />
         public void PostMessage(Message msg)
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectQueueStats)
-            {
-                queueTracking[(int)msg.Category].OnEnQueueRequest(1, messageQueues[(int)msg.Category].Count, msg);
-            }
-#endif
             this.messageQueues[(int)msg.Category].Add(msg);
 
             if (this.log.IsEnabled(LogLevel.Trace))
@@ -95,19 +90,15 @@ namespace Orleans.Runtime.Messaging
         }
 
         /// <inheritdoc />
-        public Message WaitMessage(Message.Categories type)
+        public Message WaitMessage(Message.Categories type, CancellationToken cancellationToken)
         {
             try
             {
-                Message msg = this.messageQueues[(int)type].Take();
-
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectQueueStats)
-                {
-                    queueTracking[(int)msg.Category].OnDeQueueRequest(msg);
-                }
-#endif
-                return msg;
+                return this.messageQueues[(int)type].Take(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
             }
             catch (InvalidOperationException)
             {

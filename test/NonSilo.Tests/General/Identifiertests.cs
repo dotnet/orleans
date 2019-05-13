@@ -30,9 +30,27 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
-        public void UniqueKeyToByteArray()
+        public void UniqueKeyToByteArrayWithKeyExt()
         {
             var key = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: "hello world");
+
+            var result = key.ToByteArray();
+
+            var sw = new BinaryTokenStreamWriter();
+            sw.Write(key);
+            var expected = sw.ToByteArray();
+
+            Assert.Equal(expected.Length, result.Length);
+            for (int i = 0; i < expected.Length; i++)
+            {
+                Assert.Equal(expected[i], result[i]);
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void UniqueKeyToByteArrayWithoutKeyExt()
+        {
+            var key = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.GeoClient);
 
             var result = key.ToByteArray();
 
@@ -144,26 +162,26 @@ namespace UnitTests.General
         {
             UniqueKey expected1 = UniqueKey.NewKey(Guid.NewGuid());
             string str1 = expected1.ToHexString();
-            UniqueKey actual1 = UniqueKey.Parse(str1);
+            UniqueKey actual1 = UniqueKey.Parse(str1.AsSpan());
             Assert.Equal(expected1, actual1); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 1).
 
             string kx3 = "case 3";
             UniqueKey expected3 = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: kx3);
             string str3 = expected3.ToHexString();
-            UniqueKey actual3 = UniqueKey.Parse(str3);
+            UniqueKey actual3 = UniqueKey.Parse(str3.AsSpan());
             Assert.Equal(expected3, actual3); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 3).
 
             long pk = random.Next();
             UniqueKey expected4 = UniqueKey.NewKey(pk);
             string str4 = expected4.ToHexString();
-            UniqueKey actual4 = UniqueKey.Parse(str4);
+            UniqueKey actual4 = UniqueKey.Parse(str4.AsSpan());
             Assert.Equal(expected4, actual4); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 4).
 
             pk = random.Next();
             string kx5 = "case 5";
             UniqueKey expected5 = UniqueKey.NewKey(pk, category: UniqueKey.Category.KeyExtGrain, keyExt: kx5);
             string str5 = expected5.ToHexString();
-            UniqueKey actual5 = UniqueKey.Parse(str5);
+            UniqueKey actual5 = UniqueKey.Parse(str5.AsSpan());
             Assert.Equal(expected5, actual5); // UniqueKey.ToString() and UniqueKey.Parse() failed to reproduce an identical object (case 5).
         }
 

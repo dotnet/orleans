@@ -3,7 +3,7 @@ using System;
 namespace Orleans.Runtime.Messaging
 {
     /// <summary>
-    /// Used for controlling message delverye
+    /// Used for controlling message delivery
     /// </summary>
     internal interface IOutboundMessageQueue : IDisposable
     {
@@ -22,6 +22,11 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// Current queue length
         /// </summary>
-        int Count { get; }
+        int GetCount();
+
+        /// <summary>
+        /// Application level message queue length
+        /// </summary>
+        int GetApplicationMessageCount();
     }
 }

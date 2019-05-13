@@ -27,7 +27,6 @@ namespace Orleans.Streams
             producerReference = streamProducer as GrainReference;
         }
 
-        #region IEquatable<PubSubPublisherState> methods
         public override bool Equals(object obj)
         {
             if (ReferenceEquals(null, obj)) return false;
@@ -62,7 +61,6 @@ namespace Orleans.Streams
                 return ((Stream != null ? Stream.GetHashCode() : 0) * 397) ^ (Producer != null ? Producer.GetHashCode() : 0);
             }
         }
-        #endregion
 
         public override string ToString()
         {

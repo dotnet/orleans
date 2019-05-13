@@ -69,8 +69,6 @@ namespace UnitTests.StreamingTests
             fireAndForgetDeliveryProperty = Fixture.SMSFireAndForgetOnSilo;
         }
 
-        #region Simple Message Stream Tests
-
         //------------------------ One to One ----------------------//
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
@@ -204,7 +202,5 @@ namespace UnitTests.StreamingTests
         {
             await runner.StreamTest_22_TestImmutabilityDuringStreaming();
         }
-
-        #endregion Simple Message Stream Tests
     }
 }

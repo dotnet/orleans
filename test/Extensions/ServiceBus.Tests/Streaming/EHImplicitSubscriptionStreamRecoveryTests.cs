@@ -16,17 +16,17 @@ using Microsoft.Extensions.Configuration;
 
 namespace ServiceBus.Tests.StreamingTests
 {
-    [TestCategory("EventHub"), TestCategory("Streaming")]
+    [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<EHImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
         private readonly Fixture fixture;
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
-        private const string EHPath = "ehorleanstest";
+        private const string EHPath = "ehorleanstest2";
         private const string EHConsumerGroup = "orleansnightly";
 
         private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
 
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseEventHubTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
@@ -41,20 +41,22 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddEventHubStreams(StreamProviderName, b=>b
-                        .ConfigureEventHub(ob => ob.Configure(options =>
-                          {
-                              options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                              options.ConsumerGroup = EHConsumerGroup;
-                              options.Path = EHPath;
-                          }))
-                        .UseEventHubCheckpointer(ob => ob.Configure(options =>
-                          {
-                              options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                              options.PersistInterval = TimeSpan.FromSeconds(1);
-                          }))
-                        .UseDynamicClusterConfigDeploymentBalancer()
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                        .AddEventHubStreams(StreamProviderName, b=>
+                        {
+                            b.ConfigureEventHub(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
+                            }));
+                            b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.PersistInterval = TimeSpan.FromSeconds(1);
+                            }));
+                            b.UseDynamicClusterConfigDeploymentBalancer();
+                            b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                        });
                     hostBuilder
                         .AddMemoryGrainStorageAsDefault();
                 }
@@ -65,13 +67,15 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
                     clientBuilder.AddEventHubStreams(StreamProviderName, b=>
-                        b.ConfigureEventHub(ob=>ob.Configure( options =>
-                        {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                            options.ConsumerGroup = EHConsumerGroup;
-                            options.Path = EHPath;
-                        }))
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                    {
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                        b.ConfigureEventHub(ob => ob.Configure(options =>
+                         {
+                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                             options.ConsumerGroup = EHConsumerGroup;
+                             options.Path = EHPath;
+                         }));
+                    });
                 }
             }
         }
@@ -79,17 +83,18 @@ namespace ServiceBus.Tests.StreamingTests
         public EHImplicitSubscriptionStreamRecoveryTests(Fixture fixture)
         {
             this.fixture = fixture;
+            fixture.EnsurePreconditionsMet();
             this.runner = new ImplicitSubscritionRecoverableStreamTestRunner(this.fixture.GrainFactory, StreamProviderName);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Recoverable100EventStreamsWithTransientErrorsTest()
         {
             this.fixture.Logger.Info("************************ EHRecoverable100EventStreamsWithTransientErrorsTest *********************************");
             await runner.Recoverable100EventStreamsWithTransientErrors(GenerateEvents, ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace, 4, 100);
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
         {
             this.fixture.Logger.Info("************************ EHRecoverable100EventStreamsWith1NonTransientErrorTest *********************************");

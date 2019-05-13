@@ -136,7 +136,6 @@ namespace UnitTests.StorageTests
             }
         }
 
-        #region IStorageProvider methods
         public virtual Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
         {
             this.Name = name;
@@ -203,7 +202,6 @@ namespace UnitTests.StorageTests
             }
             return Task.CompletedTask;
         }
-#endregion
 
         private static string GetId(GrainReference grainReference)
         {
@@ -226,7 +224,6 @@ namespace UnitTests.StorageTests
             LastState = null;
         }
 
-        #region IControllable interface methods
         /// <summary>
         /// A function to execute a control command.
         /// </summary>
@@ -252,6 +249,5 @@ namespace UnitTests.StorageTests
                     return Task.FromResult<object>(true); 
             }
         }
-        #endregion
     }
 }

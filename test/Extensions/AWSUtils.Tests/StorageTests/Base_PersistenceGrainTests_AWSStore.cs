@@ -280,7 +280,7 @@ namespace AWSUtils.Tests.StorageTests
             output.WriteLine("About to reset Silos");
             foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
-                this.HostedCluster.RestartSilo(silo);
+                await this.HostedCluster.RestartSiloAsync(silo);
             }
             this.HostedCluster.InitializeClient();
 
@@ -364,7 +364,6 @@ namespace AWSUtils.Tests.StorageTests
             }
         }
 
-        #region Utility functions
         // ---------- Utility functions ----------
 
         protected void RunPerfTest(int n, string testName, TimeSpan target,
@@ -438,6 +437,5 @@ namespace AWSUtils.Tests.StorageTests
             output.WriteLine("{0} completed. Did {1} iterations in {2} at {3} RPS",
                               testName, n, sw.Elapsed, n / sw.Elapsed.TotalSeconds);
         }
-        #endregion
     }
 }

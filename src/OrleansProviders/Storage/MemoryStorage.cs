@@ -209,7 +209,7 @@ namespace Orleans.Storage
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
             return ActivatorUtilities.CreateInstance<MemoryGrainStorage>(services,
-                services.GetRequiredService<IOptionsSnapshot<MemoryGrainStorageOptions>>().Get(name), name);
+                services.GetRequiredService<IOptionsMonitor<MemoryGrainStorageOptions>>().Get(name), name);
         }
     }
 }

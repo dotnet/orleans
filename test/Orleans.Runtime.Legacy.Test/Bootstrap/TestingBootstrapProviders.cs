@@ -169,7 +169,6 @@ namespace UnitTests.General
             return arg;
         }
 
-        #region IControllable interface methods
         /// <summary>
         /// A function to execute a control command.
         /// </summary>
@@ -185,6 +184,5 @@ namespace UnitTests.General
                     return base.ExecuteCommand(command, arg);
             }
         }
-        #endregion
     }
 }

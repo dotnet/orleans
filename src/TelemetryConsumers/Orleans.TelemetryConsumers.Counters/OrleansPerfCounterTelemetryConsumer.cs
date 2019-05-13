@@ -37,8 +37,6 @@ namespace OrleansTelemetryConsumers.Counters
             }
         }
 
-        #region Counter Management methods
-
         /// <summary>
         /// Checks to see if windows perf counters as supported by OS.
         /// </summary>
@@ -124,10 +122,6 @@ namespace OrleansTelemetryConsumers.Counters
         {
             return this.perfCounterData.Where(pcd => GetPerfCounterName(pcd) == counterName).SingleOrDefault();
         }
-
-        #endregion
-
-        #region IMetricTelemetryConsumer Methods
 
         /// <summary>
         /// Increment metric.
@@ -286,7 +280,5 @@ namespace OrleansTelemetryConsumers.Counters
             Decrement,
             Set
         }
-
-        #endregion
     }
 }

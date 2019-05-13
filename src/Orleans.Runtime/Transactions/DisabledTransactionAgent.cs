@@ -1,19 +1,16 @@
-﻿using Orleans.Transactions;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions
 {
     internal class DisabledTransactionAgent : ITransactionAgent
     {
-        public void Abort(ITransactionInfo transactionInfo, OrleansTransactionAbortedException reason)
+        public Task Abort(ITransactionInfo transactionInfo)
         {
             throw new OrleansTransactionsDisabledException();
         }
 
-        public Task Commit(ITransactionInfo transactionInfo)
+        public Task<TransactionalStatus> Resolve(ITransactionInfo transactionInfo)
         {
             throw new OrleansTransactionsDisabledException();
         }

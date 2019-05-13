@@ -12,9 +12,9 @@ namespace Orleans.Providers.Streams.Common
         private readonly TimeSpan maxRelativeMessageAge;
 
         /// <summary>
-        /// Contructor
+        /// Constructor
         /// </summary>
-        /// <param name="minTimeInCache">minimum time data should be keept in cache, unless purged due to data size.</param>
+        /// <param name="minTimeInCache">minimum time data should be kept in cache, unless purged due to data size.</param>
         /// <param name="maxRelativeMessageAge">maximum age of data to keep in the cache</param>
         public TimePurgePredicate(TimeSpan minTimeInCache, TimeSpan maxRelativeMessageAge)
         {

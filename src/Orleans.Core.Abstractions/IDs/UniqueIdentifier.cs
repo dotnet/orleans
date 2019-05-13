@@ -42,22 +42,14 @@ namespace Orleans.Runtime
             return checked((uint)key);
         }
 
-        #region IEquatable<UniqueIdentifier> Members
-
         public virtual bool Equals(UniqueIdentifier other)
         {
             return other != null && GetType() == other.GetType() && Key.Equals(other.Key);
         }
 
-        #endregion
-
-        #region IComparable<UniqueIdentifier> Members
-
         public int CompareTo(UniqueIdentifier other)
         {
             return Key.CompareTo(other.Key);
         }
-
-        #endregion
     }
 }

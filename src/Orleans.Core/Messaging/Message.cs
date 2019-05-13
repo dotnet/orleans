@@ -14,8 +14,6 @@ namespace Orleans.Runtime
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
 
-        #region metadata
-
         [NonSerialized]
         private string _targetHistory;
 
@@ -52,8 +50,6 @@ namespace Orleans.Runtime
             get { return _maxRetries; }
             set { _maxRetries = value; }
         }
-
-        #endregion
 
         /// <summary>
         /// NOTE: The contents of bodyBytes should never be modified
@@ -100,6 +96,7 @@ namespace Orleans.Runtime
             DuplicateRequest,
             Unrecoverable,
             GatewayTooBusy,
+            CacheInvalidation
         }
 
         internal HeadersContainer Headers { get; set; } = new HeadersContainer();
@@ -248,6 +245,12 @@ namespace Orleans.Runtime
             }
         }
 
+        public CorrelationId CallChainId
+        {
+            get { return Headers.CallChainId; }
+            set { Headers.CallChainId = value; }
+        }
+
         public ActivationAddress SendingAddress
         {
             get { return sendingAddress ?? (sendingAddress = ActivationAddress.GetAddress(SendingSilo, SendingGrain, SendingActivation)); }
@@ -309,7 +312,7 @@ namespace Orleans.Runtime
             if (id == null) return false;
 
             // don't set expiration for one way, system target and system grain messages.
-            return Direction != Directions.OneWay && !id.IsSystemTarget && !Constants.IsSystemGrain(id);
+            return Direction != Directions.OneWay && !id.IsSystemTarget;
         }
 
         public ITransactionInfo TransactionInfo
@@ -329,6 +332,9 @@ namespace Orleans.Runtime
             get { return Headers.CacheInvalidationHeader; }
             set { Headers.CacheInvalidationHeader = value; }
         }
+
+        public bool HasCacheInvalidationHeader => this.CacheInvalidationHeader != null
+                                                  && this.CacheInvalidationHeader.Count > 0;
         
         internal void AddToCacheInvalidationHeader(ActivationAddress address)
         {
@@ -476,8 +482,6 @@ namespace Orleans.Runtime
             return Equals(SendingSilo, other.SendingSilo) && Equals(Id, other.Id);
         }
 
-        #region Serialization
-
         public List<ArraySegment<byte>> Serialize(SerializationManager serializationManager, out int headerLengthOut, out int bodyLengthOut)
         {
             var context = new SerializationContext(serializationManager)
@@ -540,8 +544,6 @@ namespace Orleans.Runtime
             bodyBytes = null;
         }
 
-        #endregion
-
         // For testing and logging/tracing
         public string ToLongString()
         {
@@ -578,6 +580,7 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.TARGET_ACTIVATION, sb, (m) => m.TargetActivation);
             AppendIfExists(HeadersContainer.Headers.TARGET_GRAIN, sb, (m) => m.TargetGrain);
             AppendIfExists(HeadersContainer.Headers.TARGET_OBSERVER, sb, (m) => m.TargetObserverId);
+            AppendIfExists(HeadersContainer.Headers.CALL_CHAIN_ID, sb, (m) => m.CallChainId);
             AppendIfExists(HeadersContainer.Headers.TARGET_SILO, sb, (m) => m.TargetSilo);
 
             return sb.ToString();
@@ -761,6 +764,7 @@ namespace Orleans.Runtime
                 TRANSACTION_INFO = 1 << 27,
                 IS_TRANSACTION_REQUIRED = 1 << 28,
 
+                CALL_CHAIN_ID = 1 << 29,
                 // Do not add over int.MaxValue of these.
             }
 
@@ -793,6 +797,7 @@ namespace Orleans.Runtime
             private RejectionTypes _rejectionType;
             private string _rejectionInfo;
             private Dictionary<string, object> _requestContextData;
+            private CorrelationId _callChainId;
             private readonly DateTime _localCreationTime;
 
             public HeadersContainer()
@@ -1072,6 +1077,15 @@ namespace Orleans.Runtime
                 }
             }
 
+            public CorrelationId CallChainId
+            {
+                get { return _callChainId; }
+                set
+                {
+                    _callChainId = value;
+                }
+            }
+
             internal Headers GetHeadersMask()
             {
                 Headers headers = Headers.NONE;
@@ -1112,6 +1126,7 @@ namespace Orleans.Runtime
                 headers = _rejectionType == default(RejectionTypes) ? headers & ~Headers.REJECTION_TYPE : headers | Headers.REJECTION_TYPE;
                 headers = string.IsNullOrEmpty(_rejectionInfo) ? headers & ~Headers.REJECTION_INFO : headers | Headers.REJECTION_INFO;
                 headers = _requestContextData == null || _requestContextData.Count == 0 ? headers & ~Headers.REQUEST_CONTEXT : headers | Headers.REQUEST_CONTEXT;
+                headers = _callChainId == null ? headers & ~Headers.CALL_CHAIN_ID : headers | Headers.CALL_CHAIN_ID;
                 headers = IsTransactionRequired ? headers | Headers.IS_TRANSACTION_REQUIRED : headers & ~Headers.IS_TRANSACTION_REQUIRED;
                 headers = _transactionInfo == null ? headers & ~Headers.TRANSACTION_INFO : headers | Headers.TRANSACTION_INFO;
                 return headers;
@@ -1238,6 +1253,11 @@ namespace Orleans.Runtime
                     WriteObj(context, typeof(GuidId), input.TargetObserverId);
                 }
 
+                if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
+                {
+                    writer.Write(input.CallChainId);
+                }
+
                 if ((headers & Headers.TARGET_SILO) != Headers.NONE)
                 {
                     writer.Write(input.TargetSilo);
@@ -1350,6 +1370,9 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
                     result.TargetObserverId = (Orleans.Runtime.GuidId)ReadObj(typeof(Orleans.Runtime.GuidId), context);
+
+                if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
+                    result.CallChainId = reader.ReadCorrelationId();
 
                 if ((headers & Headers.TARGET_SILO) != Headers.NONE)
                     result.TargetSilo = reader.ReadSiloAddress();

@@ -20,9 +20,9 @@ Implementation notes:
    Orleans handles exception as a failure and will retry.
 
 7) The implementation follows the Extended Orleans membership protocol. For more information, see at:
-     http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html
-     http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management
-     https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs
+        https://dotnet.github.io/orleans/Documentation/Runtime-Implementation-Details/Runtime-Tables.html
+        https://dotnet.github.io/orleans/Documentation/Runtime-Implementation-Details/Cluster-Management.html
+        https://github.com/dotnet/orleans/blob/master/src/Orleans.Core/SystemTargetInterfaces/IMembershipTable.cs
 */
 -- This table defines Orleans operational queries. Orleans uses these to manage its operations,
 -- these are the only queries Orleans issues to the database.

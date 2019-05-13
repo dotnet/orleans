@@ -397,7 +397,7 @@ namespace Orleans.Runtime
 
                         if (!isLoadable)
                         {
-                            complaints = new[] { $"The file {fileName} is not loadable into this process, either it is not an MSIL assembly or the compliled for a different processor architecture." };
+                            complaints = new[] { $"The file {fileName} is not loadable into this process, either it is not an MSIL assembly or the complied for a different processor architecture." };
                         }
 
                         return isLoadable;
@@ -423,7 +423,7 @@ namespace Orleans.Runtime
             }
             catch (MissingMethodException)
             {
-                complaints = new[] { "MissingMethodException occured. Please try to add a BindingRedirect for System.Collections.ImmutableCollections to the App.config file to correct this error." };
+                complaints = new[] { "MissingMethodException occurred. Please try to add a BindingRedirect for System.Collections.ImmutableCollections to the App.config file to correct this error." };
                 return false;
             }
             catch (Exception ex)

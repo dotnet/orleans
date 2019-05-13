@@ -106,9 +106,8 @@ namespace Orleans.Runtime
         {
             lock (this)
             {
-                var grainTypeInfo = grain.GetTypeInfo();
-                var grainName = TypeUtils.GetFullName(grainTypeInfo);
-                var isGenericGrainClass = grainTypeInfo.ContainsGenericParameters;
+                var grainName = TypeUtils.GetFullName(grain);
+                var isGenericGrainClass = grain.ContainsGenericParameters;
                 var grainTypeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grain);
 
                 var grainInterfaceData = GetOrAddGrainInterfaceData(iface, isGenericGrainClass);
@@ -134,7 +133,7 @@ namespace Orleans.Runtime
 
                 if (localTestMode)
                 {
-                    var assembly = grainTypeInfo.Assembly.CodeBase;
+                    var assembly = grain.Assembly.CodeBase;
                     if (!loadedGrainAsemblies.Contains(assembly))
                         loadedGrainAsemblies.Add(assembly);
                 }
@@ -225,10 +224,9 @@ namespace Orleans.Runtime
 
         internal static string GetTypeKey(Type interfaceType, bool isGenericGrainClass)
         {
-            var typeInfo = interfaceType.GetTypeInfo();
-            if (isGenericGrainClass && typeInfo.IsGenericType)
+            if (isGenericGrainClass && interfaceType.IsGenericType)
             {
-                return typeInfo.GetGenericTypeDefinition().AssemblyQualifiedName;
+                return interfaceType.GetGenericTypeDefinition().AssemblyQualifiedName;
             }
             else 
             {

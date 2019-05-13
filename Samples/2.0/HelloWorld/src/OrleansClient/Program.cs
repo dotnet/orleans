@@ -13,6 +13,9 @@ namespace OrleansClient
     /// </summary>
     public class Program
     {
+        const int initializeAttemptsBeforeFailing = 5;
+        private static int attempt = 0;
+
         static int Main(string[] args)
         {
             return RunMainAsync().Result;
@@ -38,42 +41,40 @@ namespace OrleansClient
             }
         }
 
-        private static async Task<IClusterClient> StartClientWithRetries(int initializeAttemptsBeforeFailing = 5)
+        private static async Task<IClusterClient> StartClientWithRetries()
         {
-            int attempt = 0;
+            attempt = 0;
             IClusterClient client;
-            while (true)
-            {
-                try
+            client = new ClientBuilder()
+                .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options =>
                 {
-                    client = new ClientBuilder()
-                        .UseLocalhostClustering()
-                        .Configure<ClusterOptions>(options =>
-                        {
-                            options.ClusterId = "dev";
-                            options.ServiceId = "HelloWorldApp";
-                        })
-                        .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IHello).Assembly).WithReferences())
-                        .ConfigureLogging(logging => logging.AddConsole())
-                        .Build();
+                    options.ClusterId = "dev";
+                    options.ServiceId = "HelloWorldApp";
+                })
+                .ConfigureLogging(logging => logging.AddConsole())
+                .Build();
 
-                    await client.Connect();
-                    Console.WriteLine("Client successfully connect to silo host");
-                    break;
-                }
-                catch (SiloUnavailableException)
-                {
-                    attempt++;
-                    Console.WriteLine($"Attempt {attempt} of {initializeAttemptsBeforeFailing} failed to initialize the Orleans client.");
-                    if (attempt > initializeAttemptsBeforeFailing)
-                    {
-                        throw;
-                    }
-                    await Task.Delay(TimeSpan.FromSeconds(4));
-                }
-            }
-
+            await client.Connect(RetryFilter);
+            Console.WriteLine("Client successfully connect to silo host");
             return client;
+        }
+
+        private static async Task<bool> RetryFilter(Exception exception)
+        {
+            if (exception.GetType() != typeof(SiloUnavailableException))
+            {
+                Console.WriteLine($"Cluster client failed to connect to cluster with unexpected error.  Exception: {exception}");
+                return false;
+            }
+            attempt++;
+            Console.WriteLine($"Cluster client attempt {attempt} of {initializeAttemptsBeforeFailing} failed to connect to cluster.  Exception: {exception}");
+            if (attempt > initializeAttemptsBeforeFailing)
+            {
+                return false;
+            }
+            await Task.Delay(TimeSpan.FromSeconds(4));
+            return true;
         }
 
         private static async Task DoClientWork(IClusterClient client)

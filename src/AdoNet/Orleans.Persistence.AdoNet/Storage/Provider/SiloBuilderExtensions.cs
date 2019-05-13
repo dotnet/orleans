@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -21,7 +21,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configure silo to use  AdoNet grain storagee for grain storage.
+        /// Configure silo to use  AdoNet grain storage for grain storage.
         /// </summary>
         public static ISiloHostBuilder AddAdoNetGrainStorage(this ISiloHostBuilder builder, string name, Action<AdoNetGrainStorageOptions> configureOptions)
         {
@@ -40,6 +40,38 @@ namespace Orleans.Hosting
         /// Configure silo to use AdoNet grain storage for grain storage.
         /// </summary>
         public static ISiloHostBuilder AddAdoNetGrainStorage(this ISiloHostBuilder builder, string name, Action<OptionsBuilder<AdoNetGrainStorageOptions>> configureOptions = null)
+        {
+            return builder.ConfigureServices(services => services.AddAdoNetGrainStorage(name, configureOptions));
+        }
+
+        /// <summary>
+        /// Configure silo to use AdoNet grain storage as the default grain storage.
+        /// </summary>
+        public static ISiloBuilder AddAdoNetGrainStorageAsDefault(this ISiloBuilder builder, Action<AdoNetGrainStorageOptions> configureOptions)
+        {
+            return builder.AddAdoNetGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
+        }
+
+        /// <summary>
+        /// Configure silo to use  AdoNet grain storage for grain storage.
+        /// </summary>
+        public static ISiloBuilder AddAdoNetGrainStorage(this ISiloBuilder builder, string name, Action<AdoNetGrainStorageOptions> configureOptions)
+        {
+            return builder.ConfigureServices(services => services.AddAdoNetGrainStorage(name, configureOptions));
+        }
+
+        /// <summary>
+        /// Configure silo to use  AdoNet grain storage as the default grain storage.
+        /// </summary>
+        public static ISiloBuilder AddAdoNetGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<AdoNetGrainStorageOptions>> configureOptions = null)
+        {
+            return builder.AddAdoNetGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
+        }
+
+        /// <summary>
+        /// Configure silo to use AdoNet grain storage for grain storage.
+        /// </summary>
+        public static ISiloBuilder AddAdoNetGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<AdoNetGrainStorageOptions>> configureOptions = null)
         {
             return builder.ConfigureServices(services => services.AddAdoNetGrainStorage(name, configureOptions));
         }
@@ -77,7 +109,7 @@ namespace Orleans.Hosting
             configureOptions?.Invoke(services.AddOptions<AdoNetGrainStorageOptions>(name));
             services.ConfigureNamedOptionForLogging<AdoNetGrainStorageOptions>(name);
             services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            services.AddTransient<IConfigurationValidator>(sp => new AdoNetGrainStorageOptionsValidator(sp.GetService<IOptionsSnapshot<AdoNetGrainStorageOptions>>().Get(name), name));
+            services.AddTransient<IConfigurationValidator>(sp => new AdoNetGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AdoNetGrainStorageOptions>>().Get(name), name));
             return services.AddSingletonNamedService<IGrainStorage>(name, AdoNetGrainStorageFactory.Create)
                            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
         }

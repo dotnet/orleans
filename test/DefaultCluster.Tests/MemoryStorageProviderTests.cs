@@ -133,6 +133,7 @@ namespace DefaultCluster.Tests.StorageTests
             }
 
             public object State { get; set; }
+            public Type Type => typeof(int);
             public string ETag { get; set; }
         }
     }

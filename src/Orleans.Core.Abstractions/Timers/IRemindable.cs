@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace Orleans
 {
     /// <summary>
-    /// Callback interface that grains must implement inorder to be able to register and receive Reminders.
+    /// Callback interface that grains must implement in order to be able to register and receive Reminders.
     /// </summary>
     public interface IRemindable : IGrain
     {
@@ -31,7 +31,7 @@ namespace Orleans
 
         /// <summary>
         /// The status of a tick when the tick is delivered to the registrar grain.
-        /// In case of failures, it may happen that a tick is not delivered on time. The app can notice such missed missed ticks as follows.
+        /// In case of failures, it may happen that a tick is not delivered on time. The app can notice such missed ticks as follows.
         /// Upon receiving a tick, the app can calculate the theoretical number of ticks since start of the reminder as: 
         /// curCount = (Now - FirstTickTime) / Period
         /// The app can keep track of it as 'count'. Upon receiving a tick, the number of missed ticks = curCount - count - 1
@@ -72,8 +72,6 @@ namespace Orleans
             }
         }
 
-        #region App visible exceptions
-
         /// <summary>
         /// Exception related to Orleans Reminder functions or Reminder service.
         /// </summary>
@@ -87,7 +85,5 @@ namespace Orleans
             {
             }
         }
-
-        #endregion
     }
 }

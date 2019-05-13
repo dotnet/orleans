@@ -9,6 +9,8 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Microsoft.Extensions.Hosting;
+using Orleans.Hosting;
 
 namespace Orleans
 {
@@ -17,9 +19,10 @@ namespace Orleans
     /// </summary>
     internal class ClusterClient : IInternalClusterClient
     {
-        private readonly OutsideRuntimeClient runtimeClient;
+        private readonly IRuntimeClient runtimeClient;
         private readonly ClusterClientLifecycle clusterClientLifecycle;
         private readonly AsyncLock initLock = new AsyncLock();
+        private readonly ClientApplicationLifetime applicationLifetime;
         private LifecycleState state = LifecycleState.Created;
 
         private enum LifecycleState
@@ -38,13 +41,13 @@ namespace Orleans
         /// <param name="runtimeClient">The runtime client.</param>
         /// <param name="loggerFactory">Logger factory used to create loggers</param>
         /// <param name="clientMessagingOptions">Messaging parameters</param>
-        public ClusterClient(OutsideRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
+        public ClusterClient(IRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
         {
             this.runtimeClient = runtimeClient;
             this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
 
             //set PropagateActivityId flag from node cofnig
-            RequestContext.PropagateActivityId = clientMessagingOptions.Value.PropagateActivityId;
+            RequestContext.PropagateActivityId |= clientMessagingOptions.Value.PropagateActivityId;
 
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<IClusterClientLifecycle>> lifecycleParticipants = this.ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();
@@ -61,6 +64,9 @@ namespace Orleans
             {
                 participant?.Participate(clusterClientLifecycle);
             }
+
+            // It is fine for this field to be null in the case that the silo is not the host.
+            this.applicationLifetime = runtimeClient.ServiceProvider.GetService<IApplicationLifetime>() as ClientApplicationLifetime;
         }
 
         /// <inheritdoc />
@@ -116,24 +122,24 @@ namespace Orleans
                 }
                 
                 this.state = LifecycleState.Starting;
-                await this.runtimeClient.Start(retryFilter).ConfigureAwait(false);
+                if (this.runtimeClient is OutsideRuntimeClient orc) await orc.Start(retryFilter).ConfigureAwait(false);
                 await this.clusterClientLifecycle.OnStart().ConfigureAwait(false);
                 this.state = LifecycleState.Started;
             }
+
+            this.applicationLifetime?.NotifyStarted();
         }
 
         /// <inheritdoc />
         public Task Close() => this.Stop(gracefully: true);
 
         /// <inheritdoc />
-        public void Abort()
-        {
-            this.Stop(gracefully: false).GetAwaiter().GetResult();
-        }
+        public Task AbortAsync() => this.Stop(gracefully: false);
 
         private async Task Stop(bool gracefully)
         {
             if (this.IsDisposing) return;
+            this.applicationLifetime?.StopApplication();
             using (await this.initLock.LockAsync().ConfigureAwait(false))
             {
                 if (this.state == LifecycleState.Disposed) return;
@@ -147,10 +153,12 @@ namespace Orleans
                         cts.Cancel();
                         canceled = cts.Token;
                     }
+
                     await this.clusterClientLifecycle.OnStop(canceled);
+
                     if (gracefully)
                     {
-                        Utils.SafeExecute(() => this.runtimeClient.Disconnect());
+                        Utils.SafeExecute(() => (this.runtimeClient as OutsideRuntimeClient)?.Disconnect());
                     }
 
                     Utils.SafeExecute(() => this.runtimeClient.Reset(gracefully));
@@ -162,10 +170,12 @@ namespace Orleans
                     if (this.state == LifecycleState.Disposing) this.state = LifecycleState.Invalid;
                 }
             }
+
+            this.applicationLifetime?.NotifyStopped();
         }
 
         /// <inheritdoc />
-        void IDisposable.Dispose() => this.Abort();
+        void IDisposable.Dispose() => this.AbortAsync().GetAwaiter().GetResult();
 
         /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null)
@@ -263,7 +273,7 @@ namespace Orleans
         {
             if (disposing)
             {
-                Utils.SafeExecute(() => this.runtimeClient.Dispose());
+                Utils.SafeExecute(() => (this.runtimeClient as IDisposable)?.Dispose());
                 this.state = LifecycleState.Disposed;
             }
 

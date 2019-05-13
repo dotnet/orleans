@@ -63,8 +63,6 @@ namespace Orleans.Runtime
 
         public ISiloRuntimeClient RuntimeClient => this.catalog.RuntimeClient;
 
-        #region Receive path
-
         /// <summary>
         /// Receive a new message:
         /// - validate order constraints, queue (or possibly redirect) if out of order
@@ -206,7 +204,8 @@ namespace Orleans.Runtime
             Exception exc, 
             string rejectInfo = null)
         {
-            if (message.Direction == Message.Directions.Request)
+            if (message.Direction == Message.Directions.Request
+                || (message.Direction == Message.Directions.OneWay && message.HasCacheInvalidationHeader))
             {
                 var str = String.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
                 MessagingStatisticsGroup.OnRejectedMessage(message);
@@ -243,7 +242,7 @@ namespace Orleans.Runtime
                 {
                     logger.Warn(ErrorCode.Dispatcher_Receive_InvalidActivation,
                         "Response received for invalid activation {0}", message);
-                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Ivalid");
+                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Invalid");
                     return;
                 }
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
@@ -327,8 +326,8 @@ namespace Orleans.Runtime
         {
             bool canInterleave = 
                    incoming.IsAlwaysInterleave
-                || targetActivation.Running == null
-                || (targetActivation.Running.IsReadOnly && incoming.IsReadOnly)
+                || targetActivation.Blocking == null
+                || (targetActivation.Blocking.IsReadOnly && incoming.IsReadOnly)
                 || (schedulingOptions.AllowCallChainReentrancy && targetActivation.ActivationId.Equals(incoming.SendingActivation))
                 || catalog.CanInterleave(targetActivation.ActivationId, incoming);
 
@@ -416,7 +415,7 @@ namespace Orleans.Runtime
                 }
 
                 // Now we can actually scheduler processing of this request
-                targetActivation.RecordRunning(message);
+                targetActivation.RecordRunning(message, message.IsAlwaysInterleave);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
                 scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
@@ -528,8 +527,18 @@ namespace Orleans.Runtime
             bool forwardingSucceded = true;
             try
             {
-
-                logger.Info(ErrorCode.Messaging_Dispatcher_TryForward, $"Trying to forward after {failedOperation}, ForwardCount = {message.ForwardCount}. Message {message}.");
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation(
+                        (int)ErrorCode.Messaging_Dispatcher_TryForward,
+                        "Trying to forward after {FailedOperation}, ForwardCount = {ForwardCount}. OldAddress = {OldAddress}, ForwardingAddress = {ForwardingAddress}, Message {Message}, Exception: {Exception}.",
+                        failedOperation,
+                        message.ForwardCount,
+                        oldAddress,
+                        forwardingAddress,
+                        message,
+                        exc);
+                }
 
                 // if this message is from a different cluster and hit a non-existing activation
                 // in this cluster (which can happen due to stale cache or directory states)
@@ -560,11 +569,25 @@ namespace Orleans.Runtime
             }
             finally
             {
+                var sentRejection = false;
+
+                // If the message was a one-way message, send a cache invalidation response even if the message was successfully forwarded.
+                if (message.Direction == Message.Directions.OneWay)
+                {
+                    this.RejectMessage(
+                        message,
+                        Message.RejectionTypes.CacheInvalidation,
+                        exc,
+                        "OneWay message sent to invalid activation");
+                    sentRejection = true;
+                }
+
                 if (!forwardingSucceded)
                 {
                     var str = $"Forwarding failed: tried to forward message {message} for {message.ForwardCount} times after {failedOperation} to invalid activation. Rejecting now.";
                     logger.Warn(ErrorCode.Messaging_Dispatcher_TryForwardFailed, str, exc);
-                    RejectMessage(message, Message.RejectionTypes.Transient, exc, str);
+
+                    if (!sentRejection) RejectMessage(message, Message.RejectionTypes.Transient, exc, str);
                 }
             }
         }
@@ -623,15 +646,14 @@ namespace Orleans.Runtime
         }
 
         // Forwarding is used by the receiver, usually when it cannot process the message and forwards it to another silo to perform the processing
-        // (got here due to outdated cache, silo is shutting down/overloaded, ...).
+        // (got here due to duplicate activation, outdated cache, silo is shutting down/overloaded, ...).
         private static bool MayForward(Message message, SiloMessagingOptions messagingOptions)
         {
-            return message.ForwardCount < messagingOptions.MaxForwardCount;
+            return message.ForwardCount < messagingOptions.MaxForwardCount
+                // allow one more forward hop for multi-cluster case
+                + (message.IsReturnedFromRemoteCluster ? 1 : 0)
+                ;
         }
-
-        #endregion
-
-        #region Send path
 
         /// <summary>
         /// Send an outgoing message, may complete synchronously
@@ -811,9 +833,6 @@ namespace Orleans.Runtime
             Transport.SendMessage(message);
         }
 
-        #endregion
-        #region Execution
-
         /// <summary>
         /// Invoked when an activation has finished a transaction and may be ready for additional transactions
         /// </summary>
@@ -873,7 +892,5 @@ namespace Orleans.Runtime
             }
             while (runLoop);
         }
-
-        #endregion
     }
 }

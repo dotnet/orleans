@@ -22,8 +22,6 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         public DateTime GossipTimestamp { get; set; }   // timestamp of gossip entry
 
-        #region gateway entry
-
         public string Status { get; set; }
 
         // all of the following are packed in rowkey
@@ -38,15 +36,9 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         public SiloAddress SiloAddress;
 
-        #endregion
-
-        #region configuration entry
-
         public string Clusters { get; set; }   // comma-separated list of clusters
 
         public string Comment { get; set; }
-
-        #endregion
 
         internal const string CONFIGURATION_ROW = "CONFIG"; // Row key for configuration row.
 

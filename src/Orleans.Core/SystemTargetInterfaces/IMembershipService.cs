@@ -16,7 +16,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Ping request from another silo that probes the liveness of the recipient silo.
         /// </summary>
-        /// <param name="pingNumber">A unique sequence number for ping message, to facilitate testijng and debugging.</param>
+        /// <param name="pingNumber">A unique sequence number for ping message, to facilitate testing and debugging.</param>
         Task Ping(int pingNumber);
     }
 }

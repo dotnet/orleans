@@ -37,7 +37,7 @@ namespace Orleans.Configuration
 
         /// <summary>
         /// ActivationSchedulingQuantum is a soft time limit on the duration of activation macro-turn (a number of micro-turns). 
-        /// If a activation was running its micro-turns longer than this, we will give up the thread.
+        /// If an activation was running its micro-turns longer than this, we will give up the thread.
         /// If this is set to zero or a negative number, then the full work queue is drained (MaxWorkItemsPerTurn allowing).
         /// </summary>
         public TimeSpan ActivationSchedulingQuantum { get; set; } = DEFAULT_ACTIVATION_SCHEDULING_QUANTUM;
@@ -54,14 +54,6 @@ namespace Orleans.Configuration
         /// </summary>
         public int MaxPendingWorkItemsSoftLimit { get; set; } = DEFAULT_MAX_PENDING_ITEMS_SOFT_LIMIT;
         public const int DEFAULT_MAX_PENDING_ITEMS_SOFT_LIMIT = 0;
-
-        /// <summary>
-        /// Per work group limit of how many items can be queued up before work is rejected.
-        /// NOTE: This setting is not in effect.
-        /// TODO: Remove this setting - jbragg
-        /// </summary>
-        public int MaxPendingWorkItemsHardLimit { get; set; } = DEFAULT_MAX_PENDING_ITEMS_HARD_LIMIT;
-        public const int DEFAULT_MAX_PENDING_ITEMS_HARD_LIMIT = 0;
 
         /// <summary>
         /// For test use only.  Do not alter from default in production services

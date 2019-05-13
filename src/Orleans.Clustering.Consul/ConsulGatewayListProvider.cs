@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Consul;
 using Orleans.Messaging;
@@ -18,6 +19,7 @@ namespace Orleans.Runtime.Membership
         private ILogger logger;
         private readonly ConsulClusteringClientOptions options;
         private readonly TimeSpan maxStaleness;
+        private readonly string kvRootFolder;
 
         public ConsulGatewayListProvider(
             ILogger<ConsulGatewayListProvider> logger, 
@@ -29,6 +31,7 @@ namespace Orleans.Runtime.Membership
             this.clusterId = clusterOptions.Value.ClusterId;
             this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
             this.options = options.Value;
+            this.kvRootFolder = options.Value.KvRootFolder;
         }
 
         public TimeSpan MaxStaleness
@@ -43,22 +46,27 @@ namespace Orleans.Runtime.Membership
         public Task InitializeGatewayListProvider()
         {
             consulClient =
-                new ConsulClient(config => config.Address = options.Address);
+                new ConsulClient(config =>
+                {
+                    config.Address = options.Address;
+                    config.Token = options.AclClientToken;
+                });
 
             return Task.CompletedTask;
         }
 
         public async Task<IList<Uri>> GetGateways()
         {
-            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.logger);
+            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.kvRootFolder, this.logger);
             if (membershipTableData == null) return new List<Uri>();
 
             return membershipTableData.Members.Select(e => e.Item1).
                 Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
                 Select(m =>
                 {
-                    m.SiloAddress.Endpoint.Port = m.ProxyPort;
-                    return m.SiloAddress.ToGatewayUri();
+                    var endpoint = new IPEndPoint(m.SiloAddress.Endpoint.Address, m.ProxyPort);
+                    var gatewayAddress = SiloAddress.New(endpoint, m.SiloAddress.Generation);
+                    return gatewayAddress.ToGatewayUri();
                 }).ToList();
         }
     }

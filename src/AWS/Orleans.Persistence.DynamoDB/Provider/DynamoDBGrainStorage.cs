@@ -143,7 +143,7 @@ namespace Orleans.Storage
             if (record != null)
             {
                 var loadedState = ConvertFromStorageFormat(record);
-                grainState.State = loadedState ?? Activator.CreateInstance(grainState.State.GetType());
+                grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
                 grainState.ETag = record.ETag.ToString();
             }
 
@@ -377,8 +377,8 @@ namespace Orleans.Storage
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<DynamoDBStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<DynamoDBStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(services, optionsSnapshot.Get(name), name);
+            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>();
+            return ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(services, optionsMonitor.Get(name), name);
         }
     }
 }

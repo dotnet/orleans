@@ -13,7 +13,7 @@ namespace Orleans.Messaging
     }
 
     /// <summary>
-    /// Wrapper for legacy client config.  Should not be used for any new developent, only adapting legacy systems.
+    /// Wrapper for legacy client config.  Should not be used for any new development, only adapting legacy systems.
     /// </summary>
     public class ClientConfigurationReader
     {

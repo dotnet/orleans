@@ -31,6 +31,19 @@ namespace Orleans.Clustering.ServiceFabric
         /// <summary>
         /// Adds Service Fabric cluster membership support.
         /// </summary>
+        /// <param name="builder">The host builder.</param>
+        /// <param name="serviceContext">The Service Fabric service context.</param>
+        /// <returns>The provided service collection.</returns>
+        public static ISiloBuilder UseServiceFabricClustering(
+            this ISiloBuilder builder,
+            ServiceContext serviceContext)
+        {
+            return builder.ConfigureServices(serviceCollection => serviceCollection.UseServiceFabricClustering(serviceContext));
+        }
+
+        /// <summary>
+        /// Adds Service Fabric cluster membership support.
+        /// </summary>
         /// <param name="serviceCollection">The service collection.</param>
         /// <param name="serviceContext">The Service Fabric service context.</param>
         /// <returns>The provided service collection.</returns>

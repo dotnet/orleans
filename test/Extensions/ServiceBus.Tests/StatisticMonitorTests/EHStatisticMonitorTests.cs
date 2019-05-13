@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Azure.EventHubs;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -43,10 +43,15 @@ namespace ServiceBus.Tests.MonitorTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams(StreamProviderName, EHStreamProviderForMonitorTestsAdapterFactory.Create, b=>b
-                        .ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance)
-                        .Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval))
-                        .UseDynamicClusterConfigDeploymentBalancer());
+                        .AddPersistentStreams(
+                            StreamProviderName,
+                            EHStreamProviderForMonitorTestsAdapterFactory.Create,
+                            b=>
+                            {
+                                b.ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance);
+                                b.Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval));
+                                b.UseDynamicClusterConfigDeploymentBalancer();
+                            });
                     hostBuilder
                         .ConfigureServices(services =>
                         {
@@ -113,25 +118,29 @@ namespace ServiceBus.Tests.MonitorTests
 
         private void AssertCacheMonitorCallCounters(CacheMonitorCounters totalCacheMonitorCallCounters)
         {
-            Assert.True(totalCacheMonitorCallCounters.TrackCachePressureMonitorStatusChangeCallCounter > 0);
-            Assert.True(totalCacheMonitorCallCounters.TrackMemoryAllocatedCallCounter > 0);
-            Assert.Equal(0, totalCacheMonitorCallCounters.TrackMemoryReleasedCallCounter);
-            Assert.True(totalCacheMonitorCallCounters.TrackMessageAddedCounter > 0);
-            Assert.Equal(0, totalCacheMonitorCallCounters.TrackMessagePurgedCounter);
+            var c = totalCacheMonitorCallCounters;
+            Assert.True(c.TrackCachePressureMonitorStatusChangeCallCounter > 0,
+                $"Expected {nameof(c.TrackCachePressureMonitorStatusChangeCallCounter)} > 0, got {c.TrackCachePressureMonitorStatusChangeCallCounter}");
+            Assert.True(c.TrackMemoryAllocatedCallCounter > 0, $"Expected {nameof(c.TrackMemoryAllocatedCallCounter)} > 0, got {c.TrackMemoryAllocatedCallCounter}");
+            Assert.True(0 == c.TrackMemoryReleasedCallCounter, $"Expected {nameof(c.TrackMemoryReleasedCallCounter)} == 0, got {c.TrackMemoryReleasedCallCounter}");
+            Assert.True(c.TrackMessageAddedCounter > 0, $"Expected {nameof(c.TrackMessageAddedCounter)} > 0, got {c.TrackMessageAddedCounter}");
+            Assert.True(0 == c.TrackMessagePurgedCounter, $"Expected {nameof(c.TrackMessagePurgedCounter)} == 0, got {c.TrackMessagePurgedCounter}");
         }
 
         private void AssertReceiverMonitorCallCounters(EventHubReceiverMonitorCounters totalReceiverMonitorCallCounters)
         {
-            Assert.Equal(ehPartitionCountPerSilo, totalReceiverMonitorCallCounters.TrackInitializationCallCounter);
-            Assert.True(totalReceiverMonitorCallCounters.TrackMessagesReceivedCallCounter > 0);
-            Assert.True(totalReceiverMonitorCallCounters.TrackReadCallCounter > 0);
-            Assert.Equal(0, totalReceiverMonitorCallCounters.TrackShutdownCallCounter);
+            var c = totalReceiverMonitorCallCounters;
+            Assert.True(ehPartitionCountPerSilo == c.TrackInitializationCallCounter, $"Expected {nameof(c.TrackInitializationCallCounter)} == {ehPartitionCountPerSilo}, got {c.TrackInitializationCallCounter}");
+            Assert.True(c.TrackMessagesReceivedCallCounter > 0, $"Expected {nameof(c.TrackMessagesReceivedCallCounter)} > 0, got {c.TrackMessagesReceivedCallCounter}");
+            Assert.True(c.TrackReadCallCounter > 0, $"Expected {nameof(c.TrackReadCallCounter)} > 0, got {c.TrackReadCallCounter}");
+            Assert.True(0 == c.TrackShutdownCallCounter, $"Expected {nameof(c.TrackShutdownCallCounter)} == 0, got {c.TrackShutdownCallCounter}");
         }
 
         private void AssertObjectPoolMonitorCallCounters(ObjectPoolMonitorCounters totalObjectPoolMonitorCallCounters)
         {
-            Assert.True(totalObjectPoolMonitorCallCounters.TrackObjectAllocatedByCacheCallCounter > 0);
-            Assert.Equal(0, totalObjectPoolMonitorCallCounters.TrackObjectReleasedFromCacheCallCounter);
+            var c = totalObjectPoolMonitorCallCounters;
+            Assert.True(c.TrackObjectAllocatedByCacheCallCounter > 0, $"Expected {nameof(c.TrackObjectAllocatedByCacheCallCounter)} > 0, got {c.TrackObjectAllocatedByCacheCallCounter}");
+            Assert.True(0 == c.TrackObjectReleasedFromCacheCallCounter, $"Expected {nameof(c.TrackObjectReleasedFromCacheCallCounter)} == 0, got {c.TrackObjectReleasedFromCacheCallCounter}");
         }
     }
 }

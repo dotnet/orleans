@@ -35,7 +35,7 @@ namespace Orleans.ServiceBus.Providers
         { }
 
         /// <summary>
-        /// Contructor
+        /// Constructor
         /// </summary>
         /// <param name="flowControlThreshold"></param>
         /// <param name="logger"></param>

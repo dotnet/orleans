@@ -16,7 +16,7 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-DOCKER_IMAGENAME=microsoft/dotnet:2.0.3-sdk
+DOCKER_IMAGENAME=microsoft/dotnet:2.1.300-sdk
 
 # $args array may have empty elements in it.
 # The easiest way to remove them is to cast to string and back to array.

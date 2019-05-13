@@ -6,6 +6,11 @@
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
   <PropertyGroup>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);612,618</WarningsNotAsErrors>
+    <NoWarn>$(NoWarn);FS2003,612,618</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>

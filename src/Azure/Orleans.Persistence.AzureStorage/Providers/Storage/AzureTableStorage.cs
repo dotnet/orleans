@@ -24,7 +24,7 @@ using Orleans.Configuration.Overrides;
 namespace Orleans.Storage
 {
     /// <summary>
-    /// Simple stroge storage for writing grain state data to Azure table storage.
+    /// Simple storage for writing grain state data to Azure table storage.
     /// </summary>
     public class AzureTableGrainStorage : IGrainStorage, IRestExceptionDecoder, ILifecycleParticipant<ISiloLifecycle>
     {
@@ -38,7 +38,7 @@ namespace Orleans.Storage
 
         private GrainStateTableDataManager tableDataManager;
         private JsonSerializerSettings JsonSettings;
-        
+
         // each property can hold 64KB of data and each entity can take 1MB in total, so 15 full properties take
         // 15 * 64 = 960 KB leaving room for the primary key, timestamp etc
         private const int MAX_DATA_CHUNK_SIZE = 64 * 1024;
@@ -50,7 +50,7 @@ namespace Orleans.Storage
         private string name;
 
         /// <summary> Default constructor </summary>
-        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, IOptions<ClusterOptions> clusterOptions, SerializationManager serializationManager, 
+        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, IOptions<ClusterOptions> clusterOptions, SerializationManager serializationManager,
             IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory)
         {
             this.options = options;
@@ -80,8 +80,8 @@ namespace Orleans.Storage
                 var entity = record.Entity;
                 if (entity != null)
                 {
-                    var loadedState = ConvertFromStorageFormat(entity);
-                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.State.GetType());
+                    var loadedState = ConvertFromStorageFormat(entity, grainState.Type);
+                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
                     grainState.ETag = record.ETag;
                 }
             }
@@ -336,7 +336,8 @@ namespace Orleans.Storage
         /// Deserialize from Azure storage format
         /// </summary>
         /// <param name="entity">The Azure table entity the stored data</param>
-        internal object ConvertFromStorageFormat(DynamicTableEntity entity)
+        /// <param name="stateType">The state type</param>
+        internal object ConvertFromStorageFormat(DynamicTableEntity entity, Type stateType)
         {
             var binaryData = ReadBinaryData(entity);
             var stringData = ReadStringData(entity);
@@ -351,7 +352,7 @@ namespace Orleans.Storage
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {
-                    dataValue = Newtonsoft.Json.JsonConvert.DeserializeObject<object>(stringData, this.JsonSettings);
+                    dataValue = Newtonsoft.Json.JsonConvert.DeserializeObject(stringData, stateType, this.JsonSettings);
                 }
 
                 // Else, no data found
@@ -449,6 +450,13 @@ namespace Orleans.Storage
             public async Task Delete(GrainStateRecord record)
             {
                 var entity = record.Entity;
+
+                if (record.ETag == null)
+                {
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "Not attempting to delete non-existent persistent state: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
+                    return;
+                }
+
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing, "Deleting: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
                 await tableManager.DeleteTableEntryAsync(entity, record.ETag).ConfigureAwait(false);
                 record.ETag = null;
@@ -498,8 +506,8 @@ namespace Orleans.Storage
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<AzureTableStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureTableStorageOptions>>();
-            IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
+            var optionsSnapshot = services.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>();
+            var clusterOptions = services.GetProviderClusterOptions(name);
             return ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(services, name, optionsSnapshot.Get(name), clusterOptions);
         }
     }

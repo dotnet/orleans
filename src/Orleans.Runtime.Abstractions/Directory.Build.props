@@ -13,21 +13,15 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
-  <!-- Configure source link: https://github.com/ctaggart/SourceLink -->
-  <PropertyGroup>
-    <SourceLinkCreate>true</SourceLinkCreate>
-    <SourceLinkOriginUrl>https://github.com/dotnet/orleans</SourceLinkOriginUrl>
-  </PropertyGroup>
-
   <Choose>
     <When Condition="$(OrleansCoreVersion) == $(VersionPrefix) AND $(OrleansCoreVersion) == $(OrleansRuntimeAbstractionsVersion)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Core" Version="$(OrleansRuntimeAbstractionsVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.Core" Version="$(OrleansCoreVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>

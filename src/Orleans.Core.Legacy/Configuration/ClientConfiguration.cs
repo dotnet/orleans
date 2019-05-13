@@ -15,6 +15,7 @@ namespace Orleans.Runtime.Configuration
     /// <summary>
     /// Orleans client configuration parameters.
     /// </summary>
+    [Obsolete("This type is obsolete and may be removed in a future release. Use configuration methods on ClientBuilder to configure specific types.")]
     [Serializable]
     public class ClientConfiguration : MessagingConfiguration, IStatisticsConfiguration
     {
@@ -52,7 +53,7 @@ namespace Orleans.Runtime.Configuration
         public string SourceFile { get; private set; }
 
         /// <summary>
-        /// The list fo the gateways to use.
+        /// The list of the gateways to use.
         /// Each GatewayNode element specifies an outside grain client gateway node.
         /// If outside (non-Orleans) clients are to connect to the Orleans system, then at least one gateway node must be specified.
         /// Additional gateway nodes may be specified if desired, and will add some failure resilience and scalability.
@@ -114,7 +115,6 @@ namespace Orleans.Runtime.Configuration
         ///  Whether Trace.CorrelationManager.ActivityId settings should be propagated into grain calls.
         /// </summary>
         public bool PropagateActivityId { get; set; }
-
         /// <summary>
         /// </summary>
         public AddressFamily PreferredFamily { get; set; }
@@ -361,13 +361,12 @@ namespace Orleans.Runtime.Configuration
         /// <param name="properties">Properties that will be passed to stream provider upon initialization</param>
         public void RegisterStreamProvider<T>(string providerName, IDictionary<string, string> properties = null) where T : Orleans.Streams.IStreamProvider
         {
-            TypeInfo providerTypeInfo = typeof(T).GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
-                !typeof(Orleans.Streams.IStreamProvider).IsAssignableFrom(typeof(T)))
+            if (typeof(T).IsAbstract ||
+                typeof(T).IsGenericType ||
+                !typeof(Streams.IStreamProvider).IsAssignableFrom(typeof(T)))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IStreamProvider interface", "typeof(T)");
 
-            ProviderConfigurationUtility.RegisterProvider(ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(this.ProviderConfigurations, ProviderCategoryConfiguration.STREAM_PROVIDER_CATEGORY_NAME, typeof(T).FullName, providerName, properties);
         }
 
         /// <summary>

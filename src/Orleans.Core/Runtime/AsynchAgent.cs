@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Threading;
 
@@ -137,8 +135,6 @@ namespace Orleans.Runtime
             Log.Debug("Stopped agent");
         }
 
-#region IDisposable Members
-
         public void Dispose()
         {
             Dispose(true);
@@ -157,8 +153,6 @@ namespace Orleans.Runtime
 
             disposed = true;
         }
-
-#endregion
 
         public override string ToString()
         {
@@ -186,18 +180,26 @@ namespace Orleans.Runtime
 
             public override bool ExceptionHandler(Exception ex, Threading.ExecutionContext context)
             {
-                context.CancellationTokenSource.Cancel();
-                agent.HandleFault(ex);
+                if(!agent.HandleFault(ex, context))
+                {
+                    context.CancellationTokenSource.Cancel();
+                }
                 return true;
             }
         }
 
-        protected void HandleFault(Exception ex)
+        /// <summary>
+        /// Handles fault
+        /// </summary>
+        /// <param name="ex"></param>
+        /// <param name="context"></param>
+        /// <returns>false agent has been stopped</returns>
+        protected bool HandleFault(Exception ex, Threading.ExecutionContext context)
         {
             State = ThreadState.Stopped;
             if (ex is ThreadAbortException)
             {
-                return;
+                return false;
             }
 
             LogExecutorError(ex);
@@ -214,6 +216,8 @@ namespace Orleans.Runtime
                     State = ThreadState.Stopped;
                 }
             }
+
+            return State != ThreadState.Stopped;
         }
 
         private void EnsureExecutorInitialized()

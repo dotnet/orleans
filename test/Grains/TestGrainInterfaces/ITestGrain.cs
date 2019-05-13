@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace UnitTests.GrainInterfaces
 {
@@ -58,7 +59,19 @@ namespace UnitTests.GrainInterfaces
 
         Task<bool> NotifyOtherGrain(IOneWayGrain otherGrain, ISimpleGrainObserver observer);
 
+        Task<IOneWayGrain> GetOtherGrain();
+
+        Task NotifyOtherGrain();
+
         Task<int> GetCount();
+
+        Task Deactivate();
+
+        Task<SiloAddress> GetSiloAddress();
+
+        Task<SiloAddress> GetPrimaryForGrain();
+
+        Task<string> GetActivationAddress(IGrain grain);
     }
 
     public interface ICanBeOneWayGrain : IGrainWithGuidKey

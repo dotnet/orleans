@@ -1,13 +1,12 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 using Orleans;
 using Orleans.TestingHost;
+using Orleans.Hosting;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
-using Xunit;
-using Orleans.Hosting;
-using Orleans.Services;
 
 namespace Tester
 {
@@ -37,7 +36,8 @@ namespace Tester
                         // register client for LegacyGrainService the legacy way
                         services.AddSingleton<ILegacyGrainServiceClient, LegacyGrainServiceClient>())
                     // register TestGrainService the modern way
-                    .AddTestGrainService("abc");
+                    .AddTestGrainService("abc")
+                    .AddGrainExtension<IEchoExtension, EchoExtension>();
                 }
             }
         }
@@ -116,6 +116,22 @@ namespace Tester
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
             var prop = await grain.CallHasInit();
             Assert.True(prop);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        public async Task GrainServiceExtensionTest()
+        {
+            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
+            var what = await grain.EchoViaExtension("what");
+            Assert.Equal("what", what);
+        }
+
+        public class EchoExtension : IEchoExtension
+        {
+            public Task<string> Echo(string what)
+            {
+                return Task.FromResult(what);
+            }
         }
     }
 }

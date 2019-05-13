@@ -24,139 +24,6 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ActivationData : IGrainActivationContext, IActivationData, IInvokable, IDisposable
     {
-        // This class is used for activations that have extension invokers. It keeps a dictionary of 
-        // invoker objects to use with the activation, and extend the default invoker
-        // defined for the grain class.
-        // Note that in all cases we never have more than one copy of an actual invoker;
-        // we may have a ExtensionInvoker per activation, in the worst case.
-        private class ExtensionInvoker : IGrainMethodInvoker, IGrainExtensionMap
-        {
-            // Because calls to ExtensionInvoker are allways made within the activation context,
-            // we rely on the single-threading guarantee of the runtime and do not protect the map with a lock.
-            private Dictionary<int, Tuple<IGrainExtension, IGrainExtensionMethodInvoker>> extensionMap; // key is the extension interface ID
-            
-            /// <summary>
-            /// Try to add an extension for the specific interface ID.
-            /// Fail and return false if there is already an extension for that interface ID.
-            /// Note that if an extension invoker handles multiple interface IDs, it can only be associated
-            /// with one of those IDs when added, and so only conflicts on that one ID will be detected and prevented.
-            /// </summary>
-            /// <param name="invoker"></param>
-            /// <param name="handler"></param>
-            /// <returns></returns>
-            internal bool TryAddExtension(IGrainExtensionMethodInvoker invoker, IGrainExtension handler)
-            {
-                if (extensionMap == null)
-                {
-                    extensionMap = new Dictionary<int, Tuple<IGrainExtension, IGrainExtensionMethodInvoker>>(1);
-                }
-
-                if (extensionMap.ContainsKey(invoker.InterfaceId)) return false;
-
-                extensionMap.Add(invoker.InterfaceId, new Tuple<IGrainExtension, IGrainExtensionMethodInvoker>(handler, invoker));
-                return true;
-            }
-
-            /// <summary>
-            /// Removes all extensions for the specified interface id.
-            /// Returns true if the chained invoker no longer has any extensions and may be safely retired.
-            /// </summary>
-            /// <param name="extension"></param>
-            /// <returns>true if the chained invoker is now empty, false otherwise</returns>
-            public bool Remove(IGrainExtension extension)
-            {
-                int interfaceId = 0;
-
-                foreach(int iface in extensionMap.Keys)
-                    if (extensionMap[iface].Item1 == extension)
-                    {
-                        interfaceId = iface;
-                        break;
-                    }
-
-                if (interfaceId == 0) // not found
-                    throw new InvalidOperationException(String.Format("Extension {0} is not installed",
-                        extension.GetType().FullName));
-
-                extensionMap.Remove(interfaceId);
-                return extensionMap.Count == 0;
-            }
-
-            public bool TryGetExtensionHandler(Type extensionType, out IGrainExtension result)
-            {
-                result = null;
-
-                if (extensionMap == null) return false;
-
-                foreach (var ext in extensionMap.Values)
-                    if (extensionType == ext.Item1.GetType())
-                    {
-                        result = ext.Item1;
-                        return true;
-                    }
-
-                return false;
-            }
-
-            /// <summary>
-            /// Invokes the appropriate grain or extension method for the request interface ID and method ID.
-            /// First each extension invoker is tried; if no extension handles the request, then the base
-            /// invoker is used to handle the request.
-            /// The base invoker will throw an appropriate exception if the request is not recognized.
-            /// </summary>
-            /// <param name="grain"></param>
-            /// <param name="request"></param>
-            /// <returns></returns>
-            public Task<object> Invoke(IAddressable grain, InvokeMethodRequest request)
-            {
-                if (extensionMap == null || !extensionMap.ContainsKey(request.InterfaceId))
-                    throw new InvalidOperationException(
-                        String.Format("Extension invoker invoked with an unknown inteface ID:{0}.", request.InterfaceId));
-
-                var invoker = extensionMap[request.InterfaceId].Item2;
-                var extension = extensionMap[request.InterfaceId].Item1;
-                return invoker.Invoke(extension, request);
-            }
-
-            public bool IsExtensionInstalled(int interfaceId)
-            {
-                return extensionMap != null && extensionMap.ContainsKey(interfaceId);
-            }
-
-            public int InterfaceId
-            {
-                get { return 0; } // 0 indicates an extension invoker that may have multiple intefaces inplemented by extensions.
-            }
-
-            public ushort InterfaceVersion
-            {
-                get { return 0; }
-            }
-
-            /// <summary>
-            /// Gets the extension from this instance if it is available.
-            /// </summary>
-            /// <param name="interfaceId">The interface id.</param>
-            /// <param name="extension">The extension.</param>
-            /// <returns>
-            /// <see langword="true"/> if the extension is found, <see langword="false"/> otherwise.
-            /// </returns>
-            public bool TryGetExtension(int interfaceId, out IGrainExtension extension)
-            {
-                Tuple<IGrainExtension, IGrainExtensionMethodInvoker> value;
-                if (extensionMap != null && extensionMap.TryGetValue(interfaceId, out value))
-                {
-                    extension = value.Item1;
-                }
-                else
-                {
-                    extension = null;
-                }
-
-                return extension != null;
-            }
-        }
-
         internal class GrainActivationContextFactory
         {
             public IGrainActivationContext Context { get; set; }
@@ -199,10 +66,11 @@ namespace Orleans.Runtime
             State = ActivationState.Create;
             PlacedUsing = placedUsing;
             RegistrationStrategy = registrationStrategy;
-            if (!Grain.IsSystemTarget && !Constants.IsSystemGrain(Grain))
+            if (!Grain.IsSystemTarget)
             {
                 this.collector = collector;
             }
+
             CollectionAgeLimit = ageLimit;
 
             GrainReference = GrainReference.FromGrainId(addr.Grain, runtimeClient.GrainReferenceRuntime, genericArguments, Grain.IsSystemTarget ? addr.Silo : null);
@@ -215,9 +83,16 @@ namespace Orleans.Runtime
 
         public IServiceProvider ActivationServices => this.serviceScope.ServiceProvider;
 
-        #region Method invocation
-
         private ExtensionInvoker extensionInvoker;
+        internal ExtensionInvoker ExtensionInvoker
+        {
+            get
+            {
+                this.lastInvoker = null;
+                return this.extensionInvoker ?? (this.extensionInvoker = new ExtensionInvoker());
+            }
+        }
+
         public IGrainMethodInvoker GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType = null)
         {
             // Return previous cached invoker, if applicable
@@ -237,33 +112,6 @@ namespace Orleans.Runtime
 
             return lastInvoker;
         }
-
-        internal bool TryAddExtension(IGrainExtensionMethodInvoker invoker, IGrainExtension extension)
-        {
-            if(extensionInvoker == null)
-                extensionInvoker = new ExtensionInvoker();
-
-            return extensionInvoker.TryAddExtension(invoker, extension);
-        }
-
-        internal void RemoveExtension(IGrainExtension extension)
-        {
-            if (extensionInvoker != null)
-            {
-                if (extensionInvoker.Remove(extension))
-                    extensionInvoker = null;
-            }
-            else
-                throw new InvalidOperationException("Grain extensions not installed.");
-        }
-
-        internal bool TryGetExtensionHandler(Type extensionType, out IGrainExtension result)
-        {
-            result = null;
-            return extensionInvoker != null && extensionInvoker.TryGetExtensionHandler(extensionType, out result);
-        }
-
-        #endregion
 
         public HashSet<ActivationId> RunningRequestsSenders { get; } = new HashSet<ActivationId>();
 
@@ -340,7 +188,6 @@ namespace Orleans.Runtime
             await streamDirectory.Cleanup(true, false);
         }
 
-        #region IActivationData
         GrainReference IActivationData.GrainReference
         {
             get { return GrainReference; }
@@ -374,10 +221,6 @@ namespace Orleans.Runtime
             AddTimer(timer);
         }
 
-        #endregion
-
-        #region Catalog
-
         internal readonly GrainReference GrainReference;
 
         public SiloAddress Silo { get { return Address.Silo;  } }
@@ -396,7 +239,8 @@ namespace Orleans.Runtime
         {
             SetState(ActivationState.Deactivating);
             deactivationStartTime = DateTime.UtcNow;
-            StopAllTimers();
+            if (!IsCurrentlyExecuting)
+                StopAllTimers();
         }
 
         /// <summary>
@@ -448,21 +292,20 @@ namespace Orleans.Runtime
             CollectionTicket = ticket;
         }
 
-        #endregion
-
-        #region Dispatcher
-
         public PlacementStrategy PlacedUsing { get; private set; }
 
         public IMultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
 
         // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
-        internal bool IsStatelessWorker { get { return PlacedUsing is StatelessWorkerPlacement; } }
+        internal bool IsStatelessWorker => this.PlacedUsing is StatelessWorkerPlacement;
+        
+        /// <summary>
+        /// Returns a value indicating whether or not this placement strategy requires activations to be registered in
+        /// the grain directory.
+        /// </summary>
+        internal bool IsUsingGrainDirectory => this.PlacedUsing.IsUsingGrainDirectory;
 
-        // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker. 
-        internal bool IsUsingGrainDirectory { get { return !IsStatelessWorker; } }
-
-        public Message Running { get; private set; }
+        public Message Blocking { get; private set; }
 
         // the number of requests that are currently executing on this activation.
         // includes reentrant and non-reentrant requests.
@@ -472,7 +315,7 @@ namespace Orleans.Runtime
         private DateTime becameIdle;
         private DateTime deactivationStartTime;
 
-        public void RecordRunning(Message message)
+        public void RecordRunning(Message message, bool isInterleavable)
         {
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
 
@@ -484,11 +327,11 @@ namespace Orleans.Runtime
                 RunningRequestsSenders.Add(message.SendingActivation);
             }
 
-            if (Running != null) return;
+            if (this.Blocking != null || isInterleavable) return;
 
             // This logic only works for non-reentrant activations
             // Consider: Handle long request detection for reentrant activations.
-            Running = message;
+            this.Blocking = message;
             currentRequestStartTime = DateTime.UtcNow;
         }
 
@@ -507,9 +350,9 @@ namespace Orleans.Runtime
             }
 
             // The below logic only works for non-reentrant activations.
-            if (Running != null && !message.Equals(Running)) return;
+            if (this.Blocking != null && !message.Equals(this.Blocking)) return;
 
-            Running = null;
+            this.Blocking = null;
             currentRequestStartTime = DateTime.MinValue;
         }
 
@@ -533,10 +376,10 @@ namespace Orleans.Runtime
         /// <summary>Decrement the number of in-flight messages currently being processed.</summary>
         public void DecrementInFlightCount() { Interlocked.Decrement(ref inFlightCount); }
 
-        /// <summary>Increment the number of messages currently in the prcess of being received.</summary>
+        /// <summary>Increment the number of messages currently in the process of being received.</summary>
         public void IncrementEnqueuedOnDispatcherCount() { Interlocked.Increment(ref enqueuedOnDispatcherCount); }
 
-        /// <summary>Decrement the number of messages currently in the prcess of being received.</summary>
+        /// <summary>Decrement the number of messages currently in the process of being received.</summary>
         public void DecrementEnqueuedOnDispatcherCount() { Interlocked.Decrement(ref enqueuedOnDispatcherCount); }
        
         /// <summary>
@@ -583,13 +426,13 @@ namespace Orleans.Runtime
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }
                 }
-                if (Running != null)
+                if (this.Blocking != null)
                 {
                     var currentRequestActiveTime = DateTime.UtcNow - currentRequestStartTime;
                     if (currentRequestActiveTime > maxRequestProcessingTime)
                     {
                         logger.Error(ErrorCode.Dispatcher_StuckActivation,
-                            $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {Running}.  Trying  to enqueue {message}.");
+                            $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {this.Blocking}.  Trying  to enqueue {message}.");
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }
                     // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
@@ -597,7 +440,7 @@ namespace Orleans.Runtime
                     {
                         logger.Warn(ErrorCode.Dispatcher_ExtendedMessageProcessing,
                              "Current request has been active for {0} for activation {1}. Currently executing {2}. Trying  to enqueue {3}.",
-                             currentRequestActiveTime, this.ToDetailedString(), Running, message);
+                             currentRequestActiveTime, this.ToDetailedString(), this.Blocking, message);
                     }
                 }
 
@@ -681,10 +524,6 @@ namespace Orleans.Runtime
                 return tmp;
             }
         }
-
-        #endregion
-        
-        #region Activation collection
 
         public bool IsInactive
         {
@@ -777,9 +616,6 @@ namespace Orleans.Runtime
             }
         }
 
-        #endregion
-
-        #region In-grain Timers
         internal void AddTimer(IGrainTimer timer)
         {
             lock(this)
@@ -832,9 +668,6 @@ namespace Orleans.Runtime
                 return Task.WhenAll(tasks);
             }
         }
-        #endregion
-
-        #region Printing functions
 
         public string DumpStatus()
         {
@@ -842,9 +675,9 @@ namespace Orleans.Runtime
             lock (this)
             {
                 sb.AppendFormat("   {0}", ToDetailedString());
-                if (Running != null)
+                if (this.Blocking != null)
                 {
-                    sb.AppendFormat("   Processing message: {0}", Running);
+                    sb.AppendFormat("   Processing message: {0}", this.Blocking);
                 }
 
                 if (waiting!=null && waiting.Count > 0)
@@ -881,7 +714,7 @@ namespace Orleans.Runtime
                     numRunning,                     // 8 NumRunning
                     GetIdleness(DateTime.UtcNow),   // 9 IdlenessTimeSpan
                     CollectionAgeLimit,             // 10 CollectionAgeLimit
-                    (includeExtraDetails && Running != null) ? " CurrentlyExecuting=" + Running : "");  // 11: Running
+                    (includeExtraDetails && this.Blocking != null) ? " CurrentlyExecuting=" + this.Blocking : "");  // 11: Running
         }
 
         public string Name
@@ -912,8 +745,6 @@ namespace Orleans.Runtime
             return GrainInstanceType == null ? placement :
                 String.Format(" #GrainType={0} Placement={1}", GrainInstanceType.FullName, placement);
         }
-
-        #endregion
 
         public void Dispose()
         {

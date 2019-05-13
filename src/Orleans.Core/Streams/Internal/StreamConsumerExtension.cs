@@ -21,11 +21,11 @@ namespace Orleans.Streams
     }
 
     /// <summary>
-    /// The extesion multiplexes all stream related messages to this grain between different streams and their stream observers.
+    /// The extension multiplexes all stream related messages to this grain between different streams and their stream observers.
     /// 
-    /// On the silo, we have one extension object per activation and this extesion multiplexes all streams on this activation 
+    /// On the silo, we have one extension object per activation and this extension multiplexes all streams on this activation 
     ///     (streams of all types and ids: different stream ids and different stream providers).
-    /// On the client, we have one extension per stream (we bind an extesion for every StreamConsumer, therefore every stream has its own extension).
+    /// On the client, we have one extension per stream (we bind an extension for every StreamConsumer, therefore every stream has its own extension).
     /// </summary>
     [Serializable]
     internal class StreamConsumerExtension : IStreamConsumerExtension
@@ -47,17 +47,16 @@ namespace Orleans.Streams
             logger = providerRt.ServiceProvider.GetRequiredService<ILogger<StreamConsumerExtension>>();
         }
 
-        internal StreamSubscriptionHandleImpl<T> SetObserver<T>(GuidId subscriptionId, StreamImpl<T> stream, IAsyncObserver<T> observer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        internal StreamSubscriptionHandleImpl<T> SetObserver<T>(GuidId subscriptionId, StreamImpl<T> stream, IAsyncObserver<T> observer, IAsyncBatchObserver<T> batchObserver, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
         {
             if (null == stream) throw new ArgumentNullException("stream");
-            if (null == observer) throw new ArgumentNullException("observer");
 
             try
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.StreamId);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
-                var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, filter, token);
+                var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, batchObserver, stream, filter, token);
                 return allStreamObservers.AddOrUpdate(subscriptionId, handle, (key, old) => handle) as StreamSubscriptionHandleImpl<T>;
             }
             catch (Exception exc)

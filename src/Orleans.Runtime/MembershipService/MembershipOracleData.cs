@@ -190,7 +190,7 @@ namespace Orleans.Runtime.MembershipService
 
         private static MembershipEntry CreateNewMembershipEntry(string siloName, SiloAddress myAddress, int proxyPort, string myHostname, SiloStatus myStatus, DateTime startTime)
         {
-            var assy = Assembly.GetEntryAssembly() ?? typeof(MembershipOracleData).GetTypeInfo().Assembly;
+            var assy = Assembly.GetEntryAssembly() ?? typeof(MembershipOracleData).Assembly;
             var roleName = assy.GetName().Name;
 
             var entry = new MembershipEntry

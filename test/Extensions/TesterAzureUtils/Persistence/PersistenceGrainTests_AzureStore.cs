@@ -68,14 +68,14 @@ namespace Tester.AzureUtils.Persistence
             return providerConfig.First();
         }
 
-        public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseTestClusterFixture fixture)
+        public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseTestClusterFixture fixture, string grainNamespace = "UnitTests.Grains")
         {
             this.output = output;
             this.logger = fixture.Logger;
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
             timingFactor = TestUtils.CalibrateTimings();
-            this.basicPersistenceTestsRunner = new GrainPersistenceTestsRunner(output, fixture);
+            this.basicPersistenceTestsRunner = new GrainPersistenceTestsRunner(output, fixture, grainNamespace);
         }
 
         public IGrainFactory GrainFactory { get; }
@@ -186,7 +186,6 @@ namespace Tester.AzureUtils.Persistence
             }
         }
 
-        #region Utility functions
         // ---------- Utility functions ----------
 
         protected void RunPerfTest(int n, string testName, TimeSpan target,
@@ -260,7 +259,6 @@ namespace Tester.AzureUtils.Persistence
             output.WriteLine("{0} completed. Did {1} iterations in {2} at {3} RPS",
                               testName, n, sw.Elapsed, n / sw.Elapsed.TotalSeconds);
         }
-        #endregion
     }
 }
 

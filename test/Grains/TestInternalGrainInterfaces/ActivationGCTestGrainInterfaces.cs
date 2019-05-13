@@ -27,6 +27,16 @@ namespace UnitTests.GrainInterfaces
         Task Nop();
     }
 
+    public interface ICollectionSpecificAgeLimitForTenSecondsActivationGcTestGrain : IGrainWithGuidKey
+    {
+        Task Nop();
+    }
+
+    public interface ICollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain : IGrainWithGuidKey
+    {
+        Task Nop();
+    }
+
     public interface IStatelessWorkerActivationCollectorTestGrain1 : IGrainWithGuidKey
     {
         Task Nop();

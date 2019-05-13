@@ -1,0 +1,5 @@
+application:
+  schemaVersion: 1.0.0-preview1
+  name: VotingApp
+  properties:
+    description: VotingApp description.

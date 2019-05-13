@@ -9,7 +9,7 @@
     <Authors>Microsoft</Authors>
     <Product>Microsoft Orleans</Product>
     <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
-    <PackageLicenseUrl>https://github.com/dotnet/Orleans#license</PackageLicenseUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/dotnet/Orleans</PackageProjectUrl>
     <PackageIconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</PackageIconUrl>
     <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
@@ -18,12 +18,13 @@
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <IncludeSource>true</IncludeSource>
+    <LangVersion>7.3</LangVersion>
   </PropertyGroup>
 
   <!-- Common compile parameters -->
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <NoWarn>$(NoWarn);1591</NoWarn>
+    <NoWarn>$(NoWarn);1591;2003</NoWarn>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <!-- We use full (Windows PDBs) until cross platform support for source link will get better -->
     <DebugType>full</DebugType>
@@ -44,35 +45,39 @@
   <PropertyGroup>
     <!-- System packages -->
     <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
-    
+
     <SystemCollectionsImmutableVersion>1.4.0</SystemCollectionsImmutableVersion>
-    <SystemNetHttpVersion>4.3.2</SystemNetHttpVersion>
+    <SystemNetHttpVersion>4.3.3</SystemNetHttpVersion>
     <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
+    <SystemThreadingTasksExtensionsVersion>4.4.0</SystemThreadingTasksExtensionsVersion>
+    <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>15.3.409</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisCSharpVersion>2.0.0</MicrosoftCodeAnalysisCSharpVersion>
+    <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>
+    <MicrosoftCodeAnalysisVersion>2.8.2</MicrosoftCodeAnalysisVersion>
 
-    <MicrosoftExtensionsConfigurationBinderVersion>2.0.0</MicrosoftExtensionsConfigurationBinderVersion>
-    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
-    <MicrosoftExtensionsConfigurationJsonVersion>2.0.0</MicrosoftExtensionsConfigurationJsonVersion>
-    <MicrosoftExtensionsConfigurationVersion>2.0.0</MicrosoftExtensionsConfigurationVersion>
-    <MicrosoftExtensionsDependencyInjectionVersion>2.0.0</MicrosoftExtensionsDependencyInjectionVersion>
+    <MicrosoftExtensionsConfigurationBinderVersion>2.1.1</MicrosoftExtensionsConfigurationBinderVersion>
+    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.1.1</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
+    <MicrosoftExtensionsConfigurationJsonVersion>2.1.1</MicrosoftExtensionsConfigurationJsonVersion>
+    <MicrosoftExtensionsConfigurationVersion>2.1.1</MicrosoftExtensionsConfigurationVersion>
+    <MicrosoftExtensionsDependencyInjectionVersion>2.1.1</MicrosoftExtensionsDependencyInjectionVersion>
     <MicrosoftExtensionsDependencyModelVersion>2.0.0</MicrosoftExtensionsDependencyModelVersion>
     <MicrosoftExtensionsLoggingVersion>2.0.0</MicrosoftExtensionsLoggingVersion>
-    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>2.0.0</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
-    <MicrosoftExtensionsOptionsVersion>2.0.0</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>2.1.1</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
+    <MicrosoftExtensionsOptionsVersion>2.1.1</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsHostingAbstractionsVersion>2.1.0</MicrosoftExtensionsHostingAbstractionsVersion>
+    <MicrosoftExtensionsHostingVersion>2.1.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
-    <MicrosoftAzureEventHubsVersion>1.0.3</MicrosoftAzureEventHubsVersion>
+    <MicrosoftAzureEventHubsVersion>2.2.1</MicrosoftAzureEventHubsVersion>
     <MicrosoftDataSQLiteVersion>2.0.0</MicrosoftDataSQLiteVersion>
     <MicrosoftPowerShell5ReferenceAssembliesVersion>1.1.0</MicrosoftPowerShell5ReferenceAssembliesVersion>
     <MicrosoftServiceFabricServicesVersion>3.0.472</MicrosoftServiceFabricServicesVersion>
     <WindowsAzureStorageVersion>8.2.1</WindowsAzureStorageVersion>
 
-    <FSharpCoreVersion>4.2.3</FSharpCoreVersion>
+    <FSharpCoreVersion>4.5.2</FSharpCoreVersion>
 
     <SystemManagementAutomationdllVersion>10.0.10586</SystemManagementAutomationdllVersion>
 
@@ -85,15 +90,15 @@
     <GoogleProtobufVersion>3.4.0</GoogleProtobufVersion>
     <ProtobufNetVersion>2.3.7</ProtobufNetVersion>
     <MySqlDataVersion>6.9.9</MySqlDataVersion>
-    <NewRelicAgentApiVersion>5.10.59.0</NewRelicAgentApiVersion>
+    <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
     <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
     <NpgsqlVersion>3.1.9</NpgsqlVersion>
     <NSubstituteVersion>1.10.0</NSubstituteVersion>
-    <ZooKeeperNetExVersion>3.4.9.4</ZooKeeperNetExVersion>
+    <ZooKeeperNetExVersion>3.4.12.1</ZooKeeperNetExVersion>
 
     <!-- Test related packages -->
     <MicrosoftTestSdkVersion>15.5.0</MicrosoftTestSdkVersion>
-    <BenchmarkDotNetVersion>0.10.14</BenchmarkDotNetVersion>
+    <BenchmarkDotNetVersion>0.11.3</BenchmarkDotNetVersion>
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
     <XunitSkippableFactVersion>1.3.3</XunitSkippableFactVersion>
     <xUnitVersion>2.3.1</xUnitVersion>
@@ -106,7 +111,7 @@
   <!-- Versioning properties -->
   <PropertyGroup>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.1.0</VersionPrefix>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.3.0</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
@@ -121,29 +126,37 @@
 
   <!-- Inner dependency versions -->
   <PropertyGroup Condition="$(FullBuild) != 'true'">
-    <OrleansCoreAbstractionsVersion>2.0.0</OrleansCoreAbstractionsVersion>
-    <OrleansRuntimeAbstractionsVersion>2.0.0</OrleansRuntimeAbstractionsVersion>
-    <OrleansCoreVersion>2.1.0</OrleansCoreVersion>
-    <OrleansRuntimeVersion>2.1.0</OrleansRuntimeVersion>
-    <OrleansCoreLegacyVersion>2.1.0</OrleansCoreLegacyVersion>
-    <OrleansRuntimeLegacyVersion>2.1.0</OrleansRuntimeLegacyVersion>
-    <OrleansProvidersVersion>2.0.0</OrleansProvidersVersion>
-    <OrleansExtensionsVersion>2.0.0</OrleansExtensionsVersion>
-    <OrleansEventSourcingVersion>2.0.0</OrleansEventSourcingVersion>
-    <OrleansAdoNetVersion>2.0.0</OrleansAdoNetVersion>
-    <OrleansAWSVersion>2.0.0</OrleansAWSVersion>
-    <OrleansAzureVersion>2.0.0</OrleansAzureVersion>
-    <OrleansTestingHostVersion>2.1.0</OrleansTestingHostVersion>
-    <OrleansTransactionsVersion>2.1.0</OrleansTransactionsVersion>
-    <OrleansServiceFabricVersion>2.0.0</OrleansServiceFabricVersion>
-    <OrleansSerializersVersion>2.0.0</OrleansSerializersVersion>
-    <OrleansToolsVersion>2.0.0</OrleansToolsVersion>
-    <OrleansClientVersion>2.0.0</OrleansClientVersion>
-    <OrleansServerVersion>2.0.0</OrleansServerVersion>
-    <OrleansCodegenVersion>2.1.0</OrleansCodegenVersion>
-    <OrleansEventHubProviderVersion>2.1.0</OrleansEventHubProviderVersion>
+    <OrleansCoreAbstractionsVersion>2.3.0</OrleansCoreAbstractionsVersion>
+    <OrleansRuntimeAbstractionsVersion>2.3.0</OrleansRuntimeAbstractionsVersion>
+    <OrleansCoreVersion>2.3.0</OrleansCoreVersion>
+    <OrleansRuntimeVersion>2.3.0</OrleansRuntimeVersion>
+    <OrleansCoreLegacyVersion>2.3.0</OrleansCoreLegacyVersion>
+    <OrleansRuntimeLegacyVersion>2.3.0</OrleansRuntimeLegacyVersion>
+    <OrleansProvidersVersion>2.3.0</OrleansProvidersVersion>
+    <OrleansExtensionsVersion>2.3.0</OrleansExtensionsVersion>
+    <OrleansEventSourcingVersion>2.3.0</OrleansEventSourcingVersion>
+    <OrleansAdoNetVersion>2.3.0</OrleansAdoNetVersion>
+    <OrleansAWSVersion>2.3.0</OrleansAWSVersion>
+    <OrleansAzureClusteringVersion>2.3.0</OrleansAzureClusteringVersion>
+    <OrleansAzureStreamingVersion>2.3.0</OrleansAzureStreamingVersion>
+    <OrleansAzureEventHubsVersion>2.3.0</OrleansAzureEventHubsVersion>
+    <OrleansAzurePersistenceVersion>2.3.0</OrleansAzurePersistenceVersion>
+    <OrleansAzureRemindersVersion>2.3.0</OrleansAzureRemindersVersion>
+    <OrleansAzureMetapackageVersion>2.3.0</OrleansAzureMetapackageVersion>
+    <OrleansGoogleCloudProviderVersion>2.3.0</OrleansGoogleCloudProviderVersion>
+    <OrleansAzureCloudServicesVersion>2.3.0</OrleansAzureCloudServicesVersion>
+    <OrleansTestingHostVersion>2.3.0</OrleansTestingHostVersion>
+    <OrleansTransactionsVersion>2.3.0</OrleansTransactionsVersion>
+    <OrleansServiceFabricVersion>2.3.0</OrleansServiceFabricVersion>
+    <OrleansSerializersVersion>2.3.0</OrleansSerializersVersion>
+    <OrleansToolsVersion>2.3.0</OrleansToolsVersion>
+    <OrleansClientVersion>2.3.0</OrleansClientVersion>
+    <OrleansServerVersion>2.3.0</OrleansServerVersion>
+    <OrleansCodegenVersion>2.3.0</OrleansCodegenVersion>
+    <OrleansEventHubProviderVersion>2.3.0</OrleansEventHubProviderVersion>
+    <OrleansTelemetryConsumersVersion>2.3.0</OrleansTelemetryConsumersVersion>
   </PropertyGroup>
-  
+
   <PropertyGroup Condition="$(FullBuild) == 'true'">
     <OrleansCoreAbstractionsVersion>$(VersionPrefix)</OrleansCoreAbstractionsVersion>
     <OrleansRuntimeAbstractionsVersion>$(VersionPrefix)</OrleansRuntimeAbstractionsVersion>
@@ -156,7 +169,14 @@
     <OrleansEventSourcingVersion>$(VersionPrefix)</OrleansEventSourcingVersion>
     <OrleansAdoNetVersion>$(VersionPrefix)</OrleansAdoNetVersion>
     <OrleansAWSVersion>$(VersionPrefix)</OrleansAWSVersion>
-    <OrleansAzureVersion>$(VersionPrefix)</OrleansAzureVersion>
+    <OrleansAzureClusteringVersion>$(VersionPrefix)</OrleansAzureClusteringVersion>
+    <OrleansAzureStreamingVersion>$(VersionPrefix)</OrleansAzureStreamingVersion>
+    <OrleansAzureEventHubsVersion>$(VersionPrefix)</OrleansAzureEventHubsVersion>
+    <OrleansAzurePersistenceVersion>$(VersionPrefix)</OrleansAzurePersistenceVersion>
+    <OrleansAzureRemindersVersion>$(VersionPrefix)</OrleansAzureRemindersVersion>
+    <OrleansAzureMetapackageVersion>$(VersionPrefix)</OrleansAzureMetapackageVersion>
+    <OrleansGoogleCloudProviderVersion>$(VersionPrefix)</OrleansGoogleCloudProviderVersion>
+    <OrleansAzureCloudServicesVersion>$(VersionPrefix)</OrleansAzureCloudServicesVersion>
     <OrleansTestingHostVersion>$(VersionPrefix)</OrleansTestingHostVersion>
     <OrleansTransactionsVersion>$(VersionPrefix)</OrleansTransactionsVersion>
     <OrleansServiceFabricVersion>$(VersionPrefix)</OrleansServiceFabricVersion>
@@ -166,6 +186,7 @@
     <OrleansServerVersion>$(VersionPrefix)</OrleansServerVersion>
     <OrleansCodegenVersion>$(VersionPrefix)</OrleansCodegenVersion>
     <OrleansEventHubProviderVersion>$(VersionPrefix)</OrleansEventHubProviderVersion>
+    <OrleansTelemetryConsumersVersion>$(VersionPrefix)</OrleansTelemetryConsumersVersion>
   </PropertyGroup>
 
   <!-- Set output folder for created NuGet packages -->

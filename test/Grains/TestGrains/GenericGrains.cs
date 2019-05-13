@@ -673,6 +673,12 @@ namespace UnitTests.Grains
         {
             return Task.FromResult(RuntimeIdentity);
         }
+
+        public async Task<string> GetRuntimeInstanceIdWithDelay(TimeSpan delay)
+        {
+            await Task.Delay(delay);
+            return RuntimeIdentity;
+        }
     }
 
     public class GenericGrainWithContraints<A, B, C>: Grain, IGenericGrainWithConstraints<A, B, C>
@@ -793,11 +799,11 @@ namespace UnitTests.Grains
 
 
             Type GetImmediateSubclass(Type subject) {
-                if(subject.GetTypeInfo().BaseType == typeof(BasicGrain)) {
+                if(subject.BaseType == typeof(BasicGrain)) {
                     return subject;
                 }
 
-                return GetImmediateSubclass(subject.GetTypeInfo().BaseType);
+                return GetImmediateSubclass(subject.BaseType);
             }
         }
 

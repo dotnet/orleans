@@ -16,12 +16,11 @@ namespace Orleans.Runtime.GrainDirectory
         /// Stops the local portion of the directory service.
         /// </summary>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1716:IdentifiersShouldNotMatchKeywords", MessageId = "Stop")]
-        void Stop(bool doOnStopHandoff);
+        Task Stop(bool doOnStopHandoff);
 
         RemoteGrainDirectory RemoteGrainDirectory { get; }
         RemoteGrainDirectory CacheValidator { get; }
         ClusterGrainDirectory RemoteClusterGrainDirectory { get; }
-        Task StopPreparationCompletion { get; }  // Will be resolved when this directory is prepared to stop
 
         /// <summary>
         /// Removes the record for an non-existing activation from the directory service.
@@ -61,10 +60,10 @@ namespace Orleans.Runtime.GrainDirectory
         /// Invalidates cache entry for the given activation address.
         /// This method is intended to be called whenever a directory client tries to access 
         /// an activation returned from the previous directory lookup and gets a reject from the target silo 
-        /// notifiying him that the activation does not exist.
+        /// notifying him that the activation does not exist.
         /// </summary>
         /// <param name="activation">The address of the activation that needs to be invalidated in the directory cache for the given grain.</param>
-        /// <param name="invalidateDirectoryAlso">If true, on owner, invalidates directory entry that point to activatiosn in remote clusters as well</param>
+        /// <param name="invalidateDirectoryAlso">If true, on owner, invalidates directory entry that point to activations in remote clusters as well</param>
         void InvalidateCacheEntry(ActivationAddress activation, bool invalidateDirectoryAlso = false);
 
         /// <summary>
@@ -104,8 +103,8 @@ namespace Orleans.Runtime.GrainDirectory
         AddressesAndTag GetLocalDirectoryData(GrainId grain);
 
         /// <summary>
-        /// For testing and troubleshhoting purposes only.
-        /// Returns the directory information held in a local directory cacche for the provided grain ID.
+        /// For testing and troubleshooting purposes only.
+        /// Returns the directory information held in a local directory cache for the provided grain ID.
         /// The result will be null if no information is held.
         /// </summary>
         /// <param name="grain"></param>

@@ -25,7 +25,7 @@ namespace Orleans.Configuration
         public int GatewaySenderQueues { get; set; }
 
         /// <summary>
-        /// The MaxForwardCount attribute specifies the maximal number of times a message is being forwared from one silo to another.
+        /// The MaxForwardCount attribute specifies the maximal number of times a message is being forwarded from one silo to another.
         /// Forwarding is used internally by the tuntime as a recovery mechanism when silos fail and the membership is unstable.
         /// In such times the messages might not be routed correctly to destination, and runtime attempts to forward such messages a number of times before rejecting them.
         /// </summary>
@@ -76,5 +76,13 @@ namespace Orleans.Configuration
         /// For test only - Do not use in production
         /// </summary>
         public bool AssumeHomogenousSilosForTesting { get; set; } = false;
+
+        public static TimeSpan DEFAULT_SHUTDOWN_REROUTE_TIMEOUT { get; set; } = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// How long the silo will wait for rerouting queued mesages, before it continues shutting down. 
+        /// </summary>
+        public TimeSpan ShutdownRerouteTimeout { get; set; } =
+            DEFAULT_SHUTDOWN_REROUTE_TIMEOUT;
     }
 }

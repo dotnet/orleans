@@ -19,13 +19,12 @@ namespace Orleans.Runtime.Configuration
         public static void RegisterBootstrapProvider<T>(this GlobalConfiguration config, string providerName, IDictionary<string, string> properties = null) where T : IBootstrapProvider
         {
             Type providerType = typeof(T);
-            var providerTypeInfo = providerType.GetTypeInfo();
-            if (providerTypeInfo.IsAbstract ||
-                providerTypeInfo.IsGenericType ||
+            if (providerType.IsAbstract ||
+                providerType.IsGenericType ||
                 !typeof(IBootstrapProvider).IsAssignableFrom(providerType))
                 throw new ArgumentException("Expected non-generic, non-abstract type which implements IBootstrapProvider interface", "typeof(T)");
 
-            ProviderConfigurationUtility.RegisterProvider(config.ProviderConfigurations, BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerTypeInfo.FullName, providerName, properties);
+            ProviderConfigurationUtility.RegisterProvider(config.ProviderConfigurations, BOOTSTRAP_PROVIDER_CATEGORY_NAME, providerType.FullName, providerName, properties);
         }
 
         /// <summary>

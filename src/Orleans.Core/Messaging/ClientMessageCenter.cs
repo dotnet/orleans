@@ -64,12 +64,9 @@ namespace Orleans.Messaging
     {
         internal readonly SerializationManager SerializationManager;
 
-        #region Constants
-
         internal static readonly TimeSpan MINIMUM_INTERCONNECT_DELAY = TimeSpan.FromMilliseconds(100);   // wait one tenth of a second between connect attempts
         internal const int CONNECT_RETRY_COUNT = 2;                                                      // Retry twice before giving up on a gateway server
 
-        #endregion
         internal GrainId ClientId { get; private set; }
         public IRuntimeClient RuntimeClient { get; }
         internal bool Running { get; private set; }
@@ -123,7 +120,7 @@ namespace Orleans.Messaging
             this.messageFactory = messageFactory;
             this.connectionStatusListener = connectionStatusListener;
             Running = false;
-            GatewayManager = new GatewayManager(gatewayOptions.Value, gatewayListProvider, loggerFactory);
+            GatewayManager = new GatewayManager(this, gatewayOptions.Value, gatewayListProvider, loggerFactory);
             PendingInboundMessages = new BlockingCollection<Message>();
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
@@ -333,20 +330,7 @@ namespace Orleans.Messaging
         {
             try
             {
-                if (ct.IsCancellationRequested)
-                {
-                    return null;
-                }
-
-                // Don't pass CancellationToken to Take. It causes too much spinning.
-                Message msg = PendingInboundMessages.Take();
-#if TRACK_DETAILED_STATS
-                if (StatisticsCollector.CollectQueueStats)
-                {
-                    queueTracking.OnDeQueueRequest(msg);
-                }
-#endif
-                return msg;
+                return PendingInboundMessages.Take(ct);
             }
             catch (ThreadAbortException exc)
             {
@@ -383,20 +367,13 @@ namespace Orleans.Messaging
 
         internal void QueueIncomingMessage(Message msg)
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectQueueStats)
-            {
-                queueTracking.OnEnQueueRequest(1, PendingInboundMessages.Count, msg);
-            }
-#endif
             PendingInboundMessages.Add(msg);
         }
 
-        private void RejectMessage(Message msg, string reasonFormat, params object[] reasonParams)
+        public void RejectMessage(Message msg, string reason, Exception exc = null)
         {
             if (!Running) return;
 
-            var reason = String.Format(reasonFormat, reasonParams);
             if (msg.Direction != Message.Directions.Request)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
@@ -405,7 +382,7 @@ namespace Orleans.Messaging
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason);
+                Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 QueueIncomingMessage(error);
             }
         }
@@ -429,8 +406,6 @@ namespace Orleans.Messaging
             throw new NotImplementedException("Reconnect");
         }
 
-        #region Random IMessageCenter stuff
-
         public int SendQueueLength
         {
             get { return 0; }
@@ -440,8 +415,6 @@ namespace Orleans.Messaging
         {
             get { return 0; }
         }
-
-        #endregion
 
         private IClusterTypeManager GetTypeManager(SiloAddress destination, IInternalGrainFactory grainFactory)
         {
@@ -471,17 +444,45 @@ namespace Orleans.Messaging
             ClientId = clientId;
         }
 
+        internal void CleanupGatewayConnections(IList<Uri> liveGateways)
+        {
+            lock (lockable)
+            {
+                foreach (var weakRef in this.grainBuckets)
+                {
+                    if (weakRef != null && weakRef.IsAlive)
+                    {
+                        var connection = weakRef.Target as GatewayConnection;
+                        if (!liveGateways.Contains(connection.Address))
+                        {
+                            if (connection.IsLive)
+                            {
+                                this.logger.Warn(
+                                    ErrorCode.ProxyClient_GatewayUnknownStatus,
+                                    "Stopping connection to {gateway} because it is not known by the gateway manager", connection.Address);
+                                connection.Stop();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         internal void OnGatewayConnectionOpen()
         {
-            Interlocked.Increment(ref numberOfConnectedGateways);
+            int newCount = Interlocked.Increment(ref numberOfConnectedGateways);
+            this.connectionStatusListener.NotifyGatewayCountChanged(newCount, newCount - 1);
         }
 
         internal void OnGatewayConnectionClosed()
         {
-            if (Interlocked.Decrement(ref numberOfConnectedGateways) == 0)
+            var gatewayCount = Interlocked.Decrement(ref numberOfConnectedGateways);
+            if (gatewayCount == 0)
             {
                 this.connectionStatusListener.NotifyClusterConnectionLost();
             }
+
+            this.connectionStatusListener.NotifyGatewayCountChanged(gatewayCount, gatewayCount + 1);
         }
 
         public void Dispose()

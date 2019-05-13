@@ -45,6 +45,14 @@ namespace UnitTests
             hostedCluster = fixture.HostedCluster;
         }
 
+        // See https://github.com/dotnet/orleans/pull/5086
+        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        public async Task CorrelationId_Bug()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IFirstGrain>(Guid.NewGuid());
+            await grain.Start(Guid.NewGuid(), Guid.NewGuid());
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void ReentrantGrain()
         {
@@ -108,7 +116,7 @@ namespace UnitTests
                 Assert.NotNull(ex.GetBaseException().InnerException);
                 Assert.IsType<ApplicationException>(ex.GetBaseException().InnerException);
                 Assert.True(ex.GetBaseException().InnerException?.Message == "boom",
-                    "Should fail with Orleans runtime exception having all of neccessary details");
+                    "Should fail with Orleans runtime exception having all of necessary details");
             }
             this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
         }

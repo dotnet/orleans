@@ -333,8 +333,6 @@ namespace Orleans.EventSourcing.StateStorage
         }
 
 
-        #region non-reentrancy assertions
-
 #if DEBUG
         bool operation_in_progress;
 #endif
@@ -358,9 +356,5 @@ namespace Orleans.EventSourcing.StateStorage
             operation_in_progress = false;
 #endif
         }
-
-       
-
-        #endregion
     }
 }

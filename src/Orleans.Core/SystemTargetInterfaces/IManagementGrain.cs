@@ -56,20 +56,20 @@ namespace Orleans.Runtime
         Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] hostsIds);
 
         /// <summary>
-        /// Return the most recent grain statistics information, amalgomated across silos.
+        /// Return the most recent grain statistics information, amalgamated across silos.
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(SiloAddress[] hostsIds);
 
         /// <summary>
-        /// Return the most recent grain statistics information, amalgomated across all silos.
+        /// Return the most recent grain statistics information, amalgamated across all silos.
         /// </summary>
         /// <returns>Completion promise for this operation.</returns>
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics();
 
         /// <summary>
-        /// Returns the most recent detailed grain statistics information, amalgomated across silos for the specified types.
+        /// Returns the most recent detailed grain statistics information, amalgamated across silos for the specified types.
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <param name="types">Array of grain types to filter the results with</param>
@@ -108,8 +108,6 @@ namespace Orleans.Runtime
         /// <returns></returns>
         Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null);
 
-        #region MultiCluster Management
-
         /// <summary>
         /// Get the current list of multicluster gateways.
         /// </summary>
@@ -137,7 +135,5 @@ namespace Orleans.Runtime
         /// <param name="checkForLaggingSilosFirst">if true, checks that all clusters are reachable and up-to-date before injecting the new configuration</param>
         /// <returns> The task completes once information has propagated to the gossip channels</returns>
         Task<MultiClusterConfiguration> InjectMultiClusterConfiguration(IEnumerable<string> clusters, string comment = "", bool checkForLaggingSilosFirst = true);
-
-#endregion
     }
 }

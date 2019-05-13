@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,7 +8,6 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.AzureStorage
@@ -24,8 +23,8 @@ namespace Orleans.Transactions.AzureStorage
 
         public static ITransactionalStateStorageFactory Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<AzureTableTransactionalStateOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureTableTransactionalStateOptions>>();
-            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorageFactory>(services, name, optionsSnapshot.Get(name));
+            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AzureTableTransactionalStateOptions>>();
+            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorageFactory>(services, name, optionsMonitor.Get(name));
         }
 
         public AzureTableTransactionalStateStorageFactory(string name, AzureTableTransactionalStateOptions options, IOptions<ClusterOptions> clusterOptions, ITypeResolver typeResolver, IGrainFactory grainFactory, ILoggerFactory loggerFactory)
@@ -33,14 +32,16 @@ namespace Orleans.Transactions.AzureStorage
             this.name = name;
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
-            this.jsonSettings = OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, grainFactory);
+            this.jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(
+                typeResolver,
+                grainFactory);
             this.loggerFactory = loggerFactory;
         }
 
         public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainActivationContext context) where TState : class, new()
         {
             string partitionKey = MakePartitionKey(context, stateName);
-            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, stateName, this.jsonSettings);
+            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorage<TState>>(context.ActivationServices, this.table, partitionKey, this.jsonSettings);
         }
 
         public void Participate(ISiloLifecycle lifecycle)
@@ -51,7 +52,7 @@ namespace Orleans.Transactions.AzureStorage
         private string MakePartitionKey(IGrainActivationContext context, string stateName)
         {
             string grainKey = context.GrainInstance.GrainReference.ToShortKeyString();
-            var key = $"ts_{this.clusterOptions.ServiceId}_{grainKey}_{stateName}";
+            var key = $"{grainKey}_{this.clusterOptions.ServiceId}_{stateName}";
             return AzureStorageUtils.SanitizeTableProperty(key);
         }
 

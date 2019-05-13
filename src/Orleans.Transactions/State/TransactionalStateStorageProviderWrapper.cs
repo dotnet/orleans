@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Storage;
-using Microsoft.Extensions.Logging;
 using Orleans.Utilities;
 using Orleans.Transactions.Abstractions;
+using Orleans.CodeGeneration;
+
+[assembly: GenerateSerializer(typeof(Orleans.Transactions.TransactionalStateRecord<>))]
 
 namespace Orleans.Transactions
 {
@@ -36,7 +39,7 @@ namespace Orleans.Transactions
             return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, stateStorage.State.CommittedState, stateStorage.State.CommittedSequenceId, stateStorage.State.Metadata, stateStorage.State.PendingStates);
         }
 
-        public async Task<string> Store(string expectedETag, string metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
+        public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
         {
             if (this.StateStorage.Etag != expectedETag)
                 throw new ArgumentException(nameof(expectedETag), "Etag does not match");
@@ -57,12 +60,22 @@ namespace Orleans.Transactions
             // prepare
             if (statesToPrepare?.Count > 0)
             {
-                // remove prepare records that are being overwritten
-                while (pendinglist.Count != 0 && pendinglist[pendinglist.Count - 1].SequenceId >= statesToPrepare[0].SequenceId)
+                foreach (var p in statesToPrepare)
                 {
-                    pendinglist.RemoveAt(pendinglist.Count - 1);
+                    var pos = pendinglist.FindIndex(t => t.SequenceId >= p.SequenceId);
+                    if (pos == -1)
+                    {
+                        pendinglist.Add(p); //append
+                    }
+                    else if (pendinglist[pos].SequenceId == p.SequenceId)
+                    {
+                        pendinglist[pos] = p;  //replace
+                    }
+                    else
+                    {
+                        pendinglist.Insert(pos, p); //insert
+                    }
                 }
-                pendinglist.AddRange(statesToPrepare);
             }
 
             // commit
@@ -102,7 +115,7 @@ namespace Orleans.Transactions
 
         public long CommittedSequenceId { get; set; }
 
-        public string Metadata { get; set; }
+        public TransactionalStateMetaData Metadata { get; set; } = new TransactionalStateMetaData();
 
         public List<PendingTransactionState<TState>> PendingStates { get; set; } = new List<PendingTransactionState<TState>>();
     }

@@ -80,7 +80,6 @@ namespace Orleans
                     $"Type {implementationType} passed to {nameof(CreateMapForNonGeneric)} is a constructed generic type.");
             }
 
-            var implementationTypeInfo = implementationType.GetTypeInfo();
             var interfaces = implementationType.GetInterfaces();
 
             // Create an invoker for every interface on the provided type.
@@ -98,7 +97,7 @@ namespace Orleans
                     // get the mapping for the interface which it does belong to.
                     if (mapping.InterfaceType != method.DeclaringType)
                     {
-                        mapping = implementationTypeInfo.GetRuntimeInterfaceMap(method.DeclaringType);
+                        mapping = implementationType.GetTypeInfo().GetRuntimeInterfaceMap(method.DeclaringType);
                     }
 
                     // Find the index of the interface method and then get the implementation method at that position.
@@ -135,8 +134,6 @@ namespace Orleans
             }
 
             var genericClass = implementationType.GetGenericTypeDefinition();
-            var genericClassTypeInfo = genericClass.GetTypeInfo();
-            var implementationTypeInfo = implementationType.GetTypeInfo();
 
             var genericInterfaces = genericClass.GetInterfaces();
             var concreteInterfaces = implementationType.GetInterfaces();
@@ -161,8 +158,8 @@ namespace Orleans
                     var genericInterfaceMethod = genericMethods[j];
                     if (genericMap.InterfaceType != genericInterfaceMethod.DeclaringType)
                     {
-                        genericMap = genericClassTypeInfo.GetRuntimeInterfaceMap(genericInterfaceMethod.DeclaringType);
-                        concreteMap = implementationTypeInfo.GetRuntimeInterfaceMap(concreteInterfaceMethods[j].DeclaringType);
+                        genericMap = genericClass.GetTypeInfo().GetRuntimeInterfaceMap(genericInterfaceMethod.DeclaringType);
+                        concreteMap = implementationType.GetTypeInfo().GetRuntimeInterfaceMap(concreteInterfaceMethods[j].DeclaringType);
                     }
 
                     // Determine the position in the definition's map which the target method belongs to and take the implementation

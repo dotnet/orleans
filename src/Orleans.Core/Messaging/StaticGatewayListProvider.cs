@@ -16,8 +16,6 @@ namespace Orleans.Messaging
             this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
-        #region Implementation of IGatewayListProvider
-
         public Task InitializeGatewayListProvider() => Task.CompletedTask;
         
 
@@ -32,7 +30,5 @@ namespace Orleans.Messaging
         {
             get => true;
         }
-
-        #endregion
     }
 }

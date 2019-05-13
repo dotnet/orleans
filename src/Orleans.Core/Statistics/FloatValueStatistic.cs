@@ -158,7 +158,9 @@ namespace Orleans.Runtime
 
         public void TrackMetric(ITelemetryProducer telemetryProducer)
         {
-            telemetryProducer.TrackMetric(currentName, GetCurrentValue());
+            var rawValue = GetCurrentValue();
+            var value = valueConverter?.Invoke(rawValue) ?? rawValue;
+            telemetryProducer.TrackMetric(currentName, value);
             // TODO: track delta, when we figure out how to calculate them accurately
         }
     }
