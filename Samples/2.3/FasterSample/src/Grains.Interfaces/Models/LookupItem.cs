@@ -30,5 +30,12 @@ namespace Grains.Models
 
         [ProtoMember(3)]
         public DateTime Timestamp { get; protected set; }
+
+        public void Mutate(int key, decimal value, DateTime timestamp)
+        {
+            Key = key;
+            Value = value;
+            Timestamp = timestamp;
+        }
     }
 }

@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using BenchmarkDotNet.Running;
 using Grains;
 using Grains.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +13,6 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Serialization.ProtobufNet;
 
 namespace Silo
 {
@@ -23,19 +21,25 @@ namespace Silo
         public static IHost StartNewHost()
         {
             var builder = new HostBuilder()
-                .UseOrleans(_ =>
+                .UseOrleans(sb =>
                 {
-                    _.UseLocalhostClustering();
-                    _.ConfigureApplicationParts(m => m.AddApplicationPart(typeof(DictionaryGrain).Assembly).WithReferences());
+                    sb.UseLocalhostClustering();
+                    sb.ConfigureApplicationParts(apm => apm.AddApplicationPart(typeof(FasterGrain).Assembly).WithReferences());
+                    sb.ConfigureLogging(lb =>
+                    {
+                        lb.SetMinimumLevel(LogLevel.Warning);
+                    });
                 })
                 .ConfigureLogging(_ =>
                 {
                     _.AddConsole();
+                    /*
                     _.SetMinimumLevel(LogLevel.Warning);
                     _.AddFilter("Orleans.Runtime.NoOpHostEnvironmentStatistics", LogLevel.Error);
                     _.AddFilter("Orleans.Runtime.HostedClient", LogLevel.None);
                     _.AddFilter("Orleans.Runtime.Silo", LogLevel.Error);
                     _.AddFilter("Orleans.Runtime.ClientObserverRegistrar", LogLevel.None);
+                    */
                 })
                 .ConfigureServices(_ =>
                 {
@@ -49,10 +53,6 @@ namespace Silo
                         x.HybridLogDeviceFileTitle = "hybrid.log";
                         x.ObjectLogDeviceFileTitle = "object.log";
                         x.CheckpointsSubDirectory = "checkpoints";
-                    });
-                    _.Configure<SerializationProviderOptions>(x =>
-                    {
-                        x.SerializationProviders.Add(typeof(ProtobufNetSerializer));
                     });
                     _.Configure<SiloMessagingOptions>(options =>
                     {
@@ -89,6 +89,7 @@ namespace Silo
             var pipeline = new AsyncPipeline(Environment.ProcessorCount);
 
             logger.LogWarning("Generating data...");
+
             var load = Enumerable.Range(0, total)
                 .Select(index => new LookupItem(index, index, DateTime.UtcNow))
                 .BatchIEnumerable(batch)

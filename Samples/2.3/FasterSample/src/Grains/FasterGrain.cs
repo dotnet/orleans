@@ -50,13 +50,13 @@ namespace Grains
 
             // create the faster lookup
             lookup = new FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions>(
-                1L << 30, // one billion hash buckets
+                1L << 20, // 2^20 hash buckets * 64 bytes per bucket = 64MB key space
                 new LookupItemFunctions(),
                 new LogSettings()
                 {
                     LogDevice = logDevice,
                     ObjectLogDevice = objectLogDevice,
-                    MemorySizeBits = 30 // one gigagbyte
+                    MemorySizeBits = 30 // 2^30 bytes = 1GB log space
                 },
                 new CheckpointSettings
                 {
@@ -65,7 +65,7 @@ namespace Grains
                 },
                 serializerSettings: new SerializerSettings<int, LookupItem>
                 {
-                    valueSerializer = () => new ProtobufObjectSerializer<LookupItem>()
+                    valueSerializer = () => new LookupItemSerializer()
                 },
                 comparer: LookupItemFasterKeyComparer.Default);
 
