@@ -1,12 +1,18 @@
 using System;
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading;
 using BenchmarkDotNet.Running;
 using Grains;
+using Grains.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.Serialization.ProtobufNet;
 
 namespace Silo
@@ -67,7 +73,34 @@ namespace Silo
 
         public static void Main()
         {
-            BenchmarkRunner.Run<RangeDeltaBenchmarks>();
+            var host = StartNewHost();
+
+            var grain = host.Services
+                .GetService<IGrainFactory>()
+                .GetGrain<IFasterGrain>(Guid.Empty);
+
+            var total = 1 << 30;
+            var batch = 1 << 20;
+            var done = 0;
+            var pipeline = new AsyncPipeline(Environment.ProcessorCount);
+            var generator = Enumerable.Range(0, total)
+                .Select(index => new LookupItem(index, index, DateTime.UtcNow))
+                .BatchIEnumerable(batch)
+                .Select(list => list.ToImmutableList())
+                .Select(items => grain.SetRangeAsync(items, true).ContinueWith(_ =>
+                {
+                    Interlocked.Add(ref done, batch);
+                    Console.WriteLine($"Loaded {done} items...");
+                }));
+
+            pipeline.AddRange(generator);
+            pipeline.Wait();
+
+            Console.WriteLine("Complete");
+
+            host.StopAsync().Wait();
+
+            //BenchmarkRunner.Run<RangeDeltaBenchmarks>();
             //BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(config: new DebugInProcessConfig());
             //BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run();
         }

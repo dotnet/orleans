@@ -37,7 +37,7 @@ namespace Grains
 
             // create the faster lookup
             lookup = new FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions>(
-                1L << 21,
+                1L << 20,
                 new LookupItemFunctions(),
                 new LogSettings()
                 {
@@ -86,7 +86,7 @@ namespace Grains
             }
         }
 
-        public Task SetRangeAsync(ImmutableList<LookupItem> items)
+        public Task SetRangeAsync(ImmutableList<LookupItem> items, bool wait = false)
         {
             return Task.Run(async () =>
             {
@@ -101,6 +101,9 @@ namespace Grains
                         var key = item.Key;
                         lookup.Upsert(ref key, ref item, Empty.Default, i);
                     }
+                    lookup.CompletePending(wait);
+                    lookup.TakeFullCheckpoint(out var token);
+                    lookup.CompleteCheckpoint(wait);
                 }
                 finally
                 {

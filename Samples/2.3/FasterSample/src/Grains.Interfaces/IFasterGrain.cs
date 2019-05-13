@@ -13,7 +13,7 @@ namespace Grains
 
         Task SetAsync(LookupItem item);
 
-        Task SetRangeAsync(ImmutableList<LookupItem> items);
+        Task SetRangeAsync(ImmutableList<LookupItem> items, bool wait = false);
 
         Task SetRangeDeltaAsync(ImmutableList<LookupItem> items);
 
