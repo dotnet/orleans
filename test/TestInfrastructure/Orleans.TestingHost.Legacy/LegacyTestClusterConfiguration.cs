@@ -47,7 +47,7 @@ namespace Orleans.TestingHost
         }
         
         /// <summary>Build a cluster configuration.</summary>
-        /// <returns>The builded cluster configuration</returns>
+        /// <returns>The built cluster configuration</returns>
         public ClusterConfiguration BuildClusterConfiguration()
         {
             var config = ClusterConfiguration.LocalhostPrimarySilo(builder.Options.BaseSiloPort, builder.Options.BaseGatewayPort);
@@ -146,7 +146,12 @@ namespace Orleans.TestingHost
             applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
             applicationPartManager.AddApplicationPart(typeof(ClusterConfiguration).Assembly).WithReferences();
-            var serializationManager = new SerializationManager(null, Options.Create(new SerializationProviderOptions()), new NullLoggerFactory(), new CachedTypeResolver());
+            var serializationManager = new SerializationManager(null,
+                Options.Create(new SerializationProviderOptions()),
+                new NullLoggerFactory(),
+                new CachedTypeResolver(),
+                new SerializationStatisticsGroup(Options.Create(new StatisticsOptions {CollectionLevel = StatisticsLevel.Info})),
+                MessagingOptions.DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD);
             serializationManager.RegisterSerializers(applicationPartManager);
             return serializationManager;
         }

@@ -15,6 +15,7 @@ namespace Orleans.Runtime.Configuration
     /// <summary>
     /// Data object holding Silo configuration parameters.
     /// </summary>
+    [Obsolete("This type is obsolete and may be removed in a future release. Use configuration methods on ISiloHostBuilder to configure specific types.")]
     [Serializable]
     public class ClusterConfiguration
     {

@@ -10,8 +10,6 @@ namespace UnitTests.Grains
 
         protected ISimpleObserverableGrain Target { get; set; }
 
-        #region IObserverGrain Members
-
         public Task SetTarget(ISimpleObserverableGrain target)
         {
             Target = target;
@@ -24,15 +22,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        #endregion
-
-        #region ISimpleGrainObserver Members
-
         public void StateChanged(int a, int b)
         {
             Observer.StateChanged(a, b);
         }
-
-        #endregion
     }
 }

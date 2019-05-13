@@ -364,7 +364,7 @@ namespace Orleans.Runtime.GrainDirectory
 
    
         /// <summary>
-        /// Removes the grain (and, effectively, all its activations) from the diretcory
+        /// Removes the grain (and, effectively, all its activations) from the directory
         /// </summary>
         /// <param name="grain"></param>
         internal void RemoveGrain(GrainId grain)
@@ -495,8 +495,10 @@ namespace Orleans.Runtime.GrainDirectory
         /// This method is supposed to be used by handoff manager to update the partitions when the system view (set of live silos) changes.
         /// </summary>
         /// <param name="other"></param>
-        internal void Merge(GrainDirectoryPartition other)
+        /// <returns>Activations which must be deactivated.</returns>
+        internal Dictionary<SiloAddress, List<ActivationAddress>> Merge(GrainDirectoryPartition other)
         {
+            Dictionary<SiloAddress, List<ActivationAddress>> activationsToRemove = null;
             lock (lockable)
             {
                 foreach (var pair in other.partitionData)
@@ -507,10 +509,17 @@ namespace Orleans.Runtime.GrainDirectory
                         var activationsToDrop = partitionData[pair.Key].Merge(pair.Key, pair.Value);
                         if (activationsToDrop == null) continue;
 
+                        if (activationsToRemove == null) activationsToRemove = new Dictionary<SiloAddress, List<ActivationAddress>>();
                         foreach (var siloActivations in activationsToDrop)
                         {
-                            var remoteCatalog = grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, siloActivations.Key);
-                            remoteCatalog.DeleteActivations(siloActivations.Value).Ignore();
+                            if (activationsToRemove.TryGetValue(siloActivations.Key, out var activations))
+                            {
+                                activations.AddRange(siloActivations.Value);
+                            }
+                            else
+                            {
+                                activationsToRemove[siloActivations.Key] = siloActivations.Value;
+                            }
                         }
                     }
                     else
@@ -519,6 +528,8 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
             }
+
+            return activationsToRemove;
         }
 
         /// <summary>
@@ -527,7 +538,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// This method is supposed to be used by handoff manager to update the partitions when the system view (set of live silos) changes.
         /// </summary>
         /// <param name="predicate">filter predicate (usually if the given grain is owned by particular silo)</param>
-        /// <param name="modifyOrigin">flag controling whether the source partition should be modified (i.e., the entries should be moved or just copied) </param>
+        /// <param name="modifyOrigin">flag controlling whether the source partition should be modified (i.e., the entries should be moved or just copied) </param>
         /// <returns>new grain directory partition containing entries satisfying the given predicate</returns>
         internal GrainDirectoryPartition Split(Predicate<GrainId> predicate, bool modifyOrigin)
         {
@@ -589,7 +600,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         /// <summary>
-        /// Sets the internal parition dictionary to the one given as input parameter.
+        /// Sets the internal partition dictionary to the one given as input parameter.
         /// This method is supposed to be used by handoff manager to update the old partition with a new partition.
         /// </summary>
         /// <param name="newPartitionData">new internal partition dictionary</param>

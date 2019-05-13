@@ -17,7 +17,7 @@ namespace UnitTests.Serialization
             {
                 SerializationProviders =
                 {
-                    typeof(FakeSerializer).GetTypeInfo()
+                    typeof(FakeSerializer)
                 }
             };
             this.environment = SerializationTestEnvironment.InitializeWithDefaults(config);

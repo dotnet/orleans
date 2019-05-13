@@ -2,7 +2,7 @@
 namespace Orleans.ServiceBus.Providers
 {
     /// <summary>
-    /// Base class for monitor aggregation dimensions, whcih is a information bag for the monitoring target. 
+    /// Base class for monitor aggregation dimensions, which is an information bag for the monitoring target. 
     /// Monitors can use this information bag to build its aggregation dimensions.
     /// </summary>
     public class EventHubMonitorAggregationDimensions
@@ -90,7 +90,7 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Zero parametrers constructor
+        /// Zero parameters constructor
         /// </summary>
         public EventHubCacheMonitorDimensions()
         {

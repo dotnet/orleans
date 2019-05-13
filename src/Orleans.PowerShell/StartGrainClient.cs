@@ -1,9 +1,10 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Runtime.Configuration;
 using System;
 using System.IO;
 using System.Management.Automation;
 using System.Net;
+#pragma warning disable 618
 
 namespace OrleansPSUtils
 {

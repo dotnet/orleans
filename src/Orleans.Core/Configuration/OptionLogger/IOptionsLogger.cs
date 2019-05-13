@@ -79,7 +79,7 @@ namespace Orleans
                 this.logger.LogInformation(stringBuiler.ToString());
             } catch(Exception ex)
             {
-                this.logger.LogError(ex, $"An error occured while logging options {formatter.Name}", formatter.Name);
+                this.logger.LogError(ex, $"An error occurred while logging options {formatter.Name}", formatter.Name);
                 throw;
             }
         }

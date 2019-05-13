@@ -18,6 +18,8 @@ namespace Orleans.Runtime.Scheduler
     {
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
+        private readonly SchedulerStatisticsGroup schedulerStatistics;
+        private readonly IOptions<StatisticsOptions> statisticsOptions;
         private readonly ILogger taskWorkItemLogger;
         private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory;
         private bool applicationTurnsStopped;
@@ -33,47 +35,29 @@ namespace Orleans.Runtime.Scheduler
 
         // This is the maximum number of pending work items for a single activation before we write a warning log.
         internal int MaxPendingItemsSoftLimit { get; private set; }
-        internal int MaxPendingItemsHardLimit { get; private set; }
 
         public int RunQueueLength => systemAgent.Count + mainAgent.Count;
-
-        public static OrleansTaskScheduler CreateTestInstance(int maxActiveThreads, IHostEnvironmentStatistics hostStatistics, ILoggerFactory loggerFactory)
-        {
-            return new OrleansTaskScheduler(
-                maxActiveThreads,
-                TimeSpan.FromMilliseconds(100),
-                TimeSpan.FromMilliseconds(100),
-                TimeSpan.FromMilliseconds(100),
-                SchedulingOptions.DEFAULT_ENABLE_WORKER_THREAD_INJECTION,
-                SchedulingOptions.DEFAULT_MAX_PENDING_ITEMS_SOFT_LIMIT,
-                SchedulingOptions.DEFAULT_MAX_PENDING_ITEMS_HARD_LIMIT,
-                hostStatistics,
-                new ExecutorService(), 
-                loggerFactory);
-        }
-
-        public OrleansTaskScheduler(IOptions<SchedulingOptions> options, IHostEnvironmentStatistics hostStatistics, ExecutorService executorService, ILoggerFactory loggerFactory)
-            : this(options.Value.MaxActiveThreads, options.Value.DelayWarningThreshold, options.Value.ActivationSchedulingQuantum,
-                    options.Value.TurnWarningLengthThreshold, options.Value.EnableWorkerThreadInjection, options.Value.MaxPendingWorkItemsSoftLimit,
-                    options.Value.MaxPendingWorkItemsHardLimit, hostStatistics, executorService, loggerFactory)
-        {
-        }
-
-        private OrleansTaskScheduler(int maxActiveThreads, TimeSpan delayWarningThreshold, TimeSpan activationSchedulingQuantum,
-            TimeSpan turnWarningLengthThreshold, bool injectMoreWorkerThreads, int maxPendingItemsSoftLimit, int maxPendingItemsHardLimit,
-            IHostEnvironmentStatistics hostStatistics, ExecutorService executorService, ILoggerFactory loggerFactory)
+        
+        public OrleansTaskScheduler(
+            IOptions<SchedulingOptions> options,
+            ExecutorService executorService,
+            ILoggerFactory loggerFactory,
+            SchedulerStatisticsGroup schedulerStatistics,
+            IOptions<StatisticsOptions> statisticsOptions)
         {
             this.loggerFactory = loggerFactory;
+            this.schedulerStatistics = schedulerStatistics;
+            this.statisticsOptions = statisticsOptions;
             this.logger = loggerFactory.CreateLogger<OrleansTaskScheduler>();
             cancellationTokenSource = new CancellationTokenSource();
-            WorkItemGroup.ActivationSchedulingQuantum = activationSchedulingQuantum;
+            WorkItemGroup.ActivationSchedulingQuantum = options.Value.ActivationSchedulingQuantum;
             applicationTurnsStopped = false;
-            TurnWarningLengthThreshold = turnWarningLengthThreshold;
-            this.MaxPendingItemsSoftLimit = maxPendingItemsSoftLimit;
-            this.MaxPendingItemsHardLimit = maxPendingItemsHardLimit;
+            TurnWarningLengthThreshold = options.Value.TurnWarningLengthThreshold;
+            this.MaxPendingItemsSoftLimit = options.Value.MaxPendingWorkItemsSoftLimit;
             workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
 
             const int maxSystemThreads = 2;
+            var maxActiveThreads = options.Value.MaxActiveThreads;
             maximumConcurrencyLevel = maxActiveThreads + maxSystemThreads;
 
             OrleansSchedulerAsynchAgent CreateSchedulerAsynchAgent(string agentName, bool drainAfterCancel, int degreeOfParallelism)
@@ -82,8 +66,8 @@ namespace Orleans.Runtime.Scheduler
                     agentName,
                     executorService,
                     degreeOfParallelism,
-                    delayWarningThreshold,
-                    turnWarningLengthThreshold,
+                    options.Value.DelayWarningThreshold,
+                    options.Value.TurnWarningLengthThreshold,
                     this,
                     drainAfterCancel,
                     loggerFactory);
@@ -97,7 +81,7 @@ namespace Orleans.Runtime.Scheduler
             IntValueStatistic.FindOrCreate(StatisticNames.SCHEDULER_WORKITEMGROUP_COUNT, () => WorkItemGroupCount);
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_QUEUE_SIZE_INSTANTANEOUS_PER_QUEUE, "Scheduler.LevelOne"), () => RunQueueLength);
 
-            if (!StatisticsCollector.CollectShedulerQueuesStats) return;
+            if (!schedulerStatistics.CollectShedulerQueuesStats) return;
 
             FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_QUEUE_SIZE_AVERAGE_PER_QUEUE, "Scheduler.LevelTwo.Average"), () => AverageRunQueueLengthLevelTwo);
             FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_ENQUEUED_PER_QUEUE, "Scheduler.LevelTwo.Average"), () => AverageEnqueuedLevelTwo);
@@ -266,18 +250,17 @@ namespace Orleans.Runtime.Scheduler
             }
 
             workItem.SchedulingContext = context;
-
+            
             // We must wrap any work item in Task and enqueue it as a task to the right scheduler via Task.Start.
+            Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
+
             // This will make sure the TaskScheduler.Current is set correctly on any task that is created implicitly in the execution of this workItem.
             if (workItemGroup == null)
             {
-                Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, this);
                 t.Start(this);
             }
             else
             {
-                // Create Task wrapper for this work item
-                Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem, context, workItemGroup.TaskRunner);
                 t.Start(workItemGroup.TaskRunner);
             }
         }
@@ -287,7 +270,13 @@ namespace Orleans.Runtime.Scheduler
         {
             if (context == null) return null;
 
-            var wg = new WorkItemGroup(this, context, this.loggerFactory, cancellationTokenSource.Token);
+            var wg = new WorkItemGroup(
+                this,
+                context,
+                this.loggerFactory,
+                this.cancellationTokenSource.Token,
+                this.schedulerStatistics,
+                this.statisticsOptions);
             workgroupDirectory.TryAdd(context, wg);
             return wg;
         }
@@ -385,7 +374,7 @@ namespace Orleans.Runtime.Scheduler
 
             if (workItemGroup == null)
             {
-                RuntimeContext.SetExecutionContext(null, this);
+                RuntimeContext.SetExecutionContext(null);
                 bool done = TryExecuteTask(task);
                 if (!done)
                     logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete2, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",

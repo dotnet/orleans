@@ -100,16 +100,14 @@ namespace Orleans.LogConsistency
 
         private ILogViewAdaptorFactory SetupLogConsistencyProvider(IGrainActivationContext activationContext)
         {
-            var attr = this.GetType().GetTypeInfo().GetCustomAttributes<LogConsistencyProviderAttribute>(true).FirstOrDefault();
+            var attr = this.GetType().GetCustomAttributes<LogConsistencyProviderAttribute>(true).FirstOrDefault();
 
             ILogViewAdaptorFactory defaultFactory = attr != null
                 ? this.ServiceProvider.GetServiceByName<ILogViewAdaptorFactory>(attr.ProviderName)
                 : this.ServiceProvider.GetService<ILogViewAdaptorFactory>();
             if (attr != null && defaultFactory == null)
             {
-                var errMsg = attr != null
-                    ? $"Cannot find consistency provider with Name={attr.ProviderName} for grain type {this.GetType().FullName}"
-                    : $"No consistency provider manager found loading grain type {this.GetType().FullName}";
+                var errMsg = $"Cannot find consistency provider with Name={attr.ProviderName} for grain type {this.GetType().FullName}";
                 throw new BadGrainStorageConfigException(errMsg);
             }
 

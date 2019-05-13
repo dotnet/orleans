@@ -33,7 +33,7 @@ namespace AdventureClient
 \_| |_/\__,_| \_/ \___|_| |_|\__|\__,_|_|  \___|");
 
             Console.WriteLine();
-            Console.WriteLine("What's you name?");
+            Console.WriteLine("What's your name?");
             string name = Console.ReadLine();
 
             var player = client.GetGrain<IPlayerGrain>(Guid.NewGuid());

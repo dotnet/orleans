@@ -8,7 +8,6 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public interface IQueueAdapterReceiverMonitor
     {
-        #region event driven metrics
         /// <summary>
         /// Track attempts to initialize the receiver.
         /// </summary>
@@ -39,6 +38,5 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="callTime">Shutdown operation time</param>
         /// <param name="exception">Exception caught if shutdown fail</param>
         void TrackShutdown(bool success, TimeSpan callTime, Exception exception);
-        #endregion
     }
 }

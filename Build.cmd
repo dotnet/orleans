@@ -9,6 +9,9 @@ if not defined BuildConfiguration SET BuildConfiguration=Debug
 :: misleading value (such as 'MCD' in HP PCs) may lead to build breakage (issue: #69).
 set Platform=
 
+:: Disable multilevel lookup https://github.com/dotnet/core-setup/blob/master/Documentation/design-docs/multilevel-sharedfx-lookup.md
+set DOTNET_MULTILEVEL_LOOKUP=0 
+
 call Ensure-DotNetSdk.cmd
 
 SET SOLUTION=%CMDHOME%\Orleans.sln

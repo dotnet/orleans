@@ -7,7 +7,7 @@ using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyModel;
 using Microsoft.Extensions.DependencyModel.Resolution;
 using Orleans.Runtime;
-#if NETCOREAPP2_0
+#if NETCOREAPP
 using System.Runtime.Loader;
 #endif
 
@@ -19,7 +19,7 @@ namespace Orleans.CodeGeneration
     internal class AssemblyResolver
     {
         /// <summary>
-        /// Needs to be public so can be serialized accross the the app domain.
+        /// Needs to be public so can be serialized across the app domain.
         /// </summary>
         public Dictionary<string, string> ReferenceAssemblyPaths { get; } = new Dictionary<string, string>();
 
@@ -28,7 +28,7 @@ namespace Orleans.CodeGeneration
 
         private readonly DependencyContext dependencyContext;
         private readonly DependencyContext resolverRependencyContext;
-#if NETCOREAPP2_0
+#if NETCOREAPP
         private readonly AssemblyLoadContext loadContext;
 #endif
 
@@ -53,7 +53,7 @@ namespace Orleans.CodeGeneration
                     new PackageCompilationAssemblyResolver()
                 });
 
-#if NETCOREAPP2_0
+#if NETCOREAPP
             this.loadContext = AssemblyLoadContext.GetLoadContext(this.Assembly);
 
             if (this.loadContext == AssemblyLoadContext.Default)
@@ -87,7 +87,7 @@ namespace Orleans.CodeGeneration
 
         public void Dispose()
         {
-#if NETCOREAPP2_0
+#if NETCOREAPP
 
             if (this.loadContext == AssemblyLoadContext.Default)
             {
@@ -114,13 +114,13 @@ namespace Orleans.CodeGeneration
         /// <param name="sender">The source of the event.</param>
         /// <param name="args">The event data.</param>
         /// <returns>The assembly that resolves the type, assembly, or resource; 
-        /// or null if theassembly cannot be resolved.
+        /// or null if the assembly cannot be resolved.
         /// </returns>
         public Assembly ResolveAssembly(object sender, ResolveEventArgs args)
         {
             var context = default(AssemblyLoadContext);
 
-#if NETCOREAPP2_0
+#if NETCOREAPP
             context = AssemblyLoadContext.GetLoadContext(args.RequestingAssembly);
 #endif
 
@@ -185,7 +185,7 @@ namespace Orleans.CodeGeneration
         {
             try
             {
-#if NETCOREAPP2_0
+#if NETCOREAPP
                 return this.loadContext.LoadFromAssemblyPath(path);
 #else
                 return Assembly.LoadFrom(path);
@@ -197,7 +197,7 @@ namespace Orleans.CodeGeneration
             }
         }
 
-#if !NETCOREAPP2_0
+#if !NETCOREAPP
         internal class AssemblyLoadContext
         {
         }

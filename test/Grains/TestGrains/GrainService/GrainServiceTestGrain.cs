@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans;
 using Tester;
 using UnitTests.GrainInterfaces;
@@ -64,6 +64,11 @@ namespace UnitTests.Grains
         public Task<string> GetServiceConfigProperty()
         {
             return this.testGrainServiceClient.GetServiceConfigProperty();
+        }
+
+        public Task<string> EchoViaExtension(string what)
+        {
+            return this.testGrainServiceClient.EchoViaExtension(what);
         }
     }
 

@@ -82,8 +82,6 @@ namespace Orleans.LogConsistency
         void UnsubscribeFromMultiClusterConfigurationChanges();
 
 
-        #region Logging Functionality
-
         /// <summary>
         /// Log an error that occurred in a log-consistency protocol.
         /// </summary>
@@ -104,8 +102,6 @@ namespace Orleans.LogConsistency
 
         /// <summary> Output the specified message at the specified log level. </summary>
         void Log(LogLevel level, string format, params object[] args);
-
-        #endregion
     }
 
 

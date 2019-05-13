@@ -1,13 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.WindowsAzure.Storage.Table;
-using Orleans.Streaming.EventHubs;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.ServiceBus.Providers;
-using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -17,17 +10,18 @@ using Orleans.Hosting;
 
 namespace ServiceBus.Tests.StreamingTests
 {
+    [TestCategory("Functional")]
     public class EHSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<EHSubscriptionMultiplicityTests.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "EHSubscriptionMultiplicityTestsNamespace";
-        private const string EHPath = "ehorleanstest";
+        private const string EHPath = "ehorleanstest7";
         private const string EHConsumerGroup = "orleansnightly";
 
         private readonly SubscriptionMultiplicityTestRunner runner;
         private readonly Fixture fixture;
 
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseEventHubTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
@@ -40,21 +34,22 @@ namespace ServiceBus.Tests.StreamingTests
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore")
-                        .AddEventHubStreams(StreamProviderName, b=>b
-                        .ConfigureEventHub(ob => ob.Configure(
-                        options =>
+                        .AddEventHubStreams(StreamProviderName, b=>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                            options.ConsumerGroup = EHConsumerGroup;
-                            options.Path = EHPath;
-                          
-                        }))
-                        .UseEventHubCheckpointer(ob=>ob.Configure(options=>
-                        {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.PersistInterval = TimeSpan.FromSeconds(1);
-                        }))
-                        .UseDynamicClusterConfigDeploymentBalancer());
+                            b.ConfigureEventHub(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
+
+                            }));
+                            b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.PersistInterval = TimeSpan.FromSeconds(1);
+                            }));
+                            b.UseDynamicClusterConfigDeploymentBalancer();
+                        });
                 }
             }
         }
@@ -62,52 +57,53 @@ namespace ServiceBus.Tests.StreamingTests
         public EHSubscriptionMultiplicityTests(Fixture fixture)
         {
             this.fixture = fixture;
+            fixture.EnsurePreconditionsMet();
             runner = new SubscriptionMultiplicityTestRunner(StreamProviderName, fixture.HostedCluster);            
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHMultipleParallelSubscriptionTest()
         {
             this.fixture.Logger.Info("************************ EHMultipleParallelSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHMultipleLinearSubscriptionTest()
         {
             this.fixture.Logger.Info("************************ EHMultipleLinearSubscriptionTest *********************************");
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHMultipleSubscriptionTest_AddRemove()
         {
             this.fixture.Logger.Info("************************ EHMultipleSubscriptionTest_AddRemove *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHResubscriptionTest()
         {
             this.fixture.Logger.Info("************************ EHResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHResubscriptionAfterDeactivationTest()
         {
             this.fixture.Logger.Info("************************ EHResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHActiveSubscriptionTest()
         {
             this.fixture.Logger.Info("************************ EHActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHTwoIntermitentStreamTest()
         {
             this.fixture.Logger.Info("************************ EHTwoIntermitentStreamTest *********************************");

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,8 +23,8 @@ namespace Tester.AzureUtils.Streaming
     {
         public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-        private const int partitionCount = 8;
         private readonly SingleStreamTestRunner runner;
+        private const int queueCount = 8;
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
@@ -36,13 +38,13 @@ namespace Tester.AzureUtils.Streaming
             {
                 clientBuilder
                     .AddSimpleMessageStreamProvider(SmsStreamProviderName)
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, b=>
-                    b.ConfigureAzureQueue(ob=>ob.Configure(
-                        options =>
+                    .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>
+                    b.ConfigureAzureQueue(ob=>ob.Configure<IOptions<ClusterOptions>>(
+                        (options, dep) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }))
-                    .ConfigurePartitioning(partitionCount));
+                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
+                        })));
             }
         }
 
@@ -63,13 +65,13 @@ namespace Tester.AzureUtils.Streaming
                             options.DeleteStateOnClear = true;
                         }))
                     .AddMemoryGrainStorage("MemoryStore")
-                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, c=>
-                        c.ConfigureAzureQueue(ob => ob.Configure(
-                            options =>
+                    .AddAzureQueueStreams(AzureQueueStreamProviderName, c=>
+                        c.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
+                            (options, dep) =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            }))
-                        .ConfigurePartitioning(partitionCount));
+                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
+                        })));
             }
         }
 
@@ -80,9 +82,10 @@ namespace Tester.AzureUtils.Streaming
         
         public override void Dispose()
         {
-            var clusterId = HostedCluster.Options.ClusterId;
             base.Dispose();
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, clusterId, TestDefaultConfiguration.DataConnectionString).Wait();
+            AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(NullLoggerFactory.Instance, 
+                AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), 
+                TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         ////------------------------ One to One ----------------------//

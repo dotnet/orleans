@@ -44,7 +44,7 @@ namespace Orleans.Runtime
         [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         public static readonly SystemStatus Stopping = new SystemStatus(InternalSystemStatus.Stopping);
         
-        /// <summary>Status = Shuttingdown</summary>
+        /// <summary>Status = ShuttingDown</summary>
         [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         public static readonly SystemStatus ShuttingDown = new SystemStatus(InternalSystemStatus.ShuttingDown);
 

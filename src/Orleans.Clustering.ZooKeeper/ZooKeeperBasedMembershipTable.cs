@@ -194,7 +194,7 @@ namespace Orleans.Runtime.Membership
         /// <summary>
         /// Atomically tries to update the MembershipEntry for one silo and also update the TableVersion.
         /// If operation succeeds, the following changes would be made to the table:
-        /// 1) The MembershipEntry for this silo will be updated to the new MembershipEntry (the old entry will be fully substitued by the new entry) 
+        /// 1) The MembershipEntry for this silo will be updated to the new MembershipEntry (the old entry will be fully substituted by the new entry) 
         /// 2) The eTag for the updated MembershipEntry will also be eTag with the new unique automatically generated eTag.
         /// 3) TableVersion.Version in the table will be updated to the new TableVersion.Version.
         /// 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag.
@@ -226,7 +226,7 @@ namespace Orleans.Runtime.Membership
 
         /// <summary>
         /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
-        /// This operation should only update the IAmAlive collumn and not change other columns.
+        /// This operation should only update the IAmAlive column and not change other columns.
         /// This operation is a "dirty write" or "in place update" and is performed without etag validation. 
         /// With regards to eTags update:
         /// This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed ("dirty write").
@@ -337,6 +337,10 @@ namespace Orleans.Runtime.Membership
             return JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(data), MembershipSerializerSettings.Instance);
         }
 
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     /// <summary>

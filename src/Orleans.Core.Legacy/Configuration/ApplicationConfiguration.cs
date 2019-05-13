@@ -59,7 +59,7 @@ namespace Orleans.Runtime.Configuration
         public IEnumerable<GrainTypeConfiguration> ClassSpecific { get { return this.classSpecific.Values; } }
 
         /// <summary>
-        /// Load this configuratin from xml element.
+        /// Load this configuration from xml element.
         /// </summary>
         /// <param name="xmlElement"></param>
         public void Load(XmlElement xmlElement)
@@ -248,7 +248,7 @@ namespace Orleans.Runtime.Configuration
         public string FullTypeName { get; private set; }
 
         /// <summary>
-        /// Whether this is a defualt configuration that applies to all grain types.
+        /// Whether this is a default configuration that applies to all grain types.
         /// </summary>
         public bool AreDefaults { get { return this.FullTypeName == null; } }
 
@@ -365,7 +365,6 @@ namespace Orleans.Runtime.Configuration
                 logger.Error(ErrorCode.Loader_TypeLoadError_2, errStr);
                 throw new OrleansException(errStr);
             }
-            var typeInfo = type.GetTypeInfo();
             // postcondition: returned type must implement IGrain.
             if (!typeof(IGrain).IsAssignableFrom(type))
             {
@@ -375,7 +374,7 @@ namespace Orleans.Runtime.Configuration
             }
             // postcondition: returned type must either be an interface or a class.
             
-            if (!typeInfo.IsInterface && !typeInfo.IsClass)
+            if (!type.IsInterface && !type.IsClass)
             {
                 string errStr = string.Format("Type {0} must either be an interface or class used Application configuration context.",type.FullName);
                 logger.Error(ErrorCode.Loader_TypeLoadError_4, errStr);

@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Orleans.Core.Abstractions.Internal
+namespace Orleans
 {
     internal static class InternerConstants
     {
@@ -44,8 +44,8 @@ namespace Orleans.Core.Abstractions.Internal
     /// Interner is used to optimise garbage collection.
     /// We use it to store objects that are allocated frequently and may have long timelife. 
     /// This means those object may quickly fill gen 2 and cause frequent costly full heap collections.
-    /// Specificaly, a message that arrives to a silo and all the headers and ids inside it may stay alive long enough to reach gen 2.
-    /// Therefore, we store all ids in interner to re-use their memory accros different messages.
+    /// Specifically, a message that arrives to a silo and all the headers and ids inside it may stay alive long enough to reach gen 2.
+    /// Therefore, we store all ids in interner to re-use their memory across different messages.
     /// </summary>
     /// <typeparam name="K">Type of objects to be used for intern keys</typeparam>
     /// <typeparam name="T">Type of objects to be interned / cached</typeparam>
@@ -135,7 +135,32 @@ namespace Orleans.Core.Abstractions.Internal
         /// <returns>Object with specified key - either previous cached copy or justed passed in</returns>
         public T Intern(K key, T obj)
         {
-            return FindOrCreate(key, _ => obj);
+            T result;
+            WeakReference<T> cacheEntry;
+
+            // Attempt to get the existing value from cache.
+            internCache.TryGetValue(key, out cacheEntry);
+
+            // If no cache entry exists, create and insert a new one using the creator function.
+            if (cacheEntry == null)
+            {
+                result = obj;
+                cacheEntry = new WeakReference<T>(result);
+                internCache[key] = cacheEntry;
+                return result;
+            }
+
+            // If a cache entry did exist, determine if it still holds a valid value.
+            cacheEntry.TryGetTarget(out result);
+            if (result == null)
+            {
+                // Create new object and ensure the entry is still valid by re-inserting it into the cache.
+                result = obj;
+                cacheEntry.SetTarget(result);
+                internCache[key] = cacheEntry;
+            }
+
+            return result;
         }
 
         public void StopAndClear()

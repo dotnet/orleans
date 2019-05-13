@@ -201,7 +201,7 @@ namespace UnitTests.General
         /// Creates a new instance of the storage based on the old connection string by changing the database name.
         /// </summary>
         /// <param name="newDatabaseName">Connection string instance name of the database.</param>
-        /// <returns>A new <see cref="RelationalStorageForTesting"/> instance with having the same connection string but with with a new databaseName.</returns>
+        /// <returns>A new <see cref="RelationalStorageForTesting"/> instance with having the same connection string but with a new databaseName.</returns>
         private RelationalStorageForTesting CopyInstance(string newDatabaseName)
         {
             var csb = new DbConnectionStringBuilder();

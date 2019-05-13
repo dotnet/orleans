@@ -52,8 +52,6 @@ namespace OrleansAWSUtils.Storage
             CreateClient();
         }
 
-        #region Queue Management Operations
-
         private void ParseDataConnectionString(string dataConnectionString)
         {
             var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
@@ -159,10 +157,6 @@ namespace OrleansAWSUtils.Storage
             }
         }
 
-        #endregion
-
-        #region Messaging
-
         /// <summary>
         /// Add a message to the SQS queue
         /// </summary>
@@ -236,8 +230,6 @@ namespace OrleansAWSUtils.Storage
                 ReportErrorAndRethrow(exc, "GetMessages", ErrorCode.StreamProviderManagerBase);
             }
         }
-
-        #endregion
 
         private void ReportErrorAndRethrow(Exception exc, string operation, ErrorCode errorCode)
         {

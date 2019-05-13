@@ -21,4 +21,8 @@ namespace UnitTests.GrainInterfaces
     {
         Task DoSomething();
     }
+
+    public interface INoOpTestGrain : IGrainWithIntegerKey
+    {
+    }
 }

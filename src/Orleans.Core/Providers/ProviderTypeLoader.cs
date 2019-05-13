@@ -81,13 +81,12 @@ namespace Orleans.Providers
             }
         }
 
-        internal void ProcessType(TypeInfo typeInfo)
+        internal void ProcessType(Type type)
         {
-            var type = typeInfo.AsType();
-            if (alreadyProcessed.Contains(type) || typeInfo.IsInterface || typeInfo.IsAbstract || !condition(type)) return;
+            if (this.alreadyProcessed.Contains(type) || type.IsInterface || type.IsAbstract || !this.condition(type)) return;
 
-            alreadyProcessed.Add(type);
-            callback(type);
+            this.alreadyProcessed.Add(type);
+            this.callback(type);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]

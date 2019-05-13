@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Dynamic;
 using System.Threading.Tasks;
@@ -33,7 +33,7 @@ namespace Orleans.TestingHost
         private readonly FaultInjectionGrainStorageOptions options;
         
         /// <summary>
-        /// Default conststructor which creates the decorated storage provider
+        /// Default constructor which creates the decorated storage provider
         /// </summary>
         public FaultInjectionGrainStorage(IGrainStorage realStorageProvider, string name, ILoggerFactory loggerFactory, 
             IGrainFactory grainFactory, FaultInjectionGrainStorageOptions faultInjectionOptions)
@@ -134,7 +134,7 @@ namespace Orleans.TestingHost
         public static IGrainStorage Create(IServiceProvider services, string name, Func<IServiceProvider, string, IGrainStorage> injectedGrainStorageFactory)
         {
             return new FaultInjectionGrainStorage(injectedGrainStorageFactory(services,name), name, services.GetRequiredService<ILoggerFactory>(), services.GetRequiredService<IGrainFactory>(),
-                services.GetService<IOptionsSnapshot<FaultInjectionGrainStorageOptions>>().Get(name));
+                services.GetRequiredService<IOptionsMonitor<FaultInjectionGrainStorageOptions>>().Get(name));
         }
     }
 }

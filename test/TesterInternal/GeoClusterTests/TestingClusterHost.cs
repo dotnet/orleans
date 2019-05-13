@@ -123,8 +123,6 @@ namespace Tests.GeoClusterTests
 
         public ParallelOptions paralleloptions = new ParallelOptions() { MaxDegreeOfParallelism = 4 };
 
-        #region Default Cluster and Client Configuration
-
         private static int GetPortBase(int clusternumber)
         {
             return 21000 + (clusternumber + 1) * 100;
@@ -134,9 +132,6 @@ namespace Tests.GeoClusterTests
             return 22000 + (clusternumber + 2) * 100;
         }
 
-        #endregion
-
-        #region Cluster Creation
         public void NewGeoCluster(Guid globalServiceId, string clusterId, short numSilos, Action<ClusterConfiguration> customizer = null)
         {
            NewGeoCluster<NoOpSiloBuilderConfigurator>(globalServiceId, clusterId, numSilos, customizer);
@@ -220,7 +215,7 @@ namespace Tests.GeoClusterTests
                         BaseSiloPort = GetPortBase(myCount),
                         BaseGatewayPort = GetProxyBase(myCount)
                     },
-                    CreateSilo = AppDomainSiloHandle.Create
+                    CreateSiloAsync = AppDomainSiloHandle.Create
                 };
                 builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<TSiloBuilderConfigurator>();
@@ -298,10 +293,6 @@ namespace Tests.GeoClusterTests
                 Clusters.Clear();
             }
         }
-
-        #endregion
-
-        #region client wrappers
 
         private readonly List<ClientWrapperBase> activeClients = new List<ClientWrapperBase>();
 
@@ -413,8 +404,6 @@ namespace Tests.GeoClusterTests
                 }
             });
         }
-
-        #endregion
 
         public void BlockAllClusterCommunication(string from, string to)
         {

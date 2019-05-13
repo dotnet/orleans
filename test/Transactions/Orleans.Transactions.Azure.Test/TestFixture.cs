@@ -1,12 +1,11 @@
-using System;
-using Xunit;
+using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.TestingHost;
+using Orleans.Transactions.TestKit;
 using Orleans.Transactions.Tests;
-using Orleans.TestingHost.Utils;
 using TestExtensions;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using Tester;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
@@ -15,7 +14,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
         protected override void CheckPreconditionsOrThrow()
         {
             base.CheckPreconditionsOrThrow();
-            CheckForAzureStorage(TestDefaultConfiguration.DataConnectionString);
+            TestUtils.CheckForAzureStorage();
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -23,46 +22,89 @@ namespace Orleans.Transactions.AzureStorage.Tests
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
-        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                var id = (uint) Guid.NewGuid().GetHashCode() % 100000;
                 hostBuilder
-                    .UseInClusterTransactionManager()
-                    .AddAzureTableGrainStorage(TransactionTestConstants.TransactionStore, builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
+                    .ConfigureServices(services => services.AddSingletonNamedService<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
+                    .ConfigureTracingForTransactionTests()
+                    .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    }))
-                    .UseAzureTransactionLog(options => {
-                        // TODO: Find better way for test isolation.  Possibly different partition keys.
-                        options.TableName = $"TransactionLog{id:X}";
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     })
-                    .UseTransactionalState();
-            }
-        }
-
-        public static void CheckForAzureStorage(string dataConnectionString)
-        {
-            if (string.IsNullOrWhiteSpace(dataConnectionString))
-            {
-                throw new SkipException("No connection string found. Skipping");
-            }
-
-            bool usingLocalWAS = string.Equals(dataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
-
-            if (!usingLocalWAS)
-            {
-                // Tests are using Azure Cloud Storage, not local WAS emulator.
-                return;
-            }
-
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if (!StorageEmulator.TryStart())
-            {
-                throw new SkipException("Azure Storage Emulator could not be started.");
+                    .UseTransactions();
             }
         }
     }
+
+    public class ControlledFaultInjectionTestFixture : BaseTestClusterFixture
+    {
+        protected override void CheckPreconditionsOrThrow()
+        {
+            base.CheckPreconditionsOrThrow();
+            TestUtils.CheckForAzureStorage();
+        }
+
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+        }
+
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .ConfigureTracingForTransactionTests()
+                    .AddFaultInjectionAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    })
+                    .UseControlledFaultInjectionTransactionState()
+                    .UseTransactions()
+                    .ConfigureServices(svc =>
+                    {
+                        svc.AddScoped<ITransactionFaultInjector, SimpleAzureStorageExceptionInjector>()
+                        .AddScoped<IControlledTransactionFaultInjector>(sp => sp.GetService<ITransactionFaultInjector>() as IControlledTransactionFaultInjector);
+                    });
+            }
+        }
+    }
+
+    public class SkewedClockTestFixture : TestFixture
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.AddSiloBuilderConfigurator<SkewedClockConfigurator>();
+            base.ConfigureTestCluster(builder);
+        }
+    }
+
+
+    public class RandomFaultInjectedTestFixture : TestFixture
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.AddSiloBuilderConfigurator<TxSiloBuilderConfigurator>();
+            base.ConfigureTestCluster(builder);
+        }
+
+        public class TxSiloBuilderConfigurator : ISiloBuilderConfigurator
+        {
+            private static readonly double probability = 0.05;
+            public void Configure(ISiloHostBuilder hostBuilder)
+            {
+                hostBuilder
+                    .ConfigureTracingForTransactionTests()
+                    .AddFaultInjectionAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    })
+                    .UseTransactions()
+                    .ConfigureServices(services => services.AddSingleton<ITransactionFaultInjector>(sp => new RandomErrorInjector(probability)));
+            }
+        }
+    }
+
 }

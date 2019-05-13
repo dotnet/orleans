@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -27,7 +27,7 @@ namespace Orleans.Configuration.Overrides
         public static IClientBuilder AddProviderClusterOptions(this IClientBuilder builder, string providerName, Action<ClusterOptions> configureOptions) => builder.ConfigureServices(services => services.AddOptionsOverride<ClusterOptions>(providerName, ob => ob.Configure(configureOptions)));
 
         /// <summary>
-        /// Gets option that can be overriden by named service.
+        /// Gets option that can be overridden by named service.
         /// </summary>
         private static IOptions<TOptions> GetOverridableOption<TOptions>(this IServiceProvider services, string key)
             where TOptions : class, new()
@@ -46,7 +46,7 @@ namespace Orleans.Configuration.Overrides
         {
             configureOptions?.Invoke(collection.AddOptions<TOptions>(name));
             return collection.ConfigureNamedOptionForLogging<TOptions>(name)
-                             .AddSingletonNamedService(name, (sp, n) => sp.GetRequiredService<IOptionsSnapshot<TOptions>>().Get(n));
+                             .AddSingletonNamedService(name, (sp, n) => sp.GetRequiredService<IOptionsMonitor<TOptions>>().Get(n));
         }
     }
 }

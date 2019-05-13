@@ -58,7 +58,7 @@ namespace TestGrains
     /// <summary>
     /// A grain used for testing log-consistency providers.
     /// has two fields A, B that can be updated or incremented;
-    /// and a dictionary of reservations thatcan be aded and removed
+    /// and a dictionary of reservations that can be added and removed
     /// We subclass this to create variations for all storage providers
     /// </summary>
     public abstract class LogTestGrain : JournaledGrain<MyGrainState,object>, UnitTests.GrainInterfaces.ILogTestGrain

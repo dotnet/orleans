@@ -23,8 +23,6 @@ namespace Orleans.Runtime
             safeTimerBase.Start(dueTime, period);
         }
 
-        #region IDisposable Members
-
         public void Dispose()
         {
             safeTimerBase.Dispose();
@@ -40,8 +38,6 @@ namespace Orleans.Runtime
                 safeTimerBase.DisposeTimer();
             }
         }
-
-        #endregion
 
         public bool CheckTimerFreeze(DateTime lastCheckTime, Func<string> callerName)
         {

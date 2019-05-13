@@ -1,7 +1,5 @@
 ﻿
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using Orleans.Runtime;
 
 namespace Orleans.Transactions
@@ -22,19 +20,20 @@ namespace Orleans.Transactions
             return null;
         }
 
+        public static string CurrentTransactionId => GetRequiredTransactionInfo<ITransactionInfo>().Id;
 
         public static T GetRequiredTransactionInfo<T>() where T : class, ITransactionInfo
         {
             var result = GetTransactionInfo();
             if (result == null)
             {
-                throw new OrleansTransactionException($"A transaction context is required for access. Did you forget a [TransactionOption.Required] annotation?");
+                throw new OrleansTransactionException($"A transaction context is required for access. Did you forget a [Transaction] attribute?");
             }
             else if (result is T info)
             {
                 return info;
             }
-            else  
+            else
             {
                 throw new OrleansTransactionException($"Configuration error: transaction agent is using a different protocol ({result.GetType().FullName}) than the participant expects ({typeof(T).FullName}).");
             }
@@ -64,19 +63,5 @@ namespace Orleans.Transactions
         {
             return (Dictionary<string, object>)RequestContext.Get(Orleans_TransactionContext_Key);
         }
-
-        public static string ToShortString(this ITransactionalResource resource)
-        {
-            // Meant to help humans when debugging or reading traces
-            return resource.GetHashCode().ToString("x4").Substring(0,4);
-        }
-
-        public static string ToShortString(this ITransactionParticipant participant)
-        {
-            // Meant to help humans when debugging or reading traces
-            return participant.GetHashCode().ToString("x4").Substring(0, 4);
-        }
-
     }
-
 }

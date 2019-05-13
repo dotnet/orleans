@@ -37,7 +37,6 @@ namespace Orleans.Streams
             filters.Add(filter);
         }
 
-        #region ISerializable methods
         protected OrFilter(SerializationInfo info, StreamingContext context)
         {
             filters = (List<IStreamFilterPredicateWrapper>)info.GetValue("Filters", serializedType);
@@ -46,7 +45,6 @@ namespace Orleans.Streams
         {
             info.AddValue("Filters", this.filters, serializedType);
         }
-        #endregion
 
         public bool ShouldReceive(IStreamIdentity stream, object filterData, object item)
         {

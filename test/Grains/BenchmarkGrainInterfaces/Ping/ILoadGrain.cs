@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 
@@ -13,7 +13,7 @@ namespace BenchmarkGrainInterfaces.Ping
 
     public interface ILoadGrain : IGrainWithGuidKey
     {
-        Task Generate(int run, int conncurrent, TimeSpan duration);
+        Task Generate(int run, int conncurrent);
         Task<Report> TryGetReport();
     }
 }

@@ -20,7 +20,7 @@ namespace Orleans.Streams
         /// This is intended to reduce queue read rate prior to causing the silo to shed load.
         /// Note:  Triggered only when load shedding is enabled.
         /// </summary>
-        /// <param name="options">The silo satistics options.</param>
+        /// <param name="options">The silo statistics options.</param>
         /// <param name="percentOfSiloSheddingLimit">Percentage of load shed limit which triggers a reduction of queue read rate.</param>
         /// <returns></returns>
         public static IQueueFlowController CreateAsPercentOfLoadSheddingLimit(LoadSheddingOptions options, int percentOfSiloSheddingLimit = LoadSheddingOptions.DEFAULT_LOAD_SHEDDING_LIMIT)
@@ -35,7 +35,7 @@ namespace Orleans.Streams
         /// Note:  Triggered only when load shedding is enabled.
         /// </summary>
         /// <param name="loadSheddingLimit">Percentage of CPU which triggers queue read rate reduction</param>
-        /// <param name="options">The silo satistics options.</param>
+        /// <param name="options">The silo statistics options.</param>
         /// <returns></returns>
         public static IQueueFlowController CreateAsPercentageOfCPU(int loadSheddingLimit, LoadSheddingOptions options)
         {

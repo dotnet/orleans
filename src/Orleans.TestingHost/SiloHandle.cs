@@ -1,4 +1,6 @@
-﻿using System;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans.TestingHost
@@ -28,7 +30,11 @@ namespace Orleans.TestingHost
 
         /// <summary>Stop the remote silo</summary>
         /// <param name="stopGracefully">Specifies whether the silo should be stopped gracefully or abruptly.</param>
-        public abstract void StopSilo(bool stopGracefully);
+        public abstract Task StopSiloAsync(bool stopGracefully);
+
+        /// <summary>Stop the remote silo. This method cannot be use with AppDomain</summary>
+        /// <param name="ct">Specifies the cancellation token to use for the shutdown sequence</param>
+        public abstract Task StopSiloAsync(CancellationToken ct);
 
         /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
         public void Dispose()
@@ -46,7 +52,7 @@ namespace Orleans.TestingHost
             // Concrete SiloHandle implementations can do have their own cleanup functionality
             if (disposing)
             {
-                StopSilo(true);
+                StopSiloAsync(true).GetAwaiter().GetResult();
             }
         }
 
@@ -54,6 +60,11 @@ namespace Orleans.TestingHost
         ~SiloHandle()
         {
             Dispose(false);
+        }
+
+        public override string ToString()
+        {
+            return SiloAddress.ToString();
         }
     }
 }

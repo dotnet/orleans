@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
@@ -55,13 +56,14 @@ namespace Orleans.Runtime.Membership
                 Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
                 Select(m =>
                 {
-                    m.SiloAddress.Endpoint.Port = m.ProxyPort;
-                    return m.SiloAddress.ToGatewayUri();
+                    var endpoint = new IPEndPoint(m.SiloAddress.Endpoint.Address, m.ProxyPort);
+                    var gatewayAddress = SiloAddress.New(endpoint, m.SiloAddress.Generation);
+                    return gatewayAddress.ToGatewayUri();
                 }).ToList();
         }
 
         /// <summary>
-        /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned infomation.
+        /// Specifies how often this IGatewayListProvider is refreshed, to have a bound on max staleness of its returned information.
         /// </summary>
         public TimeSpan MaxStaleness
         {
@@ -69,7 +71,7 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <summary>
-        /// Specifies whether this IGatewayListProvider ever refreshes its returned infomation, or always returns the same gw list.
+        /// Specifies whether this IGatewayListProvider ever refreshes its returned information, or always returns the same gw list.
         /// (currently only the static config based StaticGatewayListProvider is not updatable. All others are.)
         /// </summary>
         public bool IsUpdatable

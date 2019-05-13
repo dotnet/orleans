@@ -6,15 +6,15 @@ namespace Orleans.Runtime
     internal class StatelessWorkerPlacement : PlacementStrategy
     {
         private static readonly int DefaultMaxStatelessWorkers = Environment.ProcessorCount;
-        private const int DefaultMaxLocal = -1;
+
+        /// <summary>
+        /// Stateless workers are not registered in the grain directory.
+        /// </summary>
+        public override bool IsUsingGrainDirectory => false;
+
         public int MaxLocal { get; private set; }
 
-        public StatelessWorkerPlacement()
-            : this(DefaultMaxLocal)
-        {
-        }
-
-        internal StatelessWorkerPlacement(int maxLocal)
+        internal StatelessWorkerPlacement(int maxLocal = -1)
         {
             // If maxLocal was not specified on the StatelessWorkerAttribute, 
             // we will use the defaultMaxStatelessWorkers, which is System.Environment.ProcessorCount.

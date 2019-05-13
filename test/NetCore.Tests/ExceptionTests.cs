@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
@@ -53,7 +53,7 @@ namespace NetCore.Tests
             this.silo?.StopAsync(cancel.Token).GetAwaiter().GetResult();
             this.silo?.Dispose();
 
-            this.client?.Abort();
+            this.client?.AbortAsync().GetAwaiter().GetResult();
             this.client?.Dispose();
         }
     }

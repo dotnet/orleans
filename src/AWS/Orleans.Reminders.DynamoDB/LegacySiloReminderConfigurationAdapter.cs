@@ -72,5 +72,12 @@ namespace Orleans.Hosting
                     options.WriteCapacityUnits = int.Parse(value[1]);
             }
         }
+
+        public void Configure(object configuration, ISiloBuilder builder)
+        {
+            var reader = new GlobalConfigurationReader(configuration);
+            var connectionString = reader.GetPropertyValue<string>("DataConnectionStringForReminders");
+            builder.UseDynamoDBReminderService(options => ParseDataConnectionString(connectionString, options));
+        }
     }
 }

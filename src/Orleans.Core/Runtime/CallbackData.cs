@@ -1,108 +1,48 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
 using Orleans.Transactions;
 
 namespace Orleans.Runtime
 {
-    /// <summary>
-    /// This interface is for use with the Orleans timers.
-    /// </summary>
-    internal interface ITimebound
+    internal class CallbackData
     {
-        /// <summary>
-        /// This method is called by the timer when the time out is reached.
-        /// </summary>
-        void OnTimeout();
-        TimeSpan RequestedTimeout();
-    }
-
-    internal class CallbackData : ITimebound, IDisposable
-    {
-        private readonly Action<Message, TaskCompletionSource<object>> callback;
-        private readonly Func<Message, bool> resendFunc;
-        private readonly Action<Message> unregister;
+        private readonly SharedCallbackData shared;
         private readonly TaskCompletionSource<object> context;
-        private readonly MessagingOptions messagingOptions;
+        private ValueStopwatch stopwatch;
 
-        private bool alreadyFired;
-        private TimeSpan timeout;
-        private SafeTimer timer;
-        private ITimeInterval timeSinceIssued;
-        private readonly ILogger logger;
-        private readonly ILogger timerLogger;
+        public CallbackData(
+            SharedCallbackData shared,
+            TaskCompletionSource<object> ctx, 
+            Message msg)
+        {
+            this.shared = shared;
+            this.context = ctx;
+            this.Message = msg;
+            this.TransactionInfo = TransactionContext.GetTransactionInfo();
+            this.stopwatch = ValueStopwatch.StartNew();
+        }
+
         public ITransactionInfo TransactionInfo { get; set; }
 
         public Message Message { get; set; } // might hold metadata used by response pipeline
 
-        public CallbackData(
-            Action<Message, TaskCompletionSource<object>> callback, 
-            Func<Message, bool> resendFunc, 
-            TaskCompletionSource<object> ctx, 
-            Message msg, 
-            Action<Message> unregisterDelegate,
-            MessagingOptions messagingOptions,
-            ILogger logger,
-            ILogger timerLogger)
+        public bool IsCompleted { get; private set; }
+
+        public bool IsExpired(long currentTimestamp)
         {
-            // We are never called without a callback func, but best to double check.
-            if (callback == null) throw new ArgumentNullException(nameof(callback));
-            // We are never called without a resend func, but best to double check.
-            if (resendFunc == null) throw new ArgumentNullException(nameof(resendFunc));
-            this.logger = logger;
-            this.callback = callback;
-            this.resendFunc = resendFunc;
-            context = ctx;
-            Message = msg;
-            unregister = unregisterDelegate;
-            alreadyFired = false;
-            this.messagingOptions = messagingOptions;
-            this.TransactionInfo = TransactionContext.GetTransactionInfo();
-            this.timerLogger = timerLogger;
+            return currentTimestamp - this.stopwatch.GetRawTimestamp() > this.shared.ResponseTimeoutStopwatchTicks;
         }
 
-        /// <summary>
-        /// Start this callback timer
-        /// </summary>
-        /// <param name="time">Timeout time</param>
-        public void StartTimer(TimeSpan time)
+        public void OnTimeout(TimeSpan timeout)
         {
-            if (time < TimeSpan.Zero)
-                throw new ArgumentOutOfRangeException(nameof(time), "The timeout parameter is negative.");
-            timeout = time;
-            if (StatisticsCollector.CollectApplicationRequestsStats)
-            {
-                timeSinceIssued = TimeIntervalFactory.CreateTimeInterval(true);
-                timeSinceIssued.Start();
-            }
-
-            TimeSpan firstPeriod = timeout;
-            TimeSpan repeatPeriod = Constants.INFINITE_TIMESPAN; // Single timeout period --> No repeat
-            if (messagingOptions.ResendOnTimeout && messagingOptions.MaxResendCount > 0)
-            {
-                firstPeriod = repeatPeriod = timeout.Divide(messagingOptions.MaxResendCount + 1);
-            }
-            // Start time running
-            DisposeTimer();
-            timer = new SafeTimer(this.timerLogger, TimeoutCallback, null, firstPeriod, repeatPeriod);
-
-        }
-
-        private void TimeoutCallback(object obj)
-        {
-            OnTimeout();
-        }
-
-        public void OnTimeout()
-        {
-            if (alreadyFired)
+            if (this.IsCompleted)
                 return;
-            var msg = Message; // Local working copy
+            var msg = this.Message; // Local working copy
 
             string messageHistory = msg.GetTargetHistory();
             string errorMsg = $"Response did not arrive on time in {timeout} for message: {msg}. Target History is: {messageHistory}.";
-            logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
+            this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
             var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
             OnFail(msg, error, "OnTimeout - Resend {0} for {1}", true);
@@ -110,14 +50,14 @@ namespace Orleans.Runtime
 
         public void OnTargetSiloFail()
         {
-            if (alreadyFired)
+            if (this.IsCompleted)
                 return;
 
-            var msg = Message;
+            var msg = this.Message;
             var messageHistory = msg.GetTargetHistory();
             string errorMsg = 
                 $"The target silo became unavailable for message: {msg}. Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.";
-            logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
+            this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
             var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
             OnFail(msg, error, "On silo fail - Resend {0} for {1}");
@@ -125,95 +65,71 @@ namespace Orleans.Runtime
 
         public void DoCallback(Message response)
         {
-            if (alreadyFired)
+            if (this.IsCompleted)
                 return;
+            var requestStatistics = this.shared.RequestStatistics;
             lock (this)
             {
-                if (alreadyFired)
+                if (this.IsCompleted)
                     return;
 
                 if (response.Result == Message.ResponseTypes.Rejection && response.RejectionType == Message.RejectionTypes.Transient)
                 {
-                    if (resendFunc(Message))
+                    if (this.shared.ShouldResend(this.Message))
                     {
                         return;
                     }
                 }
 
-                alreadyFired = true;
-                DisposeTimer();
-                if (StatisticsCollector.CollectApplicationRequestsStats)
+                this.IsCompleted = true;
+                if (requestStatistics.CollectApplicationRequestsStats)
                 {
-                    timeSinceIssued.Stop();
+                    this.stopwatch.Stop();
                 }
-                unregister?.Invoke(Message);
             }
-            if (StatisticsCollector.CollectApplicationRequestsStats)
+
+            if (requestStatistics.CollectApplicationRequestsStats)
             {
-                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(timeSinceIssued.Elapsed);
+                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
             }
+
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-            callback(response, context);
-        }
-
-        public void Dispose()
-        {
-            DisposeTimer();
-            GC.SuppressFinalize(this);
-        }
-
-        private void DisposeTimer()
-        {
-            try
-            {
-                var tmp = timer;
-                if (tmp != null)
-                {
-                    timer = null;
-                    tmp.Dispose();
-                }
-            }
-            catch (Exception) { } // Ignore any problems with Dispose
+            this.shared.ResponseCallback(response, this.context);
         }
 
         private void OnFail(Message msg, Message error, string resendLogMessageFormat, bool isOnTimeout = false)
         {
+            var requestStatistics = this.shared.RequestStatistics;
             lock (this)
             {
-                if (alreadyFired)
+                if (this.IsCompleted)
                     return;
 
-                if (messagingOptions.ResendOnTimeout && resendFunc(msg))
+                if (this.shared.MessagingOptions.ResendOnTimeout && this.shared.ShouldResend(msg))
                 {
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(resendLogMessageFormat, msg.ResendCount, msg);
+                    if (this.shared.Logger.IsEnabled(LogLevel.Debug)) this.shared.Logger.Debug(resendLogMessageFormat, msg.ResendCount, msg);
                     return;
                 }
 
-                alreadyFired = true;
-                DisposeTimer();
-                if (StatisticsCollector.CollectApplicationRequestsStats)
+                this.IsCompleted = true;
+                if (requestStatistics.CollectApplicationRequestsStats)
                 {
-                    timeSinceIssued.Stop();
+                    this.stopwatch.Stop();
                 }
 
-                unregister?.Invoke(Message);
+                this.shared.Unregister(this.Message);
             }
             
-            if (StatisticsCollector.CollectApplicationRequestsStats)
+            if (requestStatistics.CollectApplicationRequestsStats)
             {
-                ApplicationRequestsStatisticsGroup.OnAppRequestsEnd(timeSinceIssued.Elapsed);
+                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
                 if (isOnTimeout)
                 {
-                    ApplicationRequestsStatisticsGroup.OnAppRequestsTimedOut();
+                    requestStatistics.OnAppRequestsTimedOut();
                 }
             }
 
-            callback(error, context);
-        }
-
-        public TimeSpan RequestedTimeout()
-        {
-            return timeout;
+            this.shared.ResponseCallback(error, this.context);
         }
     }
 }

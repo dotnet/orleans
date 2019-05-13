@@ -21,7 +21,7 @@ namespace Orleans.Configuration
         public int NumStorageGrains { get; set; } = NumStorageGrainsDefaultValue;
 
         /// <summary>
-        /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialzed prior to use.
+        /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         /// <summary>
@@ -53,7 +53,7 @@ namespace Orleans.Configuration
             if(this.options.InitStage < ServiceLifecycleStage.RuntimeGrainServices)
                 throw new OrleansConfigurationException(
                    $"Configuration for {nameof(MemoryGrainStorage)} {name} is invalid. {nameof(this.options.InitStage)} must be larger than {ServiceLifecycleStage.RuntimeGrainServices} since " +
-                   $"{nameof(MemoryGrainStorage)} depends on {nameof(MemoryStorageGrain)} to have grain evnironment to finish set up.");
+                   $"{nameof(MemoryGrainStorage)} depends on {nameof(MemoryStorageGrain)} to have grain environment to finish set up.");
         }
     }
 }

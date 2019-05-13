@@ -34,14 +34,10 @@ namespace UnitTests.SchedulerTests
 
         public string DetailedStatus() { return ToString(); }
 
-        #region IEquatable<ISchedulingContext> Members
-
         public bool Equals(ISchedulingContext other)
         {
             return base.Equals(other);
         }
-
-        #endregion
     }
     
     [TestCategory("BVT"), TestCategory("Scheduler")]
@@ -720,8 +716,6 @@ namespace UnitTests.SchedulerTests
             orleansConfig.StandardLoad();
             NodeConfiguration config = orleansConfig.CreateNodeConfigurationForSilo("Primary");
             var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(config.SiloName, orleansConfig.Globals.ClusterId), filters);
-            StatisticsCollector.Initialize(StatisticsLevel.Info);
-            SchedulerStatisticsGroup.Init(loggerFactory);
             return loggerFactory;
         }
     }

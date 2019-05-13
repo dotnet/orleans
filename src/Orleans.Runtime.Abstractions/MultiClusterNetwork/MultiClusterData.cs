@@ -38,8 +38,6 @@ namespace Orleans.Runtime.MultiClusterNetwork
 
         private static Dictionary<SiloAddress, GatewayEntry> emptyd = new Dictionary<SiloAddress, GatewayEntry>();
 
-        #region constructor overloads
-
         /// <summary>
         /// Construct MultiClusterData containing a collection of gateway entries and a multi-cluster configuration.
         /// </summary>
@@ -90,8 +88,6 @@ namespace Orleans.Runtime.MultiClusterNetwork
             Gateways = emptyd;
             Configuration = config;
         }
-
-        #endregion
 
         /// <summary>
         /// Display content of MultiCluster data as an (abbreviated) string.

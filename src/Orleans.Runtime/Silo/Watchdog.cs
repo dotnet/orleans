@@ -36,8 +36,6 @@ namespace Orleans.Runtime
             base.Start();
         }
 
-        #region Overrides of AsynchAgent
-
         protected override void Run()
         {
             while (!Cts.IsCancellationRequested)
@@ -57,8 +55,6 @@ namespace Orleans.Runtime
                 }
             }
         }
-
-        #endregion
 
         private void WatchdogHeartbeatTick(object state)
         {

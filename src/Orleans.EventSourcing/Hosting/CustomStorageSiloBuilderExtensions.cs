@@ -27,6 +27,22 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(services => services.AddCustomStorageBasedLogConsistencyProvider(name, primaryCluster));
         }
 
+        /// <summary>
+        /// Adds a custom storage log consistency provider as default consistency provider"/>
+        /// </summary>
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder, string primaryCluster = null)
+        {
+            return builder.AddCustomStorageBasedLogConsistencyProvider(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, primaryCluster);
+        }
+
+        /// <summary>
+        /// Adds a custom storage log consistency provider"/>
+        /// </summary>
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string primaryCluster = null)
+        {
+            return builder.ConfigureServices(services => services.AddCustomStorageBasedLogConsistencyProvider(name, primaryCluster));
+        }
+
         internal static void AddCustomStorageBasedLogConsistencyProvider(this IServiceCollection services, string name, string primaryCluster)
         {
             services.AddOptions<CustomStorageLogConsistencyOptions>(name)

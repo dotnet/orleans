@@ -118,5 +118,7 @@ namespace Orleans.Serialization
         /// <param name="array">Array to output the data to.</param>
         /// <param name="n">Number of bytes to read.</param>
         void ReadBlockInto(Array array, int n);
+
+        byte PeekByte();
     }
 }

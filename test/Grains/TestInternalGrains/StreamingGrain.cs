@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -145,7 +145,7 @@ namespace UnitTests.Grains
         [NonSerialized]
         private ILogger _logger;
         [NonSerialized]
-        private IAsyncBatchObserver<StreamItem> _observer;
+        private IAsyncObserver<StreamItem> _observer;
         [NonSerialized]
         private Dictionary<IDisposable, TimerState> _timers;
 
@@ -195,7 +195,7 @@ namespace UnitTests.Grains
             // only SimpleMessageStreamProducer implements IDisposable and a means to verify it was cleaned up.
             if (null == observerAsSMSProducer)
             {
-                _logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuted.");
+                _logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
                 _observerDisposedYet = true;
             }
             else
@@ -222,7 +222,7 @@ namespace UnitTests.Grains
             // only SimpleMessageStreamProducer implements IDisposable and a means to verify it was cleaned up.
             if (null == observerAsSMSProducer)
             {
-                //_logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuted.");
+                //_logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
                 _observerDisposedYet = true;
             }
             else

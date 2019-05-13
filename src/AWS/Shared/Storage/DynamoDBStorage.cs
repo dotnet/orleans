@@ -190,8 +190,6 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-#region Table Management Operations
-        
         private void CreateClient()
         {
             if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
@@ -289,11 +287,14 @@ namespace Orleans.Transactions.DynamoDB
             }
         }
 
-        #endregion
-
-        #region CRUD
-
-        /// <inheritdoc />
+        /// <summary>
+        /// Create or Replace an entry in a DynamoDB Table
+        /// </summary>
+        /// <param name="tableName">The name of the table to put an entry</param>
+        /// <param name="fields">The fields/attributes to add or replace in the table</param>
+        /// <param name="conditionExpression">Optional conditional expression</param>
+        /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
+        /// <returns></returns>
         public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
             if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Creating {0} table entry: {1}", tableName, Utils.DictionaryToString(fields));
@@ -587,7 +588,5 @@ namespace Orleans.Transactions.DynamoDB
                 throw;
             }
         }
-
-#endregion
     }
 }

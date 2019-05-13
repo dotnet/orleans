@@ -1,10 +1,11 @@
-﻿using Xunit.Abstractions;
+﻿using Orleans.Transactions.TestKit.xUnit;
+using Xunit.Abstractions;
 using Xunit;
 
 namespace Orleans.Transactions.Tests
 {
     [TestCategory("BVT"), TestCategory("Transactions")]
-    public class GoldenPathTransactionMemoryTests : GoldenPathTransactionTestRunner, IClassFixture<MemoryTransactionsFixture>
+    public class GoldenPathTransactionMemoryTests : GoldenPathTransactionTestRunnerxUnit, IClassFixture<MemoryTransactionsFixture>
     {
         public GoldenPathTransactionMemoryTests(MemoryTransactionsFixture fixture, ITestOutputHelper output)
             : base(fixture.GrainFactory, output)

@@ -32,17 +32,15 @@ namespace Orleans.Configuration
         public bool DeleteStateOnClear { get; set; } = false;
 
         /// <summary>
-        /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialzed prior to use.
+        /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
-        #region json serialization
         public bool UseJson { get; set; }
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
-        #endregion json serialization
     }
     /// <summary>
     /// Configuration validator for AzureTableStorageOptions

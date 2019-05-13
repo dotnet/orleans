@@ -19,8 +19,17 @@ namespace Orleans.Core
 
         public TState State
         {
-            get { return grainState.State; }
-            set { grainState.State = value; }
+            get
+            {
+                CheckRuntimeContext();
+                return grainState.State;
+            }
+
+            set
+            {
+                CheckRuntimeContext();
+                grainState.State = value;
+            }
         }
 
         public string Etag
@@ -52,6 +61,8 @@ namespace Orleans.Core
             Stopwatch sw = Stopwatch.StartNew();
             try
             {
+                CheckRuntimeContext();
+
                 await store.ReadStateAsync(name, grainRef, grainState);
 
                 StorageStatisticsGroup.OnStorageRead(name, grainRef, sw.Elapsed);
@@ -82,6 +93,8 @@ namespace Orleans.Core
             const string what = "WriteState";
             try
             {
+                CheckRuntimeContext();
+
                 Stopwatch sw = Stopwatch.StartNew();
                 await store.WriteStateAsync(name, grainRef, grainState);
                 sw.Stop();
@@ -109,6 +122,8 @@ namespace Orleans.Core
             const string what = "ClearState";
             try
             {
+                CheckRuntimeContext();
+
                 Stopwatch sw = Stopwatch.StartNew();
                 // Clear (most likely Delete) state from external storage
                 await store.ClearStateAsync(name, grainRef, grainState);
@@ -144,6 +159,14 @@ namespace Orleans.Core
 
             return string.Format("Error from storage provider {0} during {1} for grain Type={2} Pk={3} Id={4} Error={5}" + Environment.NewLine + " {6}",
                 $"{this.store.GetType().Name}.{this.name}", what, name, grainRef.GrainId.ToDetailedString(), grainRef, errorCode, LogFormatter.PrintException(exc));
+        }
+
+        private static void CheckRuntimeContext()
+        {
+            if (RuntimeContext.Current == null)
+            {
+                throw new InvalidOperationException("Activation access violation. A non-activation thread attempted to access activation state.");
+            }
         }
     }
 }

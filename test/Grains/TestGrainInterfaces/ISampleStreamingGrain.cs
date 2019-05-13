@@ -30,4 +30,9 @@ namespace UnitTests.GrainInterfaces
     public interface ISampleStreaming_InlineConsumerGrain : ISampleStreaming_ConsumerGrain
     {
     }
+
+    public interface IGrainWithGenericMethodsValue : IGrainWithGuidKey
+    {
+        ValueTask<int> ValueTaskMethod(bool useCache);
+    }
 }

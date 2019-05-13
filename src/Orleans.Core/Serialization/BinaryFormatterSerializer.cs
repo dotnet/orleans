@@ -12,7 +12,7 @@ namespace Orleans.Serialization
     {
         public bool IsSupportedType(Type itemType)
         {
-            return itemType.GetTypeInfo().IsSerializable;
+            return itemType.IsSerializable;
         }
 
         public object DeepCopy(object source, ICopyContext context)

@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
@@ -19,19 +17,21 @@ using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Tester;
 
 namespace ServiceBus.Tests.StreamingTests
 {
-    [TestCategory("EventHub"), TestCategory("Streaming")]
+    [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
     public class EHStreamProviderCheckpointTests : TestClusterPerTest
     {
         private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
-        private const string EHPath = "ehorleanstest";
+        private const string EHPath = "ehorleanstest6";
         private const string EHConsumerGroup = "orleansnightly";
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
+            TestUtils.CheckForEventHub();
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
@@ -42,26 +42,29 @@ namespace ServiceBus.Tests.StreamingTests
             {
                 hostBuilder
                     .AddAzureBlobGrainStorage(
-                    ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
-                    (AzureBlobStorageOptions options) =>
+                        ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
+                        (AzureBlobStorageOptions options) =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        })
+                    .AddEventHubStreams(StreamProviderName, b=>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    })
-                    .AddEventHubStreams(StreamProviderName, b=>b
-                    .ConfigureEventHub(ob=>ob.Configure(
-                    options =>
-                    {
-                        options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                        options.ConsumerGroup = EHConsumerGroup;
-                        options.Path = EHPath;
-                     
-                    }))
-                    .UseEventHubCheckpointer(ob=>ob.Configure(options => {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        options.PersistInterval = TimeSpan.FromSeconds(1);
-                    }))
-                    .UseDynamicClusterConfigDeploymentBalancer()
-                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                        b.UseDynamicClusterConfigDeploymentBalancer();
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                        b.ConfigureEventHub(ob => ob.Configure(
+                            options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
+
+                            }));
+                        b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.PersistInterval = TimeSpan.FromSeconds(1);
+                        }));
+                    });
             }
         }
 
@@ -70,26 +73,27 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddEventHubStreams(StreamProviderName, b=>b
-                    .ConfigureEventHub(ob => ob.Configure(
-                    options =>
+                    .AddEventHubStreams(StreamProviderName, b=>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                        options.ConsumerGroup = EHConsumerGroup;
-                        options.Path = EHPath;
-                    }))
-                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                        b.ConfigureEventHub(ob => ob.Configure(options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConsumerGroup = EHConsumerGroup;
+                            options.Path = EHPath;
+                        }));
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    });
             }
         }
 
-        [Fact]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5356")]
         public async Task ReloadFromCheckpointTest()
         {
             logger.Info("************************ EHReloadFromCheckpointTest *********************************");
             await this.ReloadFromCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 1, 256);
         }
 
-        [Fact]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5356")]
         public async Task RestartSiloAfterCheckpointTest()
         {
             logger.Info("************************ EHRestartSiloAfterCheckpointTest *********************************");
@@ -124,7 +128,7 @@ namespace ServiceBus.Tests.StreamingTests
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
                 await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(60));
 
-                HostedCluster.RestartSilo(HostedCluster.SecondarySilos[0]);
+                await HostedCluster.RestartSiloAsync(HostedCluster.SecondarySilos[0]);
                 await HostedCluster.WaitForLivenessToStabilizeAsync();
 
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);

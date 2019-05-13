@@ -17,7 +17,7 @@ namespace UnitTests.Serialization
 
         public ILBasedExceptionSerializerTests()
         {
-            this.environment = SerializationTestEnvironment.Initialize(null, typeof(ILBasedSerializer).GetTypeInfo());
+            this.environment = SerializationTestEnvironment.Initialize(null, typeof(ILBasedSerializer));
         }
 
         /// <summary>

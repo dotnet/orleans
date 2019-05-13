@@ -18,7 +18,7 @@ namespace UnitTests.Grains
     }
 
     /// <summary>
-    /// A simple grain that allows to set two agruments and then multiply them.
+    /// A simple grain that allows to set two arguments and then multiply them.
     /// </summary>
     [StorageProvider(ProviderName = "MemoryStore")]
     public class ChainedGrain : Grain<ChainedGrainState>, IChainedGrain
@@ -30,8 +30,6 @@ namespace UnitTests.Grains
             logger = this.GetLogger("ChainedGrain-" + IdentityString);
             return base.OnActivateAsync();
         }
-
-        #region IChainedGrain Members
 
         Task<IChainedGrain> IChainedGrain.GetNext() { return Task.FromResult(State.Next); } 
 
@@ -99,7 +97,5 @@ namespace UnitTests.Grains
         {
             return next.Next.SetNextNested(new ChainGrainHolder { Next = null });
         }
-
-        #endregion
     }
 }

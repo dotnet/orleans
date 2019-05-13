@@ -289,7 +289,7 @@ namespace Orleans.Tests.SqlUtils
 
 
         /// <summary>
-        /// Checks the the parameters passed into a ReadAsync() or Read() are valid.
+        /// Checks the parameters passed into a ReadAsync() or Read() are valid.
         /// </summary>        
         /// <param name="buffer"></param>
         /// <param name="offset"></param>

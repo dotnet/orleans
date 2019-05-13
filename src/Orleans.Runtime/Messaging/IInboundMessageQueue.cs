@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -10,6 +11,6 @@ namespace Orleans.Runtime.Messaging
 
         void PostMessage(Message message);
 
-        Message WaitMessage(Message.Categories type);
+        Message WaitMessage(Message.Categories type, CancellationToken cancellationToken);
     }
 }

@@ -1,4 +1,6 @@
-﻿using System;
+﻿
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions.Abstractions
@@ -6,67 +8,55 @@ namespace Orleans.Transactions.Abstractions
     public interface ITransactionManager
     {
         /// <summary>
-        /// Start the TM
+        /// Request sent by TA to TM. The TM responds after committing or aborting the transaction.
         /// </summary>
-        /// <remarks>
-        /// This must be called before any other method.
-        /// </remarks>
-        Task StartAsync();
+        /// <param name="transactionId">the id of the transaction to prepare</param>
+        /// <param name="accessCount">number of reads/writes performed on this participant by this transaction</param>
+        /// <param name="timeStamp">the commit timestamp for this transaction</param>
+        /// <param name="writerResources">the participants who wrote during the transaction</param>
+        /// <param name="totalParticipants">the total number of participants in the transaction</param>
+        /// <returns>the status of the transaction</returns>
+        Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp,
+            List<ParticipantId> writerResources, int totalParticipants);
 
         /// <summary>
-        /// Stop the TM
+        /// One-way message sent by a participant to the TM after it (successfully or unsuccessfully) prepares.
         /// </summary>
-        Task StopAsync();
-
-        /// <summary>
-        /// Start a new transaction.
-        /// </summary>
-        /// <param name="timeout">
-        /// Transaction is automatically aborted if it does not complete within timeout
-        /// </param>
-        /// <returns>Id of the started transaction</returns>
-        long StartTransaction(TimeSpan timeout);
-
-        /// <summary>
-        /// Initiates Transaction Commit.
-        /// </summary>
-        /// <param name="transactionInfo"></param>
-        /// <remarks>
-        /// Use GetTransactionState to poll for the outcome.
-        /// </remarks>
-        /// <exception cref="OrleansTransactionAbortedException"></exception>
-        void CommitTransaction(TransactionInfo transactionInfo);
-
-        /// <summary>
-        /// Abort Transaction.
-        /// </summary>
-        /// <param name="transactionId"></param>
-        /// <param name="reason"></param>
+        /// <param name="transactionId">The id of the transaction</param>
+        /// <param name="timeStamp">The commit timestamp of the transaction</param>
+        /// <param name="resource">The participant sending the message</param>
+        /// <param name="status">The outcome of the prepare</param>
         /// <returns></returns>
-        /// <remarks>
-        /// If called after CommitTransaction was called for the transaction it will be ignored.
-        /// </remarks>
-        void AbortTransaction(long transactionId, OrleansTransactionAbortedException reason);
+        Task Prepared(Guid transactionId, DateTime timeStamp, ParticipantId resource, TransactionalStatus status);
 
         /// <summary>
-        /// Get the state of the transaction.
+        /// One-way message sent by participants to TM, to let TM know they are still waiting to hear about
+        /// the fate of a transaction.
         /// </summary>
-        /// <param name="transactionId"></param>
-        /// <param name="abortingException">If the transaction aborted, returns the exception that caused the abort</param>
-        /// <returns>Transaction state</returns>
-        TransactionStatus GetTransactionStatus(long transactionId, out OrleansTransactionAbortedException abortingException);
-
-        /// <summary>
-        /// Return a safe TransactionId for read-only snapshot isolation.
-        /// </summary>
-        long GetReadOnlyTransactionId();
+        /// <param name="transactionId">The id of the transaction</param>
+        /// <param name="timeStamp">The commit timestamp of the transaction</param>
+        /// <param name="resource">The participant sending the message</param>
+        Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource);
     }
 
-   public enum TransactionStatus
+
+
+    /// <summary>
+    /// Counts read and write accesses on a transaction participant.
+    /// </summary>
+    [Serializable]
+    public struct AccessCounter
     {
-        InProgress = 0,
-        Committed = 1,
-        Aborted = 2,
-        Unknown = 3,
+        public int Reads;
+        public int Writes;
+
+        public static AccessCounter operator +(AccessCounter c1, AccessCounter c2)
+        {
+            return new AccessCounter { Reads = c1.Reads + c2.Reads, Writes = c1.Writes + c2.Writes };
+        }
     }
 }
+
+  
+   
+

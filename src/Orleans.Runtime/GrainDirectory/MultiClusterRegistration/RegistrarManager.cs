@@ -44,7 +44,7 @@ namespace Orleans.Runtime.GrainDirectory
             return this.GetRegistrar(strategy);
         }
 
-        private IGrainRegistrar GetRegistrar(IMultiClusterRegistrationStrategy strategy)
+        public IGrainRegistrar GetRegistrar(IMultiClusterRegistrationStrategy strategy)
         {
             IGrainRegistrar result;
             var strategyType = strategy.GetType();

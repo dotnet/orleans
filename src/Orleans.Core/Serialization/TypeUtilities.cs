@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text;
@@ -21,84 +20,74 @@ namespace Orleans.Serialization
                    t == typeof(string) ||
                    t == typeof(DateTime) ||
                    t == typeof(Decimal) ||
+                   t == typeof(Guid) ||
                    (t.IsArray && t.GetElementType().IsOrleansPrimitive());
         }
 
-        static readonly ConcurrentDictionary<Type, bool> shallowCopyableTypes = new ConcurrentDictionary<Type, bool>();
         static readonly ConcurrentDictionary<Type, string> typeNameCache = new ConcurrentDictionary<Type, string>();
         static readonly ConcurrentDictionary<Type, string> typeKeyStringCache = new ConcurrentDictionary<Type, string>();
         static readonly ConcurrentDictionary<Type, byte[]> typeKeyCache = new ConcurrentDictionary<Type, byte[]>();
 
-        static TypeUtilities()
+        static readonly ConcurrentDictionary<Type, bool> shallowCopyableTypes = new ConcurrentDictionary<Type, bool>
         {
-            shallowCopyableTypes[typeof(Decimal)] = true;
-            shallowCopyableTypes[typeof(DateTime)] = true;
-            shallowCopyableTypes[typeof(TimeSpan)] = true;
-            shallowCopyableTypes[typeof(IPAddress)] = true;
-            shallowCopyableTypes[typeof(IPEndPoint)] = true;
-            shallowCopyableTypes[typeof(SiloAddress)] = true;
-            shallowCopyableTypes[typeof(GrainId)] = true;
-            shallowCopyableTypes[typeof(ActivationId)] = true;
-            shallowCopyableTypes[typeof(ActivationAddress)] = true;
-            shallowCopyableTypes[typeof(CorrelationId)] = true;
-            shallowCopyableTypes[typeof(string)] = true;
-            shallowCopyableTypes[typeof(Immutable<>)] = true;
-            shallowCopyableTypes[typeof(CancellationToken)] = true;
-        }
+            [typeof(Decimal)] = true,
+            [typeof(DateTime)] = true,
+            [typeof(TimeSpan)] = true,
+            [typeof(IPAddress)] = true,
+            [typeof(IPEndPoint)] = true,
+            [typeof(SiloAddress)] = true,
+            [typeof(GrainId)] = true,
+            [typeof(ActivationId)] = true,
+            [typeof(ActivationAddress)] = true,
+            [typeof(CorrelationId)] = true,
+            [typeof(string)] = true,
+            [typeof(CancellationToken)] = true,
+            [typeof(Guid)] = true,
+        };
 
         internal static bool IsOrleansShallowCopyable(this Type t)
         {
-            bool result;
-            if (shallowCopyableTypes.TryGetValue(t, out result))
+            if (shallowCopyableTypes.TryGetValue(t, out var result))
             {
                 return result;
             }
+            return shallowCopyableTypes.GetOrAdd(t, IsShallowCopyableInternal(t));
+        }
 
-            var typeInfo = t.GetTypeInfo();
-            if (typeInfo.IsPrimitive || typeInfo.IsEnum)
-            {
-                shallowCopyableTypes[t] = true;
+        private static bool IsShallowCopyableInternal(Type t)
+        {
+            if (t.IsPrimitive || t.IsEnum)
                 return true;
-            }
 
-            if (typeInfo.GetCustomAttributes(typeof(ImmutableAttribute), false).Any())
-            {
-                shallowCopyableTypes[t] = true;
+            if (t.GetCustomAttributes(typeof(ImmutableAttribute), false).Length != 0)
                 return true;
+
+            if (t.IsConstructedGenericType)
+            {
+                var def = t.GetGenericTypeDefinition();
+
+                if (def == typeof(Immutable<>))
+                    return true;
+
+                if (def == typeof(Nullable<>)
+                    || def == typeof(Tuple<>)
+                    || def == typeof(Tuple<,>)
+                    || def == typeof(Tuple<,,>)
+                    || def == typeof(Tuple<,,,>)
+                    || def == typeof(Tuple<,,,,>)
+                    || def == typeof(Tuple<,,,,,>)
+                    || def == typeof(Tuple<,,,,,,>)
+                    || def == typeof(Tuple<,,,,,,,>))
+                    return Array.TrueForAll(t.GenericTypeArguments, a => IsOrleansShallowCopyable(a));
             }
 
-            if (typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition() == typeof(Immutable<>))
-            {
-                shallowCopyableTypes[t] = true;
+            if (t.IsValueType && !t.IsGenericTypeDefinition)
+                return Array.TrueForAll(t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), f => IsOrleansShallowCopyable(f.FieldType));
+
+            if (typeof(Exception).IsAssignableFrom(t))
                 return true;
-            }
 
-            if (typeof(Exception).IsAssignableFrom(typeInfo))
-            {
-                shallowCopyableTypes[t] = true;
-                return true;
-            }
-
-            if (typeInfo.IsValueType && !typeInfo.IsGenericType && !typeInfo.IsGenericTypeDefinition)
-            {
-                result = IsValueTypeFieldsShallowCopyable(typeInfo);
-                shallowCopyableTypes[t] = result;
-                return result;
-            }
-
-            shallowCopyableTypes[t] = false;
             return false;
-        }
-
-        private static bool IsValueTypeFieldsShallowCopyable(TypeInfo typeInfo)
-        {
-            return typeInfo.GetFields().All(f => f.FieldType != typeInfo.AsType() && IsOrleansShallowCopyable(f.FieldType));
-        }
-
-        internal static bool IsSpecializationOf(this Type t, Type match)
-        {
-            var typeInfo = t.GetTypeInfo();
-            return typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition() == match;
         }
 
         internal static string OrleansTypeName(this Type t)
@@ -129,15 +118,14 @@ namespace Orleans.Serialization
             if (typeKeyStringCache.TryGetValue(t, out key))
                 return key;
 
-            var typeInfo = t.GetTypeInfo();
             var sb = new StringBuilder();
-            if (typeInfo.IsGenericTypeDefinition)
+            if (t.IsGenericTypeDefinition)
             {
                 sb.Append(GetBaseTypeKey(t));
                 sb.Append('\'');
-                sb.Append(typeInfo.GetGenericArguments().Length);
+                sb.Append(t.GetGenericArguments().Length);
             }
-            else if (typeInfo.IsGenericType)
+            else if (t.IsGenericType)
             {
                 sb.Append(GetBaseTypeKey(t));
                 sb.Append('<');
@@ -176,20 +164,18 @@ namespace Orleans.Serialization
 
         private static string GetBaseTypeKey(Type t)
         {
-            var typeInfo = t.GetTypeInfo();
-
             string namespacePrefix = "";
-            if ((typeInfo.Namespace != null) && !typeInfo.Namespace.StartsWith("System.") && !typeInfo.Namespace.Equals("System"))
+            if ((t.Namespace != null) && !t.Namespace.StartsWith("System.") && !t.Namespace.Equals("System"))
             {
-                namespacePrefix = typeInfo.Namespace + '.';
+                namespacePrefix = t.Namespace + '.';
             }
 
-            if (typeInfo.IsNestedPublic)
+            if (t.IsNestedPublic)
             {
-                return namespacePrefix + OrleansTypeKeyString(typeInfo.DeclaringType) + "." + typeInfo.Name;
+                return namespacePrefix + OrleansTypeKeyString(t.DeclaringType) + "." + t.Name;
             }
 
-            return namespacePrefix + typeInfo.Name;
+            return namespacePrefix + t.Name;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -232,7 +218,6 @@ namespace Orleans.Serialization
             if (type.IsPointer || type.IsByRef) return false;
 
             // Generic types are only accessible if their generic arguments are accessible.
-            var typeInfo = type.GetTypeInfo();
             if (type.IsConstructedGenericType)
             {
                 foreach (var parameter in type.GetGenericArguments())
@@ -240,12 +225,12 @@ namespace Orleans.Serialization
                     if (!IsAccessibleFromAssembly(parameter, assembly)) return false;
                 }
             }
-            else if (typeInfo.IsGenericTypeDefinition)
+            else if (type.IsGenericTypeDefinition)
             {
                 // Guard against unrepresentable type constraints, which appear when generating code for some languages, such as F#.
-                foreach (var parameter in typeInfo.GenericTypeParameters)
+                foreach (var parameter in type.GetTypeInfo().GenericTypeParameters)
                 {
-                    foreach (var constraint in parameter.GetTypeInfo().GetGenericParameterConstraints())
+                    foreach (var constraint in parameter.GetGenericParameterConstraints())
                     {
                         if (constraint == typeof(Array) || constraint == typeof(Delegate) || constraint == typeof(Enum)) return false;
                     }
@@ -253,16 +238,16 @@ namespace Orleans.Serialization
             }
 
             // Internal types are accessible only if the declaring assembly exposes its internals to the target assembly.
-            if (typeInfo.IsNotPublic || typeInfo.IsNestedAssembly || typeInfo.IsNestedFamORAssem)
+            if (type.IsNotPublic || type.IsNestedAssembly || type.IsNestedFamORAssem)
             {
-                if (!AreInternalsVisibleTo(typeInfo.Assembly, assembly)) return false;
+                if (!AreInternalsVisibleTo(type.Assembly, assembly)) return false;
             }
 
             // Nested types which are private or protected are not accessible.
-            if (typeInfo.IsNestedPrivate || typeInfo.IsNestedFamily || typeInfo.IsNestedFamANDAssem) return false;
+            if (type.IsNestedPrivate || type.IsNestedFamily || type.IsNestedFamANDAssem) return false;
 
             // Nested types are otherwise accessible if their declaring type is accessible.
-            if (typeInfo.IsNested)
+            if (type.IsNested)
             {
                 return IsAccessibleFromAssembly(type.DeclaringType, assembly);
             }

@@ -150,7 +150,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Acquire a stream message cursor.  This can be used to retreave messages from the
+        /// Acquire a stream message cursor.  This can be used to retrieve messages from the
         ///   cache starting at the location indicated by the provided token.
         /// </summary>
         /// <param name="streamIdentity"></param>
@@ -174,12 +174,8 @@ namespace Orleans.Providers.Streams.Common
                 return;
             }
 
-            // if no token is provided, set cursor to idle at end of cache
-            if (sequenceToken == null)
-            {
-                UnsetCursor(cursor, cachedMessages.First?.Value?.SequenceToken);
-                return;
-            }
+            // if no token is provided, set token to item at end of cache
+            sequenceToken = sequenceToken ?? cachedMessages.First?.Value?.SequenceToken;
 
             // If sequenceToken is too new to be in cache, unset token, and wait for more data.
             if (sequenceToken.Newer(cachedMessages.First.Value.SequenceToken))
@@ -229,7 +225,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Aquires the next message in the cache at the provided cursor
+        /// Acquires the next message in the cache at the provided cursor
         /// </summary>
         /// <param name="cursor"></param>
         /// <param name="batch"></param>

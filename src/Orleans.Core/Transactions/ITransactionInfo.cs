@@ -1,6 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿
+using Orleans.Serialization;
+using System;
 
 namespace Orleans.Transactions
 {
@@ -13,12 +13,21 @@ namespace Orleans.Transactions
         /// <summary>
         /// The transaction identifier.
         /// </summary>
-        long TransactionId { get; }
+        string Id { get; }
 
         /// <summary>
-        /// Indicates that the transaction has aborted.
+        /// Record an unhandled exception thrown by a grain call. This causes the transaction to abort.
         /// </summary>
-        bool IsAborted { get; set; }
+        /// <param name="e">The unhandled exception that was thrown by the grain call</param>
+        /// <param name="serializationManager">The serialization manager used for serializing the exception</param>
+        void RecordException(Exception e, SerializationManager serializationManager);
+
+        /// <summary>
+        /// Check if this transaction must abort. 
+        /// </summary>
+        /// <param name="serializationManager">The serialization manager used for deserializing the exception</param>
+        /// <returns>returns an exception object if the transaction must abort, or null otherwise</returns>
+        OrleansTransactionAbortedException MustAbort(SerializationManager serializationManager);
 
         /// <summary>
         /// Forks the transaction info, for passing a copy to a call.
@@ -33,11 +42,10 @@ namespace Orleans.Transactions
 
 
         /// <summary>
-        /// Applies all pending joins, and returns true if there are no orphaned calls
+        /// Applies all pending joins 
         /// </summary>
-        /// <returns>true if there are no orphans, false otherwise</returns>
-        bool ReconcilePending(out int numberOrphans);
+        void ReconcilePending();
     }
 
-
+ 
 }

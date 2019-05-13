@@ -7,7 +7,6 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
     <AssemblyName>Orleans.TelemetryConsumers.NewRelic</AssemblyName>
     <RootNamespace>Orleans.TelemetryConsumers.NewRelic</RootNamespace>
   </PropertyGroup>

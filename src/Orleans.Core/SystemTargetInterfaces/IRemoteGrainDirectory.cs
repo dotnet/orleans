@@ -61,7 +61,7 @@ namespace Orleans.Runtime
         Task<List<Tuple<GrainId, int, List<ActivationAddress>>>> LookUpMany(List<Tuple<GrainId, int>> grainAndETagList);
 
         /// <summary>
-        /// Handoffs the the directory partition from source silo to the destination silo.
+        /// Handoffs the directory partition from source silo to the destination silo.
         /// </summary>
         /// <param name="source">The address of the owner of the partition.</param>
         /// <param name="partition">The (full or partial) copy of the directory partition to be Haded off.</param>
@@ -76,5 +76,13 @@ namespace Orleans.Runtime
         /// <param name="source">The address of the owner of the partition.</param>
         /// <returns></returns>
         Task RemoveHandoffPartition(SiloAddress source);
+
+        /// <summary>
+        /// Registers activations from a split partition with this directory.
+        /// </summary>
+        /// <param name="singleActivations">The single-activation registrations from the split partition.</param>
+        /// <param name="multiActivations">The multiple-activation registrations from the split partition.</param>
+        /// <returns></returns>
+        Task AcceptSplitPartition(List<ActivationAddress> singleActivations, List<ActivationAddress> multiActivations);
     }
 }

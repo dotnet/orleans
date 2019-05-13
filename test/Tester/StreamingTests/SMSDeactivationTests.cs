@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -17,7 +18,7 @@ namespace UnitTests.StreamingTests
         private const string SMSStreamProviderName = "SMSProvider";
         private const string StreamNamespace = "SMSDeactivationTestsNamespace";
         private readonly DeactivationTestRunner runner;
-
+        public static readonly TimeSpan CollectionAge = GrainCollectionOptions.DEFAULT_COLLECTION_QUANTUM + TimeSpan.FromSeconds(1);
         public SMSDeactivationTests()
         {
             runner = new DeactivationTestRunner(SMSStreamProviderName, this.Client);
@@ -25,12 +26,6 @@ namespace UnitTests.StreamingTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromMinutes(1));
-                legacy.ClusterConfiguration.Globals.Application.SetCollectionAgeLimit(typeof(MultipleSubscriptionConsumerGrain), TimeSpan.FromHours(2));
-                legacy.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromMinutes(30);
-            });
             builder.AddClientBuilderConfigurator<ClientConfiguretor>();
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
@@ -40,7 +35,13 @@ namespace UnitTests.StreamingTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
-                     .AddMemoryGrainStorage("PubSubStore");
+                     .AddMemoryGrainStorage("PubSubStore")
+                     .Configure<GrainCollectionOptions>(op =>
+                    {
+                        op.CollectionAge = CollectionAge;
+                        op.ClassSpecificCollectionAge.Add(typeof(MultipleSubscriptionConsumerGrain).FullName, TimeSpan.FromHours(2));
+                    })
+                    .Configure<SiloMessagingOptions>(op=>op.ResponseTimeout = TimeSpan.FromMinutes(30));
             }
         }
         public class ClientConfiguretor : IClientBuilderConfigurator

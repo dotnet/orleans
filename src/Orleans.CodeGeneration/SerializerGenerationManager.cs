@@ -56,12 +56,11 @@ namespace Orleans.CodeGenerator
         private bool HasSerializer(Type type)
         {
             if (this.typesToIgnore.Contains(type)) return true;
-            var typeInfo = type.GetTypeInfo();
-            if (typeInfo.IsOrleansPrimitive()) return true;
-            if (!typeInfo.IsGenericType) return false;
-            var genericTypeDefinition = typeInfo.GetGenericTypeDefinition();
+            if (type.IsOrleansPrimitive()) return true;
+            if (!type.IsGenericType) return false;
+            var genericTypeDefinition = type.GetGenericTypeDefinition();
             return this.typesToIgnore.Contains(genericTypeDefinition) &&
-                   typeInfo.GetGenericArguments().All(arg => HasSerializer(arg));
+                   type.GetGenericArguments().All(arg => this.HasSerializer(arg));
         }
 
         internal bool IsTypeRecorded(Type type)
@@ -83,9 +82,9 @@ namespace Orleans.CodeGenerator
 
             if (t.IsGenericParameter || processedTypes.Contains(t) || typesToProcess.Contains(t)
                 || typesToIgnore.Contains(t)
-                || typeof (Exception).GetTypeInfo().IsAssignableFrom(t)
-                || typeof (Delegate).GetTypeInfo().IsAssignableFrom(t)
-                || typeof (Task<>).GetTypeInfo().IsAssignableFrom(t)) return false;
+                || typeof (Exception).IsAssignableFrom(t)
+                || typeof (Delegate).IsAssignableFrom(t)
+                || typeof (Task<>).IsAssignableFrom(t)) return false;
 
             if (t.IsArray)
             {
@@ -121,7 +120,7 @@ namespace Orleans.CodeGenerator
             }
 
             if (t.IsOrleansPrimitive() || this.HasSerializer(t) ||
-                typeof(IAddressable).GetTypeInfo().IsAssignableFrom(t)) return false;
+                typeof(IAddressable).IsAssignableFrom(t)) return false;
 
             if (t.Namespace != null && (t.Namespace.Equals("System") || t.Namespace.StartsWith("System.")))
             {

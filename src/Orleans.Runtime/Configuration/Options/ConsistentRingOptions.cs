@@ -10,7 +10,7 @@ namespace Orleans.Configuration
     public class ConsistentRingOptions
     {
         /// <summary>
-        /// Determines the number of registerations a silo maintains in a consistent hash ring.  This affects the probabilistic
+        /// Determines the number of registrations a silo maintains in a consistent hash ring.  This affects the probabilistic
         ///   balancing of resource allocations across the cluster.  More virtual buckets increase the probability of evenly balancing
         ///   while minimally increasing management cost. 
         /// </summary>

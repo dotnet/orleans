@@ -130,7 +130,7 @@ namespace UnitTests.StorageTests
 
         public async override Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            logger.Info(0, "WriteStateAsync for {0} {1} ErrorInjection={0}", grainType, grainReference, ErrorInjection);
+            logger.Info(0, "WriteStateAsync for {grainType} {grainReference} ErrorInjection={errorInjection}", grainType, grainReference, ErrorInjection);
             try
             {
                 ThrowIfMatches(ErrorInjectionPoint.BeforeWrite);
@@ -159,7 +159,6 @@ namespace UnitTests.StorageTests
             }
         }
 
-        #region IControllable interface methods
         /// <summary>
         /// A function to execute a control command.
         /// </summary>
@@ -176,6 +175,5 @@ namespace UnitTests.StorageTests
                     return base.ExecuteCommand(command, arg);
             }
         }
-        #endregion
     }
 }

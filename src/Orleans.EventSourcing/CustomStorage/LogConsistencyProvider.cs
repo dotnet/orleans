@@ -1,4 +1,4 @@
-﻿
+
 using Orleans.LogConsistency;
 using Orleans.Storage;
 using Orleans.Configuration;
@@ -22,7 +22,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
         /// <summary>
         /// Specifies a clusterid of the primary cluster from which to access storage exclusively, null if
-        /// storage should be accessed direcly from all clusters.
+        /// storage should be accessed directly from all clusters.
         /// </summary>
         public string PrimaryCluster => options.PrimaryCluster;
 
@@ -47,8 +47,8 @@ namespace Orleans.EventSourcing.CustomStorage
     {
         public static ILogViewAdaptorFactory Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<CustomStorageLogConsistencyOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<CustomStorageLogConsistencyOptions>>();
-            return ActivatorUtilities.CreateInstance<LogConsistencyProvider>(services, optionsSnapshot.Get(name));
+            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CustomStorageLogConsistencyOptions>>();
+            return ActivatorUtilities.CreateInstance<LogConsistencyProvider>(services, optionsMonitor.Get(name));
         }
     }
 }

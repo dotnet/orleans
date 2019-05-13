@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -10,13 +13,16 @@ namespace UnitTests.MessageCenterTests
     public class AsynchAgentRestartTest
     {
         private readonly ITestOutputHelper output;
+        private readonly ServiceProvider serviceProvider;
 
         private class TestAgent : DedicatedAsynchAgent
         {
             private readonly ITestOutputHelper output;
 
-            public TestAgent(ITestOutputHelper output)
-                : base(new ExecutorService(), NullLoggerFactory.Instance)
+            public TestAgent(ITestOutputHelper output, IServiceProvider serviceProvider)
+                : base(
+                    ActivatorUtilities.CreateInstance<ExecutorService>(serviceProvider),
+                    NullLoggerFactory.Instance)
             {
                 this.output = output;
             }
@@ -32,12 +38,19 @@ namespace UnitTests.MessageCenterTests
         public AsynchAgentRestartTest(ITestOutputHelper output)
         {
             this.output = output;
+
+            var services = new ServiceCollection();
+            services.AddSingleton<SchedulerStatisticsGroup>();
+            services.AddSingleton<StageAnalysisStatisticsGroup>();
+            services.AddLogging();
+            services.Configure<StatisticsOptions>(options => options.CollectionLevel = StatisticsLevel.Info);
+            this.serviceProvider = services.BuildServiceProvider();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Messaging")]
         public void AgentRestart()
         {
-            TestAgent t = new TestAgent(output);
+            TestAgent t = new TestAgent(output, this.serviceProvider);
 
             t.Start();
             Assert.Equal(ThreadState.Running, t.State); // "Agent state is wrong after initial start"
@@ -67,7 +80,7 @@ namespace UnitTests.MessageCenterTests
         [Fact, TestCategory("Functional"), TestCategory("Messaging")]
         public void AgentStartWhileStarted()
         {
-            TestAgent t = new TestAgent(output);
+            TestAgent t = new TestAgent(output, this.serviceProvider);
 
             t.Start();
             Thread.Sleep(100);
@@ -88,7 +101,7 @@ namespace UnitTests.MessageCenterTests
         [Fact, TestCategory("Functional"), TestCategory("Messaging")]
         public void AgentStopWhileStopped()
         {
-            TestAgent t = new TestAgent(output);
+            TestAgent t = new TestAgent(output, this.serviceProvider);
 
             t.Start();
             Thread.Sleep(100);

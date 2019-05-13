@@ -139,7 +139,7 @@ namespace Orleans.Runtime
         internal void GetTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
         {
             if (!ClusterGrainInterfaceMap.TryGetTypeInfo(typeCode, out grainClass, out placement, out activationStrategy, genericArguments))
-                throw new OrleansException(String.Format("Unexpected: Cannot find an implementation class for grain interface {0}", typeCode));
+                throw new OrleansException(string.Format("Unexpected: Cannot find an implementation class for grain interface {0}", typeCode));
         }
 
         internal void SetInterfaceMapsBySilo(Dictionary<SiloAddress, GrainInterfaceMap> value)
@@ -328,7 +328,7 @@ namespace Orleans.Runtime
 
                 if (excluded != null && excluded.Contains(className)) continue;
 
-                var typeData = grainType.GetTypeInfo().IsGenericTypeDefinition ?
+                var typeData = grainType.IsGenericTypeDefinition ?
                     new GenericGrainTypeData(grainType) :
                     new GrainTypeData(grainType);
                 result[className] = typeData;
@@ -345,7 +345,7 @@ namespace Orleans.Runtime
             foreach (var grainType in grainTypeData.Values.OrderBy(gtd => gtd.Type.FullName))
             {
                 // Skip system targets and Orleans grains
-                var assemblyName = grainType.Type.GetTypeInfo().Assembly.FullName.Split(',')[0];
+                var assemblyName = grainType.Type.Assembly.FullName.Split(',')[0];
                 if (!typeof(ISystemTarget).IsAssignableFrom(grainType.Type))
                 {
                     int grainClassTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainClassTypeCode(grainType.Type);
@@ -389,7 +389,7 @@ namespace Orleans.Runtime
             public InvokerData(Type invokerType)
             {
                 baseInvokerType = invokerType;
-                this.isGeneric = invokerType.GetTypeInfo().IsGenericType;
+                this.isGeneric = invokerType.IsGenericType;
                 if (this.isGeneric)
                 {
                     cachedGenericInvokers = new CachedReadConcurrentDictionary<string, IGrainMethodInvoker>();

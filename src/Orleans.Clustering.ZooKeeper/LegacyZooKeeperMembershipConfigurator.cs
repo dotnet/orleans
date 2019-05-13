@@ -14,5 +14,14 @@ namespace OrleansZooKeeperUtils
                 options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
             });
         }
+
+        public void Configure(object configuration, ISiloBuilder builder)
+        {
+            var reader = new GlobalConfigurationReader(configuration);
+            builder.UseZooKeeperClustering(options =>
+            {
+                options.ConnectionString = reader.GetPropertyValue<string>("DataConnectionString");
+            });
+        }
     }
 }

@@ -65,7 +65,6 @@ namespace Tester.AzureUtils.TimerTests
             await Test_Reminders_ReminderNotFound();
         }
 
-        #region Basic test
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic()
         {
@@ -112,18 +111,14 @@ namespace Tester.AzureUtils.TimerTests
             AssertIsInRange(curr, 2, 3, grain, DR, sleepFor);
             await grain.StopReminder(DR); // cleanup
         }
-        #endregion
 
-        #region Basic single grain multi reminders test
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_MultipleReminders()
         {
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             await PerGrainMultiReminderTest(grain);
         }
-        #endregion
 
-        #region Multiple joins ... multi grain, multi reminders
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_2J_MultiGrainMultiReminders()
         {
@@ -149,15 +144,13 @@ namespace Tester.AzureUtils.TimerTests
             // start two extra silos ... although it will take it a while before they stabilize
             log.Info("Starting 2 extra silos");
 
-            await this.HostedCluster.StartAdditionalSilos(2, true);
+            await this.HostedCluster.StartAdditionalSilosAsync(2, true);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             //Block until all tasks complete.
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT);
         }
-        #endregion
 
-        #region Multi grains multi reminders/grain test
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_MultiGrainMultiReminders()
         {
@@ -179,9 +172,6 @@ namespace Tester.AzureUtils.TimerTests
             //Block until all tasks complete.
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT);
         }
-        #endregion
-
-        #region Secondary failure ... Basic test
 
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_1F_Basic()
@@ -195,17 +185,15 @@ namespace Tester.AzureUtils.TimerTests
             Thread.Sleep(period.Multiply(failAfter));
             // stop the secondary silo
             log.Info("Stopping secondary silo");
-            this.HostedCluster.StopSilo(this.HostedCluster.SecondarySilos.First());
+            await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos.First());
 
             await test; // Block until test completes.
         }
-        #endregion
 
-        #region Multiple failures ... multiple grains
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_2F_MultiGrain()
         {
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilos(2,true);
+            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(2,true);
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -229,19 +217,17 @@ namespace Tester.AzureUtils.TimerTests
             // stop a couple of silos
             log.Info("Stopping 2 silos");
             int i = random.Next(silos.Count);
-            this.HostedCluster.StopSilo(silos[i]);
+            await this.HostedCluster.StopSiloAsync(silos[i]);
             silos.RemoveAt(i);
-            this.HostedCluster.StopSilo(silos[random.Next(silos.Count)]);
+            await this.HostedCluster.StopSiloAsync(silos[random.Next(silos.Count)]);
 
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
         }
-        #endregion
 
-        #region 1 join 1 failure simulateneously ... multiple grains
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_1F1J_MultiGrain()
         {
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilos(1);
+            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -266,25 +252,17 @@ namespace Tester.AzureUtils.TimerTests
             var siloToKill = silos[random.Next(silos.Count)];
             // stop a silo and join a new one in parallel
             log.Info("Stopping a silo and joining a silo");
-            Task<bool> t1 = Task.Factory.StartNew(() =>
-            {
-
-                this.HostedCluster.StopSilo(siloToKill);
-                return true;
-            });
-            Task<bool> t2 = this.HostedCluster.StartAdditionalSilos(1, true).ContinueWith(t =>
+            Task t1 = Task.Factory.StartNew(async () => await this.HostedCluster.StopSiloAsync(siloToKill));
+            Task t2 = this.HostedCluster.StartAdditionalSilosAsync(1, true).ContinueWith(t =>
             {
                 t.GetAwaiter().GetResult();
-                return true;
             });
             await Task.WhenAll(new[] { t1, t2 }).WithTimeout(ENDWAIT);
 
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
             log.Info("\n\n\nReminderTest_1F1J_MultiGrain passed OK.\n\n\n");
         }
-        #endregion
 
-        #region Register same reminder multiple times
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_RegisterSameReminderTwice()
         {
@@ -296,9 +274,7 @@ namespace Tester.AzureUtils.TimerTests
             //Assert.NotEqual(promise1.Result, promise2.Result);
             // TODO: write tests where period of a reminder is changed
         }
-        #endregion
 
-        #region Multiple grain types
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_GT_Basic()
         {
@@ -327,7 +303,7 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilos(1);
+            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -350,25 +326,13 @@ namespace Tester.AzureUtils.TimerTests
             var siloToKill = silos[random.Next(silos.Count)];
             // stop a silo and join a new one in parallel
             log.Info("Stopping a silo and joining a silo");
-            Task<bool> t1 = Task.Run(() =>
-            {
-                this.HostedCluster.StopSilo(siloToKill);
-                return true;
-            });
-            Task<bool> t2 = Task.Run(async () =>
-            {
-                await this.HostedCluster.StartAdditionalSilos(1);
-                return true;
-            });
+            Task t1 = Task.Run(async () => await this.HostedCluster.StopSiloAsync(siloToKill));
+            Task t2 = Task.Run(async () => await this.HostedCluster.StartAdditionalSilosAsync(1));
             await Task.WhenAll(new[] { t1, t2 }).WithTimeout(ENDWAIT);
 
             await Task.WhenAll(tasks).WithTimeout(ENDWAIT); // Block until all tasks complete.
         }
-        #endregion       
 
-        #region Testing things that should fail
-
-        #region Lower than allowed reminder period
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Wrong_LowerThanAllowedPeriod()
         {
@@ -376,9 +340,7 @@ namespace Tester.AzureUtils.TimerTests
             await Assert.ThrowsAsync<ArgumentException>(() =>
                 grain.StartReminder(DR, TimeSpan.FromMilliseconds(3000), true));
         }
-        #endregion
 
-        #region The wrong reminder grain
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_Wrong_Grain()
         {
@@ -387,9 +349,6 @@ namespace Tester.AzureUtils.TimerTests
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 grain.StartReminder(DR));
         }
-        #endregion
-
-        #endregion
     }
 
 }

@@ -11,62 +11,47 @@ namespace Orleans.Hosting
     public static class SiloBuilderExtensions
     {
         /// <summary>
-        /// Configure cluster to use an in-cluster transaction manager using a configure action.
+        /// Configure cluster to use the distributed TM algorithm
         /// </summary>
-        public static ISiloHostBuilder UseInClusterTransactionManager(this ISiloHostBuilder builder, Action<TransactionsOptions> configureOptions)
+        /// <param name="builder">Silo host builder</param>
+        /// <param name="withStatisticsReporter">Configure a transaction statistics reporter.  Set to false if you want to configure your own transaction statistics reporting or don't want transaction statistics reported</param>
+        /// <returns></returns>
+        public static ISiloHostBuilder UseTransactions(this ISiloHostBuilder builder, bool withStatisticsReporter = true)
         {
-            return builder.ConfigureServices(services => services.UseInClusterTransactionManager(configureOptions));
+            return builder.ConfigureServices(services => services.UseTransactions(withStatisticsReporter))
+                          .AddGrainExtension<ITransactionManagerExtension, TransactionManagerExtension>()
+                          .AddGrainExtension<ITransactionalResourceExtension, TransactionalResourceExtension>();
         }
 
         /// <summary>
-        /// Configure cluster to use an in-cluster transaction manager using a configuration builder.
+        /// Configure cluster to use the distributed TM algorithm
         /// </summary>
-        public static ISiloHostBuilder UseInClusterTransactionManager(this ISiloHostBuilder builder, Action<OptionsBuilder<TransactionsOptions>> configureOptions = null)
+        /// <param name="builder">Silo host builder</param>
+        /// <param name="withStatisticsReporter">Configure a transaction statistics reporter.  Set to false if you want to configure your own transaction statistics reporting or don't want transaction statistics reported</param>
+        /// <returns></returns>
+        public static ISiloBuilder UseTransactions(this ISiloBuilder builder, bool withStatisticsReporter = true)
         {
-            return builder.ConfigureServices(services => services.UseInClusterTransactionManager(configureOptions));
+            return builder.ConfigureServices(services => services.UseTransactions(withStatisticsReporter))
+                          .AddGrainExtension<ITransactionManagerExtension, TransactionManagerExtension>()
+                          .AddGrainExtension<ITransactionalResourceExtension, TransactionalResourceExtension>();
         }
 
-        /// <summary>
-        /// Configure cluster services to use an in-cluster transaction manager using a configure action.
-        /// </summary>
-        public static IServiceCollection UseInClusterTransactionManager(this IServiceCollection services, Action<TransactionsOptions> configureOptions)
+        internal static IServiceCollection UseTransactions(this IServiceCollection services, bool withReporter)
         {
-            return services.UseInClusterTransactionManager(ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure cluster services to use an in-cluster transaction manager using a configuration builder.
-        /// </summary>
-        public static IServiceCollection UseInClusterTransactionManager(this IServiceCollection services,
-            Action<OptionsBuilder<TransactionsOptions>> configureOptions = null)
-        {
-            configureOptions?.Invoke(services.AddOptions<TransactionsOptions>());
-            return services.AddTransient<TransactionLog>()
-                           .AddTransient<ITransactionManager, TransactionManager>()
-                           .AddSingleton<TransactionServiceGrainFactory>()
-                           .AddSingleton(sp => sp.GetRequiredService<TransactionServiceGrainFactory>().CreateTransactionManagerService());
-        }
-
-        /// <summary>
-        /// Configure cluster to support the use of transactional state.
-        /// </summary>
-        public static ISiloHostBuilder UseTransactionalState(this ISiloHostBuilder builder)
-        {
-            return builder.ConfigureServices(services => services.UseTransactionalState());
-        }
-
-        /// <summary>
-        /// Configure cluster to support the use of transactional state.
-        /// </summary>
-        public static IServiceCollection UseTransactionalState(this IServiceCollection services)
-        {
+            services.TryAddSingleton<IClock,Clock>();
+            services.TryAddSingleton<ITransactionAgentStatistics, TransactionAgentStatistics>();
+            services.TryAddSingleton<ITransactionOverloadDetector,TransactionOverloadDetector>();
+            services.AddSingleton<ITransactionAgent, TransactionAgent>();
             services.TryAddSingleton(typeof(ITransactionDataCopier<>), typeof(DefaultTransactionDataCopier<>));
             services.AddSingleton<IAttributeToFactoryMapper<TransactionalStateAttribute>, TransactionalStateAttributeMapper>();
             services.TryAddTransient<ITransactionalStateFactory, TransactionalStateFactory>();
+            services.AddSingleton<IAttributeToFactoryMapper<TransactionCommitterAttribute>, TransactionCommitterAttributeMapper>();
+            services.TryAddTransient<ITransactionCommitterFactory, TransactionCommitterFactory>();
             services.TryAddTransient<INamedTransactionalStateStorageFactory, NamedTransactionalStateStorageFactory>();
             services.AddTransient(typeof(ITransactionalState<>), typeof(TransactionalState<>));
+            if (withReporter)
+                services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, TransactionAgentStatisticsReporter>();
             return services;
         }
-
     }
 }

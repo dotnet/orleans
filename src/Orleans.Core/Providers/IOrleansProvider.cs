@@ -25,7 +25,7 @@ namespace Orleans.Providers
         /// <param name="name">Name assigned for this provider</param>
         /// <param name="providerRuntime">Callback for accessing system functions in the Provider Runtime</param>
         /// <param name="config">Configuration metadata to be used for this provider instance</param>
-        /// <returns>Completion promise Task for the inttialization work for this provider</returns>
+        /// <returns>Completion promise Task for the initialization work for this provider</returns>
         Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config);
 
         /// <summary>Close function for this provider instance.</summary>

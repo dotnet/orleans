@@ -41,7 +41,7 @@ namespace Orleans.CodeGeneration
 
         public static bool IsGrainInterface(Type t)
         {
-            if (t.GetTypeInfo().IsClass)
+            if (t.IsClass)
                 return false;
             if (t == typeof(IGrainObserver) || t == typeof(IAddressable) || t == typeof(IGrainExtension))
                 return false;
@@ -78,9 +78,19 @@ namespace Orleans.CodeGeneration
 
         public static bool IsTaskType(Type t)
         {
-            var typeInfo = t.GetTypeInfo();
-            return t == typeof (Task)
-                || (typeInfo.IsGenericType && typeInfo.GetGenericTypeDefinition().FullName == "System.Threading.Tasks.Task`1");
+            if (t == typeof(Task))
+            {
+                return true;
+            }
+
+            if (t.IsGenericType)
+            {
+                var typeName = t.GetGenericTypeDefinition().FullName;
+                return typeName == "System.Threading.Tasks.Task`1" 
+                       || typeName == "System.Threading.Tasks.ValueTask`1";
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -101,39 +111,31 @@ namespace Orleans.CodeGeneration
 
         public static bool IsUnordered(MethodInfo methodInfo)
         {
-            var declaringTypeInfo = methodInfo.DeclaringType.GetTypeInfo();
-            return declaringTypeInfo.GetCustomAttributes(typeof(UnorderedAttribute), true).Any() 
-                || (declaringTypeInfo.GetInterfaces().Any(
-                    i => i.GetTypeInfo().GetCustomAttributes(typeof(UnorderedAttribute), true).Any() 
-                        && declaringTypeInfo.GetRuntimeInterfaceMap(i).TargetMethods.Contains(methodInfo)))
+            var declaringType = methodInfo.DeclaringType;
+            return declaringType.GetCustomAttributes(typeof(UnorderedAttribute), true).Any() 
+                || (declaringType.GetInterfaces().Any(
+                    i => i.GetCustomAttributes(typeof(UnorderedAttribute), true).Any() 
+                        && declaringType.GetTypeInfo().GetRuntimeInterfaceMap(i).TargetMethods.Contains(methodInfo)))
                 || IsStatelessWorker(methodInfo);
         }
 
         public static bool IsStatelessWorker(MethodInfo methodInfo)
         {
-            var declaringTypeInfo = methodInfo.DeclaringType.GetTypeInfo();
-            return declaringTypeInfo.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any() ||
-                (declaringTypeInfo.GetInterfaces().Any(
-                    i => i.GetTypeInfo().GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any()
-                        && declaringTypeInfo.GetRuntimeInterfaceMap(i).TargetMethods.Contains(methodInfo)));
+            var declaringType = methodInfo.DeclaringType;
+            return declaringType.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any() ||
+                (declaringType.GetInterfaces().Any(
+                    i => i.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any()
+                        && declaringType.GetTypeInfo().GetRuntimeInterfaceMap(i).TargetMethods.Contains(methodInfo)));
         }
 
-        public static bool IsNewTransactionRequired(MethodInfo methodInfo)
+        public static bool TryGetTransactionOption(MethodInfo methodInfo, out TransactionOption option)
         {
+            option = TransactionOption.Suppress;
             TransactionAttribute transactionAttribute = methodInfo.GetCustomAttribute<TransactionAttribute>(true);
             if (transactionAttribute != null)
             {
-                return transactionAttribute.Requirement == TransactionOption.RequiresNew;
-            }
-            return false;
-        }
-
-        public static bool IsTransactionRequired(MethodInfo methodInfo)
-        {
-            TransactionAttribute transactionAttribute = methodInfo.GetCustomAttribute<TransactionAttribute>(true);
-            if (transactionAttribute != null)
-            {
-                return transactionAttribute.Requirement == TransactionOption.Required;
+                option = transactionAttribute.Requirement;
+                return true;
             }
             return false;
         }
@@ -157,6 +159,12 @@ namespace Orleans.CodeGeneration
             var attr = methodInfo.GetCustomAttribute<MethodIdAttribute>(true);
             if (attr != null) return attr.MethodId;
 
+            var result = FormatMethodForIdComputation(methodInfo);
+            return Utils.CalculateIdHash(result);
+        }
+
+        internal static string FormatMethodForIdComputation(MethodInfo methodInfo)
+        {
             var strMethodId = new StringBuilder(methodInfo.Name);
 
             if (methodInfo.IsGenericMethodDefinition)
@@ -192,8 +200,10 @@ namespace Orleans.CodeGeneration
 
                 bFirstTime = false;
             }
+
             strMethodId.Append(')');
-            return Utils.CalculateIdHash(strMethodId.ToString());
+            var result = strMethodId.ToString();
+            return result;
         }
 
         public static int GetGrainInterfaceId(Type grainInterface)
@@ -206,7 +216,7 @@ namespace Orleans.CodeGeneration
             if (typeof(IGrainExtension).IsAssignableFrom(grainInterface))
                 return 0;
 
-            var attr = grainInterface.GetTypeInfo().GetCustomAttribute<VersionAttribute>();
+            var attr = grainInterface.GetCustomAttribute<VersionAttribute>();
             return attr?.Version ?? Constants.DefaultInterfaceVersion;
         }
 
@@ -295,7 +305,7 @@ namespace Orleans.CodeGeneration
                             GetParameterName(parameter), type.FullName, method.Name));
                     }
 
-                    if (parameter.ParameterType.GetTypeInfo().IsByRef)
+                    if (parameter.ParameterType.IsByRef)
                     {
                         success = false;
                         violations.Add(String.Format("Argument {0} of method {1}.{2} is an a reference parameter. Reference parameters are not allowed.",
@@ -377,20 +387,19 @@ namespace Orleans.CodeGeneration
         {
             Type[] iTypes = GetRemoteInterfaces(serviceType, false).Values.ToArray();
 
-            var typeInfo = grainType.GetTypeInfo();
 
             foreach (Type iType in iTypes)
             {
                 var mapping = new InterfaceMapping();
                 
-                if (typeInfo.IsClass)
-                    mapping = typeInfo.GetRuntimeInterfaceMap(iType);
+                if (grainType.IsClass)
+                    mapping = grainType.GetTypeInfo().GetRuntimeInterfaceMap(iType);
 
-                if (typeInfo.IsInterface || mapping.TargetType == grainType)
+                if (grainType.IsInterface || mapping.TargetType == grainType)
                 {
                     foreach (var methodInfo in iType.GetMethods())
                     {
-                        if (typeInfo.IsClass)
+                        if (grainType.IsClass)
                         {
                             var mi = methodInfo;
                             var match = mapping.TargetMethods.Any(info => MethodComparer.Equals(mi, info) &&
@@ -411,8 +420,7 @@ namespace Orleans.CodeGeneration
 
         private static int GetTypeCode(Type grainInterfaceOrClass)
         {
-            var typeInfo = grainInterfaceOrClass.GetTypeInfo();
-            var attr = typeInfo.GetCustomAttributes<TypeCodeOverrideAttribute>(false).FirstOrDefault();
+            var attr = grainInterfaceOrClass.GetCustomAttributes<TypeCodeOverrideAttribute>(false).FirstOrDefault();
             if (attr != null && attr.TypeCode > 0)
             {
                 return attr.TypeCode;

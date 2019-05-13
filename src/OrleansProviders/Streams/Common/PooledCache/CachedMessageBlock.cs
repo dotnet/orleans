@@ -119,7 +119,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
-        /// Access the cached message at the provdied index.
+        /// Access the cached message at the provided index.
         /// </summary>
         /// <param name="index"></param>
         /// <returns></returns>

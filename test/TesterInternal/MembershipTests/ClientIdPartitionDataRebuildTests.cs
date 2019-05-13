@@ -61,7 +61,7 @@ namespace UnitTests.MembershipTests
             await observer.WaitForNotification(10, 0, TimeSpan.FromSeconds(10));
 
             // Kill the silo that hold directory client entry
-            this.hostedCluster.SecondarySilos[0].StopSilo(stopGracefully: false);
+            await this.hostedCluster.SecondarySilos[0].StopSiloAsync(stopGracefully: false);
             await Task.Delay(5000);
 
             // Second notification should work since the directory was "rebuilt" when
@@ -79,7 +79,7 @@ namespace UnitTests.MembershipTests
 
             // Launch a long task and kill the silo that hold directory client entry
             var promise = grain.DoLongAction(TimeSpan.FromSeconds(10), "LongAction");
-            this.hostedCluster.SecondarySilos[0].StopSilo(stopGracefully: false);
+            await this.hostedCluster.SecondarySilos[0].StopSiloAsync(stopGracefully: false);
 
             // It should work since the directory was "rebuilt" when
             // silos in cluster detected the dead one
@@ -106,7 +106,7 @@ namespace UnitTests.MembershipTests
                     break;
                 }
                 clientId = null;
-                this.hostedCluster.KillClient();
+                await this.hostedCluster.KillClientAsync();
             }
             Assert.NotNull(clientId);
 

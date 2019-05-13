@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -50,9 +51,6 @@ namespace Orleans.Runtime.GrainDirectory
         public RemoteGrainDirectory RemoteGrainDirectory { get; private set; }
         public RemoteGrainDirectory CacheValidator { get; private set; }
         public ClusterGrainDirectory RemoteClusterGrainDirectory { get; private set; }
-
-        private readonly TaskCompletionSource<bool> stopPreparationResolver;
-        public Task StopPreparationCompletion { get { return stopPreparationResolver.Task; } }
 
         internal OrleansTaskScheduler Scheduler { get; private set; }
 
@@ -136,15 +134,14 @@ namespace Orleans.Runtime.GrainDirectory
                     grainFactory, 
                     executorService,
                     loggerFactory);
-            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, grainFactory, multiClusterOracle, executorService, siloDetails, multiClusterOptions, loggerFactory);
+            GsiActivationMaintainer = new GlobalSingleInstanceActivationMaintainer(this, this.Logger, grainFactory, multiClusterOracle, executorService, siloDetails, multiClusterOptions, loggerFactory, registrarManager);
 
             var primarySiloEndPoint = developmentClusterMembershipOptions.Value.PrimarySiloEndpoint;
             if (primarySiloEndPoint != null)
             {
                 this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
             }
-
-            stopPreparationResolver = new TaskCompletionSource<bool>();
+            
             DirectoryPartition = grainDirectoryPartitionFactory();
             HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
 
@@ -237,22 +234,16 @@ namespace Orleans.Runtime.GrainDirectory
         // The alternative would be to allow the silo to process requests after it has handed off its partition, in which case those changes 
         // would receive successful responses but would not be reflected in the eventual state of the directory. 
         // It's easy to change this, if we think the trade-off is better the other way.
-        public void Stop(bool doOnStopHandoff)
+        public async Task Stop(bool doOnStopHandoff)
         {
             // This will cause remote write requests to be forwarded to the silo that will become the new owner.
             // Requests might bounce back and forth for a while as membership stabilizes, but they will either be served by the
             // new owner of the grain, or will wind up failing. In either case, we avoid requests succeeding at this silo after we've
             // begun stopping, which could cause them to not get handed off to the new owner.
+
+            //mark Running as false will exclude myself from CalculateGrainDirectoryPartition(grainId)
             Running = false;
 
-            if (doOnStopHandoff)
-            {
-                HandoffManager.ProcessSiloStoppingEvent();
-            }
-            else
-            {
-                MarkStopPreparationCompleted();
-            }
             if (maintainer != null)
             {
                 maintainer.Stop();
@@ -261,17 +252,20 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 GsiActivationMaintainer.Stop();
             }
+
+            if (doOnStopHandoff)
+            {
+                try
+                {
+                    await HandoffManager.ProcessSiloStoppingEvent();
+                }
+                catch (Exception exc)
+                {
+                    this.log.LogWarning($"GrainDirectoryHandOffManager failed ProcessSiloStoppingEvent due to exception {exc}");
+                }
+            }
+            DirectoryPartition.Clear();
             DirectoryCache.Clear();
-        }
-
-        internal void MarkStopPreparationCompleted()
-        {
-            stopPreparationResolver.TrySetResult(true);
-        }
-
-        internal void MarkStopPreparationFailed(Exception ex)
-        {
-            stopPreparationResolver.TrySetException(ex);
         }
 
         /// <inheritdoc />
@@ -284,7 +278,6 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        #region Handling membership events
         protected void AddServer(SiloAddress silo)
         {
             lock (membershipCache)
@@ -349,7 +342,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         /// <summary>
-        /// Adjust local directory following the removal of a silo by droping all activations located on the removed silo
+        /// Adjust local directory following the removal of a silo by dropping all activations located on the removed silo
         /// </summary>
         /// <param name="removedSilo"></param>
         protected void AdjustLocalDirectory(SiloAddress removedSilo)
@@ -364,7 +357,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        /// Adjust local cache following the removal of a silo by droping:
+        /// Adjust local cache following the removal of a silo by dropping:
         /// 1) entries that point to activations located on the removed silo 
         /// 2) entries for grains that are now owned by this silo (me)
         /// 3) entries for grains that were owned by this removed silo - we currently do NOT do that.
@@ -378,7 +371,7 @@ namespace Orleans.Runtime.GrainDirectory
             foreach (Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int> tuple in DirectoryCache.KeyValues)
             {
                 // 2) remove entries now owned by me (they should be retrieved from my directory partition)
-                if (MyAddress.Equals(CalculateTargetSilo(tuple.Item1)))
+                if (MyAddress.Equals(CalculateGrainDirectoryPartition(tuple.Item1)))
                 {
                     DirectoryCache.Remove(tuple.Item1);
                 }
@@ -435,20 +428,7 @@ namespace Orleans.Runtime.GrainDirectory
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
             // This silo's status has changed
-            if (Equals(updatedSilo, MyAddress))
-            {
-                if (status == SiloStatus.Stopping || status == SiloStatus.ShuttingDown)
-                {
-                    // QueueAction up the "Stop" to run on a system turn
-                    Scheduler.QueueAction(() => Stop(true), CacheValidator.SchedulingContext).Ignore();
-                }
-                else if (status == SiloStatus.Dead)
-                {
-                    // QueueAction up the "Stop" to run on a system turn
-                    Scheduler.QueueAction(() => Stop(false), CacheValidator.SchedulingContext).Ignore();
-                }
-            }
-            else // Status change for some other silo
+            if (!Equals(updatedSilo, MyAddress)) // Status change for some other silo
             {
                 if (status.IsTerminating())
                 {
@@ -468,57 +448,48 @@ namespace Orleans.Runtime.GrainDirectory
             return this.siloStatusOracle.IsFunctionalDirectory(silo);
         }
 
-        #endregion
-
         /// <summary>
         /// Finds the silo that owns the directory information for the given grain ID.
-        /// This routine will always return a non-null silo address unless the excludeThisSiloIfStopping parameter is true,
-        /// this is the only silo known, and this silo is stopping.
+        /// This method will only be null when I'm the only silo in the cluster and I'm shutting down
         /// </summary>
         /// <param name="grainId"></param>
-        /// <param name="excludeThisSiloIfStopping"></param>
         /// <returns></returns>
-        public SiloAddress CalculateTargetSilo(GrainId grainId, bool excludeThisSiloIfStopping = true)
+        public SiloAddress CalculateGrainDirectoryPartition(GrainId grainId)
         {
             // give a special treatment for special grains
             if (grainId.IsSystemTarget)
             {
+                if (Constants.SystemMembershipTableId.Equals(grainId))
+                {
+                    if (Seed == null)
+                    {
+                        var errorMsg =
+                            $"MembershipTable cannot run without Seed node. Please check your silo configuration make sure it specifies a SeedNode element. " +
+                            $"This is in either the configuration file or the {nameof(NetworkingOptions)} configuration. " +
+                            " Alternatively, you may want to use reliable membership, such as Azure Table.";
+                        throw new ArgumentException(errorMsg, "grainId = " + grainId);
+                    }
+                }
+
                 if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} looked for a system target {1}, returned {2}", MyAddress, grainId, MyAddress);
                 // every silo owns its system targets
                 return MyAddress;
             }
 
-            if (Constants.SystemMembershipTableId.Equals(grainId))
-            {
-                if (Seed == null)
-                {
-                    string grainName;
-                    if (!Constants.TryGetSystemGrainName(grainId, out grainName))
-                        grainName = "MembershipTableGrain";
-
-                    var errorMsg = $"{grainName} cannot run without Seed node. Please check your silo configuration make sure it specifies a SeedNode element. " +
-                                   $"This is in either the configuration file or the {nameof(NetworkingOptions)} configuration. " +
-                                   " Alternatively, you may want to use reliable membership, such as Azure Table.";
-                    throw new ArgumentException(errorMsg, "grainId = " + grainId);
-                }
-                // Directory info for the membership table grain has to be located on the primary (seed) node, for bootstrapping
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} looked for a special grain {1}, returned {2}", MyAddress, grainId, Seed);
-                return Seed;
-            }
-
             SiloAddress siloAddress = null;
             int hash = unchecked((int)grainId.GetUniformHashCode());
 
-
             // excludeMySelf from being a TargetSilo if we're not running and the excludeThisSIloIfStopping flag is true. see the comment in the Stop method.
-            bool excludeMySelf = !Running && excludeThisSiloIfStopping;
+            // excludeThisSIloIfStopping flag was removed because we believe that flag complicates things unnecessarily. We can add it back if it turns out that flag 
+            // is doing something valuable. 
+            bool excludeMySelf = !Running;
 
             lock (membershipCache)
             {
                 if (membershipRingList.Count == 0)
                 {
                     // If the membership ring is empty, then we're the owner by default unless we're stopping.
-                    return excludeThisSiloIfStopping && !Running ? null : MyAddress;
+                    return !Running ? null : MyAddress;
                 }
 
                 // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
@@ -544,15 +515,13 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
             }
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} calculated directory partition owner silo {1} for grain {2}: {3} --> {4}", MyAddress, siloAddress, grainId, hash, siloAddress.GetConsistentHashCode());
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} calculated directory partition owner silo {1} for grain {2}: {3} --> {4}", MyAddress, siloAddress, grainId, hash, siloAddress?.GetConsistentHashCode());
             return siloAddress;
         }
 
-        #region Implementation of ILocalGrainDirectory
-
         public SiloAddress CheckIfShouldForward(GrainId grainId, int hopCount, string operationDescription)
         {
-            SiloAddress owner = CalculateTargetSilo(grainId);
+            SiloAddress owner = CalculateGrainDirectoryPartition(grainId);
 
             if (owner == null)
             {
@@ -804,10 +773,18 @@ namespace Orleans.Runtime.GrainDirectory
         {
             localLookups.Increment();
 
-            SiloAddress silo = CalculateTargetSilo(grain, false);
-            // No need to check that silo != null since we're passing excludeThisSiloIfStopping = false
+            SiloAddress silo = CalculateGrainDirectoryPartition(grain);
 
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} tries to lookup for {1}-->{2} ({3}-->{4})", MyAddress, grain, silo, grain.GetUniformHashCode(), silo.GetConsistentHashCode());
+
+            if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} tries to lookup for {1}-->{2} ({3}-->{4})", MyAddress, grain, silo, grain.GetUniformHashCode(), silo?.GetConsistentHashCode());
+
+            //this will only happen if I'm the only silo in the cluster and I'm shutting down
+            if (silo == null)
+            {
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup mine {0}=null", grain);
+                result = new AddressesAndTag();
+                return false;
+            }
 
             // check if we own the grain
             if (silo.Equals(MyAddress))
@@ -984,7 +961,7 @@ namespace Orleans.Runtime.GrainDirectory
             // for multi-cluster registration, the local directory may cache remote activations
             // and we need to remove them here, on the fast path, to avoid forwarding the message
             // to the wrong destination again
-            if (invalidateDirectoryAlso && CalculateTargetSilo(grainId).Equals(MyAddress))
+            if (invalidateDirectoryAlso && MyAddress.Equals(CalculateGrainDirectoryPartition(grainId)))
             {
                 var registrar = this.registrarManager.GetRegistrarForGrain(grainId);
                 registrar.InvalidateCache(activationAddress);
@@ -1000,7 +977,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns></returns>
         public SiloAddress GetPrimaryForGrain(GrainId grain)
         {
-            return CalculateTargetSilo(grain);
+            return CalculateGrainDirectoryPartition(grain);
         }
 
         /// <summary>
@@ -1012,7 +989,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns></returns>
         public List<SiloAddress> GetSilosHoldingDirectoryInformationForGrain(GrainId grain)
         {
-            var primary = CalculateTargetSilo(grain);
+            var primary = CalculateGrainDirectoryPartition(grain);
             return FindPredecessors(primary, 1);
         }
 
@@ -1026,7 +1003,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns></returns>
         public List<ActivationAddress> GetLocalDataForGrain(GrainId grain, out bool isPrimary)
         {
-            var primary = CalculateTargetSilo(grain);
+            var primary = CalculateGrainDirectoryPartition(grain);
             List<ActivationAddress> backupData = HandoffManager.GetHandedOffInfo(grain);
             if (MyAddress.Equals(primary))
             {
@@ -1039,8 +1016,6 @@ namespace Orleans.Runtime.GrainDirectory
             isPrimary = false;
             return backupData;
         }
-
-        #endregion
 
         public override string ToString()
         {

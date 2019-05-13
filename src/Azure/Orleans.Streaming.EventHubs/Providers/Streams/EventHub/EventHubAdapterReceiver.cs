@@ -50,7 +50,7 @@ namespace Orleans.ServiceBus.Providers
 
         private IEventHubReceiver receiver;
 
-        private Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, Task<IEventHubReceiver>> eventHubReceiverFactory;
+        private Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, IEventHubReceiver> eventHubReceiverFactory;
 
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;
@@ -73,7 +73,7 @@ namespace Orleans.ServiceBus.Providers
             IQueueAdapterReceiverMonitor monitor,
             LoadSheddingOptions loadSheddingOptions,
             ITelemetryProducer telemetryProducer,
-            Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, Task<IEventHubReceiver>> eventHubReceiverFactory = null)
+            Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, IEventHubReceiver> eventHubReceiverFactory = null)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             if (cacheFactory == null) throw new ArgumentNullException(nameof(cacheFactory));
@@ -103,7 +103,7 @@ namespace Orleans.ServiceBus.Providers
                 : Initialize();
         }
         /// <summary>
-        /// Initialization of EventHub receiver is performed at adapter reciever initialization, but if it fails,
+        /// Initialization of EventHub receiver is performed at adapter receiver initialization, but if it fails,
         ///  it will be retried when messages are requested
         /// </summary>
         /// <returns></returns>
@@ -121,7 +121,7 @@ namespace Orleans.ServiceBus.Providers
                 this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory, this.telemetryProducer);
                 this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions) };
                 string offset = await this.checkpointer.Load();
-                this.receiver = await this.eventHubReceiverFactory(this.settings, offset, this.logger, this.telemetryProducer);
+                this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger, this.telemetryProducer);
                 watch.Stop();
                 this.monitor?.TrackInitialization(true, watch.Elapsed, null);
             }
@@ -273,32 +273,35 @@ namespace Orleans.ServiceBus.Providers
             }
         }
 
-        private static async Task<IEventHubReceiver> CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
+        private static IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
         {
-            bool offsetInclusive = true;
             var connectionStringBuilder = new EventHubsConnectionStringBuilder(partitionSettings.Hub.ConnectionString)
             {
                 EntityPath = partitionSettings.Hub.Path
             };
             EventHubClient client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
 
-            // if we have a starting offset or if we're not configured to start reading from utc now, read from offset
-            if (!partitionSettings.ReceiverOptions.StartFromNow ||
-                offset != EventHubConstants.StartOfStream)
+            EventPosition eventPosition;
+             
+            // If we have a starting offset, read from offset
+            if (offset != EventHubConstants.StartOfStream)
             {
                 logger.Info("Starting to read from EventHub partition {0}-{1} at offset {2}", partitionSettings.Hub.Path, partitionSettings.Partition, offset);
+                eventPosition = EventPosition.FromOffset(offset, true);
             }
-            else
+            // else, if configured to start from now, start reading from most recent data
+            else if (partitionSettings.ReceiverOptions.StartFromNow)
             {
-                // to start reading from most recent data, we get the latest offset from the partition.
-                EventHubPartitionRuntimeInformation partitionInfo =
-                    await client.GetPartitionRuntimeInformationAsync(partitionSettings.Partition);
-                offset = partitionInfo.LastEnqueuedOffset;
-                offsetInclusive = false;
-                logger.Info("Starting to read latest messages from EventHub partition {0}-{1} at offset {2}", partitionSettings.Hub.Path, partitionSettings.Partition, offset);
+                eventPosition = EventPosition.FromEnd();
+                logger.Info("Starting to read latest messages from EventHub partition {0}-{1}.", partitionSettings.Hub.Path, partitionSettings.Partition);
+            } else
+            // else, start reading from begining of the partition
+            {
+                eventPosition = EventPosition.FromStart();
+                logger.Info("Starting to read messages from begining of EventHub partition {0}-{1}.", partitionSettings.Hub.Path, partitionSettings.Partition);
             }
 
-            PartitionReceiver receiver = client.CreateReceiver(partitionSettings.Hub.ConsumerGroup, partitionSettings.Partition, offset, offsetInclusive);
+            PartitionReceiver receiver = client.CreateReceiver(partitionSettings.Hub.ConsumerGroup, partitionSettings.Partition, eventPosition);
 
             if (partitionSettings.ReceiverOptions.PrefetchCount.HasValue)
                 receiver.PrefetchCount = partitionSettings.ReceiverOptions.PrefetchCount.Value;
@@ -306,7 +309,6 @@ namespace Orleans.ServiceBus.Providers
             return new EventHubReceiverProxy(receiver);
         }
 
-#region EventHubGeneratorStreamProvider related region
         /// <summary>
         /// For test purpose. ConfigureDataGeneratorForStream will configure a data generator for the stream
         /// </summary>
@@ -320,7 +322,6 @@ namespace Orleans.ServiceBus.Providers
         {
             (this.receiver as EventHubPartitionGeneratorReceiver)?.StopProducingOnStream(streamId);
         }
-#endregion
 
         private class StreamActivityNotificationBatch : IBatchContainer
         {

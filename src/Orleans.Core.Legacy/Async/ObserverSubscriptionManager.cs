@@ -52,7 +52,7 @@ namespace Orleans
         /// <summary>
         /// Determines if the SubscriptionManager has the input observer
         /// </summary>
-        /// <param name="observer">True if the the observer is already subscribed, otherwise False.</param>
+        /// <param name="observer">True if the observer is already subscribed, otherwise False.</param>
         /// <returns>True is the SubscriptionManager has the input observer.</returns>
         public bool IsSubscribed(T observer)
         {

@@ -203,11 +203,11 @@ namespace UnitTests.StorageTests.AdoNet
                     {
                         //If the operation is cancelled already before database calls, a OperationCancelledException
                         //will be thrown in any case.
-                        Assert.True(innerException is DbException || innerException is OperationCanceledException, $"Unexcepted exception: {ex}");
+                        Assert.True(innerException is DbException || innerException is OperationCanceledException, $"Unexpected exception: {ex}");
                     }
                     else
                     {
-                        Assert.True(innerException is OperationCanceledException, $"Unexcepted exception: {ex}");
+                        Assert.True(innerException is OperationCanceledException, $"Unexpected exception: {ex}");
                     }
                 }
             }

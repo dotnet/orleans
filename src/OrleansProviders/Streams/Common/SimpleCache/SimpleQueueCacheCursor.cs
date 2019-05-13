@@ -77,7 +77,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Move to next message in the stream.
         /// If it returns false, there are no more messages.  The enumerator is still
-        ///  valid howerver and can be called again when more data has come in on this
+        ///  valid however and can be called again when more data has come in on this
         ///  stream.
         /// </summary>
         /// <returns></returns>
@@ -126,8 +126,6 @@ namespace Orleans.Providers.Streams.Common
                     string.Equals(batchContainer.StreamNamespace, streamIdentity.Namespace);
         }
 
-        #region IDisposable Members
-
         /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
         /// </summary>
@@ -147,8 +145,6 @@ namespace Orleans.Providers.Streams.Common
                 cache.UnsetCursor(this, null);
             }
         }
-
-        #endregion
 
         /// <summary>
         /// Convert object to string

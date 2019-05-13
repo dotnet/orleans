@@ -1,9 +1,4 @@
-using Orleans.CodeGeneration;
-using Orleans.Transactions.Abstractions;
-using Orleans.Transactions;
+using System.Runtime.CompilerServices;
 
-[assembly: GenerateSerializer(typeof(TransactionalExtensionExtensions.TransactionalResourceExtensionWrapper))]
-[assembly: GenerateSerializer(typeof(CommitRecord))]
-[assembly: GenerateSerializer(typeof(TransactionalStateRecord<>))]
-[assembly: GenerateSerializer(typeof(PendingTransactionState<>))]
-[assembly: GenerateSerializer(typeof(TransactionalStorageLoadResponse<>))]
+[assembly: InternalsVisibleTo("Orleans.Transactions.Tests")]
+[assembly: InternalsVisibleTo("Orleans.Transactions.TestKit.Base")]

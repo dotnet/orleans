@@ -312,7 +312,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         /// <param name="e">SocketAsyncEventArg associated with the completed accept operation.</param>
         /// <param name="completedSynchronously">Shows whether AcceptAsync completed synchronously, 
-        /// if true - the next accept operation woun't be started. Used for avoiding potential stack overflows.</param>
+        /// if true - the next accept operation won't be started. Used for avoiding potential stack overflows.</param>
         private void ProcessAccept(SocketAsyncEventArgs e, bool completedSynchronously)
         {
             var ima = e.UserToken as IncomingMessageAcceptor;
@@ -468,7 +468,7 @@ namespace Orleans.Runtime.Messaging
             // situation that shows when the remote host has finished sending data.
             if (e.BytesTransferred <= 0)
             {
-                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Closing recieving socket: " + e.RemoteEndPoint);
+                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Closing receiving socket: " + e.RemoteEndPoint);
                 rcc.IMA.SafeCloseSocket(rcc.Socket);
                 FreeSocketAsyncEventArgs(e);
                 return;
@@ -585,6 +585,10 @@ namespace Orleans.Runtime.Messaging
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Transient,
                     string.Format("The target silo is no longer active: target was {0}, but this silo is {1}. The rejected message is {2}.",
                         msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg));
+
+                // Invalidate the remote caller's activation cache entry.
+                if (msg.TargetAddress != null) rejection.AddToCacheInvalidationHeader(msg.TargetAddress);
+
                 MessageCenter.OutboundQueue.SendMessage(rejection);
                 if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
                     msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg);
@@ -647,23 +651,6 @@ namespace Orleans.Runtime.Messaging
 
             public void ProcessReceived(SocketAsyncEventArgs e)
             {
-#if TRACK_DETAILED_STATS
-                ThreadTrackingStatistic tracker = null;
-                if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                {
-                    int id = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                    if (!trackers.TryGetValue(id, out tracker))
-                    {
-                        tracker = new ThreadTrackingStatistic("ThreadPoolThread." + System.Threading.Thread.CurrentThread.ManagedThreadId);
-                        bool added = trackers.TryAdd(id, tracker);
-                        if (added)
-                        {
-                            tracker.OnStartExecution();
-                        }
-                    }
-                    tracker.OnStartProcessing();
-                }
-#endif
                 try
                 {
                     _buffer.UpdateReceivedData(e.Buffer, e.BytesTransferred);
@@ -711,16 +698,6 @@ namespace Orleans.Runtime.Messaging
 
                     throw;
                 }
-#if TRACK_DETAILED_STATS
-                finally
-                {
-                    if (StatisticsCollector.CollectThreadTimeTrackingStats)
-                    {
-                        tracker.IncrementNumberOfProcessed();
-                        tracker.OnStopProcessing();
-                    }
-                }
-#endif
             }
 
             public void Reset()

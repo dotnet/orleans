@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Host
     /// <summary>
     /// Utility class for initializing an Orleans client running inside Azure.
     /// </summary>
+    [Obsolete("This type is obsolete and may be removed in a future release. Use ClientBuilder to create an instance of IClusterClient instead.")]
     public static class AzureClient
     {
         private static readonly IServiceRuntimeWrapper serviceRuntimeWrapper = new ServiceRuntimeWrapper(AzureSilo.CreateDefaultLoggerFactory("AzureClient.log"));
@@ -24,6 +25,9 @@ namespace Orleans.Runtime.Host
 
         /// <summary> delegate to configure logging, default to none logger configured </summary>
         public static Action<ILoggingBuilder> ConfigureLoggingDelegate { get; set; } = builder => { };
+
+        /// <summary>delegate to add some configuration to the client</summary>
+        public static Action<IClientBuilder> ConfigureClientDelegate { get; set; } = builder => { };
 
         /// <summary>
         /// Whether the Orleans Azure client runtime has already been initialized
@@ -95,8 +99,6 @@ namespace Orleans.Runtime.Host
             
             return config;
         }
-
-        #region Internal implementation of client initialization processing
 
         private static void InitializeImpl_FromFile(FileInfo configFile)
         {
@@ -181,8 +183,8 @@ namespace Orleans.Runtime.Host
             {
                 try
                 {
-                    //parse through ConfigureLoggingDelegate to GrainClient
                     GrainClient.ConfigureLoggingDelegate = ConfigureLoggingDelegate;
+                    GrainClient.ConfigureClientDelegate = ConfigureClientDelegate;
                     // Initialize will throw if cannot find Gateways
                     GrainClient.Initialize(config);
                     initSucceeded = true;
@@ -206,8 +208,6 @@ namespace Orleans.Runtime.Host
             Trace.TraceError("Error starting Orleans Azure client application -- {0} -- bailing. {1}", err.Message, LogFormatter.PrintException(err));
             throw err;
         }
-
-        #endregion
     }
 }
 #pragma warning restore CS0618 // Type or member is obsolete

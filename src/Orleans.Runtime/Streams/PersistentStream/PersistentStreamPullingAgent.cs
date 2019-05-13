@@ -10,13 +10,13 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    
+
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
         private static readonly IBackoffProvider DeliveryBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
         private static readonly IBackoffProvider ReadLoopBackoff = new ExponentialBackoff(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1));
         private const int ReadLoopRetryMax = 6;
-        private static readonly IStreamFilterPredicateWrapper DefaultStreamFilter =new DefaultStreamFilterPredicateWrapper();
+        private static readonly IStreamFilterPredicateWrapper DefaultStreamFilter = new DefaultStreamFilterPredicateWrapper();
         private const int StreamInactivityCheckFrequency = 10;
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
@@ -41,7 +41,7 @@ namespace Orleans.Streams
         private string StatisticUniquePostfix => streamProviderName + "." + QueueId;
 
         internal PersistentStreamPullingAgent(
-            GrainId id, 
+            GrainId id,
             string strProviderName,
             IStreamProviderRuntime runtime,
             ILoggerFactory loggerFactory,
@@ -62,7 +62,7 @@ namespace Orleans.Streams
             numMessages = 0;
 
             logger = runtime.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger($"{this.GetType().Namespace}.{((ISystemTargetBase)this).GrainId}.{streamProviderName}");
-            logger.Info(ErrorCode.PersistentStreamPullingAgent_01, 
+            logger.Info(ErrorCode.PersistentStreamPullingAgent_01,
                 "Created {0} {1} for Stream Provider {2} on silo {3} for Queue {4}.",
                 GetType().Name, ((ISystemTargetBase)this).GrainId.ToDetailedString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
             numReadMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES, StatisticUniquePostfix));
@@ -75,8 +75,8 @@ namespace Orleans.Streams
         /// Take responsibility for a new queues that was assigned to me via a new range.
         /// We first store the new queue in our internal data structure, try to initialize it and start a pumping timer.
         /// ERROR HANDLING:
-        ///     The resposibility to handle initializatoion and shutdown failures is inside the INewQueueAdapterReceiver code.
-        ///     The agent will call Initialize once and log an error. It will not call initiliaze again.
+        ///     The responsibility to handle initialization and shutdown failures is inside the INewQueueAdapterReceiver code.
+        ///     The agent will call Initialize once and log an error. It will not call initialize again.
         ///     The receiver itself may attempt later to recover from this error and do initialization again. 
         ///     The agent will assume initialization has succeeded and will subsequently start calling pumping receive.
         ///     Same applies to shutdown.
@@ -162,7 +162,7 @@ namespace Orleans.Streams
 
             Task localReceiverInitTask = receiverInitTask;
             if (localReceiverInitTask != null)
-            { 
+            {
                 try
                 {
                     await localReceiverInitTask;
@@ -213,7 +213,7 @@ namespace Orleans.Streams
                     "Failed to unregister myself as stream producer to some streams that used to be in my responsibility.", exc);
             }
             pubSubCache.Clear();
-            IntValueStatistic.Delete(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix));          
+            IntValueStatistic.Delete(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix));
             //IntValueStatistic.Delete(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE, StatisticUniquePostfix));
         }
 
@@ -245,8 +245,8 @@ namespace Orleans.Streams
             StreamConsumerCollection streamDataCollection;
             if (!pubSubCache.TryGetValue(streamId, out streamDataCollection))
             {
-                streamDataCollection = new StreamConsumerCollection(DateTime.UtcNow);
-                pubSubCache.Add(streamId, streamDataCollection);
+                // If stream is not in pubsub cache, then we've received no events on this stream, and will aquire the subscriptions from pubsub when we do.
+                return;
             }
 
             StreamConsumerData data;
@@ -331,7 +331,7 @@ namespace Orleans.Streams
             // remove consumer
             bool removed = streamData.RemoveConsumer(subscriptionId, logger);
             if (removed && logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscription={0}, for stream {1}.", subscriptionId, streamId);
-            
+
             if (streamData.Count == 0)
                 pubSubCache.Remove(streamId);
         }
@@ -356,7 +356,7 @@ namespace Orleans.Streams
                     int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
                         return;
-                    
+
                     // If read succeeds and there is more data, we continue reading.
                     // If read succeeds and there is no more data, we break out of loop
                     // If read fails, we retry 6 more times, with backoff policy.
@@ -453,7 +453,18 @@ namespace Orleans.Streams
                 if (pubSubCache.TryGetValue(streamId, out streamData))
                 {
                     streamData.RefreshActivity(now);
-                    StartInactiveCursors(streamData, startToken); // if this is an existing stream, start any inactive cursors
+                    if (streamData.StreamRegistered)
+                    {
+                        StartInactiveCursors(streamData,
+                            startToken); // if this is an existing stream, start any inactive cursors
+                    }
+                    else
+                    {
+                        if(this.logger.IsEnabled(LogLevel.Debug))
+                            this.logger.LogDebug($"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
+                                                   $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
+                    }
+
                 }
                 else
                 {
@@ -469,7 +480,7 @@ namespace Orleans.Streams
             var toRemove = pubSubCache.Where(pair => pair.Value.IsInactive(now, this.options.StreamInactivityPeriod))
                          .ToList();
             toRemove.ForEach(tuple =>
-            {                
+            {
                 pubSubCache.Remove(tuple.Key);
                 tuple.Value.DisposeAll(logger);
             });
@@ -488,7 +499,9 @@ namespace Orleans.Streams
             try
             {
                 await RegisterAsStreamProducer(streamId, firstToken);
-            }finally
+                streamData.StreamRegistered = true;
+            }
+            finally
             {
                 // Cleanup the fake pinning cursor.
                 pinCursor?.Dispose();
@@ -515,7 +528,7 @@ namespace Orleans.Streams
                 // double check in case of interleaving
                 if (consumerData.State == StreamConsumerDataState.Active ||
                     consumerData.Cursor == null) return;
-                
+
                 consumerData.State = StreamConsumerDataState.Active;
                 while (consumerData.Cursor != null)
                 {
@@ -523,12 +536,11 @@ namespace Orleans.Streams
                     Exception exceptionOccured = null;
                     try
                     {
-                        Exception ignore;
-                        if (!consumerData.Cursor.MoveNext())
+                        batch = GetBatchForConsumer(consumerData.Cursor, filterWrapper, consumerData.StreamId);
+                        if (batch == null)
                         {
                             break;
                         }
-                        batch = consumerData.Cursor.GetCurrent(out ignore);
                     }
                     catch (Exception exc)
                     {
@@ -552,7 +564,7 @@ namespace Orleans.Streams
                         {
                             var message =
                                 $"Ignoring exception while trying to evaluate subscription filter function {filterWrapper} on stream {consumerData.StreamId} in PersistentStreamPullingAgentGrain.RunConsumerCursor";
-                            logger.Warn((int) ErrorCode.PersistentStreamPullingAgent_13, message, exc);
+                            logger.Warn((int)ErrorCode.PersistentStreamPullingAgent_13, message, exc);
                         }
                     }
 
@@ -604,15 +616,77 @@ namespace Orleans.Streams
             }
         }
 
+        private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor, IStreamFilterPredicateWrapper filterWrapper, StreamId streamId)
+        {
+            if (this.options.BatchContainerBatchSize <= 1)
+            {
+                Exception ignore;
+
+                if (!cursor.MoveNext())
+                {
+                    return null;
+                }
+
+                return cursor.GetCurrent(out ignore);
+            }
+            else if (this.options.BatchContainerBatchSize > 1)
+            {
+                Exception ignore;
+                int i = 0;
+                var batchContainers = new List<IBatchContainer>();
+
+                while (i < this.options.BatchContainerBatchSize)
+                {
+                    if (!cursor.MoveNext())
+                    {
+                        break;
+                    }
+
+                    var batchContainer = cursor.GetCurrent(out ignore);
+                    if (!batchContainer.ShouldDeliver(
+                                streamId,
+                                filterWrapper.FilterData,
+                                filterWrapper.ShouldReceive)) continue;
+
+                    batchContainers.Add(batchContainer);
+                    i++;
+                }
+
+                if (i == 0)
+                {
+                    return null;
+                }
+
+                return new BatchContainerBatch(batchContainers);
+            }
+
+            return null;
+        }
+
         private async Task<StreamHandshakeToken> DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
-            StreamHandshakeToken prevToken = consumerData.LastToken;
-            Task<StreamHandshakeToken> batchDeliveryTask;
+            try
+            {
+                StreamHandshakeToken newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch);
+                consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
+                return newToken;
+            }
+            catch (Exception ex)
+            {
+                this.logger.LogWarning(ex, "Failed to deliver message to consumer on {SubscriptionId} for stream {StreamId}, may retry.", consumerData.SubscriptionId, consumerData.StreamId);
+                throw;
+            }
+        }
 
+        /// <summary>
+        /// Add call context for batch delivery call, then clear context immediately, without giving up turn.
+        /// </summary>
+        private Task<StreamHandshakeToken> ContextualizedDeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
+        {
             bool isRequestContextSet = batch.ImportRequestContext();
             try
             {
-                batchDeliveryTask = consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch.AsImmutable(), prevToken);
+                return consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch.AsImmutable(), consumerData.LastToken);
             }
             finally
             {
@@ -622,10 +696,8 @@ namespace Orleans.Streams
                     RequestContext.Clear();
                 }
             }
-            StreamHandshakeToken newToken = await batchDeliveryTask;
-            consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
-            return newToken;
         }
+
 
         private static async Task DeliverErrorToConsumer(StreamConsumerData consumerData, Exception exc, IBatchContainer batch)
         {
@@ -695,6 +767,21 @@ namespace Orleans.Streams
             return false;
         }
 
+        private static async Task<ISet<PubSubSubscriptionState>> PubsubRegisterProducer(IStreamPubSub pubSub, StreamId streamId, string streamProviderName,
+            IStreamProducerExtension meAsStreamProducer, ILogger logger)
+        {
+            try
+            {
+                var streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
+                return streamData;
+            }
+            catch (Exception e)
+            {
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_17, $"RegisterAsStreamProducer failed due to {e}", e);
+                throw e;
+            }
+        }
+
         private async Task RegisterAsStreamProducer(StreamId streamId, StreamSequenceToken streamStartToken)
         {
             try
@@ -702,7 +789,16 @@ namespace Orleans.Streams
                 if (pubSub == null) throw new NullReferenceException("Found pubSub reference not set up correctly in RetreaveNewStream");
 
                 IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
-                ISet<PubSubSubscriptionState> streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
+                ISet<PubSubSubscriptionState> streamData = null;
+                await AsyncExecutorWithRetries.ExecuteWithRetries(
+                                async i => { streamData = 
+                                    await PubsubRegisterProducer(pubSub, streamId, streamProviderName, meAsStreamProducer, logger); },
+                                AsyncExecutorWithRetries.INFINITE_RETRIES,
+                                (exception, i) => !IsShutdown,
+                                Constants.INFINITE_TIMESPAN,
+                                DeliveryBackoffProvider);
+               
+                
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
 
                 var addSubscriptionTasks = new List<Task>(streamData.Count);

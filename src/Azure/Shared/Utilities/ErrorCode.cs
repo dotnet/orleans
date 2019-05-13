@@ -16,6 +16,8 @@ namespace Orleans.Streaming.AzureStorage.Utilities
 namespace Orleans.Streaming.EventHubs.Utilities
 #elif TESTER_AZUREUTILS
 namespace Orleans.Tests.AzureUtils.Utilities
+#elif ORLEANS_TRANSACTIONS
+namespace Orleans.Transactions.AzureStorage.Utilities
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif

@@ -151,7 +151,7 @@ namespace Orleans.Runtime.Configuration
     }
 
     /// <summary>
-    /// Provider categoty configuration.
+    /// Provider category configuration.
     /// </summary>
     [Serializable]
     public class ProviderCategoryConfiguration

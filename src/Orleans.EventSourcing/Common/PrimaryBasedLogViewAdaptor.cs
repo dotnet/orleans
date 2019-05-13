@@ -36,10 +36,6 @@ namespace Orleans.EventSourcing.Common
         where TLogEntry : class
         where TSubmissionEntry : SubmissionEntry<TLogEntry>
     {
-
-        #region interface to subclasses that implement specific providers
-
-
         /// <summary>
         /// Set confirmed view the initial value (a view of the empty log)
         /// </summary>
@@ -188,7 +184,7 @@ namespace Orleans.EventSourcing.Common
             this.Host = host;
             this.Services = services;
             InitializeConfirmedView(initialstate);
-            worker = new BatchWorkerFromDelegate(() => Work());
+            worker = new BatchWorkerFromDelegate(Work);
         }
 
         /// <inheritdoc/>
@@ -237,9 +233,6 @@ namespace Orleans.EventSourcing.Common
             Services.Log(LogLevel.Trace, "Deactivation Complete");
         }
 
-
-
-        #endregion
 
         // the currently submitted, unconfirmed entries. 
         private readonly List<TSubmissionEntry> pending = new List<TSubmissionEntry>();
@@ -321,11 +314,6 @@ namespace Orleans.EventSourcing.Common
             }
         }
 
-
-
-
-
-        #region Interface
 
         /// <inheritdoc />
         public void Submit(TLogEntry logEntry)
@@ -545,9 +533,6 @@ namespace Orleans.EventSourcing.Common
             }
         }
 
-
-
-        #endregion
 
         /// <summary>
         /// method is virtual so subclasses can add their own events

@@ -16,7 +16,7 @@ using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 
-namespace Tester.ClientConnectionTests
+namespace Tester
 {
     public class TestGatewayManager : IGatewayListProvider
     {

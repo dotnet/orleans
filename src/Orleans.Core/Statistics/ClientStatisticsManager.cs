@@ -10,19 +10,18 @@ namespace Orleans.Runtime
 {
     internal class ClientStatisticsManager : IDisposable
     {
-        private readonly ClientStatisticsOptions statisticsOptions;
+        private readonly StatisticsOptions statisticsOptions;
         private readonly LogStatistics logStatistics;
 
         public ClientStatisticsManager(
-            SerializationManager serializationManager, 
+            SerializationStatisticsGroup serializationStatistics, 
             ILoggerFactory loggerFactory, 
-            IOptions<ClientStatisticsOptions> statisticsOptions)
+            IOptions<StatisticsOptions> statisticsOptions)
         {
             this.statisticsOptions = statisticsOptions.Value;
-            this.logStatistics = new LogStatistics(this.statisticsOptions.LogWriteInterval, false, serializationManager, loggerFactory);
+            this.logStatistics = new LogStatistics(this.statisticsOptions.LogWriteInterval, false, serializationStatistics, loggerFactory);
             MessagingStatisticsGroup.Init(false);
             NetworkingStatisticsGroup.Init(false);
-            ApplicationRequestsStatisticsGroup.Init();
         }
 
         internal void Start(IMessageCenter transport, GrainId clientId)

@@ -25,6 +25,8 @@ namespace Orleans.Streaming.AzureStorage
 namespace Orleans.Streaming.EventHubs
 #elif TESTER_AZUREUTILS
 namespace Orleans.Tests.AzureUtils
+#elif ORLEANS_TRANSACTIONS
+namespace Orleans.Transactions.AzureStorage
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
@@ -33,7 +35,7 @@ namespace Orleans.Tests.AzureUtils
     /// Utility class to encapsulate row-based access to Azure table storage.
     /// </summary>
     /// <remarks>
-    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constrants this class needs to have public visibility.
+    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constraints this class needs to have public visibility.
     /// </remarks>
     /// <typeparam name="T">Table data entry used by this table / manager.</typeparam>
     public class AzureTableDataManager<T> where T : class, ITableEntity, new()
@@ -49,7 +51,11 @@ namespace Orleans.Tests.AzureUtils
 
         private CloudTable tableReference;
 
+        public CloudTable Table => tableReference;
+
+#if !ORLEANS_TRANSACTIONS
         private readonly CounterStatistic numServerBusy = CounterStatistic.FindOrCreate(StatisticNames.AZURE_SERVER_BUSY, true);
+#endif
 
         /// <summary>
         /// Constructor
@@ -183,7 +189,7 @@ namespace Orleans.Tests.AzureUtils
         }
 
         /// <summary>
-        /// Inserts a data entry in the Azure table: creates a new one if does not exists or overwrites (without eTag) an already existing version (the "update in place" semantincs).
+        /// Inserts a data entry in the Azure table: creates a new one if does not exists or overwrites (without eTag) an already existing version (the "update in place" semantics).
         /// </summary>
         /// <param name="data">Data to be inserted or replaced in the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
@@ -476,6 +482,7 @@ namespace Orleans.Tests.AzureUtils
                         return list;
                     };
 
+#if !ORLEANS_TRANSACTIONS
                     IBackoffProvider backoff = new FixedBackoff(AzureTableDefaultPolicies.PauseBetweenTableOperationRetries);
 
                     List<T> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
@@ -484,7 +491,9 @@ namespace Orleans.Tests.AzureUtils
                         (exc, counter) => AzureStorageUtils.AnalyzeReadException(exc.GetBaseException(), counter, TableName, Logger),
                         AzureTableDefaultPolicies.TableOperationTimeout,
                         backoff);
-
+#else
+                    List<T> results = await executeQueryHandleContinuations();
+#endif
                     // Data was read successfully if we got to here
                     return results.Select(i => Tuple.Create(i, i.ETag)).ToList();
 
@@ -562,8 +571,6 @@ namespace Orleans.Tests.AzureUtils
                 CheckAlertSlowAccess(startTime, operation);
             }
         }
-
-#region Internal functions
 
         internal async Task<Tuple<string, string>> InsertTwoTableEntriesConditionallyAsync(T data1, T data2, string data2Etag)
         {
@@ -728,8 +735,6 @@ namespace Orleans.Tests.AzureUtils
                 Logger.Warn((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {0} for {1}, which took {2}.", TableName, operation, timeSpan);
             }
         }
-
-        #endregion
 
         /// <summary>
         /// Helper functions for building table queries.

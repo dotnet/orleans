@@ -38,7 +38,6 @@ namespace Orleans.Runtime
         {
             implementation = null;
             GrainInterfaceData interfaceData;
-            var typeInfo = interfaceType.GetTypeInfo();
 
             // First, try to find a non-generic grain implementation:
             if (this.typeToInterfaceData.TryGetValue(GrainInterfaceMap.GetTypeKey(interfaceType, false), out interfaceData) &&
@@ -49,7 +48,7 @@ namespace Orleans.Runtime
 
             // If a concrete implementation was not found and the interface is generic, 
             // try to find a generic grain implementation:
-            if (typeInfo.IsGenericType &&
+            if (interfaceType.IsGenericType &&
                 this.typeToInterfaceData.TryGetValue(GrainInterfaceMap.GetTypeKey(interfaceType, true), out interfaceData) &&
                 TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
             {

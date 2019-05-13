@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -10,6 +10,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using TestGrainInterfaces;
+using UnitTests.DtosRefOrleans;
 using Xunit;
 
 namespace NonSilo.Tests
@@ -39,17 +40,27 @@ namespace NonSilo.Tests
     public class ClientBuilderTests
     {
         /// <summary>
-        /// Tests that a client cannot be created without specifying a ClusterId.
+        /// Tests that a client cannot be created without specifying a ClusterId and a ServiceId.
         /// </summary>
         [Fact]
-        public void ClientBuilder_NoClusterIdTest()
+        public void ClientBuilder_ClusterOptionsTest()
         {
             Assert.Throws<OrleansConfigurationException>(() => new ClientBuilder()
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>())
                 .Build());
 
+            Assert.Throws<OrleansConfigurationException>(() => new ClientBuilder()
+               .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+               .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>())
+               .Build());
+
+            Assert.Throws<OrleansConfigurationException>(() => new ClientBuilder()
+               .Configure<ClusterOptions>(options => options.ServiceId = "someServiceId")
+               .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>())
+               .Build());
+
             var builder = new ClientBuilder()
-                .Configure<ClusterOptions>(options => options.ClusterId = "test")
+                .Configure<ClusterOptions>(options => { options.ClusterId = "someClusterId"; options.ServiceId = "someServiceId"; })
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
             using (var client = builder.Build())
             {
@@ -71,6 +82,18 @@ namespace NonSilo.Tests
             {
                 Assert.NotNull(client);
             }
+        }
+
+        [Fact]
+        public void ClientBuilder_ThrowsDuringStartupIfNoGrainInterfacesAdded()
+        {
+            // Add only an assembly with generated serializers but no grain interfaces
+            var clientBuilder = new ClientBuilder()
+                .UseLocalhostClustering()
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ClassReferencingOrleansTypeDto).Assembly))
+                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
+
+            Assert.Throws<OrleansConfigurationException>(() => clientBuilder.Build());
         }
 
         /// <summary>

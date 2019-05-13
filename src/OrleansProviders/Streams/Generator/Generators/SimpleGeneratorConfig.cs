@@ -32,16 +32,16 @@ namespace Orleans.Hosting
 
     public class SimpleGeneratorOptionsFormatterResolver : IOptionFormatterResolver<SimpleGeneratorOptions>
     {
-        private IOptionsSnapshot<SimpleGeneratorOptions> optionsSnapshot;
+        private IOptionsMonitor<SimpleGeneratorOptions> optionsMonitor;
 
-        public SimpleGeneratorOptionsFormatterResolver(IOptionsSnapshot<SimpleGeneratorOptions> optionsSnapshot)
+        public SimpleGeneratorOptionsFormatterResolver(IOptionsMonitor<SimpleGeneratorOptions> optionsMonitor)
         {
-            this.optionsSnapshot = optionsSnapshot;
+            this.optionsMonitor = optionsMonitor;
         }
 
         public IOptionFormatter<SimpleGeneratorOptions> Resolve(string name)
         {
-            return new Formatter(name, optionsSnapshot.Get(name));
+            return new Formatter(name, this.optionsMonitor.Get(name));
         }
 
         private class Formatter : IOptionFormatter<SimpleGeneratorOptions>

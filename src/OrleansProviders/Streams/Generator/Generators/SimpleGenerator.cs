@@ -30,12 +30,9 @@ namespace Orleans.Providers.Streams.Generator
         }
 
         /// <summary>
-        /// Untill we've generated the configured number of events, return a single generated event
+        /// Until we've generated the configured number of events, return a single generated event
         /// </summary>
-        /// <param name="utcNow"></param>
-        /// <param name="events"></param>
-        /// <returns></returns>
-        public bool TryReadEvents(DateTime utcNow, out List<IBatchContainer> events)
+        public bool TryReadEvents(DateTime utcNow, int maxCount, out List<IBatchContainer> events)
         {
             events = new List<IBatchContainer>();
             if (sequenceId >= this.options.EventsInStream)
@@ -43,13 +40,23 @@ namespace Orleans.Providers.Streams.Generator
                 return false;
             }
 
-            events.Add(GenerateBatch());
+            for(int i=0; i< maxCount; i++)
+            {
+                if (!TryGenerateBatch(out GeneratedBatchContainer batch))
+                    break;
+                events.Add(batch);
+            }
 
             return true;
         }
         
-        private GeneratedBatchContainer GenerateBatch()
+        private bool TryGenerateBatch(out GeneratedBatchContainer batch)
         {
+            batch = null;
+            if (sequenceId >= this.options.EventsInStream)
+            {
+                return false;
+            }
             sequenceId++;
             var evt = new GeneratedEvent
             {
@@ -58,7 +65,8 @@ namespace Orleans.Providers.Streams.Generator
                         ? GeneratedEvent.GeneratedEventType.Fill
                         : GeneratedEvent.GeneratedEventType.Report
             };
-            return new GeneratedBatchContainer(streamGuid, this.options.StreamNamespace, evt, new EventSequenceTokenV2(sequenceId));
+            batch = new GeneratedBatchContainer(streamGuid, this.options.StreamNamespace, evt, new EventSequenceTokenV2(sequenceId));
+            return true;
         }
     }
 }

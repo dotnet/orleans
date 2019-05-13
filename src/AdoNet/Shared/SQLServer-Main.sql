@@ -20,9 +20,9 @@ Implementation notes:
    Orleans handles exception as a failure and will retry.
 
 7) The implementation follows the Extended Orleans membership protocol. For more information, see at:
-		http://dotnet.github.io/orleans/Runtime-Implementation-Details/Runtime-Tables.html
-		http://dotnet.github.io/orleans/Runtime-Implementation-Details/Cluster-Management
-		https://github.com/dotnet/orleans/blob/master/src/Orleans/SystemTargetInterfaces/IMembershipTable.cs
+        https://dotnet.github.io/orleans/Documentation/Runtime-Implementation-Details/Runtime-Tables.html
+        https://dotnet.github.io/orleans/Documentation/Runtime-Implementation-Details/Cluster-Management.html
+        https://github.com/dotnet/orleans/blob/master/src/Orleans.Core/SystemTargetInterfaces/IMembershipTable.cs
 */
 
 -- These settings improves throughput of the database by reducing locking by better separating readers from writers.
@@ -30,7 +30,7 @@ Implementation notes:
 DECLARE @current NVARCHAR(256);
 DECLARE @snapshotSettings NVARCHAR(612);
 
-SELECT @current = (SELECT DB_NAME());
+SELECT @current = N'[' + (SELECT DB_NAME()) + N']';
 SET @snapshotSettings = N'ALTER DATABASE ' + @current + N' SET READ_COMMITTED_SNAPSHOT ON; ALTER DATABASE ' + @current + N' SET ALLOW_SNAPSHOT_ISOLATION ON;';
 
 EXECUTE sp_executesql @snapshotSettings;

@@ -1,7 +1,7 @@
-using Orleans.Runtime.Configuration;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.Hosting;
-using Orleans.Hosting.Development;
+using Orleans.Transactions.TestKit;
 using TestExtensions;
 
 namespace Orleans.Transactions.Tests
@@ -13,16 +13,25 @@ namespace Orleans.Transactions.Tests
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
-        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .ConfigureServices(services => services.AddSingletonNamedService<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
+                    .ConfigureTracingForTransactionTests()
                     .AddMemoryGrainStorage(TransactionTestConstants.TransactionStore)
-                    .UseInClusterTransactionManager()
-                    .UseInMemoryTransactionLog()
-                    .UseTransactionalState();
+                    .UseTransactions();
             }
+        }
+    }
+
+    public class SkewedClockMemoryTransactionsFixture : MemoryTransactionsFixture
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.AddSiloBuilderConfigurator<SkewedClockConfigurator>();
+            base.ConfigureTestCluster(builder);
         }
     }
 }

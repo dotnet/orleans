@@ -8,7 +8,7 @@ namespace Orleans.Runtime.Placement
     /// When activation is requested (OnSelectActivation), it uses the same algorithm as RandomPlacementDirector to pick one if one already exists.
     /// That is, it checks with the Distributed Directory.
     /// If none exits, it prefers to place a new one in the local silo. If there are no races (only one silo at a time tries to activate this grain),
-    /// the the local silo wins. In the case of concurrent activations of the first activation of this grain, only one silo wins.
+    /// the local silo wins. In the case of concurrent activations of the first activation of this grain, only one silo wins.
     /// </summary>
     internal class PreferLocalPlacementDirector : RandomPlacementDirector, IPlacementDirector
     {

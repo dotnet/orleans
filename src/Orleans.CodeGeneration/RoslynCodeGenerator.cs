@@ -153,8 +153,8 @@ namespace Orleans.CodeGenerator
         /// </returns>
         public string GenerateSourceForAssembly(Assembly input)
         {
-            if (input.GetCustomAttribute<GeneratedCodeAttribute>() != null
-                || input.GetCustomAttribute<SkipCodeGenerationAttribute>() != null)
+            if (input.GetCustomAttributes<OrleansCodeGenerationTargetAttribute>().Any()
+                || input.GetCustomAttributes<SkipCodeGenerationAttribute>().Any())
             {
                 return string.Empty;
             }
@@ -171,7 +171,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Generates a syntax tree for the provided assemblies.
         /// </summary>
-        /// <param name="targetAssembly">The assemblies used for accessiblity checks, or <see langword="null"/> during runtime code generation.</param>
+        /// <param name="targetAssembly">The assemblies used for accessibility checks, or <see langword="null"/> during runtime code generation.</param>
         /// <param name="assemblies">The assemblies to generate code for.</param>
         /// <returns>The generated syntax tree.</returns>
         private GeneratedSyntax GenerateCode(Assembly targetAssembly, List<Assembly> assemblies)
@@ -651,8 +651,8 @@ namespace Orleans.CodeGenerator
         {
             return !assembly.IsDynamic
                    && TypeUtils.IsOrleansOrReferencesOrleans(assembly)
-                   && assembly.GetCustomAttribute<GeneratedCodeAttribute>() == null
-                   && assembly.GetCustomAttribute<SkipCodeGenerationAttribute>() == null;
+                   && !assembly.GetCustomAttributes<OrleansCodeGenerationTargetAttribute>().Any()
+                   && !assembly.GetCustomAttributes<SkipCodeGenerationAttribute>().Any();
         }
 
         private bool IsOrleansGeneratedCode(MemberInfo type) =>

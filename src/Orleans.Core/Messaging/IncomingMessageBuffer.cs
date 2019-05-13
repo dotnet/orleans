@@ -228,13 +228,13 @@ namespace Orleans.Runtime
             // drop buffers consumed by messages and adjust offsets
             // TODO: This can be optimized further. Linked lists?
             int consumedBytes = 0;
-            while (readBuffer.Count != 0)
+            int removed = 0;
+            for (; removed < this.readBuffer.Count; removed++)
             {
-                ArraySegment<byte> seg = readBuffer[0];
+                ArraySegment<byte> seg = this.readBuffer[removed];
                 if (seg.Count <= decodeOffset - consumedBytes)
                 {
                     consumedBytes += seg.Count;
-                    readBuffer.Remove(seg);
                     BufferPool.GlobalPool.Release(seg.Array);
                 }
                 else
@@ -242,6 +242,8 @@ namespace Orleans.Runtime
                     break;
                 }
             }
+            if (removed != 0) this.readBuffer.RemoveRange(0, removed);
+
             decodeOffset -= consumedBytes;
             receiveOffset -= consumedBytes;
 

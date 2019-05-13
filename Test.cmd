@@ -7,6 +7,9 @@ SET CMDHOME=%~dp0
 @REM Remove trailing backslash \
 set CMDHOME=%CMDHOME:~0,-1%
 
+:: Disable multilevel lookup https://github.com/dotnet/core-setup/blob/master/Documentation/design-docs/multilevel-sharedfx-lookup.md
+set DOTNET_MULTILEVEL_LOOKUP=0 
+
 call Ensure-DotNetSdk.cmd
 
 pushd "%CMDHOME%"
@@ -35,9 +38,9 @@ set TESTS=^
 %CMDHOME%\test\RuntimeCodeGen.Tests,^
 %CMDHOME%\test\Transactions\Orleans.Transactions.Tests,^
 %CMDHOME%\test\Transactions\Orleans.Transactions.Azure.Test,^
-%CMDHOME%\test\Transactions\Orleans.Transactions.DynamoDB.Test,^
 %CMDHOME%\test\TestInfrastructure\Orleans.TestingHost.Tests,^
-%CMDHOME%\test\DependencyInjection.Tests
+%CMDHOME%\test\DependencyInjection.Tests,^
+%CMDHOME%\test\Analyzers.Tests
 
 if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait Category=BVT -trait Category=SlowBVT
 

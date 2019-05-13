@@ -71,17 +71,17 @@ namespace UnitTests.Serialization
                 serializerToUse,
                 _ =>
                 {
-                    TypeInfo fallback;
+                    Type fallback;
                     switch (serializerToUse)
                     {
                         case SerializerToUse.IlBasedFallbackSerializer:
-                            fallback = typeof(ILBasedSerializer).GetTypeInfo();
+                            fallback = typeof(ILBasedSerializer);
                             break;
                         case SerializerToUse.BinaryFormatterFallbackSerializer:
-                            fallback = typeof(BinaryFormatterSerializer).GetTypeInfo();
+                            fallback = typeof(BinaryFormatterSerializer);
                             break;
                         case SerializerToUse.NoFallback:
-                            fallback = typeof(SupportsNothingSerializer).GetTypeInfo();
+                            fallback = typeof(SupportsNothingSerializer);
                             break;
                         default:
                             throw new InvalidOperationException("Invalid Serializer was selected");
@@ -886,39 +886,39 @@ namespace UnitTests.Serialization
         }
 
         [Theory, TestCategory("Functional")]
-        [InlineData(SerializerToUse.NoFallback)]
-        public void SerializationTests_IsOrleansShallowCopyable(SerializerToUse serializerToUse)
+        [InlineData(typeof(Dictionary<string, object>))]
+        [InlineData(typeof(Dictionary<string, int>))]
+        [InlineData(typeof(NonShallowCopyableValueType))]
+        [InlineData(typeof(NonShallowCopyableValueType?))]
+        [InlineData(typeof(Tuple<string, NonShallowCopyableValueType>))]
+        public void SerializationTests_IsNotOrleansShallowCopyable(Type type)
         {
-            var environment = InitializeSerializer(serializerToUse);
-            var nonShallowCopyableTypes = new[]
-            {
-                typeof(Dictionary<string, object>),
-                typeof(Dictionary<string, int>)
-            };
+            Assert.False(type.IsOrleansShallowCopyable());
+        }
 
-            foreach (var nonShallowCopyableType in nonShallowCopyableTypes)
-            {
-                Assert.False(nonShallowCopyableType.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {nonShallowCopyableType.Name}");
-            }
-
-            var shallowCopyableTypes = new[]
-            {
-                typeof(int),
-                typeof(DateTime),
-                typeof(Immutable<Dictionary<string, object>>),
-                typeof(ShallowCopyableValueType),
-                typeof(ArgumentNullException)
-            };
-
-            foreach (var shallowCopyableType in shallowCopyableTypes)
-            {
-                Assert.True(shallowCopyableType.IsOrleansShallowCopyable(), $"IsOrleansShallowCopyable: {shallowCopyableType.Name}");
-            }
+        [Theory, TestCategory("Functional")]
+        [InlineData(typeof(int))]
+        [InlineData(typeof(DateTime))]
+        [InlineData(typeof(Immutable<Dictionary<string, object>>))]
+        [InlineData(typeof(ShallowCopyableValueType))]
+        [InlineData(typeof(ArgumentNullException))]
+        [InlineData(typeof(int?))]
+        [InlineData(typeof(Tuple<string, int>))]
+        [InlineData(typeof(Tuple<Guid?, Tuple<string, ShallowCopyableValueType?, DateTimeOffset>>))]
+        public void SerializationTests_IsOrleansShallowCopyable(Type type)
+        {
+            Assert.True(type.IsOrleansShallowCopyable());
         }
 
         public struct ShallowCopyableValueType
         {
             public int AnotherValueType;
+        }
+
+        public struct NonShallowCopyableValueType
+        {
+            public object AutoProp { get; }
+            public NonShallowCopyableValueType(object o) => AutoProp = o;
         }
 
         internal static object OrleansSerializationLoop(SerializationManager serializationManager, object input, bool includeWire = true)

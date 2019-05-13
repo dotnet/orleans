@@ -40,9 +40,9 @@ namespace Orleans.Storage
     public interface IRestExceptionDecoder
     {
         /// <summary>
-        /// Decode details of the exceprion
+        /// Decode details of the exception
         /// </summary>
-        /// <param name="e">Excption to decode</param>
+        /// <param name="e">Exception to decode</param>
         /// <param name="httpStatusCode">HTTP status code for the error</param>
         /// <param name="restStatus">REST status for the error</param>
         /// <param name="getExtendedErrors">Whether or not to extract REST error code</param>

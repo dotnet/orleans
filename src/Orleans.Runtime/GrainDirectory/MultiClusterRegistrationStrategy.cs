@@ -26,7 +26,7 @@ namespace Orleans.GrainDirectory
 
         internal MultiClusterRegistrationStrategy GetMultiClusterRegistrationStrategy(Type grainClass)
         {
-            var attribs = grainClass.GetTypeInfo().GetCustomAttributes<RegistrationAttribute>(inherit: true).ToArray();
+            var attribs = grainClass.GetCustomAttributes<RegistrationAttribute>(inherit: true).ToArray();
 
             switch (attribs.Length)
             {

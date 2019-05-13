@@ -146,7 +146,7 @@ namespace Tests.GeoClusterTests
             }
         }
 
-        [SkippableFact(), TestCategory("Functional")]
+        [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/3929"), TestCategory("Functional")]
         public async Task TestMultiClusterConf_3_3()
         {
             // use a random global service id for testing purposes
@@ -192,7 +192,7 @@ namespace Tests.GeoClusterTests
             // shut down one of the gateways in cluster B gracefully
             var target = Clusters[clusterB].Cluster.GetActiveSilos().Where(h => h.SiloAddress.Endpoint.Port == portsB[1]).FirstOrDefault();
             Assert.NotNull(target);
-            Clusters[clusterB].Cluster.StopSilo(target);
+            await Clusters[clusterB].Cluster.StopSiloAsync(target);
             await WaitForLivenessToStabilizeAsync();
 
             // expect disappearance and replacement of gateway from multicluster network
@@ -208,7 +208,7 @@ namespace Tests.GeoClusterTests
             // kill one of the gateways in cluster A
             target = Clusters[clusterA].Cluster.GetActiveSilos().Where(h => h.SiloAddress.Endpoint.Port == portsA[1]).FirstOrDefault();
             Assert.NotNull(target);
-            Clusters[clusterA].Cluster.KillSilo(target);
+            await Clusters[clusterA].Cluster.KillSiloAsync(target);
             await WaitForLivenessToStabilizeAsync();
 
             // wait for time necessary before peer removal can kick in

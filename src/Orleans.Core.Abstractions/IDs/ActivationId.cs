@@ -1,4 +1,3 @@
-using Orleans.Core.Abstractions.Internal;
 using System;
 
 namespace Orleans.Runtime
@@ -69,14 +68,10 @@ namespace Orleans.Runtime
             return o != null && Key.Equals(o.Key);
         }
 
-        #region IEquatable<ActivationId> Members
-
         public bool Equals(ActivationId other)
         {
             return other != null && Key.Equals(other.Key);
         }
-
-        #endregion
 
         public override int GetHashCode()
         {

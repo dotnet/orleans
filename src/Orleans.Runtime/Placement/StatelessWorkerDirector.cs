@@ -25,7 +25,13 @@ namespace Orleans.Runtime.Placement
 
         public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            return Task.FromResult(context.LocalSilo);
+            // If the current silo is not shutting down, place locally
+            if (!context.LocalSiloStatus.IsTerminating())
+                return Task.FromResult(context.LocalSilo);
+
+            // otherwise, place somewhere else
+            var compatibleSilos = context.GetCompatibleSilos(target);
+            return Task.FromResult(compatibleSilos[random.Next(compatibleSilos.Count)]);
         }
 
         private PlacementResult SelectActivationCore(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
@@ -37,6 +43,9 @@ namespace Orleans.Runtime.Placement
             // If all are busy and the number of local activations reached or exceeded MaxLocal, it randomly returns one of them.
             // Otherwise, it requests creation of a new activation.
             List<ActivationData> local;
+
+            if (context.LocalSiloStatus.IsTerminating())
+                return null;
 
             if (!context.LocalLookup(target, out local) || local.Count == 0)
                 return null;
@@ -63,7 +72,7 @@ namespace Orleans.Runtime.Placement
 
         internal static ActivationData PickRandom(List<ActivationData> local)
         {
-             return local[local.Count == 1 ? 0 : random.Next(local.Count)];
+            return local[local.Count == 1 ? 0 : random.Next(local.Count)];
         }
     }
 }

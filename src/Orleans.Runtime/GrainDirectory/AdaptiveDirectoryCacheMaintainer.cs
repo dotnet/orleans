@@ -70,7 +70,7 @@ namespace Orleans.Runtime.GrainDirectory
                     GrainId grain = pair.Key;
                     var entry = pair.Value;
 
-                    SiloAddress owner = router.CalculateTargetSilo(grain);
+                    SiloAddress owner = router.CalculateGrainDirectoryPartition(grain);
                     if (owner == null) // Null means there's no other silo and we're shutting down, so skip this entry
                     {
                         continue;
@@ -80,7 +80,7 @@ namespace Orleans.Runtime.GrainDirectory
                     {
                         // we found our owned entry in the cache -- it is not supposed to happen unless there were 
                         // changes in the membership
-                        Log.Warn(ErrorCode.Runtime_Error_100185, "Grain {0} owned by {1} was found in the cache of {1}", grain, owner, owner);
+                        Log.Warn(ErrorCode.Runtime_Error_100185, "Grain {grain} owned by {owner} was found in the cache of {owner}", grain, owner, owner);
                         cache.Remove(grain);
                         cnt1++;                             // for debug
                     }
@@ -216,7 +216,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // this may happen only if the LRU cache is full and decided to drop this grain
                     // while we try to refresh it
-                    Log.Warn(ErrorCode.Runtime_Error_100199, "Grain {0} disappeared from the cache during maintainance", grain);
+                    Log.Warn(ErrorCode.Runtime_Error_100199, "Grain {0} disappeared from the cache during maintenance", grain);
                 }
             }
 
