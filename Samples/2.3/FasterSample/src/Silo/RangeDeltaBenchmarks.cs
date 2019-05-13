@@ -51,7 +51,7 @@ namespace Silo
         public void IterationSetup()
         {
             concurrentGrain.StartAsync().Wait();
-            fasterGrain.StartAsync().Wait();
+            fasterGrain.TryGetAsync(0).Wait();
         }
 
         [IterationCleanup]

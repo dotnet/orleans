@@ -56,7 +56,7 @@ namespace Silo
         {
             dictionaryGrain.StartAsync().Wait();
             concurrentGrain.StartAsync().Wait();
-            fasterGrain.StartAsync().Wait();
+            fasterGrain.TryGetAsync(0).Wait();
         }
 
         [IterationCleanup]

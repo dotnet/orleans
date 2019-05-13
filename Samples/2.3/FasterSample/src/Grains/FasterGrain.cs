@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using FASTER.core;
 using Grains.Models;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Concurrency;
@@ -14,22 +15,34 @@ namespace Grains
     [Reentrant]
     public class FasterGrain : Grain, IFasterGrain
     {
+        private readonly ILogger<FasterGrain> logger;
         private readonly FasterOptions options;
         private IDevice logDevice;
         private IDevice objectLogDevice;
         private FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions> lookup;
-        private SemaphoreSlim semaphore = new SemaphoreSlim(Environment.ProcessorCount, Environment.ProcessorCount);
+        private readonly SemaphoreSlim semaphore = new SemaphoreSlim(Environment.ProcessorCount, Environment.ProcessorCount);
 
-        public FasterGrain(IOptions<FasterOptions> options)
+        public FasterGrain(ILogger<FasterGrain> logger, IOptions<FasterOptions> options)
         {
+            this.logger = logger;
             this.options = options.Value;
         }
 
         public override Task OnActivateAsync()
         {
             // define paths
-            var logPath = Path.Combine(options.BaseDirectory, GetType().Name, this.GetPrimaryKey().ToString("D"), options.HybridLogDeviceFileTitle);
-            var objectPath = Path.Combine(options.BaseDirectory, GetType().Name, this.GetPrimaryKey().ToString("D"), options.ObjectLogDeviceFileTitle);
+            var grainPath = Path.Combine(options.BaseDirectory, GetType().Name, this.GetPrimaryKey().ToString("D"));
+            if (!Directory.Exists(grainPath))
+            {
+                Directory.CreateDirectory(grainPath);
+            }
+            var logPath = Path.Combine(grainPath, options.HybridLogDeviceFileTitle);
+            var objectPath = Path.Combine(grainPath, options.ObjectLogDeviceFileTitle);
+            var checkpointPath = Path.Combine(grainPath, options.CheckpointsSubDirectory);
+            if (!Directory.Exists(checkpointPath))
+            {
+                Directory.CreateDirectory(checkpointPath);
+            }
 
             // define the underlying log file
             logDevice = Devices.CreateLogDevice(logPath, true, true);
@@ -37,18 +50,39 @@ namespace Grains
 
             // create the faster lookup
             lookup = new FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions>(
-                1L << 20,
+                1L << 30, // one billion hash buckets
                 new LookupItemFunctions(),
                 new LogSettings()
                 {
                     LogDevice = logDevice,
-                    ObjectLogDevice = objectLogDevice
+                    ObjectLogDevice = objectLogDevice,
+                    MemorySizeBits = 30 // one gigagbyte
+                },
+                new CheckpointSettings
+                {
+                    CheckpointDir = checkpointPath,
+                    CheckPointType = CheckpointType.Snapshot
                 },
                 serializerSettings: new SerializerSettings<int, LookupItem>
                 {
                     valueSerializer = () => new ProtobufObjectSerializer<LookupItem>()
                 },
                 comparer: LookupItemFasterKeyComparer.Default);
+
+            // attempt recovery
+            try
+            {
+                lookup.Recover();
+                logger.LogWarning("Recovered {@ItemsRecovered} entries", lookup.EntryCount);
+            }
+            catch (DirectoryNotFoundException)
+            {
+                logger.LogWarning("Nothing to recover from");
+            }
+            catch (InvalidOperationException)
+            {
+                logger.LogWarning("Nothing to recover from");
+            }
 
             return base.OnActivateAsync();
         }
@@ -72,6 +106,7 @@ namespace Grains
 
                 var key = item.Key;
                 lookup.Upsert(ref key, ref item, Empty.Default, 0);
+                lookup.Refresh();
             }
             finally
             {
@@ -86,7 +121,7 @@ namespace Grains
             }
         }
 
-        public Task SetRangeAsync(ImmutableList<LookupItem> items, bool wait = false)
+        public Task SetRangeAsync(ImmutableList<LookupItem> items)
         {
             return Task.Run(async () =>
             {
@@ -97,13 +132,16 @@ namespace Grains
                     lookup.StartSession();
                     for (var i = 0; i < items.Count; ++i)
                     {
+                        if (i % 1024 == 0)
+                        {
+                            lookup.Refresh();
+                        }
+
                         var item = items[i];
                         var key = item.Key;
                         lookup.Upsert(ref key, ref item, Empty.Default, i);
                     }
-                    lookup.CompletePending(wait);
-                    lookup.TakeFullCheckpoint(out var token);
-                    lookup.CompleteCheckpoint(wait);
+                    lookup.CompletePending(true);
                 }
                 finally
                 {
@@ -115,6 +153,28 @@ namespace Grains
                     {
                         semaphore.Release();
                     }
+                }
+                return Task.CompletedTask;
+            });
+        }
+
+        public Task SnapshotAsync()
+        {
+            return Task.Run(async () =>
+            {
+                await semaphore.WaitAsync();
+
+                try
+                {
+                    lookup.StartSession();
+                    lookup.CompletePending(true);
+                    lookup.TakeFullCheckpoint(out var token);
+                    lookup.CompleteCheckpoint(true);
+                    lookup.StopSession();
+                }
+                finally
+                {
+                    semaphore.Release();
                 }
                 return Task.CompletedTask;
             });
@@ -142,51 +202,10 @@ namespace Grains
             }
         }
 
-        public Task StartAsync() => Task.CompletedTask;
-
         public Task StopAsync()
         {
             DeactivateOnIdle();
             return Task.CompletedTask;
-        }
-
-        public Task<ImmutableList<LookupItem>> TryGetRangeAsync(ImmutableList<int> keys)
-        {
-            return Task.Run(() =>
-            {
-                var results = ImmutableList.CreateBuilder<LookupItem>();
-                var session = Guid.Empty;
-                try
-                {
-                    session = lookup.StartSession();
-                    for (var i = 0; i < keys.Count; ++i)
-                    {
-                        var key = keys[i];
-                        LookupItem result = null;
-                        var status = lookup.Read(ref key, ref result, ref result, Empty.Default, 0);
-                        switch (status)
-                        {
-                            case Status.OK:
-                                results.Add(result);
-                                break;
-
-                            case Status.NOTFOUND:
-                                break;
-
-                            default:
-                                throw new ApplicationException();
-                        }
-                    }
-                    return Task.FromResult(results.ToImmutable());
-                }
-                finally
-                {
-                    if (session != Guid.Empty)
-                    {
-                        lookup.StopSession();
-                    }
-                }
-            });
         }
 
         public Task SetRangeDeltaAsync(ImmutableList<LookupItem> items)

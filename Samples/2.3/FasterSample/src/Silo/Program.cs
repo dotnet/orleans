@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using BenchmarkDotNet.Running;
 using Grains;
 using Grains.Models;
@@ -44,7 +45,7 @@ namespace Silo
                     });
                     _.Configure<FasterOptions>(x =>
                     {
-                        x.BaseDirectory = @"D:\Temp\Faster";
+                        x.BaseDirectory = @"C:\Temp\Faster";
                         x.HybridLogDeviceFileTitle = "hybrid.log";
                         x.ObjectLogDeviceFileTitle = "object.log";
                         x.CheckpointsSubDirectory = "checkpoints";
@@ -79,24 +80,54 @@ namespace Silo
                 .GetService<IGrainFactory>()
                 .GetGrain<IFasterGrain>(Guid.Empty);
 
-            var total = 1 << 30;
-            var batch = 1 << 20;
+            var logger = host.Services
+                .GetService<ILogger<Program>>();
+
+            var total = 1 << 20; // one million
+            var batch = 1 << 10; // one thousand
             var done = 0;
             var pipeline = new AsyncPipeline(Environment.ProcessorCount);
-            var generator = Enumerable.Range(0, total)
+
+            logger.LogWarning("Generating data...");
+            var load = Enumerable.Range(0, total)
                 .Select(index => new LookupItem(index, index, DateTime.UtcNow))
                 .BatchIEnumerable(batch)
                 .Select(list => list.ToImmutableList())
-                .Select(items => grain.SetRangeAsync(items, true).ContinueWith(_ =>
+                .Select(items => Task.Run(async () =>
                 {
-                    Interlocked.Add(ref done, batch);
-                    Console.WriteLine($"Loaded {done} items...");
+                    try
+                    {
+                        await grain.SetRangeAsync(items);
+                    }
+                    catch (Exception error)
+                    {
+                        logger.LogError(error, error.Message);
+                        throw;
+                    }
+                    Interlocked.Add(ref done, items.Count);
                 }));
 
-            pipeline.AddRange(generator);
+            logger.LogWarning("Going to load a total of {@Total:N0} items at {@BatchSize} items/batch...",
+                total, batch);
+
+            var watch = Stopwatch.StartNew();
+            var timer = new Timer(_ =>
+            {
+                if (watch.IsRunning && watch.ElapsedMilliseconds > 0)
+                {
+                    logger.LogWarning("Loaded {@Done:N0} out of {@Total:N0} at {Ops:N0}/s {@Percent:N2}%",
+                                done, total, ((double)done / watch.ElapsedMilliseconds) * 1000.0, (double)done / total * 100);
+                }
+            }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+
+            pipeline.AddRange(load);
             pipeline.Wait();
 
-            Console.WriteLine("Complete");
+            grain.SnapshotAsync().Wait();
+            watch.Stop();
+
+            logger.LogWarning("Completed {@Items} in {@Elapsed}ms at {@Ops}/s",
+                done, watch.ElapsedMilliseconds, (double)done / watch.ElapsedMilliseconds * 1000.0);
 
             host.StopAsync().Wait();
 

@@ -33,7 +33,7 @@ namespace Silo
         }
 
         [IterationSetup]
-        public void IterationSetup() => grain.StartAsync().Wait();
+        public void IterationSetup() => grain.TryGetAsync(0).Wait();
 
         [IterationCleanup]
         public void IterationCleanup() => grain.StopAsync().Wait();
