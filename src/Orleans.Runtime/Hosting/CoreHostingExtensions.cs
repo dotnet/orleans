@@ -27,9 +27,7 @@ namespace Orleans.Hosting
                 {
                     services.PostConfigure<SiloOptions>(
                         options => options.SiloName =
-                            options.SiloName
-                            ?? context.HostingEnvironment.ApplicationName
-                            ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
+                            options.SiloName ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
                     services.TryAddSingleton<Silo>();
                     DefaultSiloServices.AddDefaultServices(context.GetApplicationPartManager(), services);
@@ -155,9 +153,7 @@ namespace Orleans.Hosting
                 {
                     services.PostConfigure<SiloOptions>(
                         options => options.SiloName =
-                            options.SiloName
-                            ?? context.HostingEnvironment.ApplicationName
-                            ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
+                            options.SiloName ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
                     services.TryAddSingleton<Silo>();
                     DefaultSiloServices.AddDefaultServices(context.GetApplicationPartManager(), services);
