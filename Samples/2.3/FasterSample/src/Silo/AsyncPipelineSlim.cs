@@ -1,41 +1,38 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 namespace Silo
 {
     public class AsyncPipelineSlim
     {
-        private readonly HashSet<Task> tasks = new HashSet<Task>();
+        private readonly ActionBlock<Func<Task>> worker;
 
         public AsyncPipelineSlim(int capacity)
         {
-            Capacity = capacity;
-        }
-
-        public int Capacity { get; }
-
-        public async Task AddAsync(Func<Task> action)
-        {
-            while (tasks.Count >= Capacity)
+            this.worker = new ActionBlock<Func<Task>>(async action =>
             {
-                tasks.Remove(await Task.WhenAny(tasks));
-            }
-
-            tasks.Add(action());
+                await action();
+            },
+            new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = capacity
+            });
         }
 
-        public async Task AddRangeAsync(IEnumerable<Func<Task>> actions)
+        public void AddRange(IEnumerable<Func<Task>> actions)
         {
             foreach (var action in actions)
             {
-                await AddAsync(action);
+                worker.Post(action);
             }
         }
 
-        public Task WhenAll()
+        public void Wait()
         {
-            return Task.WhenAll(tasks);
+            worker.Complete();
+            worker.Completion.Wait();
         }
     }
 }

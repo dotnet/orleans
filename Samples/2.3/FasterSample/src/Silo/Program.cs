@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using BenchmarkDotNet.Running;
 using Grains;
 using Grains.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -74,6 +75,7 @@ namespace Silo
 
         public static void Main()
         {
+            /*
             var host = StartNewHost();
 
             var grain = host.Services
@@ -82,7 +84,9 @@ namespace Silo
 
             var logger = host.Services
                 .GetService<ILogger<Program>>();
+            */
 
+            /*
             var total = 1 << 20; // one million
             var batch = 1 << 10; // one thousand
             var done = 0;
@@ -135,6 +139,14 @@ namespace Silo
             //BenchmarkRunner.Run<RangeDeltaBenchmarks>();
             //BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(config: new DebugInProcessConfig());
             //BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run();
+            */
+
+            BenchmarkRunner.Run<AsyncPipelineSlimBenchmarks>();
+
+            //var Tasks = Enumerable.Range(0, 10).Select(_ => Task.CompletedTask).ToArray();
+            //var pipeline = new AsyncPipelineSlim(5);
+            //pipeline.AddRange(Tasks);
+            //pipeline.Wait();
         }
     }
 }
