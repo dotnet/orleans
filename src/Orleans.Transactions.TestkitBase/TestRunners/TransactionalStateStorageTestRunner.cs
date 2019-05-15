@@ -554,7 +554,7 @@ namespace Orleans.Transactions.TestKit
             etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1, pendingstate2, pendingstate3a, pendingstate4a}, null, null);
 
             // replace 3b,4b, prepare 5, 6, 7, 8 confirm 1, 2, 3b, 4b, 5, 6
-            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate3b, pendingstate4b, pendingstate5, pendingstate6, pendingstate7, pendingstate8 }, 6, 6);
+            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate3b, pendingstate4b, pendingstate5, pendingstate6, pendingstate7, pendingstate8 }, 6, null);
 
             loadresponse = await stateStorage.Load();
             etag = loadresponse.ETag;
