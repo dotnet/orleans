@@ -70,6 +70,7 @@ namespace Grains
                 comparer: LookupItemFasterKeyComparer.Default);
 
             // attempt recovery
+            /*
             try
             {
                 lookup.Recover();
@@ -83,6 +84,7 @@ namespace Grains
             {
                 logger.LogWarning("Nothing to recover from");
             }
+            */
 
             return base.OnActivateAsync();
         }
@@ -94,6 +96,14 @@ namespace Grains
             objectLogDevice.Close();
 
             return base.OnDeactivateAsync();
+        }
+
+        public Task StartAsync() => Task.CompletedTask;
+
+        public Task StopAsync()
+        {
+            DeactivateOnIdle();
+            return Task.CompletedTask;
         }
 
         public async Task SetAsync(LookupItem item)
@@ -200,12 +210,6 @@ namespace Grains
                     lookup.StopSession();
                 }
             }
-        }
-
-        public Task StopAsync()
-        {
-            DeactivateOnIdle();
-            return Task.CompletedTask;
         }
 
         public Task SetRangeDeltaAsync(ImmutableList<LookupItem> items)

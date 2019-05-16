@@ -1,20 +1,12 @@
 using System;
-using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Running;
 using Grains;
-using Grains.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Runtime;
 
 namespace Silo
 {
@@ -31,7 +23,7 @@ namespace Silo
 
             .ConfigureServices(_ => _
                 .Configure<ConsoleLifetimeOptions>(x => x.SuppressStatusMessages = true)
-                .Configure<SchedulingOptions>(x => x.TurnWarningLengthThreshold = TimeSpan.FromSeconds(10))
+                .Configure<SchedulingOptions>(x => x.TurnWarningLengthThreshold = TimeSpan.FromSeconds(1))
                 .Configure<FasterOptions>(x =>
                 {
                     x.BaseDirectory = @"C:\Temp\Faster";
@@ -43,13 +35,11 @@ namespace Silo
             .UseConsoleLifetime()
             .Build();
 
-        public static async Task Main()
+        public static void Main()
         {
-#if DEBUG
-            BenchmarkRunner.Run<VolatileBatchWriteBenchmarks>(new DebugInProcessConfig());
-#else
-            BenchmarkRunner.Run<VolatileBatchWriteBenchmarks>();
-#endif
+            BenchmarkRunner.Run<VolatileBatchWriteBenchmarks>(
+            // new BenchmarkDotNet.Configs.DebugInProcessConfig()
+            );
         }
     }
 }

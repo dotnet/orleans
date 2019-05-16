@@ -7,15 +7,17 @@ namespace Grains
 {
     public interface IFasterGrain : IGrainWithGuidKey
     {
+        Task StartAsync();
+
         Task StopAsync();
 
         Task SetAsync(LookupItem item);
 
         Task SetRangeAsync(ImmutableList<LookupItem> items);
 
-        Task SnapshotAsync();
-
         Task SetRangeDeltaAsync(ImmutableList<LookupItem> items);
+
+        Task SnapshotAsync();
 
         Task<LookupItem> TryGetAsync(int key);
     }

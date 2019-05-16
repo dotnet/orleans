@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using Grains;
 using Grains.Models;
@@ -12,33 +12,26 @@ using Orleans.Runtime;
 
 namespace Silo
 {
-    [EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
+    [ShortRunJob, MarkdownExporter, RunOncePerIteration]
     [GcServer(true), GcConcurrent(true)]
     public class VolatileBatchWriteBenchmarks
     {
-        private const int ItemCount = 1 << 20;
+        private const int ItemCount = 1 << 21;
 
-        private IHost host;
-        private IDictionaryGrain dictionaryGrain;
+        private readonly IHost host = Program.BuildHost();
         private IConcurrentDictionaryGrain concurrentGrain;
         private IFasterGrain fasterGrain;
-        private ImmutableList<LookupItem>[] batches;
-        private Task[] tasks;
+        private IEnumerable<ImmutableList<LookupItem>> generator;
 
         [GlobalSetup]
         public void GlobalSetup()
         {
-            batches = Enumerable.Range(0, Items)
+            generator = Enumerable.Range(0, Items)
                 .Select(i => new LookupItem(i, i, DateTime.UtcNow))
                 .BatchIEnumerable(BatchSize)
-                .Select(_ => _.ToImmutableList())
-                .ToArray();
+                .Select(_ => _.ToImmutableList());
 
-            host = Program.StartNewHost();
-
-            dictionaryGrain = host.Services
-                .GetService<IGrainFactory>()
-                .GetGrain<IDictionaryGrain>(Guid.Empty);
+            host.StartAsync().Wait();
 
             concurrentGrain = host.Services
                 .GetService<IGrainFactory>()
@@ -47,14 +40,11 @@ namespace Silo
             fasterGrain = host.Services
                 .GetService<IGrainFactory>()
                 .GetGrain<IFasterGrain>(Guid.Empty);
-
-            tasks = new Task[batches.Length];
         }
 
         [IterationSetup]
         public void IterationSetup()
         {
-            dictionaryGrain.StartAsync().Wait();
             concurrentGrain.StartAsync().Wait();
             fasterGrain.TryGetAsync(0).Wait();
         }
@@ -62,7 +52,6 @@ namespace Silo
         [IterationCleanup]
         public void IterationCleanup()
         {
-            dictionaryGrain.StopAsync().Wait();
             concurrentGrain.StopAsync().Wait();
             fasterGrain.StopAsync().Wait();
         }
@@ -73,37 +62,26 @@ namespace Silo
         [Params(ItemCount)]
         public int Items { get; set; }
 
-        [Params(1 << 10, 1 << 11, 1 << 12)]
+        [Params(1 << 10, 1 << 11, 1 << 12, 1 << 13, 1 << 14)]
         public int BatchSize { get; set; }
+
+        [Params(2, 4, 8, 16, 32, 64, 128)]
+        public int Concurrency { get; set; }
+
+        [Benchmark(OperationsPerInvoke = ItemCount, Baseline = true)]
+        public void ConcurrentDictionary()
+        {
+            var pipeline = new AsyncPipeline(Concurrency);
+            pipeline.AddRange(generator.Select(_ => concurrentGrain.SetRangeAsync(_)));
+            pipeline.Wait();
+        }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
         public void Faster()
         {
-            for (var i = 0; i < batches.Length; ++i)
-            {
-                tasks[i] = fasterGrain.SetRangeAsync(batches[i]);
-            }
-            Task.WaitAll(tasks);
-        }
-
-        [Benchmark(OperationsPerInvoke = ItemCount)]
-        public void ConcurrentDictionary()
-        {
-            for (var i = 0; i < batches.Length; ++i)
-            {
-                tasks[i] = concurrentGrain.SetRangeAsync(batches[i]);
-            }
-            Task.WaitAll(tasks);
-        }
-
-        [Benchmark(OperationsPerInvoke = ItemCount)]
-        public void Dictionary()
-        {
-            for (var i = 0; i < batches.Length; ++i)
-            {
-                tasks[i] = dictionaryGrain.SetRangeAsync(batches[i]);
-            }
-            Task.WaitAll(tasks);
+            var pipeline = new AsyncPipeline(Concurrency);
+            pipeline.AddRange(generator.Select(_ => fasterGrain.SetRangeAsync(_)));
+            pipeline.Wait();
         }
     }
 }

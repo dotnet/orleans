@@ -19,7 +19,7 @@ namespace Silo
     {
         private const int ItemCount = 1 << 21;
 
-        private IHost host;
+        private readonly IHost host = Program.BuildHost();
         private IConcurrentDictionaryGrain concurrentGrain;
         private IFasterGrain fasterGrain;
         private ImmutableList<LookupItem>[] batches;
@@ -34,7 +34,7 @@ namespace Silo
                 .Select(_ => _.ToImmutableList())
                 .ToArray();
 
-            host = Program.StartNewHost();
+            host.StartAsync().Wait();
 
             concurrentGrain = host.Services
                 .GetService<IGrainFactory>()
