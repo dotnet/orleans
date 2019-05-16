@@ -1,12 +1,16 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Silo
 {
     public class AsyncPipelineSlim
     {
-        private readonly HashSet<Task> tasks = new HashSet<Task>();
+        private readonly HashSet<Task> running = new HashSet<Task>();
+        private readonly LinkedList<TaskCompletionSource<Task>> completions = new LinkedList<TaskCompletionSource<Task>>();
+        private LinkedListNode<TaskCompletionSource<Task>> nextCompletionSlot;
 
         public AsyncPipelineSlim(int capacity)
         {
@@ -15,27 +19,53 @@ namespace Silo
 
         public int Capacity { get; }
 
-        public async Task AddAsync(Func<Task> action)
+        public void Add(Func<Task> action)
         {
-            while (tasks.Count >= Capacity)
+            // make room
+            while (running.Count >= Capacity)
             {
-                tasks.Remove(await Task.WhenAny(tasks));
+                TaskCompletionSource<Task> completion;
+                lock (completions)
+                {
+                    completion = completions.First.Value;
+                    completions.RemoveFirst();
+                }
+                completion.Task.Wait();
+                running.Remove(completion.Task);
             }
 
-            tasks.Add(action());
+            // add completion capacity
+            var newCompletion = new TaskCompletionSource<Task>();
+            lock (completions)
+            {
+                completions.AddLast(newCompletion);
+            }
+
+            // start the task
+            var task = action();
+            task.ContinueWith(x =>
+            {
+                TaskCompletionSource<Task> completion;
+                lock (completions)
+                {
+                    nextCompletionSlot = nextCompletionSlot == null
+                        ? completions.First
+                        : nextCompletionSlot.Next;
+                    completion = nextCompletionSlot.Value;
+                }
+                completion.TrySetResult(x);
+            });
+            running.Add(task);
         }
 
-        public async Task AddRangeAsync(IEnumerable<Func<Task>> actions)
+        public void AddRange(IEnumerable<Func<Task>> actions)
         {
             foreach (var action in actions)
             {
-                await AddAsync(action);
+                Add(action);
             }
         }
 
-        public Task WhenAll()
-        {
-            return Task.WhenAll(tasks);
-        }
+        public void WaitAll() => Task.WaitAll(running.ToArray());
     }
 }
