@@ -12,9 +12,9 @@ using Orleans.Runtime;
 
 namespace Silo
 {
-    [ShortRunJob, EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
+    [EvaluateOverhead(false), AllStatisticsColumn, MarkdownExporter, RunOncePerIteration]
     [GcServer(true), GcConcurrent(true)]
-    public class RangeSetBenchmarks
+    public class VolatileBatchWriteBenchmarks
     {
         private const int ItemCount = 1 << 20;
 
