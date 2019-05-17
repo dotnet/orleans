@@ -21,72 +21,12 @@ namespace Grains
         private IDevice objectLogDevice;
         private FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions> lookup;
         private readonly SemaphoreSlim semaphore = new SemaphoreSlim(Environment.ProcessorCount, Environment.ProcessorCount);
+        private bool started = false;
 
         public FasterGrain(ILogger<FasterGrain> logger, IOptions<FasterOptions> options)
         {
             this.logger = logger;
             this.options = options.Value;
-        }
-
-        public override Task OnActivateAsync()
-        {
-            // define paths
-            var grainPath = Path.Combine(options.BaseDirectory, GetType().Name, this.GetPrimaryKey().ToString("D"));
-            if (!Directory.Exists(grainPath))
-            {
-                Directory.CreateDirectory(grainPath);
-            }
-            var logPath = Path.Combine(grainPath, options.HybridLogDeviceFileTitle);
-            var objectPath = Path.Combine(grainPath, options.ObjectLogDeviceFileTitle);
-            var checkpointPath = Path.Combine(grainPath, options.CheckpointsSubDirectory);
-            if (!Directory.Exists(checkpointPath))
-            {
-                Directory.CreateDirectory(checkpointPath);
-            }
-
-            // define the underlying log file
-            logDevice = Devices.CreateLogDevice(logPath, true, true);
-            objectLogDevice = Devices.CreateLogDevice(objectPath, true, true);
-
-            // create the faster lookup
-            lookup = new FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions>(
-                1L << 20, // 2^20 hash buckets * 64 bytes per bucket = 64MB key space
-                new LookupItemFunctions(),
-                new LogSettings()
-                {
-                    LogDevice = logDevice,
-                    ObjectLogDevice = objectLogDevice,
-                    MemorySizeBits = 30 // 2^30 bytes = 1GB log space
-                },
-                new CheckpointSettings
-                {
-                    CheckpointDir = checkpointPath,
-                    CheckPointType = CheckpointType.Snapshot
-                },
-                serializerSettings: new SerializerSettings<int, LookupItem>
-                {
-                    valueSerializer = () => new LookupItemSerializer()
-                },
-                comparer: LookupItemFasterKeyComparer.Default);
-
-            // attempt recovery
-            /*
-            try
-            {
-                lookup.Recover();
-                logger.LogWarning("Recovered {@ItemsRecovered} entries", lookup.EntryCount);
-            }
-            catch (DirectoryNotFoundException)
-            {
-                logger.LogWarning("Nothing to recover from");
-            }
-            catch (InvalidOperationException)
-            {
-                logger.LogWarning("Nothing to recover from");
-            }
-            */
-
-            return base.OnActivateAsync();
         }
 
         public override Task OnDeactivateAsync()
@@ -98,39 +38,125 @@ namespace Grains
             return base.OnDeactivateAsync();
         }
 
-        public Task StartAsync() => Task.CompletedTask;
+        /// <summary>
+        /// This sets up a faster lookup as per the given parameters.
+        /// This code is only here to facilitate benchmarking.
+        /// In a production design, the code below would sit in OnActivateAsync() with parameters taken from injected options.
+        /// </summary>
+        /// <param name="hashBuckets">The number of hash buckets in the key space.</param>
+        /// <param name="memorySizeBits">The power of two size for the in-memory log portion size.</param>
+        /// <param name="checkpointType">Whether to take a full snapshot of state or just fold over the log.</param>
+        /// <returns></returns>
+        public Task StartAsync(int hashBuckets, int memorySizeBits, CheckpointType checkpointType)
+        {
+            if (started) throw new InvalidOperationException();
 
+            // define the base folder to hold the dictionary state of this grain
+            var grainPath = Path.Combine(options.BaseDirectory, GetType().Name, this.GetPrimaryKey().ToString("D"));
+
+            // ensure said folder exists
+            if (!Directory.Exists(grainPath))
+            {
+                Directory.CreateDirectory(grainPath);
+            }
+
+            // define the paths for the log files
+            var logPath = Path.Combine(grainPath, options.HybridLogDeviceFileTitle);
+            var objectPath = Path.Combine(grainPath, options.ObjectLogDeviceFileTitle);
+
+            // define the sub-folder to hold checkpoints
+            var checkpointPath = Path.Combine(grainPath, options.CheckpointsSubDirectory);
+
+            // ensure said folder exists
+            if (!Directory.Exists(checkpointPath))
+            {
+                Directory.CreateDirectory(checkpointPath);
+            }
+
+            // define the underlying log devices using the default file providers
+            logDevice = Devices.CreateLogDevice(logPath, true, true);
+            objectLogDevice = Devices.CreateLogDevice(objectPath, true, true);
+
+            // create the faster lookup
+            lookup = new FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions>(
+                hashBuckets, // hash buckets * 64 bytes per bucket = memory spent by hash table key space
+                new LookupItemFunctions(),
+                new LogSettings()
+                {
+                    LogDevice = logDevice,
+                    ObjectLogDevice = objectLogDevice,
+
+                    // 2^(memorySizeBits) = memory spent by in-memory log portion
+                    // e.g. 2^30 = 1GB in-memory log (the overflow is spilt to disk)
+                    MemorySizeBits = memorySizeBits
+                },
+                new CheckpointSettings
+                {
+                    CheckpointDir = checkpointPath,
+                    CheckPointType = checkpointType
+                },
+                serializerSettings: new SerializerSettings<int, LookupItem>
+                {
+                    valueSerializer = () => new LookupItemSerializer()
+                },
+                comparer: LookupItemFasterKeyComparer.Default);
+
+            // disallow starting again
+            started = true;
+
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Terminates this grain.
+        /// This method is here only to facilitate benchmarking.
+        /// </summary>
+        /// <returns></returns>
         public Task StopAsync()
         {
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
 
-        public async Task SetAsync(LookupItem item)
+        /// <summary>
+        /// Sets a single item in the lookup.
+        /// This is a blind update.
+        /// </summary>
+        /// <param name="item">The item to set.</param>
+        /// <returns></returns>
+        public Task SetAsync(LookupItem item)
         {
-            await semaphore.WaitAsync();
-
-            try
+            return Task.Run(async () =>
             {
-                lookup.StartSession();
+                await semaphore.WaitAsync();
 
-                var key = item.Key;
-                lookup.Upsert(ref key, ref item, Empty.Default, 0);
-                lookup.Refresh();
-            }
-            finally
-            {
                 try
                 {
-                    lookup.StopSession();
+                    lookup.StartSession();
+
+                    var key = item.Key;
+                    lookup.Upsert(ref key, ref item, Empty.Default, 0);
                 }
                 finally
                 {
-                    semaphore.Release();
+                    try
+                    {
+                        lookup.StopSession();
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
                 }
-            }
+            });
         }
 
+        /// <summary>
+        /// Sets a range of item in the lookup.
+        /// This is a blind update.
+        /// </summary>
+        /// <param name="items">The items to set.</param>
+        /// <returns></returns>
         public Task SetRangeAsync(ImmutableList<LookupItem> items)
         {
             return Task.Run(async () =>
@@ -142,16 +168,10 @@ namespace Grains
                     lookup.StartSession();
                     for (var i = 0; i < items.Count; ++i)
                     {
-                        if (i % 1024 == 0)
-                        {
-                            lookup.Refresh();
-                        }
-
                         var item = items[i];
                         var key = item.Key;
                         lookup.Upsert(ref key, ref item, Empty.Default, i);
                     }
-                    lookup.CompletePending(true);
                 }
                 finally
                 {

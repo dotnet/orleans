@@ -7,7 +7,7 @@ namespace Grains
 {
     public interface IFasterGrain : IGrainWithGuidKey
     {
-        Task StartAsync();
+        Task StartAsync(int hashBuckets, int memorySizeBits);
 
         Task StopAsync();
 
