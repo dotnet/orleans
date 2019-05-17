@@ -9,7 +9,7 @@ namespace Grains
     {
         Task StartAsync(int hashBuckets, int memorySizeBits);
 
-        Task StopAsync();
+        Task ReleaseAsync();
 
         Task SetAsync(LookupItem item);
 

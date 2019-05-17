@@ -53,7 +53,7 @@ namespace Silo
         public void IterationCleanup()
         {
             concurrentGrain.StopAsync().Wait();
-            fasterGrain.StopAsync().Wait();
+            fasterGrain.ReleaseAsync().Wait();
         }
 
         [GlobalCleanup]

@@ -17,25 +17,13 @@ namespace Grains
     {
         private readonly ILogger<FasterGrain> logger;
         private readonly FasterOptions options;
-        private IDevice logDevice;
-        private IDevice objectLogDevice;
-        private FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions> lookup;
-        private readonly SemaphoreSlim semaphore = new SemaphoreSlim(Environment.ProcessorCount, Environment.ProcessorCount);
         private bool started = false;
+        private FasterLookupWrapper<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions> lookup;
 
         public FasterGrain(ILogger<FasterGrain> logger, IOptions<FasterOptions> options)
         {
             this.logger = logger;
             this.options = options.Value;
-        }
-
-        public override Task OnDeactivateAsync()
-        {
-            lookup.Dispose();
-            logDevice.Close();
-            objectLogDevice.Close();
-
-            return base.OnDeactivateAsync();
         }
 
         /// <summary>
@@ -47,59 +35,11 @@ namespace Grains
         /// <param name="memorySizeBits">The power of two size for the in-memory log portion size.</param>
         /// <param name="checkpointType">Whether to take a full snapshot of state or just fold over the log.</param>
         /// <returns></returns>
-        public Task StartAsync(int hashBuckets, int memorySizeBits, CheckpointType checkpointType)
+        public Task ConfigureAsync(int hashBuckets, int memorySizeBits, CheckpointType checkpointType)
         {
-            if (started) throw new InvalidOperationException();
+            if (lookup != null) throw new ArgumentException();
 
-            // define the base folder to hold the dictionary state of this grain
-            var grainPath = Path.Combine(options.BaseDirectory, GetType().Name, this.GetPrimaryKey().ToString("D"));
-
-            // ensure said folder exists
-            if (!Directory.Exists(grainPath))
-            {
-                Directory.CreateDirectory(grainPath);
-            }
-
-            // define the paths for the log files
-            var logPath = Path.Combine(grainPath, options.HybridLogDeviceFileTitle);
-            var objectPath = Path.Combine(grainPath, options.ObjectLogDeviceFileTitle);
-
-            // define the sub-folder to hold checkpoints
-            var checkpointPath = Path.Combine(grainPath, options.CheckpointsSubDirectory);
-
-            // ensure said folder exists
-            if (!Directory.Exists(checkpointPath))
-            {
-                Directory.CreateDirectory(checkpointPath);
-            }
-
-            // define the underlying log devices using the default file providers
-            logDevice = Devices.CreateLogDevice(logPath, true, true);
-            objectLogDevice = Devices.CreateLogDevice(objectPath, true, true);
-
-            // create the faster lookup
-            lookup = new FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions>(
-                hashBuckets, // hash buckets * 64 bytes per bucket = memory spent by hash table key space
-                new LookupItemFunctions(),
-                new LogSettings()
-                {
-                    LogDevice = logDevice,
-                    ObjectLogDevice = objectLogDevice,
-
-                    // 2^(memorySizeBits) = memory spent by in-memory log portion
-                    // e.g. 2^30 = 1GB in-memory log (the overflow is spilt to disk)
-                    MemorySizeBits = memorySizeBits
-                },
-                new CheckpointSettings
-                {
-                    CheckpointDir = checkpointPath,
-                    CheckPointType = checkpointType
-                },
-                serializerSettings: new SerializerSettings<int, LookupItem>
-                {
-                    valueSerializer = () => new LookupItemSerializer()
-                },
-                comparer: LookupItemFasterKeyComparer.Default);
+            lookup = new FasterLookupWrapper()
 
             // disallow starting again
             started = true;
@@ -108,13 +48,16 @@ namespace Grains
         }
 
         /// <summary>
-        /// Terminates this grain.
-        /// This method is here only to facilitate benchmarking.
+        /// Terminates the faster lookup.
+        /// This method is here to facilitate releasing memory during benchmarking.
+        /// Allows the grain to be configured again.
         /// </summary>
         /// <returns></returns>
-        public Task StopAsync()
+        public Task ReleaseAsync()
         {
-            DeactivateOnIdle();
+            lookup?.Dispose();
+            lookup = null;
+
             return Task.CompletedTask;
         }
 
