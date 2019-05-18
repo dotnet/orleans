@@ -15,6 +15,7 @@
   <ItemGroup>
     <PackageReference Include="FASTER" Version="2019.4.24.4" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.ObjectPool" Version="2.2.0" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="2.2.0" />
     <PackageReference Include="Microsoft.Orleans.CodeGenerator.MSBuild" Version="2.3.2">
       <PrivateAssets>all</PrivateAssets>

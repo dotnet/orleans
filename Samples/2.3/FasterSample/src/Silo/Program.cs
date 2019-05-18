@@ -4,6 +4,7 @@ using Grains;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
