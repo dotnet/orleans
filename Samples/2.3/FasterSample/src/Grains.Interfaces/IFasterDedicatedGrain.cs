@@ -1,10 +1,11 @@
 using System.Collections.Immutable;
 using System.Threading.Tasks;
 using Grains.Models;
+using Orleans;
 
 namespace Grains
 {
-    public interface IFasterDedicatedGrain
+    public interface IFasterDedicatedGrain : IGrainWithGuidKey
     {
         Task StartAsync(int hashBuckets, int memorySizeBits);
 

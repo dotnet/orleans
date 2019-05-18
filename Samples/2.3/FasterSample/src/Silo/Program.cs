@@ -4,7 +4,6 @@ using Grains;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ObjectPool;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -38,8 +37,8 @@ namespace Silo
 
         public static void Main()
         {
-            BenchmarkRunner.Run<VolatileBatchWriteBenchmarks>(
-            // new BenchmarkDotNet.Configs.DebugInProcessConfig()
+            BenchmarkRunner.Run<FasterDedicatedGrainBenchmarks>(
+            new BenchmarkDotNet.Configs.DebugInProcessConfig()
             );
         }
     }

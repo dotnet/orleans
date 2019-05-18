@@ -122,8 +122,8 @@ namespace Grains
             // start a dedicated thread per logical code
             for (var i = 0; i < threads.Length; ++i)
             {
-                threads[i] = new Thread(input => RunWorker((uint)input));
-                threads[i].Start(i);
+                threads[i] = new Thread(() => RunWorker((uint)id));
+                threads[i].Start();
             }
 
             return Task.CompletedTask;
