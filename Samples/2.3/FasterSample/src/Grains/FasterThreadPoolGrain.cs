@@ -9,58 +9,87 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Concurrency;
+using MyFasterKV = FASTER.core.FasterKV<int, Grains.Models.LookupItem, Grains.Models.LookupItem, Grains.Models.LookupItem, FASTER.core.Empty, Grains.LookupItemFunctions>;
 
 namespace Grains
 {
     [Reentrant]
-    public class FasterGrain : Grain, IFasterGrain
+    public class FasterThreadPoolGrain : Grain, IFasterThreadPoolGrain
     {
-        private readonly ILogger<FasterGrain> logger;
+        private readonly ILogger<FasterThreadPoolGrain> logger;
         private readonly FasterOptions options;
+
+        private string grainType;
+        private Guid grainKey;
 
         private IDevice logDevice;
         private IDevice objectLogDevice;
-        private FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions> lookup;
+        private MyFasterKV lookup;
 
         /// <summary>
         /// There is a hard limit on the number of concurrent sessions on the faster lookup.
         /// This semaphore prevents creating more concurrent sessions than the number of logical processors when using the thread pool.
         /// </summary>
-        private SemaphoreSlim semaphore = new SemaphoreSlim(Environment.ProcessorCount, Environment.ProcessorCount);
+        private readonly SemaphoreSlim semaphore = new SemaphoreSlim(Environment.ProcessorCount, Environment.ProcessorCount);
 
-        public FasterGrain(ILogger<FasterGrain> logger, IOptions<FasterOptions> options)
+        public FasterThreadPoolGrain(ILogger<FasterThreadPoolGrain> logger, IOptions<FasterOptions> options)
         {
             this.logger = logger;
             this.options = options.Value;
+        }
+
+        public override Task OnActivateAsync()
+        {
+            grainType = GetType().Name;
+            grainKey = this.GetPrimaryKey();
+
+            return base.OnActivateAsync();
         }
 
         /// <summary>
         /// Releases the lookup resources on graceful grain deactivation.
         /// </summary>
         /// <returns></returns>
-        public override async Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync()
         {
             try
             {
-                lookup.Dispose();
+                lookup?.Dispose();
+            }
+            catch (Exception error)
+            {
+                logger.LogError(error,
+                    "{@GrainType} {@GrainKey} failed to dispose of the faster lookup",
+                    grainType, grainKey);
             }
             finally
             {
                 try
                 {
-                    logDevice.Close();
+                    logDevice?.Close();
+                }
+                catch (Exception error)
+                {
+                    logger.LogError(error,
+                        "{@GrainType} {@GrainKey} failed to close the log device",
+                        grainType, grainKey);
                 }
                 finally
                 {
-                    objectLogDevice.Close();
+                    try
+                    {
+                        objectLogDevice?.Close();
+                    }
+                    catch (Exception error)
+                    {
+                        logger.LogError(error,
+                            "{@GrainType} {@GrainKey} failed to close the object log device",
+                            grainType, grainKey);
+                    }
                 }
             }
 
-            lookup = null;
-            logDevice = null;
-            objectLogDevice = null;
-
-            await base.OnDeactivateAsync();
+            return base.OnDeactivateAsync();
         }
 
         /// <summary>
@@ -104,7 +133,7 @@ namespace Grains
             objectLogDevice = Devices.CreateLogDevice(objectPath, true, true);
 
             // create the faster lookup now
-            lookup = new FasterKV<int, LookupItem, LookupItem, LookupItem, Empty, LookupItemFunctions>(
+            lookup = new MyFasterKV(
                 hashBuckets, // hash buckets * 64 bytes per bucket = memory spent by hash table key space
                 new LookupItemFunctions(),
                 new LogSettings()
@@ -145,32 +174,33 @@ namespace Grains
         /// </summary>
         /// <param name="item">The item to set.</param>
         /// <returns></returns>
-        public Task SetAsync(LookupItem item)
+        public Task SetAsync(LookupItem item) => Task.Run(async () =>
         {
-            return Task.Run(async () =>
-            {
-                await semaphore.WaitAsync();
+            await semaphore.WaitAsync();
 
+            var session = Guid.Empty;
+            try
+            {
+                session = lookup.StartSession();
+
+                var key = item.Key;
+                if (lookup.Upsert(ref key, ref item, Empty.Default, 0) == Status.ERROR)
+                {
+                    throw new ApplicationException();
+                }
+            }
+            finally
+            {
                 try
                 {
-                    lookup.StartSession();
-
-                    var key = item.Key;
-                    lookup.Upsert(ref key, ref item, Empty.Default, 0);
+                    if (session != Guid.Empty) lookup.StopSession();
                 }
                 finally
                 {
-                    try
-                    {
-                        lookup.StopSession();
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
+                    semaphore.Release();
                 }
-            });
-        }
+            }
+        });
 
         /// <summary>
         /// Sets a range of item in the lookup.
@@ -178,61 +208,66 @@ namespace Grains
         /// </summary>
         /// <param name="items">The items to set.</param>
         /// <returns></returns>
-        public Task SetRangeAsync(ImmutableList<LookupItem> items)
+        public Task SetRangeAsync(ImmutableList<LookupItem> items) => Task.Run(async () =>
         {
-            return Task.Run(async () =>
-            {
-                await semaphore.WaitAsync();
+            await semaphore.WaitAsync();
 
-                try
+            var session = Guid.Empty;
+            try
+            {
+                session = lookup.StartSession();
+                for (var i = 0; i < items.Count; ++i)
                 {
-                    lookup.StartSession();
-                    for (var i = 0; i < items.Count; ++i)
+                    var item = items[i];
+                    var key = item.Key;
+                    if (lookup.Upsert(ref key, ref item, Empty.Default, i) == Status.ERROR)
                     {
-                        var item = items[i];
-                        var key = item.Key;
-                        lookup.Upsert(ref key, ref item, Empty.Default, i);
+                        throw new ApplicationException();
                     }
                 }
-                finally
-                {
-                    try
-                    {
-                        lookup.StopSession();
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
-                }
-                return Task.CompletedTask;
-            });
-        }
-
-        public Task SnapshotAsync()
-        {
-            return Task.Run(async () =>
+            }
+            finally
             {
-                await semaphore.WaitAsync();
-
                 try
                 {
-                    lookup.StartSession();
-                    lookup.CompletePending(true);
-                    lookup.TakeFullCheckpoint(out var token);
-                    lookup.CompleteCheckpoint(true);
-                    lookup.StopSession();
+                    if (session != Guid.Empty) lookup.StopSession();
                 }
                 finally
                 {
                     semaphore.Release();
                 }
-                return Task.CompletedTask;
-            });
-        }
+            }
+        });
 
-        public Task<LookupItem> TryGetAsync(int key)
+        public Task SnapshotAsync() => Task.Run(async () =>
         {
+            await semaphore.WaitAsync();
+
+            var session = Guid.Empty;
+            try
+            {
+                session = lookup.StartSession();
+                if (!lookup.CompletePending(true)) throw new ApplicationException();
+                if (!lookup.TakeFullCheckpoint(out var token)) throw new ApplicationException();
+                if (!lookup.CompleteCheckpoint(true)) throw new ApplicationException();
+            }
+            finally
+            {
+                try
+                {
+                    if (session != Guid.Empty) lookup.StopSession();
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }
+        });
+
+        public Task<LookupItem> TryGetAsync(int key) => Task.Run(async () =>
+        {
+            await semaphore.WaitAsync();
+
             var session = Guid.Empty;
             try
             {
@@ -242,46 +277,19 @@ namespace Grains
                 {
                     throw new ApplicationException();
                 }
-                return Task.FromResult(result);
+                return result;
             }
             finally
             {
-                if (session != Guid.Empty)
-                {
-                    lookup.StopSession();
-                }
-            }
-        }
-
-        public Task SetRangeDeltaAsync(ImmutableList<LookupItem> items)
-        {
-            return Task.Run(async () =>
-            {
-                await semaphore.WaitAsync();
-
                 try
                 {
-                    lookup.StartSession();
-                    for (var i = 0; i < items.Count; ++i)
-                    {
-                        var item = items[i];
-                        var key = item.Key;
-                        lookup.RMW(ref key, ref item, Empty.Default, i);
-                    }
+                    if (session != Guid.Empty) lookup.StopSession();
                 }
                 finally
                 {
-                    try
-                    {
-                        lookup.StopSession();
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
+                    semaphore.Release();
                 }
-                return Task.CompletedTask;
-            });
-        }
+            }
+        });
     }
 }

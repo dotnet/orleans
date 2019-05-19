@@ -26,7 +26,7 @@ namespace Grains
         private MyFasterKV lookup;
 
         private readonly Thread[] threads = new Thread[Environment.ProcessorCount];
-        private readonly TaskCompletionSource<bool>[] completions = new TaskCompletionSource<bool>[Environment.ProcessorCount];
+        private readonly TaskCompletionSource<object>[] completions = new TaskCompletionSource<object>[Environment.ProcessorCount];
         private readonly BlockingCollection<Command> commands = new BlockingCollection<Command>();
 
         private readonly MyCommandPool commandPool = new MyCommandPool();
@@ -61,7 +61,7 @@ namespace Grains
         public Task StartAsync(int hashBuckets, int memorySizeBits)
         {
             // must call release before configuring again
-            if (lookup != null) throw new ArgumentException();
+            if (lookup != null) throw new InvalidOperationException();
 
             // define the base folder to hold the dictionary state of this grain
             var grainPath = Path.Combine(options.BaseDirectory, GetType().Name, this.GetPrimaryKey().ToString("D"));
@@ -116,16 +116,22 @@ namespace Grains
             // dedicated threads will signal their completion task when done
             for (var i = 0; i < completions.Length; ++i)
             {
-                completions[i] = new TaskCompletionSource<bool>();
+                completions[i] = new TaskCompletionSource<object>();
             }
 
             // start a dedicated thread per logical code
             for (var i = 0; i < threads.Length; ++i)
             {
-                threads[i] = new Thread(() => RunWorker((uint)id));
-                threads[i].Start();
+                threads[i] = new Thread(id => RunWorker((uint)id));
+                threads[i].Start((uint)i);
             }
 
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync()
+        {
+            DeactivateOnIdle();
             return Task.CompletedTask;
         }
 
@@ -145,9 +151,6 @@ namespace Grains
                 {
                     command.Execute(lookup);
                 }
-
-                // let the grain know the thread completed gracefully
-                completions[id].TrySetResult(true);
             }
             catch (Exception error)
             {
@@ -170,6 +173,10 @@ namespace Grains
                         logger.LogError(error, "Dedicated thread {@ThreadId} failed to stop the faster session", id);
                     }
                 }
+
+                // let the grain know the thread completed gracefully
+                // unless the catch block has already set an exception
+                completions[id].TrySetResult(true);
             }
         }
 
@@ -242,14 +249,14 @@ namespace Grains
 
         #region Command Methods
 
-        public Task SetAsync(LookupItem item)
+        public async Task SetAsync(LookupItem item)
         {
             var command = commandPool.GetSet();
             try
             {
                 command.Item = item;
                 commands.Add(command);
-                return command.Completed;
+                await command.Completed;
             }
             finally
             {
@@ -257,14 +264,14 @@ namespace Grains
             }
         }
 
-        public Task SetRangeAsync(ImmutableList<LookupItem> items)
+        public async Task SetRangeAsync(ImmutableList<LookupItem> items)
         {
             var command = commandPool.GetSetRange();
             try
             {
                 command.Items = items;
                 commands.Add(command);
-                return command.Completed;
+                await command.Completed;
             }
             finally
             {
@@ -272,13 +279,13 @@ namespace Grains
             }
         }
 
-        public Task SnapshotAsync()
+        public async Task SnapshotAsync()
         {
             var command = commandPool.GetSnapshot();
             try
             {
                 commands.Add(command);
-                return command.Completed;
+                await command.Completed;
             }
             finally
             {
@@ -286,25 +293,19 @@ namespace Grains
             }
         }
 
-        public Task<LookupItem> TryGetAsync(int key)
+        public async Task<LookupItem> TryGetAsync(int key)
         {
             var command = commandPool.GetGet();
             try
             {
                 command.Key = key;
                 commands.Add(command);
-                return command.Completed;
+                return await command.Completed;
             }
             finally
             {
                 commandPool.Return(command);
             }
-        }
-
-        public Task StopAsync()
-        {
-            DeactivateOnIdle();
-            return Task.CompletedTask;
         }
 
         #endregion Command Methods

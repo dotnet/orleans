@@ -46,7 +46,7 @@ namespace Grains
             var value = reader.ReadDecimal();
             var timestamp = DateTime.FromBinary(reader.ReadInt64());
 
-            obj.Mutate(key, value, timestamp);
+            obj = new LookupItem(key, value, timestamp);
         }
 
         public override void Serialize(ref LookupItem obj)

@@ -16,14 +16,14 @@ namespace Silo
 
             .UseOrleans(_ => _
                 .UseLocalhostClustering()
-                .ConfigureApplicationParts(apm => apm.AddApplicationPart(typeof(FasterGrain).Assembly).WithReferences())
+                .ConfigureApplicationParts(apm => apm.AddApplicationPart(typeof(FasterThreadPoolGrain).Assembly).WithReferences())
                 .ConfigureLogging(lb => lb.SetMinimumLevel(LogLevel.Warning)))
 
             .ConfigureLogging(_ => _.AddConsole())
 
             .ConfigureServices(_ => _
                 .Configure<ConsoleLifetimeOptions>(x => x.SuppressStatusMessages = true)
-                .Configure<SchedulingOptions>(x => x.TurnWarningLengthThreshold = TimeSpan.FromSeconds(1))
+                .Configure<SchedulingOptions>(x => x.TurnWarningLengthThreshold = TimeSpan.FromSeconds(10))
                 .Configure<FasterOptions>(x =>
                 {
                     x.BaseDirectory = @"C:\Temp\Faster";
@@ -37,8 +37,8 @@ namespace Silo
 
         public static void Main()
         {
-            BenchmarkRunner.Run<FasterDedicatedGrainBenchmarks>(
-            new BenchmarkDotNet.Configs.DebugInProcessConfig()
+            BenchmarkRunner.Run<SetRangeBenchmarks>(
+                //new BenchmarkDotNet.Configs.DebugInProcessConfig()
             );
         }
     }
