@@ -291,5 +291,58 @@ namespace Grains
                 }
             }
         });
+
+        public Task<ImmutableList<LookupItem>> TryGetRangeAsync(ImmutableList<int> keys) => Task.Run(async () =>
+        {
+            await semaphore.WaitAsync();
+
+            var session = Guid.Empty;
+            try
+            {
+                session = lookup.StartSession();
+                var result = ImmutableList.CreateBuilder<LookupItem>();
+                foreach (var key in keys)
+                {
+                    var _key = key;
+                    LookupItem input = null;
+                    LookupItem output = null;
+                    switch (lookup.Read(ref _key, ref input, ref output, Empty.Default, 0))
+                    {
+                        case Status.OK:
+                            result.Add(output);
+                            break;
+
+                        case Status.PENDING:
+                            if (lookup.CompletePending(true))
+                            {
+                                result.Add(output);
+                            }
+                            else
+                            {
+                                throw new ApplicationException();
+                            }
+                            break;
+
+                        case Status.ERROR:
+                            throw new ApplicationException();
+
+                        default:
+                            break;
+                    }
+                }
+                return result.ToImmutable();
+            }
+            finally
+            {
+                try
+                {
+                    if (session != Guid.Empty) lookup.StopSession();
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }
+        });
     }
 }

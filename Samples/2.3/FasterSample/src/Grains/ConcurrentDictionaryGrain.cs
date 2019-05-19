@@ -12,6 +12,14 @@ namespace Grains
     {
         private readonly ConcurrentDictionary<int, LookupItem> lookup = new ConcurrentDictionary<int, LookupItem>();
 
+        public Task StartAsync() => Task.CompletedTask;
+
+        public Task StopAsync()
+        {
+            DeactivateOnIdle();
+            return Task.CompletedTask;
+        }
+
         public Task<LookupItem> TryGetAsync(int key) => Task.Run(() =>
         {
             lookup.TryGetValue(key, out var item);
@@ -33,12 +41,17 @@ namespace Grains
             return Task.CompletedTask;
         });
 
-        public Task StartAsync() => Task.CompletedTask;
-
-        public Task StopAsync()
+        public Task<ImmutableList<LookupItem>> TryGetRangeAsync(ImmutableList<int> keys) => Task.Run(() =>
         {
-            DeactivateOnIdle();
-            return Task.CompletedTask;
-        }
+            var result = ImmutableList.CreateBuilder<LookupItem>();
+            foreach (var key in keys)
+            {
+                if (lookup.TryGetValue(key, out var value))
+                {
+                    result.Add(value);
+                }
+            }
+            return result.ToImmutable();
+        });
     }
 }

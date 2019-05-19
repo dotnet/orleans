@@ -308,6 +308,21 @@ namespace Grains
             }
         }
 
+        public async Task<ImmutableList<LookupItem>> TryGetRangeAsync(ImmutableList<int> keys)
+        {
+            var command = commandPool.GetGetRange();
+            try
+            {
+                command.Keys = keys;
+                commands.Add(command);
+                return await command.Completed;
+            }
+            finally
+            {
+                commandPool.Return(command);
+            }
+        }
+
         #endregion Command Methods
 
         #region Commands
@@ -470,6 +485,64 @@ namespace Grains
             }
         }
 
+        private sealed class GetRangeCommand : Command
+        {
+            public ImmutableList<int> Keys { get; set; }
+
+            private TaskCompletionSource<ImmutableList<LookupItem>> completion = new TaskCompletionSource<ImmutableList<LookupItem>>();
+            public Task<ImmutableList<LookupItem>> Completed => completion.Task;
+
+            public override void Execute(MyFasterKV lookup)
+            {
+                try
+                {
+                    var result = ImmutableList.CreateBuilder<LookupItem>();
+                    foreach (var key in Keys)
+                    {
+                        var _key = key;
+                        LookupItem input = null;
+                        LookupItem output = null;
+                        switch (lookup.Read(ref _key, ref input, ref output, Empty.Default, 0))
+                        {
+                            case Status.OK:
+                                result.Add(output);
+                                break;
+
+                            case Status.PENDING:
+                                if (lookup.CompletePending(true))
+                                {
+                                    result.Add(output);
+                                }
+                                else
+                                {
+                                    completion.TrySetException(new ApplicationException());
+                                    return;
+                                }
+                                break;
+
+                            case Status.ERROR:
+                                completion.TrySetException(new ApplicationException());
+                                return;
+
+                            default:
+                                break;
+                        }
+                    }
+                    completion.TrySetResult(result.ToImmutable());
+                }
+                catch (Exception error)
+                {
+                    completion.TrySetException(error);
+                }
+            }
+
+            public override void Reset()
+            {
+                Keys = null;
+                completion = new TaskCompletionSource<ImmutableList<LookupItem>>();
+            }
+        }
+
         private sealed class SnapshotCommand : Command
         {
             private TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>();
@@ -512,6 +585,7 @@ namespace Grains
         {
             private readonly DefaultObjectPool<SetRangeCommand> setRangeCommandPool = new DefaultObjectPool<SetRangeCommand>(new SetRangeCommandPooledObjectPolicy());
             private readonly DefaultObjectPool<SetCommand> setCommandPool = new DefaultObjectPool<SetCommand>(new SetCommandPooledObjectPolicy());
+            private readonly DefaultObjectPool<GetRangeCommand> getRangeCommandPool = new DefaultObjectPool<GetRangeCommand>(new GetRangeCommandPooledObjectPolicy());
             private readonly DefaultObjectPool<GetCommand> getCommandPool = new DefaultObjectPool<GetCommand>(new GetCommandPooledObjectPolicy());
             private readonly DefaultObjectPool<SnapshotCommand> snapshotCommandPool = new DefaultObjectPool<SnapshotCommand>(new SnapshotCommandPooledObjectPolicy());
 
@@ -521,6 +595,8 @@ namespace Grains
 
             public GetCommand GetGet() => getCommandPool.Get();
 
+            public GetRangeCommand GetGetRange() => getRangeCommandPool.Get();
+
             public SnapshotCommand GetSnapshot() => snapshotCommandPool.Get();
 
             public void Return(SetRangeCommand command) => setRangeCommandPool.Return(command);
@@ -528,6 +604,8 @@ namespace Grains
             public void Return(SetCommand command) => setCommandPool.Return(command);
 
             public void Return(GetCommand command) => getCommandPool.Return(command);
+
+            public void Return(GetRangeCommand command) => getRangeCommandPool.Return(command);
 
             public void Return(SnapshotCommand command) => snapshotCommandPool.Return(command);
 
@@ -558,6 +636,17 @@ namespace Grains
                 public override bool Return(GetCommand obj)
                 {
                     obj.Reset(); return true;
+                }
+            }
+
+            private sealed class GetRangeCommandPooledObjectPolicy : PooledObjectPolicy<GetRangeCommand>
+            {
+                public override GetRangeCommand Create() => new GetRangeCommand();
+
+                public override bool Return(GetRangeCommand obj)
+                {
+                    obj.Reset();
+                    return true;
                 }
             }
 

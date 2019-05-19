@@ -18,5 +18,7 @@ namespace Grains
         Task SnapshotAsync();
 
         Task<LookupItem> TryGetAsync(int key);
+
+        Task<ImmutableList<LookupItem>> TryGetRangeAsync(ImmutableList<int> keys);
     }
 }
