@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using BenchmarkDotNet.Attributes;
 using Grains;
@@ -13,7 +14,7 @@ namespace Silo
 {
     [ShortRunJob, RunOncePerIteration, AllStatisticsColumn, MarkdownExporter]
     [GcServer(true), GcConcurrent(true)]
-    public class SetBenchmarks
+    public class GetBenchmarks
     {
         private const int ItemCount = 1 << 17;
 
@@ -21,7 +22,7 @@ namespace Silo
         private IConcurrentDictionaryGrain dictionaryGrain;
         private IFasterThreadPoolGrain fasterThreadPoolGrain;
         private IFasterDedicatedGrain fasterDedicatedGrain;
-        private IEnumerable<LookupItem> generator;
+        private IEnumerable<int> generator;
 
         [GlobalSetup]
         public void GlobalSetup()
@@ -40,24 +41,18 @@ namespace Silo
                 .GetService<IGrainFactory>()
                 .GetGrain<IFasterDedicatedGrain>(Guid.NewGuid());
 
-            generator = Enumerable.Range(0, Items)
-                .Select(i => new LookupItem(i, i, new DateTime(i)));
-        }
-
-        [IterationSetup]
-        public void IterationSetup()
-        {
+            // start the grains
             fasterThreadPoolGrain.StartAsync(HashBuckets, MemorySizeBits).Wait();
             fasterDedicatedGrain.StartAsync(HashBuckets, MemorySizeBits).Wait();
             dictionaryGrain.StartAsync().Wait();
-        }
 
-        [IterationCleanup]
-        public void IterationCleanup()
-        {
-            fasterThreadPoolGrain.StopAsync().Wait();
-            fasterDedicatedGrain.StopAsync().Wait();
-            dictionaryGrain.StopAsync().Wait();
+            // pre-load grains
+            var data = Enumerable.Range(0, Items).Select(i => new LookupItem(i, i, new DateTime(i))).ToImmutableList();
+            dictionaryGrain.SetRangeAsync(data).Wait();
+            fasterThreadPoolGrain.SetRangeAsync(data).Wait();
+            fasterDedicatedGrain.SetRangeAsync(data).Wait();
+
+            generator = Enumerable.Range(0, Items);
         }
 
         [GlobalCleanup]
@@ -79,9 +74,9 @@ namespace Silo
         public void ConcurrentDictionary()
         {
             var pipeline = new AsyncPipeline(Concurrency);
-            foreach (var item in generator)
+            foreach (var key in generator)
             {
-                pipeline.Add(dictionaryGrain.SetAsync(item));
+                pipeline.Add(dictionaryGrain.TryGetAsync(key));
             }
             pipeline.Wait();
         }
@@ -90,9 +85,9 @@ namespace Silo
         public void FasterOnThreadPool()
         {
             var pipeline = new AsyncPipeline(Concurrency);
-            foreach (var item in generator)
+            foreach (var key in generator)
             {
-                pipeline.Add(fasterThreadPoolGrain.SetAsync(item));
+                pipeline.Add(fasterThreadPoolGrain.TryGetAsync(key));
             }
             pipeline.Wait();
         }
@@ -101,9 +96,9 @@ namespace Silo
         public void FasterOnDedicatedThreads()
         {
             var pipeline = new AsyncPipeline(Concurrency);
-            foreach (var item in generator)
+            foreach (var key in generator)
             {
-                pipeline.Add(fasterDedicatedGrain.SetAsync(item));
+                pipeline.Add(fasterDedicatedGrain.TryGetAsync(key));
             }
             pipeline.Wait();
         }
