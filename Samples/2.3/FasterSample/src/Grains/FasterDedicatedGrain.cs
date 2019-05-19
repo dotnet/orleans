@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using FASTER.core;
 using Grains.Models;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Concurrency;
