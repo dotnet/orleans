@@ -9,20 +9,21 @@ using Grains.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
+using Orleans.Runtime;
 
 namespace Silo
 {
-    [RunOncePerIteration, AllStatisticsColumn, MarkdownExporter]
+    [ShortRunJob, EvaluateOverhead(false), RunOncePerIteration, AllStatisticsColumn, MarkdownExporter]
     [GcServer(true), GcConcurrent(true)]
-    public class GetBenchmarks
+    public class BigDataBenchmarks
     {
-        private const int ItemCount = 1 << 20;
+        private const int ItemCount = 1 << 27;
 
         private readonly IHost host = Program.BuildHost();
         private IConcurrentDictionaryGrain dictionaryGrain;
         private IFasterThreadPoolGrain fasterThreadPoolGrain;
         private IFasterDedicatedGrain fasterDedicatedGrain;
-        private IEnumerable<int> generator;
+        private IEnumerable<ImmutableList<LookupItem>> generator;
 
         [GlobalSetup]
         public void GlobalSetup()
@@ -31,28 +32,36 @@ namespace Silo
 
             dictionaryGrain = host.Services
                 .GetService<IGrainFactory>()
-                .GetGrain<IConcurrentDictionaryGrain>(Guid.NewGuid());
+                .GetGrain<IConcurrentDictionaryGrain>(Guid.Empty);
 
             fasterThreadPoolGrain = host.Services
                 .GetService<IGrainFactory>()
-                .GetGrain<IFasterThreadPoolGrain>(Guid.NewGuid());
+                .GetGrain<IFasterThreadPoolGrain>(Guid.Empty);
 
             fasterDedicatedGrain = host.Services
                 .GetService<IGrainFactory>()
-                .GetGrain<IFasterDedicatedGrain>(Guid.NewGuid());
+                .GetGrain<IFasterDedicatedGrain>(Guid.Empty);
 
-            // start the grains
+            generator = Enumerable.Range(0, Items)
+                .Select(i => new LookupItem(i, i, new DateTime(i)))
+                .BatchIEnumerable(BatchSize)
+                .Select(b => b.ToImmutableList());
+        }
+
+        [IterationSetup]
+        public void IterationSetup()
+        {
             fasterThreadPoolGrain.StartAsync(HashBuckets, MemorySizeBits).Wait();
             fasterDedicatedGrain.StartAsync(HashBuckets, MemorySizeBits).Wait();
             dictionaryGrain.StartAsync().Wait();
+        }
 
-            // pre-load grains
-            var data = Enumerable.Range(0, Items).Select(i => new LookupItem(i, i, new DateTime(i))).ToImmutableList();
-            dictionaryGrain.SetRangeAsync(data).Wait();
-            fasterThreadPoolGrain.SetRangeAsync(data).Wait();
-            fasterDedicatedGrain.SetRangeAsync(data).Wait();
-
-            generator = Enumerable.Range(0, Items);
+        [IterationCleanup]
+        public void IterationCleanup()
+        {
+            fasterThreadPoolGrain.StopAsync().Wait();
+            fasterDedicatedGrain.StopAsync().Wait();
+            dictionaryGrain.StopAsync().Wait();
         }
 
         [GlobalCleanup]
@@ -67,17 +76,20 @@ namespace Silo
         [Params(29)]
         public int MemorySizeBits { get; set; }
 
+        [Params(1 << 20)]
+        public int BatchSize { get; set; }
+
         [Params(4)]
         public int Concurrency { get; set; }
 
-        [Benchmark(OperationsPerInvoke = ItemCount, Baseline = true)]
-        public async Task ConcurrentDictionary()
+        [Benchmark(OperationsPerInvoke = ItemCount)]
+        public async Task FasterOnDedicatedThreads()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
-            foreach (var key in generator)
+            foreach (var batch in generator)
             {
                 await pipeline.WaitOneAsync();
-                await pipeline.Add(dictionaryGrain.TryGetAsync(key));
+                await pipeline.Add(fasterDedicatedGrain.SetRangeAsync(batch));
             }
             await pipeline.WaitAllAsync();
         }
@@ -86,22 +98,22 @@ namespace Silo
         public async Task FasterOnThreadPool()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
-            foreach (var key in generator)
+            foreach (var batch in generator)
             {
                 await pipeline.WaitOneAsync();
-                await pipeline.Add(fasterThreadPoolGrain.TryGetAsync(key));
+                await pipeline.Add(fasterThreadPoolGrain.SetRangeAsync(batch));
             }
             await pipeline.WaitAllAsync();
         }
 
-        [Benchmark(OperationsPerInvoke = ItemCount)]
-        public async Task FasterOnDedicatedThreads()
+        [Benchmark(OperationsPerInvoke = ItemCount, Baseline = true)]
+        public async Task ConcurrentDictionary()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
-            foreach (var key in generator)
+            foreach (var batch in generator)
             {
                 await pipeline.WaitOneAsync();
-                await pipeline.Add(fasterDedicatedGrain.TryGetAsync(key));
+                await pipeline.Add(dictionaryGrain.SetRangeAsync(batch));
             }
             await pipeline.WaitAllAsync();
         }

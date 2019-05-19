@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using Grains;
 using Grains.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
-using Orleans.Runtime;
 
 namespace Silo
 {
@@ -76,36 +76,39 @@ namespace Silo
         public int Concurrency { get; set; }
 
         [Benchmark(OperationsPerInvoke = ItemCount, Baseline = true)]
-        public void ConcurrentDictionary()
+        public async Task ConcurrentDictionary()
         {
-            var pipeline = new AsyncPipeline(Concurrency);
+            var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var item in generator)
             {
-                pipeline.Add(dictionaryGrain.SetAsync(item));
+                await pipeline.WaitOneAsync();
+                await pipeline.Add(dictionaryGrain.SetAsync(item));
             }
-            pipeline.Wait();
+            await pipeline.WaitAllAsync();
         }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
-        public void FasterOnThreadPool()
+        public async Task FasterOnThreadPool()
         {
-            var pipeline = new AsyncPipeline(Concurrency);
+            var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var item in generator)
             {
-                pipeline.Add(fasterThreadPoolGrain.SetAsync(item));
+                await pipeline.WaitOneAsync();
+                await pipeline.Add(fasterThreadPoolGrain.SetAsync(item));
             }
-            pipeline.Wait();
+            await pipeline.WaitAllAsync();
         }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
-        public void FasterOnDedicatedThreads()
+        public async Task FasterOnDedicatedThreads()
         {
-            var pipeline = new AsyncPipeline(Concurrency);
+            var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var item in generator)
             {
-                pipeline.Add(fasterDedicatedGrain.SetAsync(item));
+                await pipeline.WaitOneAsync();
+                await pipeline.Add(fasterDedicatedGrain.SetAsync(item));
             }
-            pipeline.Wait();
+            await pipeline.WaitAllAsync();
         }
     }
 }
