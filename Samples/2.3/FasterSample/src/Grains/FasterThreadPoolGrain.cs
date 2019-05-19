@@ -344,5 +344,65 @@ namespace Grains
                 }
             }
         });
+
+        public Task SetRangeDeltaAsync(ImmutableList<LookupItem> deltas) => Task.Run(async () =>
+        {
+            await semaphore.WaitAsync();
+
+            var session = Guid.Empty;
+            try
+            {
+                session = lookup.StartSession();
+
+                foreach (var delta in deltas)
+                {
+                    var _key = delta.Key;
+                    var _delta = delta;
+                    switch (lookup.RMW(ref _key, ref _delta, Empty.Default, 0))
+                    {
+                        case Status.OK:
+                            break;
+
+                        case Status.NOTFOUND:
+                            switch (lookup.Upsert(ref _key, ref _delta, Empty.Default, 0))
+                            {
+                                case Status.OK:
+                                case Status.NOTFOUND:
+                                case Status.PENDING:
+                                    break;
+
+                                case Status.ERROR:
+                                    throw new ApplicationException();
+
+                                default:
+                                    throw new ArgumentOutOfRangeException();
+                            }
+                            break;
+
+                        case Status.PENDING:
+                            break;
+
+                        case Status.ERROR:
+                            throw new ApplicationException();
+
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
+                }
+                if (!lookup.CompletePending(true))
+                    throw new ApplicationException();
+            }
+            finally
+            {
+                try
+                {
+                    if (session != Guid.Empty) lookup.StopSession();
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }
+        });
     }
 }

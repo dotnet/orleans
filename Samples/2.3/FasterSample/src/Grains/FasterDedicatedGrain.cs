@@ -29,8 +29,6 @@ namespace Grains
         private readonly TaskCompletionSource<object>[] completions = new TaskCompletionSource<object>[Environment.ProcessorCount];
         private readonly BlockingCollection<Command> commands = new BlockingCollection<Command>();
 
-        private readonly MyCommandPool commandPool = new MyCommandPool();
-
         private string grainType;
         private Guid grainKey;
 
@@ -249,78 +247,46 @@ namespace Grains
 
         #region Command Methods
 
-        public async Task SetAsync(LookupItem item)
+        public Task SetAsync(LookupItem item)
         {
-            var command = commandPool.GetSet();
-            try
-            {
-                command.Item = item;
-                commands.Add(command);
-                await command.Completed;
-            }
-            finally
-            {
-                commandPool.Return(command);
-            }
+            var command = new SetCommand(item);
+            commands.Add(command);
+            return command.Completed;
         }
 
-        public async Task SetRangeAsync(ImmutableList<LookupItem> items)
+        public Task SetRangeAsync(ImmutableList<LookupItem> items)
         {
-            var command = commandPool.GetSetRange();
-            try
-            {
-                command.Items = items;
-                commands.Add(command);
-                await command.Completed;
-            }
-            finally
-            {
-                commandPool.Return(command);
-            }
+            var command = new SetRangeCommand(items);
+            commands.Add(command);
+            return command.Completed;
         }
 
-        public async Task SnapshotAsync()
+        public Task SnapshotAsync()
         {
-            var command = commandPool.GetSnapshot();
-            try
-            {
-                commands.Add(command);
-                await command.Completed;
-            }
-            finally
-            {
-                commandPool.Return(command);
-            }
+            var command = new SnapshotCommand();
+            commands.Add(command);
+            return command.Completed;
         }
 
-        public async Task<LookupItem> TryGetAsync(int key)
+        public Task<LookupItem> TryGetAsync(int key)
         {
-            var command = commandPool.GetGet();
-            try
-            {
-                command.Key = key;
-                commands.Add(command);
-                return await command.Completed;
-            }
-            finally
-            {
-                commandPool.Return(command);
-            }
+            var command = new GetCommand(key);
+            commands.Add(command);
+            return command.Completed;
         }
 
-        public async Task<ImmutableList<LookupItem>> TryGetRangeAsync(ImmutableList<int> keys)
+        public Task<ImmutableList<LookupItem>> TryGetRangeAsync(ImmutableList<int> keys)
         {
-            var command = commandPool.GetGetRange();
-            try
-            {
-                command.Keys = keys;
-                commands.Add(command);
-                return await command.Completed;
-            }
-            finally
-            {
-                commandPool.Return(command);
-            }
+            var command = new GetRangeCommand(keys);
+            commands.Add(command);
+            return command.Completed;
+        }
+
+        public Task SetRangeDeltaAsync(ImmutableList<LookupItem> deltas)
+        {
+            var command = new SetRangeDeltaCommand(deltas);
+            commands.Add(command);
+            return command.Completed;
         }
 
         #endregion Command Methods
@@ -330,166 +296,236 @@ namespace Grains
         private abstract class Command
         {
             public abstract void Execute(MyFasterKV lookup);
-
-            public abstract void Reset();
         }
 
         private sealed class SetRangeCommand : Command
         {
-            public ImmutableList<LookupItem> Items { get; set; }
+            private readonly ImmutableList<LookupItem> items;
+            private readonly TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
 
-            private TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>();
+            public SetRangeCommand(ImmutableList<LookupItem> items)
+            {
+                this.items = items ?? throw new ArgumentNullException(nameof(items));
+            }
+
             public Task Completed => completion.Task;
 
             public override void Execute(MyFasterKV lookup)
             {
-                var okay = true;
                 try
                 {
-                    foreach (var item in Items)
+                    foreach (var item in items)
                     {
                         var _key = item.Key;
                         var _item = item;
                         switch (lookup.Upsert(ref _key, ref _item, Empty.Default, 0))
                         {
-                            case Status.ERROR:
-                                okay = false;
+                            case Status.OK:
+                            case Status.NOTFOUND:
+                            case Status.PENDING:
                                 break;
 
+                            case Status.ERROR:
+                                lookup.Refresh();
+                                completion.TrySetException(new ApplicationException());
+                                return;
+
                             default:
-                                break;
+                                lookup.Refresh();
+                                completion.TrySetException(new ArgumentOutOfRangeException());
+                                return;
                         }
                     }
                     lookup.Refresh();
+                    completion.TrySetResult(null);
                 }
                 catch (Exception error)
                 {
                     completion.TrySetException(error);
-                    return;
-                }
-
-                if (okay)
-                {
-                    completion.TrySetResult(true);
-                }
-                else
-                {
-                    completion.TrySetException(new ApplicationException());
                 }
             }
+        }
 
-            public override void Reset()
+        private sealed class SetRangeDeltaCommand : Command
+        {
+            private readonly ImmutableList<LookupItem> deltas;
+            private readonly TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
+
+            public SetRangeDeltaCommand(ImmutableList<LookupItem> deltas)
             {
-                Items = null;
-                completion = new TaskCompletionSource<bool>();
+                this.deltas = deltas ?? throw new ArgumentNullException(nameof(deltas));
+            }
+
+            public Task Completed => completion.Task;
+
+            public override void Execute(MyFasterKV lookup)
+            {
+                try
+                {
+                    foreach (var delta in deltas)
+                    {
+                        var _key = delta.Key;
+                        var _delta = delta;
+                        switch (lookup.RMW(ref _key, ref _delta, Empty.Default, 0))
+                        {
+                            case Status.OK:
+                                break;
+
+                            case Status.NOTFOUND:
+                                switch (lookup.Upsert(ref _key, ref _delta, Empty.Default, 0))
+                                {
+                                    case Status.OK:
+                                    case Status.NOTFOUND:
+                                    case Status.PENDING:
+                                        break;
+
+                                    case Status.ERROR:
+                                        lookup.Refresh();
+                                        completion.TrySetException(new ApplicationException());
+                                        return;
+
+                                    default:
+                                        lookup.Refresh();
+                                        completion.TrySetException(new ArgumentOutOfRangeException());
+                                        return;
+                                }
+                                break;
+
+                            case Status.PENDING:
+                                break;
+
+                            case Status.ERROR:
+                                lookup.Refresh();
+                                completion.TrySetException(new ApplicationException());
+                                return;
+
+                            default:
+                                lookup.Refresh();
+                                completion.TrySetException(new ArgumentOutOfRangeException());
+                                return;
+                        }
+                    }
+                    lookup.Refresh();
+                    completion.TrySetResult(null);
+                }
+                catch (Exception error)
+                {
+                    completion.TrySetException(error);
+                }
             }
         }
 
         private sealed class SetCommand : Command
         {
-            public LookupItem Item { get; set; }
+            private readonly LookupItem item;
+            private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>();
 
-            private TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>();
+            public SetCommand(LookupItem item)
+            {
+                this.item = item ?? throw new ArgumentNullException(nameof(item));
+            }
+
             public Task Completed => completion.Task;
 
             public override void Execute(MyFasterKV lookup)
             {
-                var okay = true;
                 try
                 {
-                    var _item = Item;
-                    var _key = _item.Key;
+                    var _key = item.Key;
+                    var _item = item;
                     switch (lookup.Upsert(ref _key, ref _item, Empty.Default, 0))
                     {
+                        case Status.OK:
+                        case Status.NOTFOUND:
+                        case Status.PENDING:
+                            break;
+
                         case Status.ERROR:
-                            okay = false;
+                            lookup.Refresh();
+                            completion.TrySetException(new ApplicationException());
                             break;
 
                         default:
+                            lookup.Refresh();
+                            completion.TrySetException(new ArgumentOutOfRangeException());
                             break;
                     }
                     lookup.Refresh();
+                    completion.TrySetResult(true);
                 }
                 catch (Exception error)
                 {
                     completion.TrySetException(error);
-                    return;
                 }
-
-                if (okay)
-                {
-                    completion.TrySetResult(true);
-                }
-                else
-                {
-                    completion.TrySetException(new ApplicationException());
-                }
-            }
-
-            public override void Reset()
-            {
-                Item = null;
-                completion = new TaskCompletionSource<bool>();
             }
         }
 
         private sealed class GetCommand : Command
         {
-            public int Key { get; set; }
+            private readonly int key;
+            private readonly TaskCompletionSource<LookupItem> completion = new TaskCompletionSource<LookupItem>();
 
-            private TaskCompletionSource<LookupItem> completion = new TaskCompletionSource<LookupItem>();
+            public GetCommand(int key)
+            {
+                this.key = key;
+            }
+
             public Task<LookupItem> Completed => completion.Task;
 
             public override void Execute(MyFasterKV lookup)
             {
-                var okay = true;
-                LookupItem output = null;
                 try
                 {
-                    var _key = Key;
+                    var _key = key;
                     LookupItem input = null;
+                    LookupItem output = null;
                     switch (lookup.Read(ref _key, ref input, ref output, Empty.Default, 0))
                     {
-                        case Status.ERROR:
-                            okay = false;
+                        case Status.OK:
+                            completion.TrySetResult(output);
+                            break;
+
+                        case Status.NOTFOUND:
+                            completion.TrySetResult(null);
                             break;
 
                         case Status.PENDING:
-                            lookup.CompletePending(true);
+                            if (lookup.CompletePending(true))
+                            {
+                                completion.TrySetResult(output);
+                            }
+                            else
+                            {
+                                completion.TrySetException(new ApplicationException());
+                            }
+                            break;
+
+                        case Status.ERROR:
+                            completion.TrySetException(new ApplicationException());
                             break;
 
                         default:
+                            completion.TrySetException(new ArgumentOutOfRangeException());
                             break;
                     }
                 }
                 catch (Exception error)
                 {
                     completion.TrySetException(error);
-                    return;
                 }
-
-                if (okay)
-                {
-                    completion.TrySetResult(output);
-                }
-                else
-                {
-                    completion.TrySetException(new ApplicationException());
-                }
-            }
-
-            public override void Reset()
-            {
-                Key = default;
-                completion = new TaskCompletionSource<LookupItem>();
             }
         }
 
         private sealed class GetRangeCommand : Command
         {
-            public ImmutableList<int> Keys { get; set; }
+            private readonly ImmutableList<int> keys;
+            private readonly TaskCompletionSource<ImmutableList<LookupItem>> completion = new TaskCompletionSource<ImmutableList<LookupItem>>();
 
-            private TaskCompletionSource<ImmutableList<LookupItem>> completion = new TaskCompletionSource<ImmutableList<LookupItem>>();
+            public GetRangeCommand(ImmutableList<int> keys)
+            {
+                this.keys = keys ?? throw new ArgumentNullException(nameof(keys));
+            }
+
             public Task<ImmutableList<LookupItem>> Completed => completion.Task;
 
             public override void Execute(MyFasterKV lookup)
@@ -497,7 +533,7 @@ namespace Grains
                 try
                 {
                     var result = ImmutableList.CreateBuilder<LookupItem>();
-                    foreach (var key in Keys)
+                    foreach (var key in keys)
                     {
                         var _key = key;
                         LookupItem input = null;
@@ -506,6 +542,9 @@ namespace Grains
                         {
                             case Status.OK:
                                 result.Add(output);
+                                break;
+
+                            case Status.NOTFOUND:
                                 break;
 
                             case Status.PENDING:
@@ -525,7 +564,8 @@ namespace Grains
                                 return;
 
                             default:
-                                break;
+                                completion.TrySetException(new ArgumentOutOfRangeException());
+                                return;
                         }
                     }
                     completion.TrySetResult(result.ToImmutable());
@@ -534,12 +574,6 @@ namespace Grains
                 {
                     completion.TrySetException(error);
                 }
-            }
-
-            public override void Reset()
-            {
-                Keys = null;
-                completion = new TaskCompletionSource<ImmutableList<LookupItem>>();
             }
         }
 
@@ -550,117 +584,26 @@ namespace Grains
 
             public override void Execute(MyFasterKV lookup)
             {
-                var okay = true;
                 try
                 {
-                    okay &= lookup.CompletePending(true);
-                    okay &= lookup.TakeFullCheckpoint(out var token);
-                    okay &= lookup.CompleteCheckpoint(true);
-                    lookup.Refresh();
+                    if (lookup.CompletePending(true) &&
+                        lookup.TakeFullCheckpoint(out var token) &&
+                        lookup.CompleteCheckpoint(true))
+                    {
+                        completion.TrySetResult(true);
+                    }
+                    else
+                    {
+                        completion.TrySetException(new ApplicationException());
+                    }
                 }
                 catch (Exception error)
                 {
                     completion.TrySetException(error);
-                    return;
-                }
-
-                if (okay)
-                {
-                    completion.TrySetResult(true);
-                }
-                else
-                {
-                    completion.TrySetException(new ApplicationException());
                 }
             }
-
-            public override void Reset() => completion = new TaskCompletionSource<bool>();
         }
 
         #endregion Commands
-
-        #region Command Pool
-
-        private sealed class MyCommandPool
-        {
-            private readonly DefaultObjectPool<SetRangeCommand> setRangeCommandPool = new DefaultObjectPool<SetRangeCommand>(new SetRangeCommandPooledObjectPolicy());
-            private readonly DefaultObjectPool<SetCommand> setCommandPool = new DefaultObjectPool<SetCommand>(new SetCommandPooledObjectPolicy());
-            private readonly DefaultObjectPool<GetRangeCommand> getRangeCommandPool = new DefaultObjectPool<GetRangeCommand>(new GetRangeCommandPooledObjectPolicy());
-            private readonly DefaultObjectPool<GetCommand> getCommandPool = new DefaultObjectPool<GetCommand>(new GetCommandPooledObjectPolicy());
-            private readonly DefaultObjectPool<SnapshotCommand> snapshotCommandPool = new DefaultObjectPool<SnapshotCommand>(new SnapshotCommandPooledObjectPolicy());
-
-            public SetRangeCommand GetSetRange() => setRangeCommandPool.Get();
-
-            public SetCommand GetSet() => setCommandPool.Get();
-
-            public GetCommand GetGet() => getCommandPool.Get();
-
-            public GetRangeCommand GetGetRange() => getRangeCommandPool.Get();
-
-            public SnapshotCommand GetSnapshot() => snapshotCommandPool.Get();
-
-            public void Return(SetRangeCommand command) => setRangeCommandPool.Return(command);
-
-            public void Return(SetCommand command) => setCommandPool.Return(command);
-
-            public void Return(GetCommand command) => getCommandPool.Return(command);
-
-            public void Return(GetRangeCommand command) => getRangeCommandPool.Return(command);
-
-            public void Return(SnapshotCommand command) => snapshotCommandPool.Return(command);
-
-            private sealed class SetRangeCommandPooledObjectPolicy : PooledObjectPolicy<SetRangeCommand>
-            {
-                public override SetRangeCommand Create() => new SetRangeCommand();
-
-                public override bool Return(SetRangeCommand obj)
-                {
-                    obj.Reset(); return true;
-                }
-            }
-
-            private sealed class SetCommandPooledObjectPolicy : PooledObjectPolicy<SetCommand>
-            {
-                public override SetCommand Create() => new SetCommand();
-
-                public override bool Return(SetCommand obj)
-                {
-                    obj.Reset(); return true;
-                }
-            }
-
-            private sealed class GetCommandPooledObjectPolicy : PooledObjectPolicy<GetCommand>
-            {
-                public override GetCommand Create() => new GetCommand();
-
-                public override bool Return(GetCommand obj)
-                {
-                    obj.Reset(); return true;
-                }
-            }
-
-            private sealed class GetRangeCommandPooledObjectPolicy : PooledObjectPolicy<GetRangeCommand>
-            {
-                public override GetRangeCommand Create() => new GetRangeCommand();
-
-                public override bool Return(GetRangeCommand obj)
-                {
-                    obj.Reset();
-                    return true;
-                }
-            }
-
-            private sealed class SnapshotCommandPooledObjectPolicy : PooledObjectPolicy<SnapshotCommand>
-            {
-                public override SnapshotCommand Create() => new SnapshotCommand();
-
-                public override bool Return(SnapshotCommand obj)
-                {
-                    obj.Reset(); return true;
-                }
-            }
-        }
-
-        #endregion Command Pool
     }
 }

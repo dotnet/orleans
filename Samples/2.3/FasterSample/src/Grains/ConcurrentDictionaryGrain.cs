@@ -53,5 +53,17 @@ namespace Grains
             }
             return result.ToImmutable();
         });
+
+        public Task SetRangeDeltaAsync(ImmutableList<LookupItem> deltas) => Task.Run(() =>
+        {
+            foreach (var delta in deltas)
+            {
+                lookup.AddOrUpdate(
+                    delta.Key,
+                    delta,
+                    (k, v) => new LookupItem(k, v.Value + delta.Value, delta.Timestamp));
+            }
+            return Task.CompletedTask;
+        });
     }
 }
