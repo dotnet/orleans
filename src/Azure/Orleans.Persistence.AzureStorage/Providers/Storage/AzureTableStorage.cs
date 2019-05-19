@@ -450,6 +450,13 @@ namespace Orleans.Storage
             public async Task Delete(GrainStateRecord record)
             {
                 var entity = record.Entity;
+
+                if (record.ETag == null)
+                {
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "Not attempting to delete non-existent persistent state: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
+                    return;
+                }
+
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing, "Deleting: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
                 await tableManager.DeleteTableEntryAsync(entity, record.ETag).ConfigureAwait(false);
                 record.ETag = null;

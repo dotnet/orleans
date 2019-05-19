@@ -238,8 +238,6 @@ namespace Orleans.Runtime.Configuration
 
             this.LimitManager = new LimitManager();
 
-            this.MinDotNetThreadPoolSize = PerformanceTuningOptions.DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
-
             // .NET ServicePointManager settings / optimizations
             this.Expect100Continue = false;
             this.DefaultConnectionLimit = PerformanceTuningOptions.DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT;

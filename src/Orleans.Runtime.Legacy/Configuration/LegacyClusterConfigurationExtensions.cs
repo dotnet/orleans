@@ -341,6 +341,7 @@ namespace Orleans.Hosting
                     options.Expect100Continue = config.Expect100Continue;
                     options.UseNagleAlgorithm = config.UseNagleAlgorithm;
                     options.MinDotNetThreadPoolSize = config.MinDotNetThreadPoolSize;
+                    options.MinIOThreadPoolSize = config.MinDotNetThreadPoolSize;
                 });
 
             services.AddOptions<TypeManagementOptions>()

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -45,6 +45,15 @@ namespace Orleans.CodeGenerator.Utilities
             }
 
             foreach (var t in type.TypeArguments) yield return t;
+        }
+
+        public static IEnumerable<INamedTypeSymbol> GetNestedHierarchy(this INamedTypeSymbol type)
+        {
+            while (type != null)
+            {
+                yield return type;
+                type = type.ContainingType;
+            }
         }
 
         public static string GetGenericTypeSuffix(this INamedTypeSymbol type)

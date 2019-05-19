@@ -87,7 +87,7 @@
       <PublishedFiles Include="$(PublishRoot)**/*" Exclude="$(PublishRoot)**/$(AssemblyName).*;$(PublishRoot)*/refs/**/*" />
       <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).Tasks.*" />
       <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).deps.json" />
-      <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).*.config" />
+      <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).*.config" Exclude="$(PublishRoot)**/$(AssemblyName).Tasks.*" />
       <_PackageFiles Include="@(PublishedFiles)">
         <PackagePath>tasks/$(RecursiveDir)</PackagePath>
         <Visible>false</Visible>
