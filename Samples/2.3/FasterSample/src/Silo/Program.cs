@@ -37,8 +37,8 @@ namespace Silo
 
         public static void Main()
         {
-            BenchmarkRunner.Run<SetRangeBenchmarks>(
-                //new BenchmarkDotNet.Configs.DebugInProcessConfig()
+            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(
+            //config: new BenchmarkDotNet.Configs.DebugInProcessConfig()
             );
         }
     }
