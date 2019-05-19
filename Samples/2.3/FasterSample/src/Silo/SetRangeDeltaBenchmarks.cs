@@ -12,7 +12,7 @@ using Orleans.Runtime;
 
 namespace Silo
 {
-    [ShortRunJob, RunOncePerIteration, AllStatisticsColumn, MarkdownExporter]
+    [RunOncePerIteration, AllStatisticsColumn, MarkdownExporter]
     [GcServer(true), GcConcurrent(true)]
     public class SetRangeDeltaBenchmarks
     {
@@ -74,7 +74,7 @@ namespace Silo
         [Params(1 << 10)]
         public int BatchSize { get; set; }
 
-        [Params(8)]
+        [Params(4)]
         public int Concurrency { get; set; }
 
         [Benchmark(OperationsPerInvoke = ItemCount, Baseline = true)]

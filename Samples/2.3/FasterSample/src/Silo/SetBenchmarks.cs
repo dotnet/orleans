@@ -11,7 +11,7 @@ using Orleans.Runtime;
 
 namespace Silo
 {
-    [ShortRunJob, RunOncePerIteration, AllStatisticsColumn, MarkdownExporter]
+    [RunOncePerIteration, AllStatisticsColumn, MarkdownExporter]
     [GcServer(true), GcConcurrent(true)]
     public class SetBenchmarks
     {
@@ -72,7 +72,7 @@ namespace Silo
         [Params(29)]
         public int MemorySizeBits { get; set; }
 
-        [Params(8)]
+        [Params(4)]
         public int Concurrency { get; set; }
 
         [Benchmark(OperationsPerInvoke = ItemCount, Baseline = true)]
