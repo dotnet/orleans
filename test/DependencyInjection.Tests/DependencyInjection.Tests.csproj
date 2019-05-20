@@ -11,7 +11,7 @@
     <PackageReference Include="StructureMap.Microsoft.DependencyInjection" Version="1.4.0" />
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
     <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
-    <DotNetCliToolReference Include="dotnet-xunit" Version="$(xUnitVersion)" />
+    <DotNetCliToolReference Include="dotnet-xunit" Version="$(DotNetxUnitVersion)" />
   </ItemGroup>
 
   <ItemGroup>

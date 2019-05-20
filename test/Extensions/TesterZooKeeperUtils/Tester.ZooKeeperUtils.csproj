@@ -8,7 +8,7 @@
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
     <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
     <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
-    <DotNetCliToolReference Include="dotnet-xunit" Version="$(xUnitVersion)" />
+    <DotNetCliToolReference Include="dotnet-xunit" Version="$(DotNetxUnitVersion)" />
   </ItemGroup>
 
   <ItemGroup>
