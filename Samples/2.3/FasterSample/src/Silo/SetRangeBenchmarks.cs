@@ -13,7 +13,7 @@ using Orleans.Runtime;
 
 namespace Silo
 {
-    [RunOncePerIteration, AllStatisticsColumn, MarkdownExporter]
+    [RunOncePerIteration, MemoryDiagnoser, MarkdownExporter]
     [GcServer(true), GcConcurrent(true)]
     public class SetRangeBenchmarks
     {
@@ -23,7 +23,7 @@ namespace Silo
         private IConcurrentDictionaryGrain dictionaryGrain;
         private IFasterThreadPoolGrain fasterThreadPoolGrain;
         private IFasterDedicatedGrain fasterDedicatedGrain;
-        private IEnumerable<ImmutableList<LookupItem>> generator;
+        private ImmutableList<LookupItem>[] batches;
 
         [GlobalSetup]
         public void GlobalSetup()
@@ -42,10 +42,19 @@ namespace Silo
                 .GetService<IGrainFactory>()
                 .GetGrain<IFasterDedicatedGrain>(Guid.NewGuid());
 
-            generator = Enumerable.Range(0, Items)
-                .Select(i => new LookupItem(i, i, new DateTime(i)))
-                .BatchIEnumerable(BatchSize)
-                .Select(b => b.ToImmutableList());
+            // create test data in advance
+            // this assumes even batch sizes
+            batches = new ImmutableList<LookupItem>[Items / BatchSize];
+            for (var b = 0; b < batches.Length; ++b)
+            {
+                var batch = ImmutableList.CreateBuilder<LookupItem>();
+                for (var i = 0; i < BatchSize; ++i)
+                {
+                    var x = BatchSize * b + i;
+                    batch.Add(new LookupItem(x, x, new DateTime(x)));
+                }
+                batches[b] = batch.ToImmutable();
+            }
         }
 
         [IterationSetup]
@@ -86,7 +95,7 @@ namespace Silo
         public async Task ConcurrentDictionary()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
-            foreach (var batch in generator)
+            foreach (var batch in batches)
             {
                 await pipeline.WaitOneAsync();
                 await pipeline.Add(dictionaryGrain.SetRangeAsync(batch));
@@ -98,7 +107,7 @@ namespace Silo
         public async Task FasterOnThreadPool()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
-            foreach (var batch in generator)
+            foreach (var batch in batches)
             {
                 await pipeline.WaitOneAsync();
                 await pipeline.Add(fasterThreadPoolGrain.SetRangeAsync(batch));
@@ -110,7 +119,7 @@ namespace Silo
         public async Task FasterOnDedicatedThreads()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
-            foreach (var batch in generator)
+            foreach (var batch in batches)
             {
                 await pipeline.WaitOneAsync();
                 await pipeline.Add(fasterDedicatedGrain.SetRangeAsync(batch));
