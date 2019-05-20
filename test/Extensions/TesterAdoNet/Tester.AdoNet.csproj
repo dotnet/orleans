@@ -13,7 +13,7 @@
     <PackageReference Include="Microsoft.Data.SQLite" Version="$(MicrosoftDataSQLiteVersion)" />
     <PackageReference Include="Npgsql" Version="$(NpgsqlVersion)" />
     <PackageReference Include="MySql.Data" Version="$(MySqlDataVersion)" />
-    <DotNetCliToolReference Include="dotnet-xunit" Version="$(xUnitVersion)" />
+    <DotNetCliToolReference Include="dotnet-xunit" Version="$(DotNetxUnitVersion)" />
   </ItemGroup>
 
   <ItemGroup>
