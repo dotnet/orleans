@@ -23,6 +23,7 @@ namespace Silo
         private IFasterThreadPoolGrain fasterThreadPoolGrain;
         private IFasterDedicatedGrain fasterDedicatedGrain;
         private IEnumerable<ImmutableList<int>> generator;
+        private MyAsyncPipeline pipeline;
 
         [GlobalSetup]
         public void GlobalSetup()
@@ -55,6 +56,8 @@ namespace Silo
             generator = Enumerable.Range(0, Items)
                 .BatchIEnumerable(BatchSize)
                 .Select(_ => _.ToImmutableList());
+
+            pipeline = new MyAsyncPipeline(Concurrency);
         }
 
         [GlobalCleanup]
@@ -78,7 +81,6 @@ namespace Silo
         [Benchmark(OperationsPerInvoke = ItemCount, Baseline = true)]
         public void ConcurrentDictionary()
         {
-            var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var batch in generator)
             {
                 pipeline.Add(dictionaryGrain.TryGetRangeAsync(batch));
@@ -89,7 +91,6 @@ namespace Silo
         [Benchmark(OperationsPerInvoke = ItemCount)]
         public void FasterOnThreadPool()
         {
-            var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var batch in generator)
             {
                 pipeline.Add(fasterThreadPoolGrain.TryGetRangeAsync(batch));
@@ -100,7 +101,6 @@ namespace Silo
         [Benchmark(OperationsPerInvoke = ItemCount)]
         public void FasterOnDedicatedThreads()
         {
-            var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var batch in generator)
             {
                 pipeline.Add(fasterDedicatedGrain.TryGetRangeAsync(batch));

@@ -23,6 +23,7 @@ namespace Silo
         private IFasterThreadPoolGrain fasterThreadPoolGrain;
         private IFasterDedicatedGrain fasterDedicatedGrain;
         private IEnumerable<ImmutableList<LookupItem>> generator;
+        private MyAsyncPipeline pipeline;
 
         [GlobalSetup]
         public void GlobalSetup()
@@ -45,6 +46,8 @@ namespace Silo
                 .Select(i => new LookupItem(i, i, new DateTime(i)))
                 .BatchIEnumerable(BatchSize)
                 .Select(b => b.ToImmutableList());
+
+            pipeline = new MyAsyncPipeline(Concurrency);
         }
 
         [IterationSetup]
@@ -84,7 +87,6 @@ namespace Silo
         [Benchmark(OperationsPerInvoke = ItemCount)]
         public void FasterOnDedicatedThreads()
         {
-            var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var batch in generator)
             {
                 pipeline.Add(fasterDedicatedGrain.SetRangeAsync(batch));
@@ -95,7 +97,6 @@ namespace Silo
         [Benchmark(OperationsPerInvoke = ItemCount)]
         public void FasterOnThreadPool()
         {
-            var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var batch in generator)
             {
                 pipeline.Add(fasterThreadPoolGrain.SetRangeAsync(batch));
@@ -106,7 +107,6 @@ namespace Silo
         [Benchmark(OperationsPerInvoke = ItemCount, Baseline = true)]
         public void ConcurrentDictionary()
         {
-            var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var batch in generator)
             {
                 pipeline.Add(dictionaryGrain.SetRangeAsync(batch));
