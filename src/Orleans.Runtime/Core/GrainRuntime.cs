@@ -107,6 +107,7 @@ namespace Orleans.Runtime
 
             if (context == null)
             {
+                // Move exceptions into local functions to help inlining this method.
                 ThrowMissingContext();
                 void ThrowMissingContext() => throw new InvalidOperationException("Activation access violation. A non-activation thread attempted to access activation services.");
             }
@@ -115,6 +116,7 @@ namespace Orleans.Runtime
                 && schedulingContext.Activation is ActivationData activation
                 && activation.State == ActivationState.Invalid)
             {
+                // Move exceptions into local functions to help inlining this method.
                 ThrowInvalidActivation(activation);
                 void ThrowInvalidActivation(ActivationData activationData) => throw new InvalidOperationException($"Attempt to access an invalid activation: {activationData}");
             }
