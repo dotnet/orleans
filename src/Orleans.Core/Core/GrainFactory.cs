@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans
 {
@@ -119,6 +120,9 @@ namespace Orleans
 
         /// <inheritdoc />
         public GrainReference GetGrainFromKeyString(string key) => GrainReference.FromKeyString(key, this.GrainReferenceRuntime);
+
+        /// <inheritdoc />
+        public GrainReference GetGrainFromKeyInfo(GrainReferenceKeyInfo keyInfo) => GrainReference.FromKeyInfo(keyInfo, this.GrainReferenceRuntime);
 
         /// <inheritdoc />
         public Task<TGrainObserverInterface> CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj)

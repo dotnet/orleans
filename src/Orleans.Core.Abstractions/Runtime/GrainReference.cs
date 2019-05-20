@@ -388,6 +388,23 @@ namespace Orleans.Runtime
             }
             return String.Format("{0}={1}", GRAIN_REFERENCE_STR, GrainId.ToParsableString());
         }
+
+        public GrainReferenceKeyInfo ToKeyInfo()
+        {
+            if (IsObserverReference)
+            {
+                return new GrainReferenceKeyInfo(GrainId.ToKeyInfo(), observerId.Guid);
+            }
+            if (IsSystemTarget)
+            {
+                return new GrainReferenceKeyInfo(GrainId.ToKeyInfo(), (SystemTargetSilo.Endpoint, SystemTargetSilo.Generation));
+            }
+            if (HasGenericArgument)
+            {
+                return new GrainReferenceKeyInfo(GrainId.ToKeyInfo(), genericArguments);
+            }
+            return new GrainReferenceKeyInfo(GrainId.ToKeyInfo());
+        }
         
         internal static GrainReference FromKeyString(string key, IGrainReferenceRuntime runtime)
         {
@@ -425,6 +442,26 @@ namespace Orleans.Runtime
             {
                 grainIdStr = trimmed.Slice(grainIdIndex);
                 return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime);
+            }
+        }
+
+        internal static GrainReference FromKeyInfo(GrainReferenceKeyInfo keyInfo, IGrainReferenceRuntime runtime)
+        {
+            if (keyInfo.HasGenericArgument)
+            {
+                return FromGrainId(GrainId.FromKeyInfo(keyInfo.Key), runtime, keyInfo.GenericArgument);
+            }
+            else if (keyInfo.HasObserverId)
+            {
+                return NewObserverGrainReference(GrainId.FromKeyInfo(keyInfo.Key), GuidId.GetGuidId(keyInfo.ObserverId), runtime);
+            }
+            else if (keyInfo.HasTargetSilo)
+            {
+                return FromGrainId(GrainId.FromKeyInfo(keyInfo.Key), runtime, null, SiloAddress.New(keyInfo.TargetSilo.endpoint, keyInfo.TargetSilo.generation));
+            }
+            else
+            {
+                return FromGrainId(GrainId.FromKeyInfo(keyInfo.Key), runtime);
             }
         }
 
