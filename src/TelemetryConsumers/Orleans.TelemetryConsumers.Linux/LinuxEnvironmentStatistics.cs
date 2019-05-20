@@ -255,9 +255,10 @@ namespace Orleans.Statistics
             using (var r = new StreamReader(fs, Encoding.ASCII))
             {
                 string line;
-                while ((line = await r.ReadLineAsync()) != null && line.StartsWith(lineStartsWith))
+                while ((line = await r.ReadLineAsync()) != null)
                 {
-                    return line;
+                    if (line.StartsWith(lineStartsWith))
+                        return line;
                 }
             }
 
