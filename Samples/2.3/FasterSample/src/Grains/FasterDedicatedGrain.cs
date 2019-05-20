@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using FASTER.core;
 using Grains.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Concurrency;
@@ -253,11 +254,19 @@ namespace Grains
             return command.Completed;
         }
 
-        public Task SetRangeAsync(ImmutableList<LookupItem> items)
+        public async Task SetRangeAsync(ImmutableList<LookupItem> items)
         {
-            var command = new SetRangeCommand(items);
-            commands.Add(command);
-            return command.Completed;
+            var command = setRangeCommandPool.Get();
+            try
+            {
+                command.Items = items;
+                commands.Add(command);
+                await command.Completed;
+            }
+            finally
+            {
+                setRangeCommandPool.Return(command);
+            }
         }
 
         public Task SnapshotAsync()
@@ -299,21 +308,17 @@ namespace Grains
 
         private sealed class SetRangeCommand : Command
         {
-            private readonly ImmutableList<LookupItem> items;
-            private readonly TaskCompletionSource<object> completion = new TaskCompletionSource<object>();
-
-            public SetRangeCommand(ImmutableList<LookupItem> items)
-            {
-                this.items = items ?? throw new ArgumentNullException(nameof(items));
-            }
-
+            public ImmutableList<LookupItem> Items { get; set; }
+            private TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>();
             public Task Completed => completion.Task;
 
             public override void Execute(MyFasterKV lookup)
             {
+                if (Items == null || Items.IsEmpty) return;
+
                 try
                 {
-                    foreach (var item in items)
+                    foreach (var item in Items)
                     {
                         var _key = item.Key;
                         var _item = item;
@@ -325,23 +330,29 @@ namespace Grains
                                 break;
 
                             case Status.ERROR:
-                                lookup.Refresh();
                                 completion.TrySetException(new ApplicationException());
+                                lookup.Refresh();
                                 return;
 
                             default:
-                                lookup.Refresh();
                                 completion.TrySetException(new ArgumentOutOfRangeException());
+                                lookup.Refresh();
                                 return;
                         }
                     }
+                    completion.TrySetResult(true);
                     lookup.Refresh();
-                    completion.TrySetResult(null);
                 }
                 catch (Exception error)
                 {
                     completion.TrySetException(error);
                 }
+            }
+
+            public void Reset()
+            {
+                Items = null;
+                completion = new TaskCompletionSource<bool>();
             }
         }
 
@@ -604,5 +615,22 @@ namespace Grains
         }
 
         #endregion Commands
+
+        #region Command Pools
+
+        private class SetRangeCommandPooledObjectPolicy : DefaultPooledObjectPolicy<SetRangeCommand>
+        {
+            public override SetRangeCommand Create() => new SetRangeCommand();
+
+            public override bool Return(SetRangeCommand obj)
+            {
+                obj.Reset();
+                return true;
+            }
+        }
+
+        private readonly DefaultObjectPool<SetRangeCommand> setRangeCommandPool = new DefaultObjectPool<SetRangeCommand>(new SetRangeCommandPooledObjectPolicy());
+
+        #endregion Command Pools
     }
 }

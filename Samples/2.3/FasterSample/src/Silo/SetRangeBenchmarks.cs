@@ -13,7 +13,7 @@ namespace Silo
     [GcServer(true), GcConcurrent(true)]
     public class SetRangeBenchmarks
     {
-        private const int ItemCount = 1 << 20;
+        private const int ItemCount = 1 << 21;
 
         private readonly IHost host = Program.BuildHost();
         private IConcurrentDictionaryGrain dictionaryGrain;
@@ -29,15 +29,15 @@ namespace Silo
 
             dictionaryGrain = host.Services
                 .GetService<IGrainFactory>()
-                .GetGrain<IConcurrentDictionaryGrain>(Guid.NewGuid());
+                .GetGrain<IConcurrentDictionaryGrain>(Guid.Empty);
 
             fasterThreadPoolGrain = host.Services
                 .GetService<IGrainFactory>()
-                .GetGrain<IFasterThreadPoolGrain>(Guid.NewGuid());
+                .GetGrain<IFasterThreadPoolGrain>(Guid.Empty);
 
             fasterDedicatedGrain = host.Services
                 .GetService<IGrainFactory>()
-                .GetGrain<IFasterDedicatedGrain>(Guid.NewGuid());
+                .GetGrain<IFasterDedicatedGrain>(Guid.Empty);
 
             // create test data in advance
             // this assumes even batch sizes
