@@ -1,15 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using Grains;
 using Grains.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
-using Orleans.Runtime;
 
 namespace Silo
 {
@@ -92,39 +88,36 @@ namespace Silo
         public int Concurrency { get; set; }
 
         [Benchmark(OperationsPerInvoke = ItemCount, Baseline = true)]
-        public async Task ConcurrentDictionary()
+        public void ConcurrentDictionary()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var batch in batches)
             {
-                await pipeline.WaitOneAsync();
-                await pipeline.Add(dictionaryGrain.SetRangeAsync(batch));
+                pipeline.Add(dictionaryGrain.SetRangeAsync(batch));
             }
-            await pipeline.WaitAllAsync();
+            pipeline.WaitAll();
         }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
-        public async Task FasterOnThreadPool()
+        public void FasterOnThreadPool()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var batch in batches)
             {
-                await pipeline.WaitOneAsync();
-                await pipeline.Add(fasterThreadPoolGrain.SetRangeAsync(batch));
+                pipeline.Add(fasterThreadPoolGrain.SetRangeAsync(batch));
             }
-            await pipeline.WaitAllAsync();
+            pipeline.WaitAll();
         }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
-        public async Task FasterOnDedicatedThreads()
+        public void FasterOnDedicatedThreads()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var batch in batches)
             {
-                await pipeline.WaitOneAsync();
-                await pipeline.Add(fasterDedicatedGrain.SetRangeAsync(batch));
+                pipeline.Add(fasterDedicatedGrain.SetRangeAsync(batch));
             }
-            await pipeline.WaitAllAsync();
+            pipeline.WaitAll();
         }
     }
 }

@@ -23,11 +23,11 @@ namespace Silo
         /// This allows the user to decide whether to always keep under capacity (by calling this before running a task and calling <see cref="Add(Task)"/>)
         /// or to keep an extra task in-flight (by not calling this before <see cref="Add(Task)"/>)
         /// </summary>
-        public async Task WaitOneAsync()
+        public void WaitOne()
         {
             while (queue.Count >= capacity)
             {
-                await queue.Dequeue();
+                queue.Dequeue().Wait();
             }
         }
 
@@ -35,20 +35,20 @@ namespace Silo
         /// Adds a running task to the pipeline.
         /// Will await until there is a slot free.
         /// </summary>
-        public async Task Add(Task task)
+        public void Add(Task task)
         {
-            await WaitOneAsync();
+            WaitOne();
             queue.Enqueue(task);
         }
 
         /// <summary>
         /// Awaits for all running tasks to complete.
         /// </summary>
-        public async Task WaitAllAsync()
+        public void WaitAll()
         {
             while (queue.Count > 0)
             {
-                await queue.Dequeue();
+                queue.Dequeue().Wait();
             }
         }
     }

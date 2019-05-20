@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using Grains;
 using Grains.Models;
@@ -71,39 +70,36 @@ namespace Silo
         public int Concurrency { get; set; }
 
         [Benchmark(OperationsPerInvoke = ItemCount, Baseline = true)]
-        public async Task ConcurrentDictionary()
+        public void ConcurrentDictionary()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var key in generator)
             {
-                await pipeline.WaitOneAsync();
-                await pipeline.Add(dictionaryGrain.TryGetAsync(key));
+                pipeline.Add(dictionaryGrain.TryGetAsync(key));
             }
-            await pipeline.WaitAllAsync();
+            pipeline.WaitAll();
         }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
-        public async Task FasterOnThreadPool()
+        public void FasterOnThreadPool()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var key in generator)
             {
-                await pipeline.WaitOneAsync();
-                await pipeline.Add(fasterThreadPoolGrain.TryGetAsync(key));
+                pipeline.Add(fasterThreadPoolGrain.TryGetAsync(key));
             }
-            await pipeline.WaitAllAsync();
+            pipeline.WaitAll();
         }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
-        public async Task FasterOnDedicatedThreads()
+        public void FasterOnDedicatedThreads()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var key in generator)
             {
-                await pipeline.WaitOneAsync();
-                await pipeline.Add(fasterDedicatedGrain.TryGetAsync(key));
+                pipeline.Add(fasterDedicatedGrain.TryGetAsync(key));
             }
-            await pipeline.WaitAllAsync();
+            pipeline.WaitAll();
         }
     }
 }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using Grains;
 using Grains.Models;
@@ -76,39 +75,36 @@ namespace Silo
         public int Concurrency { get; set; }
 
         [Benchmark(OperationsPerInvoke = ItemCount, Baseline = true)]
-        public async Task ConcurrentDictionary()
+        public void ConcurrentDictionary()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var item in generator)
             {
-                await pipeline.WaitOneAsync();
-                await pipeline.Add(dictionaryGrain.SetAsync(item));
+                pipeline.Add(dictionaryGrain.SetAsync(item));
             }
-            await pipeline.WaitAllAsync();
+            pipeline.WaitAll();
         }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
-        public async Task FasterOnThreadPool()
+        public void FasterOnThreadPool()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var item in generator)
             {
-                await pipeline.WaitOneAsync();
-                await pipeline.Add(fasterThreadPoolGrain.SetAsync(item));
+                pipeline.Add(fasterThreadPoolGrain.SetAsync(item));
             }
-            await pipeline.WaitAllAsync();
+            pipeline.WaitAll();
         }
 
         [Benchmark(OperationsPerInvoke = ItemCount)]
-        public async Task FasterOnDedicatedThreads()
+        public void FasterOnDedicatedThreads()
         {
             var pipeline = new MyAsyncPipeline(Concurrency);
             foreach (var item in generator)
             {
-                await pipeline.WaitOneAsync();
-                await pipeline.Add(fasterDedicatedGrain.SetAsync(item));
+                pipeline.Add(fasterDedicatedGrain.SetAsync(item));
             }
-            await pipeline.WaitAllAsync();
+            pipeline.WaitAll();
         }
     }
 }
