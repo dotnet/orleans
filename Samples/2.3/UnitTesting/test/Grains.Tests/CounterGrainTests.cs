@@ -151,43 +151,5 @@ namespace Grains.Tests
             // assert
             Mock.Get(summary).Verify(_ => _.SetAsync("MyCounter", 123));
         }
-
-
-        /// <summary>
-        /// Demonstrates a test for a grain that calls another grain on a timer.
-        /// </summary>
-        [Fact]
-        public async Task Publishes_On_Timer()
-        {
-            // arrange mocks
-            var counter = Mock.Of<IPersistentState<CounterGrain.Counter>>(_ => _.State.Value == 123);
-            var summary = Mock.Of<ISummaryGrain>();
-            var factory = Mock.Of<IGrainFactory>(_ => _.GetGrain<ISummaryGrain>(Guid.Empty, default) == summary);
-
-            // arrange - for this test we need to mock the grain so we can override some behaviour
-            // we must tell moq to call base class methods to ensure normal grain behaviour
-            var grain = new Mock<CounterGrain>(counter, null, null, null) { CallBase = true };
-
-            // arrange - mock the grain key
-            grain.Setup(_ => _.GrainKey).Returns("MyCounter");
-
-            // arrange - mock the grain factory
-            grain.Setup(_ => _.GrainFactory).Returns(factory);
-
-            // arrange - mock the timer call and capture the registered action
-            Func<object, Task> action = null;
-            grain.Setup(_ => _.RegisterTimer(It.IsAny<Func<object, Task>>(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)))
-                .Callback((Func<object, Task> t, object s, TimeSpan d, TimeSpan p) => { action = t; });
-
-            // act - simulate activation
-            await grain.Object.OnActivateAsync();
-
-            // act - tick the timer
-            Assert.NotNull(action);
-            await action(null);
-
-            // assert
-            Mock.Get(summary).Verify(_ => _.SetAsync("MyCounter", 123));
-        }
     }
 }
