@@ -8,17 +8,16 @@ namespace Grains.Tests
         [Fact]
         public async Task Gets_And_Sets_Value()
         {
-            // Create a new grain.
-            // As this test does not interact with orleans services, we do not need to mock the grain.
+            // create a new grain - we do not need to mock the grain here because we do not use orleans services in this test
             var grain = new BasicGrain();
 
-            // Assert the default value is zero.
+            // assert the default value is zero
             Assert.Equal(0, await grain.GetValueAsync());
 
-            // Act by setting a new value.
+            // set a new value
             await grain.SetValueAsync(123);
 
-            // Assert the new value is as set.
+            // assert the new value is as set
             Assert.Equal(123, await grain.GetValueAsync());
         }
     }

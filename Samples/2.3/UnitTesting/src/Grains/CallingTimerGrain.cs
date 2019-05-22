@@ -19,11 +19,16 @@ namespace Grains
         public override Task OnActivateAsync()
         {
             // register a timer to call another grain every second
-            RegisterTimer(_ => GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).SetAsync(nameof(CallingTimerGrain), counter),
+            RegisterTimer(_ => GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).SetAsync(GrainKey, counter),
                 null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
 
             return base.OnActivateAsync();
         }
+
+        /// <summary>
+        /// This opens up the grain key for mocking.
+        /// </summary>
+        public virtual string GrainKey => this.GetPrimaryKeyString();
 
         /// <summary>
         /// This opens up the grain factory property for mocking.

@@ -5,6 +5,9 @@ using Xunit;
 
 namespace Grains.Tests
 {
+    /// <summary>
+    /// Demonstrates how to test a grain with a timer that performs an internal operation.
+    /// </summary>
     public class TimerGrainTests
     {
         [Fact]

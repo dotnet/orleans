@@ -6,48 +6,54 @@ using Xunit;
 
 namespace Grains.Tests
 {
+    /// <summary>
+    /// Demonstrates how to test a grain that calls another grain upon a timer tick.
+    /// </summary>
     public class CallingTimerGrainTests
     {
         [Fact]
         public async Task Publishes_Counter_To_Summary_On_Timer()
         {
-            // arrange the summary grain mock
+            // mock the summary grain
             var summary = Mock.Of<ISummaryGrain>();
 
-            // arrange the the grain factory mock
+            // mock the grain factory and summary grain
             var factory = Mock.Of<IGrainFactory>(_ => _.GetGrain<ISummaryGrain>(Guid.Empty, null) == summary);
 
-            // arrange the grain class mock
+            // mock the grain under test
             var grain = new Mock<CallingTimerGrain>() { CallBase = true };
 
-            // arrange the grain class factory override
+            // override the grain factory on the grain
             grain.Setup(_ => _.GrainFactory).Returns(factory);
 
-            // arrange the grain reminder method override
+            // override the timer registration method on the grain
             Func<object, Task> action = null;
             grain.Setup(_ => _.RegisterTimer(It.IsAny<Func<object, Task>>(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)))
                 .Callback<Func<object, Task>, object, TimeSpan, TimeSpan>((a, b, c, d) => { action = a; });
 
-            // act by simulating activation
+            // override the grain key
+            grain.Setup(_ => _.GrainKey).Returns("MyGrainKey");
+
+            // simulate activation
             await grain.Object.OnActivateAsync();
 
             // assert the timer was registered
             Assert.NotNull(action);
 
-            // act by ticking the timer
+            // tick the timer
             await action(null);
 
             // assert the summary got the first result
-            Mock.Get(summary).Verify(_ => _.SetAsync(nameof(CallingTimerGrain), 0));
+            Mock.Get(factory.GetGrain<ISummaryGrain>(Guid.Empty)).Verify(_ => _.SetAsync("MyGrainKey", 0));
 
-            // act by incrementing the value
+            // increment the value
             await grain.Object.IncrementAsync();
 
-            // act by ticking the timer again
+            // tick the timer again
             await action(null);
 
             // assert the summary got the next result
-            Mock.Get(summary).Verify(_ => _.SetAsync(nameof(CallingTimerGrain), 1));
+            Mock.Get(summary).Verify(_ => _.SetAsync("MyGrainKey", 1));
         }
     }
 }

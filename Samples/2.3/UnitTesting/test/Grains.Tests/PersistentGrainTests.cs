@@ -5,6 +5,9 @@ using Xunit;
 
 namespace Grains.Tests
 {
+    /// <summary>
+    /// Demonstrates how to test a grain that persists state to storage.
+    /// </summary>
     public class PersistentGrainTests
     {
         [Fact]
