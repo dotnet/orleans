@@ -17,4 +17,8 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Grains\Grains.csproj" />
+  </ItemGroup>
+
 </Project>
