@@ -8,5 +8,7 @@ namespace Grains
         Task IncrementAsync();
 
         Task<int> GetValueAsync();
+
+        Task SaveAsync();
     }
 }

@@ -22,6 +22,8 @@ namespace Grains
 
         public Task<int> GetValueAsync() => Task.FromResult(counter.State.Value);
 
+        public Task SaveAsync() => counter.WriteStateAsync();
+
         public class Counter
         {
             public int Value { get; set; }
