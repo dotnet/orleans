@@ -10,5 +10,7 @@ namespace Grains
         Task<int> GetValueAsync();
 
         Task SaveAsync();
+
+        Task PublishAsync();
     }
 }

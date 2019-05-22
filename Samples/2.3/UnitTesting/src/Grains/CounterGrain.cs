@@ -94,6 +94,13 @@ namespace Grains
 
         public Task SaveAsync() => counter.WriteStateAsync();
 
+        /// <summary>
+        /// Publishes the current counter value to the summary grain.
+        /// </summary>
+        public Task PublishAsync() =>
+            GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty)
+                .SetAsync(GrainKey, counter.State.Value);
+
         public class Counter
         {
             public int Value { get; set; }
