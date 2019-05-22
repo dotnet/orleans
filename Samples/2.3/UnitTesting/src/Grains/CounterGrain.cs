@@ -49,7 +49,7 @@ namespace Grains
             /// We are using the helper method here but we can also use the injected <see cref="ITimerRegistry"/> instance.
             RegisterTimer(_ =>
 
-                hostedGrainFactory.GetGrain<ISummaryGrain>(Guid.Empty)
+                GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty)
                     .SetAsync(GrainKey, counter.State.Value)
 
             , null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
