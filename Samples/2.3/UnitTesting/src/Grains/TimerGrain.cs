@@ -5,45 +5,29 @@ using Orleans;
 namespace Grains
 {
     /// <summary>
-    /// Demonstrates a grain that calls an external grain based on a timer.
+    /// Demonstrates a grain that performs an internal operation based on a timer.
     /// </summary>
     public class TimerGrain : Grain, ITimerGrain
     {
-        private int counter;
+        private int value;
 
-        /// <summary>
-        /// Orleans calls this on grain activation.
-        /// For isolated unit tests we must call this to simulate activation.
-        /// However, the test host will call this on its own.
-        /// </summary>
+        public Task<int> GetValueAsync() => Task.FromResult(value);
+
         public override Task OnActivateAsync()
         {
-            // register a timer to call another grain every second
-            RegisterTimer(_ => GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).SetAsync(nameof(TimerGrain), counter),
-                null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+            RegisterTimer(_ =>
+            {
+                ++value;
+                return Task.CompletedTask;
+            }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
 
             return base.OnActivateAsync();
         }
-
-        /// <summary>
-        /// This opens up the grain factory property for mocking.
-        /// </summary>
-        public virtual new IGrainFactory GrainFactory =>
-            base.GrainFactory;
 
         /// <summary>
         /// This opens up the timer registration method for mocking.
         /// </summary>
         public virtual new IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period) =>
             base.RegisterTimer(asyncCallback, state, dueTime, period);
-
-        /// <summary>
-        /// Increments the counter by one.
-        /// </summary>
-        public Task IncrementAsync()
-        {
-            counter += 1;
-            return Task.CompletedTask;
-        }
     }
 }

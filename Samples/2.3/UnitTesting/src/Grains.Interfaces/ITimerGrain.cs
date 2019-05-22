@@ -3,8 +3,8 @@ using Orleans;
 
 namespace Grains
 {
-    public interface ITimerGrain : IGrainWithStringKey
+    public interface ITimerGrain : IGrainWithGuidKey
     {
-        Task IncrementAsync();
+        Task<int> GetValueAsync();
     }
 }

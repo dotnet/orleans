@@ -103,28 +103,6 @@ namespace Grains.Tests
         }
 
         /// <summary>
-        /// Demonstrates a test that validates a timer registration.
-        /// </summary>
-        [Fact]
-        public async Task Registers_Summary_Timer()
-        {
-            // arrange - for this test we need to mock the grain so we can override some behaviour
-            // we must tell moq to call base class methods to ensure normal grain behaviour
-            var grain = new Mock<CounterGrain>(null, null, null, null) { CallBase = true };
-
-            // arrange - mock the timer registraton method
-            // the alternative is for the grain to use the injected timer registry instead - either way works
-            grain.Setup(_ => _.RegisterTimer(It.IsAny<Func<object, Task>>(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)))
-                .Returns(Mock.Of<IDisposable>());
-
-            // act - simulate activation for the registration to happen
-            await grain.Object.OnActivateAsync();
-
-            // assert
-            grain.VerifyAll();
-        }
-
-        /// <summary>
         /// Demonstrates a test for a grain that calls another grain.
         /// </summary>
         [Fact]
