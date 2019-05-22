@@ -48,42 +48,6 @@ namespace Grains.Tests
         }
 
         /// <summary>
-        /// Demonstrates a test over injected state.
-        /// </summary>
-        [Fact]
-        public async Task Incrementing_Affects_State()
-        {
-            // arrange
-            var counter = new CounterGrain.Counter();
-            var state = Mock.Of<IPersistentState<CounterGrain.Counter>>(_ => _.State == counter);
-            var grain = new CounterGrain(state, null, null, null);
-
-            // act
-            await grain.IncrementAsync();
-
-            // assert
-            Assert.Equal(1, counter.Value);
-        }
-
-        /// <summary>
-        /// Demonstrates a test on storage method calls on injected state.
-        /// </summary>
-        [Fact]
-        public async Task Saves_State_On_Demand()
-        {
-            // arrange
-            var counter = new CounterGrain.Counter();
-            var state = Mock.Of<IPersistentState<CounterGrain.Counter>>(_ => _.State == counter);
-            var grain = new CounterGrain(state, null, null, null);
-
-            // act
-            await grain.SaveAsync();
-
-            // assert
-            Mock.Get(state).Verify(_ => _.WriteStateAsync());
-        }
-
-        /// <summary>
         /// Demonstrates a test for a grain that calls another grain.
         /// </summary>
         [Fact]

@@ -15,6 +15,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="2.3.2" />
     <PackageReference Include="Microsoft.Orleans.Runtime.Abstractions" Version="2.3.2" />
+    <PackageReference Include="protobuf-net" Version="2.4.0" />
   </ItemGroup>
 
   <ItemGroup>
