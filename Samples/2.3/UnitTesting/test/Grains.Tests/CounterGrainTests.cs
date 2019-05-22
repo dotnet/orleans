@@ -48,25 +48,6 @@ namespace Grains.Tests
         }
 
         /// <summary>
-        /// Demonstrates a basic set-and-get unit test.
-        /// </summary>
-        [Fact]
-        public async Task Increments_Value_And_Returns_On_Get()
-        {
-            // arrange
-            var counter = new CounterGrain.Counter();
-            var state = Mock.Of<IPersistentState<CounterGrain.Counter>>(_ => _.State == counter);
-            var grain = new CounterGrain(state, null, null, null);
-
-            // act
-            await grain.IncrementAsync();
-            var value = await grain.GetValueAsync();
-
-            // assert
-            Assert.Equal(1, value);
-        }
-
-        /// <summary>
         /// Demonstrates a test over injected state.
         /// </summary>
         [Fact]
