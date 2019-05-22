@@ -7,4 +7,8 @@
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Server" Version="2.3.2" />
+  </ItemGroup>
+
 </Project>
