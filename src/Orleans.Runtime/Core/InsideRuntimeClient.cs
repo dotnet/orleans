@@ -19,9 +19,42 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Threading;
 using Orleans.Configuration;
+using System.Diagnostics.Tracing;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime
 {
+    [EventSource(Name = "Microsoft-Orleans-InsideRuntimeClientEvent")]
+    public class OrleansInsideRuntimeClientEvent : EventSource
+    {
+        public static OrleansInsideRuntimeClientEvent Log = new OrleansInsideRuntimeClientEvent();
+        public void SendRequestStart()
+        {
+            WriteEvent(1);
+        }
+
+        public void SendRequestStop()
+        {
+            WriteEvent(2);
+        }
+        public void ReceiveResponseStart()
+        {
+            WriteEvent(3);
+        }
+        public void ReceiveResponseStop()
+        {
+            WriteEvent(4);
+        }
+
+        public void SendResponseStart()
+        {
+            WriteEvent(5);
+        }
+        public void SendResponseStop()
+        {
+            WriteEvent(6);
+        }
+    }
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
@@ -121,7 +154,18 @@ namespace Orleans.Runtime
             string genericArguments = null)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            SendRequestMessage(target, message, context, debugContext, options, genericArguments);
+            var previousId = EventSource.CurrentThreadActivityId;
+            try
+            {
+                EventSource.SetCurrentThreadActivityId(message.ActivityId);
+                OrleansInsideRuntimeClientEvent.Log.SendRequestStart();
+                SendRequestMessage(target, message, context, debugContext, options, genericArguments);
+            }
+            finally
+            {
+                OrleansInsideRuntimeClientEvent.Log.SendRequestStop();
+                EventSource.SetCurrentThreadActivityId(previousId);
+            }
         }
 
         private void SendRequestMessage(
@@ -216,14 +260,26 @@ namespace Orleans.Runtime
 
         public void SendResponse(Message request, Response response)
         {
-            // Don't process messages that have already timed out
-            if (request.IsExpired)
+            var previousId = EventSource.CurrentThreadActivityId;
+            try
             {
-                request.DropExpiredMessage(MessagingStatisticsGroup.Phase.Respond);
-                return;
-            }
+                EventSource.SetCurrentThreadActivityId(request.ActivityId);
+                OrleansInsideRuntimeClientEvent.Log.SendResponseStart();
+                // Don't process messages that have already timed out
+                if (request.IsExpired)
+                {
+                    request.DropExpiredMessage(MessagingStatisticsGroup.Phase.Respond);
+                    OrleansInsideRuntimeClientEvent.Log.SendResponseStop();
+                    return;
+                }
 
-            this.Dispatcher.SendResponse(request, response);
+                this.Dispatcher.SendResponse(request, response);
+            }
+            finally
+            {
+                OrleansInsideRuntimeClientEvent.Log.SendResponseStop();
+                EventSource.SetCurrentThreadActivityId(previousId);
+            }
         }
 
         /// <summary>
@@ -588,69 +644,77 @@ namespace Orleans.Runtime
 
         public void ReceiveResponse(Message message)
         {
-            if (message.Result == Message.ResponseTypes.Rejection)
+            try
             {
-                if (!message.TargetSilo.Matches(this.MySilo))
+                OrleansInsideRuntimeClientEvent.Log.ReceiveResponseStart();
+                if (message.Result == Message.ResponseTypes.Rejection)
                 {
-                    // gatewayed message - gateway back to sender
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
-                    this.Dispatcher.Transport.SendMessage(message);
-                    return;
-                }
-
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_HandleMsg, "HandleMessage {0}", message);
-                switch (message.RejectionType)
-                {
-                    case Message.RejectionTypes.DuplicateRequest:
-                        // try to remove from callbackData, just in case it is still there.
-                        break;
-                    case Message.RejectionTypes.Overloaded:
-                        break;
-
-                    case Message.RejectionTypes.Unrecoverable:
-                    // fall through & reroute
-                    case Message.RejectionTypes.Transient:
-                        if (message.CacheInvalidationHeader == null)
-                        {
-                            // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
-                            // If CacheMgmtHeader is present, we already did this. Otherwise, we left this code for backward compatability. 
-                            // It should be retired as we move to use CacheMgmtHeader in all relevant places.
-                            this.Directory.InvalidateCacheEntry(message.SendingAddress);
-                        }
-                        break;
-
-                    case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
-                        // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
+                    if (!message.TargetSilo.Matches(this.MySilo))
+                    {
+                        // gatewayed message - gateway back to sender
+                        if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
+                        this.Dispatcher.Transport.SendMessage(message);
                         return;
-                    default:
-                        logger.Error(ErrorCode.Dispatcher_InvalidEnum_RejectionType,
-                            "Missing enum in switch: " + message.RejectionType);
-                        break;
-                }
-            }
+                    }
 
-            CallbackData callbackData;
-            bool found = callbacks.TryRemove(message.Id, out callbackData);
-            if (found)
-            {
-                if (message.TransactionInfo != null)
-                {
-                    // NOTE: Not clear if thread-safe, revise
-                    callbackData.TransactionInfo.Join(message.TransactionInfo);
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_HandleMsg, "HandleMessage {0}", message);
+                    switch (message.RejectionType)
+                    {
+                        case Message.RejectionTypes.DuplicateRequest:
+                            // try to remove from callbackData, just in case it is still there.
+                            break;
+                        case Message.RejectionTypes.Overloaded:
+                            break;
+
+                        case Message.RejectionTypes.Unrecoverable:
+                        // fall through & reroute
+                        case Message.RejectionTypes.Transient:
+                            if (message.CacheInvalidationHeader == null)
+                            {
+                                // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
+                                // If CacheMgmtHeader is present, we already did this. Otherwise, we left this code for backward compatability. 
+                                // It should be retired as we move to use CacheMgmtHeader in all relevant places.
+                                this.Directory.InvalidateCacheEntry(message.SendingAddress);
+                            }
+                            break;
+
+                        case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
+                            // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
+                            return;
+                        default:
+                            logger.Error(ErrorCode.Dispatcher_InvalidEnum_RejectionType,
+                                "Missing enum in switch: " + message.RejectionType);
+                            break;
+                    }
                 }
-                // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
-                // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items. 
-                callbackData.DoCallback(message);
+
+                CallbackData callbackData;
+                bool found = callbacks.TryRemove(message.Id, out callbackData);
+                if (found)
+                {
+                    if (message.TransactionInfo != null)
+                    {
+                        // NOTE: Not clear if thread-safe, revise
+                        callbackData.TransactionInfo.Join(message.TransactionInfo);
+                    }
+                    // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
+                    // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items. 
+                    callbackData.DoCallback(message);
+                }
+                else
+                {
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_NoCallbackForResp,
+                        "No callback for response message: " + message);
+                }
             }
-            else
+            finally
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_NoCallbackForResp,
-                    "No callback for response message: " + message);
+                OrleansInsideRuntimeClientEvent.Log.ReceiveResponseStop();
             }
         }
 
         public string CurrentActivationIdentity
-        {
+        {             
             get
             {
                 if (RuntimeContext.Current == null) return this.HostedClient.ToString();

@@ -1,5 +1,8 @@
 
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.Tracing;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
@@ -25,6 +28,7 @@ namespace Orleans.Runtime
                 Category = Message.Categories.Application,
                 Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
                 Id = CorrelationId.GetNext(),
+                ActivityId = Trace.CorrelationManager.ActivityId,
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
@@ -94,6 +98,7 @@ namespace Orleans.Runtime
                 IsReadOnly = request.IsReadOnly,
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
                 TargetSilo = request.SendingSilo,
+                ActivityId = request.ActivityId,
                 TransactionInfo = request.TransactionInfo
             };
 
@@ -107,6 +112,7 @@ namespace Orleans.Runtime
             }
 
             response.SendingSilo = request.TargetSilo;
+
             if (request.TargetGrain != null)
             {
                 response.SendingGrain = request.TargetGrain;

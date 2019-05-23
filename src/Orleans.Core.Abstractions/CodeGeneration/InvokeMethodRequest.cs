@@ -74,7 +74,7 @@ namespace Orleans.CodeGeneration
         TransactionCreate = 0x600,
         TransactionJoin = 0x800,
         TransactionSupported = 0xA00,
-        TransactionNotAllowed = 0xC00,
+        TransactionNotAllowed = 0xC00
     }
 
     public static class InvokeMethodOptionsExtensions

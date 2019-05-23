@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.Tracing;
 
 namespace Orleans.Runtime.Scheduler
 {
@@ -22,7 +23,18 @@ namespace Orleans.Runtime.Scheduler
 
         public override void Execute()
         {
-            target.HandleNewRequest(request);
+            // set/clear activityid
+            var previousId = EventSource.CurrentThreadActivityId;
+            try
+            {
+                EventSource.SetCurrentThreadActivityId(request.ActivityId);
+                target.HandleNewRequest(request);
+            }
+            finally
+            {
+                EventSource.SetCurrentThreadActivityId(previousId);
+            }
+            
         }
 
         public override string ToString()

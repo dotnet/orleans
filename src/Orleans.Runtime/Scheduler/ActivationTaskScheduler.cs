@@ -1,11 +1,24 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Tracing;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Scheduler
 {
+    [EventSource(Name = "Microsoft-Orleans-ActivationTaskSchedulerEvent")]
+    public class OrleansActivationTaskSchedulerEvent : EventSource
+    {
+        public static OrleansActivationTaskSchedulerEvent Log = new OrleansActivationTaskSchedulerEvent();
+        public void QueueTaskStart(int taskId) => WriteEvent(1, taskId);
+        public void QueueTaskStop(int taskId) => WriteEvent(2, taskId);
+        public void RunTaskStart(int taskId) => WriteEvent(3, taskId);
+        public void RunTaskStop(int taskId) => WriteEvent(4, taskId);
+
+    }
+
     /// <summary>
     /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
     /// </summary>
@@ -41,12 +54,13 @@ namespace Orleans.Runtime.Scheduler
 
         public void RunTask(Task task)
         {
+            OrleansActivationTaskSchedulerEvent.Log.RunTaskStart(task.Id);
             RuntimeContext.SetExecutionContext(workerGroup.SchedulingContext);
             bool done = TryExecuteTask(task);
             if (!done)
                 logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete4, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
                     task.Id, task.Status);
-            
+            OrleansActivationTaskSchedulerEvent.Log.RunTaskStop(task.Id);
             //  Consider adding ResetExecutionContext() or even better:
             //  Consider getting rid of ResetExecutionContext completely and just making sure we always call SetExecutionContext before TryExecuteTask.
         }
@@ -63,10 +77,12 @@ namespace Orleans.Runtime.Scheduler
         /// <param name="task">The task to be queued.</param>
         protected override void QueueTask(Task task)
         {
+            OrleansActivationTaskSchedulerEvent.Log.QueueTaskStart(task.Id);
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(myId + " QueueTask Task Id={0}", task.Id);
 #endif
             workerGroup.EnqueueTask(task);
+            OrleansActivationTaskSchedulerEvent.Log.QueueTaskStop(task.Id);
         }
 
         /// <summary>

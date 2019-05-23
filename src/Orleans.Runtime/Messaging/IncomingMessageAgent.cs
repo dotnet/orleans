@@ -1,10 +1,18 @@
 using System;
+using System.Diagnostics.Tracing;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
+    [EventSource(Name = "Microsoft-Orleans-IncomingMessageAgentEvent")]
+    public class OrleansIncomingMessageAgentEvent : EventSource
+    {
+        public static OrleansIncomingMessageAgentEvent Log = new OrleansIncomingMessageAgentEvent();
+        public void ReceiverMessageStart() => WriteEvent(1);
+        public void ReceiverMessageStop() => WriteEvent(2);
+    }
     internal class IncomingMessageAgent : DedicatedAsynchAgent
     {
         private readonly IMessageCenter messageCenter;
@@ -62,82 +70,95 @@ namespace Orleans.Runtime.Messaging
 
         private void ReceiveMessage(Message msg)
         {
-            MessagingProcessingStatisticsGroup.OnImaMessageReceived(msg);
-
-            ISchedulingContext context;
-            // Find the activation it targets; first check for a system activation, then an app activation
-            if (msg.TargetGrain.IsSystemTarget)
+            // set/clear activityid
+            var previousId = EventSource.CurrentThreadActivityId;
+            try
             {
-                SystemTarget target = directory.FindSystemTarget(msg.TargetActivation);
-                if (target == null)
-                {
-                    MessagingStatisticsGroup.OnRejectedMessage(msg);
-                    Message response = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
-                        String.Format("SystemTarget {0} not active on this silo. Msg={1}", msg.TargetGrain, msg));
-                    messageCenter.SendMessage(response);
-                    Log.Warn(ErrorCode.MessagingMessageFromUnknownActivation, "Received a message {0} for an unknown SystemTarget: {1}", msg, msg.TargetAddress);
-                    return;
-                }
-                context = target.SchedulingContext;
-                switch (msg.Direction)
-                {
-                    case Message.Directions.Request:
-                        MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
-                        scheduler.QueueWorkItem(new RequestWorkItem(target, msg), context);
-                        break;
+                EventSource.SetCurrentThreadActivityId(msg.ActivityId);
+                OrleansIncomingMessageAgentEvent.Log.ReceiverMessageStart();
+                MessagingProcessingStatisticsGroup.OnImaMessageReceived(msg);
 
-                    case Message.Directions.Response:
-                        MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
-                        scheduler.QueueWorkItem(new ResponseWorkItem(target, msg), context);
-                        break;
-
-                    default:
-                        Log.Error(ErrorCode.Runtime_Error_100097, "Invalid message: " + msg);
-                        break;
-                }
-            }
-            else
-            {
-                // Run this code on the target activation's context, if it already exists
-                ActivationData targetActivation = directory.FindTarget(msg.TargetActivation);
-                if (targetActivation != null)
+                ISchedulingContext context;
+                // Find the activation it targets; first check for a system activation, then an app activation
+                if (msg.TargetGrain.IsSystemTarget)
                 {
-                    lock (targetActivation)
+                    SystemTarget target = directory.FindSystemTarget(msg.TargetActivation);
+                    if (target == null)
                     {
-                        var target = targetActivation; // to avoid a warning about nulling targetActivation under a lock on it
-                        if (target.State == ActivationState.Valid)
-                        {
-                            // Response messages are not subject to overload checks.
-                            if (msg.Direction != Message.Directions.Response)
-                            {
-                                var overloadException = target.CheckOverloaded(Log);
-                                if (overloadException != null)
-                                {
-                                    // Send rejection as soon as we can, to avoid creating additional work for runtime
-                                    dispatcher.RejectMessage(msg, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + target);
-                                    return;
-                                }
-                            }
+                        MessagingStatisticsGroup.OnRejectedMessage(msg);
+                        Message response = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
+                            String.Format("SystemTarget {0} not active on this silo. Msg={1}", msg.TargetGrain, msg));
+                        messageCenter.SendMessage(response);
+                        Log.Warn(ErrorCode.MessagingMessageFromUnknownActivation, "Received a message {0} for an unknown SystemTarget: {1}", msg, msg.TargetAddress);
+                        return;
+                    }
+                    context = target.SchedulingContext;
+                    switch (msg.Direction)
+                    {
+                        case Message.Directions.Request:
+                            MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
+                            scheduler.QueueWorkItem(new RequestWorkItem(target, msg), context);
+                            break;
 
-                            // Run ReceiveMessage in context of target activation
-                            context = target.SchedulingContext;
-                        }
-                        else
-                        {
-                            // Can't use this activation - will queue for another activation
-                            target = null;
-                            context = null;
-                        }
+                        case Message.Directions.Response:
+                            MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
+                            scheduler.QueueWorkItem(new ResponseWorkItem(target, msg), context);
+                            break;
 
-                        EnqueueReceiveMessage(msg, target, context);
+                        default:
+                            Log.Error(ErrorCode.Runtime_Error_100097, "Invalid message: " + msg);
+                            break;
                     }
                 }
                 else
                 {
-                    // No usable target activation currently, so run ReceiveMessage in system context
-                    EnqueueReceiveMessage(msg, null, null);
+                    // Run this code on the target activation's context, if it already exists
+                    ActivationData targetActivation = directory.FindTarget(msg.TargetActivation);
+                    if (targetActivation != null)
+                    {
+                        lock (targetActivation)
+                        {
+                            var target = targetActivation; // to avoid a warning about nulling targetActivation under a lock on it
+                            if (target.State == ActivationState.Valid)
+                            {
+                                // Response messages are not subject to overload checks.
+                                if (msg.Direction != Message.Directions.Response)
+                                {
+                                    var overloadException = target.CheckOverloaded(Log);
+                                    if (overloadException != null)
+                                    {
+                                        // Send rejection as soon as we can, to avoid creating additional work for runtime
+                                        dispatcher.RejectMessage(msg, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + target);
+                                        return;
+                                    }
+                                }
+
+                                // Run ReceiveMessage in context of target activation
+                                context = target.SchedulingContext;
+                            }
+                            else
+                            {
+                                // Can't use this activation - will queue for another activation
+                                target = null;
+                                context = null;
+                            }
+
+                            EnqueueReceiveMessage(msg, target, context);
+                        }
+                    }
+                    else
+                    {
+                        // No usable target activation currently, so run ReceiveMessage in system context
+                        EnqueueReceiveMessage(msg, null, null);
+                    }
                 }
             }
+            finally
+            {
+                OrleansIncomingMessageAgentEvent.Log.ReceiverMessageStop();
+                EventSource.SetCurrentThreadActivityId(previousId);
+            }
+            
         }
 
         private void EnqueueReceiveMessage(Message msg, ActivationData targetActivation, ISchedulingContext context)

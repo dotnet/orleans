@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.Tracing;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -127,25 +128,36 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public bool TryDispatchToClient(Message message)
         {
-            if (!this.ClientId.Equals(message.TargetGrain)) return false;
-            if (message.IsExpired)
+            // set/clear activityid
+            var previousId = EventSource.CurrentThreadActivityId;
+            try
             {
-                message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
+                EventSource.SetCurrentThreadActivityId(message.ActivityId);
+                if (!this.ClientId.Equals(message.TargetGrain)) return false;
+                if (message.IsExpired)
+                {
+                    message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
+                    return true;
+                }
+
+                if (message.Direction == Message.Directions.Response)
+                {
+                    // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
+                    this.runtimeClient.ReceiveResponse(message);
+                }
+                else
+                {
+                    // Requests agrainst client objects are scheduled for execution on the client.
+                    this.incomingMessages.Add(message);
+                }
+
                 return true;
             }
-
-            if (message.Direction == Message.Directions.Response)
+            finally
             {
-                // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
-                this.runtimeClient.ReceiveResponse(message);
+                EventSource.SetCurrentThreadActivityId(previousId);
             }
-            else
-            {
-                // Requests agrainst client objects are scheduled for execution on the client.
-                this.incomingMessages.Add(message);
-            }
-
-            return true;
+            
         }
 
         /// <inheritdoc />

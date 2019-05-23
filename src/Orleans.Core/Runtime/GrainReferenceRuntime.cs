@@ -1,10 +1,13 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.Tracing;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -84,6 +87,7 @@ namespace Orleans.Runtime
 
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
             return resultTask.ToTypedTask<T>();
+
         }
 
         public TGrainInterface Convert<TGrainInterface>(IAddressable grain)
@@ -127,7 +131,6 @@ namespace Orleans.Runtime
         private Task<object> SendRequest(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
         {
             bool isOneWayCall = (options & InvokeMethodOptions.OneWay) != 0;
-
             var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
             this.RuntimeClient.SendRequest(reference, request, resolver, debugContext, options, reference.GenericArguments);
             return isOneWayCall ? null : resolver.Task;

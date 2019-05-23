@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.Tracing;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,13 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
+    [EventSource(Name = "Microsoft-Orleans-DispatcherEvent")]
+    public class OrleansDispatcherEvent : EventSource
+    {
+        public static OrleansDispatcherEvent Log = new OrleansDispatcherEvent();
+        public void ReceiveMessageStart() => WriteEvent(1);
+        public void ReceiveMessageStop() => WriteEvent(2);
+    }
     internal class Dispatcher
     {
         internal ISiloMessageCenter Transport { get; }
@@ -72,130 +80,144 @@ namespace Orleans.Runtime
         /// <param name="message"></param>
         public void ReceiveMessage(Message message)
         {
-            MessagingProcessingStatisticsGroup.OnDispatcherMessageReceive(message);
-            // Don't process messages that have already timed out
-            if (message.IsExpired)
-            {
-                logger.Warn(ErrorCode.Dispatcher_DroppingExpiredMessage, "Dropping an expired message: {0}", message);
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Expired");
-                message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Dispatch);
-                return;
-            }
-
-            // check if its targeted at a new activation
-            if (message.TargetGrain.IsSystemTarget)
-            {
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "ReceiveMessage on system target.");
-                throw new InvalidOperationException("Dispatcher was called ReceiveMessage on system target for " + message);
-            }
-
+            // set/clear activityid
+            var previousId = EventSource.CurrentThreadActivityId;
             try
             {
-                Task ignore;
-                ActivationData target = catalog.GetOrCreateActivation(
-                    message.TargetAddress, 
-                    message.IsNewPlacement,
-                    message.NewGrainType,
-                    String.IsNullOrEmpty(message.GenericGrainType) ? null : message.GenericGrainType, 
-                    message.RequestContextData,
-                    out ignore);
-
-                if (ignore != null)
+                EventSource.SetCurrentThreadActivityId(message.ActivityId);
+                OrleansDispatcherEvent.Log.ReceiveMessageStart();
+                MessagingProcessingStatisticsGroup.OnDispatcherMessageReceive(message);
+                // Don't process messages that have already timed out
+                if (message.IsExpired)
                 {
-                    ignore.Ignore();
+                    logger.Warn(ErrorCode.Dispatcher_DroppingExpiredMessage, "Dropping an expired message: {0}", message);
+                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Expired");
+                    message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Dispatch);
+                    return;
                 }
 
-                if (message.Direction == Message.Directions.Response)
+                // check if its targeted at a new activation
+                if (message.TargetGrain.IsSystemTarget)
                 {
-                    ReceiveResponse(message, target);
+                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "ReceiveMessage on system target.");
+                    throw new InvalidOperationException("Dispatcher was called ReceiveMessage on system target for " + message);
                 }
-                else // Request or OneWay
-                {
-                    if (target.State == ActivationState.Valid)
-                    {
-                        this.activationCollector.TryRescheduleCollection(target);
-                    }
-                    // Silo is always capable to accept a new request. It's up to the activation to handle its internal state.
-                    // If activation is shutting down, it will queue and later forward this request.
-                    ReceiveRequest(message, target);
-                }
-            }
-            catch (Exception ex)
-            {
+
                 try
                 {
-                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Non-existent activation");
-              
-                    var nea = ex as Catalog.NonExistentActivationException;
-                    if (nea == null)
+                    Task ignore;
+                    ActivationData target = catalog.GetOrCreateActivation(
+                        message.TargetAddress,
+                        message.IsNewPlacement,
+                        message.NewGrainType,
+                        String.IsNullOrEmpty(message.GenericGrainType) ? null : message.GenericGrainType,
+                        message.RequestContextData,
+                        out ignore);
+
+                    if (ignore != null)
                     {
-                        var str = $"Error creating activation for {message.NewGrainType}. Message {message}";
-                        logger.Error(ErrorCode.Dispatcher_ErrorCreatingActivation, str, ex);
-                        throw new OrleansException(str, ex);
+                        ignore.Ignore();
                     }
 
-                    if (nea.IsStatelessWorker)
+                    if (message.Direction == Message.Directions.Response)
                     {
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                           $"Intermediate StatelessWorker NonExistentActivation for message {message}, Exception {ex}");
+                        ReceiveResponse(message, target);
                     }
-                    else
+                    else // Request or OneWay
                     {
-                        logger.Info(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                            $"Intermediate NonExistentActivation for message {message}, with Exception {ex}");
-                    }
-
-                    ActivationAddress nonExistentActivation = nea.NonExistentActivation;
-
-                    if (message.Direction != Message.Directions.Response)
-                    {
-                        // Un-register the target activation so we don't keep getting spurious messages.
-                        // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
-                        // this request snuck ahead of another request, with new placement requested, for the same activation.
-                        // If the activation registration request from the new placement somehow sneaks ahead of this un-registration,
-                        // we want to make sure that we don't un-register the activation we just created.
-                        // We would add a counter here, except that there's already a counter for this in the Catalog.
-                        // Note that this has to run in a non-null scheduler context, so we always queue it to the catalog's context
-                        var origin = message.SendingSilo;
-                        scheduler.QueueWorkItem(new ClosureWorkItem(
-                            // don't use message.TargetAddress, cause it may have been removed from the headers by this time!
-                            async () =>
-                            {
-                                try
-                                {
-                                    await this.localGrainDirectory.UnregisterAfterNonexistingActivation(
-                                        nonExistentActivation, origin);
-                                }
-                                catch (Exception exc)
-                                {
-                                    logger.Warn(ErrorCode.Dispatcher_FailedToUnregisterNonExistingAct,
-                                        $"Failed to un-register NonExistentActivation {nonExistentActivation}", exc);
-                                }
-                            },
-                            "LocalGrainDirectory.UnregisterAfterNonexistingActivation"),
-                            catalog.SchedulingContext);
-
-                        ProcessRequestToInvalidActivation(message, nonExistentActivation, null, "Non-existent activation");
-                    }
-                    else
-                    {
-                        logger.Warn(
-                            ErrorCode.Dispatcher_NoTargetActivation,
-                            nonExistentActivation.Silo.IsClient
-                                ? "No target client {0} for response message: {1}. It's likely that the client recently disconnected."
-                                : "No target activation {0} for response message: {1}",
-                            nonExistentActivation,
-                            message);
-
-                        this.localGrainDirectory.InvalidateCacheEntry(nonExistentActivation);
+                        if (target.State == ActivationState.Valid)
+                        {
+                            this.activationCollector.TryRescheduleCollection(target);
+                        }
+                        // Silo is always capable to accept a new request. It's up to the activation to handle its internal state.
+                        // If activation is shutting down, it will queue and later forward this request.
+                        ReceiveRequest(message, target);
                     }
                 }
-                catch (Exception exc)
+                catch (Exception ex)
                 {
-                    // Unable to create activation for this request - reject message
-                    RejectMessage(message, Message.RejectionTypes.Transient, exc);
+                    try
+                    {
+                        MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Non-existent activation");
+
+                        var nea = ex as Catalog.NonExistentActivationException;
+                        if (nea == null)
+                        {
+                            var str = $"Error creating activation for {message.NewGrainType}. Message {message}";
+                            logger.Error(ErrorCode.Dispatcher_ErrorCreatingActivation, str, ex);
+                            throw new OrleansException(str, ex);
+                        }
+
+                        if (nea.IsStatelessWorker)
+                        {
+                            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                               $"Intermediate StatelessWorker NonExistentActivation for message {message}, Exception {ex}");
+                        }
+                        else
+                        {
+                            logger.Info(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
+                                $"Intermediate NonExistentActivation for message {message}, with Exception {ex}");
+                        }
+
+                        ActivationAddress nonExistentActivation = nea.NonExistentActivation;
+
+                        if (message.Direction != Message.Directions.Response)
+                        {
+                            // Un-register the target activation so we don't keep getting spurious messages.
+                            // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
+                            // this request snuck ahead of another request, with new placement requested, for the same activation.
+                            // If the activation registration request from the new placement somehow sneaks ahead of this un-registration,
+                            // we want to make sure that we don't un-register the activation we just created.
+                            // We would add a counter here, except that there's already a counter for this in the Catalog.
+                            // Note that this has to run in a non-null scheduler context, so we always queue it to the catalog's context
+                            var origin = message.SendingSilo;
+                            scheduler.QueueWorkItem(new ClosureWorkItem(
+                                // don't use message.TargetAddress, cause it may have been removed from the headers by this time!
+                                async () =>
+                                {
+                                    try
+                                    {
+                                        await this.localGrainDirectory.UnregisterAfterNonexistingActivation(
+                                            nonExistentActivation, origin);
+                                    }
+                                    catch (Exception exc)
+                                    {
+                                        logger.Warn(ErrorCode.Dispatcher_FailedToUnregisterNonExistingAct,
+                                            $"Failed to un-register NonExistentActivation {nonExistentActivation}", exc);
+                                    }
+                                },
+                                "LocalGrainDirectory.UnregisterAfterNonexistingActivation"),
+                                catalog.SchedulingContext);
+
+                            ProcessRequestToInvalidActivation(message, nonExistentActivation, null, "Non-existent activation");
+                        }
+                        else
+                        {
+                            logger.Warn(
+                                ErrorCode.Dispatcher_NoTargetActivation,
+                                nonExistentActivation.Silo.IsClient
+                                    ? "No target client {0} for response message: {1}. It's likely that the client recently disconnected."
+                                    : "No target activation {0} for response message: {1}",
+                                nonExistentActivation,
+                                message);
+
+                            this.localGrainDirectory.InvalidateCacheEntry(nonExistentActivation);
+                        }
+                    }
+                    catch (Exception exc)
+                    {
+                        // Unable to create activation for this request - reject message
+                        RejectMessage(message, Message.RejectionTypes.Transient, exc);
+                    }
                 }
             }
+            finally
+            {
+                OrleansDispatcherEvent.Log.ReceiveMessageStop();
+                EventSource.SetCurrentThreadActivityId(previousId);
+            }
+
+            
         }
 
         public void RejectMessage(

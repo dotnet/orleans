@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Tracing;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,6 +20,38 @@ using Orleans.Streams;
 
 namespace Orleans
 {
+    [EventSource(Name="Microsoft-Orleans-OutsideRuntimeClientEvent")]
+    public class OrleansOutsideRuntimeClientEvent : EventSource
+    {
+        public static OrleansOutsideRuntimeClientEvent Log = new OrleansOutsideRuntimeClientEvent();
+        public void SendRequestStart()
+        {
+            WriteEvent(1);
+        }
+
+        public void SendRequestStop()
+        {
+            WriteEvent(2);
+        }
+        public void ReceiveResponseStart()
+        {
+            WriteEvent(3);
+        }
+        public void ReceiveResponseStop()
+        {
+            WriteEvent(4);
+        }
+
+        public void SendResponseStart()
+        {
+            WriteEvent(5);
+        }
+        public void SendResponseStop()
+        {
+            WriteEvent(6);
+        }
+    }
+
     internal class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
@@ -304,46 +337,57 @@ namespace Orleans
 
             while (listenForMessages)
             {
+                // set/clear activityid
                 var message = transport.WaitMessage(Message.Categories.Application, ct);
-
+               
                 if (message == null) // if wait was cancelled
                     break;
-
-                // when we receive the first message, we update the
-                // clientId for this client because it may have been modified to
-                // include the cluster name
-                if (!firstMessageReceived)
+                var previousId = EventSource.CurrentThreadActivityId;
+                try
                 {
-                    firstMessageReceived = true;
-                    if (!handshakeClientId.Equals(message.TargetGrain))
+                    EventSource.SetCurrentThreadActivityId(message.ActivityId);
+                    // when we receive the first message, we update the
+                    // clientId for this client because it may have been modified to
+                    // include the cluster name
+                    if (!firstMessageReceived)
                     {
-                        clientId = message.TargetGrain;
-                        transport.UpdateClientId(clientId);
-                        CurrentActivationAddress = ActivationAddress.GetAddress(transport.MyAddress, clientId, CurrentActivationAddress.Activation);
+                        firstMessageReceived = true;
+                        if (!handshakeClientId.Equals(message.TargetGrain))
+                        {
+                            clientId = message.TargetGrain;
+                            transport.UpdateClientId(clientId);
+                            CurrentActivationAddress = ActivationAddress.GetAddress(transport.MyAddress, clientId,
+                                CurrentActivationAddress.Activation);
+                        }
+                        else
+                        {
+                            clientId = handshakeClientId;
+                        }
                     }
-                    else
-                    {
-                        clientId = handshakeClientId;
-                    }
-                }
 
-                switch (message.Direction)
-                {
-                    case Message.Directions.Response:
+                    switch (message.Direction)
+                    {
+                        case Message.Directions.Response:
                         {
                             ReceiveResponse(message);
                             break;
                         }
-                    case Message.Directions.OneWay:
-                    case Message.Directions.Request:
+                        case Message.Directions.OneWay:
+                        case Message.Directions.Request:
                         {
                             this.localObjects.Dispatch(message);
                             break;
                         }
-                    default:
-                        logger.Error(ErrorCode.Runtime_Error_100327, $"Message not supported: {message}.");
-                        break;
+                        default:
+                            logger.Error(ErrorCode.Runtime_Error_100327, $"Message not supported: {message}.");
+                            break;
+                    }
                 }
+                finally
+                {
+                    EventSource.SetCurrentThreadActivityId(previousId);
+                }
+
             }
 
             incomingMessagesThreadTimeTracking?.OnStopExecution();
@@ -352,9 +396,19 @@ namespace Orleans
         public void SendResponse(Message request, Response response)
         {
             var message = this.messageFactory.CreateResponseMessage(request);
-            message.BodyObject = response;
-
-            transport.SendMessage(message);
+            var previousId = EventSource.CurrentThreadActivityId;
+            try
+            {
+                EventSource.SetCurrentThreadActivityId(message.ActivityId);
+                OrleansOutsideRuntimeClientEvent.Log.SendResponseStart();
+                message.BodyObject = response;
+                transport.SendMessage(message);
+            }
+            finally
+            {
+                OrleansOutsideRuntimeClientEvent.Log.SendResponseStop();
+                EventSource.SetCurrentThreadActivityId(previousId);
+            }
         }
 
         /// <summary>
@@ -378,7 +432,18 @@ namespace Orleans
         public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            SendRequestMessage(target, message, context, debugContext, options, genericArguments);
+            var previousId = EventSource.CurrentThreadActivityId;
+            try
+            {
+                EventSource.SetCurrentThreadActivityId(message.ActivityId);
+                OrleansOutsideRuntimeClientEvent.Log.SendRequestStart() ;
+                SendRequestMessage(target, message, context, debugContext, options, genericArguments);
+            }
+            finally
+            {
+                OrleansOutsideRuntimeClientEvent.Log.SendRequestStop();
+                EventSource.SetCurrentThreadActivityId(previousId);
+            }
         }
 
         private void SendRequestMessage(GrainReference target, Message message, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
@@ -451,28 +516,37 @@ namespace Orleans
 
         public void ReceiveResponse(Message response)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Received {0}", response);
+            try
+            {
+                OrleansOutsideRuntimeClientEvent.Log.ReceiveResponseStart();
 
-            // ignore duplicate requests
-            if (response.Result == Message.ResponseTypes.Rejection
-                && (response.RejectionType == Message.RejectionTypes.DuplicateRequest
-                 || response.RejectionType == Message.RejectionTypes.CacheInvalidation))
-            {
-                return;
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Received {0}", response);
+
+                // ignore duplicate requests
+                if (response.Result == Message.ResponseTypes.Rejection
+                    && (response.RejectionType == Message.RejectionTypes.DuplicateRequest
+                        || response.RejectionType == Message.RejectionTypes.CacheInvalidation))
+                {
+                    return;
+                }
+
+                CallbackData callbackData;
+                var found = callbacks.TryRemove(response.Id, out callbackData);
+                if (found)
+                {
+                    // We need to import the RequestContext here as well.
+                    // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
+                    // RequestContextExtensions.Import(response.RequestContextData);
+                    callbackData.DoCallback(response);
+                }
+                else
+                {
+                    logger.Warn(ErrorCode.Runtime_Error_100011, "No callback for response message: " + response);
+                }
             }
-            
-            CallbackData callbackData;
-            var found = callbacks.TryRemove(response.Id, out callbackData);
-            if (found)
+            finally
             {
-                // We need to import the RequestContext here as well.
-                // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
-                // RequestContextExtensions.Import(response.RequestContextData);
-                callbackData.DoCallback(response);
-            }
-            else
-            {
-                logger.Warn(ErrorCode.Runtime_Error_100011, "No callback for response message: " + response);
+                OrleansOutsideRuntimeClientEvent.Log.ReceiveResponseStop();
             }
         }
 
