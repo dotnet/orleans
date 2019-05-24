@@ -2,19 +2,19 @@ using System;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 
-namespace Grains.Tests
+namespace Grains.Tests.Hosted
 {
     public class ClusterFixture : IDisposable
     {
-        private readonly TestCluster cluster;
+        public TestCluster Cluster { get; }
 
         public ClusterFixture()
         {
             var builder = new TestClusterBuilder();
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
 
-            cluster = builder.Build();
-            cluster.Deploy();
+            Cluster = builder.Build();
+            Cluster.Deploy();
         }
 
         private class SiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -26,6 +26,6 @@ namespace Grains.Tests
             }
         }
 
-        public void Dispose() => cluster.StopAllSilos();
+        public void Dispose() => Cluster.StopAllSilos();
     }
 }

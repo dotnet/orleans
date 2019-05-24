@@ -1,15 +1,25 @@
+using System;
 using System.Threading.Tasks;
+using Orleans.TestingHost;
 using Xunit;
 
-namespace Grains.Tests
+namespace Grains.Tests.Hosted
 {
+    [Collection(nameof(ClusterCollection))]
     public class BasicGrainTests
     {
+        private readonly TestCluster cluster;
+
+        public BasicGrainTests(ClusterFixture fixture)
+        {
+            cluster = fixture.Cluster;
+        }
+
         [Fact]
         public async Task Gets_And_Sets_Value()
         {
-            // create a new grain - we do not need to mock the grain here because we do not use orleans services in this test
-            var grain = new BasicGrain();
+            // get a new basic grain from the cluster
+            var grain = cluster.GrainFactory.GetGrain<IBasicGrain>(Guid.NewGuid());
 
             // assert the default value is zero
             Assert.Equal(0, await grain.GetValueAsync());

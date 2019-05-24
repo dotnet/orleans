@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Moq;
 using Xunit;
 
-namespace Grains.Tests
+namespace Grains.Tests.Isolated
 {
     /// <summary>
     /// Demonstrates how to test a grain with a timer that performs an internal operation.

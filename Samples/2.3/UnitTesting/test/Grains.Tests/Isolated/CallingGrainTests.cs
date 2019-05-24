@@ -4,7 +4,7 @@ using Moq;
 using Orleans;
 using Xunit;
 
-namespace Grains.Tests
+namespace Grains.Tests.Isolated
 {
     /// <summary>
     /// Demonstrates testing a grain that calls another grain on demand.

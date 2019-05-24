@@ -3,7 +3,7 @@ using Moq;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Grains.Tests
+namespace Grains.Tests.Isolated
 {
     /// <summary>
     /// Demonstrates how to test a grain that persists state to storage.

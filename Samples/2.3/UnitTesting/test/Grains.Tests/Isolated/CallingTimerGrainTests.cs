@@ -4,7 +4,7 @@ using Moq;
 using Orleans;
 using Xunit;
 
-namespace Grains.Tests
+namespace Grains.Tests.Isolated
 {
     /// <summary>
     /// Demonstrates how to test a grain that calls another grain upon a timer tick.

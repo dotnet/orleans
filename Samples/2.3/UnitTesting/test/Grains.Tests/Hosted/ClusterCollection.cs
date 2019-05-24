@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Grains.Tests
+namespace Grains.Tests.Hosted
 {
     [CollectionDefinition(nameof(ClusterCollection))]
     public class ClusterCollection : ICollectionFixture<ClusterFixture>
