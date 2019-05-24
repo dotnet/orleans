@@ -1,4 +1,5 @@
 using System;
+using Orleans;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 

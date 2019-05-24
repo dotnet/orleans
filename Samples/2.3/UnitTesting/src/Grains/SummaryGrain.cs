@@ -8,6 +8,12 @@ namespace Grains
     {
         private readonly Dictionary<string, int> counters = new Dictionary<string, int>();
 
+        public Task<int?> TryGetAsync(string name) =>
+
+            counters.TryGetValue(name, out var value)
+                ? Task.FromResult<int?>(value)
+                : Task.FromResult<int?>(null);
+
         public Task SetAsync(string name, int value)
         {
             counters[name] = value;
