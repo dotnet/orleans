@@ -25,8 +25,11 @@ namespace Grains.Tests.Hosted
         [Fact]
         public async Task Publishes_On_Demand()
         {
+            // we should use a unique grain key as we are using a shared test cluster
+            var key = Guid.NewGuid().ToString();
+
             // get a new grain from the test host
-            var grain = cluster.GrainFactory.GetGrain<ICallingGrain>("MyCounter");
+            var grain = cluster.GrainFactory.GetGrain<ICallingGrain>(key);
 
             // increment the value in the grain
             await grain.IncrementAsync();
@@ -35,7 +38,7 @@ namespace Grains.Tests.Hosted
             await grain.PublishAsync();
 
             // assert the summary was called as expected
-            var value = await cluster.GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).TryGetAsync("MyCounter");
+            var value = await cluster.GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).TryGetAsync(key);
             Assert.Equal(1, value);
         }
     }
