@@ -1,10 +1,11 @@
 using System;
+using System.Threading.Tasks;
 using FASTER.core;
 using Grains.Models;
 
 namespace Grains
 {
-    public class LookupItemFunctions : IFunctions<int, LookupItem, LookupItem, LookupItem, Empty>
+    public class LookupItemFunctions : IFunctions<int, LookupItem, LookupItem, LookupItem, TaskCompletionSource<LookupItem>>
     {
         public void CheckpointCompletionCallback(Guid sessionId, long serialNum)
         {
@@ -30,9 +31,8 @@ namespace Grains
             newValue = new LookupItem(oldValue.Key, oldValue.Value + newValue.Value, newValue.Timestamp);
         }
 
-        public void DeleteCompletionCallback(ref int key, Empty ctx)
-        {
-        }
+        public void DeleteCompletionCallback(ref int key, TaskCompletionSource<LookupItem> ctx) =>
+            ctx.SetResult(null);
 
         public void InitialUpdater(ref int key, ref LookupItem input, ref LookupItem value)
         {
@@ -47,12 +47,46 @@ namespace Grains
             value = new LookupItem(value.Key, value.Value + input.Value, input.Timestamp);
         }
 
-        public void ReadCompletionCallback(ref int key, ref LookupItem input, ref LookupItem output, Empty ctx, Status status)
+        public void ReadCompletionCallback(ref int key, ref LookupItem input, ref LookupItem output, TaskCompletionSource<LookupItem> ctx, Status status)
         {
+            switch (status)
+            {
+                case Status.OK:
+                    ctx.SetResult(output);
+                    break;
+
+                case Status.NOTFOUND:
+                    ctx.SetResult(null);
+                    break;
+
+                case Status.ERROR:
+                    ctx.SetException(new ApplicationException());
+                    break;
+
+                default:
+                    break;
+            }
         }
 
-        public void RMWCompletionCallback(ref int key, ref LookupItem input, Empty ctx, Status status)
+        public void RMWCompletionCallback(ref int key, ref LookupItem input, TaskCompletionSource<LookupItem> ctx, Status status)
         {
+            switch (status)
+            {
+                case Status.OK:
+                    ctx.SetResult(input);
+                    break;
+
+                case Status.NOTFOUND:
+                    ctx.SetResult(null);
+                    break;
+
+                case Status.ERROR:
+                    ctx.SetException(new ApplicationException());
+                    break;
+
+                default:
+                    break;
+            }
         }
 
         public void SingleReader(ref int key, ref LookupItem input, ref LookupItem value, ref LookupItem dst)
@@ -63,12 +97,11 @@ namespace Grains
 
         public void SingleWriter(ref int key, ref LookupItem src, ref LookupItem dst)
         {
-            // for single-writer scenario just storage the source item
+            // for single-writer scenario just store the source item
             dst = src;
         }
 
-        public void UpsertCompletionCallback(ref int key, ref LookupItem value, Empty ctx)
-        {
-        }
+        public void UpsertCompletionCallback(ref int key, ref LookupItem value, TaskCompletionSource<LookupItem> ctx) =>
+            ctx.SetResult(value);
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Immutable;
 using System.IO;
 using System.Threading;
@@ -9,7 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Concurrency;
-using MyFasterKV = FASTER.core.FasterKV<int, Grains.Models.LookupItem, Grains.Models.LookupItem, Grains.Models.LookupItem, FASTER.core.Empty, Grains.LookupItemFunctions>;
+using MyFasterKV = FASTER.core.FasterKV<int, Grains.Models.LookupItem, Grains.Models.LookupItem, Grains.Models.LookupItem, System.Threading.Tasks.TaskCompletionSource<Grains.Models.LookupItem>, Grains.LookupItemFunctions>;
 
 namespace Grains
 {
@@ -184,10 +185,11 @@ namespace Grains
                 session = lookup.StartSession();
 
                 var key = item.Key;
-                if (lookup.Upsert(ref key, ref item, Empty.Default, 0) == Status.ERROR)
-                {
-                    throw new ApplicationException();
-                }
+                var context = new TaskCompletionSource<LookupItem>();
+
+                lookup.Upsert(ref key, ref item, context, 0);
+                lookup.CompletePending();
+                await context.Task;
             }
             finally
             {
@@ -213,28 +215,55 @@ namespace Grains
             await semaphore.WaitAsync();
 
             var session = Guid.Empty;
+            var completions = ArrayPool<TaskCompletionSource<LookupItem>>.Shared.Rent(items.Count);
+
             try
             {
                 session = lookup.StartSession();
+
                 for (var i = 0; i < items.Count; ++i)
                 {
                     var item = items[i];
                     var key = item.Key;
-                    if (lookup.Upsert(ref key, ref item, Empty.Default, i) == Status.ERROR)
+                    completions[i] = new TaskCompletionSource<LookupItem>();
+
+                    switch (lookup.Upsert(ref key, ref item, completions[i], i))
                     {
-                        throw new ApplicationException();
+                        case Status.OK:
+                            completions[i].SetResult(item);
+                            break;
+
+                        case Status.ERROR:
+                            completions[i].SetException(new ApplicationException());
+                            break;
+
+                        default:
+                            break;
                     }
+                }
+
+                lookup.CompletePending();
+                for (var i = 0; i < items.Count; ++i)
+                {
+                    await completions[i].Task;
                 }
             }
             finally
             {
                 try
                 {
-                    if (session != Guid.Empty) lookup.StopSession();
+                    ArrayPool<TaskCompletionSource<LookupItem>>.Shared.Return(completions);
                 }
                 finally
                 {
-                    semaphore.Release();
+                    try
+                    {
+                        if (session != Guid.Empty) lookup.StopSession();
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
                 }
             }
         });
@@ -272,12 +301,12 @@ namespace Grains
             try
             {
                 session = lookup.StartSession();
+
+                var context = new TaskCompletionSource<LookupItem>();
                 LookupItem result = null;
-                if (lookup.Read(ref key, ref result, ref result, Empty.Default, 0) == Status.ERROR)
-                {
-                    throw new ApplicationException();
-                }
-                return result;
+                lookup.Read(ref key, ref result, ref result, context, 0);
+                lookup.CompletePending();
+                return await context.Task;
             }
             finally
             {
@@ -297,51 +326,45 @@ namespace Grains
             await semaphore.WaitAsync();
 
             var session = Guid.Empty;
+            var completions = ArrayPool<TaskCompletionSource<LookupItem>>.Shared.Rent(keys.Count);
+
             try
             {
                 session = lookup.StartSession();
                 var result = ImmutableList.CreateBuilder<LookupItem>();
-                foreach (var key in keys)
+
+                for (var i = 0; i < keys.Count; ++i)
                 {
-                    var _key = key;
+                    var key = keys[i];
                     LookupItem input = null;
                     LookupItem output = null;
-                    switch (lookup.Read(ref _key, ref input, ref output, Empty.Default, 0))
+                    completions[i] = new TaskCompletionSource<LookupItem>();
+
+                    lookup.Read(ref key, ref input, ref output, completions[i], i);
+                }
+                lookup.CompletePending();
+
+                for (var i = 0; i < keys.Count; ++i)
+                {
+                    var item = await completions[i].Task;
+                    if (item != null)
                     {
-                        case Status.OK:
-                            result.Add(output);
-                            break;
-
-                        case Status.PENDING:
-                            if (lookup.CompletePending(true))
-                            {
-                                result.Add(output);
-                            }
-                            else
-                            {
-                                throw new ApplicationException();
-                            }
-                            break;
-
-                        case Status.ERROR:
-                            throw new ApplicationException();
-
-                        default:
-                            break;
+                        result.Add(item);
                     }
                 }
+
                 return result.ToImmutable();
             }
             finally
             {
-                try
-                {
-                    if (session != Guid.Empty) lookup.StopSession();
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
+                try { ArrayPool<TaskCompletionSource<LookupItem>>.Shared.Return(completions); }
+                catch (Exception error) { logger.LogError(error, error.Message); }
+
+                try { if (session != Guid.Empty) lookup.StopSession(); }
+                catch (Exception error) { logger.LogError(error, error.Message); }
+
+                try { semaphore.Release(); }
+                catch (Exception error) { logger.LogError(error, error.Message); }
             }
         });
 
@@ -350,58 +373,37 @@ namespace Grains
             await semaphore.WaitAsync();
 
             var session = Guid.Empty;
+            var completions = ArrayPool<TaskCompletionSource<LookupItem>>.Shared.Rent(deltas.Count);
+
             try
             {
                 session = lookup.StartSession();
 
-                foreach (var delta in deltas)
+                for (var i = 0; i < deltas.Count; ++i)
                 {
-                    var _key = delta.Key;
-                    var _delta = delta;
-                    switch (lookup.RMW(ref _key, ref _delta, Empty.Default, 0))
-                    {
-                        case Status.OK:
-                            break;
+                    var item = deltas[i];
+                    var key = item.Key;
+                    completions[i] = new TaskCompletionSource<LookupItem>();
 
-                        case Status.NOTFOUND:
-                            switch (lookup.Upsert(ref _key, ref _delta, Empty.Default, 0))
-                            {
-                                case Status.OK:
-                                case Status.NOTFOUND:
-                                case Status.PENDING:
-                                    break;
-
-                                case Status.ERROR:
-                                    throw new ApplicationException();
-
-                                default:
-                                    throw new ArgumentOutOfRangeException();
-                            }
-                            break;
-
-                        case Status.PENDING:
-                            break;
-
-                        case Status.ERROR:
-                            throw new ApplicationException();
-
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
+                    lookup.RMW(ref key, ref item, completions[i], i);
                 }
-                if (!lookup.CompletePending(true))
-                    throw new ApplicationException();
+                lookup.CompletePending();
+
+                for (var i = 0; i < deltas.Count; ++i)
+                {
+                    await completions[i].Task;
+                }
             }
             finally
             {
-                try
-                {
-                    if (session != Guid.Empty) lookup.StopSession();
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
+                try { ArrayPool<TaskCompletionSource<LookupItem>>.Shared.Return(completions); }
+                catch (Exception error) { logger.LogError(error, error.Message); }
+
+                try { if (session != Guid.Empty) lookup.StopSession(); }
+                catch (Exception error) { logger.LogError(error, error.Message); }
+
+                try { semaphore.Release(); }
+                catch (Exception error) { logger.LogError(error, error.Message); }
             }
         });
     }

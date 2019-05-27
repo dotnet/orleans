@@ -9,7 +9,7 @@ using Orleans;
 
 namespace Silo
 {
-    [RunOncePerIteration, MemoryDiagnoser, MarkdownExporter]
+    [ShortRunJob, EvaluateOverhead(false), RunOncePerIteration, MemoryDiagnoser, MarkdownExporter]
     [GcServer(true), GcConcurrent(true)]
     public class SetRangeBenchmarks
     {
@@ -84,7 +84,7 @@ namespace Silo
         [Params(29)]
         public int MemorySizeBits { get; set; }
 
-        [Params(1 << 10)]
+        [Params(1 << 10, 1 << 11, 1 << 12)]
         public int BatchSize { get; set; }
 
         [Params(4)]
@@ -110,6 +110,7 @@ namespace Silo
             pipeline.WaitAll();
         }
 
+        /*
         [Benchmark(OperationsPerInvoke = ItemCount)]
         public void FasterOnDedicatedThreads()
         {
@@ -119,5 +120,6 @@ namespace Silo
             }
             pipeline.WaitAll();
         }
+        */
     }
 }

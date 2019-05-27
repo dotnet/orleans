@@ -11,11 +11,12 @@ using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Concurrency;
-using MyFasterKV = FASTER.core.FasterKV<int, Grains.Models.LookupItem, Grains.Models.LookupItem, Grains.Models.LookupItem, FASTER.core.Empty, Grains.LookupItemFunctions>;
+using MyFasterKV = FASTER.core.FasterKV<int, Grains.Models.LookupItem, Grains.Models.LookupItem, Grains.Models.LookupItem, System.Threading.Tasks.TaskCompletionSource<Grains.Models.LookupItem>, Grains.LookupItemFunctions>;
 
 namespace Grains
 {
     [Reentrant]
+    [Obsolete]
     public class FasterDedicatedGrain : Grain, IFasterDedicatedGrain
     {
         private readonly ILogger<FasterDedicatedGrain> logger;
@@ -322,7 +323,7 @@ namespace Grains
                     {
                         var _key = item.Key;
                         var _item = item;
-                        switch (lookup.Upsert(ref _key, ref _item, Empty.Default, 0))
+                        switch (lookup.Upsert(ref _key, ref _item, null, 0))
                         {
                             case Status.OK:
                             case Status.NOTFOUND:
@@ -376,13 +377,13 @@ namespace Grains
                     {
                         var _key = delta.Key;
                         var _delta = delta;
-                        switch (lookup.RMW(ref _key, ref _delta, Empty.Default, 0))
+                        switch (lookup.RMW(ref _key, ref _delta, null, 0))
                         {
                             case Status.OK:
                                 break;
 
                             case Status.NOTFOUND:
-                                switch (lookup.Upsert(ref _key, ref _delta, Empty.Default, 0))
+                                switch (lookup.Upsert(ref _key, ref _delta, null, 0))
                                 {
                                     case Status.OK:
                                     case Status.NOTFOUND:
@@ -443,7 +444,7 @@ namespace Grains
                 {
                     var _key = item.Key;
                     var _item = item;
-                    switch (lookup.Upsert(ref _key, ref _item, Empty.Default, 0))
+                    switch (lookup.Upsert(ref _key, ref _item, null, 0))
                     {
                         case Status.OK:
                         case Status.NOTFOUND:
@@ -489,7 +490,7 @@ namespace Grains
                     var _key = key;
                     LookupItem input = null;
                     LookupItem output = null;
-                    switch (lookup.Read(ref _key, ref input, ref output, Empty.Default, 0))
+                    switch (lookup.Read(ref _key, ref input, ref output, null, 0))
                     {
                         case Status.OK:
                             completion.TrySetResult(output);
@@ -548,7 +549,7 @@ namespace Grains
                         var _key = key;
                         LookupItem input = null;
                         LookupItem output = null;
-                        switch (lookup.Read(ref _key, ref input, ref output, Empty.Default, 0))
+                        switch (lookup.Read(ref _key, ref input, ref output, null, 0))
                         {
                             case Status.OK:
                                 result.Add(output);
