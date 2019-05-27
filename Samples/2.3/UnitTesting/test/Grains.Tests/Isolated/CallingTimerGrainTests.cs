@@ -20,22 +20,18 @@ namespace Grains.Tests.Isolated
             // mock the grain factory and summary grain
             var factory = Mock.Of<IGrainFactory>(_ => _.GetGrain<ISummaryGrain>(Guid.Empty, null) == summary);
 
-            // mock the grain under test
+            // mock the grain under test and override affected orleans methods
             var grain = new Mock<CallingTimerGrain>() { CallBase = true };
-
-            // override the grain factory on the grain
             grain.Setup(_ => _.GrainFactory).Returns(factory);
+            grain.Setup(_ => _.GrainKey).Returns("MyGrainKey");
 
-            // override the timer registration method on the grain
             Func<object, Task> action = null;
             grain.Setup(_ => _.RegisterTimer(It.IsAny<Func<object, Task>>(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)))
                 .Callback<Func<object, Task>, object, TimeSpan, TimeSpan>((a, b, c, d) => { action = a; });
 
-            // override the grain key
-            grain.Setup(_ => _.GrainKey).Returns("MyGrainKey");
-
-            // simulate activation
+            // increment the value while simulating activation
             await grain.Object.OnActivateAsync();
+            await grain.Object.IncrementAsync();
 
             // assert the timer was registered
             Assert.NotNull(action);
@@ -44,7 +40,7 @@ namespace Grains.Tests.Isolated
             await action(null);
 
             // assert the summary got the first result
-            Mock.Get(factory.GetGrain<ISummaryGrain>(Guid.Empty)).Verify(_ => _.SetAsync("MyGrainKey", 0));
+            Mock.Get(factory.GetGrain<ISummaryGrain>(Guid.Empty)).Verify(_ => _.SetAsync("MyGrainKey", 1));
 
             // increment the value
             await grain.Object.IncrementAsync();
@@ -53,7 +49,7 @@ namespace Grains.Tests.Isolated
             await action(null);
 
             // assert the summary got the next result
-            Mock.Get(summary).Verify(_ => _.SetAsync("MyGrainKey", 1));
+            Mock.Get(summary).Verify(_ => _.SetAsync("MyGrainKey", 2));
         }
     }
 }

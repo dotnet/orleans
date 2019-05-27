@@ -38,8 +38,7 @@ namespace Grains.Tests.Hosted
             await grain.PublishAsync();
 
             // assert the summary was called as expected
-            var value = await fixture.Cluster.GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).TryGetAsync(key);
-            Assert.Equal(1, value);
+            Assert.Equal(1, await fixture.Cluster.GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).TryGetAsync(key));
         }
     }
 }

@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using Grains.Tests.Hosted.Fakes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using Orleans.Timers;
@@ -29,9 +32,17 @@ namespace Grains.Tests.Hosted.Cluster
         public static ConcurrentDictionary<string, ConcurrentBag<FakeGrainStorage>> GrainStorageGroups { get; } = new ConcurrentDictionary<string, ConcurrentBag<FakeGrainStorage>>();
 
         /// <summary>
-        /// Exposes the grain storage instances for unit tests to use.
+        /// Gets the fake grain storage item for the given grain by searching across all silos.
         /// </summary>
-        public IEnumerable<FakeGrainStorage> GrainStorageInstances => GrainStorageGroups[TestClusterId];
+        public IGrainState GetGrainState(Type implementationType, string name, IGrain grain)
+        {
+            return GrainStorageGroups[TestClusterId]
+                .SelectMany(_ => _.Storage)
+                .Where(_ => _.Key.Item1 == $"{implementationType.FullName}{(name == null ? "" : $",{typeof(PersistentGrain).Namespace}.{name}")}")
+                .Where(_ => _.Key.Item2.Equals((GrainReference)grain))
+                .Select(_ => _.Value)
+                .SingleOrDefault();
+        }
 
         /// <summary>
         /// Keeps all the fake timer registries in use by different clusters to facilitate parallel unit testing.
@@ -39,9 +50,14 @@ namespace Grains.Tests.Hosted.Cluster
         public static ConcurrentDictionary<string, ConcurrentBag<FakeTimerRegistry>> TimerRegistryGroups { get; } = new ConcurrentDictionary<string, ConcurrentBag<FakeTimerRegistry>>();
 
         /// <summary>
-        /// Exposes the fake timer registry for unit tests to use.
+        /// Gets all the fake timers for the target grain across all silos.
         /// </summary>
-        public IEnumerable<FakeTimerRegistry> TimerRegistryInstances => TimerRegistryGroups[TestClusterId];
+        public IEnumerable<FakeTimerEntry> GetTimers(IGrain grain)
+        {
+            return TimerRegistryGroups[TestClusterId]
+                .SelectMany(_ => _.GetAll())
+                .Where(_ => _.Grain.GrainReference.Equals((GrainReference)grain));
+        }
 
         /// <summary>
         /// Keeps all the fake reminder registries in use by different clusters to facilitate parallel unit testing.
@@ -49,9 +65,15 @@ namespace Grains.Tests.Hosted.Cluster
         public static ConcurrentDictionary<string, ConcurrentBag<FakeReminderRegistry>> ReminderRegistryGroups { get; } = new ConcurrentDictionary<string, ConcurrentBag<FakeReminderRegistry>>();
 
         /// <summary>
-        /// Exposes the fake timer registry for unit tests to use.
+        /// Gets the target fake reminder by searching across all silos.
         /// </summary>
-        public IEnumerable<FakeReminderRegistry> ReminderRegistryInstances => ReminderRegistryGroups[TestClusterId];
+        public FakeReminder GetReminder(IGrain grain, string name)
+        {
+            return ReminderRegistryGroups[TestClusterId]
+                .Select(_ => _.GetReminder((GrainReference)grain, name).Result)
+                .Where(_ => _ != null)
+                .SingleOrDefault();
+        }
 
         public ClusterFixture()
         {

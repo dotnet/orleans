@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Grains.Tests.Hosted.Cluster;
 using Orleans;
+using Orleans.Runtime;
 using Xunit;
 
 namespace Grains.Tests.Hosted
@@ -33,10 +34,7 @@ namespace Grains.Tests.Hosted
             Assert.Equal(0, await grain.GetValueAsync());
 
             // assert the timer was registered on some silo
-            var timer = fixture.TimerRegistryInstances
-                .SelectMany(_ => _.GetAll())
-                .Where(_ => _.Grain.AsReference<ITimerGrain>().Equals(grain))
-                .SingleOrDefault();
+            var timer = fixture.GetTimers(grain).SingleOrDefault();
 
             Assert.NotNull(timer);
 

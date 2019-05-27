@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Grains.Tests.Hosted.Cluster;
-using Orleans;
 using Xunit;
 
 namespace Grains.Tests.Hosted
@@ -33,19 +32,13 @@ namespace Grains.Tests.Hosted
             await grain.IncrementAsync();
 
             // assert the timer was registered on some silo in the cluster
-            var timer = fixture.TimerRegistryInstances
-                .SelectMany(_ => _.GetAll())
-                .Where(_ => _.Grain.AsReference<ICallingTimerGrain>().Equals(grain))
-                .SingleOrDefault();
-
-            Assert.NotNull(timer);
+            var timer = fixture.GetTimers(grain).Single();
 
             // tick the timer once
             await timer.TickAsync();
 
             // assert the summary grain got the first result
-            var summary = await fixture.Cluster.GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).TryGetAsync(key);
-            Assert.Equal(1, summary);
+            Assert.Equal(1, await fixture.Cluster.GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).TryGetAsync(key));
 
             // increment the counter again
             await grain.IncrementAsync();
@@ -54,8 +47,7 @@ namespace Grains.Tests.Hosted
             await timer.TickAsync();
 
             // assert the summary grain got the second result
-            summary = await fixture.Cluster.GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).TryGetAsync(key);
-            Assert.Equal(2, summary);
+            Assert.Equal(2, await fixture.Cluster.GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).TryGetAsync(key));
         }
     }
 }

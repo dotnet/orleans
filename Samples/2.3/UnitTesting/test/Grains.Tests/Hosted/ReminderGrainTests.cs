@@ -31,11 +31,7 @@ namespace Grains.Tests.Hosted
             Assert.Equal(0, await grain.GetValueAsync());
 
             // assert the reminder was registered on one of the fake registries
-            var reminder = fixture.ReminderRegistryInstances
-                .Select(_ => _.GetReminder((GrainReference)grain, "IncrementAsync").Result)
-                .Where(_ => _ != null)
-                .SingleOrDefault();
-
+            var reminder = fixture.GetReminder(grain, "IncrementAsync");
             Assert.NotNull(reminder);
 
             // tick the reminder

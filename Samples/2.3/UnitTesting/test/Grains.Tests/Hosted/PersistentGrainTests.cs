@@ -33,11 +33,7 @@ namespace Grains.Tests.Hosted
             await grain.SaveAsync();
 
             // assert that state was saved by one of the silos
-            var state = fixture.GrainStorageInstances
-                .SelectMany(_ => _.Storage)
-                .Where(_ => _.Key.Item1 == $"{typeof(PersistentGrain).FullName},{typeof(PersistentGrain).Namespace}.State" && _.Key.Item2.Equals(grain.AsReference<IPersistentGrain>()))
-                .Select(_ => _.Value)
-                .SingleOrDefault();
+            var state = fixture.GetGrainState(typeof(PersistentGrain), "State", grain);
             Assert.NotNull(state);
 
             // assert that state is of the corect type
