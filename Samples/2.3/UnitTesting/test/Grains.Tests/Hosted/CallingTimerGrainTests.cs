@@ -32,7 +32,7 @@ namespace Grains.Tests.Hosted
             await grain.IncrementAsync();
 
             // assert the timer was registered on some silo in the cluster
-            var timer = fixture.TimerRegistries
+            var timer = fixture.TimerRegistryInstances
                 .SelectMany(_ => _.GetAll())
                 .Where(_ => _.Grain.AsReference<ICallingTimerGrain>().Equals(grain))
                 .SingleOrDefault();

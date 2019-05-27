@@ -32,7 +32,7 @@ namespace Grains.Tests.Hosted
             Assert.Equal(0, await grain.GetValueAsync());
 
             // assert the timer was registered on some silo
-            var timer = fixture.TimerRegistries
+            var timer = fixture.TimerRegistryInstances
                 .SelectMany(_ => _.GetAll())
                 .Where(_ => _.Grain.AsReference<ITimerGrain>().Equals(grain))
                 .SingleOrDefault();
