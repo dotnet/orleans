@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Grains.Tests.Hosted.Cluster;
 using Orleans.TestingHost;
 using Xunit;
 

@@ -5,7 +5,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
 
-namespace Grains.Tests.Hosted
+namespace Grains.Tests.Hosted.Fakes
 {
     public class FakeGrainStorage : IGrainStorage
     {
