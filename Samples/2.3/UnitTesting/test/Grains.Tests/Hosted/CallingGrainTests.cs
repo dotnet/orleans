@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Grains.Tests.Hosted.Cluster;
-using Orleans.TestingHost;
 using Xunit;
 
 namespace Grains.Tests.Hosted
@@ -12,11 +11,11 @@ namespace Grains.Tests.Hosted
     [Collection(nameof(ClusterCollection))]
     public class CallingGrainTests
     {
-        private readonly TestCluster cluster;
+        private readonly ClusterFixture fixture;
 
         public CallingGrainTests(ClusterFixture fixture)
         {
-            cluster = fixture.Cluster;
+            this.fixture = fixture;
         }
 
         /// <summary>
@@ -30,7 +29,7 @@ namespace Grains.Tests.Hosted
             var key = Guid.NewGuid().ToString();
 
             // get a new grain from the test host
-            var grain = cluster.GrainFactory.GetGrain<ICallingGrain>(key);
+            var grain = fixture.Cluster.GrainFactory.GetGrain<ICallingGrain>(key);
 
             // increment the value in the grain
             await grain.IncrementAsync();
@@ -39,7 +38,7 @@ namespace Grains.Tests.Hosted
             await grain.PublishAsync();
 
             // assert the summary was called as expected
-            var value = await cluster.GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).TryGetAsync(key);
+            var value = await fixture.Cluster.GrainFactory.GetGrain<ISummaryGrain>(Guid.Empty).TryGetAsync(key);
             Assert.Equal(1, value);
         }
     }
