@@ -59,6 +59,12 @@ namespace Orleans.Configuration
         /// For test use only.  Do not alter from default in production services
         /// </summary>
         public bool EnableWorkerThreadInjection { get; set; } = DEFAULT_ENABLE_WORKER_THREAD_INJECTION;
+
+        /// <summary>
+        /// The period of time after which to log errors for tasks scheduled to stopped activations.
+        /// </summary>
+        public TimeSpan StoppedActivationWarningInterval { get; set; } = TimeSpan.FromMinutes(1);
+
         public const bool DEFAULT_ENABLE_WORKER_THREAD_INJECTION = false;
     }
 }
