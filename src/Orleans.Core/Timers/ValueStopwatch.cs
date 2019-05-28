@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         /// Starts a new instance.
         /// </summary>
         /// <returns>A new, running stopwatch.</returns>
-        public static ValueStopwatch StartNew() => new ValueStopwatch(Stopwatch.GetTimestamp());
+        public static ValueStopwatch StartNew() => new ValueStopwatch(GetTimestamp());
         
         private ValueStopwatch(long timestamp)
         {
@@ -62,6 +62,20 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// Gets the number of ticks in the timer mechanism.
+        /// </summary>
+        /// <returns>The number of ticks in the timer mechanism</returns>
+        public static long GetTimestamp() => Stopwatch.GetTimestamp();
+
+        /// <summary>
+        /// Returns a new, stopped <see cref="ValueStopwatch"/> with the provided start and end timestamps.
+        /// </summary>
+        /// <param name="start">The start timestamp.</param>
+        /// <param name="end">The end timestamp.</param>
+        /// <returns>A new, stopped <see cref="ValueStopwatch"/> with the provided start and end timestamps.</returns>
+        public static ValueStopwatch FromTimestamp(long start, long end) => new ValueStopwatch(-(end - start));
+
+        /// <summary>
         /// Gets the raw counter value for this instance.
         /// </summary>
         /// <remarks> 
@@ -83,7 +97,7 @@ namespace Orleans.Runtime
 
             // Stopwatch is stopped, therefore value is zero or negative.
             // Add the negative value to the current timestamp to start the stopwatch again.
-            var newValue = Stopwatch.GetTimestamp() + timestamp;
+            var newValue = GetTimestamp() + timestamp;
             if (newValue == 0) newValue = 1;
             this.value = newValue;
         }
@@ -91,7 +105,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Restarts this stopwatch, beginning from zero time elapsed.
         /// </summary>
-        public void Restart() => this.value = Stopwatch.GetTimestamp();
+        public void Restart() => this.value = GetTimestamp();
 
         /// <summary>
         /// Stops this stopwatch.
@@ -103,7 +117,7 @@ namespace Orleans.Runtime
             // If already stopped, do nothing.
             if (!this.IsRunning) return;
 
-            var end = Stopwatch.GetTimestamp();
+            var end = GetTimestamp();
             var delta = end - timestamp;
 
             this.value = -delta;
