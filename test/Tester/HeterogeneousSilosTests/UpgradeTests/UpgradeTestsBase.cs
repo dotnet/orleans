@@ -210,7 +210,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
                     legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList(); // Only use primary gw
                     
-                    waitDelay = TestClusterLegacyUtils.GetLivenessStabilizationTime(legacy.ClusterConfiguration.Globals, false);
+                    waitDelay = TimeSpan.FromSeconds(30);
                 });
 
                 this.cluster = builder.Build();
