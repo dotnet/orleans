@@ -9,8 +9,6 @@ namespace Orleans.Runtime.Scheduler
 {
     internal class OrleansSchedulerAsynchAgent : AsynchQueueAgent<IWorkItem>
     {
-        private readonly TaskScheduler scheduler;
-
         private readonly ThreadPoolExecutorOptions.BuilderConfigurator configureExecutorOptionsBuilder;
         
         public OrleansSchedulerAsynchAgent(
@@ -19,11 +17,9 @@ namespace Orleans.Runtime.Scheduler
             int maxDegreeOfParalelism, 
             TimeSpan delayWarningThreshold, 
             TimeSpan turnWarningLengthThreshold,
-            TaskScheduler scheduler,
             bool drainAfterCancel,
             ILoggerFactory loggerFactory) : base(name, executorService, loggerFactory)
         {
-            this.scheduler = scheduler;
             configureExecutorOptionsBuilder = builder => builder
                 .WithDegreeOfParallelism(maxDegreeOfParalelism)
                 .WithDrainAfterCancel(drainAfterCancel)
@@ -49,11 +45,6 @@ namespace Orleans.Runtime.Scheduler
             {
                 RuntimeContext.ResetExecutionContext();
             }
-        }
-
-        protected override void OnEnqueue(IWorkItem request)
-        {
-            base.OnEnqueue(request);
         }
         
         protected override ThreadPoolExecutorOptions.Builder ExecutorOptionsBuilder => configureExecutorOptionsBuilder(base.ExecutorOptionsBuilder);
