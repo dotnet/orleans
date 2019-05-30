@@ -170,7 +170,7 @@ namespace Tester.StreamingTests
         }
 
 
-        [SkippableFact]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5650")]
         public async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
         {
             var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
