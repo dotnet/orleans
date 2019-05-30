@@ -274,6 +274,11 @@ namespace Orleans.Runtime
             return IsSameEndpoint(other) && this.Generation > other.Generation;
         }
 
+        public bool IsPredecessorOf(SiloAddress other)
+        {
+            return IsSameEndpoint(other) && this.Generation < other.Generation;
+        }
+
         // non-generic version of CompareTo is needed by some contexts. Just calls generic version.
         public int CompareTo(object obj)
         {

@@ -301,6 +301,8 @@ namespace Orleans.Runtime.GrainDirectory
 
                 HandoffManager.ProcessSiloAddEvent(silo);
 
+                AdjustLocalDirectory(silo, dead: false);
+
                 if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} added silo {1}", MyAddress, silo);
             }
         }
@@ -334,7 +336,7 @@ namespace Orleans.Runtime.GrainDirectory
                 membershipCache.Remove(silo);
                 membershipRingList.Remove(silo);
 
-                AdjustLocalDirectory(silo);
+                AdjustLocalDirectory(silo, dead: true);
                 AdjustLocalCache(silo);
 
                 if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} removed silo {1}", MyAddress, silo);
@@ -342,15 +344,30 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         /// <summary>
-        /// Adjust local directory following the removal of a silo by dropping all activations located on the removed silo
+        /// Adjust local directory following the addition/removal of a silo
         /// </summary>
-        /// <param name="removedSilo"></param>
-        protected void AdjustLocalDirectory(SiloAddress removedSilo)
+        protected void AdjustLocalDirectory(SiloAddress silo, bool dead)
         {
-            var activationsToRemove = (from pair in DirectoryPartition.GetItems()
-                                       from pair2 in pair.Value.Instances.Where(pair3 => pair3.Value.SiloAddress.Equals(removedSilo))
-                                       select new Tuple<GrainId, ActivationId>(pair.Key, pair2.Key)).ToList();
-            // drop all records of activations located on the removed silo
+            // Determine which activations to remove.
+            var activationsToRemove = new List<(GrainId, ActivationId)>();
+            foreach (var entry in this.DirectoryPartition.GetItems())
+            {
+                var (grain, grainInfo) = (entry.Key, entry.Value);
+                foreach (var instance in grainInfo.Instances)
+                {
+                    var (activationId, activationInfo) = (instance.Key, instance.Value);
+
+                    // Include any activations from dead silos and from predecessors.
+                    var siloIsDead = dead && activationInfo.SiloAddress.Equals(silo);
+                    var siloIsPredecessor = activationInfo.SiloAddress.IsPredecessorOf(silo);
+                    if (siloIsDead || siloIsPredecessor)
+                    {
+                        activationsToRemove.Add((grain, activationId));
+                    }
+                }
+            }
+
+            // Remove all defunct activations.
             foreach (var activation in activationsToRemove)
             {
                 DirectoryPartition.RemoveActivation(activation.Item1, activation.Item2);
