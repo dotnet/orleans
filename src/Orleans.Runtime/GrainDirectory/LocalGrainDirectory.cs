@@ -302,6 +302,7 @@ namespace Orleans.Runtime.GrainDirectory
                 HandoffManager.ProcessSiloAddEvent(silo);
 
                 AdjustLocalDirectory(silo, dead: false);
+                AdjustLocalCache(silo, dead: false);
 
                 if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} added silo {1}", MyAddress, silo);
             }
@@ -337,7 +338,7 @@ namespace Orleans.Runtime.GrainDirectory
                 membershipRingList.Remove(silo);
 
                 AdjustLocalDirectory(silo, dead: true);
-                AdjustLocalCache(silo);
+                AdjustLocalCache(silo, dead: true);
 
                 if (log.IsEnabled(LogLevel.Debug)) log.Debug("Silo {0} removed silo {1}", MyAddress, silo);
             }
@@ -382,8 +383,14 @@ namespace Orleans.Runtime.GrainDirectory
         ///     We don't do that since first cache refresh handles that. 
         ///     Second, since Membership events are not guaranteed to be ordered, we may remove a cache entry that does not really point to a failed silo.
         ///     To do that properly, we need to store for each cache entry who was the directory owner that registered this activation (the original partition owner). 
-        protected void AdjustLocalCache(SiloAddress removedSilo)
+        protected void AdjustLocalCache(SiloAddress silo, bool dead)
         {
+            // For dead silos, remove any activation registered to that silo or one of its predecessors.
+            // For new silos, remove any activation registered to one of its predecessors.
+            Func<Tuple<SiloAddress, ActivationId>, bool> predicate;
+            if (dead) predicate = t => t.Item1.Equals(silo) || t.Item1.IsPredecessorOf(silo);
+            else predicate = t => t.Item1.IsPredecessorOf(silo);
+
             // remove all records of activations located on the removed silo
             foreach (Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int> tuple in DirectoryCache.KeyValues)
             {
@@ -394,7 +401,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 // 1) remove entries that point to activations located on the removed silo
-                RemoveActivations(DirectoryCache, tuple.Item1, tuple.Item2, tuple.Item3, t => t.Item1.Equals(removedSilo));
+                RemoveActivations(DirectoryCache, tuple.Item1, tuple.Item2, tuple.Item3, predicate);
             }
         }
 
