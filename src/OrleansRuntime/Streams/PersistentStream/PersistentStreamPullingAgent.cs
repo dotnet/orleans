@@ -442,7 +442,17 @@ namespace Orleans.Streams
                 if (pubSubCache.TryGetValue(streamId, out streamData))
                 {
                     streamData.RefreshActivity(now);
-                    StartInactiveCursors(streamData, startToken); // if this is an existing stream, start any inactive cursors
+                    if (streamData.StreamRegistered)
+                    {
+                        StartInactiveCursors(streamData,
+                            startToken); // if this is an existing stream, start any inactive cursors 
+                    }
+                    else
+                    {
+                        if (this.logger.IsDebug)
+                            this.logger.Information($"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
+                                $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
+                    }
                 }
                 else
                 {
@@ -477,7 +487,9 @@ namespace Orleans.Streams
             try
             {
                 await RegisterAsStreamProducer(streamId, firstToken);
-            }finally
+                streamData.StreamRegistered = true;
+            }
+            finally
             {
                 // Cleanup the fake pinning cursor.
                 pinCursor?.Dispose();
@@ -684,6 +696,20 @@ namespace Orleans.Streams
             return false;
         }
 
+        private static async Task<ISet<PubSubSubscriptionState>> PubsubRegisterProducer(IStreamPubSub pubSub, StreamId streamId, string streamProviderName,
+           IStreamProducerExtension meAsStreamProducer, Logger logger)
+        {
+            try
+            {
+                var streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
+                return streamData;
+            }
+            catch (Exception e)
+            {
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_17, $"RegisterAsStreamProducer failed due to {e}", e);
+                throw e;
+            }
+        }
         private async Task RegisterAsStreamProducer(StreamId streamId, StreamSequenceToken streamStartToken)
         {
             try
@@ -691,7 +717,16 @@ namespace Orleans.Streams
                 if (pubSub == null) throw new NullReferenceException("Found pubSub reference not set up correctly in RetreaveNewStream");
 
                 IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
-                ISet<PubSubSubscriptionState> streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
+                ISet<PubSubSubscriptionState> streamData = null;
+                await AsyncExecutorWithRetries.ExecuteWithRetries(
+                                async i => {
+                                    streamData =
+                           await PubsubRegisterProducer(pubSub, streamId, streamProviderName, meAsStreamProducer, logger);
+                                },
+                                AsyncExecutorWithRetries.INFINITE_RETRIES,
+                                (exception, i) => !IsShutdown,
+                                Constants.INFINITE_TIMESPAN,
+                                DeliveryBackoffProvider);
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
 
                 var addSubscriptionTasks = new List<Task>(streamData.Count);
