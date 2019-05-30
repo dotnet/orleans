@@ -449,8 +449,8 @@ namespace Orleans.Streams
                     }
                     else
                     {
-                        if (this.logger.IsDebug)
-                            this.logger.Information($"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
+                        if (this.logger.IsVerbose)
+                            this.logger.Verbose($"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
                                 $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
                     }
                 }
