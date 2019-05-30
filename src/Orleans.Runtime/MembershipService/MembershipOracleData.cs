@@ -65,6 +65,7 @@ namespace Orleans.Runtime.MembershipService
         // ONLY access localTableCopy and not the localTable, to prevent races, as this method may be called outside the turn.
         internal SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress)
         {
+            var statuses = localTableCopy;
             var status = SiloStatus.None;
             if (siloAddress.Equals(MyAddress))
             {
@@ -72,13 +73,27 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                if (!localTableCopy.TryGetValue(siloAddress, out status))
+                if (!statuses.TryGetValue(siloAddress, out status))
                 {
                     if (CurrentStatus == SiloStatus.Active)
                         if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Runtime_Error_100209, "-The given siloAddress {0} is not registered in this MembershipOracle.", siloAddress.ToLongString());
+
                     status = SiloStatus.None;
                 }
             }
+
+            if (status == SiloStatus.None)
+            {
+                foreach (var entry in statuses)
+                {
+                    if (entry.Key.IsSuccessorOf(siloAddress))
+                    {
+                        status = SiloStatus.Dead;
+                        break;
+                    }
+                }
+            }
+
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("-GetApproximateSiloStatus returned {0} for silo: {1}", status, siloAddress.ToLongString());
             return status;
         }
