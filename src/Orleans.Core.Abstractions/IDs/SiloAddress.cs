@@ -271,12 +271,12 @@ namespace Orleans.Runtime
 
         public bool IsSuccessorOf(SiloAddress other)
         {
-            return IsSameEndpoint(other) && this.Generation > other.Generation;
+            return IsSameEndpoint(other) && this.Generation != 0 && other.Generation != 0 && this.Generation > other.Generation;
         }
 
         public bool IsPredecessorOf(SiloAddress other)
         {
-            return IsSameEndpoint(other) && this.Generation < other.Generation;
+            return IsSameEndpoint(other) && this.Generation != 0 && other.Generation != 0 && this.Generation < other.Generation;
         }
 
         // non-generic version of CompareTo is needed by some contexts. Just calls generic version.
