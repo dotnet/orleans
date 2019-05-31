@@ -75,7 +75,7 @@ namespace ServiceBus.Tests.StreamingTests
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5647"), TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHMultipleSubscriptionTest_AddRemove()
         {
             this.fixture.Logger.Info("************************ EHMultipleSubscriptionTest_AddRemove *********************************");
@@ -103,7 +103,7 @@ namespace ServiceBus.Tests.StreamingTests
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5653"), TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHTwoIntermitentStreamTest()
         {
             this.fixture.Logger.Info("************************ EHTwoIntermitentStreamTest *********************************");

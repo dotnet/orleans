@@ -90,7 +90,7 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5657")]
         public async Task EHStreamProducerOnDroppedClientTest()
         {
             logger.Info("************************ EHStreamProducerOnDroppedClientTest *********************************");
