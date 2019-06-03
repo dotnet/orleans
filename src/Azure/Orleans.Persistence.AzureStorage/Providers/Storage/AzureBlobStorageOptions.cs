@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 using Microsoft.WindowsAzure.Storage;
@@ -33,6 +33,7 @@ namespace Orleans.Configuration
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
+        public MetadataPropertyHandling? MetadataPropertyHandling { get; set; }
     }
 
     /// <summary>

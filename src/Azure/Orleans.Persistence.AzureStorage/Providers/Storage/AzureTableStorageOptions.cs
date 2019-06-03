@@ -41,6 +41,7 @@ namespace Orleans.Configuration
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
+        public MetadataPropertyHandling? MetadataPropertyHandling { get; set; }
     }
     /// <summary>
     /// Configuration validator for AzureTableStorageOptions

@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
 
@@ -59,6 +59,7 @@ namespace Orleans.Configuration
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
+        public MetadataPropertyHandling? MetadataPropertyHandling { get; set; }
     }
 
     /// <summary>

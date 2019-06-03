@@ -16,6 +16,7 @@ namespace Orleans.Serialization
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public const string IndentJsonProperty = "IndentJSON";
         public const string TypeNameHandlingProperty = "TypeNameHandling";
+        public const string MetadataPropertyHandlingProperty = "MetadataPropertyHandling";
         private readonly Lazy<JsonSerializerSettings> settings;
 
         public OrleansJsonSerializer(IServiceProvider services)
@@ -71,10 +72,11 @@ namespace Orleans.Serialization
             bool useFullAssemblyNames = config.GetBoolProperty(UseFullAssemblyNamesProperty, false);
             bool indentJson = config.GetBoolProperty(IndentJsonProperty, false);
             TypeNameHandling typeNameHandling = config.GetEnumProperty(TypeNameHandlingProperty, settings.TypeNameHandling);
-            return UpdateSerializerSettings(settings, useFullAssemblyNames, indentJson, typeNameHandling);
+            MetadataPropertyHandling metadataPropertyHandling = config.GetEnumProperty(MetadataPropertyHandlingProperty, settings.MetadataPropertyHandling);
+            return UpdateSerializerSettings(settings, useFullAssemblyNames, indentJson, typeNameHandling,metadataPropertyHandling);
         }
 
-        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, bool useFullAssemblyNames, bool indentJson, TypeNameHandling? typeNameHandling)
+        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, bool useFullAssemblyNames, bool indentJson, TypeNameHandling? typeNameHandling, MetadataPropertyHandling? metadataPropertyHandling)
         {
             if (useFullAssemblyNames)
             {
@@ -89,6 +91,10 @@ namespace Orleans.Serialization
             if (typeNameHandling.HasValue)
             {
                 settings.TypeNameHandling = typeNameHandling.Value;
+            }
+            if(metadataPropertyHandling.HasValue)
+            {
+                settings.MetadataPropertyHandling = metadataPropertyHandling.Value;
             }
             return settings;
         }
