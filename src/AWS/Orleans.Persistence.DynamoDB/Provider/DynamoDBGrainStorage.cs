@@ -77,6 +77,7 @@ namespace Orleans.Storage
                 this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(
                     OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory),
                     this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
+                this.options.ConfigureJsonSerializerSettings?.Invoke(this.jsonSettings);
 
                 this.logger.LogInformation((int)ErrorCode.StorageProviderBase, $"AWS DynamoDB Grain Storage {this.name} is initializing: {initMsg}");
 
