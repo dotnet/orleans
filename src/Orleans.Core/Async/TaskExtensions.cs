@@ -102,7 +102,7 @@ namespace Orleans
 
                 if (result is null)
                 {
-                    if (typeof(T).IsValueType)
+                    if (!NullabilityHelper<T>.IsNullableType)
                     {
                         ThrowInvalidTaskResultType(typeof(T));
                     }
@@ -112,6 +112,14 @@ namespace Orleans
 
                 return (T)result;
             }
+        }
+
+        private static class NullabilityHelper<T>
+        {
+            /// <summary>
+            /// True if <typeparamref name="T" /> is an instance of a nullable type (a reference type or <see cref="Nullable{T}"/>), otherwise false.
+            /// </summary>
+            public static readonly bool IsNullableType = !typeof(T).IsValueType || typeof(T).IsConstructedGenericType && typeof(T).GetGenericTypeDefinition() == typeof(Nullable<>);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
