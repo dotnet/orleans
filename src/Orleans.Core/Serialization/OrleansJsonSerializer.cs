@@ -16,7 +16,6 @@ namespace Orleans.Serialization
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public const string IndentJsonProperty = "IndentJSON";
         public const string TypeNameHandlingProperty = "TypeNameHandling";
-        public const string MetadataPropertyHandlingProperty = "MetadataPropertyHandling";
         private readonly Lazy<JsonSerializerSettings> settings;
 
         public OrleansJsonSerializer(IServiceProvider services)
