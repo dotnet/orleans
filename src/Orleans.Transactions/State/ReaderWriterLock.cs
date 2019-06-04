@@ -25,7 +25,6 @@ namespace Orleans.Transactions.State
         // the linked list of lock groups
         // the head is the group that is currently holding the lock
         private LockGroup currentGroup = null;
-        private const int maxGroupSize = 20;
 
         // cache the last known minimum so we don't have to recompute it as much
         private DateTime cachedMin = DateTime.MaxValue;
@@ -405,7 +404,7 @@ namespace Orleans.Transactions.State
 
                     // if we have not found a place to insert this op yet, and there is room, and no conflicts, use this one
                     if (group == null
-                        && pos.FillCount < maxGroupSize
+                        && pos.FillCount < this.options.MaxLockGroupSize
                         && !HasConflict(isRead, DateTime.MaxValue, guid, pos, out var resolvable))
                     {
                         group = pos;
