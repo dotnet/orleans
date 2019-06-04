@@ -90,6 +90,7 @@ namespace Orleans.Serialization
             {
                 settings.TypeNameHandling = typeNameHandling.Value;
             }
+           
             return settings;
         }
 
