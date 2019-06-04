@@ -25,5 +25,8 @@ namespace Orleans.Configuration
         public static int ConfirmationRetryLimit { get; set; } = DefaultConfirmationRetryLimit;
         public const int DefaultConfirmationRetryLimit = 3;
 
+        public int MaxLockGroupSize { get; set; } = DefaultMaxLockGroupSize;
+        public const int DefaultMaxLockGroupSize = 20;
+
     }
 }
