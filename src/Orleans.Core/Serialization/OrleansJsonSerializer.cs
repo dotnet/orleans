@@ -72,11 +72,10 @@ namespace Orleans.Serialization
             bool useFullAssemblyNames = config.GetBoolProperty(UseFullAssemblyNamesProperty, false);
             bool indentJson = config.GetBoolProperty(IndentJsonProperty, false);
             TypeNameHandling typeNameHandling = config.GetEnumProperty(TypeNameHandlingProperty, settings.TypeNameHandling);
-            MetadataPropertyHandling metadataPropertyHandling = config.GetEnumProperty(MetadataPropertyHandlingProperty, settings.MetadataPropertyHandling);
-            return UpdateSerializerSettings(settings, useFullAssemblyNames, indentJson, typeNameHandling,metadataPropertyHandling);
+            return UpdateSerializerSettings(settings, useFullAssemblyNames, indentJson, typeNameHandling, null);
         }
 
-        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, bool useFullAssemblyNames, bool indentJson, TypeNameHandling? typeNameHandling, MetadataPropertyHandling? metadataPropertyHandling)
+        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, bool useFullAssemblyNames, bool indentJson, TypeNameHandling? typeNameHandling, Action<JsonSerializerSettings> configureSettings)
         {
             if (useFullAssemblyNames)
             {
@@ -92,9 +91,9 @@ namespace Orleans.Serialization
             {
                 settings.TypeNameHandling = typeNameHandling.Value;
             }
-            if(metadataPropertyHandling.HasValue)
+            if(configureSettings != null)
             {
-                settings.MetadataPropertyHandling = metadataPropertyHandling.Value;
+                configureSettings(settings);
             }
             return settings;
         }
