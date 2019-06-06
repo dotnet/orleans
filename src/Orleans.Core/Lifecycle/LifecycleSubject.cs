@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
@@ -60,7 +60,7 @@ namespace Orleans
             {
                 string error = $"Lifecycle start canceled due to errors at stage {this.highStage}";
                 this.logger?.Error(ErrorCode.LifecycleStartFailure, error, ex);
-                throw new OrleansLifecycleCanceledException(error, ex);
+                throw;
             }
         }
 
