@@ -29,7 +29,7 @@ namespace Orleans.Configuration
         /// The number of seconds to periodically probe other silos for their liveness or for the silo to send "I am alive" heartbeat  messages about itself.
         /// </summary>
         public TimeSpan ProbeTimeout { get; set; } = DEFAULT_LIVENESS_PROBE_TIMEOUT;
-        public static readonly TimeSpan DEFAULT_LIVENESS_PROBE_TIMEOUT = TimeSpan.FromSeconds(10);
+        public static readonly TimeSpan DEFAULT_LIVENESS_PROBE_TIMEOUT = TimeSpan.FromSeconds(5);
 
         /// <summary>
         /// The number of seconds to periodically fetch updates from the membership table.
