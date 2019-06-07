@@ -2,6 +2,8 @@ using System;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -76,12 +78,29 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private ClusterMembershipSnapshot Create(MembershipTableSnapshot table) => ClusterMembershipSnapshot.Create(this.localSilo.SiloAddress, table);
+        private ClusterMembershipSnapshot Create(MembershipTableSnapshot table) => ClusterMembershipSnapshot.Create(table);
 
         public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, this);
 
         public Task OnStart(CancellationToken ct)
         {
+            IntValueStatistic.FindOrCreate(StatisticNames.MEMBERSHIP_ACTIVE_CLUSTER_SIZE, () => this.CurrentMembership.Members.Count);
+            StringValueStatistic.FindOrCreate(
+                StatisticNames.MEMBERSHIP_ACTIVE_CLUSTER,
+                () =>
+                {
+                    var list = new List<string>();
+                    foreach (var item in this.CurrentMembership.Members)
+                    {
+                        var entry = item.Value;
+                        if (entry.Status != SiloStatus.Active) continue;
+                        list.Add(entry.SiloAddress.ToLongString());
+                    }
+
+                    list.Sort();
+                    return Utils.EnumerableToString(list);
+                });
+
             this.processUpdatesTask = this.ProcessUpdates();
             return Task.CompletedTask;
         }

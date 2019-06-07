@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -17,10 +18,11 @@ namespace Orleans.Runtime.MembershipService
         private readonly IInternalGrainFactory grainFactory;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IMembershipTable membershipTableProvider;
-        private readonly MembershipOracleData membershipOracleData;
+        private readonly MembershipTableCache tableCache;
         private readonly ILogger log;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
-        private SiloAddress MyAddress => this.membershipOracleData.MyAddress;
+        private readonly DateTime siloStartTime = DateTime.UtcNow;
+        private SiloAddress MyAddress => this.tableCache.MyAddress;
         private GrainTimer timerGetTableUpdates;
 
         private const int NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS = -1; // unlimited
@@ -32,7 +34,7 @@ namespace Orleans.Runtime.MembershipService
         private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
         private readonly ILogger timerLogger;
 
-        private SiloStatus CurrentStatus => this.membershipOracleData.CurrentStatus;  // current status of this silo.
+        private SiloStatus CurrentStatus => this.tableCache.CurrentStatus;  // current status of this silo.
         private readonly ChangeFeedSource<MembershipTableSnapshot> membershipTableUpdates;
         private MembershipTableSnapshot membershipTableSnapshot;
 
@@ -47,7 +49,6 @@ namespace Orleans.Runtime.MembershipService
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IMembershipTable membershipTable,
             IInternalGrainFactory grainFactory,
-            IOptions<MultiClusterOptions> multiClusterOptions,
             ILogger<MembershipTableManager> log,
             ILoggerFactory loggerFactory)
             : base(Constants.MembershipOracleId, localSiloDetails.SiloAddress, loggerFactory)
@@ -58,7 +59,7 @@ namespace Orleans.Runtime.MembershipService
             this.grainFactory = grainFactory;
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
             this.log = log;
-            this.membershipOracleData = new MembershipOracleData(localSiloDetails, log, multiClusterOptions.Value);
+            this.tableCache = new MembershipTableCache(localSiloDetails);
             
             var backOffMax = StandardExtensions.Max(EXP_BACKOFF_STEP.Multiply(this.clusterMembershipOptions.ExpectedClusterSize), SiloMessageSender.CONNECTION_RETRY_DELAY.Multiply(2));
             EXP_BACKOFF_CONTENTION_MAX = backOffMax;
@@ -107,7 +108,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                log.Info(ErrorCode.MembershipStarting, "MembershipOracle starting on host = " + membershipOracleData.MyHostname + " address = " + MyAddress.ToLongString() + " at " + LogFormatter.PrintDate(membershipOracleData.SiloStartTime) + ", backOffMax = " + EXP_BACKOFF_CONTENTION_MAX);
+                log.Info(ErrorCode.MembershipStarting, "MembershipOracle starting on host = " + this.localSiloDetails.DnsHostName + " address = " + MyAddress.ToLongString() + " at " + LogFormatter.PrintDate(this.siloStartTime) + ", backOffMax = " + EXP_BACKOFF_CONTENTION_MAX);
 
                 // Init the membership table.
                 await this.membershipTableProvider.InitializeMembershipTable(true);
@@ -130,7 +131,7 @@ namespace Orleans.Runtime.MembershipService
                 await this.ProcessTableUpdate(table, nameof(Start));
 
                 // read the table and look for my node migration occurrences
-                DetectNodeMigration(table, membershipOracleData.MyHostname);
+                DetectNodeMigration(table, this.localSiloDetails.DnsHostName);
             }
             catch (Exception exc)
             {
@@ -305,7 +306,7 @@ namespace Orleans.Runtime.MembershipService
                 if (ok)
                 {
                     if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Silo {0} Successfully updated my Status in the Membership table to {1}", MyAddress.ToLongString(), status);
-                    membershipOracleData.UpdateMyStatusLocal(status);
+                    tableCache.UpdateMyStatusLocal(status);
                     if (status == SiloStatus.Stopping || status == SiloStatus.ShuttingDown || status == SiloStatus.Dead)
                     {
                         try
@@ -363,7 +364,7 @@ namespace Orleans.Runtime.MembershipService
                 var myTuple = table.Get(MyAddress);
                 myEntry = myTuple.Item1;
                 myEtag = myTuple.Item2;
-                myEntry.TryUpdateStartTime(membershipOracleData.SiloStartTime);
+                myEntry.TryUpdateStartTime(this.siloStartTime);
                 if (myEntry.Status == SiloStatus.Dead) // check if the table already knows that I am dead
                 {
                     var msg = string.Format("I should be Dead according to membership table (in TryUpdateMyStatusGlobalOnce): myEntry = {0}.", myEntry.ToFullString());
@@ -374,7 +375,25 @@ namespace Orleans.Runtime.MembershipService
             }
             else // first write attempt of this silo. Insert instead of Update.
             {
-                myEntry = membershipOracleData.CreateNewMembershipEntry(newStatus);
+                var assy = Assembly.GetEntryAssembly() ?? typeof(MembershipTableCache).Assembly;
+                var roleName = assy.GetName().Name;
+
+                myEntry = new MembershipEntry
+                {
+                    SiloAddress = this.localSiloDetails.SiloAddress,
+
+                    HostName = this.localSiloDetails.DnsHostName,
+                    SiloName = this.localSiloDetails.Name,
+
+                    Status = newStatus,
+                    ProxyPort = this.localSiloDetails.GatewayAddress?.Endpoint?.Port ?? 0,
+
+                    RoleName = roleName,
+
+                    SuspectTimes = new List<Tuple<SiloAddress, DateTime>>(),
+                    StartTime = this.siloStartTime,
+                    IAmAliveTime = DateTime.UtcNow
+                };
             }
 
             var now = DateTime.UtcNow;
@@ -422,10 +441,11 @@ namespace Orleans.Runtime.MembershipService
                 // just eat the exception.
             }
 
+            this.tableCache.Update(table);
+
             // Update the current membership snapshot.
             MembershipTableSnapshot previous;
             var updated = MembershipTableSnapshot.Create(this.localSiloDetails, table);
-
             do
             {
                 previous = this.membershipTableSnapshot;
@@ -451,25 +471,13 @@ namespace Orleans.Runtime.MembershipService
                 }
             } while (!this.membershipTableUpdates.TryPublish(updated));
 
-            bool localViewChanged = false;
             LogMissedIAmAlives(table);
 
-            // only process the table if in the active or ShuttingDown state. In other states I am not ready yet.
-            if (IsFunctionalForMembership(CurrentStatus))
-            {
-                foreach (var entry in table.Members.Select(tuple => tuple.Item1))
-                {
-                    if (!entry.SiloAddress.Endpoint.Equals(MyAddress.Endpoint))
-                    {
-                        bool changed = membershipOracleData.TryUpdateStatusAndNotify(entry);
-                        localViewChanged = localViewChanged || changed;
-                    }
-                }
-            }
-
-            if (localViewChanged) log.Info(ErrorCode.MembershipReadAll_2,
-                "-ReadAll (called from {0}, after local view changed, with removed duplicate deads) Membership table: {1}",
-                caller, table.WithoutDuplicateDeads().ToString());
+            this.log.Info(
+                ErrorCode.MembershipReadAll_2,
+                "-ReadAll (called from {0}, with removed duplicate deads) Membership table: {1}",
+                caller,
+                table.WithoutDuplicateDeads().ToString());
         }
 
         private void LogMissedIAmAlives(MembershipTableData table)
@@ -567,7 +575,7 @@ namespace Orleans.Runtime.MembershipService
             bool alreadyStopping = CurrentStatus.IsTerminating();
 
             DisposeTimers();
-            membershipOracleData.UpdateMyStatusLocal(SiloStatus.Dead);
+            tableCache.UpdateMyStatusLocal(SiloStatus.Dead);
 
             if (!alreadyStopping || !this.clusterMembershipOptions.IsRunningAsUnitTest)
             {
@@ -586,7 +594,7 @@ namespace Orleans.Runtime.MembershipService
             if (!this.clusterMembershipOptions.UseLivenessGossip) return Task.CompletedTask;
             var tasks = new List<Task>();
             // spread the rumor that some silo has just been marked dead
-            foreach (var silo in membershipOracleData.GetSiloStatuses(IsFunctionalForMembership, false).Keys)
+            foreach (var silo in tableCache.GetSiloStatuses(IsFunctionalForMembership, false).Keys)
             {
                 if (log.IsEnabled(LogLevel.Trace)) log.Trace("-Sending status update GOSSIP notification about silo {0}, status {1}, to silo {2}", updatedSilo.ToLongString(), updatedStatus, silo.ToLongString());
                 var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
@@ -684,7 +692,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             // handle the corner case when the number of active silos is very small (then my only vote is enough)
-            int activeSilos = membershipOracleData.GetSiloStatuses(status => status == SiloStatus.Active, true).Count;
+            int activeSilos = table.GetSiloStatuses(status => status == SiloStatus.Active, true, this.localSiloDetails.SiloAddress).Count;
             // find if I have already voted
             int myVoteIndex = freshVotes.FindIndex(voter => MyAddress.Equals(voter.Item1));
 

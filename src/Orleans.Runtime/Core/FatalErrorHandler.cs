@@ -1,8 +1,8 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
-namespace Orleans.Runtime.MembershipService
+namespace Orleans.Runtime
 {
     internal class FatalErrorHandler : IFatalErrorHandler
     {

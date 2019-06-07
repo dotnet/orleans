@@ -251,7 +251,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                     result = MembershipHelper.DeterministicBalancedChoice(
                         activeSilos,
                         this.maxMultiClusterGateways,
-                       (SiloAddress a) => new MembershipOracleData.UpdateFaultCombo(currentMembership.Entries[a]),
+                       (SiloAddress a) => new UpdateFaultCombo(currentMembership.Entries[a]),
                        logger);
                 }
 

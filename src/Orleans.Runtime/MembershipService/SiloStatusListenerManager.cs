@@ -81,6 +81,7 @@ namespace Orleans.Runtime.MembershipService
 
         private void NotifyObservers(ClusterMembershipUpdate update)
         {
+            if (!update.HasChanges) return;
             foreach (var change in update.Changes)
             {
                 foreach (var listener in this.listeners)

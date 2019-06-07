@@ -144,6 +144,7 @@ namespace UnitTests.Grains
 
         public async Task PingOtherSiloAsync()
         {
+            await Task.Delay(TimeSpan.FromSeconds(5));
             logger.Info("IEchoGrainAsync.PingOtherSilo");
             SiloAddress mySilo = Data.Address.Silo;
 

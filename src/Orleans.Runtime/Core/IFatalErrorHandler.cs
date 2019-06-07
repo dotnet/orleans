@@ -1,6 +1,6 @@
-﻿using System;
+using System;
 
-namespace Orleans.Runtime.MembershipService
+namespace Orleans.Runtime
 {
     internal interface IFatalErrorHandler
     {

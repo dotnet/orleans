@@ -230,6 +230,19 @@ namespace Orleans
             all.AddRange(Members.Where(item => item.Item1.Status != SiloStatus.Dead));
             return new MembershipTableData(all, Version);
         }
+
+        internal Dictionary<SiloAddress, SiloStatus> GetSiloStatuses(Func<SiloStatus, bool> filter, bool includeMyself, SiloAddress myAddress)
+        {
+            var result = new Dictionary<SiloAddress, SiloStatus>();
+            foreach (var memberEntry in this.Members)
+            {
+                var entry = memberEntry.Item1;
+                if (!includeMyself && entry.SiloAddress.Equals(myAddress)) continue;
+                if (filter(entry.Status)) result[entry.SiloAddress] = entry.Status;
+            }
+
+            return result;
+        }
     }
 
     [Serializable]
