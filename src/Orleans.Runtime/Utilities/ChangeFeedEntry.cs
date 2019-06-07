@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
-    public abstract class ChangeFeedEntry<T>
+    internal abstract class ChangeFeedEntry<T>
     {
         public abstract bool HasValue { get; }
 

@@ -14,10 +14,6 @@ namespace Orleans.Runtime.MembershipService
     /// </summary>
     internal class MembershipAgent : ILifecycleParticipant<ISiloLifecycle>
     {
-        // Subscribe to membership table updates, listen for death declarations about this silo, kill local silo when declared dead (if not shutting down).
-        // Subscribe to silo lifecycle, reflect changes in membership table.
-        // Periodically update IAmAlive row in table.
-
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly MembershipTableManager tableManager;
         private readonly ClusterHealthMonitor clusterHealthMonitor;
@@ -26,7 +22,6 @@ namespace Orleans.Runtime.MembershipService
         private readonly ClusterMembershipOptions clusterMembershipOptions;
         private readonly ILogger<MembershipAgent> log;
         private readonly int updateLivenessPeriodMilliseconds;
-        private SiloStatus expectedStatus;
 
         public MembershipAgent(
             MembershipTableManager tableManager,
@@ -44,9 +39,7 @@ namespace Orleans.Runtime.MembershipService
             this.updateLivenessPeriodMilliseconds = (int)this.clusterMembershipOptions.IAmAliveTablePublishTimeout.TotalMilliseconds;
             this.log = log;
         }
-
-        public SiloStatus ExpectedStatus => this.expectedStatus;
-                
+        
         private async Task ProcessMembershipUpdates()
         {
             var cancellationTask = this.cancellation.Token.WhenCancelled();
@@ -61,7 +54,7 @@ namespace Orleans.Runtime.MembershipService
 
                     // Handle graceful termination.
                     var task = await Task.WhenAny(next, cancellationTask);
-                    if (this.expectedStatus.IsTerminating() || ReferenceEquals(task, cancellationTask)) break;
+                    if (this.tableManager.CurrentStatus.IsTerminating() || ReferenceEquals(task, cancellationTask)) break;
 
                     current = next.GetAwaiter().GetResult();
 
@@ -79,7 +72,7 @@ namespace Orleans.Runtime.MembershipService
                     }
 
                     // Check to see if this silo has been declared dead.
-                    if (entry.Status == SiloStatus.Dead && !this.expectedStatus.IsTerminating())
+                    if (entry.Status == SiloStatus.Dead && !this.tableManager.CurrentStatus.IsTerminating())
                     {
                         var message = $"{OrleansSiloDeclaredDeadException.BaseMessage} Membership record: {entry.ToFullString()}";
                         this.log.LogError((int)ErrorCode.MembershipKillMyselfLocally, message);
@@ -116,7 +109,7 @@ namespace Orleans.Runtime.MembershipService
 
                     // Handle graceful termination.
                     var task = await Task.WhenAny(next, cancellationTask);
-                    if (this.expectedStatus.IsTerminating() || ReferenceEquals(task, cancellationTask)) break;
+                    if (this.tableManager.CurrentStatus.IsTerminating() || ReferenceEquals(task, cancellationTask)) break;
 
                     var snapshot = this.tableManager.MembershipTableSnapshot;
 
@@ -162,30 +155,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (this.clusterMembershipOptions.ValidateInitialConnectivity)
             {
-                var silos = new List<SiloAddress>();
-                var now = DateTime.UtcNow;
-                foreach (var item in this.tableManager.MembershipTableSnapshot.Entries)
-                {
-                    var entry = item.Value;
-                    if (entry.Status != SiloStatus.Active) continue;
-                    if (entry.SiloAddress.Endpoint.Equals(this.localSilo.SiloAddress.Endpoint)) continue;
-                    if (entry.HasMissedIAmAlivesSince(this.clusterMembershipOptions, now) != default) continue;
-
-                    silos.Add(entry.SiloAddress);
-                }
-
-                var failedSilos = await this.clusterHealthMonitor.CheckClusterConnectivity(silos.ToArray());
-                var successfulSilos = silos.Where(s => !failedSilos.Contains(s));
-
-                this.log.LogError(
-                    (int)ErrorCode.MembershipJoiningPreconditionFailure,
-                    "Failed to get ping responses from {FailedCount} of {ActiveCount} active silos. "
-                    + "Newly joining silos validate connectivity with all active silos that have recently updated their 'I Am Alive' value before joining the cluster."
-                    + "Active silos are: {ActiveSilos}. Silos which did not respond successfully are: {FailedSilos}",
-                    failedSilos.Count,
-                    silos.Count,
-                    Utils.EnumerableToString(successfulSilos),
-                    Utils.EnumerableToString(failedSilos));
+                await this.ValidateInitialConnectivity();
             }
             else
             {
@@ -196,7 +166,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                await this.tableManager.UpdateMyStatusGlobal(SiloStatus.Active);
+                await this.UpdateStatus(SiloStatus.Active);
                 this.log.LogInformation(
                     (int)ErrorCode.MembershipFinishBecomeActive,
                     "-Finished BecomeActive.");
@@ -208,6 +178,42 @@ namespace Orleans.Runtime.MembershipService
                     "BecomeActive failed: {Exception}",
                     exception);
                 throw;
+            }
+        }
+
+        private async Task ValidateInitialConnectivity()
+        {
+            var activeSilos = new List<SiloAddress>();
+            var now = DateTime.UtcNow;
+            foreach (var item in this.tableManager.MembershipTableSnapshot.Entries)
+            {
+                var entry = item.Value;
+                if (entry.Status != SiloStatus.Active) continue;
+                if (entry.SiloAddress.Endpoint.Equals(this.localSilo.SiloAddress.Endpoint)) continue;
+                if (entry.HasMissedIAmAlivesSince(this.clusterMembershipOptions, now) != default) continue;
+
+                activeSilos.Add(entry.SiloAddress);
+            }
+
+            var failedSilos = await this.clusterHealthMonitor.CheckClusterConnectivity(activeSilos.ToArray());
+            var successfulSilos = activeSilos.Where(s => !failedSilos.Contains(s));
+
+            if (failedSilos.Count > 0)
+            {
+                this.log.LogError(
+                    (int)ErrorCode.MembershipJoiningPreconditionFailure,
+                    "Failed to get ping responses from {FailedCount} of {ActiveCount} active silos. "
+                    + "Newly joining silos validate connectivity with all active silos that have recently updated their 'I Am Alive' value before joining the cluster."
+                    + "Successfully contacted: {SuccessfulSilos}. Silos which did not respond successfully are: {FailedSilos}",
+                    failedSilos.Count,
+                    activeSilos.Count,
+                    Utils.EnumerableToString(successfulSilos),
+                    Utils.EnumerableToString(failedSilos));
+
+                var msg = $"Failed to get ping responses from {failedSilos.Count} of {activeSilos.Count} active silos. "
+                    + "Newly joining silos validate connectivity with all active silos that have recently updated their 'I Am Alive' value before joining the cluster."
+                    + $"Successfully contacted: {Utils.EnumerableToString(successfulSilos)}. Failed to get response from: {Utils.EnumerableToString(failedSilos)}";
+                this.fatalErrorHandler.OnFatalException(this, nameof(ValidateInitialConnectivity), new OrleansClusterConnectivityCheckFailedException(msg));
             }
         }
 
@@ -271,7 +277,6 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task UpdateStatus(SiloStatus status)
         {
-            this.expectedStatus = status;
             await this.tableManager.UpdateMyStatusGlobal(status);
         }
 

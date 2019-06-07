@@ -9,36 +9,33 @@ namespace Orleans.Runtime.MembershipService
     internal class SiloStatusOracleCompatibilityShim : IMembershipOracle
     {
         private readonly ILocalSiloDetails localSiloDetails;
-        private readonly MembershipService membershipService;
-        private readonly MembershipAgent membershipAgent;
+        private readonly MembershipTableManager membershipTableManager;
         private readonly SiloStatusListenerManager listenerManager;
         private readonly ILogger log;
         private readonly object cacheUpdateLock = new object();
-        private ClusterMembershipSnapshot cachedSnapshot;
+        private MembershipTableSnapshot cachedSnapshot;
         private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
         private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
 
         public SiloStatusOracleCompatibilityShim(
             ILocalSiloDetails localSiloDetails,
-            MembershipService membershipService,
-            MembershipAgent membershipAgent,
+            MembershipTableManager membershipTableManager,
             ILoggerFactory loggerFactory,
             SiloStatusListenerManager listenerManager)
         {
             this.localSiloDetails = localSiloDetails;
-            this.membershipService = membershipService;
-            this.membershipAgent = membershipAgent;
+            this.membershipTableManager = membershipTableManager;
             this.listenerManager = listenerManager;
             this.log = loggerFactory.CreateLogger("MembershipOracle");
         }
 
-        public SiloStatus CurrentStatus => this.membershipAgent.ExpectedStatus;
+        public SiloStatus CurrentStatus => this.membershipTableManager.CurrentStatus;
         public string SiloName => this.localSiloDetails.Name;
         public SiloAddress SiloAddress => this.localSiloDetails.SiloAddress;
         
         public SiloStatus GetApproximateSiloStatus(SiloAddress silo)
         {
-            var status = this.membershipService.CurrentMembership.GetSiloStatus(silo);
+            var status = this.membershipTableManager.MembershipTableSnapshot.GetSiloStatus(silo);
 
             if (status == SiloStatus.None)
             {
@@ -53,14 +50,14 @@ namespace Orleans.Runtime.MembershipService
 
         public Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false)
         {
-            if (ReferenceEquals(this.cachedSnapshot, this.membershipService.CurrentMembership))
+            if (ReferenceEquals(this.cachedSnapshot, this.membershipTableManager.MembershipTableSnapshot))
             {
                 return onlyActive ? this.siloStatusCacheOnlyActive : this.siloStatusCache;
             }
 
             lock (this.cacheUpdateLock)
             {
-                var currentMembership = this.membershipService.CurrentMembership;
+                var currentMembership = this.membershipTableManager.MembershipTableSnapshot;
                 if (ReferenceEquals(this.cachedSnapshot, currentMembership))
                 {
                     return onlyActive ? this.siloStatusCacheOnlyActive : this.siloStatusCache;
@@ -68,7 +65,7 @@ namespace Orleans.Runtime.MembershipService
 
                 var newSiloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
                 var newSiloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
-                foreach (var entry in currentMembership.Members)
+                foreach (var entry in currentMembership.Entries)
                 {
                     var silo = entry.Key;
                     var status = entry.Value.Status;
@@ -102,10 +99,10 @@ namespace Orleans.Runtime.MembershipService
 
         public bool TryGetSiloName(SiloAddress siloAddress, out string siloName)
         {
-            var snapshot = this.membershipService.CurrentMembership.Members;
+            var snapshot = this.membershipTableManager.MembershipTableSnapshot.Entries;
             if (snapshot.TryGetValue(siloAddress, out var entry))
             {
-                siloName = entry.Name;
+                siloName = entry.SiloName;
                 return true;
             }
 

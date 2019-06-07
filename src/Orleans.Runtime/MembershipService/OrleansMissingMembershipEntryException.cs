@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 
 namespace Orleans.Runtime.MembershipService
 {
+    [Serializable]
     public class OrleansMissingMembershipEntryException : OrleansException
     {
         public OrleansMissingMembershipEntryException() : base("Membership table does not contain information an entry for this silo.") { }

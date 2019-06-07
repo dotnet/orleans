@@ -22,7 +22,6 @@ using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 using Orleans.Streams;
-using Orleans.Transactions;
 using Orleans.Runtime.Versions;
 using Orleans.Versions;
 using Orleans.ApplicationParts;
@@ -307,7 +306,7 @@ namespace Orleans.Runtime
             logger.Debug("Creating {0} System Target", "MembershipOracle");
             if (this.membershipService is SystemTarget)
             {
-                RegisterSystemTarget((SystemTarget)membershipService);
+                RegisterSystemTarget((SystemTarget)this.membershipService);
             }
 
             if (multiClusterOracle != null && multiClusterOracle is SystemTarget)

@@ -293,7 +293,6 @@ namespace Orleans
         /// </summary>
         public DateTime IAmAliveTime { get; set; }
         
-
         private static readonly List<Tuple<SiloAddress, DateTime>> EmptyList = new List<Tuple<SiloAddress, DateTime>>(0);
 
         public void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
@@ -305,23 +304,24 @@ namespace Orleans
             SuspectTimes.Add(suspector);
         }
 
-        // partialUpdate arrivies via gossiping with other oracles. In such a case only take the status.
-        internal void Update(MembershipEntry updatedSiloEntry)
+        internal MembershipEntry WithStatus(SiloStatus status)
         {
-            SiloAddress = updatedSiloEntry.SiloAddress;
-            Status = updatedSiloEntry.Status;
-            //---
-            HostName = updatedSiloEntry.HostName;
-            ProxyPort = updatedSiloEntry.ProxyPort;
+            return new MembershipEntry
+            {
+                SiloAddress = this.SiloAddress,
+                Status = status,
+                HostName = this.HostName,
+                ProxyPort = this.ProxyPort,
 
-            RoleName = updatedSiloEntry.RoleName;
-            SiloName = updatedSiloEntry.SiloName;
-            UpdateZone = updatedSiloEntry.UpdateZone;
-            FaultZone = updatedSiloEntry.FaultZone;
+                RoleName = this.RoleName,
+                SiloName = this.SiloName,
+                UpdateZone = this.UpdateZone,
+                FaultZone = this.FaultZone,
 
-            SuspectTimes = updatedSiloEntry.SuspectTimes;
-            StartTime = updatedSiloEntry.StartTime;
-            IAmAliveTime = updatedSiloEntry.IAmAliveTime;
+                SuspectTimes = this.SuspectTimes,
+                StartTime = this.StartTime,
+                IAmAliveTime = this.IAmAliveTime,
+            };
         }
 
         internal List<Tuple<SiloAddress, DateTime>> GetFreshVotes(DateTime now, TimeSpan expiration)

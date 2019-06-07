@@ -5,35 +5,16 @@ namespace Orleans.Runtime.MembershipService
     internal sealed class MembershipTableSnapshot
     {
         public MembershipTableSnapshot(
-            ILocalSiloDetails localSilo,
+            MembershipEntry localSilo,
             MembershipVersion version,
             ImmutableDictionary<SiloAddress, MembershipEntry> entries)
         {
             this.LocalSilo = localSilo;
             this.Version = version;
             this.Entries = entries;
-
-            var statuses = ImmutableDictionary.CreateBuilder<SiloAddress, SiloStatus>();
-            var activeStatuses = ImmutableDictionary.CreateBuilder<SiloAddress, SiloStatus>();
-            var names = ImmutableDictionary.CreateBuilder<SiloAddress, string>();
-            foreach (var item in entries)
-            {
-                var entry = item.Value;
-                statuses.Add(item.Key, entry.Status);
-                if (entry.Status == SiloStatus.Active)
-                {
-                    activeStatuses.Add(item.Key, entry.Status);
-                }
-
-                names.Add(item.Key, entry.SiloName);
-            }
-
-            this.localTableCopy = statuses.ToImmutable();
-            this.localTableCopyOnlyActive = activeStatuses.ToImmutable();
-            this.localNamesTableCopy = names.ToImmutable();
         }
 
-        public static MembershipTableSnapshot Create(ILocalSiloDetails localSilo, MembershipTableData table)
+        public static MembershipTableSnapshot Create(MembershipEntry localSiloEntry, MembershipTableData table)
         {
             var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
             foreach (var item in table.Members)
@@ -42,29 +23,40 @@ namespace Orleans.Runtime.MembershipService
                 entries.Add(entry.SiloAddress, entry);
             }
 
+            if (entries.TryGetValue(localSiloEntry.SiloAddress, out var existing))
+            {
+                entries[localSiloEntry.SiloAddress] = existing.WithStatus(localSiloEntry.Status);
+            }
+            else
+            {
+                entries[localSiloEntry.SiloAddress] = localSiloEntry;
+            }
+
             var version = new MembershipVersion(table.Version.Version);
-            return new MembershipTableSnapshot(localSilo, version, entries.ToImmutable());
+            return new MembershipTableSnapshot(localSiloEntry, version, entries.ToImmutable());
         }
 
-        public ILocalSiloDetails LocalSilo { get; }
-
+        public MembershipEntry LocalSilo { get; }
         public MembershipVersion Version { get; }
-
         public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; }
 
-        /// <summary>
-        /// A cached copy of a local table, including current silo, for fast access.
-        /// </summary>
-        public ImmutableDictionary<SiloAddress, SiloStatus> localTableCopy { get; }
+        public SiloStatus GetSiloStatus(SiloAddress silo)
+        {
+            var status = this.Entries.TryGetValue(silo, out var entry) ? entry.Status : SiloStatus.None;
+            if (status == SiloStatus.None)
+            {
+                foreach (var member in this.Entries)
+                {
+                    if (member.Key.IsSuccessorOf(silo))
+                    {
+                        status = SiloStatus.Dead;
+                        break;
+                    }
+                }
+            }
 
-        /// <summary>
-        /// A cached copy of a local table, for fast access, including only active nodes and current silo (if active).
-        /// </summary>
-        public ImmutableDictionary<SiloAddress, SiloStatus> localTableCopyOnlyActive { get; }
+            return status;
+        }
 
-        /// <summary>
-        /// A copy of a map from SiloAddress to Silo Name for fast access.
-        /// </summary>
-        public ImmutableDictionary<SiloAddress, string> localNamesTableCopy { get; }
     }
 }

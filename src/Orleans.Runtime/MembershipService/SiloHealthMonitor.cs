@@ -11,7 +11,7 @@ namespace Orleans.Runtime.MembershipService
     internal class SiloHealthMonitor
     {
         private readonly ILogger log;
-        private readonly IInternalGrainFactory grainFactory;
+        private readonly MembershipOracle membershipOracle;
 
         /// <summary>
         /// The number of failed probes since the last successful probe.
@@ -21,10 +21,10 @@ namespace Orleans.Runtime.MembershipService
         public SiloHealthMonitor(
             SiloAddress siloAddress,
             ILoggerFactory loggerFactory,
-            IInternalGrainFactory grainFactory)
+            MembershipOracle membershipOracle)
         {
             this.SiloAddress = siloAddress;
-            this.grainFactory = grainFactory;
+            this.membershipOracle = membershipOracle;
             this.log = loggerFactory.CreateLogger($"{nameof(SiloHealthMonitor)}/{this.SiloAddress}");
         }
 
@@ -42,34 +42,14 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                await this.SendPing(probeNumber);
+                if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Going to send Ping #{ProbeNumber} to probe silo {Silo}", probeNumber, this.SiloAddress);
+                await this.membershipOracle.ProbeRemoteSilo(this.SiloAddress, probeNumber);
                 return this.RecordSuccess(probeNumber);
             }
             catch (Exception exception)
             {
                 return this.RecordFailure(probeNumber, exception);
             }
-        }
-
-        private Task SendPing(int probeNumber)
-        {
-            if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Going to send Ping #{ProbeNumber} to probe silo {Silo}", probeNumber, this.SiloAddress);
-            Task pingTask;
-            try
-            {
-                RequestContext.Set(RequestContext.PING_APPLICATION_HEADER, true);
-                var remoteSilo = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, this.SiloAddress);
-                pingTask = remoteSilo.Ping(probeNumber);
-
-                // Update stats counters -- only count Pings that were successfuly sent [but not necessarily replied to]
-                MessagingStatisticsGroup.OnPingSend(this.SiloAddress);
-            }
-            finally
-            {
-                RequestContext.Remove(RequestContext.PING_APPLICATION_HEADER);
-            }
-
-            return pingTask;
         }
 
         private int RecordSuccess(int probeNumber)
