@@ -26,24 +26,7 @@ namespace Orleans.Runtime.MembershipService
                 this.CurrentStatus = status;
             }
         }
-
-        internal Dictionary<SiloAddress, SiloStatus> GetSiloStatuses(Func<SiloStatus, bool> filter, bool includeMyself)
-        {
-            var cached = this.table;
-            if (cached == null)
-            {
-                var status = this.CurrentStatus;
-                if (includeMyself && filter(status))
-                {
-                    return new Dictionary<SiloAddress, SiloStatus> { [this.MyAddress] = status };
-                }
-
-                return new Dictionary<SiloAddress, SiloStatus>();
-            }
-
-            return this.table.GetSiloStatuses(filter, includeMyself, this.MyAddress);
-        }
-
+        
         internal bool Update(MembershipTableData updated)
         {
             lock (this.updateLock)
