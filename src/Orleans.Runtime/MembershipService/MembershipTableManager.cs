@@ -375,7 +375,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else // first write attempt of this silo. Insert instead of Update.
             {
-                var assy = Assembly.GetEntryAssembly() ?? typeof(MembershipTableCache).Assembly;
+                var assy = Assembly.GetEntryAssembly() ?? typeof(MembershipTableManager).Assembly;
                 var roleName = assy.GetName().Name;
 
                 myEntry = new MembershipEntry
