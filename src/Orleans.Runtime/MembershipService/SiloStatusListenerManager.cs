@@ -9,18 +9,19 @@ namespace Orleans.Runtime.MembershipService
 {
     internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener> listeners = new ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener>(ReferenceEqualsComparer<ISiloStatusListener>.Instance);
+        private readonly ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener> listeners
+            = new ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener>(ReferenceEqualsComparer<ISiloStatusListener>.Instance);
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
-        private readonly MembershipService membershipService;
+        private readonly MembershipTableManager membershipTableManager;
         private readonly ILogger<SiloStatusListenerManager> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
 
         public SiloStatusListenerManager(
-            MembershipService membershipService,
+            MembershipTableManager membershipTableManager,
             ILogger<SiloStatusListenerManager> log,
             IFatalErrorHandler fatalErrorHandler)
         {
-            this.membershipService = membershipService;
+            this.membershipTableManager = membershipTableManager;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
         }
@@ -32,20 +33,23 @@ namespace Orleans.Runtime.MembershipService
         private async Task ProcessMembershipUpdates()
         {
             var cancellationTask = this.cancellation.Token.WhenCancelled();
-            var current = this.membershipService.MembershipUpdates;
+            var current = this.membershipTableManager.MembershipTableUpdates;
             ClusterMembershipSnapshot previous = default;
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
             try
             {
                 while (!this.cancellation.IsCancellationRequested)
                 {
-                    var next = current.NextAsync();
+                    if (previous == default || !current.HasValue)
+                    {
+                        var next = current.NextAsync();
 
-                    // Handle graceful termination.
-                    var task = await Task.WhenAny(next, cancellationTask);
-                    if (ReferenceEquals(task, cancellationTask)) break;
+                        // Handle graceful termination.
+                        var task = await Task.WhenAny(next, cancellationTask);
+                        if (ReferenceEquals(task, cancellationTask)) break;
 
-                    current = next.GetAwaiter().GetResult();
+                        current = next.GetAwaiter().GetResult();
+                    }
 
                     if (!current.HasValue)
                     {
@@ -53,7 +57,7 @@ namespace Orleans.Runtime.MembershipService
                         continue;
                     }
 
-                    var snapshot = current.Value;
+                    var snapshot = ClusterMembershipSnapshot.Create(current.Value);
                     ClusterMembershipUpdate update;
                     if (ReferenceEquals(previous, default))
                     {
@@ -103,20 +107,20 @@ namespace Orleans.Runtime.MembershipService
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            var becomeActiveTasks = new List<Task>();
+            var tasks = new List<Task>();
 
-            lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.BecomeActive, OnBecomeActiveStart, OnBecomeActiveStop);
+            lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.RuntimeInitialize, OnStart, OnStop);
 
-            Task OnBecomeActiveStart(CancellationToken ct)
+            Task OnStart(CancellationToken ct)
             {
-                becomeActiveTasks.Add(this.ProcessMembershipUpdates());
+                tasks.Add(this.ProcessMembershipUpdates());
                 return Task.CompletedTask;
             }
 
-            Task OnBecomeActiveStop(CancellationToken ct)
+            Task OnStop(CancellationToken ct)
             {
                 this.cancellation.Cancel(throwOnFirstException: false);
-                return Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(becomeActiveTasks));
+                return Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }
         }
     }

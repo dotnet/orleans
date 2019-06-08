@@ -136,18 +136,13 @@ namespace Orleans.Hosting
             services.TryAddSingleton<MembershipTableManager>();
             services.AddFromExisting<IHealthCheckParticipant, MembershipTableManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
-
             services.TryAddSingleton<MembershipOracle>();
             services.AddFromExisting<IMembershipService, MembershipOracle>();
-
             services.TryAddSingleton<SiloStatusOracleCompatibilityShim>();
             services.TryAddFromExisting<IMembershipOracle, SiloStatusOracleCompatibilityShim>();
             services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracleCompatibilityShim>();
-
             services.AddSingleton<ClusterHealthMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor>();
-            services.AddSingleton<MembershipService>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipService>();
             services.AddSingleton<MembershipAgent>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipAgent>();
             services.AddSingleton<MembershipTableCleanupAgent>();
