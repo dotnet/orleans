@@ -114,7 +114,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.log.LogError(
                     (int)ErrorCode.MembershipGossipSendFailure,
-                    "Exception while sending gossip notification to remote silo {Silo}: {Exception}", exception);
+                    "Exception while sending gossip notification to remote silo {Silo}: {Exception}", silo, exception);
             }
         }
     }

@@ -86,7 +86,12 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                log.Info(ErrorCode.MembershipStarting, "MembershipOracle starting on host = " + this.localSiloDetails.DnsHostName + " address = " + myAddress + " at " + LogFormatter.PrintDate(this.siloStartTime) + ", backOffMax = " + EXP_BACKOFF_CONTENTION_MAX);
+                this.log.LogInformation(
+                    (int)ErrorCode.MembershipStarting,
+                    "MembershipOracle starting on host {HostName} with SiloAddress {SiloAddress} at {StartTime}",
+                    this.localSiloDetails.DnsHostName,
+                    this.myAddress,
+                    LogFormatter.PrintDate(this.siloStartTime));
 
                 // Init the membership table.
                 await this.membershipTableProvider.InitializeMembershipTable(true);
@@ -110,9 +115,9 @@ namespace Orleans.Runtime.MembershipService
                 // read the table and look for my node migration occurrences
                 DetectNodeMigration(table, this.localSiloDetails.DnsHostName);
             }
-            catch (Exception exc)
+            catch (Exception exception)
             {
-                log.Error(ErrorCode.MembershipFailedToStart, "MembershipFailedToStart", exc);
+                this.log.LogError((int)ErrorCode.MembershipFailedToStart, "Membership failed to start: {Exception}", exception);
                 throw;
             }
         }
@@ -191,7 +196,7 @@ namespace Orleans.Runtime.MembershipService
                         var stopwatch = ValueStopwatch.StartNew();
                         await this.Refresh();
                         var elapsed = stopwatch.Elapsed;
-                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Refreshing membership table took {Elapsed}", entry, elapsed);
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Refreshing membership table took {Elapsed}", elapsed);
                         delayMilliseconds = Math.Max(targetMilliseconds - (int)elapsed.TotalMilliseconds, 0);
                     }
                     catch (Exception exception)

@@ -40,16 +40,13 @@ namespace Orleans.Runtime.MembershipService
             {
                 while (!this.cancellation.IsCancellationRequested)
                 {
-                    if (previous == default || !current.HasValue)
-                    {
-                        var next = current.NextAsync();
+                    var next = current.NextAsync();
 
-                        // Handle graceful termination.
-                        var task = await Task.WhenAny(next, cancellationTask);
-                        if (ReferenceEquals(task, cancellationTask)) break;
+                    // Handle graceful termination.
+                    var task = await Task.WhenAny(next, cancellationTask);
+                    if (ReferenceEquals(task, cancellationTask)) break;
 
-                        current = next.GetAwaiter().GetResult();
-                    }
+                    current = next.GetAwaiter().GetResult();
 
                     if (!current.HasValue)
                     {
