@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class SiloStatusOracleCompatibilityShim : IMembershipOracle
+    internal class SiloStatusOracle : ISiloStatusOracle
     {
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly MembershipTableManager membershipTableManager;
@@ -17,7 +17,7 @@ namespace Orleans.Runtime.MembershipService
         private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
         private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
 
-        public SiloStatusOracleCompatibilityShim(
+        public SiloStatusOracle(
             ILocalSiloDetails localSiloDetails,
             MembershipTableManager membershipTableManager,
             ILoggerFactory loggerFactory,

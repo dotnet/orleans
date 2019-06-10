@@ -4,6 +4,6 @@ namespace Orleans.Runtime
 {
     internal interface IFatalErrorHandler
     {
-        void OnFatalException(object sender, string context, Exception exception);
+        void OnFatalException(object sender = null, string context = null, Exception exception = null);
     }
 }

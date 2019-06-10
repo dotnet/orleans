@@ -279,7 +279,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         {
             logger.Debug("--- PublishChanges: assess");
 
-            var activeLocalGateways = this.siloStatusOracle.GetApproximateMultiClusterGateways();
+            var activeLocalGateways = this.GetApproximateMultiClusterGateways();
 
             var iAmGateway = activeLocalGateways.Contains(Silo);
 

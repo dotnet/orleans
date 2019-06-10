@@ -5,17 +5,17 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class MembershipOracle : SystemTarget, IMembershipService
+    internal class MembershipSystemTarget : SystemTarget, IMembershipService
     {
         private readonly MembershipTableManager membershipTableManager;
-        private readonly ILogger<MembershipOracle> log;
+        private readonly ILogger<MembershipSystemTarget> log;
         private readonly IInternalGrainFactory grainFactory;
 
-        public MembershipOracle(
+        public MembershipSystemTarget(
             MembershipTableManager membershipTableManager,
             ILocalSiloDetails localSiloDetails,
             ILoggerFactory loggerFactory,
-            ILogger<MembershipOracle> log,
+            ILogger<MembershipSystemTarget> log,
             IInternalGrainFactory grainFactory)
             : base(Constants.MembershipOracleId, localSiloDetails.SiloAddress, loggerFactory)
         {
@@ -48,7 +48,7 @@ namespace Orleans.Runtime.MembershipService
 
         /// <summary>
         /// Send a ping to a remote silo. This is intended to be called from a <see cref="SiloHealthMonitor"/>
-        /// in order to initiate the call from the <see cref="MembershipOracle"/>'s context
+        /// in order to initiate the call from the <see cref="MembershipSystemTarget"/>'s context
         /// </summary>
         /// <param name="remoteSilo">The remote silo to ping.</param>
         /// <param name="probeNumber">The probe number, for diagnostic purposes.</param>

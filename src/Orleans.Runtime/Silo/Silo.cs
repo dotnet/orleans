@@ -66,7 +66,7 @@ namespace Orleans.Runtime
         private readonly InsideRuntimeClient runtimeClient;
         private IReminderService reminderService;
         private SystemTarget fallbackScheduler;
-        private readonly IMembershipOracle membershipOracle;
+        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IMultiClusterOracle multiClusterOracle;
         private readonly ExecutorService executorService;
         private Watchdog platformWatchdog;
@@ -209,7 +209,7 @@ namespace Orleans.Runtime
             incomingPingAgent = new IncomingMessageAgent(Message.Categories.Ping, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, executorService, this.loggerFactory);
             incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, executorService, this.loggerFactory);
 
-            membershipOracle = Services.GetRequiredService<IMembershipOracle>();
+            siloStatusOracle = Services.GetRequiredService<ISiloStatusOracle>();
             this.membershipService = Services.GetRequiredService<IMembershipService>();
             this.clusterOptions = Services.GetRequiredService<IOptions<ClusterOptions>>().Value;
             var multiClusterOptions = Services.GetRequiredService<IOptions<MultiClusterOptions>>().Value;
@@ -299,7 +299,7 @@ namespace Orleans.Runtime
             var versionDirectorManager = this.Services.GetRequiredService<CachedVersionSelectorManager>();
             var grainTypeManager = this.Services.GetRequiredService<GrainTypeManager>();
             IOptions<TypeManagementOptions> typeManagementOptions = this.Services.GetRequiredService<IOptions<TypeManagementOptions>>();
-            typeManager = new TypeManager(SiloAddress, grainTypeManager, membershipOracle, LocalScheduler, typeManagementOptions.Value.TypeMapRefreshInterval, implicitStreamSubscriberTable, this.grainFactory, versionDirectorManager,
+            typeManager = new TypeManager(SiloAddress, grainTypeManager, siloStatusOracle, LocalScheduler, typeManagementOptions.Value.TypeMapRefreshInterval, implicitStreamSubscriberTable, this.grainFactory, versionDirectorManager,
                 this.loggerFactory);
             this.RegisterSystemTarget(typeManager);
 
@@ -320,20 +320,23 @@ namespace Orleans.Runtime
 
         private async Task InjectDependencies()
         {
-            healthCheckParticipants.Add(membershipOracle);
+            if (siloStatusOracle is IHealthCheckParticipant)
+            {
+                healthCheckParticipants.Add((IHealthCheckParticipant)siloStatusOracle);
+            }
 
-            catalog.SiloStatusOracle = this.membershipOracle;
-            this.membershipOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
-            messageCenter.SiloDeadOracle = this.membershipOracle.IsDeadSilo;
+            catalog.SiloStatusOracle = this.siloStatusOracle;
+            this.siloStatusOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
+            messageCenter.SiloDeadOracle = this.siloStatusOracle.IsDeadSilo;
 
             // consistentRingProvider is not a system target per say, but it behaves like the localGrainDirectory, so it is here
-            this.membershipOracle.SubscribeToSiloStatusEvents((ISiloStatusListener)RingProvider);
+            this.siloStatusOracle.SubscribeToSiloStatusEvents((ISiloStatusListener)RingProvider);
 
-            this.membershipOracle.SubscribeToSiloStatusEvents(typeManager);
+            this.siloStatusOracle.SubscribeToSiloStatusEvents(typeManager);
 
-            this.membershipOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
+            this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
 
-            this.membershipOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<ClientObserverRegistrar>());
+            this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<ClientObserverRegistrar>());
 
             var reminderTable = Services.GetService<IReminderTable>();
             if (reminderTable != null)

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Data;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -14,7 +13,7 @@ using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class MembershipTableManager : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    internal class MembershipTableManager : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>
     {
         private const int NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS = -1; // unlimited
         private const int NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS = -1;
@@ -35,7 +34,6 @@ namespace Orleans.Runtime.MembershipService
         private readonly SiloAddress myAddress;
         private readonly ChangeFeedSource<MembershipTableSnapshot> membershipTableUpdates;
         
-        private GrainTimer timerGetTableUpdates;
         private MembershipTableSnapshot membershipTableSnapshot;
 
         public MembershipTableManager(
@@ -82,7 +80,7 @@ namespace Orleans.Runtime.MembershipService
             return table;
         }
 
-        public async Task Start()
+        private async Task Start()
         {
             try
             {
@@ -122,7 +120,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        internal async Task UpdateIAmAlive()
+        public async Task UpdateIAmAlive()
         {
             var entry = new MembershipEntry
             {
@@ -238,7 +236,7 @@ namespace Orleans.Runtime.MembershipService
             );
         }
 
-        public async Task UpdateMyStatusGlobal(SiloStatus status)
+        public async Task UpdateStatus(SiloStatus status)
         {
             if (status == SiloStatus.Joining)
             {
@@ -517,7 +515,7 @@ namespace Orleans.Runtime.MembershipService
                     var msg = string.Format("Detected newer version of myself - I am the older clone so I will stop -- Current Me={0} Newer Me={1}, Current entry= {2}",
                         myAddress, siloAddress, entry.ToFullString());
                     log.Warn(ErrorCode.MembershipDetectedNewer, msg);
-                    await this.UpdateMyStatusGlobal(SiloStatus.Dead);
+                    await this.UpdateStatus(SiloStatus.Dead);
                     KillMyselfLocally(msg);
                     return true; // No point continuing!
                 }
@@ -549,14 +547,12 @@ namespace Orleans.Runtime.MembershipService
             log.Error(ErrorCode.MembershipKillMyselfLocally, msg);
             bool alreadyStopping = CurrentStatus.IsTerminating();
 
-            DisposeTimers();
             this.CurrentStatus = SiloStatus.Dead;
 
-            if (!alreadyStopping || !this.clusterMembershipOptions.IsRunningAsUnitTest)
+            if (!alreadyStopping)
             {
-                log.Fail(ErrorCode.MembershipKillMyselfLocally, msg);
+                this.fatalErrorHandler.OnFatalException(this, msg, null);
             }
-            // do not abort in unit tests.
         }
 
         private async Task GossipToOthers(SiloAddress updatedSilo, SiloStatus updatedStatus)
@@ -582,7 +578,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                var membershipOracle = this.serviceProvider.GetRequiredService<MembershipOracle>();
+                var membershipOracle = this.serviceProvider.GetRequiredService<MembershipSystemTarget>();
                 await membershipOracle.GossipToRemoteSilos(updatedSilo, updatedStatus, gossipPartners);
             }
             catch (Exception exception)
@@ -754,17 +750,6 @@ namespace Orleans.Runtime.MembershipService
             return true;
         }
 
-        private void DisposeTimers()
-        {
-            if (timerGetTableUpdates != null)
-            {
-                timerGetTableUpdates.Dispose();
-                timerGetTableUpdates = null;
-            }
-        }
-
-        void IDisposable.Dispose() => this.DisposeTimers();
-
         bool IHealthCheckable.CheckHealth(DateTime lastCheckTime)
         {
             bool ok = timerGetTableUpdates != null && timerGetTableUpdates.CheckTimerFreeze(lastCheckTime);
@@ -774,11 +759,15 @@ namespace Orleans.Runtime.MembershipService
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             {
-                lifecycle.Subscribe(nameof(MembershipTableManager), ServiceLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
+                lifecycle.Subscribe(
+                    nameof(MembershipTableManager),
+                    ServiceLifecycleStage.RuntimeGrainServices,
+                    OnRuntimeGrainServicesStart,
+                    OnRuntimeGrainServicesStop);
 
                 async Task OnRuntimeGrainServicesStart(CancellationToken ct)
                 {
-                    await this.Start();
+                    await Task.Run(() => this.Start());
                 }
 
                 Task OnRuntimeGrainServicesStop(CancellationToken ct)
@@ -790,11 +779,15 @@ namespace Orleans.Runtime.MembershipService
             {
                 var cancellation = new CancellationTokenSource();
                 var tasks = new List<Task>(1);
-                lifecycle.Subscribe(nameof(MembershipTableManager), ServiceLifecycleStage.BecomeActive, OnBecomeActiveStart, OnBecomeActiveStop);
+                lifecycle.Subscribe(
+                    nameof(MembershipTableManager),
+                    ServiceLifecycleStage.BecomeActive,
+                    OnBecomeActiveStart,
+                    OnBecomeActiveStop);
 
                 Task OnBecomeActiveStart(CancellationToken ct)
                 {
-                    tasks.Add(this.PeriodicallyRefreshMembershipTable(cancellation.Token));
+                    tasks.Add(Task.Run(() => this.PeriodicallyRefreshMembershipTable(cancellation.Token)));
                     return Task.CompletedTask;
                 }
 

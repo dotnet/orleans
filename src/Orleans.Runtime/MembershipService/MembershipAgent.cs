@@ -151,7 +151,9 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeActive()
         {
-            this.log.LogInformation((int)ErrorCode.MembershipBecomeActive, "-BecomeActive");
+            this.log.LogInformation(
+                (int)ErrorCode.MembershipBecomeActive,
+                "-BecomeActive");
 
             if (this.clusterMembershipOptions.ValidateInitialConnectivity)
             {
@@ -262,22 +264,27 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task KillMyself()
         {
-            const string operation = "KillMyself";
-            log.Info(ErrorCode.MembershipKillMyself, "-" + operation);
+            this.log.LogInformation(
+                (int)ErrorCode.MembershipKillMyself,
+                "Updating status to " + nameof(SiloStatus.Dead));
+
             try
             {
                 await this.UpdateStatus(SiloStatus.Dead);
             }
-            catch (Exception exc)
+            catch (Exception exception)
             {
-                log.Error(ErrorCode.MembershipFailedToKillMyself, "Error doing " + operation, exc);
+                this.log.LogError(
+                    (int)ErrorCode.MembershipFailedToKillMyself,
+                    "Failure updating status to " + nameof(SiloStatus.Dead) + ": {Exception}",
+                    exception);
                 throw;
             }
         }
 
         private async Task UpdateStatus(SiloStatus status)
         {
-            await this.tableManager.UpdateMyStatusGlobal(status);
+            await this.tableManager.UpdateStatus(status);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
@@ -287,28 +294,38 @@ namespace Orleans.Runtime.MembershipService
 
                 Task OnRuntimeInitializeStart(CancellationToken ct)
                 {
-                    tasks.Add(this.ProcessMembershipUpdates());
+                    tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
                     return Task.CompletedTask;
                 }
 
                 async Task OnRuntimeInitializeStop(CancellationToken ct)
                 {
                     this.cancellation.Cancel();
-                    await Task.WhenAny(this.KillMyself(), Task.Delay(TimeSpan.FromMinutes(1)));
+                    await Task.WhenAny(
+                        Task.Run(() => this.KillMyself()),
+                        Task.Delay(TimeSpan.FromMinutes(1)));
                 }
 
-                lifecycle.Subscribe(nameof(MembershipAgent), ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
+                lifecycle.Subscribe(
+                    nameof(MembershipAgent),
+                    ServiceLifecycleStage.RuntimeInitialize,
+                    OnRuntimeInitializeStart,
+                    OnRuntimeInitializeStop);
             }
 
             {
                 async Task AfterRuntimeGrainServicesStart(CancellationToken ct)
                 {
-                    await this.StartJoining();
+                    await Task.Run(() => this.StartJoining());
                 }
 
                 Task AfterRuntimeGrainServicesStop(CancellationToken ct) => Task.CompletedTask;
 
-                lifecycle.Subscribe(nameof(MembershipAgent), ServiceLifecycleStage.RuntimeGrainServices + 1, AfterRuntimeGrainServicesStart, AfterRuntimeGrainServicesStop);
+                lifecycle.Subscribe(
+                    nameof(MembershipAgent),
+                    ServiceLifecycleStage.RuntimeGrainServices + 1,
+                    AfterRuntimeGrainServicesStart,
+                    AfterRuntimeGrainServicesStop);
             }
 
             {
@@ -316,8 +333,8 @@ namespace Orleans.Runtime.MembershipService
 
                 async Task OnBecomeActiveStart(CancellationToken ct)
                 {
-                    await this.BecomeActive();
-                    tasks.Add(this.UpdateIAmAlive());
+                    await Task.Run(() => this.BecomeActive());
+                    tasks.Add(Task.Run(() => this.UpdateIAmAlive()));
                 }
 
                 async Task OnBecomeActiveStop(CancellationToken ct)
@@ -328,7 +345,7 @@ namespace Orleans.Runtime.MembershipService
                     if (ReferenceEquals(task, cancellationTask))
                     {
                         this.log.LogWarning("Graceful shutdown aborted: starting ungraceful shutdown");
-                        await this.Stop();
+                        await Task.Run(() => this.Stop());
                     }
                     else
                     {
@@ -336,7 +353,11 @@ namespace Orleans.Runtime.MembershipService
                     }
                 }
 
-                lifecycle.Subscribe(nameof(MembershipAgent), ServiceLifecycleStage.BecomeActive, OnBecomeActiveStart, OnBecomeActiveStop);
+                lifecycle.Subscribe(
+                    nameof(MembershipAgent),
+                    ServiceLifecycleStage.BecomeActive,
+                    OnBecomeActiveStart,
+                    OnBecomeActiveStop);
             }
         }
     }

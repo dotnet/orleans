@@ -1,29 +1,59 @@
 using System;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
     internal class FatalErrorHandler : IFatalErrorHandler
     {
         private readonly ILogger<FatalErrorHandler> log;
+        private readonly ClusterMembershipOptions clusterMembershipOptions;
 
-        public FatalErrorHandler(ILogger<FatalErrorHandler> log)
+        public FatalErrorHandler(
+            ILogger<FatalErrorHandler> log,
+            IOptions<ClusterMembershipOptions> clusterMembershipOptions)
         {
             this.log = log;
+            this.clusterMembershipOptions = clusterMembershipOptions.Value;
         }
 
         public void OnFatalException(object sender, string context, Exception exception)
         {
-            var msg = $"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context}. Exception: {LogFormatter.PrintException(exception)}.\nCurrent stack: {Environment.StackTrace}";
-            this.log.LogError((int)ErrorCode.Logger_ProcessCrashing, msg);
-
-
-            // TODO: Should we initiate shutdown instead? might be worth having two methods, one for failfast and one for shutdown? Hard to reason about shutdown in these cases...
-            // Can also signal shutdown using IApplicationLifetime, perhaps.
+            if (exception != null)
+            {
+                this.log.LogError(
+                    (int)ErrorCode.Logger_ProcessCrashing,
+                    exception,
+                    "Fatal error from {Sender}. Context: {Context}. Exception: {Exception}",
+                    sender,
+                    context,
+                    exception);
+            }
+            else
+            {
+                this.log.LogError(
+                    (int)ErrorCode.Logger_ProcessCrashing,
+                    "Fatal error from {Sender}. Context: {Context}",
+                    sender,
+                    context);
+            }
 
             Debugger.Break();
-            Environment.FailFast(msg);
+            if (!this.clusterMembershipOptions.IsRunningAsUnitTest)
+            {
+                var msg = $"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context ?? "null"}. "
+                    + $"Exception: {(exception != null ? LogFormatter.PrintException(exception) : "null")}.\n"
+                    + $"Current stack: {Environment.StackTrace}";
+                Environment.FailFast(msg);
+            }
+            else
+            {
+                this.log.LogWarning(
+                    $"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.IsRunningAsUnitTest)} is set."
+                    + " The process will not be terminated.");
+            }
         }
     }
 }

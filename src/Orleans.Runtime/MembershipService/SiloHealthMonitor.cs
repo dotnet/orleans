@@ -11,7 +11,7 @@ namespace Orleans.Runtime.MembershipService
     internal class SiloHealthMonitor
     {
         private readonly ILogger log;
-        private readonly MembershipOracle membershipOracle;
+        private readonly MembershipSystemTarget membershipOracle;
 
         /// <summary>
         /// The number of failed probes since the last successful probe.
@@ -21,7 +21,7 @@ namespace Orleans.Runtime.MembershipService
         public SiloHealthMonitor(
             SiloAddress siloAddress,
             ILoggerFactory loggerFactory,
-            MembershipOracle membershipOracle)
+            MembershipSystemTarget membershipOracle)
         {
             this.SiloAddress = siloAddress;
             this.membershipOracle = membershipOracle;
