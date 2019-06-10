@@ -12,7 +12,7 @@ namespace Orleans.Runtime.MembershipService
 {
     internal class MembershipOracle : SystemTarget, IMembershipOracle, IMembershipService
     {
-        private readonly static TimeSpan shutdownGossipTimeout = TimeSpan.FromMilliseconds(30);
+        private readonly static TimeSpan shutdownGossipTimeout = TimeSpan.FromSeconds(10);
         private readonly IInternalGrainFactory grainFactory;
         private IMembershipTable membershipTableProvider;
         private readonly MembershipOracleData membershipOracleData;
