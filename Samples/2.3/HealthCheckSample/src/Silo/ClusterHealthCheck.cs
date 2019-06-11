@@ -23,7 +23,7 @@ namespace Silo
             try
             {
                 var hosts = await manager.GetHosts();
-                var count = hosts.Values.Where(_ => _.IsUnavailable()).Count();
+                var count = hosts.Values.Where(x => x.IsUnavailable()).Count();
                 return count > 0 ? HealthCheckResult.Degraded($"{count} silo(s) unavailable") : HealthCheckResult.Healthy();
             }
             catch (Exception error)
