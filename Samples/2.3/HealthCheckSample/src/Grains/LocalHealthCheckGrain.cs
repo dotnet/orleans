@@ -4,7 +4,7 @@ using Orleans.Concurrency;
 
 namespace Grains
 {
-    [StatelessWorker]
+    [StatelessWorker(1)]
     public class LocalHealthCheckGrain : Grain, ILocalHealthCheckGrain
     {
         public Task PingAsync() => Task.CompletedTask;
