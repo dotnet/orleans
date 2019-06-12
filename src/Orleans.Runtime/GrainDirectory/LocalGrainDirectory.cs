@@ -11,6 +11,7 @@ using Orleans.Hosting;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Configuration;
+using System.ComponentModel;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -34,8 +35,8 @@ namespace Orleans.Runtime.GrainDirectory
         private Action<SiloAddress, SiloStatus> catalogOnSiloRemoved;
 
         // Consider: move these constants into an apropriate place
-        internal const int HOP_LIMIT = 6; // forward a remote request no more than 4 times
-        public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromMilliseconds(200); // Pause 5 seconds between forwards to let the membership directory settle down
+        internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
+        public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromMilliseconds(200); // Pause 200ms between forwards to let the membership directory settle down
 
         protected SiloAddress Seed { get { return seed; } }
 
