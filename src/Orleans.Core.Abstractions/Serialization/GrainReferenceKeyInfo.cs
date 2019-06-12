@@ -5,7 +5,7 @@ using Orleans.Runtime;
 namespace Orleans.Serialization
 {
     /// <summary>
-    /// type is a low level representation of graui reference keys to enable
+    /// Type is a low level representation of grain reference keys to enable
     /// space-efficient serialization of grain references.
     /// </summary>
     /// <remarks>
