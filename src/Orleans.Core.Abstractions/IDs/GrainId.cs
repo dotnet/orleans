@@ -293,7 +293,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Return this GrainId ina  standard components form, suitable for later use with the <see cref="FromKeyInfo"/> method.
+        /// Return this GrainId in a standard components form, suitable for later use with the <see cref="FromKeyInfo"/> method.
         /// </summary>
         /// <returns>GrainId in a standard components form.</returns>
         internal (ulong, ulong, ulong, string) ToKeyInfo()
