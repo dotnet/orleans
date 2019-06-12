@@ -11,6 +11,7 @@ using Orleans.Hosting;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Configuration;
+using System.ComponentModel;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -34,8 +35,8 @@ namespace Orleans.Runtime.GrainDirectory
         private Action<SiloAddress, SiloStatus> catalogOnSiloRemoved;
 
         // Consider: move these constants into an apropriate place
-        internal const int HOP_LIMIT = 3; // forward a remote request no more than two times
-        public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromSeconds(5); // Pause 5 seconds between forwards to let the membership directory settle down
+        internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
+        public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromMilliseconds(200); // Pause 200ms between forwards to let the membership directory settle down
 
         protected SiloAddress Seed { get { return seed; } }
 
@@ -586,7 +587,8 @@ namespace Orleans.Runtime.GrainDirectory
             if (hopCount > 0 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
-                forwardAddress = this.CheckIfShouldForward(address.Grain, hopCount, "RegisterAsync(recheck)");
+                forwardAddress = this.CheckIfShouldForward(address.Grain, hopCount, "RegisterAsync");
+                this.log.LogWarning($"RegisterAsync - It seems we are not the owner of activation {address}, trying to forward it to {forwardAddress} (hopCount={hopCount})");
             }
 
             if (forwardAddress == null)
@@ -683,7 +685,8 @@ namespace Orleans.Runtime.GrainDirectory
             if (hopCount > 0 && forwardaddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
-                forwardaddress = this.CheckIfShouldForward(address.Grain, hopCount, "UnregisterAsync(recheck)");
+                forwardaddress = this.CheckIfShouldForward(address.Grain, hopCount, "UnregisterAsync");
+                this.log.LogWarning($"UnregisterAsync - It seems we are not the owner of activation {address}, trying to forward it to {forwardaddress} (hopCount={hopCount})");
             }
 
             if (forwardaddress == null)
@@ -774,8 +777,9 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 await Task.Delay(RETRY_DELAY);
                 Dictionary<SiloAddress, List<ActivationAddress>> forwardlist2 = null;
-                UnregisterOrPutInForwardList(forwardlist.SelectMany(kvp => kvp.Value), cause, hopCount, ref forwardlist2, tasks, "UnregisterManyAsync(recheck)");
+                UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardlist2, tasks, "UnregisterManyAsync");
                 forwardlist = forwardlist2;
+                this.log.LogWarning($"RegisterAsync - It seems we are not the owner of some activations, trying to forward it to {forwardlist.Count} silos (hopCount={hopCount})");
             }
 
             // forward the requests
@@ -893,7 +897,8 @@ namespace Orleans.Runtime.GrainDirectory
             if (hopCount > 0 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
-                forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "LookUpAsync(recheck)");
+                forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "LookUpAsync");
+                this.log.LogWarning($"LookupAsync - It seems we are not the owner of grain {grainId}, trying to forward it to {forwardAddress} (hopCount={hopCount})");
             }
 
             if (forwardAddress == null)
@@ -948,7 +953,8 @@ namespace Orleans.Runtime.GrainDirectory
             if (hopCount > 0 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
-                forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "DeleteGrainAsync(recheck)");
+                forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "DeleteGrainAsync");
+                this.log.LogWarning($"DeleteGrainAsync - It seems we are not the owner of grain {grainId}, trying to forward it to {forwardAddress} (hopCount={hopCount})");
             }
 
             if (forwardAddress == null)
