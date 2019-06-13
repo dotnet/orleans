@@ -5,33 +5,45 @@ using System.Threading.Tasks;
 using System.Threading;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using System.Net.Http.Headers;
 
 namespace Orleans.Runtime.MembershipService
 {
     /// <summary>
     /// Responsible for cleaning up dead membership table entries.
     /// </summary>
-    internal class MembershipTableCleanupAgent : ILifecycleParticipant<ISiloLifecycle>
+    internal class MembershipTableCleanupAgent : ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
-        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly ClusterMembershipOptions clusterMembershipOptions;
         private readonly IMembershipTable membershipTableProvider;
         private readonly ILogger<MembershipTableCleanupAgent> log;
+        private readonly CheckedTimer cleanupDefunctSilosTimer;
 
         public MembershipTableCleanupAgent(
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IMembershipTable membershipTableProvider,
-            ILogger<MembershipTableCleanupAgent> log)
+            ILogger<MembershipTableCleanupAgent> log,
+            ILoggerFactory loggerFactory)
         {
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
             this.membershipTableProvider = membershipTableProvider;
             this.log = log;
+            if (this.clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
+            {
+                this.cleanupDefunctSilosTimer = new CheckedTimer(
+                    this.clusterMembershipOptions.DefunctSiloCleanupPeriod.Value,
+                    loggerFactory,
+                    nameof(CleanupDefunctSilos));
+            }
         }
 
-        private async Task CleanupDefunctSios()
+        public void Dispose()
         {
-            var cancellationTask = this.cancellation.Token.WhenCancelled();
+            this.cleanupDefunctSilosTimer?.Dispose();
+        }
 
+        private async Task CleanupDefunctSilos()
+        {
             if (this.clusterMembershipOptions.DefunctSiloCleanupPeriod == default)
             {
                 if (this.log.IsEnabled(LogLevel.Debug))
@@ -46,12 +58,8 @@ namespace Orleans.Runtime.MembershipService
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting membership table cleanup agent");
             try
             {
-                var period = this.clusterMembershipOptions.DefunctSiloCleanupPeriod.Value;
-                while (!this.cancellation.IsCancellationRequested)
+                while (await this.cleanupDefunctSilosTimer.TickAsync())
                 {
-                    var task = await Task.WhenAny(Task.Delay(period), cancellationTask);
-                    if (ReferenceEquals(task, cancellationTask)) break;
-
                     try
                     {
                         await this.membershipTableProvider.CleanupDefunctSiloEntries(dateLimit);
@@ -82,13 +90,13 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnStart(CancellationToken ct)
             {
-                tasks.Add(this.CleanupDefunctSios());
+                tasks.Add(this.CleanupDefunctSilos());
                 return Task.CompletedTask;
             }
 
             async Task OnStop(CancellationToken ct)
             {
-                this.cancellation.Cancel(throwOnFirstException: false);
+                this.cleanupDefunctSilosTimer?.Dispose();
                 await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }
         }

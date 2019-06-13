@@ -8,56 +8,6 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal class CheckedTimer : IDisposable
-    {
-        private readonly Task cancellationTask;
-        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
-        private readonly TimeSpan period;
-        private DateTime lastFired = DateTime.MinValue;
-
-        public CheckedTimer()
-        {
-            this.cancellationTask = this.cancellation.Token.WhenCancelled();
-        }
-
-        public void Dispose() => this.Stop();
-
-        public void Stop() => this.cancellation.Cancel(throwOnFirstException: false);
-
-        public async Task TickAsync(TimeSpan? delay = default)
-        {
-            if (this.cancellation.IsCancellationRequested) return;
-
-            // Determine how long to wait for.
-            var now = DateTime.UtcNow;
-            if (delay == default)
-            {
-                if (this.lastFired == DateTime.MinValue)
-                {
-                    delay = this.period;
-                }
-                else
-                {
-                    delay = this.lastFired.Add(this.period).Subtract(now);
-                }
-            }
-
-            if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
-
-            if (delay > TimeSpan.Zero)
-            {
-                await Task.WhenAny(this.cancellationTask, Task.Delay(delay.Value));
-            }
-
-            this.lastFired = DateTime.UtcNow;
-            var expected = now.Add(delay.Value);
-            if (this.lastFired.Subtract(expected) > TimeSpan.FromSeconds(3))
-            {
-                XXXXXXXXXX
-            }
-        }
-    }
-
     internal class GrainTimer : IGrainTimer
     {
         private Func<object, Task> asyncCallback;

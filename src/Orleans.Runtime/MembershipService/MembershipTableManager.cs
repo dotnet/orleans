@@ -13,7 +13,7 @@ using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class MembershipTableManager : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>
+    internal class MembershipTableManager : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private const int NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS = -1; // unlimited
         private const int NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS = -1;
@@ -33,7 +33,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly DateTime siloStartTime = DateTime.UtcNow;
         private readonly SiloAddress myAddress;
         private readonly ChangeFeedSource<MembershipTableSnapshot> membershipTableUpdates;
-        
+        private readonly CheckedTimer membershipUpdateTimer;
         private MembershipTableSnapshot membershipTableSnapshot;
 
         public MembershipTableManager(
@@ -42,7 +42,8 @@ namespace Orleans.Runtime.MembershipService
             IMembershipTable membershipTable,
             IFatalErrorHandler fatalErrorHandler,
             IServiceProvider serviceProvider,
-            ILogger<MembershipTableManager> log)
+            ILogger<MembershipTableManager> log,
+            ILoggerFactory loggerFactory)
         {
             this.localSiloDetails = localSiloDetails;
             this.membershipTableProvider = membershipTable;
@@ -63,6 +64,11 @@ namespace Orleans.Runtime.MembershipService
             this.membershipTableUpdates = new ChangeFeedSource<MembershipTableSnapshot>(
                 (previous, proposed) => proposed.Version > previous.Version,
                 this.membershipTableSnapshot);
+
+            this.membershipUpdateTimer = new CheckedTimer(
+                this.clusterMembershipOptions.TableRefreshTimeout,
+                loggerFactory,
+                nameof(PeriodicallyRefreshMembershipTable));
         }
 
         public MembershipTableSnapshot MembershipTableSnapshot => this.membershipTableSnapshot;
@@ -162,10 +168,8 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task PeriodicallyRefreshMembershipTable(CancellationToken cancellation)
+        private async Task PeriodicallyRefreshMembershipTable()
         {
-            var cancellationTask = cancellation.WhenCancelled();
-
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting periodic membership table refreshes");
             try
             {
@@ -173,15 +177,10 @@ namespace Orleans.Runtime.MembershipService
                 var random = new SafeRandom();
                 await Task.Delay(random.NextTimeSpan(this.clusterMembershipOptions.TableRefreshTimeout));
 
-                var delayMilliseconds = (int)this.clusterMembershipOptions.TableRefreshTimeout.TotalMilliseconds;
-                while (!cancellation.IsCancellationRequested)
+                TimeSpan? onceOffDelay = default;
+                while (await this.membershipUpdateTimer.TickAsync(onceOffDelay))
                 {
-                    var next = Task.Delay(delayMilliseconds);
-
-                    // Handle graceful termination.
-                    var task = await Task.WhenAny(next, cancellationTask);
-                    if (ReferenceEquals(task, cancellationTask)) break;
-
+                    onceOffDelay = default;
                     var snapshot = this.MembershipTableSnapshot;
 
                     if (!snapshot.Entries.TryGetValue(this.localSiloDetails.SiloAddress, out var entry))
@@ -193,9 +192,7 @@ namespace Orleans.Runtime.MembershipService
                     {
                         var stopwatch = ValueStopwatch.StartNew();
                         await this.Refresh();
-                        var elapsed = stopwatch.Elapsed;
-                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Refreshing membership table took {Elapsed}", elapsed);
-                        delayMilliseconds = Math.Max(targetMilliseconds - (int)elapsed.TotalMilliseconds, 0);
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Refreshing membership table took {Elapsed}", stopwatch.Elapsed);
                     }
                     catch (Exception exception)
                     {
@@ -205,7 +202,7 @@ namespace Orleans.Runtime.MembershipService
                             exception);
 
                         // Retry quickly
-                        delayMilliseconds = 200;
+                        onceOffDelay = TimeSpan.FromMilliseconds(200);
                     }
                 }
             }
@@ -752,7 +749,7 @@ namespace Orleans.Runtime.MembershipService
 
         bool IHealthCheckable.CheckHealth(DateTime lastCheckTime)
         {
-            bool ok = timerGetTableUpdates != null && timerGetTableUpdates.CheckTimerFreeze(lastCheckTime);
+            bool ok = this.membershipUpdateTimer.CheckHealth(lastCheckTime);
             return ok;
         }
 
@@ -787,16 +784,21 @@ namespace Orleans.Runtime.MembershipService
 
                 Task OnBecomeActiveStart(CancellationToken ct)
                 {
-                    tasks.Add(Task.Run(() => this.PeriodicallyRefreshMembershipTable(cancellation.Token)));
+                    tasks.Add(Task.Run(() => this.PeriodicallyRefreshMembershipTable()));
                     return Task.CompletedTask;
                 }
 
                 async Task OnBecomeActiveStop(CancellationToken ct)
                 {
-                    cancellation.Cancel(throwOnFirstException: false);
+                    this.membershipUpdateTimer.Dispose();
                     await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            this.membershipUpdateTimer.Dispose();
         }
     }
 }

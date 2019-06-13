@@ -23,6 +23,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IServiceProvider serviceProvider;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
+        private readonly CheckedTimer monitorClusterHealthTimer;
         private int probeNumber;
 
         public ClusterHealthMonitor(
@@ -30,13 +31,19 @@ namespace Orleans.Runtime.MembershipService
             ILogger<ClusterHealthMonitor> log,
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IFatalErrorHandler fatalErrorHandler,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            ILoggerFactory loggerFactory)
         {
             this.tableManager = tableManager;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
             this.serviceProvider = serviceProvider;
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
+            this.monitorClusterHealthTimer = new CheckedTimer(
+                this.clusterMembershipOptions.ProbeTimeout,
+                loggerFactory,
+                nameof(MonitorClusterHealth),
+                this.cancellation.Token);
         }
 
         private ImmutableDictionary<SiloAddress, SiloHealthMonitor> MonitoredSilos { get; set; } = ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
@@ -117,20 +124,16 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task MonitorClusterHealth()
         {
-            var cancellationTask = this.cancellation.Token.WhenCancelled();
-
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting cluster health monitor");
             try
             {
                 // Randomize the initial wait time before initiating probes.
                 var random = new SafeRandom();
-                await Task.Delay(random.NextTimeSpan(this.clusterMembershipOptions.ProbeTimeout));
+                TimeSpan? onceOffDelay = random.NextTimeSpan(this.clusterMembershipOptions.ProbeTimeout);
 
-                while (!this.cancellation.IsCancellationRequested)
+                while (await this.monitorClusterHealthTimer.TickAsync(onceOffDelay))
                 {
-                    var task = await Task.WhenAny(Task.Delay(this.clusterMembershipOptions.ProbeTimeout), cancellationTask);
-                    if (ReferenceEquals(task, cancellationTask)) break;
-
+                    if (onceOffDelay != default) onceOffDelay = default;
                     _ = this.ProbeMonitoredSilos();
                 }
             }

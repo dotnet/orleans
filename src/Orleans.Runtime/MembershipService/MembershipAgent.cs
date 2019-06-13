@@ -12,7 +12,7 @@ namespace Orleans.Runtime.MembershipService
     /// <summary>
     /// Responsible for updating membership table with details about the local silo.
     /// </summary>
-    internal class MembershipAgent : ILifecycleParticipant<ISiloLifecycle>
+    internal class MembershipAgent : ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly MembershipTableManager tableManager;
@@ -21,7 +21,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
         private readonly ILogger<MembershipAgent> log;
-        private readonly int updateLivenessPeriodMilliseconds;
+        private readonly CheckedTimer iAmAliveTimer;
 
         public MembershipAgent(
             MembershipTableManager tableManager,
@@ -29,15 +29,20 @@ namespace Orleans.Runtime.MembershipService
             ILocalSiloDetails localSilo,
             IFatalErrorHandler fatalErrorHandler,
             IOptions<ClusterMembershipOptions> options,
-            ILogger<MembershipAgent> log)
+            ILogger<MembershipAgent> log,
+            ILoggerFactory loggerFactory)
         {
             this.tableManager = tableManager;
             this.clusterHealthMonitor = clusterHealthMonitor;
             this.localSilo = localSilo;
             this.fatalErrorHandler = fatalErrorHandler;
             this.clusterMembershipOptions = options.Value;
-            this.updateLivenessPeriodMilliseconds = (int)this.clusterMembershipOptions.IAmAliveTablePublishTimeout.TotalMilliseconds;
             this.log = log;
+            this.iAmAliveTimer = new CheckedTimer(
+                this.clusterMembershipOptions.IAmAliveTablePublishTimeout,
+                loggerFactory,
+                nameof(UpdateIAmAlive),
+                this.cancellation.Token);
         }
         
         private async Task ProcessMembershipUpdates()
@@ -97,19 +102,13 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task UpdateIAmAlive()
         {
-            var cancellationTask = this.cancellation.Token.WhenCancelled();
-
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting periodic membership liveness timestamp updates");
             try
             {
-                var delayMilliseconds = this.updateLivenessPeriodMilliseconds;
-                while (!this.cancellation.IsCancellationRequested)
+                TimeSpan? onceOffDelay = default;
+                while (!this.tableManager.CurrentStatus.IsTerminating() && await this.iAmAliveTimer.TickAsync(onceOffDelay))
                 {
-                    var next = Task.Delay(delayMilliseconds);
-
-                    // Handle graceful termination.
-                    var task = await Task.WhenAny(next, cancellationTask);
-                    if (this.tableManager.CurrentStatus.IsTerminating() || ReferenceEquals(task, cancellationTask)) break;
+                    onceOffDelay = default;
 
                     var snapshot = this.tableManager.MembershipTableSnapshot;
 
@@ -122,9 +121,7 @@ namespace Orleans.Runtime.MembershipService
                     {
                         var stopwatch = ValueStopwatch.StartNew();
                         await this.tableManager.UpdateIAmAlive();
-                        stopwatch.Stop();
                         if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Updating liveness for entry {Entry} took {Elapsed}", entry, stopwatch.Elapsed);
-                        delayMilliseconds = Math.Max(this.updateLivenessPeriodMilliseconds - (int)stopwatch.Elapsed.TotalMilliseconds, 0);
                     }
                     catch (Exception exception)
                     {
@@ -134,7 +131,7 @@ namespace Orleans.Runtime.MembershipService
                             exception);
 
                         // Retry quickly
-                        delayMilliseconds = 200;
+                        onceOffDelay = TimeSpan.FromMilliseconds(200);
                     }
                 }
             }
@@ -359,6 +356,11 @@ namespace Orleans.Runtime.MembershipService
                     OnBecomeActiveStart,
                     OnBecomeActiveStop);
             }
+        }
+
+        public void Dispose()
+        {
+            this.iAmAliveTimer.Dispose();
         }
     }
 }
