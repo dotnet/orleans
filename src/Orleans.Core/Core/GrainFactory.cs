@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
@@ -302,5 +301,22 @@ namespace Orleans
         /// <inheritdoc />
         public GrainReference GetGrain(GrainId grainId, string genericArguments)
             => GrainReference.FromGrainId(grainId, this.GrainReferenceRuntime, genericArguments);
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Guid grainPrimaryKey, Type grainInterfaceType)
+            where TGrainInterface : IGrain
+        {
+            this.runtimeClient.GrainTypeResolver.TryGetGrainClassData(grainInterfaceType, out GrainClassData implementation, string.Empty);
+            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(grainInterfaceType), grainPrimaryKey);
+            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(grainInterfaceType, grainId));
+        }
+
+        /// <inheritdoc />
+        public IGrain GetGrain(string grainPrimaryKey, Type grainInterfaceType)
+        {
+            this.runtimeClient.GrainTypeResolver.TryGetGrainClassData(grainInterfaceType, out GrainClassData implementation, string.Empty);
+            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(grainInterfaceType), grainPrimaryKey);
+            return (IGrain)this.Cast(this.MakeGrainReferenceFromType(grainInterfaceType, grainId), grainInterfaceType);
+        }
     }
 }

@@ -251,12 +251,6 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        object IInternalGrainFactory.Cast(IAddressable grain, Type interfaceType)
-        {
-            return this.InternalGrainFactory.Cast(grain, interfaceType);
-        }
-
-        /// <inheritdoc />
         TGrainInterface IInternalGrainFactory.GetGrain<TGrainInterface>(GrainId grainId)
         {
             return this.InternalGrainFactory.GetGrain<TGrainInterface>(grainId);
@@ -297,5 +291,16 @@ namespace Orleans
                     nameof(ClusterClient),
                     $"Client has been disposed either by a call to {nameof(Dispose)} or because it has been stopped.");
         }
+
+        public TGrainInterface GetGrain<TGrainInterface>(Guid grainPrimaryKey, Type grainInterfaceType) where TGrainInterface : IGrain
+            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainPrimaryKey, grainInterfaceType);
+
+        /// <inheritdoc />
+        public IGrain GetGrain(string grainPrimaryKey, Type grainInterfaceType)
+            => this.InternalGrainFactory.GetGrain(grainPrimaryKey, grainInterfaceType);
+
+        /// <inheritdoc />
+        public object Cast(IAddressable grain, Type outputGrainInterfaceType)
+            => this.InternalGrainFactory.Cast(grain, outputGrainInterfaceType);
     }
 }
