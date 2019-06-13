@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -207,22 +207,27 @@ namespace Orleans.CodeGenerator.Analysis
 
         private static IEnumerable<ITypeSymbol> ExpandType(ITypeSymbol symbol)
         {
-            yield return symbol;
-            switch (symbol)
+            return ExpandTypeInternal(symbol, new HashSet<ITypeSymbol>());
+            IEnumerable<ITypeSymbol> ExpandTypeInternal(ITypeSymbol s, HashSet<ITypeSymbol> emitted)
             {
-                case IArrayTypeSymbol array:
-                    foreach (var t in ExpandType(array.ElementType)) yield return t;
-                    break;
-                case INamedTypeSymbol named:
-                    foreach (var p in named.TypeArguments)
-                    foreach (var t in ExpandType(p))
-                        yield return t;
-                    break;
-            }
+                if (!emitted.Add(s)) yield break;
+                yield return s;
+                switch (s)
+                {
+                    case IArrayTypeSymbol array:
+                        foreach (var t in ExpandTypeInternal(array.ElementType, emitted)) yield return t;
+                        break;
+                    case INamedTypeSymbol named:
+                        foreach (var p in named.TypeArguments)
+                            foreach (var t in ExpandTypeInternal(p, emitted))
+                                yield return t;
+                        break;
+                }
 
-            if (symbol.BaseType != null)
-            {
-                foreach (var t in ExpandType(symbol.BaseType)) yield return t;
+                if (s.BaseType != null)
+                {
+                    foreach (var t in ExpandTypeInternal(s.BaseType, emitted)) yield return t;
+                }
             }
         }
 
