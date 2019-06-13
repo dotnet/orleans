@@ -372,7 +372,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private static Category GetCategory(UInt64 typeCodeData)
+        internal static Category GetCategory(UInt64 typeCodeData)
         {
             return (Category)((typeCodeData >> 56) & 0xFF);
         }
