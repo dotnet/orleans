@@ -138,6 +138,8 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
             services.TryAddSingleton<MembershipSystemTarget>();
             services.AddFromExisting<IMembershipService, MembershipSystemTarget>();
+            services.TryAddSingleton<IMembershipGossiper, MembershipGossiper>();
+            services.TryAddSingleton<IRemoteSiloProber, RemoteSiloProber>();
             services.TryAddSingleton<SiloStatusOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracle>();
             services.AddSingleton<ClusterHealthMonitor>();

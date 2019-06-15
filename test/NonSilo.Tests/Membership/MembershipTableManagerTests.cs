@@ -1,8 +1,41 @@
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime.MembershipService;
+using Xunit;
+using NSubstitute;
+using Orleans.Runtime;
+using System;
+
 namespace NonSilo.Tests.Membership
 {
-    [TestCategory("BVT")]
+    /// <summary>
+    /// Tests for <see cref="MembershipTableManager"/>
+    /// </summary>
+    [TestCategory("BVT"), TestCategory("Membership")]
     public class MembershipTableManagerTests
     {
+        /*
+        [Fact]
+        public async Task MembershipTableManager_InitialSnapshot()
+        {
+            var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+            localSiloDetails.SiloAddress.Returns(SiloAddress.FromParsableString("127.0.0.1:100@1"));
+            localSiloDetails.DnsHostName.Returns("MyServer11");
+            localSiloDetails.Name.Returns(Guid.NewGuid().ToString("N"));
+
+            var manager = new MembershipTableManager(
+                localSiloDetails: localSiloDetails,
+                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                membershipTable: null,
+                fatalErrorHandler: null,
+                gossiper: null,
+                log: null,
+                loggerFactory: null);
+            await manager.Sta
+        }*/
+
         // Initial snapshots are valid
         // Table refresh:
         // * Does period refresh
@@ -22,7 +55,7 @@ namespace NonSilo.Tests.Membership
         // Gossips on updates
     }
 
-    [TestCategory("BVT")]
+    [TestCategory("BVT"), TestCategory("Membership")]
     public class MembershipAgentTests
     {
         // Lifecycle tests:
@@ -37,7 +70,7 @@ namespace NonSilo.Tests.Membership
         // Graceful vs ungraceful shutdown
     }
 
-    [TestCategory("BVT")]
+    [TestCategory("BVT"), TestCategory("Membership")]
     public class ClusterHealthMonitorTests
     {
         // Periodically checks health
@@ -47,7 +80,7 @@ namespace NonSilo.Tests.Membership
         // Processes membership updates
     }
 
-    [TestCategory("BVT")]
+    [TestCategory("BVT"), TestCategory("Membership")]
     public class MembershipTableCleanupAgentTests
     {
         // Configuration tests:

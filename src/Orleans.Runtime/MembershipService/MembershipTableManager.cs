@@ -25,7 +25,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly static TimeSpan ShutdownGossipTimeout = TimeSpan.FromMilliseconds(3000);
 
         private readonly IFatalErrorHandler fatalErrorHandler;
-        private readonly IServiceProvider serviceProvider;
+        private readonly IMembershipGossiper gossiper;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IMembershipTable membershipTableProvider;
         private readonly ILogger log;
@@ -41,14 +41,14 @@ namespace Orleans.Runtime.MembershipService
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IMembershipTable membershipTable,
             IFatalErrorHandler fatalErrorHandler,
-            IServiceProvider serviceProvider,
+            IMembershipGossiper gossiper,
             ILogger<MembershipTableManager> log,
             ILoggerFactory loggerFactory)
         {
             this.localSiloDetails = localSiloDetails;
             this.membershipTableProvider = membershipTable;
             this.fatalErrorHandler = fatalErrorHandler;
-            this.serviceProvider = serviceProvider;
+            this.gossiper = gossiper;
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
             this.myAddress = this.localSiloDetails.SiloAddress;
             this.log = log;
@@ -575,8 +575,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                var membershipOracle = this.serviceProvider.GetRequiredService<MembershipSystemTarget>();
-                await membershipOracle.GossipToRemoteSilos(updatedSilo, updatedStatus, gossipPartners);
+                await this.gossiper.GossipToRemoteSilos(updatedSilo, updatedStatus, gossipPartners);
             }
             catch (Exception exception)
             {
