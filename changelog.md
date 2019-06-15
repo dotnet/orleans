@@ -7,6 +7,40 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.3.5] (changes since 2.3.4)
+
+- Non-breaking improvements
+  - Make transaction log group max size configurable (#5656)
+  - Reduce delay local directory when cluster membership is not stable (#5677)
+  - Add Incoming grain call filter extensions for ISiloBuilder (#5466)
+
+- Non-breaking bug fixes
+  - Fixes #5661 by allowing configuration to pass in value of MetadataPro… (#5662)
+  - Fix #5473 - codegen fails on recursively defined types (#5688)
+
+### [2.3.4] (changes since 2.3.3)
+
+- Non-breaking bug fixes
+  - Fix Nullable<T> (#5663)
+
+### [2.3.3] (changes since 2.3.2)
+
+- Non-breaking improvements
+  - Allow default(ImmutableArray<T>) to be serialized (#5587)
+  - Improve Roslyn TypeCode generation (#5604)
+  - Remove lock from CallbackData (#5595)
+  - Execute tasks scheduled against defunct activations (#5588)
+
+- Non-breaking bug fixes
+  - Fix #5565 - NullReferenceException in ConvertAsync helper (#5582)
+  - Fix NullReferenceException in TestCluster.cs (#5592)
+  - NoOp delete when ETag is null in AzureTableStorage provider (#5577)
+  - Fix potential NullReferenceException in PersistentStreamProvider (#5597)
+  - Fix breakage in Microsoft.Extensions.Hosting (#5610)
+  - Fix ReadLineStartingWithAsync for LinuxEnvironmentStatistics (#5608)
+  - Add null check in MessageCenter.TryDeliverToProxy (#5641)
+  - Improve cleanup of activations on dead silos (#5646)
+
 ### [2.3.2] (changes since 2.3.1)
 
 - Non-breaking bug fixes
