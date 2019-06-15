@@ -4,7 +4,6 @@ using System;
 using Orleans;
 using System.Linq;
 using System.Collections.Immutable;
-using Orleans.Storage;
 using System.Collections.Generic;
 
 namespace NonSilo.Tests.Membership
@@ -18,6 +17,20 @@ namespace NonSilo.Tests.Membership
         private readonly List<(string, object)> calls = new List<(string, object)>();
         private ImmutableList<(MembershipEntry, string)> entries = ImmutableList<(MembershipEntry, string)>.Empty;
         private TableVersion version = new TableVersion(0, "*");
+
+        public InMemoryMembershipTable() { }
+
+        public InMemoryMembershipTable(TableVersion version, params MembershipEntry[] entries)
+        {
+            var builder = ImmutableList.CreateBuilder<(MembershipEntry, string)>();
+            foreach (var entry in entries)
+            {
+                builder.Add((entry, version.VersionEtag));
+            }
+
+            this.version = version;
+            this.entries = builder.ToImmutable();
+        }
 
         public List<(string Method, object Arguments)> Calls
         {

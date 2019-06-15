@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -293,8 +294,6 @@ namespace Orleans
         /// </summary>
         public DateTime IAmAliveTime { get; set; }
         
-        private static readonly List<Tuple<SiloAddress, DateTime>> EmptyList = new List<Tuple<SiloAddress, DateTime>>(0);
-
         public void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
         {
             if (SuspectTimes == null)
@@ -318,7 +317,7 @@ namespace Orleans
                 UpdateZone = this.UpdateZone,
                 FaultZone = this.FaultZone,
 
-                SuspectTimes = this.SuspectTimes,
+                SuspectTimes = this.SuspectTimes is null ? null : new List<Tuple<SiloAddress, DateTime>>(this.SuspectTimes),
                 StartTime = this.StartTime,
                 IAmAliveTime = this.IAmAliveTime,
             };
@@ -331,26 +330,24 @@ namespace Orleans
             return updated;
         }
 
-        internal List<Tuple<SiloAddress, DateTime>> GetFreshVotes(DateTime now, TimeSpan expiration)
+        internal ImmutableList<Tuple<SiloAddress, DateTime>> GetFreshVotes(DateTime now, TimeSpan expiration)
         {
-            if (SuspectTimes == null)
-                return EmptyList;
-            return SuspectTimes.FindAll(voter =>
+            if (this.SuspectTimes == null)
+                return ImmutableList<Tuple<SiloAddress, DateTime>>.Empty;
+
+            var result = ImmutableList.CreateBuilder<Tuple<SiloAddress, DateTime>>();
+            foreach (var voter in this.SuspectTimes)
+            {
+                // If now is smaller than otherVoterTime, than assume the otherVoterTime is fresh.
+                // This could happen if clocks are not synchronized and the other voter clock is ahead of mine.
+                var otherVoterTime = voter.Item2;
+                if (now < otherVoterTime || now.Subtract(otherVoterTime) < expiration)
                 {
-                    DateTime otherVoterTime = voter.Item2;
-                    // If now is smaller than otherVoterTime, than assume the otherVoterTime is fresh.
-                    // This could happen if clocks are not synchronized and the other voter clock is ahead of mine.
-                    if (now < otherVoterTime) 
-                        return true;
+                    result.Add(voter);
+                }
+            }
 
-                    return now.Subtract(otherVoterTime) < expiration;
-                });
-        }
-
-        internal void TryUpdateStartTime(DateTime startTime)
-        {
-            if (StartTime.Equals(default(DateTime)))
-                StartTime = startTime;
+            return result.ToImmutable();
         }
 
         public override string ToString()

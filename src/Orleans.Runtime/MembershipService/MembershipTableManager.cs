@@ -240,7 +240,7 @@ namespace Orleans.Runtime.MembershipService
                 Func<int, Task<bool>> cleanupTableEntriesTask = async counter =>
                 {
                     if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Attempting CleanupTableEntries #{0}", counter);
-                    MembershipTableData table = await membershipTableProvider.ReadAll();
+                    var table = await this.membershipTableProvider.ReadAll();
                     log.Info(ErrorCode.MembershipReadAll_Cleanup, "-CleanupTable called on silo startup. Membership table {0}",
                         table.ToString());
 
@@ -324,9 +324,8 @@ namespace Orleans.Runtime.MembershipService
             if (table.Contains(myAddress))
             {
                 var myTuple = table.Get(myAddress);
-                myEntry = myTuple.Item1;
+                myEntry = myTuple.Item1.Copy();
                 myEtag = myTuple.Item2;
-                myEntry.TryUpdateStartTime(this.siloStartTime);
                 if (myEntry.Status == SiloStatus.Dead) // check if the table already knows that I am dead
                 {
                     var msg = string.Format("I should be Dead according to membership table (in TryUpdateMyStatusGlobalOnce): myEntry = {0}.", myEntry.ToFullString());
@@ -397,21 +396,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (table is null) throw new ArgumentNullException(nameof(table)); 
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("-ReadAll (called from {Caller}) membership table {Table}", caller, table.ToString());
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    // Even if failed to clean up old entries from the table, still process the new entries. Will retry cleanup next time.
-                    await this.CleanupMyTableEntries(table);
-                }
-                // ReSharper disable once EmptyGeneralCatchClause
-                catch
-                {
-                    // just eat the exception.
-                }
-            });
-
+            
             // Update the current membership snapshot.
             MembershipTableSnapshot previous;
             var updated = MembershipTableSnapshot.Create(this.CreateLocalSiloEntry(this.CurrentStatus), table);
@@ -609,7 +594,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             var tuple = table.Get(silo);
-            var entry = tuple.Item1;
+            var entry = tuple.Item1.Copy();
             string eTag = tuple.Item2;
             if (log.IsEnabled(LogLevel.Debug)) log.Debug("-TryToSuspectOrKill {siloAddress}: The current status of {siloAddress} in the table is {status}, its entry is {entry}",
                 entry.SiloAddress, // First
@@ -722,6 +707,8 @@ namespace Orleans.Runtime.MembershipService
         {
             if (this.clusterMembershipOptions.LivenessEnabled)
             {
+                entry = entry.Copy();
+
                 // add the killer (myself) to the suspect list, for easier diagnosis later on.
                 entry.AddSuspector(myAddress, DateTime.UtcNow);
 
