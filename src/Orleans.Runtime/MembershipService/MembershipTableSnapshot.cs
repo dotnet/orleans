@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 
 namespace Orleans.Runtime.MembershipService
@@ -16,11 +17,17 @@ namespace Orleans.Runtime.MembershipService
 
         public static MembershipTableSnapshot Create(MembershipEntry localSiloEntry, MembershipTableData table)
         {
+            if (localSiloEntry is null) throw new ArgumentNullException(nameof(localSiloEntry));
+            if (table is null) throw new ArgumentNullException(nameof(table));
+
             var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
-            foreach (var item in table.Members)
+            if (table.Members != null)
             {
-                var entry = item.Item1;
-                entries.Add(entry.SiloAddress, entry);
+                foreach (var item in table.Members)
+                {
+                    var entry = item.Item1;
+                    entries.Add(entry.SiloAddress, entry);
+                }
             }
 
             if (entries.TryGetValue(localSiloEntry.SiloAddress, out var existing))

@@ -175,9 +175,8 @@ namespace Orleans.Runtime.MembershipService
             {
                 var targetMilliseconds = (int)this.clusterMembershipOptions.TableRefreshTimeout.TotalMilliseconds;
                 var random = new SafeRandom();
-                await Task.Delay(random.NextTimeSpan(this.clusterMembershipOptions.TableRefreshTimeout));
-
-                TimeSpan? onceOffDelay = default;
+                
+                TimeSpan? onceOffDelay = random.NextTimeSpan(this.clusterMembershipOptions.TableRefreshTimeout);
                 while (await this.membershipUpdateTimer.TickAsync(onceOffDelay))
                 {
                     onceOffDelay = default;
@@ -396,6 +395,7 @@ namespace Orleans.Runtime.MembershipService
 
         private void ProcessTableUpdate(MembershipTableData table, string caller)
         {
+            if (table is null) throw new ArgumentNullException(nameof(table)); 
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("-ReadAll (called from {Caller}) membership table {Table}", caller, table.ToString());
 
             _ = Task.Run(async () =>

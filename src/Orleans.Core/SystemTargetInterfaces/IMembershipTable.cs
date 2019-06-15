@@ -304,12 +304,12 @@ namespace Orleans
             SuspectTimes.Add(suspector);
         }
 
-        internal MembershipEntry WithStatus(SiloStatus status)
+        internal MembershipEntry Copy()
         {
             return new MembershipEntry
             {
                 SiloAddress = this.SiloAddress,
-                Status = status,
+                Status = this.Status,
                 HostName = this.HostName,
                 ProxyPort = this.ProxyPort,
 
@@ -322,6 +322,13 @@ namespace Orleans
                 StartTime = this.StartTime,
                 IAmAliveTime = this.IAmAliveTime,
             };
+        }
+
+        internal MembershipEntry WithStatus(SiloStatus status)
+        {
+            var updated = this.Copy();
+            updated.Status = status;
+            return updated;
         }
 
         internal List<Tuple<SiloAddress, DateTime>> GetFreshVotes(DateTime now, TimeSpan expiration)

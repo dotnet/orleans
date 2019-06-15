@@ -60,7 +60,7 @@ namespace Orleans.Configuration
         /// The expected size of a cluster. Need not be very accurate, can be an overestimate.
         /// </summary>
         public int ExpectedClusterSize { get; set; } = DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE;
-        public static readonly int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 20;
+        public static readonly int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 0;
         
         /// <summary>
         /// Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos.

@@ -7,6 +7,11 @@ using Xunit;
 using NSubstitute;
 using Orleans.Runtime;
 using System;
+using Orleans;
+using Xunit.Abstractions;
+using System.Linq;
+using TestExtensions;
+using Newtonsoft.Json;
 
 namespace NonSilo.Tests.Membership
 {
@@ -16,29 +21,100 @@ namespace NonSilo.Tests.Membership
     [TestCategory("BVT"), TestCategory("Membership")]
     public class MembershipTableManagerTests
     {
-        /*
-        [Fact]
-        public async Task MembershipTableManager_InitialSnapshot()
+        private readonly ITestOutputHelper output;
+        public MembershipTableManagerTests(ITestOutputHelper output)
         {
+            this.output = output;
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_Startup()
+        {
+            var loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
+            var log = loggerFactory.CreateLogger(nameof(MembershipTableManager_Startup));
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
-            localSiloDetails.SiloAddress.Returns(SiloAddress.FromParsableString("127.0.0.1:100@1"));
+            var localSilo = Silo("127.0.0.1:100@1");
+            localSiloDetails.SiloAddress.Returns(localSilo);
             localSiloDetails.DnsHostName.Returns("MyServer11");
             localSiloDetails.Name.Returns(Guid.NewGuid().ToString("N"));
+
+            var membershipTable = new InMemoryMembershipTable();
+
+            var fatalErrorHandler = Substitute.For<IFatalErrorHandler>();
+            var membershipGossiper = Substitute.For<IMembershipGossiper>();
+
+            var lifecycle = new SiloLifecycleSubject(loggerFactory.CreateLogger<SiloLifecycleSubject>());
 
             var manager = new MembershipTableManager(
                 localSiloDetails: localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
-                membershipTable: null,
-                fatalErrorHandler: null,
-                gossiper: null,
-                log: null,
-                loggerFactory: null);
-            await manager.Sta
-        }*/
+                membershipTable: membershipTable,
+                fatalErrorHandler: fatalErrorHandler,
+                gossiper: membershipGossiper,
+                log: loggerFactory.CreateLogger<MembershipTableManager>(),
+                loggerFactory: loggerFactory);
+
+            // Validate that the initial snapshot is valid and contains the local silo.
+            var initialSnapshot = manager.MembershipTableSnapshot;
+            Assert.NotNull(initialSnapshot);
+            Assert.NotNull(initialSnapshot.Entries);
+            Assert.NotNull(initialSnapshot.LocalSilo);
+            Assert.Equal(SiloStatus.Created, initialSnapshot.LocalSilo.Status);
+            Assert.Equal(localSiloDetails.Name, initialSnapshot.LocalSilo.SiloName);
+            Assert.Equal(localSiloDetails.DnsHostName, initialSnapshot.LocalSilo.HostName);
+            Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
+
+            Assert.NotNull(manager.MembershipTableUpdates);
+            var changes = manager.MembershipTableUpdates;
+            Assert.Equal(changes.Value.Version, manager.MembershipTableSnapshot.Version);
+            Assert.Empty(membershipTable.Calls);
+
+            // All of these checks were performed before any lifecycle methods have a chance to run.
+            // This is in order to verify that a service accessing membership in its constructor will
+            // see the correct results regardless of initialization order.
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
+
+            await lifecycle.OnStart();
+
+            var calls = membershipTable.Calls;
+            Assert.NotEmpty(calls);
+            Assert.Equal(2, calls.Count);
+            Assert.Equal(nameof(IMembershipTable.InitializeMembershipTable), calls[0].Method);
+            Assert.Equal(nameof(IMembershipTable.ReadAll), calls[1].Method);
+            membershipTable.ClearCalls();
+
+            // During initialization, a first read from the table will be performed, transitioning
+            // membership from version long.MinValue to version 0 (since it's a mock table here)
+            Assert.True(changes.NextAsync().IsCompleted);
+            var update1 = changes.NextAsync().GetAwaiter().GetResult();
+
+            // Transition to joining.
+            await manager.UpdateStatus(SiloStatus.Joining);
+            Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
+            Assert.Equal(SiloStatus.Joining, manager.MembershipTableSnapshot.LocalSilo.Status);
+
+            // An update should have been issued.
+            Assert.True(update1.NextAsync().IsCompleted);
+            Assert.NotEqual(update1.Value.Version, manager.MembershipTableSnapshot.Version);
+
+            var update2 = update1.NextAsync().GetAwaiter().GetResult();
+            Assert.Equal(update2.Value.Version, manager.MembershipTableSnapshot.Version);
+            var entry = Assert.Single(update2.Value.Entries);
+            Assert.Equal(localSilo, entry.Key);
+            Assert.Equal(localSilo, entry.Value.SiloAddress);
+            Assert.Equal(SiloStatus.Joining, entry.Value.Status);
+
+            calls = membershipTable.Calls;
+            Assert.NotEmpty(calls);
+            Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
+
+            await lifecycle.OnStop();
+            fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+        }
 
         // Initial snapshots are valid
         // Table refresh:
-        // * Does period refresh
+        // * Does periodic refresh
         // * Quick retry after exception
         // * Emits change notification
         // TrySuspectOrKill tests:
@@ -53,6 +129,19 @@ namespace NonSilo.Tests.Membership
         // Fault on missing entry during refresh
         // Fault on declared dead
         // Gossips on updates
+
+        private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
+
+        private static MembershipEntry Entry(SiloAddress address, SiloStatus status)
+        {
+            return new MembershipEntry { SiloAddress = address, Status = status };
+        }
+
+        private static MembershipTableData Table(params MembershipEntry[] entries)
+        {
+            var entryList = entries.Select(e => Tuple.Create(e, "test")).ToList();
+            return new MembershipTableData(entryList, new TableVersion(12, "test"));
+        }
     }
 
     [TestCategory("BVT"), TestCategory("Membership")]
