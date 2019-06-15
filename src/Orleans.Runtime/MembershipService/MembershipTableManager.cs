@@ -774,7 +774,6 @@ namespace Orleans.Runtime.MembershipService
             }
 
             {
-                var cancellation = new CancellationTokenSource();
                 var tasks = new List<Task>(1);
                 lifecycle.Subscribe(
                     nameof(MembershipTableManager),
