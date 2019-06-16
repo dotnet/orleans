@@ -16,7 +16,7 @@ namespace NonSilo.Tests.Membership
         private readonly object tableLock = new object();
         private readonly List<(string, object)> calls = new List<(string, object)>();
         private ImmutableList<(MembershipEntry, string)> entries = ImmutableList<(MembershipEntry, string)>.Empty;
-        private TableVersion version = new TableVersion(0, "*");
+        private TableVersion version = new TableVersion(0, "0");
 
         public InMemoryMembershipTable() { }
 
@@ -43,6 +43,15 @@ namespace NonSilo.Tests.Membership
         public void ClearCalls()
         {
             lock (this.tableLock) this.calls.Clear();
+        }
+
+        public void Reset()
+        {
+            lock (this.tableLock)
+            {
+                this.entries = ImmutableList<(MembershipEntry, string)>.Empty;
+                this.version = this.version.Next();
+            }
         }
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)

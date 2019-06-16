@@ -12,6 +12,7 @@ using Xunit.Abstractions;
 using System.Linq;
 using TestExtensions;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace NonSilo.Tests.Membership
 {
@@ -51,8 +52,8 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_Startup_FreshTable()
         {
-            var membershipTable = new InMemoryMembershipTable();
-            await this.StartupTest(membershipTable);
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
+            await this.StartupTest(membershipTable, gracefulShutdown: true);
         }
 
         /// <summary>
@@ -71,10 +72,10 @@ namespace NonSilo.Tests.Membership
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
-            await this.StartupTest(membershipTable);
+            await this.StartupTest(membershipTable, gracefulShutdown: false);
         }
 
-        private async Task StartupTest(InMemoryMembershipTable membershipTable)
+        private async Task StartupTest(InMemoryMembershipTable membershipTable, bool gracefulShutdown = true)
         {
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
@@ -140,8 +141,10 @@ namespace NonSilo.Tests.Membership
             Assert.NotEmpty(calls);
             Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.InsertRow)));
             Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
-
-            await this.lifecycle.OnStop();
+            
+            var cts = new CancellationTokenSource();
+            if (!gracefulShutdown) cts.Cancel();
+            await this.lifecycle.OnStop(cts.Token);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
         }
 
@@ -319,7 +322,9 @@ namespace NonSilo.Tests.Membership
 
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
-            await this.lifecycle.OnStop();
+            var cts = new CancellationTokenSource();
+            cts.Cancel();
+            await this.lifecycle.OnStop(cts.Token);
         }
 
         /// <summary>
@@ -378,10 +383,10 @@ namespace NonSilo.Tests.Membership
         //x Lifecycle tests:
         //x * Verify own memberhip table entry has correct properties
         //x * Cleans up old entries for same silo
-        // * Graceful & ungraceful shutdown
+        //x * Graceful shutdown
+        // * ungraceful shutdown
         // * Timer stalls?
         //x * Snapshot updated + change notification emitted after status update
-        // Fault on missing entry during refresh
         //x Fault on declared dead
         //x Gossips on updates
 
@@ -390,12 +395,6 @@ namespace NonSilo.Tests.Membership
         private static MembershipEntry Entry(SiloAddress address, SiloStatus status)
         {
             return new MembershipEntry { SiloAddress = address, Status = status };
-        }
-
-        private static MembershipTableData Table(params MembershipEntry[] entries)
-        {
-            var entryList = entries.Select(e => Tuple.Create(e, "test")).ToList();
-            return new MembershipTableData(entryList, new TableVersion(12, "test"));
         }
 
         private static List<T> ToList<T>(ChangeFeedEntry<T> entry)

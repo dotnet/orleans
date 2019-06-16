@@ -191,12 +191,6 @@ namespace Orleans.Runtime.MembershipService
                 while (await this.membershipUpdateTimer.TickAsync(onceOffDelay))
                 {
                     onceOffDelay = default;
-                    var snapshot = this.MembershipTableSnapshot;
-
-                    if (!snapshot.Entries.TryGetValue(this.localSiloDetails.SiloAddress, out var entry))
-                    {
-                        throw new OrleansMissingMembershipEntryException();
-                    }
 
                     try
                     {
