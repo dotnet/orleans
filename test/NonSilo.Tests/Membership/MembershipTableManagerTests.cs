@@ -348,9 +348,7 @@ namespace NonSilo.Tests.Membership
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
                 loggerFactory: this.loggerFactory);
-
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-
             await this.lifecycle.OnStart();
 
             // Silo should kill itself during the joining phase
@@ -374,17 +372,198 @@ namespace NonSilo.Tests.Membership
             await this.lifecycle.OnStop();
         }
 
+        /// <summary>
+        /// Try to suspect another silo of failing but discover that this silo has failed.
+        /// </summary>
+        /// <returns></returns>
+        [Fact]
+        public async Task MembershipTableManager_TrySuspectOrKill_ButIAmKill()
+        {
+            var otherSilos = new[]
+            {
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
+            };
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
+
+            var manager = new MembershipTableManager(
+                localSiloDetails: this.localSiloDetails,
+                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                membershipTable: membershipTable,
+                fatalErrorHandler: this.fatalErrorHandler,
+                gossiper: this.membershipGossiper,
+                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                loggerFactory: this.loggerFactory);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Active);
+
+            // Mark the silo as dead
+            while (true)
+            {
+                var table = await membershipTable.ReadAll();
+                var row = table.Members.Single(e => e.Item1.SiloAddress.Equals(this.localSilo));
+                var entry = row.Item1.WithStatus(SiloStatus.Dead);
+                if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
+            }
+
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await manager.TryToSuspectOrKill(otherSilos.First().SiloAddress);
+            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+        }
+
+        [Fact]
+        public async Task MembershipTableManager_TrySuspectOrKill_AlreadyDead()
+        {
+            var otherSilos = new[]
+            {
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead),
+            };
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
+
+            var manager = new MembershipTableManager(
+                localSiloDetails: this.localSiloDetails,
+                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                membershipTable: membershipTable,
+                fatalErrorHandler: this.fatalErrorHandler,
+                gossiper: this.membershipGossiper,
+                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                loggerFactory: this.loggerFactory);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Active);
+
+            var victim = otherSilos.Last().SiloAddress;
+            await manager.TryToSuspectOrKill(victim);
+            Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
+        }
+
+        /// <summary>
+        /// Declare a silo dead in a small, 2-silo cluster, requiring one vote ((2 + 1) / 2 = 1).
+        /// </summary>
+        [Fact]
+        public async Task MembershipTableManager_TrySuspectOrKill_DeclareDead_SmallCluster()
+        {
+            var otherSilos = new[]
+            {
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Dead),
+            };
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
+
+            var manager = new MembershipTableManager(
+                localSiloDetails: this.localSiloDetails,
+                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                membershipTable: membershipTable,
+                fatalErrorHandler: this.fatalErrorHandler,
+                gossiper: this.membershipGossiper,
+                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                loggerFactory: this.loggerFactory);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Active);
+
+            var victim = otherSilos.First().SiloAddress;
+            await manager.TryToSuspectOrKill(victim);
+            Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
+        }
+
+        /// <summary>
+        /// Declare a silo dead in a larger cluster, requiring 2 votes (per configuration).
+        /// </summary>
+        [Fact]
+        public async Task MembershipTableManager_TrySuspectOrKill_DeclareDead_LargerCluster()
+        {
+            var otherSilos = new[]
+            {
+                Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:300@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:400@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:500@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:600@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:700@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:800@100"), SiloStatus.Active),
+                Entry(Silo("127.0.0.1:900@100"), SiloStatus.Dead),
+            };
+            var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
+
+            var manager = new MembershipTableManager(
+                localSiloDetails: this.localSiloDetails,
+                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                membershipTable: membershipTable,
+                fatalErrorHandler: this.fatalErrorHandler,
+                gossiper: this.membershipGossiper,
+                log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
+                loggerFactory: this.loggerFactory);
+            ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
+            await this.lifecycle.OnStart();
+            await manager.UpdateStatus(SiloStatus.Active);
+
+            // Try to declare an unknown silo dead
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => manager.TryToSuspectOrKill(Silo("123.123.123.123:1@1")));
+
+            // Multiple votes from the same node should not result in the node being declared dead.
+            var victim = otherSilos.First().SiloAddress;
+            await manager.TryToSuspectOrKill(victim);
+            await manager.TryToSuspectOrKill(victim);
+            await manager.TryToSuspectOrKill(victim);
+            Assert.Equal(SiloStatus.Active, manager.MembershipTableSnapshot.GetSiloStatus(victim));
+
+            // Manually remove our vote and add another silo's vote so we can be the one to kill the silo.
+            while (true)
+            {
+                var table = await membershipTable.ReadAll();
+                var row = table.Members.Single(e => e.Item1.SiloAddress.Equals(victim));
+                var entry = row.Item1.Copy();
+                entry.SuspectTimes?.Clear();
+                entry.AddSuspector(otherSilos[2].SiloAddress, DateTime.UtcNow);
+                if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
+            }
+
+            await manager.TryToSuspectOrKill(victim);
+            Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
+
+            // One down, one to go. Now overshoot votes and kill ourselves instead (due to internal error).
+            victim = otherSilos[1].SiloAddress;
+            while (true)
+            {
+                var table = await membershipTable.ReadAll();
+                var row = table.Members.Single(e => e.Item1.SiloAddress.Equals(victim));
+                var entry = row.Item1.Copy();
+                entry.SuspectTimes?.Clear();
+                entry.AddSuspector(otherSilos[2].SiloAddress, DateTime.UtcNow);
+                entry.AddSuspector(otherSilos[3].SiloAddress, DateTime.UtcNow);
+                entry.AddSuspector(otherSilos[4].SiloAddress, DateTime.UtcNow);
+                if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
+            }
+
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await manager.TryToSuspectOrKill(victim);
+            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+
+            // We killed ourselves and should not have marked the other silo as dead.
+            await manager.Refresh();
+            Assert.Equal(SiloStatus.Active, manager.MembershipTableSnapshot.GetSiloStatus(victim));
+        }
+
         //x Initial snapshots are valid
         // Table refresh:
         // * Does periodic refresh
         // * Quick retry after exception
         // * Emits change notification
-        // TrySuspectOrKill tests:
+        //x TrySuspectOrKill tests:
+        //x * Notice I am dead during TrySuspectOrKill
+        //x * KeyNotFound (bad silo address)
+        //x * Already dead
+        //x * Overshoot votes - fatal error
+        //x * Declare dead: votes > config
+        //x * Declare dead: votes > half cluster
+        //x * Vote multiple times & don't declare dead
         //x Lifecycle tests:
         //x * Verify own memberhip table entry has correct properties
         //x * Cleans up old entries for same silo
         //x * Graceful shutdown
-        // * ungraceful shutdown
+        //x *  Ungraceful shutdown
         // * Timer stalls?
         //x * Snapshot updated + change notification emitted after status update
         //x Fault on declared dead
