@@ -83,6 +83,17 @@ namespace Orleans.Runtime.MembershipService
         {
             var table = await this.membershipTableProvider.ReadAll();
             this.ProcessTableUpdate(table, "Refresh");
+            try
+            {
+                await CleanupMyTableEntries(table);
+            }
+            catch (Exception exception)
+            {
+                this.log.LogWarning(
+                    "Exception while trying to clean up my table entries: {Exception}",
+                    exception);
+            }
+
             return table;
         }
 
@@ -527,14 +538,8 @@ namespace Orleans.Runtime.MembershipService
         {
             var msg = "I have been told I am dead, so this silo will stop! " + reason;
             log.Error(ErrorCode.MembershipKillMyselfLocally, msg);
-            bool alreadyStopping = CurrentStatus.IsTerminating();
-
             this.CurrentStatus = SiloStatus.Dead;
-
-            if (!alreadyStopping)
-            {
-                this.fatalErrorHandler.OnFatalException(this, msg, null);
-            }
+            this.fatalErrorHandler.OnFatalException(this, msg, null);
         }
 
         private async Task GossipToOthers(SiloAddress updatedSilo, SiloStatus updatedStatus)
