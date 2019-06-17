@@ -40,6 +40,8 @@ namespace NonSilo.Tests.Membership
             }
         }
 
+        public Action OnReadAll { get; set; }
+
         public void ClearCalls()
         {
             lock (this.tableLock) this.calls.Clear();
@@ -118,6 +120,7 @@ namespace NonSilo.Tests.Membership
 
         public Task<MembershipTableData> ReadAll()
         {
+            this.OnReadAll?.Invoke();
             lock (this.tableLock)
             {
                 this.calls.Add((nameof(ReadAll), null));

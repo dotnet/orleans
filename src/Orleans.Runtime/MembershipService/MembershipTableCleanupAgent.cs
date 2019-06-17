@@ -17,22 +17,21 @@ namespace Orleans.Runtime.MembershipService
         private readonly ClusterMembershipOptions clusterMembershipOptions;
         private readonly IMembershipTable membershipTableProvider;
         private readonly ILogger<MembershipTableCleanupAgent> log;
-        private readonly CheckedTimer cleanupDefunctSilosTimer;
+        private readonly IAsyncTimer cleanupDefunctSilosTimer;
 
         public MembershipTableCleanupAgent(
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IMembershipTable membershipTableProvider,
             ILogger<MembershipTableCleanupAgent> log,
-            ILoggerFactory loggerFactory)
+            IAsyncTimerFactory timerFactory)
         {
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
             this.membershipTableProvider = membershipTableProvider;
             this.log = log;
             if (this.clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
             {
-                this.cleanupDefunctSilosTimer = new CheckedTimer(
+                this.cleanupDefunctSilosTimer = timerFactory.Create(
                     this.clusterMembershipOptions.DefunctSiloCleanupPeriod.Value,
-                    loggerFactory,
                     nameof(CleanupDefunctSilos));
             }
         }
@@ -58,7 +57,7 @@ namespace Orleans.Runtime.MembershipService
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting membership table cleanup agent");
             try
             {
-                while (await this.cleanupDefunctSilosTimer.TickAsync())
+                while (await this.cleanupDefunctSilosTimer.NextTick())
                 {
                     try
                     {

@@ -23,7 +23,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IServiceProvider serviceProvider;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
-        private readonly CheckedTimer monitorClusterHealthTimer;
+        private readonly IAsyncTimer monitorClusterHealthTimer;
         private int probeNumber;
 
         public ClusterHealthMonitor(
@@ -32,18 +32,16 @@ namespace Orleans.Runtime.MembershipService
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IFatalErrorHandler fatalErrorHandler,
             IServiceProvider serviceProvider,
-            ILoggerFactory loggerFactory)
+            IAsyncTimerFactory timerFactory)
         {
             this.tableManager = tableManager;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
             this.serviceProvider = serviceProvider;
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
-            this.monitorClusterHealthTimer = new CheckedTimer(
+            this.monitorClusterHealthTimer = timerFactory.Create(
                 this.clusterMembershipOptions.ProbeTimeout,
-                loggerFactory,
-                nameof(MonitorClusterHealth),
-                this.cancellation.Token);
+                nameof(MonitorClusterHealth));
         }
 
         private ImmutableDictionary<SiloAddress, SiloHealthMonitor> MonitoredSilos { get; set; } = ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
@@ -131,7 +129,7 @@ namespace Orleans.Runtime.MembershipService
                 var random = new SafeRandom();
                 TimeSpan? onceOffDelay = random.NextTimeSpan(this.clusterMembershipOptions.ProbeTimeout);
 
-                while (await this.monitorClusterHealthTimer.TickAsync(onceOffDelay))
+                while (await this.monitorClusterHealthTimer.NextTick(onceOffDelay))
                 {
                     if (onceOffDelay != default) onceOffDelay = default;
                     _ = this.ProbeMonitoredSilos();
@@ -316,6 +314,7 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnBecomeActiveStop(CancellationToken ct)
             {
+                this.monitorClusterHealthTimer.Dispose();
                 this.cancellation.Cancel(throwOnFirstException: false);
 
                 // Stop waiting for graceful shutdown when the provided cancellation token is cancelled

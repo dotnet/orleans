@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal class CheckedTimer : IDisposable, IHealthCheckable
+    internal class AsyncTimer : IAsyncTimer
     {
         /// <summary>
         /// Timers can fire up to 3 seconds late before a warning is emitted and the instance is deemed unhealthy.
@@ -19,39 +19,30 @@ namespace Orleans.Runtime
         private DateTime lastFired = DateTime.MinValue;
         private bool wasDelayed;
 
-        public CheckedTimer(
-            TimeSpan period,
-            ILoggerFactory loggerFactory,
-            string name,
-            CancellationToken? cancellationToken = default)
+        public AsyncTimer(TimeSpan period, ILogger log)
         {
-            if (cancellationToken is null)
-            {
-                this.cancellation = new CancellationTokenSource();
-                this.cancellationTask = this.cancellation.Token.WhenCancelled();
-            }
-            else
-            {
-                this.cancellation = null;
-                this.cancellationTask = cancellationToken?.WhenCancelled();
-            }
-
-            this.log = loggerFactory.CreateLogger($"{nameof(CheckedTimer)}-{name}");
+            this.cancellation = new CancellationTokenSource();
+            this.cancellationTask = this.cancellation.Token.WhenCancelled();
+            this.log = log;
             this.period = period;
         }
 
         /// <summary>
         /// Returns a task which completes after the required delay.
         /// </summary>
-        /// <param name="delay">An optional override to this timer's configured period.</param>
+        /// <param name="overrideDelay">An optional override to this timer's configured period.</param>
         /// <returns><see langword="true"/> if the timer completed or <see langword="false"/> if the timer was cancelled</returns>
-        public async Task<bool> TickAsync(TimeSpan? delay = default)
+        public async Task<bool> NextTick(TimeSpan? overrideDelay = default)
         {
             if (this.cancellationTask.IsCompleted) return false;
 
-            // Determine how long to wait for.
             var now = DateTime.UtcNow;
-            if (delay == default)
+            TimeSpan delay;
+            if (overrideDelay.HasValue)
+            {
+                delay = overrideDelay.Value;
+            }
+            else
             {
                 if (this.lastFired == DateTime.MinValue)
                 {
@@ -67,12 +58,12 @@ namespace Orleans.Runtime
 
             if (delay > TimeSpan.Zero)
             {
-                var resultTask = await Task.WhenAny(this.cancellationTask, Task.Delay(delay.Value));
+                var resultTask = await Task.WhenAny(this.cancellationTask, Task.Delay(delay));
                 if (ReferenceEquals(resultTask, this.cancellationTask)) return false;
             }
 
             var actual = this.lastFired = DateTime.UtcNow;
-            var dueTime = now.Add(delay.Value);
+            var dueTime = now.Add(delay);
             var overshoot = actual.Subtract(dueTime).Duration();
             this.wasDelayed = overshoot > TimerDelaySlack;
             if (this.wasDelayed)

@@ -21,7 +21,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
         private readonly ILogger<MembershipAgent> log;
-        private readonly CheckedTimer iAmAliveTimer;
+        private readonly IAsyncTimer iAmAliveTimer;
 
         public MembershipAgent(
             MembershipTableManager tableManager,
@@ -30,7 +30,7 @@ namespace Orleans.Runtime.MembershipService
             IFatalErrorHandler fatalErrorHandler,
             IOptions<ClusterMembershipOptions> options,
             ILogger<MembershipAgent> log,
-            ILoggerFactory loggerFactory)
+            IAsyncTimerFactory timerFactory)
         {
             this.tableManager = tableManager;
             this.clusterHealthMonitor = clusterHealthMonitor;
@@ -38,11 +38,9 @@ namespace Orleans.Runtime.MembershipService
             this.fatalErrorHandler = fatalErrorHandler;
             this.clusterMembershipOptions = options.Value;
             this.log = log;
-            this.iAmAliveTimer = new CheckedTimer(
+            this.iAmAliveTimer = timerFactory.Create(
                 this.clusterMembershipOptions.IAmAliveTablePublishTimeout,
-                loggerFactory,
-                nameof(UpdateIAmAlive),
-                this.cancellation.Token);
+                nameof(UpdateIAmAlive));
         }
         
         private async Task ProcessMembershipUpdates()
@@ -106,7 +104,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 TimeSpan? onceOffDelay = default;
-                while (!this.tableManager.CurrentStatus.IsTerminating() && await this.iAmAliveTimer.TickAsync(onceOffDelay))
+                while (!this.tableManager.CurrentStatus.IsTerminating() && await this.iAmAliveTimer.NextTick(onceOffDelay))
                 {
                     onceOffDelay = default;
 
@@ -297,6 +295,7 @@ namespace Orleans.Runtime.MembershipService
 
                 async Task OnRuntimeInitializeStop(CancellationToken ct)
                 {
+                    this.iAmAliveTimer.Dispose();
                     this.cancellation.Cancel();
                     await Task.WhenAny(
                         Task.Run(() => this.KillMyself()),
@@ -336,6 +335,7 @@ namespace Orleans.Runtime.MembershipService
 
                 async Task OnBecomeActiveStop(CancellationToken ct)
                 {
+                    this.iAmAliveTimer.Dispose();
                     this.cancellation.Cancel(throwOnFirstException: false);
                     var cancellationTask = ct.WhenCancelled();
                     var task = await Task.WhenAny(cancellationTask, this.Shutdown());
