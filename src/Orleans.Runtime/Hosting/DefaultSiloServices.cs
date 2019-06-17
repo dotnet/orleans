@@ -133,6 +133,7 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IMultiClusterOracle, MultiClusterOracle>();
             services.TryAddSingleton<DeploymentLoadPublisher>();
 
+            services.TryAddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
             services.TryAddSingleton<MembershipTableManager>();
             services.AddFromExisting<IHealthCheckParticipant, MembershipTableManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
