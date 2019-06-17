@@ -1,4 +1,4 @@
-namespace Orleans.Runtime
+﻿namespace Orleans.Runtime
 {
     /// <summary>
     /// Interface for types which listen to silo status change notifications.

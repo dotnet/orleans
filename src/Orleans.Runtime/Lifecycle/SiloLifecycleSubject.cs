@@ -1,8 +1,9 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,7 +18,7 @@ namespace Orleans.Runtime
         private readonly List<MonitoredObserver> observers;
 
         public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger)
-            : base(logger)
+            :base(logger)
         {
             this.logger = logger;
             this.observers = new List<MonitoredObserver>();

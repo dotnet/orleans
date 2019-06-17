@@ -4,17 +4,22 @@ using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Threading;
+using System.Collections.Immutable;
+using Orleans.Concurrency;
 
 namespace Orleans.Runtime.MembershipService
 {
+    /// <summary>
+    /// Manages <see cref="ISiloStatusListener"/> instances.
+    /// </summary>
     internal class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener> listeners
-            = new ConcurrentDictionary<ISiloStatusListener, ISiloStatusListener>(ReferenceEqualsComparer<ISiloStatusListener>.Instance);
+        private readonly object listenersLock = new object();
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly MembershipTableManager membershipTableManager;
         private readonly ILogger<SiloStatusListenerManager> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
+        private ImmutableList<WeakReference<ISiloStatusListener>> listeners = ImmutableList<WeakReference<ISiloStatusListener>>.Empty;
 
         public SiloStatusListenerManager(
             MembershipTableManager membershipTableManager,
@@ -26,9 +31,46 @@ namespace Orleans.Runtime.MembershipService
             this.fatalErrorHandler = fatalErrorHandler;
         }
 
-        public bool Subscribe(ISiloStatusListener listener) => this.listeners.TryAdd(listener, listener);
+        public bool Subscribe(ISiloStatusListener listener)
+        {
+            lock (this.listenersLock)
+            {
+                foreach (var reference in this.listeners)
+                {
+                    if (!reference.TryGetTarget(out var existing))
+                    {
+                        continue;
+                    }
 
-        public bool Unsubscribe(ISiloStatusListener listener) => this.listeners.TryRemove(listener, out _);
+                    if (ReferenceEquals(existing, listener)) return false;
+                }
+
+                this.listeners = this.listeners.Add(new WeakReference<ISiloStatusListener>(listener));
+                return true;
+            }
+        }
+
+        public bool Unsubscribe(ISiloStatusListener listener)
+        {
+            lock (this.listenersLock)
+            {
+                for (var i = 0; i < this.listeners.Count; i++)
+                {
+                    if (!this.listeners[i].TryGetTarget(out var existing))
+                    {
+                        continue;
+                    }
+
+                    if (ReferenceEquals(existing, listener))
+                    {
+                        this.listeners = this.listeners.RemoveAt(i);
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
 
         private async Task ProcessMembershipUpdates()
         {
@@ -83,13 +125,23 @@ namespace Orleans.Runtime.MembershipService
         private void NotifyObservers(ClusterMembershipUpdate update)
         {
             if (!update.HasChanges) return;
+
+            List<WeakReference<ISiloStatusListener>> toRemove = null;
+            var subscribers = this.listeners;
             foreach (var change in update.Changes)
             {
-                foreach (var listener in this.listeners)
+                for (var i = 0; i < subscribers.Count; ++i)
                 {
+                    if (!subscribers[i].TryGetTarget(out var listener))
+                    {
+                        if (toRemove is null) toRemove = new List<WeakReference<ISiloStatusListener>>();
+                        toRemove.Add(subscribers[i]);
+                        continue;
+                    }
+
                     try
                     {
-                        listener.Key.SiloStatusChangeNotification(change.SiloAddress, change.Status);
+                        listener.SiloStatusChangeNotification(change.SiloAddress, change.Status);
                     }
                     catch (Exception exception)
                     {
@@ -98,6 +150,16 @@ namespace Orleans.Runtime.MembershipService
                             listener,
                             exception);
                     }
+                }
+            }
+
+            if (toRemove != null)
+            {
+                lock (this.listenersLock)
+                {
+                    var builder = this.listeners.ToBuilder();
+                    foreach (var entry in toRemove) builder.Remove(entry);
+                    this.listeners = builder.ToImmutable();
                 }
             }
         }

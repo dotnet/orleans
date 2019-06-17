@@ -1,4 +1,6 @@
-﻿namespace NonSilo.Tests.Membership
+using System.Threading.Tasks;
+
+namespace NonSilo.Tests.Membership
 {
     [TestCategory("BVT"), TestCategory("Membership")]
     public class ClusterHealthMonitorTests

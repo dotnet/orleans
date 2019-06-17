@@ -5,7 +5,6 @@ namespace Orleans.Runtime
     [Serializable]
     internal sealed class ClusterMember : IEquatable<ClusterMember>
     {
-
         public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name)
         {
             this.SiloAddress = siloAddress ?? throw new ArgumentNullException(nameof(siloAddress));

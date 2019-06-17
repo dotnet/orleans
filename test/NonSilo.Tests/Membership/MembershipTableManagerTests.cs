@@ -55,7 +55,7 @@ namespace NonSilo.Tests.Membership
         public async Task MembershipTableManager_NewCluster()
         {
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
-            await this.BasicTest(membershipTable, gracefulShutdown: true);
+            await this.BasicScenarioTest(membershipTable, gracefulShutdown: true);
         }
 
         /// <summary>
@@ -74,10 +74,10 @@ namespace NonSilo.Tests.Membership
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
-            await this.BasicTest(membershipTable, gracefulShutdown: false);
+            await this.BasicScenarioTest(membershipTable, gracefulShutdown: false);
         }
 
-        private async Task BasicTest(InMemoryMembershipTable membershipTable, bool gracefulShutdown = true)
+        private async Task BasicScenarioTest(InMemoryMembershipTable membershipTable, bool gracefulShutdown = true)
         {
             var timers = new List<DelegateAsyncTimer>();
             var timerCalls = new ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
@@ -411,7 +411,6 @@ namespace NonSilo.Tests.Membership
         /// <summary>
         /// Try to suspect another silo of failing but discover that this silo has failed.
         /// </summary>
-        /// <returns></returns>
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_ButIAmKill()
         {
@@ -447,6 +446,9 @@ namespace NonSilo.Tests.Membership
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
         }
 
+        /// <summary>
+        /// Try to suspect another silo of failing but discover that it is already dead.
+        /// </summary>
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_AlreadyDead()
         {
@@ -648,28 +650,6 @@ namespace NonSilo.Tests.Membership
             Assert.False(timerCalls.TryDequeue(out timer));
             await this.lifecycle.OnStop();
         }
-
-        //x Initial snapshots are valid
-        //x Table refresh:
-        //x * Does periodic refresh
-        //x * Quick retry after exception
-        //x * Emits change notification
-        //x TrySuspectOrKill tests:
-        //x * Notice I am dead during TrySuspectOrKill
-        //x * KeyNotFound (bad silo address)
-        //x * Already dead
-        //x * Overshoot votes - fatal error
-        //x * Declare dead: votes > config
-        //x * Declare dead: votes > half cluster
-        //x * Vote multiple times & don't declare dead
-        //x Lifecycle tests:
-        //x * Verify own memberhip table entry has correct properties
-        //x * Cleans up old entries for same silo
-        //x * Graceful shutdown
-        //x *  Ungraceful shutdown
-        //x * Snapshot updated + change notification emitted after status update
-        //x Fault on declared dead
-        //x Gossips on updates
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
