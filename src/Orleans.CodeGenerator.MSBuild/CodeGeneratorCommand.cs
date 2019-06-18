@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -123,9 +123,15 @@ namespace Orleans.CodeGenerator.MSBuild
             this.Log.LogDebug($"GetCompilation completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
 
+            if (!compilation.SyntaxTrees.Any())
+            {
+                this.Log.LogWarning($"Skipping empty project, {compilation.AssemblyName}.");
+                return true;
+            }
+
             if (compilation.ReferencedAssemblyNames.All(name => name.Name != AbstractionsAssemblyShortName))
             {
-                this.Log.LogWarning($"Assembly {compilation.AssemblyName} does not reference {AbstractionsAssemblyShortName} (references: {string.Join(", ", compilation.ReferencedAssemblyNames)})");
+                this.Log.LogWarning($"Project {compilation.AssemblyName} does not reference {AbstractionsAssemblyShortName} (references: {string.Join(", ", compilation.ReferencedAssemblyNames)})");
                 return false;
             }
 
