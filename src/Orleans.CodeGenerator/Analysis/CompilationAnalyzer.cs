@@ -153,7 +153,7 @@ namespace Orleans.CodeGenerator.Analysis
             }
             else
             {
-                foreach (var field in type.GetAllMembers<IFieldSymbol>())
+                foreach (var field in type.GetInstanceMembers<IFieldSymbol>())
                 {
                     ExpandGenericArguments(field.Type);
                 }
@@ -180,8 +180,19 @@ namespace Orleans.CodeGenerator.Analysis
         {
             this.serializationTypesToProcess.Add(type);
             this.grainInterfacesToProcess.Add(type);
-            foreach (var method in type.GetAllMembers<IMethodSymbol>())
+            foreach (var method in type.GetInstanceMembers<IMethodSymbol>())
             {
+                var awaitable = IsAwaitable(method);
+
+                if (!awaitable && !method.ReturnsVoid)
+                {
+                    var message = $"Grain interface {type} has method {method} which returns a non-awaitable type {method.ReturnType}."
+                        + " All grain interface methods must return awaitable types."
+                        + $" Did you mean to return Task<{method.ReturnType}>?";
+                    this.log.LogError(message);
+                    throw new InvalidOperationException(message);
+                }
+
                 if (method.ReturnType is INamedTypeSymbol returnType)
                 {
                     foreach (var named in ExpandType(returnType).OfType<INamedTypeSymbol>())
@@ -202,6 +213,22 @@ namespace Orleans.CodeGenerator.Analysis
                         }
                     }
                 }
+            }
+
+            bool IsAwaitable(IMethodSymbol method)
+            {
+                foreach (var member in method.ReturnType.GetMembers("GetAwaiter"))
+                {
+                    if (member.IsStatic) continue;
+                    if (member is IMethodSymbol m && HasZeroParameters(m))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+
+                bool HasZeroParameters(IMethodSymbol m) => m.Parameters.Length == 0 && m.TypeParameters.Length == 0;
             }
         }
 

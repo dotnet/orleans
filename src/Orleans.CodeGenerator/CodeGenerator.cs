@@ -229,7 +229,7 @@ namespace Orleans.CodeGenerator
 
             if (accessible)
             {
-                var genericMethod = type.GetAllMembers<IMethodSymbol>().FirstOrDefault(m => m.IsGenericMethod);
+                var genericMethod = type.GetInstanceMembers<IMethodSymbol>().FirstOrDefault(m => m.IsGenericMethod);
                 if (genericMethod != null && this.wellKnownTypes.GenericMethodInvoker is WellKnownTypes.None)
                 {
                     if (this.log.IsEnabled(LogLevel.Warning))
@@ -262,9 +262,8 @@ namespace Orleans.CodeGenerator
 
                 foreach (var iface in GetAllInterfaces(initialType))
                 {
-                    foreach (var member in iface.GetMembers())
+                    foreach (var method in iface.GetDeclaredInstanceMembers<IMethodSymbol>())
                     {
-                        if (!(member is IMethodSymbol method)) continue;
                         yield return new GrainMethodDescription(this.wellKnownTypes.GetMethodId(method), method);
                     }
                 }
@@ -393,7 +392,7 @@ namespace Orleans.CodeGenerator
             if (this.compilationAnalyzer.IsFromKnownAssembly(type) && isSerializable)
             {
                 // Skip types which have fields whose types are inaccessible from generated code.
-                foreach (var field in type.GetAllMembers<IFieldSymbol>())
+                foreach (var field in type.GetInstanceMembers<IFieldSymbol>())
                 {
                     // Ignore fields which won't be serialized anyway.
                     if (!SerializerGenerator.ShouldSerializeField(this.wellKnownTypes, field))
