@@ -161,7 +161,7 @@ namespace Orleans
                         Utils.SafeExecute(() => (this.runtimeClient as OutsideRuntimeClient)?.Disconnect());
                     }
 
-                    Utils.SafeExecute(() => this.runtimeClient.Reset(gracefully));
+                    Utils.SafeExecute(() => (this.runtimeClient as OutsideRuntimeClient)?.Reset(gracefully));
                     this.Dispose(true);
                 }
                 finally
