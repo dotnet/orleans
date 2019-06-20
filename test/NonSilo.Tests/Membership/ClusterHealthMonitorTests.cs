@@ -240,7 +240,7 @@ namespace NonSilo.Tests.Membership
 
         private static async Task Until(Func<bool> condition)
         {
-            var maxTimeout = 20_000;
+            var maxTimeout = 40_000;
             while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
             Assert.True(maxTimeout > 0);
         }
