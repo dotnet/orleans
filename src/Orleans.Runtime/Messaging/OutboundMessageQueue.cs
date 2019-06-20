@@ -153,7 +153,14 @@ namespace Orleans.Runtime.Messaging
             {
                 if (sender.IsValueCreated)
                 {
-                    sender.Value.Stop();
+                    try
+                    {
+                        sender.Value.Stop();
+                    }
+                    catch
+                    {
+                    }
+
                     sender.Value.Dispose();
                 }
             }

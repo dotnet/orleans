@@ -113,5 +113,7 @@
     <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
     <DotNetCliToolReference Include="dotnet-xunit" Version="$(DotNetxUnitVersion)" />
+    <PackageReference Include="NSubstitute" Version="$(NSubstituteVersion)" />
+    <PackageReference Include="NSubstitute.Analyzers.CSharp" Version="$(NSubstituteAnalyzersCSharpVersion)" />
   </ItemGroup>
 </Project>

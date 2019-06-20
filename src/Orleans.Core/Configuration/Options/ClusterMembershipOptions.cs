@@ -1,5 +1,6 @@
 
 using System;
+using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
@@ -109,5 +110,7 @@ namespace Orleans.Configuration
         /// TEST ONLY - Do not modify in production environments
         /// </summary>
         public bool IsRunningAsUnitTest { get; set; } = false;
+
+        internal TimeSpan AllowedIAmAliveMissPeriod => this.IAmAliveTablePublishTimeout.Multiply(this.NumMissedTableIAmAliveLimit);
     }
 }

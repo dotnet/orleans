@@ -661,7 +661,6 @@ namespace Orleans.Runtime
 
         public void Reset(bool cleanup)
         {
-            throw new InvalidOperationException();
         }
 
         /// <inheritdoc />
