@@ -32,6 +32,11 @@ namespace Orleans
         public const int RuntimeGrainServices = 8000;
 
         /// <summary>
+        /// After runtime services have started.
+        /// </summary>
+        public const int AfterRuntimeGrainServices = 8100;
+
+        /// <summary>
         /// Start application layer services
         /// </summary>
         public const int ApplicationServices = 10000;

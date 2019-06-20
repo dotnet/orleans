@@ -15,3 +15,6 @@ using System.Runtime.CompilerServices;
 
 // Legacy provider support
 [assembly: InternalsVisibleTo("Orleans.Runtime.Legacy")]
+
+// Mocking libraries
+[assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
