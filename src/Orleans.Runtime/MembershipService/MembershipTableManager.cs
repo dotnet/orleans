@@ -53,11 +53,8 @@ namespace Orleans.Runtime.MembershipService
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
             this.myAddress = this.localSiloDetails.SiloAddress;
             this.log = log;
-            
-            var backOffMax = StandardExtensions.Max(EXP_BACKOFF_STEP.Multiply(this.clusterMembershipOptions.ExpectedClusterSize), SiloMessageSender.CONNECTION_RETRY_DELAY.Multiply(2));
-            this.EXP_BACKOFF_CONTENTION_MAX = backOffMax;
-            this.EXP_BACKOFF_ERROR_MAX = backOffMax;
 
+            this.EXP_BACKOFF_ERROR_MAX = this.EXP_BACKOFF_CONTENTION_MAX = clusterMembershipOptions.Value.MaxOperationBackoffTime;
             this.snapshot = new MembershipTableSnapshot(
                     this.CreateLocalSiloEntry(this.CurrentStatus),
                     MembershipVersion.MinValue,
@@ -113,18 +110,6 @@ namespace Orleans.Runtime.MembershipService
 
                 // Init the membership table.
                 await this.membershipTableProvider.InitializeMembershipTable(true);
-
-                if (this.clusterMembershipOptions.ExpectedClusterSize > 1)
-                {
-                    // randomly delay the startup, so not all silos write to the table at once.
-                    // Use random time not larger than MaxJoinAttemptTime, one minute and 0.5sec*ExpectedClusterSize;
-                    // Skip waiting if we expect only one member for the cluster.
-                    var random = new SafeRandom();
-                    var maxDelay = TimeSpan.FromMilliseconds(500).Multiply(this.clusterMembershipOptions.ExpectedClusterSize);
-                    maxDelay = StandardExtensions.Min(maxDelay, StandardExtensions.Min(this.clusterMembershipOptions.MaxJoinAttemptTime, TimeSpan.FromMinutes(1)));
-                    var randomDelay = random.NextTimeSpan(maxDelay);
-                    await Task.Delay(randomDelay);
-                }
                 
                 var table = await this.RefreshInternal();
 
