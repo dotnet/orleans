@@ -1,4 +1,4 @@
-namespace Orleans.Runtime
+﻿namespace Orleans.Runtime
 {
     /// <summary>
     /// Authoritative source for cluster membership.
