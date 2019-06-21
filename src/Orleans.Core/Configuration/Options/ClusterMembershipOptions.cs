@@ -55,13 +55,7 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan MaxJoinAttemptTime { get; set; } = DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
         public static readonly TimeSpan DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME = TimeSpan.FromMinutes(5); // 5 min
-
-        /// <summary>
-        /// The maximum amount of time to wait between operation retries.
-        /// </summary>
-        public TimeSpan MaxOperationBackoffTime { get; set; } = DEFAULT_MAX_OPERATION_BACKOFF_TIME;
-        public static readonly TimeSpan DEFAULT_MAX_OPERATION_BACKOFF_TIME = TimeSpan.FromSeconds(2);
-        
+                
         /// <summary>
         /// Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos.
         /// </summary>

@@ -19,10 +19,10 @@ namespace Orleans.Runtime.MembershipService
         private const int NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS = -1;
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MIN = TimeSpan.FromMilliseconds(1000);
         private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromMilliseconds(100);
-        private readonly TimeSpan EXP_BACKOFF_ERROR_MAX;
-        private readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX; // set based on config
+        private static readonly TimeSpan EXP_BACKOFF_ERROR_MAX = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX = TimeSpan.FromMinutes(1);
         private static readonly TimeSpan EXP_BACKOFF_STEP = TimeSpan.FromMilliseconds(1000);
-        private readonly static TimeSpan ShutdownGossipTimeout = TimeSpan.FromMilliseconds(3000);
+        private static readonly TimeSpan ShutdownGossipTimeout = TimeSpan.FromMilliseconds(3000);
 
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IMembershipGossiper gossiper;
@@ -54,7 +54,6 @@ namespace Orleans.Runtime.MembershipService
             this.myAddress = this.localSiloDetails.SiloAddress;
             this.log = log;
 
-            this.EXP_BACKOFF_ERROR_MAX = this.EXP_BACKOFF_CONTENTION_MAX = clusterMembershipOptions.Value.MaxOperationBackoffTime;
             this.snapshot = new MembershipTableSnapshot(
                     this.CreateLocalSiloEntry(this.CurrentStatus),
                     MembershipVersion.MinValue,
@@ -220,8 +219,8 @@ namespace Orleans.Runtime.MembershipService
                     (result, i) => result == false,   // if failed to Update on contention - retry   
                     (exc, i) => true,            // Retry on errors.          
                     timeout,
-                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, this.EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
-                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, this.EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
+                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
+                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
             );
         }
 
