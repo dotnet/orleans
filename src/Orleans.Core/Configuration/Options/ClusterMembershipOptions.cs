@@ -55,13 +55,7 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan MaxJoinAttemptTime { get; set; } = DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
         public static readonly TimeSpan DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME = TimeSpan.FromMinutes(5); // 5 min
-
-        /// <summary>
-        /// The expected size of a cluster. Need not be very accurate, can be an overestimate.
-        /// </summary>
-        public int ExpectedClusterSize { get; set; } = DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE;
-        public static readonly int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 20;
-        
+                
         /// <summary>
         /// Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos.
         /// </summary>

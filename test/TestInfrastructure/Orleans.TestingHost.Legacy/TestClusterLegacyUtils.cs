@@ -1,4 +1,4 @@
-﻿using Orleans.Configuration;
+using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
 using System;
 
@@ -20,7 +20,6 @@ namespace Orleans.TestingHost.Legacy
                 DeathVoteExpirationTimeout = config.DeathVoteExpirationTimeout,
                 IAmAliveTablePublishTimeout = config.IAmAliveTablePublishTimeout,
                 MaxJoinAttemptTime = config.MaxJoinAttemptTime,
-                ExpectedClusterSize = config.ExpectedClusterSize,
                 ValidateInitialConnectivity = config.ValidateInitialConnectivity,
                 NumMissedProbesLimit = config.NumMissedProbesLimit,
                 UseLivenessGossip = config.UseLivenessGossip,

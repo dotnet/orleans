@@ -315,7 +315,6 @@ namespace Orleans.Hosting
                     options.DeathVoteExpirationTimeout = config.DeathVoteExpirationTimeout;
                     options.IAmAliveTablePublishTimeout = config.IAmAliveTablePublishTimeout;
                     options.MaxJoinAttemptTime = config.MaxJoinAttemptTime;
-                    options.ExpectedClusterSize = config.ExpectedClusterSize;
                     options.ValidateInitialConnectivity = config.ValidateInitialConnectivity;
                     options.NumMissedProbesLimit = config.NumMissedProbesLimit;
                     options.UseLivenessGossip = config.UseLivenessGossip;
