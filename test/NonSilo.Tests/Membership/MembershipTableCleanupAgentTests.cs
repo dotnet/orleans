@@ -9,6 +9,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
+using Tester;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -71,10 +72,13 @@ namespace NonSilo.Tests.Membership
             await lifecycle.OnStart();
             Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
 
+            if (enabled) await Until(() => timerCalls.Count > 0);
+
             Assert.Equal(enabled, timerCalls.TryDequeue(out var timer));
             timer.Completion?.TrySetResult(true);
 
             var stopped = lifecycle.OnStop();
+            if (enabled) await Until(() => timerCalls.Count > 0);
             while (timerCalls.TryDequeue(out timer)) timer.Completion.TrySetResult(false);
             if (enabled)
             {
@@ -85,6 +89,12 @@ namespace NonSilo.Tests.Membership
                 Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
             }
             await stopped;
+        }
+        private static async Task Until(Func<bool> condition)
+        {
+            var maxTimeout = 40_000;
+            while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
+            Assert.True(maxTimeout > 0);
         }
     }
 }

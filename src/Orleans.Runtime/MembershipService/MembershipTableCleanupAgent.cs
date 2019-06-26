@@ -85,11 +85,11 @@ namespace Orleans.Runtime.MembershipService
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             var tasks = new List<Task>();
-            lifecycle.Subscribe(nameof(MembershipTableCleanupAgent), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
+            lifecycle.Subscribe(nameof(MembershipTableCleanupAgent), ServiceLifecycleStage.Active, OnStart, OnStop);
 
             Task OnStart(CancellationToken ct)
             {
-                tasks.Add(this.CleanupDefunctSilos());
+                tasks.Add(Task.Run(() => this.CleanupDefunctSilos()));
                 return Task.CompletedTask;
             }
 
