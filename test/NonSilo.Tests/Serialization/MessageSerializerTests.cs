@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -44,7 +44,7 @@ namespace UnitTests.Serialization
             Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(500));
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/5718"), TestCategory("Functional"), TestCategory("Serialization")]
         public async Task MessageTest_TtlUpdatedOnSerialization()
         {
             var request = new InvokeMethodRequest(0, 0, 0, null);
