@@ -41,7 +41,7 @@ namespace Orleans.TestingHost.Utils
                 Directory.CreateDirectory(traceFileFolder);
             }
 
-            var traceFileName = $"{traceFileFolder}\\{clusterId}_{nodeName}.log";
+            var traceFileName = Path.Combine(traceFileFolder, $"{clusterId}_{nodeName}.log");
 
             return traceFileName;
         }
