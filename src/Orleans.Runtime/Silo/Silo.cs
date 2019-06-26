@@ -111,6 +111,7 @@ namespace Orleans.Runtime
         private SchedulingContext multiClusterOracleContext;
         private SchedulingContext reminderServiceContext;
         private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
+        private EventHandler processExitHandler;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Silo"/> class.
@@ -363,8 +364,15 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloStarting, "Silo Start()");
 
             var processExitHandlingOptions = this.Services.GetRequiredService<IOptions<ProcessExitHandlingOptions>>().Value;
-            if(processExitHandlingOptions.FastKillOnProcessExit)
-                AppDomain.CurrentDomain.ProcessExit += HandleProcessExit;
+            if (processExitHandlingOptions.FastKillOnProcessExit)
+            {
+                var weakCapture = new WeakReference<Silo>(this);
+                this.processExitHandler = (sender, args) =>
+                {
+                    if (weakCapture.TryGetTarget(out var silo)) silo.HandleProcessExit(sender, args);
+                };
+                AppDomain.CurrentDomain.ProcessExit += this.processExitHandler;
+            }
             
             //TODO: setup thead pool directly to lifecycle
             StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
@@ -651,20 +659,25 @@ namespace Orleans.Runtime
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
                     logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
-                    Thread.Sleep(pause);
+                    await Task.Delay(pause);
                 }
 
-                await this.siloTerminatedTask.Task;
+                await this.SiloTerminated;
                 return;
             }
 
             try
             {
                 await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
-                await this.SiloTerminated;
             }
             finally
             {
+                if (this.processExitHandler != null)
+                {
+                    AppDomain.CurrentDomain.ProcessExit -= this.processExitHandler;
+                    this.processExitHandler = null;
+                }
+
                 SafeExecute(scheduler.Stop);
                 SafeExecute(scheduler.PrintStatistics);
             }
@@ -705,7 +718,6 @@ namespace Orleans.Runtime
             SafeExecute(siloStatistics.Stop);
 
             SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
-            SafeExecute(() => (this.Services as IDisposable)?.Dispose());
 
             // Setting the event should be the last thing we do.
             // Do nothing after that!

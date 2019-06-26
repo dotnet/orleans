@@ -273,11 +273,9 @@ namespace Orleans
         {
             if (disposing)
             {
-                Utils.SafeExecute(() => (this.runtimeClient as IDisposable)?.Dispose());
+                Utils.SafeExecute(() => (this.runtimeClient as OutsideRuntimeClient)?.Dispose());
                 this.state = LifecycleState.Disposed;
             }
-
-            GC.SuppressFinalize(this);
         }
 
         private void ThrowIfDisposedOrNotInitialized()

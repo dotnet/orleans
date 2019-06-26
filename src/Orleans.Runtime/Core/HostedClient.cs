@@ -158,6 +158,7 @@ namespace Orleans.Runtime
             Utils.SafeExecute(() => this.clientObserverRegistrar.SetHostedClient(null));
             Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
             Utils.SafeExecute(() => this.listeningCts.Cancel(false));
+            Utils.SafeExecute(() => this.incomingMessages.Add(null));
             Utils.SafeExecute(() => this.listeningCts.Dispose());
             Utils.SafeExecute(() => this.messagePump?.Join());
         }
@@ -178,7 +179,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    var message = this.incomingMessages.Take(this.listeningCts.Token);
+                    var message = this.incomingMessages.Take();
                     if (message == null) continue;
                     switch (message.Direction)
                     {
@@ -200,12 +201,20 @@ namespace Orleans.Runtime
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeServices, OnRuntimeServicesStart, _ => Task.CompletedTask);
+            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeServices, OnRuntimeServicesStart, OnRuntimeServicesStop);
 
             Task OnRuntimeServicesStart(CancellationToken cancellation)
             {
                 // Start pumping messages.
                 this.Start();
+
+                return Task.CompletedTask;
+            }
+
+            Task OnRuntimeServicesStop(CancellationToken cancellation)
+            {
+                this.listeningCts.Cancel(throwOnFirstException: false);
+                this.incomingMessages.Add(null);
 
                 return Task.CompletedTask;
             }
