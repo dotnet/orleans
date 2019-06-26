@@ -738,7 +738,7 @@ namespace Orleans.Runtime.MembershipService
 
                 async Task OnBecomeActiveStop(CancellationToken ct)
                 {
-                    this.membershipUpdateTimer.Dispose();
+                    this.membershipUpdateTimer.Cancel();
                     await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
                 }
             }

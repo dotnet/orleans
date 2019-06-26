@@ -176,7 +176,7 @@ namespace NonSilo.Tests.Membership
 
             var cts = new CancellationTokenSource();
             if (!gracefulShutdown) cts.Cancel();
-            Assert.Equal(0, timers.First().DisposedCounter);
+            Assert.Equal(0, timers.First().CancelCounter);
             var stopped = this.lifecycle.OnStop(cts.Token);
             Assert.Equal(gracefulShutdown, !stopped.IsCompleted);
 
@@ -184,7 +184,7 @@ namespace NonSilo.Tests.Membership
             while (timerCalls.TryDequeue(out var t)) t.Completion.TrySetResult(false);
 
             await stopped;
-            Assert.Equal(1, timers.First().DisposedCounter);
+            Assert.Equal(1, timers.First().CancelCounter);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
         }
 

@@ -16,7 +16,7 @@ namespace Orleans.Runtime.MembershipService
     /// <summary>
     /// Responsible for ensuring that this silo monitors other silos in the cluster.
     /// </summary>
-    internal class ClusterHealthMonitor : ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor
+    internal class ClusterHealthMonitor : ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor, IDisposable
     {
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly MembershipTableManager tableManager;
@@ -323,12 +323,18 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnActiveStop(CancellationToken ct)
             {
-                this.monitorClusterHealthTimer.Dispose();
+                this.monitorClusterHealthTimer.Cancel();
                 this.cancellation.Cancel(throwOnFirstException: false);
 
                 // Stop waiting for graceful shutdown when the provided cancellation token is cancelled
                 return Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }
+        }
+
+        void IDisposable.Dispose()
+        {
+            this.monitorClusterHealthTimer.Dispose();
+            this.cancellation.Dispose();
         }
     }
 }

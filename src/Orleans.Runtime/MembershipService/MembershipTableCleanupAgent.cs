@@ -36,9 +36,9 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public void Dispose()
+        void IDisposable.Dispose()
         {
-            this.cleanupDefunctSilosTimer?.Dispose();
+            this.cleanupDefunctSilosTimer.Dispose();
         }
 
         private async Task CleanupDefunctSilos()
@@ -95,7 +95,7 @@ namespace Orleans.Runtime.MembershipService
 
             async Task OnStop(CancellationToken ct)
             {
-                this.cleanupDefunctSilosTimer?.Dispose();
+                this.cleanupDefunctSilosTimer.Cancel();
                 await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }
         }

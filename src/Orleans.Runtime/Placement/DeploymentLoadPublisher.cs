@@ -249,15 +249,15 @@ namespace Orleans.Runtime
 
             async Task OnActiveStop(CancellationToken ct)
             {
-                this.publishTimer.Dispose();
                 this.siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
+                this.publishTimer.Cancel();
                 await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }
         }
 
         public void Dispose()
         {
-            this.publishTimer?.Dispose();
+            this.publishTimer.Dispose();
         }
     }
 }

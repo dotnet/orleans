@@ -23,7 +23,6 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger<MembershipAgent> log;
         private readonly IAsyncTimer iAmAliveTimer;
 
-
         public MembershipAgent(
             MembershipTableManager tableManager,
             ClusterHealthMonitor clusterHealthMonitor,
@@ -279,7 +278,7 @@ namespace Orleans.Runtime.MembershipService
 
                 async Task OnBecomeActiveStop(CancellationToken ct)
                 {
-                    this.iAmAliveTimer.Dispose();
+                    this.iAmAliveTimer.Cancel();
                     this.cancellation.Cancel(throwOnFirstException: false);
                     var cancellationTask = ct.WhenCancelled();
 

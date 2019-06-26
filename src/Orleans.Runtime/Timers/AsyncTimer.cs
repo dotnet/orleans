@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,7 @@ namespace Orleans.Runtime
         private readonly CancellationTokenSource cancellation;
         private readonly TimeSpan period;
         private readonly ILogger log;
+        private bool disposed;
         private DateTime lastFired = DateTime.MinValue;
         private bool wasDelayed;
 
@@ -84,6 +86,16 @@ namespace Orleans.Runtime
             return true;
         }
 
-        public void Dispose() => this.cancellation?.Cancel(throwOnFirstException: false);
+        public void Cancel() => this.cancellation.Cancel(throwOnFirstException: false);
+
+        public void Dispose()
+        {
+            if (!this.disposed)
+            {
+                this.disposed = true;
+                this.Cancel();
+                this.cancellation.Dispose();
+            }
+        }
     }
 }
