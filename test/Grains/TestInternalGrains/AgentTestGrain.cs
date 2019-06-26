@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
@@ -14,7 +15,7 @@ namespace UnitTests.Grains
 
         public AgentTestGrain(IServiceProvider services)
         {
-            this.testAgent = services.GetService(typeof(TestDedicatedAsynchAgent)) as TestDedicatedAsynchAgent;
+            this.testAgent = services.GetRequiredService<TestDedicatedAsynchAgent>();
         }
 
         public Task<int> GetFailureCount()
