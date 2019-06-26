@@ -118,6 +118,8 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalGrainDirectory>();
             services.TryAddSingleton(sp => sp.GetRequiredService<LocalGrainDirectory>().GsiActivationMaintainer);
             services.TryAddSingleton<GrainTypeManager>();
+            services.TryAddSingleton<TypeManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, TypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddFromExisting<ISiloMessageCenter, MessageCenter>();

@@ -238,15 +238,6 @@ namespace Orleans.Runtime
             return grainInterfaceMap;
         }
 
-        private void AddInvokerClass(int interfaceId, Type invoker)
-        {
-            lock (invokers)
-            {
-                if (!invokers.ContainsKey(interfaceId))
-                    invokers.Add(interfaceId, new InvokerData(invoker));
-            }
-        }
-
         /// <summary>
         /// Returns a list of all graintypes in the system.
         /// </summary>
