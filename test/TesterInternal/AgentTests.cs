@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
@@ -10,6 +10,7 @@ using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Orleans.Configuration;
 
 namespace UnitTests
 {
@@ -34,8 +35,11 @@ namespace UnitTests
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.ConfigureServices(services => services.TryAddSingleton<TestDedicatedAsynchAgent>());
-                    hostBuilder.ConfigureServices(services => services.TryAddSingleton(sp => sp.GetService(typeof(TestDedicatedAsynchAgent)) as ILifecycleParticipant<ISiloLifecycle>));
+                    hostBuilder.ConfigureServices(services =>
+                    {
+                        services.TryAddSingleton<TestDedicatedAsynchAgent>();
+                        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, TestDedicatedAsynchAgent>();
+                    });
                 }
             }
         }
