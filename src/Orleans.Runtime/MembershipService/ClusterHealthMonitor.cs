@@ -310,24 +310,24 @@ namespace Orleans.Runtime.MembershipService
         
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            var becomeActiveTasks = new List<Task>();
+            var tasks = new List<Task>();
 
-            lifecycle.Subscribe(nameof(ClusterHealthMonitor), ServiceLifecycleStage.BecomeActive, OnBecomeActiveStart, OnBecomeActiveStop);
+            lifecycle.Subscribe(nameof(ClusterHealthMonitor), ServiceLifecycleStage.Active, OnActiveStart, OnActiveStop);
 
-            Task OnBecomeActiveStart(CancellationToken ct)
+            Task OnActiveStart(CancellationToken ct)
             {
-                becomeActiveTasks.Add(this.ProcessMembershipUpdates());
-                becomeActiveTasks.Add(this.MonitorClusterHealth());
+                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
+                tasks.Add(Task.Run(() => this.MonitorClusterHealth()));
                 return Task.CompletedTask;
             }
 
-            Task OnBecomeActiveStop(CancellationToken ct)
+            Task OnActiveStop(CancellationToken ct)
             {
                 this.monitorClusterHealthTimer.Dispose();
                 this.cancellation.Cancel(throwOnFirstException: false);
 
                 // Stop waiting for graceful shutdown when the provided cancellation token is cancelled
-                return Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(becomeActiveTasks));
+                return Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }
         }
     }
