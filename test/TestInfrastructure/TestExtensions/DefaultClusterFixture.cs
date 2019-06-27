@@ -1,13 +1,15 @@
-using Microsoft.Extensions.Configuration;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 
+using System.Threading.Tasks;
+
 namespace TestExtensions
 {
-    public class DefaultClusterFixture
+    public class DefaultClusterFixture : IDisposable, Xunit.IAsyncLifetime
     {
         static DefaultClusterFixture()
         {
@@ -43,7 +45,21 @@ namespace TestExtensions
         {
             this.HostedCluster?.StopAllSilos();
         }
-        
+
+        public Task InitializeAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        public async Task DisposeAsync()
+        {
+            var cluster = this.HostedCluster;
+            if (cluster != null)
+            {
+                await cluster.StopAllSilosAsync();
+            }
+        }
+
         public class SiloHostConfigurator : ISiloBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
