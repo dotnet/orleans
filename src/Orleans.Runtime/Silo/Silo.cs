@@ -263,6 +263,7 @@ namespace Orleans.Runtime
             try
             {
                 await this.scheduler.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
+                this.logger.LogInformation((int)ErrorCode.SiloStarted, "Silo started");
             }
             catch (Exception exc)
             {
