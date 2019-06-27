@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,7 +26,7 @@ namespace UnitTests
             originalTimeout = this.runtimeClient.GetResponseTimeout();
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             this.runtimeClient.SetResponseTimeout(originalTimeout);
         }
