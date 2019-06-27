@@ -424,45 +424,58 @@ namespace Orleans.Runtime.Configuration
         /// If there are multiple addresses in the correct family in the server's DNS record, the first will be returned.
         /// </summary>
         /// <returns>The server's IPv4 address.</returns>
-        internal static IPAddress GetLocalIPAddress(AddressFamily family = AddressFamily.InterNetwork, string interfaceName = null)
+        internal static IPAddress GetLocalIPAddress(AddressFamily family = AddressFamily.InterNetwork, IPAddress targetAddress = null, string interfaceName = null)
         {
             var loopback = (family == AddressFamily.InterNetwork) ? IPAddress.Loopback : IPAddress.IPv6Loopback;
-            // get list of all network interfaces
-            NetworkInterface[] netInterfaces = NetworkInterface.GetAllNetworkInterfaces();
 
-            var candidates = new List<IPAddress>();
-            // loop through interfaces
-            for (int i = 0; i < netInterfaces.Length; i++)
+            if (targetAddress != null)
             {
-                NetworkInterface netInterface = netInterfaces[i];
-
-                if (netInterface.OperationalStatus != OperationalStatus.Up)
-                {
-                    // Skip network interfaces that are not operational
-                    continue;
+                Socket testSocket = new Socket(targetAddress.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+                testSocket.Connect(new IPEndPoint(targetAddress, IPEndPoint.MaxPort));
+                IPAddress address = (testSocket.LocalEndPoint as IPEndPoint)?.Address;
+                if (address != null) {
+                    return address;
                 }
-                if (!string.IsNullOrWhiteSpace(interfaceName) &&
-                    !netInterface.Name.StartsWith(interfaceName, StringComparison.Ordinal)) continue;
+            }
+            else
+            {
+                var candidates = new List<IPAddress>();
 
-                bool isLoopbackInterface = (netInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback);
-                // get list of all unicast IPs from current interface
-                UnicastIPAddressInformationCollection ipAddresses = netInterface.GetIPProperties().UnicastAddresses;
+                // get list of all network interfaces
+                NetworkInterface[] netInterfaces = NetworkInterface.GetAllNetworkInterfaces();
 
-                // loop through IP address collection
-                foreach (UnicastIPAddressInformation ip in ipAddresses)
+                foreach (NetworkInterface netInterface in netInterfaces)
                 {
-                    if (ip.Address.AddressFamily == family) // Picking the first address of the requested family for now. Will need to revisit later
+                    if (netInterface.OperationalStatus != OperationalStatus.Up)
                     {
-                        //don't pick loopback address, unless we were asked for a loopback interface
-                        if (!(isLoopbackInterface && ip.Address.Equals(loopback)))
+                        // Skip network interfaces that are not operational
+                        continue;
+                    }
+                    if (string.IsNullOrWhiteSpace(interfaceName) &&
+                        !netInterface.Name.StartsWith(interfaceName, StringComparison.Ordinal)) continue;
+
+                    bool isLoopbackInterface = (netInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback);
+                    // get list of all unicast IPs from current interface
+                    UnicastIPAddressInformationCollection ipAddresses = netInterface.GetIPProperties().UnicastAddresses;
+
+                    // loop through IP address collection
+                    foreach (UnicastIPAddressInformation ip in ipAddresses)
+                    {
+                        if (ip.Address.AddressFamily == family) // Picking the first address of the requested family for now. Will need to revisit later
                         {
-                            candidates.Add(ip.Address); // collect all candidates.
+                            //don't pick loopback address, unless we were asked for a loopback interface
+                            if (!(isLoopbackInterface && ip.Address.Equals(loopback)))
+                            {
+                                candidates.Add(ip.Address); // collect all candidates.
+                            }
                         }
                     }
                 }
+                if (candidates.Count > 0) return PickIPAddress(candidates);
             }
-            if (candidates.Count > 0) return PickIPAddress(candidates);
-            throw new OrleansException("Failed to get a local IP address.");
+
+            return loopback; // as a last resort, try the loopback address
+            // throw new OrleansException("Failed to get a local IP address.");
         }
 
         internal static string IStatisticsConfigurationToString(IStatisticsConfiguration config)

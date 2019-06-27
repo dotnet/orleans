@@ -51,4 +51,18 @@ namespace Orleans.Messaging
 
         bool UnSubscribeFromGatewayNotificationEvents(IGatewayListListener listener);
     }
+
+    /// <summary>
+    /// An optional interface that GatewayListProvider may implement in order to provide routing information when selecting an IP address.
+    /// By default GatewayListProvider should work only after InitializeGatewayListProvider is called.
+    /// IGatewayListRoute functions are called before that.
+    /// This is optional and not required.
+    /// </summary>
+    public interface IGatewayListRoute
+    {
+        /// <summary>
+        /// A  (likely invalid) address of a gateway. This is used to compute the proper local address to use.
+        /// </summary>
+        Uri SampleGatewayAddress { get; }
+    }
 }

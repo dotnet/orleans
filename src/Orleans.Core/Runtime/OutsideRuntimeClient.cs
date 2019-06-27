@@ -146,14 +146,22 @@ namespace Orleans
                 var minTicks = Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
                 var period = TimeSpan.FromTicks(minTicks);
                 this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
-                
+
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
                 BufferPool.InitGlobalBufferPool(this.clientMessagingOptions);
 
                 this.clientProviderRuntime = this.ServiceProvider.GetRequiredService<ClientProviderRuntime>();
 
-                this.localAddress = ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
+                this.gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
+
+                if (this.gatewayListProvider is IGatewayListRoute) {
+                    var targetUri = ((IGatewayListRoute)this.gatewayListProvider).SampleGatewayAddress;
+                    var targetAddress = Dns.GetHostAddresses(targetUri.Host)[0];
+                    this.localAddress = ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, targetAddress, this.clientMessagingOptions.NetworkInterfaceName);
+                } else {
+                    this.localAddress = ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, null, this.clientMessagingOptions.NetworkInterfaceName);
+                }
 
                 // Client init / sign-on message
                 logger.Info(ErrorCode.ClientInitializing, string.Format(
@@ -167,8 +175,6 @@ namespace Orleans
                 {
                     throw new InvalidOperationException("TestOnlyThrowExceptionDuringInit");
                 }
-
-                this.gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
 
                 var statisticsLevel = statisticsOptions.Value.CollectionLevel;
                 if (statisticsLevel.CollectThreadTimeTrackingStats())

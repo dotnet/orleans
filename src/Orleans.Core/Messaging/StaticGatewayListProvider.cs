@@ -6,7 +6,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Messaging
 {
-    public class StaticGatewayListProvider : IGatewayListProvider
+    public class StaticGatewayListProvider : IGatewayListProvider, IGatewayListRoute
     {
         private readonly StaticGatewayListProviderOptions options;
         private readonly TimeSpan maxStaleness;
@@ -17,7 +17,7 @@ namespace Orleans.Messaging
         }
 
         public Task InitializeGatewayListProvider() => Task.CompletedTask;
-        
+
 
         public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(this.options.Gateways);
 
@@ -29,6 +29,11 @@ namespace Orleans.Messaging
         public bool IsUpdatable
         {
             get => true;
+        }
+
+        public Uri SampleGatewayAddress
+        {
+            get => this.options.Gateways[0];
         }
     }
 }

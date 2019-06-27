@@ -122,7 +122,7 @@ namespace UnitTests.MessageCenterTests
             Assert.True((low <= counts[3]) && (counts[3] <= up), "Gateway selection is incorrectly skewed. " + counts[3]);
         }
 
-        private class TestListProvider : IGatewayListProvider
+        private class TestListProvider : IGatewayListProvider, IGatewayListRoute
         {
             private readonly IList<Uri> list;
 
@@ -145,6 +145,12 @@ namespace UnitTests.MessageCenterTests
             {
                 get { return false; }
             }
+
+            public Uri SampleGatewayAddress
+            {
+                get { return list[0]; }
+            }
+
             public Task InitializeGatewayListProvider()
             {
                 return Task.CompletedTask;

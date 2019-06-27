@@ -51,7 +51,7 @@ namespace Tester.ClientConnectionTests
             Assert.Single(exceptions);
         }
 
-        public class MockGatewayListProvider : IGatewayListProvider
+        public class MockGatewayListProvider : IGatewayListProvider, IGatewayListRoute
         {
             public ReadOnlyCollection<Uri> Gateways { get; set; } = new ReadOnlyCollection<Uri>(new List<Uri>());
 
@@ -62,6 +62,8 @@ namespace Tester.ClientConnectionTests
             public TimeSpan MaxStaleness => TimeSpan.FromSeconds(30);
 
             public bool IsUpdatable => true;
+
+            public Uri SampleGatewayAddress => this.Gateways[0];
         }
     }
 }

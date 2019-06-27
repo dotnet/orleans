@@ -18,13 +18,15 @@ using Orleans.Configuration;
 
 namespace Tester
 {
-    public class TestGatewayManager : IGatewayListProvider
+    public class TestGatewayManager : IGatewayListProvider, IGatewayListRoute
     {
         public TimeSpan MaxStaleness => TimeSpan.FromSeconds(1);
 
         public bool IsUpdatable => true;
 
         public IList<Uri> Gateways { get; }
+
+        public Uri SampleGatewayAddress => this.Gateways[0];
 
         public TestGatewayManager()
         {
