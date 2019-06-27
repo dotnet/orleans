@@ -63,6 +63,7 @@ namespace Orleans.TestingHost.Tests
             var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -77,6 +78,7 @@ namespace Orleans.TestingHost.Tests
             var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -91,6 +93,7 @@ namespace Orleans.TestingHost.Tests
             var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -105,6 +108,7 @@ namespace Orleans.TestingHost.Tests
             var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -119,6 +123,7 @@ namespace Orleans.TestingHost.Tests
             var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -133,6 +138,7 @@ namespace Orleans.TestingHost.Tests
             var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -147,10 +153,11 @@ namespace Orleans.TestingHost.Tests
             var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
-    public class TestClusterTests : IDisposable
+    public class TestClusterTests : IDisposable, IAsyncLifetime
     {
         private readonly ITestOutputHelper output;
         private TestCluster testCluster;
@@ -203,5 +210,15 @@ namespace Orleans.TestingHost.Tests
         {
             this.testCluster?.StopAllSilos();
         }
-     }
+
+        public Task InitializeAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        public async Task DisposeAsync()
+        {
+            await this.testCluster.StopAllSilosAsync();
+        }
+    }
 }

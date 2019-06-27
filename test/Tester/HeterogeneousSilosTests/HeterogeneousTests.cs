@@ -18,7 +18,7 @@ using Xunit.Abstractions;
 namespace Tester.HeterogeneousSilosTests
 {
     [TestCategory("Functional")]
-    public class HeterogeneousTests : OrleansTestingBase, IDisposable
+    public class HeterogeneousTests : OrleansTestingBase, IDisposable, IAsyncLifetime
     {
         private TestCluster cluster;
         private static TimeSpan clientRefreshDelay = TimeSpan.FromSeconds(1);
@@ -143,6 +143,17 @@ namespace Tester.HeterogeneousSilosTests
             // Should fail
             exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<ITestGrain>(0));
             Assert.Contains("Cannot find an implementation class for grain interface", exception.Message);
+        }
+
+        public Task InitializeAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        public async Task DisposeAsync()
+        {
+            if (this.cluster == null) return;
+            await cluster.StopAllSilosAsync();
         }
     }
 }

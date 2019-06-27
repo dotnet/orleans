@@ -21,7 +21,7 @@ using Xunit;
 
 namespace Tester.HeterogeneousSilosTests.UpgradeTests
 {
-    public abstract class UpgradeTestsBase : IDisposable
+    public abstract class UpgradeTestsBase : IDisposable, IAsyncLifetime
     {
         private readonly TimeSpan refreshInterval = TimeSpan.FromMilliseconds(200);
         private TimeSpan waitDelay;
@@ -256,6 +256,26 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 silo.Dispose();
             }
             primarySilo.Dispose();
+            this.Client?.Dispose();
+        }
+
+        public Task InitializeAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        public async Task DisposeAsync()
+        {
+            var primarySilo = this.deployedSilos[0];
+            foreach (var silo in this.deployedSilos.Skip(1))
+            {
+                await silo.StopSiloAsync(true);
+                silo.Dispose();
+            }
+
+            await primarySilo.StopSiloAsync(true);
+            primarySilo.Dispose();
+            if (this.Client != null) await this.Client.Close();
             this.Client?.Dispose();
         }
     }
