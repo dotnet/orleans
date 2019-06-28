@@ -140,10 +140,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.membershipSnapshot = new DirectoryMembershipSnapshot(this.log, this.MyAddress, this.clusterMembership.CurrentSnapshot);
             this.directoryMembershipUpdates = new AsyncEnumerable<DirectoryMembershipSnapshot>(
                 (previous, proposed) => proposed.ClusterMembership.Version > previous.ClusterMembership.Version,
-                this.membershipSnapshot)
-            {
-                OnPublished = update => Interlocked.Exchange(ref this.membershipSnapshot, update)
-            };
+                this.membershipSnapshot);
 
             DirectoryPartition = grainDirectoryPartitionFactory();
             this.HandoffManager = new GrainDirectoryHandoffManager(
@@ -173,8 +170,6 @@ namespace Orleans.Runtime.GrainDirectory
                 loggerFactory);
             siloProviderRuntime.RegisterSystemTarget(RemoteClusterGrainDirectory);
 
-            
-            
             localLookups = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_LOCAL_ISSUED);
             localSuccesses = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_LOCAL_SUCCESSES);
             fullLookups = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_FULL_ISSUED);
@@ -263,20 +258,23 @@ namespace Orleans.Runtime.GrainDirectory
                             delta = updated.ClusterMembership.CreateUpdate(previousClusterMembership);
                         }
 
-                        previousClusterMembership = updated.ClusterMembership;
+                        // Update membership now so that it is visible to callers below (eg, catalog, handoff)
+                        Interlocked.Exchange(ref this.membershipSnapshot, updated);
+
                         foreach (var change in delta.Changes)
                         {
                             // Ignore changes for the local silo
                             if (change.SiloAddress.Equals(this.MyAddress)) continue;
 
                             var status = change.Status;
-                            if (status.IsTerminating())
+                            var previousStatus = previousClusterMembership?.GetSiloStatus(change.SiloAddress) ?? SiloStatus.None;
+                            if (status.IsTerminating() && !previousStatus.IsTerminating())
                             {
                                 await this.Scheduler.QueueAction(
                                     () => RemoveSilo(previous, updated, change, directoryPartitionCopy, directoryCache),
                                     this.CacheValidator.SchedulingContext);
                             }
-                            else if (status == SiloStatus.Active)
+                            else if (status == SiloStatus.Active && previousStatus != SiloStatus.Active)
                             {
                                 await this.Scheduler.QueueAction(
                                     () => AddSilo(updated, change, directoryPartitionCopy, directoryCache),
@@ -285,6 +283,7 @@ namespace Orleans.Runtime.GrainDirectory
                         }
 
                         this.directoryMembershipUpdates.TryPublish(updated);
+                        previousClusterMembership = updated.ClusterMembership;
                     }
                     catch (Exception exception)
                     {

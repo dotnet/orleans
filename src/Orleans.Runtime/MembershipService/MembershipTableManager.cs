@@ -258,13 +258,13 @@ namespace Orleans.Runtime.MembershipService
                 
                 if (status == SiloStatus.Dead && this.membershipTableProvider is SystemTargetBasedMembershipTable)
                 {
+                    this.CurrentStatus = status;
+
                     // SystemTarget-based membership may not be accessible at this stage, so allow for one quick attempt to update
                     // the status before continuing regardless of the outcome.
                     var updateTask = updateMyStatusTask(0);
                     updateTask.Ignore();
-                    await Task.WhenAny(Task.Delay(TimeSpan.FromSeconds(2)), updateTask);
-
-                    this.CurrentStatus = status;
+                    await Task.WhenAny(Task.Delay(TimeSpan.FromSeconds(5)), updateTask);
                     return;
                 }
 
