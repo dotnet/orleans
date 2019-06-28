@@ -1049,11 +1049,6 @@ namespace Orleans.Runtime.GrainDirectory
                 // Perform handoff
                 await this.Stop(ct);
 
-                if (this.membershipSnapshot.FindPredecessor(this.MyAddress) == null)
-                {
-                    return;
-                }
-
                 if (this.catalog is null) this.catalog = this.serviceProvider.GetRequiredService<Catalog>();
                 
                 await await Task.WhenAny(ct.WhenCancelled(), this.catalog.DeactivateAllActivations());

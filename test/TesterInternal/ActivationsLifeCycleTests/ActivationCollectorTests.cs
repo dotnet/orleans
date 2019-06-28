@@ -19,7 +19,7 @@ using Xunit;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
-    public class ActivationCollectorTests : OrleansTestingBase, IDisposable
+    public class ActivationCollectorTests : OrleansTestingBase, IDisposable, IAsyncLifetime
     {
         private static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan DEFAULT_IDLE_TIMEOUT = DEFAULT_COLLECTION_QUANTUM + TimeSpan.FromSeconds(1);
@@ -60,7 +60,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         public void Dispose()
         {
             GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = true;
-            testCluster?.StopAllSilos();
+            testCluster?.Dispose();
             testCluster = null;
         }
 
@@ -530,6 +530,16 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
+        }
+
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        public async Task DisposeAsync()
+        {
+            if (this.testCluster != null)
+            {
+                await this.testCluster.StopAllSilosAsync();
+            }
         }
     }
 }
