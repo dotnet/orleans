@@ -1038,7 +1038,13 @@ namespace Orleans.Runtime.GrainDirectory
             async Task OnBecomeActiveStop(CancellationToken ct)
             {
                 // Wait until the local grain directory observes that the silo is stopping.
-                if (!await this.WaitForStatus(status => status.IsTerminating(), ct)) return;
+                var isTerminatingTask = this.WaitForStatus(status => status.IsTerminating(), ct);
+                var task = await Task.WhenAny(
+                    ct.WhenCancelled(),
+                    Task.Delay(TimeSpan.FromSeconds(10)),
+                    isTerminatingTask);
+
+                if (!ReferenceEquals(task, isTerminatingTask) || !await isTerminatingTask) return;
 
                 // Perform handoff
                 await this.Stop(ct);
