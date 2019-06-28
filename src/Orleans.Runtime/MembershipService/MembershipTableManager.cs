@@ -244,14 +244,6 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task UpdateStatus(SiloStatus status)
         {
-            if (status == SiloStatus.Dead && this.membershipTableProvider is SystemTargetBasedMembershipTable)
-            {
-                this.CurrentStatus = status;
-
-                // SystemTarget-based clustering does not support transitioning to Dead locally since at this point app scheduler turns have been stopped.
-                return;
-            }
-
             string errorString = null;
             int numCalls = 0;
             
@@ -263,6 +255,18 @@ namespace Orleans.Runtime.MembershipService
                     if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Going to try to TryUpdateMyStatusGlobalOnce #{0}", counter);
                     return await TryUpdateMyStatusGlobalOnce(status);  // function to retry
                 };
+                
+                if (status == SiloStatus.Dead && this.membershipTableProvider is SystemTargetBasedMembershipTable)
+                {
+                    // SystemTarget-based membership may not be accessible at this stage, so allow for one quick attempt to update
+                    // the status before continuing regardless of the outcome.
+                    var updateTask = updateMyStatusTask(0);
+                    updateTask.Ignore();
+                    await Task.WhenAny(Task.Delay(TimeSpan.FromSeconds(2)), updateTask);
+
+                    this.CurrentStatus = status;
+                    return;
+                }
 
                 bool ok = await MembershipExecuteWithRetries(updateMyStatusTask, this.clusterMembershipOptions.MaxJoinAttemptTime);
 
