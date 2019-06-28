@@ -40,12 +40,14 @@ namespace Orleans.Runtime
                     context);
             }
 
-            Debugger.Break();
             if (!this.clusterMembershipOptions.IsRunningAsUnitTest)
             {
                 var msg = $"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context ?? "null"}. "
                     + $"Exception: {(exception != null ? LogFormatter.PrintException(exception) : "null")}.\n"
                     + $"Current stack: {Environment.StackTrace}";
+
+                if (Debugger.IsAttached) Debugger.Break();
+
                 Environment.FailFast(msg);
             }
             else
