@@ -706,17 +706,17 @@ namespace Orleans.Runtime.MembershipService
             var tasks = new List<Task>(1);
             lifecycle.Subscribe(
                 nameof(MembershipTableManager),
-                ServiceLifecycleStage.RuntimeServices,
-                OnRuntimeServicesStart,
-                OnRuntimeServicesStop);
+                ServiceLifecycleStage.RuntimeGrainServices,
+                OnRuntimeGrainServicesStart,
+                OnRuntimeGrainServicesStop);
 
-            async Task OnRuntimeServicesStart(CancellationToken ct)
+            async Task OnRuntimeGrainServicesStart(CancellationToken ct)
             {
                 await Task.Run(() => this.Start());
                 tasks.Add(Task.Run(() => this.PeriodicallyRefreshMembershipTable()));
             }
 
-            async Task OnRuntimeServicesStop(CancellationToken ct)
+            async Task OnRuntimeGrainServicesStop(CancellationToken ct)
             {
                 this.membershipUpdateTimer.Dispose();
                 await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));

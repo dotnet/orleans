@@ -200,13 +200,20 @@ namespace Orleans.Runtime
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.EnableGrainCalls + 1, OnRuntimeServicesStart, _ => Task.CompletedTask);
+            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeServices, OnRuntimeServicesStart, _ => Task.CompletedTask);
 
             Task OnRuntimeServicesStart(CancellationToken cancellation)
             {
                 // Start pumping messages.
                 this.Start();
 
+                return Task.CompletedTask;
+            }
+
+            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.EnableGrainCalls + 1, OnEnableGrainCallsStart, _ => Task.CompletedTask);
+
+            Task OnEnableGrainCallsStart(CancellationToken cancellation)
+            {
                 // Register with the directory and message center so that we can receive messages.
                 this.clientObserverRegistrar.SetHostedClient(this);
                 this.clientObserverRegistrar.ClientAdded(this.ClientId);
