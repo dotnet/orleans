@@ -263,6 +263,7 @@ namespace Orleans.Runtime
             try
             {
                 await this.scheduler.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
+                this.logger.LogInformation((int)ErrorCode.SiloStarted, "Silo started");
             }
             catch (Exception exc)
             {
@@ -284,14 +285,7 @@ namespace Orleans.Runtime
 
             logger.Debug("Creating {0} System Target", "DeploymentLoadPublisher");
             RegisterSystemTarget(Services.GetRequiredService<DeploymentLoadPublisher>());
-            
-            logger.Debug("Creating {0} System Target", "RemoteGrainDirectory + CacheValidator");
-            RegisterSystemTarget(LocalGrainDirectory.RemoteGrainDirectory);
-            RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
-
-            logger.Debug("Creating {0} System Target", "RemoteClusterGrainDirectory");
-            RegisterSystemTarget(LocalGrainDirectory.RemoteClusterGrainDirectory);
-
+                        
             logger.Debug("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
 
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
@@ -326,7 +320,6 @@ namespace Orleans.Runtime
             }
 
             catalog.SiloStatusOracle = this.siloStatusOracle;
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
             messageCenter.SiloDeadOracle = this.siloStatusOracle.IsDeadSilo;
 
             // consistentRingProvider is not a system target per say, but it behaves like the localGrainDirectory, so it is here
@@ -344,7 +337,7 @@ namespace Orleans.Runtime
                 logger.Info($"Creating reminder grain service for type={reminderTable.GetType()}");
                 
                 // Start the reminder service system target
-                reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory); ;
+                reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory);
                 RegisterSystemTarget((SystemTarget)reminderService);
             }
 
@@ -406,10 +399,7 @@ namespace Orleans.Runtime
             {
                 incomingPingAgent.Start();
                 incomingSystemAgent.Start();
-                incomingAgent.Start();
-            } 
-
-            StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
+            }
 
             StartTaskWithPerfAnalysis("Init implicit stream subscribe table", InitImplicitStreamSubscribeTable, stopWatch);
             void InitImplicitStreamSubscribeTable()
@@ -723,35 +713,22 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        private async Task OnBecomeActiveStop(CancellationToken ct)
+        private Task OnBecomeActiveStop(CancellationToken ct)
         {
-            if (this.isFastKilledNeeded)
-                return;
+            if (this.isFastKilledNeeded) return Task.CompletedTask;
 
-            bool gracefully = !ct.IsCancellationRequested;
-            string operation = gracefully ? "Shutdown()" : "Stop()";
-            try
+            if (!ct.IsCancellationRequested)
             {
-                if (gracefully)
-                {
-                    logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
+                logger.LogInformation((int)ErrorCode.SiloShuttingDown, "Silo is shutting down");
+            }
+            else
+            {
+                logger.LogInformation((int)ErrorCode.SiloStopping, "Silo is stopping");
+            }
 
-                    //Stop LocalGrainDirectory
-                    await scheduler.QueueTask(()=>localGrainDirectory.Stop(true), localGrainDirectory.CacheValidator.SchedulingContext)
-                        .WithCancellation(ct, "localGrainDirectory Stop failed because the task was cancelled");
-                    SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
-                    //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
-                    await Task.Delay(WaitForMessageToBeQueuedForOutbound);
-                }
-            }
-            catch (Exception exc)
-            {
-                logger.Error(ErrorCode.SiloFailedToStopMembership,
-                    $"Failed to {operation}. About to FastKill this silo.", exc);
-                this.isFastKilledNeeded = true;
-            }
             // Stop the gateway
             SafeExecute(messageCenter.StopAcceptingClientMessages);
+            return Task.CompletedTask;
         }
 
         private async Task OnActiveStop(CancellationToken ct)
@@ -843,12 +820,20 @@ namespace Orleans.Runtime
             return localGrainDirectory.ToString();
         }
 
+        private Task OnEnableGrainCallsStart(CancellationToken ct)
+        {
+            this.incomingAgent.Start();
+            return Task.CompletedTask;
+        }
+
         private void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct)), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct)));
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeServicesStop(ct)));
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.CompletedTask);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive - 1, (ct) => Task.CompletedTask, (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.EnableGrainCalls, (ct) => Task.Run(() => OnEnableGrainCallsStart(ct)), (ct) => Task.CompletedTask);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, (ct) => Task.Run(() => OnActiveStart(ct)), (ct) => Task.Run(() => OnActiveStop(ct)));
         }
     }

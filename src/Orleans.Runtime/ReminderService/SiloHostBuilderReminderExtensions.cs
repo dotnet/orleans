@@ -52,7 +52,6 @@ namespace Orleans.Hosting
         {
             services.AddSingleton<InMemoryReminderTable>();
             services.AddFromExisting<IReminderTable, InMemoryReminderTable>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InMemoryReminderTable>();
             return services;
         }
     }

@@ -54,6 +54,8 @@ namespace Orleans
                     await Task.WhenAll(observerGroup.Select(orderedObserver => WrapExecution(ct, orderedObserver.Observer.OnStart)));
                     stopWatch.Stop();
                     this.PerfMeasureOnStart(this.highStage, stopWatch.Elapsed);
+
+                    this.OnStartStageCompleted(observerGroup.Key);
                 }
             }
             catch (Exception ex)
@@ -63,6 +65,8 @@ namespace Orleans
                 throw;
             }
         }
+
+        protected virtual void OnStartStageCompleted(int stage) { }
 
         protected virtual void PerfMeasureOnStop(int? stage, TimeSpan timelapsed)
         {
@@ -92,8 +96,12 @@ namespace Orleans
                 {
                     this.logger?.Error(ErrorCode.LifecycleStopFailure, $"Stopping lifecycle encountered an error at stage {this.highStage}.  Continuing to stop.", ex);
                 }
+
+                this.OnStopStageCompleted(observerGroup.Key);
             }
         }
+
+        protected virtual void OnStopStageCompleted(int stage) { }
 
         public virtual IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {

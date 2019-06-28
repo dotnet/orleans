@@ -62,6 +62,7 @@ namespace Orleans.Runtime.ReminderService
 
         public async override Task Stop()
         {
+            this.logger.LogInformation("Stopping");
             await base.Stop();
 
             if (listRefreshTimer != null)
@@ -74,6 +75,7 @@ namespace Orleans.Runtime.ReminderService
 
             // for a graceful shutdown, also handover reminder responsibilities to new owner, and update the ReminderTable
             // currently, this is taken care of by periodically reading the reminder table
+            this.logger.LogInformation("Stopped");
         }
 
         public async Task<IGrainReminder> RegisterOrUpdateReminder(GrainReference grainRef, string reminderName, TimeSpan dueTime, TimeSpan period)
@@ -280,6 +282,8 @@ namespace Orleans.Runtime.ReminderService
 
         private async Task ReadTableAndStartTimers(IRingRange range, int rangeSerialNumberCopy)
         {
+            if (StoppedCancellationTokenSource.IsCancellationRequested) return;
+
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Reading rows from {0}", range.ToString());
             localTableSequence++;
             long cachedSequence = localTableSequence;
@@ -377,7 +381,7 @@ namespace Orleans.Runtime.ReminderService
                 }
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug($"Removed {localReminders.Count - remindersCountBeforeRemove} reminders from local table");
             }
-            catch (Exception exc)
+            catch (Exception exc) when (!StoppedCancellationTokenSource.IsCancellationRequested)
             {
                 logger.Error(ErrorCode.RS_FailedToReadTableAndStartTimer, "Failed to read rows from table.", exc);
                 throw;

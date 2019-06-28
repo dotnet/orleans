@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,12 +16,22 @@ namespace Orleans.Runtime
     {
         private readonly ILogger<SiloLifecycleSubject> logger;
         private readonly List<MonitoredObserver> observers;
+        private int highestCompletedStage;
+        private int lowestStoppedStage;
+
+        /// <inheritdoc />
+        public int HighestCompletedStage => this.highestCompletedStage;
+
+        /// <inheritdoc />
+        public int LowestStoppedStage => this.lowestStoppedStage;
 
         public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger)
             :base(logger)
         {
             this.logger = logger;
             this.observers = new List<MonitoredObserver>();
+            this.highestCompletedStage = int.MinValue;
+            this.lowestStoppedStage = int.MaxValue;
         }
 
         public override Task OnStart(CancellationToken ct)
@@ -31,6 +41,18 @@ namespace Orleans.Runtime
                 this.logger?.Info(ErrorCode.LifecycleStagesReport, $"Stage {stage.Key}: {string.Join(", ", stage.Select(o => o.Name))}", stage.Key);
             }
             return base.OnStart(ct);
+        }
+
+        protected override void OnStartStageCompleted(int stage)
+        {
+            Interlocked.Exchange(ref this.highestCompletedStage, stage);
+            base.OnStartStageCompleted(stage);
+        }
+
+        protected override void OnStopStageCompleted(int stage)
+        {
+            Interlocked.Exchange(ref this.lowestStoppedStage, stage);
+            base.OnStopStageCompleted(stage);
         }
 
         protected override void PerfMeasureOnStop(int? stage, TimeSpan timelapsed)
