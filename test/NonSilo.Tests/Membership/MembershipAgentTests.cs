@@ -138,7 +138,7 @@ namespace NonSilo.Tests.Membership
             foreach (var pair in this.timerCalls) while (pair.Value.TryDequeue(out var call)) call.Completion.TrySetResult(false);
             await stopped;
             Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.BecomeActive - 1]);
-            Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.BecomeJoining - 1]);
+            Assert.Equal(SiloStatus.Dead, levels[ServiceLifecycleStage.BecomeJoining - 1]);
             Assert.Equal(SiloStatus.Dead, levels[ServiceLifecycleStage.RuntimeInitialize - 1]);
         }
 
