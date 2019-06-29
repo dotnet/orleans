@@ -140,7 +140,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 // check if this is one of our successors (i.e., if I hold this silo's copy)
                 // (if yes, adjust local and/or handoffed directory partitions)
-                if (!directoryPartitionsMap.ContainsKey(removedSilo)) return;
+                if (!directoryPartitionsMap.TryGetValue(removedSilo, out var removedPartition)) return;
 
                 SiloAddress predecessor = membershipSnapshot.FindPredecessor(removedSilo);
                 if (predecessor is null) return;
@@ -149,21 +149,26 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging my partition with the copy of silo " + removedSilo);
                     // now I am responsible for this directory part
-                    duplicates = localDirectory.DirectoryPartition.Merge(directoryPartitionsMap[removedSilo]);
+                    duplicates = localDirectory.DirectoryPartition.Merge(removedPartition);
                     // no need to send our new partition to all others, as they
                     // will realize the change and combine their copies without any additional communication (see below)
                 }
-                else
+                else if (directoryPartitionsMap.TryGetValue(predecessor, out var predecessorPartition))
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging partition of " + predecessor + " with the copy of silo " + removedSilo);
                     // adjust copy for the predecessor of the failed silo
-                    duplicates = directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
+                    duplicates = predecessorPartition.Merge(removedPartition);
+                }
+                else
+                {
+                    // This silo does not have a copy of the predecessor's partition
+                    duplicates = null;
                 }
 
-                localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(directoryPartitionsMap[removedSilo].GetItems());
+                localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(removedPartition.GetItems());
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removed copied partition of silo " + removedSilo);
                 directoryPartitionsMap.Remove(removedSilo);
-                DestroyDuplicateActivations(duplicates);
+                if (duplicates != null) DestroyDuplicateActivations(duplicates);
             }
         }
 
