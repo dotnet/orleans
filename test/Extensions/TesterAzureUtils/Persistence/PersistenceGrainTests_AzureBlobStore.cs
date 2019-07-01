@@ -133,7 +133,7 @@ namespace Tester.AzureUtils.Persistence
             await base.Grain_Generic_AzureStore_DiffTypes();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5651"), TestCategory("Functional")]
         public async Task Grain_AzureBlobStore_SiloRestart()
         {
             await base.Grain_AzureStore_SiloRestart();

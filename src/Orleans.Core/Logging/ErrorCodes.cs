@@ -505,6 +505,8 @@ namespace Orleans
         MembershipStartingIAmAliveTimer        = MembershipBase + 60,
         MembershipJoiningPreconditionFailure   = MembershipBase + 61,
         MembershipCleanDeadEntriesFailure      = MembershipBase + 62,
+        MembershipJoining                      = MembershipBase + 63,
+        MembershipFailedToJoin                 = MembershipBase + 64,
 
         NSMembershipStarting                   = MembershipBase + 70,
         NSMembershipBecomeActive               = MembershipBase + 71,
@@ -654,7 +656,7 @@ namespace Orleans
         SchedulerTurnTooLong2                   = SchedulerBase + 14,
         SchedulerTurnTooLong3                   = SchedulerBase + 15,
         SchedulerWorkGroupShuttingDown          = SchedulerBase + 16,
-        SchedulerNotEnqueuWorkWhenShutdown      = SchedulerBase + 17,
+        SchedulerEnqueueWorkWhenShutdown        = SchedulerBase + 17,
         SchedulerNotExecuteWhenShutdown         = SchedulerBase + 18,
         SchedulerAppTurnsStopped_1              = SchedulerBase + 19,
         SchedulerWorkGroupStopping              = SchedulerBase + 20,

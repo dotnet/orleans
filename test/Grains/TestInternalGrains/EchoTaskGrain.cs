@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -48,6 +48,8 @@ namespace UnitTests.Grains
             State.LastEcho = data;
             throw new Exception(data);
         }
+
+        public Task<DateTime?> EchoNullable(DateTime? value) => Task.FromResult(value);
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]

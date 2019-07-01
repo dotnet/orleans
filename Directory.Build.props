@@ -51,7 +51,7 @@
     <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
-    <SystemThreadingTasksExtensionsVersion>4.4.0</SystemThreadingTasksExtensionsVersion>
+    <SystemThreadingTasksExtensionsVersion>4.5.2</SystemThreadingTasksExtensionsVersion>
     <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
 
     <!-- Microsoft packages -->
@@ -93,7 +93,8 @@
     <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
     <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
     <NpgsqlVersion>3.1.9</NpgsqlVersion>
-    <NSubstituteVersion>1.10.0</NSubstituteVersion>
+    <NSubstituteVersion>4.2.0</NSubstituteVersion>
+    <NSubstituteAnalyzersCSharpVersion>1.0.10</NSubstituteAnalyzersCSharpVersion>
     <ZooKeeperNetExVersion>3.4.12.1</ZooKeeperNetExVersion>
 
     <!-- Test related packages -->
@@ -112,7 +113,7 @@
   <!-- Versioning properties -->
   <PropertyGroup>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.3.0</VersionPrefix>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.4.0</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->

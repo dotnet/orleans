@@ -100,9 +100,20 @@ namespace UnitTests.StreamingTests
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
         }
 
+        public override async Task DisposeAsync()
+        {
+            try
+            {
+                await watcher.Clear().WithTimeout(TimeSpan.FromSeconds(15));
+            }
+            finally
+            {
+                await base.DisposeAsync();
+            }
+        }
+
         public override void Dispose()
         {
-            watcher.Clear().WaitWithThrow(TimeSpan.FromSeconds(15));
             if (this.HostedCluster != null)
             {
                 AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,

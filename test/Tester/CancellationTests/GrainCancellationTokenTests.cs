@@ -138,7 +138,7 @@ namespace UnitTests.CancellationTests
             await GrainGrainCancellation(true, delay);
         }
 
-        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [SkippableTheory(Skip="https://github.com/dotnet/orleans/issues/5654"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]

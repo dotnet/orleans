@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
-
+using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.ReminderService;
 
 namespace Orleans.Hosting
 {
@@ -49,8 +50,8 @@ namespace Orleans.Hosting
         /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
         internal static IServiceCollection UseInMemoryReminderService(this IServiceCollection services)
         {
-            // The reminder table is a reference to a singleton IReminderTableGrain.
-            services.AddSingleton<IReminderTable>(sp => sp.GetRequiredService<IGrainFactory>().GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId));
+            services.AddSingleton<InMemoryReminderTable>();
+            services.AddFromExisting<IReminderTable, InMemoryReminderTable>();
             return services;
         }
     }

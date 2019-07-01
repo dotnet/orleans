@@ -7,25 +7,31 @@ using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using Microsoft.Extensions.DependencyInjection;
-using System.Threading;
 
 namespace Orleans.Runtime.Versions
 {
-    internal class GrainVersionStore : IVersionStore, ILifecycleParticipant<ISiloLifecycle>
+    internal class GrainVersionStore : IVersionStore
     {
         private readonly IInternalGrainFactory grainFactory;
         private readonly IServiceProvider services;
+        private readonly ISiloLifecycle siloLifecycle;
         private readonly string clusterId;
+        private readonly bool hasGrainStorage;
         private IVersionStoreGrain StoreGrain => this.grainFactory.GetGrain<IVersionStoreGrain>(this.clusterId);
 
-        public bool IsEnabled { get; private set; }
+        public bool IsEnabled => this.hasGrainStorage && this.siloLifecycle.HighestCompletedStage >= ServiceLifecycleStage.BecomeActive;
 
-        public GrainVersionStore(IInternalGrainFactory grainFactory, ILocalSiloDetails siloDetails, IServiceProvider services)
+        public GrainVersionStore(
+            IInternalGrainFactory grainFactory,
+            ILocalSiloDetails siloDetails,
+            IServiceProvider services,
+            ISiloLifecycle siloLifecycle)
         {
             this.grainFactory = grainFactory;
             this.services = services;
+            this.siloLifecycle = siloLifecycle;
             this.clusterId = siloDetails.ClusterId;
-            this.IsEnabled = false;
+            this.hasGrainStorage = this.services.GetService<IGrainStorage>() != null;
         }
 
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
@@ -78,17 +84,6 @@ namespace Orleans.Runtime.Versions
         {
             if (!IsEnabled)
                 throw new OrleansException("Version store not enabled, make sure the store is configured");
-        }
-
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe<GrainVersionStore>(ServiceLifecycleStage.ApplicationServices, this.OnStart);
-        }
-
-        private Task OnStart(CancellationToken token)
-        {
-            this.IsEnabled = this.services.GetService<IGrainStorage>() != null;
-            return Task.CompletedTask;
         }
     }
 }
