@@ -26,8 +26,12 @@ namespace Grains.Tests.Isolated
             grain.Setup(_ => _.GrainKey).Returns("MyGrainKey");
 
             Func<object, Task> action = null;
-            grain.Setup(_ => _.RegisterTimer(It.IsAny<Func<object, Task>>(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)))
-                .Callback<Func<object, Task>, object, TimeSpan, TimeSpan>((a, b, c, d) => { action = a; });
+            object state = null;
+            var dueTime = TimeSpan.Zero;
+            var period = TimeSpan.Zero;
+            grain.Setup(_ => _.RegisterTimer(It.IsAny<Func<object, Task>>(), It.IsAny<object>(), It.IsAny<TimeSpan>(), It.IsAny<TimeSpan>()))
+                .Callback<Func<object, Task>, object, TimeSpan, TimeSpan>((a, b, c, d) => { action = a; state = b; dueTime = c; period = d; })
+                .Returns(Mock.Of<IDisposable>());
 
             // increment the value while simulating activation
             await grain.Object.OnActivateAsync();
@@ -35,6 +39,9 @@ namespace Grains.Tests.Isolated
 
             // assert the timer was registered
             Assert.NotNull(action);
+            Assert.Null(state);
+            Assert.Equal(TimeSpan.FromSeconds(1), dueTime);
+            Assert.Equal(TimeSpan.FromSeconds(1), period);
 
             // tick the timer
             await action(null);
