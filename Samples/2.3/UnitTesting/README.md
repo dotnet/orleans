@@ -7,7 +7,7 @@ Orleans Unit Testing Sample targetting:
 * xUnit 2.4.1
 * Moq 4.12
 
-This sample demonstrates how mock and fake Orleans services using both *isolated* and *hosted* models.
+This sample demonstrates how to mock and fake Orleans services using both *isolated* and *hosted* models.
 
 ### How To Run
 
