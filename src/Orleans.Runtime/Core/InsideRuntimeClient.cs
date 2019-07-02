@@ -21,40 +21,10 @@ using System.Threading;
 using Orleans.Configuration;
 using System.Diagnostics.Tracing;
 using Orleans.Runtime.Messaging;
+using Orleans.DistributedTracing.EventSourceEvents;
 
 namespace Orleans.Runtime
 {
-    [EventSource(Name = "Microsoft-Orleans-InsideRuntimeClientEvent")]
-    public class OrleansInsideRuntimeClientEvent : EventSource
-    {
-        public static readonly OrleansInsideRuntimeClientEvent Log = new OrleansInsideRuntimeClientEvent();
-        public void SendRequestStart()
-        {
-            WriteEvent(1);
-        }
-
-        public void SendRequestStop()
-        {
-            WriteEvent(2);
-        }
-        public void ReceiveResponseStart()
-        {
-            WriteEvent(3);
-        }
-        public void ReceiveResponseStop()
-        {
-            WriteEvent(4);
-        }
-
-        public void SendResponseStart()
-        {
-            WriteEvent(5);
-        }
-        public void SendResponseStop()
-        {
-            WriteEvent(6);
-        }
-    }
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>

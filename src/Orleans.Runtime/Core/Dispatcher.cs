@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.DistributedTracing.EventSourceEvents;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
@@ -17,13 +18,6 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    [EventSource(Name = "Microsoft-Orleans-DispatcherEvent")]
-    public class OrleansDispatcherEvent : EventSource
-    {
-        public static readonly OrleansDispatcherEvent Log = new OrleansDispatcherEvent();
-        public void ReceiveMessageStart() => WriteEvent(1);
-        public void ReceiveMessageStop() => WriteEvent(2);
-    }
     internal class Dispatcher
     {
         internal ISiloMessageCenter Transport { get; }

@@ -5,20 +5,10 @@ using System.Diagnostics.Tracing;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.DistributedTracing.EventSourceEvents;
 
 namespace Orleans.Runtime.Scheduler
 {
-    [EventSource(Name = "Microsoft-Orleans-ActivationTaskSchedulerEvent")]
-    public class OrleansActivationTaskSchedulerEvent : EventSource
-    {
-        public static readonly OrleansActivationTaskSchedulerEvent Log = new OrleansActivationTaskSchedulerEvent();
-        public void QueueTaskStart(int taskId) => WriteEvent(1, taskId);
-        public void QueueTaskStop(int taskId) => WriteEvent(2, taskId);
-        public void RunTaskStart(int taskId) => WriteEvent(3, taskId);
-        public void RunTaskStop(int taskId) => WriteEvent(4, taskId);
-
-    }
-
     /// <summary>
     /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
     /// </summary>

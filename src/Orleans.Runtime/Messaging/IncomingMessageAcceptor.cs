@@ -5,27 +5,12 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.DistributedTracing.EventSourceEvents;
 using Orleans.Messaging;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging
-{
-    [EventSource(Name = "Microsoft-Orleans-IncomingMessageAcceptorEvent")]
-    public class OrleansIncomingMessageAcceptorEvent : EventSource
-    {
-        public static readonly OrleansIncomingMessageAcceptorEvent Log = new OrleansIncomingMessageAcceptorEvent();
-        
-        public void HandleMessageStart()
-        {
-                WriteEvent(1);
-        }
-
-        public void HandleMessageStop()
-        {
-                WriteEvent(2);
-        }
-    }
-
+{ 
     internal class IncomingMessageAcceptor : DedicatedAsynchAgent
     {
         private readonly ConcurrentObjectPool<SaeaPoolWrapper> receiveEventArgsPool;

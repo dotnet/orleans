@@ -2,17 +2,11 @@ using System;
 using System.Diagnostics.Tracing;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using Orleans.DistributedTracing.EventSourceEvents;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
-    [EventSource(Name = "Microsoft-Orleans-IncomingMessageAgentEvent")]
-    public class OrleansIncomingMessageAgentEvent : EventSource
-    {
-        public static readonly OrleansIncomingMessageAgentEvent Log = new OrleansIncomingMessageAgentEvent();
-        public void ReceiverMessageStart() => WriteEvent(1);
-        public void ReceiverMessageStop() => WriteEvent(2);
-    }
     internal class IncomingMessageAgent : DedicatedAsynchAgent
     {
         private readonly IMessageCenter messageCenter;

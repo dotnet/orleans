@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.DistributedTracing.EventSourceEvents;
 using Orleans.Messaging;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -20,38 +21,6 @@ using Orleans.Streams;
 
 namespace Orleans
 {
-    [EventSource(Name="Microsoft-Orleans-OutsideRuntimeClientEvent")]
-    public class OrleansOutsideRuntimeClientEvent : EventSource
-    {
-        public static readonly OrleansOutsideRuntimeClientEvent Log = new OrleansOutsideRuntimeClientEvent();
-        public void SendRequestStart()
-        {
-            WriteEvent(1);
-        }
-
-        public void SendRequestStop()
-        {
-            WriteEvent(2);
-        }
-        public void ReceiveResponseStart()
-        {
-            WriteEvent(3);
-        }
-        public void ReceiveResponseStop()
-        {
-            WriteEvent(4);
-        }
-
-        public void SendResponseStart()
-        {
-            WriteEvent(5);
-        }
-        public void SendResponseStop()
-        {
-            WriteEvent(6);
-        }
-    }
-
     internal class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }

@@ -1,32 +1,14 @@
-using System;
-using System.Diagnostics.Tracing;
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.DistributedTracing.EventSourceEvents;
 using Orleans.Messaging;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging
 {
-    [EventSource(Name = "Microsoft-Orleans-GatewayAcceptorEvent")]
-    public class OrleansGatewayAcceptorEvent : EventSource
-    {
-        public static readonly OrleansGatewayAcceptorEvent Log = new OrleansGatewayAcceptorEvent();
-
-        public void HandleMessageStart()
-        {
-            WriteEvent(1);
-        }
-        public void HandleMessageStop()
-        {
-            WriteEvent(2);
-        }
-
-    }
-
-
     internal class GatewayAcceptor : IncomingMessageAcceptor
     {
         private readonly Gateway gateway;
