@@ -129,10 +129,9 @@ namespace Orleans.Runtime
         public bool TryDispatchToClient(Message message)
         {
             // set/clear activityid
-            var previousId = EventSource.CurrentThreadActivityId;
+            EventSource.SetCurrentThreadActivityId(message.ActivityId, out var previousId);
             try
             {
-                EventSource.SetCurrentThreadActivityId(message.ActivityId);
                 if (!this.ClientId.Equals(message.TargetGrain)) return false;
                 if (message.IsExpired)
                 {

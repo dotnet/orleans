@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Scheduler
     [EventSource(Name = "Microsoft-Orleans-ActivationTaskSchedulerEvent")]
     public class OrleansActivationTaskSchedulerEvent : EventSource
     {
-        public static OrleansActivationTaskSchedulerEvent Log = new OrleansActivationTaskSchedulerEvent();
+        public static readonly OrleansActivationTaskSchedulerEvent Log = new OrleansActivationTaskSchedulerEvent();
         public void QueueTaskStart(int taskId) => WriteEvent(1, taskId);
         public void QueueTaskStop(int taskId) => WriteEvent(2, taskId);
         public void RunTaskStart(int taskId) => WriteEvent(3, taskId);

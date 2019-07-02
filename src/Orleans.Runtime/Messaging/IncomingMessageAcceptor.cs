@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Messaging
     [EventSource(Name = "Microsoft-Orleans-IncomingMessageAcceptorEvent")]
     public class OrleansIncomingMessageAcceptorEvent : EventSource
     {
-        public static OrleansIncomingMessageAcceptorEvent Log = new OrleansIncomingMessageAcceptorEvent();
+        public static readonly OrleansIncomingMessageAcceptorEvent Log = new OrleansIncomingMessageAcceptorEvent();
         
         public void HandleMessageStart()
         {
@@ -690,10 +690,10 @@ namespace Orleans.Runtime.Messaging
                         try
                         {
                             if (!this._buffer.TryDecodeMessage(out msg)) break;
-                            var previousId = EventSource.CurrentThreadActivityId;
+
+                            EventSource.SetCurrentThreadActivityId(msg.ActivityId, out var previousId);
                             try
                             {
-                                EventSource.SetCurrentThreadActivityId(msg.ActivityId);
                                 this.IMA.HandleMessage(msg, this.Socket);
                             }
                             finally

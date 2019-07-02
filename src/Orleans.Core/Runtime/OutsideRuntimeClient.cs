@@ -23,7 +23,7 @@ namespace Orleans
     [EventSource(Name="Microsoft-Orleans-OutsideRuntimeClientEvent")]
     public class OrleansOutsideRuntimeClientEvent : EventSource
     {
-        public static OrleansOutsideRuntimeClientEvent Log = new OrleansOutsideRuntimeClientEvent();
+        public static readonly OrleansOutsideRuntimeClientEvent Log = new OrleansOutsideRuntimeClientEvent();
         public void SendRequestStart()
         {
             WriteEvent(1);
@@ -342,10 +342,9 @@ namespace Orleans
                
                 if (message == null) // if wait was cancelled
                     break;
-                var previousId = EventSource.CurrentThreadActivityId;
+                EventSource.SetCurrentThreadActivityId(message.ActivityId, out var previousId);
                 try
                 {
-                    EventSource.SetCurrentThreadActivityId(message.ActivityId);
                     // when we receive the first message, we update the
                     // clientId for this client because it may have been modified to
                     // include the cluster name
@@ -396,10 +395,9 @@ namespace Orleans
         public void SendResponse(Message request, Response response)
         {
             var message = this.messageFactory.CreateResponseMessage(request);
-            var previousId = EventSource.CurrentThreadActivityId;
+            EventSource.SetCurrentThreadActivityId(message.ActivityId, out var previousId);
             try
             {
-                EventSource.SetCurrentThreadActivityId(message.ActivityId);
                 OrleansOutsideRuntimeClientEvent.Log.SendResponseStart();
                 message.BodyObject = response;
                 transport.SendMessage(message);
@@ -432,10 +430,9 @@ namespace Orleans
         public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            var previousId = EventSource.CurrentThreadActivityId;
+            EventSource.SetCurrentThreadActivityId(message.ActivityId, out var previousId);
             try
             {
-                EventSource.SetCurrentThreadActivityId(message.ActivityId);
                 OrleansOutsideRuntimeClientEvent.Log.SendRequestStart() ;
                 SendRequestMessage(target, message, context, debugContext, options, genericArguments);
             }

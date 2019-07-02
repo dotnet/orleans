@@ -41,11 +41,11 @@ namespace Orleans.Runtime.Scheduler
 
         public override void Execute()
         {
-            var previousId = EventSource.CurrentThreadActivityId;
+            // set/clear activityid
+            EventSource.SetCurrentThreadActivityId(this.message.ActivityId, out var previousId);
             try
             {
-                // set/clear activityid
-                EventSource.SetCurrentThreadActivityId(this.message.ActivityId);
+                
                 var grain = activation.GrainInstance;
                 var runtimeClient = this.dispatcher.RuntimeClient;
                 Task task = runtimeClient.Invoke(grain, this.activation, this.message);

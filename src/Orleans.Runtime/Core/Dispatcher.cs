@@ -20,7 +20,7 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-DispatcherEvent")]
     public class OrleansDispatcherEvent : EventSource
     {
-        public static OrleansDispatcherEvent Log = new OrleansDispatcherEvent();
+        public static readonly OrleansDispatcherEvent Log = new OrleansDispatcherEvent();
         public void ReceiveMessageStart() => WriteEvent(1);
         public void ReceiveMessageStop() => WriteEvent(2);
     }
@@ -81,10 +81,10 @@ namespace Orleans.Runtime
         public void ReceiveMessage(Message message)
         {
             // set/clear activityid
-            var previousId = EventSource.CurrentThreadActivityId;
+            EventSource.SetCurrentThreadActivityId(message.ActivityId, out var previousId);
             try
             {
-                EventSource.SetCurrentThreadActivityId(message.ActivityId);
+                
                 OrleansDispatcherEvent.Log.ReceiveMessageStart();
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageReceive(message);
                 // Don't process messages that have already timed out

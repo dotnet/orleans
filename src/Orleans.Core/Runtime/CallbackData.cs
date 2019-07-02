@@ -10,15 +10,33 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-CallBackDataEvent")]
     public class OrleansCallBackDataEvent : EventSource
     {
-        public static OrleansCallBackDataEvent Log = new OrleansCallBackDataEvent();
-        public void OnTimeoutStart() => WriteEvent(1);
-        public void OnTimeoutStop() => WriteEvent(2);
+        public static readonly OrleansCallBackDataEvent Log = new OrleansCallBackDataEvent();
+        public void OnTimeoutStart()
+        {
+            WriteEvent(1);
+        }
+        public void OnTimeoutStop()
+        {
+            WriteEvent(2);
+        }
 
-        public void OnTargetSiloFailStart() => WriteEvent(3);
-        public void OnTargetSiloFailStop() => WriteEvent(4);
+        public void OnTargetSiloFailStart()
+        {
+            WriteEvent(3);
+        }
+        public void OnTargetSiloFailStop()
+        {
+            WriteEvent(4);
+        }
 
-        public void DoCallbackStart() => WriteEvent(5);
-        public void DoCallbackStop() => WriteEvent(6);
+        public void DoCallbackStart()
+        {
+            WriteEvent(5);
+        }
+        public void DoCallbackStop()
+        {
+            WriteEvent(6);
+        }
     }
 
     internal class CallbackData
@@ -56,10 +74,9 @@ namespace Orleans.Runtime
             // set/clear activityid
             if (this.IsCompleted)
                 return;
-            var previousActivityId = EventSource.CurrentThreadActivityId;
+            EventSource.SetCurrentThreadActivityId(this.Message.ActivityId, out var previousActivityId);
             try
             {
-                EventSource.SetCurrentThreadActivityId(this.Message.ActivityId);
                 OrleansCallBackDataEvent.Log.OnTimeoutStart();
                
                 var msg = this.Message; // Local working copy
@@ -84,10 +101,9 @@ namespace Orleans.Runtime
         {
             if (this.IsCompleted)
                 return;
-            var previousActivityId = EventSource.CurrentThreadActivityId;
+            EventSource.SetCurrentThreadActivityId(this.Message.ActivityId, out var previousActivityId);
             try
             {
-                EventSource.SetCurrentThreadActivityId(this.Message.ActivityId);
                 OrleansCallBackDataEvent.Log.OnTargetSiloFailStart();
                 var msg = this.Message;
                 var messageHistory = msg.GetTargetHistory();
@@ -110,10 +126,9 @@ namespace Orleans.Runtime
         {
             if (this.IsCompleted)
                 return;
-            var previousActivityId = EventSource.CurrentThreadActivityId;
+            EventSource.SetCurrentThreadActivityId(this.Message.ActivityId, out var previousActivityId);
             try
             {
-                EventSource.SetCurrentThreadActivityId(this.Message.ActivityId);
                 OrleansCallBackDataEvent.Log.DoCallbackStart();
 
                 if (Interlocked.CompareExchange(ref this.completed, 1, 0) == 0)

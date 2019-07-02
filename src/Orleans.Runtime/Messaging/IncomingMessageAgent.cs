@@ -9,7 +9,7 @@ namespace Orleans.Runtime.Messaging
     [EventSource(Name = "Microsoft-Orleans-IncomingMessageAgentEvent")]
     public class OrleansIncomingMessageAgentEvent : EventSource
     {
-        public static OrleansIncomingMessageAgentEvent Log = new OrleansIncomingMessageAgentEvent();
+        public static readonly OrleansIncomingMessageAgentEvent Log = new OrleansIncomingMessageAgentEvent();
         public void ReceiverMessageStart() => WriteEvent(1);
         public void ReceiverMessageStop() => WriteEvent(2);
     }
@@ -71,10 +71,9 @@ namespace Orleans.Runtime.Messaging
         private void ReceiveMessage(Message msg)
         {
             // set/clear activityid
-            var previousId = EventSource.CurrentThreadActivityId;
+            EventSource.SetCurrentThreadActivityId(msg.ActivityId, out var previousId);
             try
             {
-                EventSource.SetCurrentThreadActivityId(msg.ActivityId);
                 OrleansIncomingMessageAgentEvent.Log.ReceiverMessageStart();
                 MessagingProcessingStatisticsGroup.OnImaMessageReceived(msg);
 

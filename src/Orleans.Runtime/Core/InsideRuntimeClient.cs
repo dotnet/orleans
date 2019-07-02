@@ -27,7 +27,7 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-InsideRuntimeClientEvent")]
     public class OrleansInsideRuntimeClientEvent : EventSource
     {
-        public static OrleansInsideRuntimeClientEvent Log = new OrleansInsideRuntimeClientEvent();
+        public static readonly OrleansInsideRuntimeClientEvent Log = new OrleansInsideRuntimeClientEvent();
         public void SendRequestStart()
         {
             WriteEvent(1);
@@ -154,10 +154,9 @@ namespace Orleans.Runtime
             string genericArguments = null)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            var previousId = EventSource.CurrentThreadActivityId;
+            EventSource.SetCurrentThreadActivityId(message.ActivityId, out var previousId);
             try
             {
-                EventSource.SetCurrentThreadActivityId(message.ActivityId);
                 OrleansInsideRuntimeClientEvent.Log.SendRequestStart();
                 SendRequestMessage(target, message, context, debugContext, options, genericArguments);
             }
@@ -260,10 +259,9 @@ namespace Orleans.Runtime
 
         public void SendResponse(Message request, Response response)
         {
-            var previousId = EventSource.CurrentThreadActivityId;
+            EventSource.SetCurrentThreadActivityId(request.ActivityId, out var previousId);
             try
             {
-                EventSource.SetCurrentThreadActivityId(request.ActivityId);
                 OrleansInsideRuntimeClientEvent.Log.SendResponseStart();
                 // Don't process messages that have already timed out
                 if (request.IsExpired)

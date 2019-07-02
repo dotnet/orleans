@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Messaging
     [EventSource(Name = "Microsoft-Orleans-GatewayAcceptorEvent")]
     public class OrleansGatewayAcceptorEvent : EventSource
     {
-        public static OrleansGatewayAcceptorEvent Log = new OrleansGatewayAcceptorEvent();
+        public static readonly OrleansGatewayAcceptorEvent Log = new OrleansGatewayAcceptorEvent();
 
         public void HandleMessageStart()
         {
