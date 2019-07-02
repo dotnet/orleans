@@ -43,7 +43,6 @@ namespace Orleans.Hosting
             {
                 this.applicationLifetime?.StopApplication();
                 await silo.StopAsync(cancellationToken);
-                await this.Stopped;
             }
             finally
             {
