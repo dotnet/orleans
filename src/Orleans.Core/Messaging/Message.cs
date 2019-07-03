@@ -252,9 +252,9 @@ namespace Orleans.Runtime
             set { Headers.CallChainId = value; }
         }
         
-        public Guid ActivityId {
-            get { return Headers.ActivityId; }
-            set { Headers.ActivityId = value; }
+        public TraceContext TraceContext {
+            get { return Headers.TraceContext; }
+            set { Headers.TraceContext = value; }
         }
 
         public ActivationAddress SendingAddress
@@ -588,7 +588,7 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.TARGET_GRAIN, sb, (m) => m.TargetGrain);
             AppendIfExists(HeadersContainer.Headers.TARGET_OBSERVER, sb, (m) => m.TargetObserverId);
             AppendIfExists(HeadersContainer.Headers.CALL_CHAIN_ID, sb, (m) => m.CallChainId);
-            AppendIfExists(HeadersContainer.Headers.ACTIVITY_ID, sb, (m) => m.ActivityId);
+            AppendIfExists(HeadersContainer.Headers.TRACE_CONTEXT, sb, (m) => m.TraceContext);
             AppendIfExists(HeadersContainer.Headers.TARGET_SILO, sb, (m) => m.TargetSilo);
 
             return sb.ToString();
@@ -774,7 +774,7 @@ namespace Orleans.Runtime
 
                 CALL_CHAIN_ID = 1 << 29,
 
-                ACTIVITY_ID = 1 << 30
+                TRACE_CONTEXT = 1 << 30
                 // Do not add over int.MaxValue of these.
             }
 
@@ -809,17 +809,17 @@ namespace Orleans.Runtime
             private Dictionary<string, object> _requestContextData;
             private CorrelationId _callChainId;
             private readonly DateTime _localCreationTime;
-            private Guid activityId;
+            private TraceContext traceContext;
 
             public HeadersContainer()
             {
                 _localCreationTime = DateTime.UtcNow;
             }
 
-            public Guid ActivityId
+            public TraceContext TraceContext
             {
-                get { return activityId; }
-                set { activityId = value; }
+                get { return traceContext; }
+                set { traceContext = value; }
             }
 
             public Categories Category
@@ -1144,7 +1144,7 @@ namespace Orleans.Runtime
                 headers = string.IsNullOrEmpty(_rejectionInfo) ? headers & ~Headers.REJECTION_INFO : headers | Headers.REJECTION_INFO;
                 headers = _requestContextData == null || _requestContextData.Count == 0 ? headers & ~Headers.REQUEST_CONTEXT : headers | Headers.REQUEST_CONTEXT;
                 headers = _callChainId == null ? headers & ~Headers.CALL_CHAIN_ID : headers | Headers.CALL_CHAIN_ID;
-                headers = activityId == Guid.Empty? headers & ~Headers.ACTIVITY_ID : headers | Headers.ACTIVITY_ID;
+                headers = traceContext == null? headers & ~Headers.TRACE_CONTEXT : headers | Headers.TRACE_CONTEXT;
                 headers = IsTransactionRequired ? headers | Headers.IS_TRANSACTION_REQUIRED : headers & ~Headers.IS_TRANSACTION_REQUIRED;
                 headers = _transactionInfo == null ? headers & ~Headers.TRANSACTION_INFO : headers | Headers.TRANSACTION_INFO;
                 return headers;
@@ -1284,9 +1284,9 @@ namespace Orleans.Runtime
                 if ((headers & Headers.TRANSACTION_INFO) != Headers.NONE)
                     SerializationManager.SerializeInner(input.TransactionInfo, context, typeof(ITransactionInfo));
 
-                if ((headers & Headers.ACTIVITY_ID) != Headers.NONE)
+                if ((headers & Headers.TRACE_CONTEXT) != Headers.NONE)
                 {
-                    writer.Write(input.ActivityId);
+                    SerializationManager.SerializeInner(input.traceContext, context, typeof(TraceContext));
                 }
             }
 
@@ -1405,8 +1405,8 @@ namespace Orleans.Runtime
                 if ((headers & Headers.TRANSACTION_INFO) != Headers.NONE)
                     result.TransactionInfo = SerializationManager.DeserializeInner<ITransactionInfo>(context);
 
-                if ((headers & Headers.ACTIVITY_ID) != Headers.NONE)
-                    result.ActivityId = reader.ReadGuid();
+                if ((headers & Headers.TRACE_CONTEXT) != Headers.NONE)
+                    result.TraceContext = SerializationManager.DeserializeInner<TraceContext>(context);
 
                 return result;
             }

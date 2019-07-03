@@ -1,71 +1,57 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Tracing;
+using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace Orleans.DistributedTracing.EventSourceEvents
+namespace Orleans.Runtime
 {
-    [EventSource(Name = "Microsoft-Orleans-CallBackDataEvent")]
-    public class OrleansCallBackDataEvent : EventSource
+    [EventSource(Name = "Microsoft-Orleans-CallBackData")]
+    internal sealed class OrleansCallBackDataEvent : EventSource
     {
         public static readonly OrleansCallBackDataEvent Log = new OrleansCallBackDataEvent();
-        public void OnTimeoutStart()
+        public void OnTimeout()
         {
             WriteEvent(1);
         }
-        public void OnTimeoutStop()
+
+        public void OnTargetSiloFail()
         {
             WriteEvent(2);
         }
 
-        public void OnTargetSiloFailStart()
+        public void DoCallback()
         {
             WriteEvent(3);
-        }
-        public void OnTargetSiloFailStop()
-        {
-            WriteEvent(4);
-        }
-
-        public void DoCallbackStart()
-        {
-            WriteEvent(5);
-        }
-        public void DoCallbackStop()
-        {
-            WriteEvent(6);
         }
     }
 
-    [EventSource(Name = "Microsoft-Orleans-OutsideRuntimeClientEvent")]
-    public class OrleansOutsideRuntimeClientEvent : EventSource
+    [EventSource(Name = "Microsoft-Orleans-OutsideRuntimeClient")]
+    internal sealed class OrleansOutsideRuntimeClientEvent : EventSource
     {
         public static readonly OrleansOutsideRuntimeClientEvent Log = new OrleansOutsideRuntimeClientEvent();
-        public void SendRequestStart()
+        public void SendRequest()
         {
             WriteEvent(1);
         }
-
-        public void SendRequestStop()
+        public void ReceiveResponse()
         {
             WriteEvent(2);
         }
-        public void ReceiveResponseStart()
+
+        public void SendResponse()
         {
             WriteEvent(3);
         }
-        public void ReceiveResponseStop()
-        {
-            WriteEvent(4);
-        }
+    }
 
-        public void SendResponseStart()
+    internal static class EventSourceUtils
+    {
+        public static void EmitEvent(Message message, Action emitAction)
         {
-            WriteEvent(5);
-        }
-        public void SendResponseStop()
-        {
-            WriteEvent(6);
+            EventSource.SetCurrentThreadActivityId(message.TraceContext?.ActivityId??Guid.Empty, out var previousId);
+            emitAction();
+            EventSource.SetCurrentThreadActivityId(previousId);
         }
     }
 }

@@ -128,35 +128,26 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public bool TryDispatchToClient(Message message)
         {
-            // set/clear activityid
-            EventSource.SetCurrentThreadActivityId(message.ActivityId, out var previousId);
-            try
+
+            if (!this.ClientId.Equals(message.TargetGrain)) return false;
+            if (message.IsExpired)
             {
-                if (!this.ClientId.Equals(message.TargetGrain)) return false;
-                if (message.IsExpired)
-                {
-                    message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
-                    return true;
-                }
-
-                if (message.Direction == Message.Directions.Response)
-                {
-                    // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
-                    this.runtimeClient.ReceiveResponse(message);
-                }
-                else
-                {
-                    // Requests agrainst client objects are scheduled for execution on the client.
-                    this.incomingMessages.Add(message);
-                }
-
+                message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
                 return true;
             }
-            finally
+
+            if (message.Direction == Message.Directions.Response)
             {
-                EventSource.SetCurrentThreadActivityId(previousId);
+                // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
+                this.runtimeClient.ReceiveResponse(message);
             }
-            
+            else
+            {
+                // Requests agrainst client objects are scheduled for execution on the client.
+                this.incomingMessages.Add(message);
+            }
+
+            return true;
         }
 
         /// <inheritdoc />

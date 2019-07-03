@@ -23,18 +23,7 @@ namespace Orleans.Runtime.Scheduler
 
         public override void Execute()
         {
-            // set/clear activityid
-            var previousId = EventSource.CurrentThreadActivityId;
-            try
-            {
-                EventSource.SetCurrentThreadActivityId(response.ActivityId);
-                target.HandleResponse(response);
-            }
-            finally
-            {
-                EventSource.SetCurrentThreadActivityId(previousId);
-            }
-            
+            target.HandleResponse(response);
         }
 
         public override string ToString()

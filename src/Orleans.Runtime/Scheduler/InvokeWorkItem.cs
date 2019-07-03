@@ -41,11 +41,8 @@ namespace Orleans.Runtime.Scheduler
 
         public override void Execute()
         {
-            // set/clear activityid
-            EventSource.SetCurrentThreadActivityId(this.message.ActivityId, out var previousId);
             try
             {
-                
                 var grain = activation.GrainInstance;
                 var runtimeClient = this.dispatcher.RuntimeClient;
                 Task task = runtimeClient.Invoke(grain, this.activation, this.message);
@@ -66,11 +63,6 @@ namespace Orleans.Runtime.Scheduler
                     String.Format("Exception trying to invoke request {0} on activation {1}.", message, activation),
                     exc);
                 OnComplete();
-            }
-            finally
-            {
-                // clear
-                EventSource.SetCurrentThreadActivityId(previousId);
             }
         }
 

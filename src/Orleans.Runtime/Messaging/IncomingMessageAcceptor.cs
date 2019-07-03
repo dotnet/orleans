@@ -5,7 +5,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.DistributedTracing.EventSourceEvents;
 using Orleans.Messaging;
 using Orleans.Serialization;
 
@@ -507,107 +506,95 @@ namespace Orleans.Runtime.Messaging
 
         protected virtual void HandleMessage(Message msg, Socket receivedOnSocket)
         {
-            // set/clear activityid
-            var previousActivityId = EventSource.CurrentThreadActivityId;
-            try
+            EventSourceUtils.EmitEvent(msg, OrleansIncomingMessageAcceptorEvent.Log.HandleMessage);
+            // See it's a Ping message, and if so, short-circuit it
+            object pingObj;
+            var requestContext = msg.RequestContextData;
+            if (requestContext != null &&
+                requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out pingObj) &&
+                pingObj is bool &&
+                (bool)pingObj)
             {
-                EventSource.SetCurrentThreadActivityId(msg.ActivityId);
-                OrleansIncomingMessageAcceptorEvent.Log.HandleMessageStart();
-                // See it's a Ping message, and if so, short-circuit it
-                object pingObj;
-                var requestContext = msg.RequestContextData;
-                if (requestContext != null &&
-                    requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out pingObj) &&
-                    pingObj is bool &&
-                    (bool)pingObj)
-                {
-                    MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
+                MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
 
-                    if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Responding to Ping from {0}", msg.SendingSilo);
+                if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Responding to Ping from {0}", msg.SendingSilo);
 
-                    if (!msg.TargetSilo.Equals(MessageCenter.MyAddress)) // got ping that is not destined to me. For example, got a ping to my older incarnation.
-                    {
-                        MessagingStatisticsGroup.OnRejectedMessage(msg);
-                        Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
-                            $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {MessageCenter.MyAddress.ToLongString()}. " +
-                            $"The rejected ping message is {msg}.");
-                        MessageCenter.OutboundQueue.SendMessage(rejection);
-                    }
-                    else
-                    {
-                        var response = this.MessageFactory.CreateResponseMessage(msg);
-                        response.BodyObject = Response.Done;
-                        MessageCenter.SendMessage(response);
-                    }
-                    return;
-                }
-
-                // sniff message headers for directory cache management
-                sniffIncomingMessageHandler?.Invoke(msg);
-
-                // Don't process messages that have already timed out
-                if (msg.IsExpired)
-                {
-                    msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
-                    return;
-                }
-
-                // If we've stopped application message processing, then filter those out now
-                // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-                if (MessageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && !Constants.SystemMembershipTableId.Equals(msg.SendingGrain))
-                {
-                    // We reject new requests, and drop all other messages
-                    if (msg.Direction != Message.Directions.Request) return;
-
-                    MessagingStatisticsGroup.OnRejectedMessage(msg);
-                    var reject = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping");
-                    MessageCenter.SendMessage(reject);
-                    return;
-                }
-
-                // Make sure the message is for us. Note that some control messages may have no target
-                // information, so a null target silo is OK.
-                if ((msg.TargetSilo == null) || msg.TargetSilo.Matches(MessageCenter.MyAddress))
-                {
-                    // See if it's a message for a client we're proxying.
-                    if (MessageCenter.IsProxying && MessageCenter.TryDeliverToProxy(msg)) return;
-
-                    // Nope, it's for us
-                    MessageCenter.InboundQueue.PostMessage(msg);
-                    return;
-                }
-
-                if (!msg.TargetSilo.Endpoint.Equals(MessageCenter.MyAddress.Endpoint))
-                {
-                    // If the message is for some other silo altogether, then we need to forward it.
-                    if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
-                    MessageCenter.OutboundQueue.SendMessage(msg);
-                    return;
-                }
-
-                // If the message was for this endpoint but an older epoch, then reject the message
-                // (if it was a request), or drop it on the floor if it was a response or one-way.
-                if (msg.Direction == Message.Directions.Request)
+                if (!msg.TargetSilo.Equals(MessageCenter.MyAddress)) // got ping that is not destined to me. For example, got a ping to my older incarnation.
                 {
                     MessagingStatisticsGroup.OnRejectedMessage(msg);
-                    Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Transient,
-                        string.Format("The target silo is no longer active: target was {0}, but this silo is {1}. The rejected message is {2}.",
-                            msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg));
-
-                    // Invalidate the remote caller's activation cache entry.
-                    if (msg.TargetAddress != null) rejection.AddToCacheInvalidationHeader(msg.TargetAddress);
-
+                    Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
+                        $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {MessageCenter.MyAddress.ToLongString()}. " +
+                        $"The rejected ping message is {msg}.");
                     MessageCenter.OutboundQueue.SendMessage(rejection);
-                    if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
-                        msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg);
                 }
+                else
+                {
+                    var response = this.MessageFactory.CreateResponseMessage(msg);
+                    response.BodyObject = Response.Done;
+                    MessageCenter.SendMessage(response);
+                }
+                return;
             }
-            finally
+
+            // sniff message headers for directory cache management
+            sniffIncomingMessageHandler?.Invoke(msg);
+
+            // Don't process messages that have already timed out
+            if (msg.IsExpired)
             {
-                OrleansIncomingMessageAcceptorEvent.Log.HandleMessageStop();
-                EventSource.SetCurrentThreadActivityId(previousActivityId);
+                msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
+                return;
             }
-            
+
+            // If we've stopped application message processing, then filter those out now
+            // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
+            if (MessageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && !Constants.SystemMembershipTableId.Equals(msg.SendingGrain))
+            {
+                // We reject new requests, and drop all other messages
+                if (msg.Direction != Message.Directions.Request) return;
+
+                MessagingStatisticsGroup.OnRejectedMessage(msg);
+                var reject = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping");
+                MessageCenter.SendMessage(reject);
+                return;
+            }
+
+            // Make sure the message is for us. Note that some control messages may have no target
+            // information, so a null target silo is OK.
+            if ((msg.TargetSilo == null) || msg.TargetSilo.Matches(MessageCenter.MyAddress))
+            {
+                // See if it's a message for a client we're proxying.
+                if (MessageCenter.IsProxying && MessageCenter.TryDeliverToProxy(msg)) return;
+
+                // Nope, it's for us
+                MessageCenter.InboundQueue.PostMessage(msg);
+                return;
+            }
+
+            if (!msg.TargetSilo.Endpoint.Equals(MessageCenter.MyAddress.Endpoint))
+            {
+                // If the message is for some other silo altogether, then we need to forward it.
+                if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
+                MessageCenter.OutboundQueue.SendMessage(msg);
+                return;
+            }
+
+            // If the message was for this endpoint but an older epoch, then reject the message
+            // (if it was a request), or drop it on the floor if it was a response or one-way.
+            if (msg.Direction == Message.Directions.Request)
+            {
+                MessagingStatisticsGroup.OnRejectedMessage(msg);
+                Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Transient,
+                    string.Format("The target silo is no longer active: target was {0}, but this silo is {1}. The rejected message is {2}.",
+                        msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg));
+
+                // Invalidate the remote caller's activation cache entry.
+                if (msg.TargetAddress != null) rejection.AddToCacheInvalidationHeader(msg.TargetAddress);
+
+                MessageCenter.OutboundQueue.SendMessage(rejection);
+                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
+                    msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg);
+            }
         }
 
         private void RestartAcceptingSocket()
@@ -675,16 +662,7 @@ namespace Orleans.Runtime.Messaging
                         try
                         {
                             if (!this._buffer.TryDecodeMessage(out msg)) break;
-
-                            EventSource.SetCurrentThreadActivityId(msg.ActivityId, out var previousId);
-                            try
-                            {
-                                this.IMA.HandleMessage(msg, this.Socket);
-                            }
-                            finally
-                            {
-                                EventSource.SetCurrentThreadActivityId(previousId);
-                            }
+                            this.IMA.HandleMessage(msg, this.Socket);
                         }
                         catch (Exception exception)
                         {

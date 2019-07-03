@@ -26,7 +26,7 @@ namespace Orleans.Runtime
                 Category = Message.Categories.Application,
                 Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
                 Id = CorrelationId.GetNext(),
-                ActivityId = Trace.CorrelationManager.ActivityId,
+                TraceContext = new TraceContext() { ActivityId = Trace.CorrelationManager.ActivityId },
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
@@ -96,7 +96,7 @@ namespace Orleans.Runtime
                 IsReadOnly = request.IsReadOnly,
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
                 TargetSilo = request.SendingSilo,
-                ActivityId = request.ActivityId,
+                TraceContext = request.TraceContext,
                 TransactionInfo = request.TransactionInfo
             };
 

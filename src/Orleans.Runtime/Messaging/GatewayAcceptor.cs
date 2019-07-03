@@ -3,7 +3,6 @@ using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.DistributedTracing.EventSourceEvents;
 using Orleans.Messaging;
 using Orleans.Serialization;
 
@@ -88,64 +87,57 @@ namespace Orleans.Runtime.Messaging
         /// <param name="receivedOnSocket"></param>
         protected override void HandleMessage(Message msg, Socket receivedOnSocket)
         {
-            try
+            EventSourceUtils.EmitEvent(msg, OrleansGatewayAcceptorEvent.Log.HandleMessage);
+            // Don't process messages that have already timed out
+            if (msg.IsExpired)
             {
-                OrleansGatewayAcceptorEvent.Log.HandleMessageStart();
-                // Don't process messages that have already timed out
-                if (msg.IsExpired)
-                {
-                    msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
-                    return;
-                }
-
-                gatewayTrafficCounter.Increment();
-
-                // return address translation for geo clients (replace sending address cli/* with gcl/*)
-                if (this.multiClusterOptions.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
-                {
-                    msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.siloDetails.ClusterId);
-                }
-
-                // Are we overloaded?
-                if (this.overloadDetector.Overloaded)
-                {
-                    MessagingStatisticsGroup.OnRejectedMessage(msg);
-                    Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
-                    MessageCenter.TryDeliverToProxy(rejection);
-                    if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Rejecting a request due to overloading: {0}", msg.ToString());
-                    loadSheddingCounter.Increment();
-                    return;
-                }
-
-                SiloAddress targetAddress = gateway.TryToReroute(msg);
-                msg.SendingSilo = MessageCenter.MyAddress;
-
-                if (targetAddress == null)
-                {
-                    // reroute via Dispatcher
-                    msg.TargetSilo = null;
-                    msg.TargetActivation = null;
-                    msg.ClearTargetAddress();
-
-                    if (msg.TargetGrain.IsSystemTarget)
-                    {
-                        msg.TargetSilo = MessageCenter.MyAddress;
-                        msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, MessageCenter.MyAddress);
-                    }
-
-                    MessagingStatisticsGroup.OnMessageReRoute(msg);
-                    MessageCenter.RerouteMessage(msg);
-                }
-                else
-                {
-                    // send directly
-                    msg.TargetSilo = targetAddress;
-                    MessageCenter.SendMessage(msg);
-                }
+                msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
+                return;
             }
-            finally
+
+            gatewayTrafficCounter.Increment();
+
+            // return address translation for geo clients (replace sending address cli/* with gcl/*)
+            if (this.multiClusterOptions.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
             {
-                OrleansGatewayAcceptorEvent.Log.HandleMessageStop();
+                msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.siloDetails.ClusterId);
+            }
+
+            // Are we overloaded?
+            if (this.overloadDetector.Overloaded)
+            {
+                MessagingStatisticsGroup.OnRejectedMessage(msg);
+                Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
+                MessageCenter.TryDeliverToProxy(rejection);
+                if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Rejecting a request due to overloading: {0}", msg.ToString());
+                loadSheddingCounter.Increment();
+                return;
+            }
+
+            SiloAddress targetAddress = gateway.TryToReroute(msg);
+            msg.SendingSilo = MessageCenter.MyAddress;
+
+            if (targetAddress == null)
+            {
+                // reroute via Dispatcher
+                msg.TargetSilo = null;
+                msg.TargetActivation = null;
+                msg.ClearTargetAddress();
+
+                if (msg.TargetGrain.IsSystemTarget)
+                {
+                    msg.TargetSilo = MessageCenter.MyAddress;
+                    msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, MessageCenter.MyAddress);
+                }
+
+                MessagingStatisticsGroup.OnMessageReRoute(msg);
+                MessageCenter.RerouteMessage(msg);
+            }
+            else
+            {
+                // send directly
+                msg.TargetSilo = targetAddress;
+                MessageCenter.SendMessage(msg);
             }
         }
     }
