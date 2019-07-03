@@ -78,7 +78,7 @@ namespace Orleans.Providers
         {
             if (config == null)
             {
-                throw new ArgumentNullException("config");
+                throw new ArgumentNullException(nameof(config));
             }
             string s;
             return config.Properties.TryGetValue(key, out s) ? int.Parse(s) : settingDefault;
@@ -88,7 +88,7 @@ namespace Orleans.Providers
         {
             if (config == null)
             {
-                throw new ArgumentNullException("config");
+                throw new ArgumentNullException(nameof(config));
             }
             string s;
             setting = 0;
@@ -99,7 +99,7 @@ namespace Orleans.Providers
         {
             if (config == null)
             {
-                throw new ArgumentNullException("config");
+                throw new ArgumentNullException(nameof(config));
             }
             string s;
             return config.Properties.TryGetValue(key, out s) ? s : settingDefault;
@@ -109,7 +109,7 @@ namespace Orleans.Providers
         {
             if (config == null)
             {
-                throw new ArgumentNullException("config");
+                throw new ArgumentNullException(nameof(config));
             }
             string s;
             return config.Properties.TryGetValue(key, out s) ? Guid.Parse(s) : settingDefault;
@@ -119,7 +119,7 @@ namespace Orleans.Providers
         {
             if (config == null)
             {
-                throw new ArgumentNullException("config");
+                throw new ArgumentNullException(nameof(config));
             }
             string s;
             return config.Properties.TryGetValue(key, out s) ? (T)Enum.Parse(typeof(T),s) : settingDefault;
@@ -129,7 +129,7 @@ namespace Orleans.Providers
         {
             if (config == null)
             {
-                throw new ArgumentNullException("config");
+                throw new ArgumentNullException(nameof(config));
             }
             string s;
             return config.Properties.TryGetValue(key, out s) ? Type.GetType(s) : settingDefault;
@@ -139,7 +139,7 @@ namespace Orleans.Providers
         {
             if (config == null)
             {
-                throw new ArgumentNullException("config");
+                throw new ArgumentNullException(nameof(config));
             }
             string s;
             return config.Properties.TryGetValue(key, out s) ? bool.Parse(s) : settingDefault;
@@ -149,7 +149,7 @@ namespace Orleans.Providers
         {
             if (config == null)
             {
-                throw new ArgumentNullException("config");
+                throw new ArgumentNullException(nameof(config));
             }
             string s;
             return config.Properties.TryGetValue(key, out s) ? TimeSpan.Parse(s) : settingDefault;
@@ -159,7 +159,7 @@ namespace Orleans.Providers
         {
             if (config == null)
             {
-                throw new ArgumentNullException("config");
+                throw new ArgumentNullException(nameof(config));
             }
             string s;
             setting = TimeSpan.Zero;
