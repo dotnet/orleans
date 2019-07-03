@@ -654,7 +654,7 @@ namespace Orleans.Runtime
         }
 
         public string CurrentActivationIdentity
-        {             
+        {
             get
             {
                 if (RuntimeContext.Current == null) return this.HostedClient.ToString();

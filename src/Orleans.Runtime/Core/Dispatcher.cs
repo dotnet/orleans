@@ -95,10 +95,10 @@ namespace Orleans.Runtime
             {
                 Task ignore;
                 ActivationData target = catalog.GetOrCreateActivation(
-                    message.TargetAddress,
+                    message.TargetAddress, 
                     message.IsNewPlacement,
                     message.NewGrainType,
-                    String.IsNullOrEmpty(message.GenericGrainType) ? null : message.GenericGrainType,
+                    String.IsNullOrEmpty(message.GenericGrainType) ? null : message.GenericGrainType, 
                     message.RequestContextData,
                     out ignore);
 
@@ -127,7 +127,7 @@ namespace Orleans.Runtime
                 try
                 {
                     MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Non-existent activation");
-
+              
                     var nea = ex as Catalog.NonExistentActivationException;
                     if (nea == null)
                     {
@@ -139,7 +139,7 @@ namespace Orleans.Runtime
                     if (nea.IsStatelessWorker)
                     {
                         if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation,
-                            $"Intermediate StatelessWorker NonExistentActivation for message {message}, Exception {ex}");
+                           $"Intermediate StatelessWorker NonExistentActivation for message {message}, Exception {ex}");
                     }
                     else
                     {

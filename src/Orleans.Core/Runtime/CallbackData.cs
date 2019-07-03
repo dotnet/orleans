@@ -47,8 +47,7 @@ namespace Orleans.Runtime
             var msg = this.Message; // Local working copy
 
             string messageHistory = msg.GetTargetHistory();
-            string errorMsg =
-                $"Response did not arrive on time in {timeout} for message: {msg}. Target History is: {messageHistory}.";
+            string errorMsg = $"Response did not arrive on time in {timeout} for message: {msg}. Target History is: {messageHistory}.";
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
             var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
@@ -62,13 +61,12 @@ namespace Orleans.Runtime
             EventSourceUtils.EmitEvent(this.Message, OrleansCallBackDataEvent.Log.OnTargetSiloFail);
             var msg = this.Message;
             var messageHistory = msg.GetTargetHistory();
-            string errorMsg =
+            string errorMsg = 
                 $"The target silo became unavailable for message: {msg}. Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.";
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
             var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
             OnFail(msg, error, "On silo fail - Resend {0} for {1}");
-            
         }
 
         public void DoCallback(Message response)
@@ -102,8 +100,6 @@ namespace Orleans.Runtime
                 // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
                 this.shared.ResponseCallback(response, this.context);
             }
-          
-            
         }
 
         private void OnFail(Message msg, Message error, string resendLogMessageFormat, bool isOnTimeout = false)

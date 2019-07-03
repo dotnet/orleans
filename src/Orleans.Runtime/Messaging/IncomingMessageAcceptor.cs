@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics.Tracing;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Serialization;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Messaging
-{ 
+{
     internal class IncomingMessageAcceptor : DedicatedAsynchAgent
     {
         private readonly ConcurrentObjectPool<SaeaPoolWrapper> receiveEventArgsPool;
@@ -350,9 +350,9 @@ namespace Orleans.Runtime.Messaging
                     // Finally, process the incoming request:
                     // Prep the socket so it will reset on close
                     sock.LingerState = receiveLingerOption;
+
                     Task.Factory.StartNew(() =>
                     {
-                       
                         // Add the socket to the open socket collection
                         if (ima.RecordOpenedSocket(sock))
                         {
@@ -631,6 +631,7 @@ namespace Orleans.Runtime.Messaging
             private readonly MessageFactory messageFactory;
             private readonly IncomingMessageBuffer _buffer;
             private Socket socket;
+
             public Socket Socket {
                 get { return socket; }
                 internal set

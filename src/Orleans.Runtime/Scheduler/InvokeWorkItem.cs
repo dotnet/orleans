@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics.Tracing;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -59,9 +58,8 @@ namespace Orleans.Runtime.Scheduler
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.InvokeWorkItem_UnhandledExceptionInInvoke,
-                    String.Format("Exception trying to invoke request {0} on activation {1}.", message, activation),
-                    exc);
+                logger.Warn(ErrorCode.InvokeWorkItem_UnhandledExceptionInInvoke, 
+                    String.Format("Exception trying to invoke request {0} on activation {1}.", message, activation), exc);
                 OnComplete();
             }
         }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics.Tracing;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -128,7 +127,6 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public bool TryDispatchToClient(Message message)
         {
-
             if (!this.ClientId.Equals(message.TargetGrain)) return false;
             if (message.IsExpired)
             {

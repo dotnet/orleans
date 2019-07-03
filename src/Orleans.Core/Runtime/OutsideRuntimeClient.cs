@@ -306,9 +306,10 @@ namespace Orleans
             while (listenForMessages)
             {
                 var message = transport.WaitMessage(Message.Categories.Application, ct);
-               
+
                 if (message == null) // if wait was cancelled
                     break;
+
                 // when we receive the first message, we update the
                 // clientId for this client because it may have been modified to
                 // include the cluster name
@@ -319,8 +320,7 @@ namespace Orleans
                     {
                         clientId = message.TargetGrain;
                         transport.UpdateClientId(clientId);
-                        CurrentActivationAddress = ActivationAddress.GetAddress(transport.MyAddress, clientId,
-                            CurrentActivationAddress.Activation);
+                        CurrentActivationAddress = ActivationAddress.GetAddress(transport.MyAddress, clientId, CurrentActivationAddress.Activation);
                     }
                     else
                     {
@@ -331,21 +331,20 @@ namespace Orleans
                 switch (message.Direction)
                 {
                     case Message.Directions.Response:
-                    {
-                        ReceiveResponse(message);
-                        break;
-                    }
+                        {
+                            ReceiveResponse(message);
+                            break;
+                        }
                     case Message.Directions.OneWay:
                     case Message.Directions.Request:
-                    {
-                        this.localObjects.Dispatch(message);
-                        break;
-                    }
+                        {
+                            this.localObjects.Dispatch(message);
+                            break;
+                        }
                     default:
                         logger.Error(ErrorCode.Runtime_Error_100327, $"Message not supported: {message}.");
                         break;
                 }
-                
             }
 
             incomingMessagesThreadTimeTracking?.OnStopExecution();
@@ -355,8 +354,8 @@ namespace Orleans
         {
             var message = this.messageFactory.CreateResponseMessage(request);
             EventSourceUtils.EmitEvent(message, OrleansOutsideRuntimeClientEvent.Log.SendResponse);
-            OrleansOutsideRuntimeClientEvent.Log.SendResponse();
             message.BodyObject = response;
+
             transport.SendMessage(message);
         }
 
@@ -382,7 +381,6 @@ namespace Orleans
         {
             var message = this.messageFactory.CreateMessage(request, options);
             EventSourceUtils.EmitEvent(message, OrleansOutsideRuntimeClientEvent.Log.SendRequest);
-            OrleansOutsideRuntimeClientEvent.Log.SendRequest();
             SendRequestMessage(target, message, context, debugContext, options, genericArguments);
         }
 
@@ -463,11 +461,11 @@ namespace Orleans
             // ignore duplicate requests
             if (response.Result == Message.ResponseTypes.Rejection
                 && (response.RejectionType == Message.RejectionTypes.DuplicateRequest
-                    || response.RejectionType == Message.RejectionTypes.CacheInvalidation))
+                 || response.RejectionType == Message.RejectionTypes.CacheInvalidation))
             {
                 return;
             }
-
+            
             CallbackData callbackData;
             var found = callbacks.TryRemove(response.Id, out callbackData);
             if (found)

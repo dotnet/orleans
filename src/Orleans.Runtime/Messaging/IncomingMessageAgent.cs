@@ -140,7 +140,6 @@ namespace Orleans.Runtime.Messaging
                     EnqueueReceiveMessage(msg, null, null);
                 }
             }
-            
         }
 
         private void EnqueueReceiveMessage(Message msg, ActivationData targetActivation, ISchedulingContext context)

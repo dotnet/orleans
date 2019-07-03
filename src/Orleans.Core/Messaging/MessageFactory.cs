@@ -110,7 +110,6 @@ namespace Orleans.Runtime
             }
 
             response.SendingSilo = request.TargetSilo;
-
             if (request.TargetGrain != null)
             {
                 response.SendingGrain = request.TargetGrain;
