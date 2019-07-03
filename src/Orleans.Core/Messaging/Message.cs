@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Tracing;
 using System.Text;
 using Orleans.CodeGeneration;
 using Orleans.Hosting;

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Orleans.Runtime
 {
-    public class TraceContext
+    internal class TraceContext
     {
         public Guid ActivityId { get; set; }
     }
