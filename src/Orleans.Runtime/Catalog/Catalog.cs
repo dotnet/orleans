@@ -946,6 +946,8 @@ namespace Orleans.Runtime
         // Reroute pending
         private Task DestroyActivations(List<ActivationData> list)
         {
+            if (list.Count == 0) return Task.CompletedTask;
+
             var tcs = new MultiTaskCompletionSource(list.Count);
             StartDestroyActivations(list, tcs);
             return tcs.Task;

@@ -107,7 +107,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task RemoveHandoffPartition(SiloAddress source)
         {
-            localGrainDirectory.HandoffManager.RemoveHandoffPartition(source);
+            // No-op
             return Task.CompletedTask;
         }
 

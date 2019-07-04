@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.Contracts;
 using System.Text;
@@ -33,6 +32,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (member.Value.Status == SiloStatus.Active)
                 {
+                    ++this.ActiveMemberCount;
                     var silo = member.Value.SiloAddress;
                     activeMembers.Add(silo);
                 }
@@ -61,6 +61,11 @@ namespace Orleans.Runtime.GrainDirectory
         /// The monotonically increasing membership version associated with this snapshot.
         /// </summary>
         public ClusterMembershipSnapshot ClusterMembership { get; }
+
+        /// <summary>
+        /// The number of active silos.
+        /// </summary>
+        public int ActiveMemberCount { get; }
 
         /// <summary>
         /// Returns the <see cref="SiloAddress"/> which owns the directory partition of the provided grain.
@@ -100,7 +105,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
 
-            if (siloAddress == null)
+            if (siloAddress is null)
             {
                 // If not found in the traversal, last silo will do (we are on a ring).
                 // We checked above to make sure that the list isn't empty, so this should always be safe.

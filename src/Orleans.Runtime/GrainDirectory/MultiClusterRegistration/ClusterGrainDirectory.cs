@@ -42,6 +42,8 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async Task<RemoteClusterActivationResponse> ProcessActivationRequest(GrainId grain, string requestClusterId, int hopCount = 0)
         {
+            var callerMembershipVersion = default(MembershipVersion);
+
             // check if the requesting cluster id is in the current configuration view of this cluster
             // if not, reject the message.
             var multiClusterConfiguration = this.multiClusterOracle?.GetMultiClusterConfiguration();
@@ -53,16 +55,9 @@ namespace Orleans.Runtime.GrainDirectory
                 return new RemoteClusterActivationResponse(ActivationResponseStatus.Failed);
             }
 
-            var forwardAddress = localGrainDirectory.CheckIfShouldForward(grain, 0, "ProcessActivationRequest");
+            var forwardAddress = await localGrainDirectory.GetPartitionOwner(grain, hopCount, callerMembershipVersion, "ProcessActivationRequest");
 
-            // on all silos other than first, we insert a retry delay and recheck owner before forwarding
-            if (hopCount > 0 && forwardAddress != null)
-            {
-                await Task.Delay(LocalGrainDirectory.RETRY_DELAY);
-                forwardAddress = localGrainDirectory.CheckIfShouldForward(grain, hopCount, "ProcessActivationRequest(recheck)");
-            }
-
-            if (forwardAddress == null)
+            if (this.Silo.Equals(forwardAddress))
             {
                 return ProcessRequestLocal(grain, requestClusterId);
             }
