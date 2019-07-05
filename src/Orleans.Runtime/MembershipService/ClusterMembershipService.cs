@@ -37,6 +37,28 @@ namespace Orleans.Runtime
 
         public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => this.updates;
 
+        public ValueTask Refresh(MembershipVersion targetVersion)
+        {
+            if (targetVersion != default && this.snapshot.Version >= targetVersion) return default;
+
+            return RefreshAsync(targetVersion);
+
+            async ValueTask RefreshAsync(MembershipVersion v)
+            {
+                var didRefresh = false;
+                do
+                {
+                    if (!didRefresh || this.membershipTableManager.MembershipTableSnapshot.Version < v)
+                    {
+                        await this.membershipTableManager.Refresh();
+                        didRefresh = true;
+                    }
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(10));
+                } while (this.snapshot.Version < v || this.snapshot.Version < this.membershipTableManager.MembershipTableSnapshot.Version);
+            }
+        }
+
         private async Task ProcessMembershipUpdates(CancellationToken ct)
         {
             IAsyncEnumerator<MembershipTableSnapshot> enumerator = default;

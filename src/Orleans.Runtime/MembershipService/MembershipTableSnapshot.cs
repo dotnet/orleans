@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Text;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -63,6 +64,15 @@ namespace Orleans.Runtime.MembershipService
             }
 
             return status;
+        }
+
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            sb.Append($"[Version: {this.Version}, {this.Entries.Count} silos");
+            foreach (var entry in this.Entries) sb.Append($", {entry.Value}");
+            sb.Append(']');
+            return sb.ToString();
         }
     }
 }
