@@ -352,7 +352,7 @@ namespace Orleans
         public void SendResponse(Message request, Response response)
         {
             var message = this.messageFactory.CreateResponseMessage(request);
-            EventSourceUtils.EmitEvent(message, OrleansOutsideRuntimeClientEvent.Log.SendResponse);
+            EventSourceUtils.EmitEvent(message, OrleansOutsideRuntimeClientEvent.SendResponseAction);
             message.BodyObject = response;
 
             transport.SendMessage(message);
@@ -379,7 +379,7 @@ namespace Orleans
         public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            EventSourceUtils.EmitEvent(message, OrleansOutsideRuntimeClientEvent.Log.SendRequest);
+            EventSourceUtils.EmitEvent(message, OrleansOutsideRuntimeClientEvent.SendRequestAction);
             SendRequestMessage(target, message, context, debugContext, options, genericArguments);
         }
 
@@ -453,7 +453,7 @@ namespace Orleans
 
         public void ReceiveResponse(Message response)
         {
-            EventSourceUtils.EmitEvent(response, OrleansOutsideRuntimeClientEvent.Log.ReceiveResponse);
+            EventSourceUtils.EmitEvent(response, OrleansOutsideRuntimeClientEvent.ReceiveResponseAction);
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Received {0}", response);
 

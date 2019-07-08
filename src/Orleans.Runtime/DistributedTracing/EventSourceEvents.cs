@@ -8,14 +8,18 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-Dispatcher")]
     internal sealed class OrleansDispatcherEvent : EventSource
     {
-        public static readonly OrleansDispatcherEvent Log = new OrleansDispatcherEvent();
+        private static readonly OrleansDispatcherEvent Log = new OrleansDispatcherEvent();
+        public static readonly Action ReceiveMessageAction = Log.ReceiveMessage;
         public void ReceiveMessage() => WriteEvent(1);
     }
 
     [EventSource(Name = "Microsoft-Orleans-InsideRuntimeClient")]
     internal sealed class OrleansInsideRuntimeClientEvent : EventSource
     {
-        public static readonly OrleansInsideRuntimeClientEvent Log = new OrleansInsideRuntimeClientEvent();
+        private static readonly OrleansInsideRuntimeClientEvent Log = new OrleansInsideRuntimeClientEvent();
+        public static readonly Action SendRequestAction = Log.SendRequest;
+        public static readonly Action ReceiveResponseAction = Log.ReceiveResponse;
+        public static readonly Action SendResponseAction = Log.SendResponse;
         public void SendRequest()
         {
             WriteEvent(1);
@@ -33,7 +37,8 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-GatewayAcceptor")]
     internal sealed class OrleansGatewayAcceptorEvent : EventSource
     {
-        public static readonly OrleansGatewayAcceptorEvent Log = new OrleansGatewayAcceptorEvent();
+        private static readonly OrleansGatewayAcceptorEvent Log = new OrleansGatewayAcceptorEvent();
+        public static readonly Action HandleMessageAction = Log.HandleMessage;
 
         public void HandleMessage()
         {
@@ -45,8 +50,8 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-IncomingMessageAcceptor")]
     internal sealed class OrleansIncomingMessageAcceptorEvent : EventSource
     {
-        public static readonly OrleansIncomingMessageAcceptorEvent Log = new OrleansIncomingMessageAcceptorEvent();
-
+        private static readonly OrleansIncomingMessageAcceptorEvent Log = new OrleansIncomingMessageAcceptorEvent();
+        public static readonly Action HandleMessageAction = Log.HandleMessage;
         public void HandleMessage()
         {
             WriteEvent(1);
@@ -56,7 +61,8 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-IncomingMessageAgent")]
     internal sealed class OrleansIncomingMessageAgentEvent : EventSource
     {
-        public static readonly OrleansIncomingMessageAgentEvent Log = new OrleansIncomingMessageAgentEvent();
+        private static readonly OrleansIncomingMessageAgentEvent Log = new OrleansIncomingMessageAgentEvent();
+        public static readonly Action ReceiverMessageAction = Log.ReceiverMessage;
         public void ReceiverMessage() => WriteEvent(1);
     }
 }

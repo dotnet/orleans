@@ -62,7 +62,7 @@ namespace Orleans.Runtime.Messaging
 
         private void ReceiveMessage(Message msg)
         {
-            EventSourceUtils.EmitEvent(msg, OrleansIncomingMessageAgentEvent.Log.ReceiverMessage);
+            EventSourceUtils.EmitEvent(msg, OrleansIncomingMessageAgentEvent.ReceiverMessageAction);
             MessagingProcessingStatisticsGroup.OnImaMessageReceived(msg);
 
             ISchedulingContext context;

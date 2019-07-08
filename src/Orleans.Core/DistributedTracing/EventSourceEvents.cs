@@ -9,7 +9,10 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-CallBackData")]
     internal sealed class OrleansCallBackDataEvent : EventSource
     {
-        public static readonly OrleansCallBackDataEvent Log = new OrleansCallBackDataEvent();
+        private static readonly OrleansCallBackDataEvent Log = new OrleansCallBackDataEvent();
+        public static readonly Action OnTimeoutAction = Log.OnTimeout;
+        public static readonly Action OnTargetSiloFailAction = Log.OnTargetSiloFail;
+        public static readonly Action DoCallbackAction = Log.DoCallback;
         public void OnTimeout()
         {
             WriteEvent(1);
@@ -29,7 +32,10 @@ namespace Orleans.Runtime
     [EventSource(Name = "Microsoft-Orleans-OutsideRuntimeClient")]
     internal sealed class OrleansOutsideRuntimeClientEvent : EventSource
     {
-        public static readonly OrleansOutsideRuntimeClientEvent Log = new OrleansOutsideRuntimeClientEvent();
+        private static readonly OrleansOutsideRuntimeClientEvent Log = new OrleansOutsideRuntimeClientEvent();
+        public static readonly Action SendRequestAction = Log.SendRequest;
+        public static readonly Action ReceiveResponseAction = Log.ReceiveResponse;
+        public static readonly Action SendResponseAction = Log.SendResponse;
         public void SendRequest()
         {
             WriteEvent(1);
