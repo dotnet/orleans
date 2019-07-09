@@ -113,7 +113,7 @@ namespace NonSilo.Tests.Membership
             Func<CancellationToken, Task> NoOp = ct => Task.CompletedTask;
             foreach (var l in new[] {
                 ServiceLifecycleStage.RuntimeInitialize,
-                ServiceLifecycleStage.AfterRuntimeGrainServices,
+                ServiceLifecycleStage.BecomeJoining,
                 ServiceLifecycleStage.BecomeActive})
             {
                 // After start
@@ -133,14 +133,14 @@ namespace NonSilo.Tests.Membership
 
             await this.lifecycle.OnStart();
             Assert.Equal(SiloStatus.Created, levels[ServiceLifecycleStage.RuntimeInitialize + 1]);
-            Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.AfterRuntimeGrainServices + 1]);
+            Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.BecomeJoining + 1]);
             Assert.Equal(SiloStatus.Active, levels[ServiceLifecycleStage.BecomeActive + 1]);
 
             var stopped = this.lifecycle.OnStop();
             foreach (var pair in this.timerCalls) while (pair.Value.TryDequeue(out var call)) call.Completion.TrySetResult(false);
             await stopped;
             Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.BecomeActive - 1]);
-            Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.AfterRuntimeGrainServices - 1]);
+            Assert.Equal(SiloStatus.Dead, levels[ServiceLifecycleStage.BecomeJoining - 1]);
             Assert.Equal(SiloStatus.Dead, levels[ServiceLifecycleStage.RuntimeInitialize - 1]);
         }
 
@@ -156,7 +156,7 @@ namespace NonSilo.Tests.Membership
             Func<CancellationToken, Task> NoOp = ct => Task.CompletedTask;
             foreach (var l in new[] {
                 ServiceLifecycleStage.RuntimeInitialize,
-                ServiceLifecycleStage.AfterRuntimeGrainServices,
+                ServiceLifecycleStage.BecomeJoining,
                 ServiceLifecycleStage.BecomeActive})
             {
                 // After start
@@ -176,14 +176,14 @@ namespace NonSilo.Tests.Membership
 
             await this.lifecycle.OnStart();
             Assert.Equal(SiloStatus.Created, levels[ServiceLifecycleStage.RuntimeInitialize + 1]);
-            Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.AfterRuntimeGrainServices + 1]);
+            Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.BecomeJoining + 1]);
             Assert.Equal(SiloStatus.Active, levels[ServiceLifecycleStage.BecomeActive + 1]);
 
             var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
             await this.lifecycle.OnStop(cancellation.Token);
             Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.BecomeActive - 1]);
-            Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.AfterRuntimeGrainServices - 1]);
+            Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.BecomeJoining - 1]);
             Assert.Equal(SiloStatus.Dead, levels[ServiceLifecycleStage.RuntimeInitialize - 1]);
         }
 

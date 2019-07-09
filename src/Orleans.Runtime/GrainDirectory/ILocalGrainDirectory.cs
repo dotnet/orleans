@@ -1,23 +1,11 @@
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    interface ILocalGrainDirectory : IGrainDirectory
+    internal interface ILocalGrainDirectory : IGrainDirectory
     {
-        /// <summary>
-        /// Starts the local portion of the directory service.
-        /// </summary>
-        void Start();
-
-        /// <summary>
-        /// Stops the local portion of the directory service.
-        /// </summary>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1716:IdentifiersShouldNotMatchKeywords", MessageId = "Stop")]
-        Task Stop(bool doOnStopHandoff);
-
         RemoteGrainDirectory RemoteGrainDirectory { get; }
         RemoteGrainDirectory CacheValidator { get; }
         ClusterGrainDirectory RemoteClusterGrainDirectory { get; }
@@ -65,35 +53,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="activation">The address of the activation that needs to be invalidated in the directory cache for the given grain.</param>
         /// <param name="invalidateDirectoryAlso">If true, on owner, invalidates directory entry that point to activations in remote clusters as well</param>
         void InvalidateCacheEntry(ActivationAddress activation, bool invalidateDirectoryAlso = false);
-
-        /// <summary>
-        /// For testing purposes only.
-        /// Returns the silo that this silo thinks is the primary owner of directory information for
-        /// the provided grain ID.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <returns></returns>
-        SiloAddress GetPrimaryForGrain(GrainId grain);
-
-        /// <summary>
-        /// For testing purposes only.
-        /// Returns the silos that this silo thinks hold copied directory information for
-        /// the provided grain ID.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <returns></returns>
-        List<SiloAddress> GetSilosHoldingDirectoryInformationForGrain(GrainId grain);
-
-        /// <summary>
-        /// For testing purposes only.
-        /// Returns the directory information held by another silo for the provided grain ID.
-        /// The result will be null if no information is held.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <param name="isPrimary"></param>
-        /// <returns></returns>
-        List<ActivationAddress> GetLocalDataForGrain(GrainId grain, out bool isPrimary);
-
+        
         /// <summary>
         /// Returns the directory information held in a local directory partition for the provided grain ID.
         /// The result will be null if no information is held.
@@ -117,16 +77,5 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="silo">the address of the silo</param>
         /// <returns>true if the silo is known to be part of this cluster</returns>
         bool IsSiloInCluster(SiloAddress silo);
-
-        /// <summary>
-        /// The id of this cluster
-        /// </summary>
-        string ClusterId { get; }
-
-        /// <summary>
-        /// Sets the callback to <see cref="Catalog"/> which is called when a silo is removed from membership.
-        /// </summary>
-        /// <param name="catalogOnSiloRemoved">The callback.</param>
-        void SetSiloRemovedCatalogCallback(Action<SiloAddress, SiloStatus> catalogOnSiloRemoved);
     }
 }

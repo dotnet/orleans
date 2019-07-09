@@ -13,8 +13,8 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly GrainDirectoryPartition partition;
         private readonly ILogger logger;
 
-        internal RemoteGrainDirectory(LocalGrainDirectory r, GrainId id, ILoggerFactory loggerFactory)
-            : base(id, r.MyAddress, loggerFactory)
+        internal RemoteGrainDirectory(ILocalSiloDetails localSiloDetails, LocalGrainDirectory r, GrainId id, ILoggerFactory loggerFactory)
+            : base(id, localSiloDetails.SiloAddress, loggerFactory)
         {
             router = r;
             partition = r.DirectoryPartition;
@@ -103,7 +103,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task RemoveHandoffPartition(SiloAddress source)
         {
-            router.HandoffManager.RemoveHandoffPartition(source);
+            // No-op
             return Task.CompletedTask;
         }
 

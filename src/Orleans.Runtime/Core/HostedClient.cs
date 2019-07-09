@@ -48,6 +48,7 @@ namespace Orleans.Runtime
             this.siloMessageCenter = messageCenter;
             this.logger = logger;
 
+            this.siloMessageCenter.SetHostedClient(this);
             this.ClientAddress = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, GrainId.NewClientId());
         }
 
@@ -200,30 +201,33 @@ namespace Orleans.Runtime
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
+            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeServices, OnRuntimeServicesStart, OnRuntimeServicesStop);
 
-            Task OnStart(CancellationToken cancellation)
+            Task OnRuntimeServicesStart(CancellationToken cancellation)
             {
-                if (cancellation.IsCancellationRequested) return Task.CompletedTask;
-
-                // Register with the directory and message center so that we can receive messages.
-                this.clientObserverRegistrar.SetHostedClient(this);
-                this.clientObserverRegistrar.ClientAdded(this.ClientId);
-                this.siloMessageCenter.SetHostedClient(this);
-
                 // Start pumping messages.
                 this.Start();
 
-                var clusterClient = this.runtimeClient.ServiceProvider.GetRequiredService<IClusterClient>();
-                return clusterClient.Connect();
+                return Task.CompletedTask;
             }
 
-            Task OnStop(CancellationToken cancellation)
+            Task OnRuntimeServicesStop(CancellationToken cancellation)
             {
-                if (cancellation.IsCancellationRequested) return Task.CompletedTask;
+                this.listeningCts.Cancel(throwOnFirstException: false);
+                this.incomingMessages.Add(null);
 
-                var clusterClient = this.runtimeClient.ServiceProvider.GetRequiredService<IClusterClient>();
-                return clusterClient.Close();
+                return Task.CompletedTask;
+            }
+
+            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.EnableGrainCalls + 1, OnEnableGrainCallsStart, _ => Task.CompletedTask);
+
+            Task OnEnableGrainCallsStart(CancellationToken cancellation)
+            {
+                // Register with the directory and message center so that we can receive messages.
+                this.clientObserverRegistrar.SetHostedClient(this);
+                this.clientObserverRegistrar.ClientAdded(this.ClientId);
+
+                return Task.CompletedTask;
             }
         }
     }

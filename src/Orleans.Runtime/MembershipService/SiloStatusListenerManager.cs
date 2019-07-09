@@ -146,7 +146,7 @@ namespace Orleans.Runtime.MembershipService
         {
             var tasks = new List<Task>();
 
-            lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.AfterRuntimeGrainServices, OnStart, _ => Task.CompletedTask);
+            lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.BecomeJoining, OnStart, _ => Task.CompletedTask);
             lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.RuntimeInitialize, _ => Task.CompletedTask, OnStop);
 
             Task OnStart(CancellationToken ct)
