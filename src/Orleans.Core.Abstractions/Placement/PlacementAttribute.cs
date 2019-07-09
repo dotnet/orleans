@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using Orleans.Runtime;
 
 namespace Orleans.Placement
@@ -67,6 +68,77 @@ namespace Orleans.Placement
         public ActivationCountBasedPlacementAttribute() :
             base(ActivationCountBasedPlacement.Singleton)
         {
+        }
+    }
+
+    /// <summary>
+    /// Marks a grain class as using the <c>SiloPlacement</c> policy.
+    /// </summary>
+    /// <remarks>
+    /// This indicates the grain should always be placed on the target silo.
+    /// </remarks>
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+    public sealed class SiloServicePlacementAttribute : PlacementAttribute
+    {
+        public SiloServicePlacementAttribute() :
+            base(SiloServicePlacement.Singleton)
+        {
+        }
+    }
+
+    public static class SiloServicePlacementKeyFormat
+    {
+        private const char Separator = '.';
+        private static readonly char[] Separators = { Separator };
+
+        public static bool TryParsePrimaryKey(string primaryKey, out string key)
+        {
+            key = default(string);
+            int index = primaryKey.IndexOfAny(Separators);
+            if (index == -1)
+                return false;
+            if (index == primaryKey.Length - 1)
+            {
+                key = string.Empty;
+                return true;
+            }
+            key = primaryKey.Substring(index + 1);
+            return true;
+        }
+
+        internal static bool TryParsePrimaryKey(IEnumerable<SiloAddress> silos, string primaryKey, out Tuple<SiloAddress, string> parsedKey)
+        {
+            parsedKey = default(Tuple<SiloAddress, string>);
+            foreach (SiloAddress silo in silos)
+            {
+                string siloTag = BuildSiloTag(silo);
+                if (primaryKey.StartsWith(siloTag))
+                {
+                    parsedKey = Tuple.Create(silo, primaryKey.Substring(siloTag.Length));
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        internal static string BuildPrimaryKey(SiloAddress silo, string key)
+        {
+            return $"{BuildSiloTag(silo)}{key}";
+        }
+
+
+        private static string BuildSiloTag(SiloAddress silo)
+        {
+            return $"{silo.GetConsistentHashCode()}{Separator}";
+        }
+    }
+
+    public static class PlacementGrainFactoryExtensions
+    {
+        public static TGrainInterface GetGrain<TGrainInterface>(this IGrainFactory grainFactory, SiloAddress silo, string primaryKey = null, string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithStringKey
+        {
+            return grainFactory.GetGrain<TGrainInterface>(SiloServicePlacementKeyFormat.BuildPrimaryKey(silo, primaryKey), grainClassNamePrefix);
         }
     }
 }
