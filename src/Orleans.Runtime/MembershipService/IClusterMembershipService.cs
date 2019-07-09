@@ -1,4 +1,4 @@
-using System.Threading.Tasks;
+using System.Collections.Generic;
 using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime
@@ -8,7 +8,5 @@ namespace Orleans.Runtime
         ClusterMembershipSnapshot CurrentSnapshot { get; }
 
         IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates { get; }
-
-        ValueTask Refresh(MembershipVersion minimumVersion = default);
     }
 }

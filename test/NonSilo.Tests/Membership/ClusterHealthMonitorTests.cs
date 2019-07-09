@@ -74,8 +74,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
-                this.lifecycle);
+                timerFactory: new AsyncTimerFactory(this.loggerFactory));
             ((ILifecycleParticipant<ISiloLifecycle>)this.manager).Participate(this.lifecycle);
         }
 
