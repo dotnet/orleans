@@ -329,6 +329,8 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Got request to register " + (isFullCopy ? "FULL" : "DELTA") + " directory partition with " + partition.Count + " elements from " + source);
 
+                var thisChunk = this.createPartion();
+                thisChunk.Set(partition);
                 if (!ongoingHandoffs.TryGetValue(source, out var targetPartition))
                 {
                     if (!isFullCopy)
@@ -340,7 +342,7 @@ namespace Orleans.Runtime.GrainDirectory
                                 membershipSnapshot.Members.Values.Count(m => m.Status == SiloStatus.Active)));
                     }
 
-                    ongoingHandoffs[source] = targetPartition = this.createPartion();
+                    ongoingHandoffs[source] = targetPartition = thisChunk;
                 }
 
                 if (isFullCopy)
@@ -354,7 +356,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 // Immediately merge the remote partition with the local directory partition so that we can serve requests
                 // using the handoff data.
-                var duplicates = this.localDirectory.DirectoryPartition.Merge(targetPartition);
+                var duplicates = this.localDirectory.DirectoryPartition.Merge(thisChunk);
                 this.DestroyDuplicateActivations(duplicates);
 
                 localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(partition);
