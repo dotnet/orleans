@@ -88,7 +88,7 @@ namespace Orleans.Placement
 
     public static class SiloServicePlacementKeyFormat
     {
-        private const char Separator = '.';
+        private const char Separator = '|';
         private static readonly char[] Separators = { Separator };
 
         public static bool TryParsePrimaryKey(string primaryKey, out string key)
@@ -106,15 +106,15 @@ namespace Orleans.Placement
             return true;
         }
 
-        internal static bool TryParsePrimaryKey(IEnumerable<SiloAddress> silos, string primaryKey, out Tuple<SiloAddress, string> parsedKey)
+        internal static bool TryParsePrimaryKey(IEnumerable<SiloAddress> silos, string primaryKey, out (SiloAddress Silo, string Key) parsedKey)
         {
-            parsedKey = default(Tuple<SiloAddress, string>);
+            parsedKey = default;
             foreach (SiloAddress silo in silos)
             {
                 string siloTag = BuildSiloTag(silo);
                 if (primaryKey.StartsWith(siloTag))
                 {
-                    parsedKey = Tuple.Create(silo, primaryKey.Substring(siloTag.Length));
+                    parsedKey = (silo, primaryKey.Substring(siloTag.Length));
                     return true;
                 }
             }
@@ -129,7 +129,10 @@ namespace Orleans.Placement
 
         private static string BuildSiloTag(SiloAddress silo)
         {
-            return $"{silo.GetConsistentHashCode()}{Separator}";
+            string siloKey = silo.ToParsableString();
+            // Validate silo key has no Separator
+            if (siloKey.IndexOfAny(Separators) != -1) throw new ArgumentOutOfRangeException(nameof(silo), "Silo parsable string format error");
+            return $"{siloKey}{Separator}";
         }
     }
 

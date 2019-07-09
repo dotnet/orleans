@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
@@ -36,9 +35,9 @@ namespace Orleans.Runtime.Placement
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
             IList<SiloAddress> allSilos = context.GetCompatibleSilos(target);
-            if(SiloServicePlacementKeyFormat.TryParsePrimaryKey(allSilos, target.GrainIdentity.PrimaryKeyString, out Tuple<SiloAddress,string> parsedKey))
+            if(SiloServicePlacementKeyFormat.TryParsePrimaryKey(allSilos, target.GrainIdentity.PrimaryKeyString, out var parsedKey))
             {
-                return Task.FromResult(parsedKey.Item1);
+                return Task.FromResult(parsedKey.Silo);
             }
             throw new OrleansMessageRejectionException($"Silo not available for silo placed grain: {target.GrainIdentity.PrimaryKeyString}");
         }
