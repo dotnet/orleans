@@ -23,7 +23,7 @@ namespace Orleans.Providers
     internal static class LegacyProviderConfigurator<TLifecycle>
         where TLifecycle : ILifecycleObservable
     {
-        public const int DefaultStage = ServiceLifecycleStage.LegacyProviders;
+        public const int DefaultStage = ServiceLifecycleStage.RuntimeStorageServices;
 
         /// <summary>
         /// Legacy way to configure providers. Will need to move to a legacy package in the future

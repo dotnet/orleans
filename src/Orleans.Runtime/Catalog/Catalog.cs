@@ -173,6 +173,7 @@ namespace Orleans.Runtime
             });
             maxWarningRequestProcessingTime = this.messagingOptions.Value.ResponseTimeout.Multiply(5);
             maxRequestProcessingTime = this.messagingOptions.Value.MaxRequestProcessingTime;
+            grainDirectory.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
         }
 
         /// <summary>
@@ -323,7 +324,6 @@ namespace Orleans.Runtime
 
         public DetailedGrainReport GetDetailedGrainReport(GrainId grain)
         {
-            this.TryGetGrainDirectoryPartitionForDiagnostics(grain, out var primary);
             var report = new DetailedGrainReport
             {
                 Grain = grain,
@@ -331,7 +331,7 @@ namespace Orleans.Runtime
                 SiloName = localSiloName,
                 LocalCacheActivationAddresses = directory.GetLocalCacheData(grain),
                 LocalDirectoryActivationAddresses = directory.GetLocalDirectoryData(grain).Addresses,
-                PrimaryForGrain = primary
+                PrimaryForGrain = directory.GetPrimaryForGrain(grain)
             };
             try
             {
@@ -604,11 +604,9 @@ namespace Orleans.Runtime
                             CounterStatistic
                                 .FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS)
                                 .Increment();
-                            
+                            var primary = directory.GetPrimaryForGrain(activation.ForwardingAddress.Grain);
                             if (logger.IsEnabled(LogLevel.Information))
                             {
-                                this.TryGetGrainDirectoryPartitionForDiagnostics(activation.ForwardingAddress.Grain, out var primary);
-                                
                                 // If this was a duplicate, it's not an error, just a race.
                                 // Forward on all of the pending messages, and then forget about this activation.
                                 var logMsg =
@@ -848,7 +846,7 @@ namespace Orleans.Runtime
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("DeactivateActivations: {0} activations.", list.Count);
             List<ActivationData> destroyNow = null;
-            List<Task> destroyLater = null;
+            List<MultiTaskCompletionSource> destroyLater = null;
             int alreadyBeingDestroyed = 0;
             foreach (var d in list)
             {
@@ -872,10 +870,10 @@ namespace Orleans.Runtime
                         {
                             if (destroyLater == null)
                             {
-                                destroyLater = new List<Task>();
+                                destroyLater = new List<MultiTaskCompletionSource>();
                             }
                             var tcs = new MultiTaskCompletionSource(1);
-                            destroyLater.Add(tcs.Task);
+                            destroyLater.Add(tcs);
                             activationData.AddOnInactive(() => DestroyActivationAsync(activationData, tcs));
                         }
                     }
@@ -899,7 +897,7 @@ namespace Orleans.Runtime
             }
             if (destroyLater != null && destroyLater.Count > 0)
             {
-                await Task.WhenAll(destroyLater);
+                await Task.WhenAll(destroyLater.Select(t => t.Task).ToArray());
             }
         }
 
@@ -1389,7 +1387,7 @@ namespace Orleans.Runtime
             return datas;
         }
 
-        internal void OnSiloStatusChange(DirectoryMembershipSnapshot previousMembership, SiloAddress updatedSilo, SiloStatus status)
+        private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
         { 
             // ignore joining events and also events on myself.
             if (updatedSilo.Equals(LocalSilo)) return;
@@ -1416,7 +1414,7 @@ namespace Orleans.Runtime
                         {
                             var activationData = activation.Value;
                             if (!activationData.IsUsingGrainDirectory) continue;
-                            if (!updatedSilo.Equals(previousMembership.CalculateGrainDirectoryPartition(activationData.Grain))) continue;
+                            if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.Grain))) continue;
 
                             lock (activationData)
                             {
@@ -1444,18 +1442,6 @@ namespace Orleans.Runtime
                     DeactivateActivations(activationsToShutdown).Ignore();
                 }
             }
-        }
-
-        private bool TryGetGrainDirectoryPartitionForDiagnostics(GrainId grainId, out SiloAddress siloAddress)
-        {
-            if (this.directory is LocalGrainDirectory localGrainDirectory)
-            {
-                siloAddress = localGrainDirectory.DirectoryMembershipSnapshot.CalculateGrainDirectoryPartition(grainId);
-                return true;
-            }
-
-            siloAddress = null;
-            return false;
         }
     }
 }

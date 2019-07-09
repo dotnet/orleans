@@ -628,8 +628,7 @@ namespace NonSilo.Tests.Membership
             // Test that retries occur after an exception.
             (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default);
             while (!timerCalls.TryDequeue(out timer)) await Task.Delay(1);
-            var counter = 0;
-            membershipTable.OnReadAll = () => { if (counter++ == 0) throw new Exception("no"); };
+            membershipTable.OnReadAll = () => throw new Exception("no");
             timer.Completion.TrySetResult(true);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 

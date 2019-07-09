@@ -265,13 +265,8 @@ namespace UnitTests.Grains
         public Task<SiloAddress> GetPrimaryForGrain()
         {
             var grainId = (GrainId)this.Identity;
-
-            if (this.LocalGrainDirectory is LocalGrainDirectory localGrainDirectory)
-            {
-                return Task.FromResult(localGrainDirectory.DirectoryMembershipSnapshot.CalculateGrainDirectoryPartition(grainId));
-            }
-
-            return Task.FromResult<SiloAddress>(null);
+            var primaryForGrain = this.LocalGrainDirectory.GetPrimaryForGrain(grainId);
+            return Task.FromResult(primaryForGrain);
         }
 
         public void StateChanged(int a, int b)
