@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
@@ -18,25 +18,24 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class ClusterGrainDirectory : SystemTarget, IClusterGrainDirectory
     {
-        private readonly LocalGrainDirectory localGrainDirectory;
+        private readonly LocalGrainDirectory router;
         private readonly string clusterId;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ILogger logger;
         private readonly IMultiClusterOracle multiClusterOracle;
 
         public ClusterGrainDirectory(
-            ILocalSiloDetails localSiloDetails,
-            LocalGrainDirectory localGrainDirectory,
+            LocalGrainDirectory r,
             GrainId grainId,
             string clusterId,
             IInternalGrainFactory grainFactory,
             IMultiClusterOracle multiClusterOracle,
-            ILoggerFactory loggerFactory) : base(grainId, localSiloDetails.SiloAddress, loggerFactory)
+            ILoggerFactory loggerFactory) : base(grainId, r.MyAddress, loggerFactory)
         {
-            this.localGrainDirectory = localGrainDirectory;
+            this.router = r;
             this.clusterId = clusterId;
             this.grainFactory = grainFactory;
-            this.logger = loggerFactory.CreateLogger<ClusterGrainDirectory>();
+            this.logger = r.Logger;
             this.multiClusterOracle = multiClusterOracle;
         }
 
@@ -53,13 +52,13 @@ namespace Orleans.Runtime.GrainDirectory
                 return new RemoteClusterActivationResponse(ActivationResponseStatus.Failed);
             }
 
-            var forwardAddress = localGrainDirectory.CheckIfShouldForward(grain, 0, "ProcessActivationRequest");
+            var forwardAddress = router.CheckIfShouldForward(grain, 0, "ProcessActivationRequest");
 
             // on all silos other than first, we insert a retry delay and recheck owner before forwarding
             if (hopCount > 0 && forwardAddress != null)
             {
                 await Task.Delay(LocalGrainDirectory.RETRY_DELAY);
-                forwardAddress = localGrainDirectory.CheckIfShouldForward(grain, hopCount, "ProcessActivationRequest(recheck)");
+                forwardAddress = router.CheckIfShouldForward(grain, hopCount, "ProcessActivationRequest(recheck)");
             }
 
             if (forwardAddress == null)
@@ -84,7 +83,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 ActivationAddress address;
                 int version;
-                GrainDirectoryEntryStatus existingActivationStatus = localGrainDirectory.DirectoryPartition.TryGetActivation(grain, out address, out version);
+                GrainDirectoryEntryStatus existingActivationStatus = router.DirectoryPartition.TryGetActivation(grain, out address, out version);
 
 
                 //Return appropriate protocol response, given current mc status   
@@ -135,7 +134,7 @@ namespace Orleans.Runtime.GrainDirectory
                             if (existingActivationStatus == GrainDirectoryEntryStatus.RequestedOwnership)
                             {
                                 logger.Trace("GSIP:Rsp {0} Origin={1} RaceLoser", grain.ToString(), requestClusterId);
-                                var success = localGrainDirectory.DirectoryPartition.UpdateClusterRegistrationStatus(grain, address.Activation, GrainDirectoryEntryStatus.RaceLoser, GrainDirectoryEntryStatus.RequestedOwnership);
+                                var success = router.DirectoryPartition.UpdateClusterRegistrationStatus(grain, address.Activation, GrainDirectoryEntryStatus.RaceLoser, GrainDirectoryEntryStatus.RequestedOwnership);
                                 if (!success)
                                 {
                                     // there was a race. retry.
@@ -194,7 +193,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             // standard grain directory mechanisms for this cluster can take care of this request
             // (forwards to owning silo in this cluster as needed)
-            return localGrainDirectory.UnregisterManyAsync(addresses, UnregistrationCause.Force, 0);
+            return router.UnregisterManyAsync(addresses, UnregistrationCause.Force, 0);
         }
 
         /// <summary>
@@ -204,7 +203,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             // standard grain directory mechanisms for this cluster can take care of this request
             // (forwards to owning silo in this cluster as needed)
-            return localGrainDirectory.DeleteGrainAsync(grainId, 0);
+            return router.DeleteGrainAsync(grainId, 0);
         }
 
         /// <summary>

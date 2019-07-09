@@ -1,23 +1,17 @@
 using System;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal class InMemoryReminderTable : IReminderTable
+    internal class InMemoryReminderTable : IReminderTable, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly IReminderTableGrain reminderTableGrain;
-        private readonly ISiloLifecycle siloLifecycle;
+        private bool isAvailable;
 
-        public InMemoryReminderTable(IGrainFactory grainFactory, ISiloLifecycle siloLifecycle)
+        public InMemoryReminderTable(IGrainFactory grainFactory)
         {
             this.reminderTableGrain = grainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
-            this.siloLifecycle = siloLifecycle;
-        }
-
-        private bool IsAvailable
-        {
-            get => this.siloLifecycle.HighestCompletedStage >= ServiceLifecycleStage.BecomeActive
-                && this.siloLifecycle.LowestStoppedStage > ServiceLifecycleStage.EnableGrainCalls;
         }
 
         public Task Init() => Task.CompletedTask;
@@ -36,7 +30,7 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
-            if (!this.IsAvailable) return new ReminderTableData();
+            if (!this.isAvailable) return new ReminderTableData();
 
             return await this.reminderTableGrain.ReadRows(begin, end);
         }
@@ -61,10 +55,28 @@ namespace Orleans.Runtime.ReminderService
 
         private void ThrowIfNotAvailable()
         {
-            if (!this.IsAvailable)
+            if (!this.isAvailable) throw new InvalidOperationException("The reminder service is not currently available.");
+        }
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            Task OnApplicationServicesStart(CancellationToken ct)
             {
-                throw new InvalidOperationException("The reminder service is not currently available.");
+                this.isAvailable = true;
+                return Task.CompletedTask;
             }
+
+            Task OnApplicationServicesStop(CancellationToken ct)
+            {
+                this.isAvailable = false;
+                return Task.CompletedTask;
+            }
+
+            lifecycle.Subscribe(
+                nameof(GrainBasedReminderTable),
+                ServiceLifecycleStage.ApplicationServices,
+                OnApplicationServicesStart,
+                OnApplicationServicesStop);
         }
     }
 }

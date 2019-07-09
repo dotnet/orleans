@@ -57,7 +57,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 TimeSpan? onceOffDelay = default;
-                while (await this.iAmAliveTimer.NextTick(onceOffDelay) && !this.tableManager.CurrentStatus.IsTerminating())
+                while (!this.tableManager.CurrentStatus.IsTerminating() && await this.iAmAliveTimer.NextTick(onceOffDelay))
                 {
                     onceOffDelay = default;
 
@@ -163,42 +163,43 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task StartJoining()
         {
-            this.log.Info(ErrorCode.MembershipJoining, "-Joining");
+            this.log.Info(ErrorCode.MembershipShutDown, "-" + "Shutdown");
             try
             {
                 await this.UpdateStatus(SiloStatus.Joining);
             }
             catch (Exception exc)
             {
-                this.log.Error(ErrorCode.MembershipFailedToJoin, "Error updating status to Joining", exc);
+                this.log.Error(ErrorCode.MembershipFailedToShutdown, "Error doing Shutdown", exc);
                 throw;
             }
         }
 
         private async Task Shutdown()
         {
-            this.log.Info(ErrorCode.MembershipShutDown, "-Shutdown");
+            this.log.Info(ErrorCode.MembershipShutDown, "-" + "Shutdown");
             try
             {
                 await this.UpdateStatus(SiloStatus.ShuttingDown);
             }
             catch (Exception exc)
             {
-                this.log.Error(ErrorCode.MembershipFailedToShutdown, "Error updating status to ShuttingDown", exc);
+                this.log.Error(ErrorCode.MembershipFailedToShutdown, "Error doing Shutdown", exc);
                 throw;
             }
         }
 
         private async Task Stop()
         {
-            log.Info(ErrorCode.MembershipStop, "-Stop");
+            const string operation = "Stop";
+            log.Info(ErrorCode.MembershipStop, "-" + operation);
             try
             {
                 await this.UpdateStatus(SiloStatus.Stopping);
             }
             catch (Exception exc)
             {
-                log.Error(ErrorCode.MembershipFailedToStop, "Error updating status to Stopping", exc);
+                log.Error(ErrorCode.MembershipFailedToStop, "Error doing " + operation, exc);
                 throw;
             }
         }
@@ -253,24 +254,18 @@ namespace Orleans.Runtime.MembershipService
             }
 
             {
-                async Task OnBecomeJoiningStart(CancellationToken ct)
+                async Task AfterRuntimeGrainServicesStart(CancellationToken ct)
                 {
                     await Task.Run(() => this.StartJoining());
                 }
 
-                async Task OnBecomeJoiningStop(CancellationToken ct)
-                {
-                    await Task.WhenAny(
-                        Task.Run(() => this.KillMyself()),
-                        Task.Delay(TimeSpan.FromMinutes(1)),
-                        ct.WhenCancelled());
-                }
+                Task AfterRuntimeGrainServicesStop(CancellationToken ct) => Task.CompletedTask;
 
                 lifecycle.Subscribe(
                     nameof(MembershipAgent),
-                    ServiceLifecycleStage.BecomeJoining,
-                    OnBecomeJoiningStart,
-                    OnBecomeJoiningStop);
+                    ServiceLifecycleStage.AfterRuntimeGrainServices,
+                    AfterRuntimeGrainServicesStart,
+                    AfterRuntimeGrainServicesStop);
             }
 
             {

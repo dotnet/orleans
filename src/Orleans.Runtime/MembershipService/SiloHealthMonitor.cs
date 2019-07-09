@@ -13,8 +13,6 @@ namespace Orleans.Runtime.MembershipService
     {
         private readonly ILogger log;
         private readonly IRemoteSiloProber prober;
-        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
-        private readonly Task cancelled;
 
         /// <summary>
         /// The number of failed probes since the last successful probe.
@@ -26,7 +24,6 @@ namespace Orleans.Runtime.MembershipService
             ILoggerFactory loggerFactory,
             IRemoteSiloProber remoteSiloProber)
         {
-            this.cancelled = this.cancellation.Token.WhenCancelled();
             this.SiloAddress = siloAddress;
             this.prober = remoteSiloProber;
             this.log = loggerFactory.CreateLogger($"{nameof(SiloHealthMonitor)}/{this.SiloAddress}");
@@ -44,8 +41,6 @@ namespace Orleans.Runtime.MembershipService
 
         int ITestAccessor.MissedProbes => this.missedProbes;
 
-        public void Cancel() => this.cancellation.Cancel();
-
         /// <summary>
         /// Probes the remote silo.
         /// </summary>
@@ -60,14 +55,10 @@ namespace Orleans.Runtime.MembershipService
                     this.log.LogTrace("Going to send Ping #{ProbeNumber} to probe silo {Silo}", probeNumber, this.SiloAddress);
                 }
 
-                var task = await Task.WhenAny(this.cancelled, this.prober.Probe(this.SiloAddress, probeNumber));
-                if (cancellation.IsCancellationRequested) return this.missedProbes;
-
-                await task;
-
+                await this.prober.Probe(this.SiloAddress, probeNumber);
                 return this.RecordSuccess(probeNumber);
             }
-            catch (Exception exception) when (!(exception is SiloUnavailableException))
+            catch (Exception exception)
             {
                 return this.RecordFailure(probeNumber, exception);
             }

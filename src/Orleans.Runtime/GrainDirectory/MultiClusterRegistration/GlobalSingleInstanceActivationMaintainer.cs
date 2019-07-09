@@ -101,18 +101,15 @@ namespace Orleans.Runtime.GrainDirectory
 
             Cts.Token.Register(this.Prod);
 
-            while (true)
+            while (router.Running && !Cts.IsCancellationRequested)
             {
                 try
                 {
-                    if (Cts.IsCancellationRequested) break;
-
                     // wait until it is time, or someone prodded us to continue
                     runNow.WaitOne(period);
                     runNow.Reset();
 
-                    var directoryMembershipSnapshot = router.DirectoryMembershipSnapshot;
-                    if (Cts.IsCancellationRequested) break;
+                    if (!router.Running || Cts.IsCancellationRequested) break;
 
                     logger.Debug("GSIP:M running check");
 
