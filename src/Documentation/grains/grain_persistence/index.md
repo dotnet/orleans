@@ -378,7 +378,7 @@ All configuration details for storage providers is defined through ISiloHostBuil
 There are _no_ mechanisms provided at this time to dynamically update or change the list of storage providers used by a silo.
 However, this is a prioritization / workload constraint rather than a fundamental design constraint.
 
-## State Persitence API
+## State Persistence API
 
 There are two parts to the state persistence APIs: grain state API and storage provider API.
 
