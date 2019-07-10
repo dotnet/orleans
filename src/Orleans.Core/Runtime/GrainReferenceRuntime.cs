@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using System;
