@@ -87,6 +87,7 @@ namespace Orleans.Runtime.Messaging
         /// <param name="receivedOnSocket"></param>
         protected override void HandleMessage(Message msg, Socket receivedOnSocket)
         {
+            EventSourceUtils.EmitEvent(msg, OrleansGatewayAcceptorEvent.HandleMessageAction);
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {

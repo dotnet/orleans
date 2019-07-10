@@ -505,6 +505,7 @@ namespace Orleans.Runtime.Messaging
 
         protected virtual void HandleMessage(Message msg, Socket receivedOnSocket)
         {
+            EventSourceUtils.EmitEvent(msg, OrleansIncomingMessageAcceptorEvent.HandleMessageAction);
             // See it's a Ping message, and if so, short-circuit it
             object pingObj;
             var requestContext = msg.RequestContextData;
