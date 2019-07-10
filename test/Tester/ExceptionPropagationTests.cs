@@ -260,7 +260,7 @@ namespace UnitTests.General
         /// <summary>
         /// Tests that when a client cannot serialize a response to a grain, an exception is promptly propagated from the client to the caller.
         /// </summary>
-        [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
+        [Fact(Skip = "Flaky. https://github.com/dotnet/orleans/issues/5397"), TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
         public async Task ExceptionPropagation_ClientToGrain_SerializationFailure()
         {
             var obj = new MessageSerializationClientObject();
