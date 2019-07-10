@@ -40,6 +40,9 @@ namespace Orleans.Runtime
         {
             if (this.IsCompleted)
                 return;
+
+            EventSourceUtils.EmitEvent(this.Message, OrleansCallBackDataEvent.OnTimeoutAction);
+               
             var msg = this.Message; // Local working copy
 
             string messageHistory = msg.GetTargetHistory();
@@ -54,7 +57,7 @@ namespace Orleans.Runtime
         {
             if (this.IsCompleted)
                 return;
-
+            EventSourceUtils.EmitEvent(this.Message, OrleansCallBackDataEvent.OnTargetSiloFailAction);
             var msg = this.Message;
             var messageHistory = msg.GetTargetHistory();
             string errorMsg = 
@@ -69,6 +72,9 @@ namespace Orleans.Runtime
         {
             if (this.IsCompleted)
                 return;
+
+            EventSourceUtils.EmitEvent(this.Message, OrleansCallBackDataEvent.DoCallbackAction);
+
             if (Interlocked.CompareExchange(ref this.completed, 1, 0) == 0)
             {
                 var requestStatistics = this.shared.RequestStatistics;

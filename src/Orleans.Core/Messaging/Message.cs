@@ -250,6 +250,11 @@ namespace Orleans.Runtime
             get { return Headers.CallChainId; }
             set { Headers.CallChainId = value; }
         }
+        
+        public TraceContext TraceContext {
+            get { return Headers.TraceContext; }
+            set { Headers.TraceContext = value; }
+        }
 
         public ActivationAddress SendingAddress
         {
@@ -581,6 +586,7 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.TARGET_GRAIN, sb, (m) => m.TargetGrain);
             AppendIfExists(HeadersContainer.Headers.TARGET_OBSERVER, sb, (m) => m.TargetObserverId);
             AppendIfExists(HeadersContainer.Headers.CALL_CHAIN_ID, sb, (m) => m.CallChainId);
+            AppendIfExists(HeadersContainer.Headers.TRACE_CONTEXT, sb, (m) => m.TraceContext);
             AppendIfExists(HeadersContainer.Headers.TARGET_SILO, sb, (m) => m.TargetSilo);
 
             return sb.ToString();
@@ -765,6 +771,8 @@ namespace Orleans.Runtime
                 IS_TRANSACTION_REQUIRED = 1 << 28,
 
                 CALL_CHAIN_ID = 1 << 29,
+
+                TRACE_CONTEXT = 1 << 30
                 // Do not add over int.MaxValue of these.
             }
 
@@ -799,10 +807,17 @@ namespace Orleans.Runtime
             private Dictionary<string, object> _requestContextData;
             private CorrelationId _callChainId;
             private readonly DateTime _localCreationTime;
+            private TraceContext traceContext;
 
             public HeadersContainer()
             {
                 _localCreationTime = DateTime.UtcNow;
+            }
+
+            public TraceContext TraceContext
+            {
+                get { return traceContext; }
+                set { traceContext = value; }
             }
 
             public Categories Category
@@ -1127,6 +1142,7 @@ namespace Orleans.Runtime
                 headers = string.IsNullOrEmpty(_rejectionInfo) ? headers & ~Headers.REJECTION_INFO : headers | Headers.REJECTION_INFO;
                 headers = _requestContextData == null || _requestContextData.Count == 0 ? headers & ~Headers.REQUEST_CONTEXT : headers | Headers.REQUEST_CONTEXT;
                 headers = _callChainId == null ? headers & ~Headers.CALL_CHAIN_ID : headers | Headers.CALL_CHAIN_ID;
+                headers = traceContext == null? headers & ~Headers.TRACE_CONTEXT : headers | Headers.TRACE_CONTEXT;
                 headers = IsTransactionRequired ? headers | Headers.IS_TRANSACTION_REQUIRED : headers & ~Headers.IS_TRANSACTION_REQUIRED;
                 headers = _transactionInfo == null ? headers & ~Headers.TRANSACTION_INFO : headers | Headers.TRANSACTION_INFO;
                 return headers;
@@ -1265,6 +1281,11 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.TRANSACTION_INFO) != Headers.NONE)
                     SerializationManager.SerializeInner(input.TransactionInfo, context, typeof(ITransactionInfo));
+
+                if ((headers & Headers.TRACE_CONTEXT) != Headers.NONE)
+                {
+                    SerializationManager.SerializeInner(input.traceContext, context, typeof(TraceContext));
+                }
             }
 
             [DeserializerMethod]
@@ -1381,6 +1402,9 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.TRANSACTION_INFO) != Headers.NONE)
                     result.TransactionInfo = SerializationManager.DeserializeInner<ITransactionInfo>(context);
+
+                if ((headers & Headers.TRACE_CONTEXT) != Headers.NONE)
+                    result.TraceContext = SerializationManager.DeserializeInner<TraceContext>(context);
 
                 return result;
             }
