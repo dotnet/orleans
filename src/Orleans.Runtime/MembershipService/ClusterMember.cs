@@ -19,5 +19,7 @@ namespace Orleans.Runtime
         public bool Equals(ClusterMember other) => other != null && this.SiloAddress.Equals(other.SiloAddress) && this.Status == other.Status;
 
         public override int GetHashCode() => this.SiloAddress.GetConsistentHashCode();
+
+        public override string ToString() => $"{this.SiloAddress}/{this.Status}";
     }
 }

@@ -88,7 +88,7 @@ namespace Orleans.Runtime.MembershipService
                     previous = snapshot;
                 }
             }
-            catch (Exception exception)
+            catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
                 this.log.LogError("Error processing membership updates: {Exception}", exception);
                 this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
@@ -146,11 +146,12 @@ namespace Orleans.Runtime.MembershipService
         {
             var tasks = new List<Task>();
 
-            lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.RuntimeInitialize, OnStart, OnStop);
+            lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.AfterRuntimeGrainServices, OnStart, _ => Task.CompletedTask);
+            lifecycle.Subscribe(nameof(SiloStatusListenerManager), ServiceLifecycleStage.RuntimeInitialize, _ => Task.CompletedTask, OnStop);
 
             Task OnStart(CancellationToken ct)
             {
-                tasks.Add(this.ProcessMembershipUpdates());
+                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
                 return Task.CompletedTask;
             }
 

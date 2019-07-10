@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Text;
 
 namespace Orleans.Runtime
 {
@@ -69,6 +70,29 @@ namespace Orleans.Runtime
             }
 
             return new ClusterMembershipUpdate(this, changes.ToImmutableArray());
+        }
+
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            sb.Append($"Version: {this.Version}. {this.Members.Count} members");
+            var first = true;
+            foreach (var member in this.Members)
+            {
+                if (first)
+                {
+                    sb.Append(": ");
+                    first = false;
+                }
+                else
+                {
+                    sb.Append(", ");
+                }
+
+                sb.Append(member.Value);
+            }
+
+            return sb.ToString();
         }
     }
 }
