@@ -302,7 +302,9 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IHostedClient, HostedClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, HostedClient>();
             services.TryAddSingleton<InvokableObjectManager>();
-            services.TryAddSingleton<IClusterClient, ClusterClient>();
+            services.TryAddSingleton<InternalClusterClient>();
+            services.TryAddFromExisting<IInternalClusterClient, InternalClusterClient>();
+            services.TryAddFromExisting<IClusterClient, InternalClusterClient>();
 
             // Enable collection specific Age limits
             services.AddOptions<GrainCollectionOptions>()
