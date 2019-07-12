@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -29,6 +29,8 @@ namespace Orleans.Runtime
         {
             this.logger = logger;
             this.observers = new List<MonitoredObserver>();
+            this.highestCompletedStage = int.MinValue;
+            this.lowestStoppedStage = int.MaxValue;
         }
 
         public override Task OnStart(CancellationToken ct)

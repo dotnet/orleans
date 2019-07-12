@@ -58,7 +58,9 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
             services.TryAddSingleton<ISiloHost, SiloWrapper>();
             services.TryAddTransient<ILifecycleSubject, LifecycleSubject>();
-            services.TryAddSingleton<ISiloLifecycleSubject, SiloLifecycleSubject>();
+            services.TryAddSingleton<SiloLifecycleSubject>();
+            services.TryAddFromExisting<ISiloLifecycleSubject, SiloLifecycleSubject>();
+            services.TryAddFromExisting<ISiloLifecycle, SiloLifecycleSubject>();
             services.TryAddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
             services.PostConfigure<SiloMessagingOptions>(options =>
             {
