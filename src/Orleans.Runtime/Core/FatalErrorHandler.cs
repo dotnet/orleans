@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using System.Threading;
 
 namespace Orleans.Runtime
 {
@@ -17,6 +18,11 @@ namespace Orleans.Runtime
         {
             this.log = log;
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
+        }
+
+        public bool IsUnexpected(Exception exception)
+        {
+            return !(exception is ThreadAbortException);
         }
 
         public void OnFatalException(object sender, string context, Exception exception)
@@ -46,6 +52,12 @@ namespace Orleans.Runtime
                 var msg = $"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context ?? "null"}. "
                     + $"Exception: {(exception != null ? LogFormatter.PrintException(exception) : "null")}.\n"
                     + $"Current stack: {Environment.StackTrace}";
+
+                Console.Error.WriteLine(msg);
+
+                // Allow some time for loggers to flush.
+                Thread.Sleep(2000);
+
                 Environment.FailFast(msg);
             }
             else
