@@ -49,6 +49,7 @@ namespace NonSilo.Tests.Membership
             this.localSiloDetails.Name.Returns(Guid.NewGuid().ToString("N"));
 
             this.fatalErrorHandler = Substitute.For<IFatalErrorHandler>();
+            this.fatalErrorHandler.IsUnexpected(default).ReturnsForAnyArgs(true);
             this.membershipGossiper = Substitute.For<IMembershipGossiper>();
             this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
             this.timers = new List<DelegateAsyncTimer>();
@@ -77,7 +78,8 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory));
+                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)this.manager).Participate(this.lifecycle);
 
             this.clusterHealthMonitor = new ClusterHealthMonitor(
@@ -300,6 +302,10 @@ namespace NonSilo.Tests.Membership
 
             var prober = Substitute.For<IRemoteSiloProber>();
             prober.Probe(default, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
+
+            var dateTimeIndex = 0;
+            var dateTimes = new DateTime[] { DateTime.UtcNow, DateTime.UtcNow.AddMinutes(8) };
+            var membershipAgentTestAccessor = ((MembershipAgent.ITestAccessor)this.agent).GetDateTime = () => dateTimes[dateTimeIndex++];
 
             var clusterHealthMonitorTestAccessor = (ClusterHealthMonitor.ITestAccessor)this.clusterHealthMonitor;
             clusterHealthMonitorTestAccessor.CreateMonitor = silo => new SiloHealthMonitor(silo, this.loggerFactory, prober);
