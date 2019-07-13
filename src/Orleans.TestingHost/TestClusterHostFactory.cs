@@ -138,6 +138,11 @@ namespace Orleans.TestingHost
                 options.AdvertisedIPAddress = IPAddress.Loopback;
                 options.SiloPort = siloPort;
                 options.GatewayPort = gatewayPort;
+                options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Loopback, siloPort);
+                if (gatewayPort != 0)
+                {
+                    options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Loopback, gatewayPort);
+                }
             });
         }
 
