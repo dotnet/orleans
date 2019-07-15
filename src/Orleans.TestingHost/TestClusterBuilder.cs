@@ -154,7 +154,7 @@ namespace Orleans.TestingHost
                 basePort = basePort - (basePort % consecutivePortsToCheck);
                 int endPort = basePort + consecutivePortsToCheck;
 
-                // make sure non of the ports in the sub range are in use
+                // make sure none of the ports in the sub range are in use
                 if (tcpConnInfoArray.All(endpoint => endpoint.Port < basePort || endpoint.Port >= endPort))
                     return basePort;
             }
