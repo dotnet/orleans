@@ -1,0 +1,97 @@
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Orleans.Client.Hosting
+{
+
+    public class OrleansClientHostedOptions
+    {
+        public int[] Gateways { get; set; }
+    }
+
+    public class OrleansClientHostedService : IHostedService
+    {
+        private readonly ILogger<OrleansClientHostedService> _logger;
+
+        public OrleansClientHostedService(
+            ILogger<OrleansClientHostedService> logger, 
+            IOptions<OrleansClientHostedOptions> clientOptions)
+        {
+            _logger = logger;
+            Client = new ClientBuilder()
+                .UseLocalhostClustering(clientOptions.Value.Gateways)
+                   .Configure<ClusterOptions>(options =>
+                   {
+
+                       options.ClusterId = "dev";
+                       options.ServiceId = "OrleansBasics";
+                   })
+                .ConfigureLogging(logging => logging.AddConsole())
+                .Build();
+
+            Client.Connect();
+
+         
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            var attempt = 0;
+            var maxAttempts = 100;
+            var delay = TimeSpan.FromSeconds(1);
+            return Client.Connect(async error =>
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                if (++attempt < maxAttempts)
+                {
+                    _logger.LogWarning(error,
+                        "Failed to connect to Orleans cluster on attempt {@Attempt} of {@MaxAttempts}.",
+                        attempt, maxAttempts);
+
+                    try
+                    {
+                        await Task.Delay(delay, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return false;
+                    }
+
+                    return true;
+                }
+                else
+                {
+                    _logger.LogError(error,
+                        "Failed to connect to Orleans cluster on attempt {@Attempt} of {@MaxAttempts}.",
+                        attempt, maxAttempts);
+
+                    return false;
+                }
+            });
+        }
+
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await Client.Close();
+            }
+            catch (OrleansException error)
+            {
+                _logger.LogWarning(error, "Error while gracefully disconnecting from Orleans cluster. Will ignore and continue to shutdown.");
+            }
+        }
+
+        public IClusterClient Client { get; }
+    }
+}
