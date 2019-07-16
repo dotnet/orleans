@@ -276,7 +276,6 @@ namespace Orleans.Runtime
                 logger.Error(ErrorCode.Logger_ProcessCrashing, "INTERNAL FAILURE! Process crashing!");
 
                 // Environment.FailFast triggers a popup on some machine "xxx has stopped working"
-                // Environment.FailFast("Unrecoverable failure: " + message);
                 Environment.Exit(128);
             }
         }
