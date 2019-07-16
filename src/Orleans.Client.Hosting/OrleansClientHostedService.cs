@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 
 namespace Orleans.Client.Hosting
 {
-
     public class OrleansClientHostedOptions
     {
         public int[] Gateways { get; set; }
@@ -18,34 +17,35 @@ namespace Orleans.Client.Hosting
     public class OrleansClientHostedService : IHostedService
     {
         private readonly ILogger<OrleansClientHostedService> _logger;
+        private OrleansClientStore clientStore;
+        private IOptions<OrleansClientHostedOptions> clientOptions;
 
         public OrleansClientHostedService(
-            ILogger<OrleansClientHostedService> logger, 
-            IOptions<OrleansClientHostedOptions> clientOptions)
+            ILogger<OrleansClientHostedService> logger,
+            IOptions<OrleansClientHostedOptions> clientOptions,
+            OrleansClientStore clientStore)
         {
             _logger = logger;
-            Client = new ClientBuilder()
-                .UseLocalhostClustering(clientOptions.Value.Gateways)
-                   .Configure<ClusterOptions>(options =>
-                   {
-
-                       options.ClusterId = "dev";
-                       options.ServiceId = "OrleansBasics";
-                   })
-                .ConfigureLogging(logging => logging.AddConsole())
-                .Build();
-
-            Client.Connect();
-
-         
+            this.clientStore = clientStore;
+            this.clientOptions = clientOptions;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
+            this.clientStore.Client = new ClientBuilder()
+                .UseLocalhostClustering(clientOptions.Value.Gateways)
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "dev";
+                    options.ServiceId = "OrleansBasics";
+                })
+                .ConfigureLogging(logging => logging.AddConsole())
+                .Build();
+
             var attempt = 0;
             var maxAttempts = 100;
             var delay = TimeSpan.FromSeconds(1);
-            return Client.Connect(async error =>
+            return this.clientStore.Client.Connect(async error =>
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
@@ -84,14 +84,12 @@ namespace Orleans.Client.Hosting
         {
             try
             {
-                await Client.Close();
+                await this.clientStore.Client.Close();
             }
             catch (OrleansException error)
             {
                 _logger.LogWarning(error, "Error while gracefully disconnecting from Orleans cluster. Will ignore and continue to shutdown.");
             }
         }
-
-        public IClusterClient Client { get; }
     }
 }

@@ -1,5 +1,3 @@
-using Orleans;
-
 namespace Orleans.Client.Hosting
 {
     public interface IOrleansClientAccessor

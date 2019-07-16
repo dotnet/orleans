@@ -1,21 +1,20 @@
 using Microsoft.Extensions.Hosting;
 using System.Collections.Generic;
 using System.Linq;
-
 namespace Orleans.Client.Hosting
 {
     public class OrleansClientAccessor : IOrleansClientAccessor
     {
-        OrleansClientHostedService hostedService;
-        public OrleansClientAccessor(IEnumerable<IHostedService> hostedServices)
+        OrleansClientStore clientStore;
+        public OrleansClientAccessor(OrleansClientStore clientStore)
         {
-            this.hostedService = hostedServices.OfType<OrleansClientHostedService>().Last();
+            this.clientStore = clientStore;
         }
         public IClusterClient Client
         {
             get
             {
-                return this.hostedService.Client;
+                return this.clientStore.Client;
             }
         }
     }
