@@ -9,10 +9,6 @@ using System.Threading.Tasks;
 
 namespace Orleans.Client.Hosting
 {
-    public class OrleansClientHostedOptions
-    {
-        public int[] Gateways { get; set; }
-    }
 
     public class OrleansClientHostedService : IHostedService
     {
