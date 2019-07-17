@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 namespace Orleans.Client.Hosting
 {
-    public class OrleansClientAccessor : IOrleansClientAccessor
+    public class OrleansHostedClientAccessor : IOrleansHostedClientAccessor
     {
-        OrleansClientStore clientStore;
-        public OrleansClientAccessor(OrleansClientStore clientStore)
+        OrleansHostedClientStore clientStore;
+        public OrleansHostedClientAccessor(OrleansHostedClientStore clientStore)
         {
             this.clientStore = clientStore;
         }
@@ -16,6 +16,12 @@ namespace Orleans.Client.Hosting
             {
                 return this.clientStore.Client;
             }
+        }
+
+        public IClusterClient GetClient(string name)
+        {
+                return this.clientStore.GetClient(name);
+
         }
     }
 }
