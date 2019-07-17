@@ -22,15 +22,18 @@ namespace Orleans.Client.Hosting
 
         public static IOrleansHostedClientBuilder AddOrleansClient(this IOrleansHostedClientBuilder builder,
         string name,
-        Action<ClientBuilder> clientBuilder)
+        Action<IClientBuilder> clientBuilder)
         {
 
-            ClientBuilder clientBuilderObj = new ClientBuilder();
+            IClientBuilder clientBuilderObj = new ClientBuilder();
             clientBuilder(clientBuilderObj);
 
             builder.Services.AddSingleton<IHostedService, OrleansHostedClientService>((sp) =>
             {
-                var namedClientBuilder = new NamedOrleansHostedClientBuilder() { Name = name, ClientBuilder = clientBuilderObj };
+                var namedClientBuilder = new NamedOrleansHostedClientBuilder() {
+                    Name = name,
+                    ClientBuilder = clientBuilderObj };
+
                 return ActivatorUtilities.CreateInstance<OrleansHostedClientService>(sp, namedClientBuilder);
             });
             return builder;
