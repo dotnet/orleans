@@ -32,7 +32,8 @@ namespace TestExtensions
 
         public static bool GetValue(string key, out string value)
         {
-            value = defaultConfiguration[key];
+            value = defaultConfiguration.GetValue(key, default(string));
+
             return value != null;
         }
 

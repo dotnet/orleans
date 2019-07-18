@@ -292,12 +292,45 @@ namespace Orleans
                     $"Client has been disposed either by a call to {nameof(Dispose)} or because it has been stopped.");
         }
 
-        public TGrainInterface GetGrain<TGrainInterface>(Guid grainPrimaryKey, Type grainInterfaceType) where TGrainInterface : IGrain
-            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainPrimaryKey, grainInterfaceType);
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, Guid grainPrimaryKey) where TGrainInterface : IGrain
+            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainInterfaceType, grainPrimaryKey);
 
         /// <inheritdoc />
-        public IGrain GetGrain(string grainPrimaryKey, Type grainInterfaceType)
-            => this.InternalGrainFactory.GetGrain(grainPrimaryKey, grainInterfaceType);
+        public TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, long grainPrimaryKey) where TGrainInterface : IGrain
+            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainInterfaceType, grainPrimaryKey);
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, string grainPrimaryKey) where TGrainInterface : IGrain
+            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainInterfaceType, grainPrimaryKey);
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, Guid grainPrimaryKey, string keyExtension) where TGrainInterface : IGrain
+            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainInterfaceType, grainPrimaryKey, keyExtension);
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, long grainPrimaryKey, string keyExtension) where TGrainInterface : IGrain
+            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainInterfaceType, grainPrimaryKey, keyExtension);
+
+        /// <inheritdoc />
+        public IGrain GetGrain(Type grainInterfaceType, string grainPrimaryKey)
+            => this.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey);
+
+        /// <inheritdoc />
+        public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey)
+            => this.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey);
+
+        /// <inheritdoc />
+        public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey)
+            => this.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey);
+
+        /// <inheritdoc />
+        public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey, string keyExtension)
+            => this.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey, keyExtension);
+
+        /// <inheritdoc />
+        public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey, string keyExtension)
+            => this.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey, keyExtension);
 
         /// <inheritdoc />
         public object Cast(IAddressable grain, Type outputGrainInterfaceType)
