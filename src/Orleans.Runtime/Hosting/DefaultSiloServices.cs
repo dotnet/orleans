@@ -126,6 +126,7 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
+            services.TryAddSingleton<IGrainServiceFactory, GrainServiceFactory>();
 
             services.TryAddSingleton<IFatalErrorHandler, FatalErrorHandler>();
 

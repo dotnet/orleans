@@ -87,9 +87,10 @@ namespace Orleans.Runtime
         }
 
         public TGrainInterface Convert<TGrainInterface>(IAddressable grain)
-        {
-            return this.internalGrainFactory.Cast<TGrainInterface>(grain);
-        }
+            => this.internalGrainFactory.Cast<TGrainInterface>(grain);
+
+        public object Convert(IAddressable grain, Type interfaceType)
+            => this.internalGrainFactory.Cast(grain, interfaceType);
 
         private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
         {

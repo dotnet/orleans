@@ -546,7 +546,6 @@ namespace Orleans.Runtime
             foreach (var grainService in grainServices)
             {
                 await RegisterGrainService(grainService);
-
             }
         }
 

@@ -94,6 +94,11 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(id, typeData));
         }
 
+        internal static GrainId GetGrainServiceGrainId(int typeData, string systemGrainId)
+        {
+            return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(systemGrainId, typeData));
+        }
+
         public Guid PrimaryKey
         {
             get { return GetPrimaryKey(); }
@@ -239,6 +244,7 @@ namespace Orleans.Runtime
                     fullString = $"*gcl/{Key.KeyExt}/{idString}";
                     break;
                 case UniqueKey.Category.SystemTarget:
+                case UniqueKey.Category.KeyExtSystemTarget:
                     fullString = $"*stg/{Key.N1}/{idString}";
                     break;
                 case UniqueKey.Category.SystemGrain:
