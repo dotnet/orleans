@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -157,7 +157,7 @@ namespace AWSUtils.Tests.StorageTests
 
             storage.ConvertToStorageFormat(initialState, entity);
 
-            var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity);
+            var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity, initialState.GetType());
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.A, convertedState.A);
             Assert.Equal(initialState.B, convertedState.B);
@@ -176,7 +176,7 @@ namespace AWSUtils.Tests.StorageTests
         private Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(bool useJson = false)
         {
             var options = new DynamoDBStorageOptions
-            {                
+            {
                 Service = AWSTestConstants.Service,
                 UseJson = useJson
             };

@@ -143,7 +143,7 @@ namespace Orleans.Storage
 
             if (record != null)
             {
-                var loadedState = ConvertFromStorageFormat(record);
+                var loadedState = ConvertFromStorageFormat(record, grainState.Type);
                 grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
                 grainState.ETag = record.ETag.ToString();
             }
@@ -297,7 +297,7 @@ namespace Orleans.Storage
             return AWSUtils.ValidateDynamoDBPartitionKey(key);
         }
 
-        internal object ConvertFromStorageFormat(GrainStateRecord entity)
+        internal object ConvertFromStorageFormat(GrainStateRecord entity, Type stateType)
         {
             var binaryData = entity.BinaryState;
             var stringData = entity.StringState;
@@ -312,7 +312,7 @@ namespace Orleans.Storage
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {
-                    dataValue = JsonConvert.DeserializeObject<object>(stringData, this.jsonSettings);
+                    dataValue = JsonConvert.DeserializeObject(stringData, stateType, this.jsonSettings);
                 }
 
                 // Else, no data found
