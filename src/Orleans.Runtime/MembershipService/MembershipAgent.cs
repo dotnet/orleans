@@ -134,6 +134,7 @@ namespace Orleans.Runtime.MembershipService
             var attemptNumber = 1;
             var now = this.getUtcDateTime();
             var attemptUntil = now + maxAttemptTime;
+            var canContinue = true;
 
             while (true)
             {
@@ -171,6 +172,7 @@ namespace Orleans.Runtime.MembershipService
 
                     if (now + TimeSpan.FromSeconds(5) > attemptUntil)
                     {
+                        canContinue = false;
                         var msg = $"Failed to get ping responses from {failedSilos.Count} of {activeSilos.Count} active silos. "
                             + "Newly joining silos validate connectivity with all active silos that have recently updated their 'I Am Alive' value before joining the cluster. "
                             + $"Successfully contacted: {Utils.EnumerableToString(successfulSilos)}. Failed to get response from: {Utils.EnumerableToString(failedSilos)}";
@@ -181,7 +183,7 @@ namespace Orleans.Runtime.MembershipService
                     await Task.Delay(TimeSpan.FromSeconds(5));
                     await this.tableManager.Refresh();
                 }
-                catch (Exception exception)
+                catch (Exception exception) when (canContinue)
                 {
                     this.log.LogError("Failed to validate initial cluster connectivity: {Exception}", exception);
                     await Task.Delay(TimeSpan.FromSeconds(1));
