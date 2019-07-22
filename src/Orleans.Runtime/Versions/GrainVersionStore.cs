@@ -66,11 +66,13 @@ namespace Orleans.Runtime.Versions
 
         public async Task<CompatibilityStrategy> GetCompatibilityStrategy()
         {
+            ThrowIfNotEnabled();
             return await StoreGrain.GetCompatibilityStrategy();
         }
 
         public async Task<VersionSelectorStrategy> GetSelectorStrategy()
         {
+            ThrowIfNotEnabled();
             return await StoreGrain.GetSelectorStrategy();
         }
 
