@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
+<Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
@@ -30,6 +30,7 @@
   
   <ItemGroup>
     <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="$(SystemRuntimeCompilerServicesUnsafeVersion)" />
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
     <PackageReference Include="System.Runtime.Loader" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftExtensionsDependencyModelVersion)" />

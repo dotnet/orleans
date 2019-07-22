@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -26,16 +28,23 @@ namespace UnitTests.General
         
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            builder.AddSiloBuilderConfigurator<Configurator>();
+            builder.AddClientBuilderConfigurator<Configurator>();
         }
 
-        private class SiloConfigurator : ISiloBuilderConfigurator
+        private class Configurator : ISiloBuilderConfigurator, IClientBuilderConfigurator
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.AddMemoryGrainStorage("MemoryStore")
                     .AddMemoryGrainStorageAsDefault()
                     .UseInMemoryReminderService();
+            }
+
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<GatewayOptions>(
+                    options => options.GatewayListRefreshPeriod = TimeSpan.FromMilliseconds(100));
             }
         }
 

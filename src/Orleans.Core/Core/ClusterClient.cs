@@ -65,7 +65,7 @@ namespace Orleans
                 participant?.Participate(clusterClientLifecycle);
             }
 
-            // It is fine for this field to be null in the case that the silo is not the host.
+            // It is fine for this field to be null in the case that the client is not the host.
             this.applicationLifetime = runtimeClient.ServiceProvider.GetService<IApplicationLifetime>() as ClientApplicationLifetime;
         }
 
@@ -155,11 +155,6 @@ namespace Orleans
                     }
 
                     await this.clusterClientLifecycle.OnStop(canceled);
-
-                    if (gracefully)
-                    {
-                        Utils.SafeExecute(() => (this.runtimeClient as OutsideRuntimeClient)?.Disconnect());
-                    }
 
                     Utils.SafeExecute(() => (this.runtimeClient as OutsideRuntimeClient)?.Reset(gracefully));
                     this.Dispose(true);

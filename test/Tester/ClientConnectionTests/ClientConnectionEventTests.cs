@@ -51,7 +51,7 @@ namespace Tester
                 await grain.SetLabel(i.ToString());
             }
 
-            runtime.Disconnect();
+            await this.HostedCluster.StopAllSilosAsync();
 
             Assert.True(await semaphore.WaitAsync(TimeSpan.FromSeconds(10)));
         }

@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using Orleans.Runtime.TestHooks;
 
 namespace Orleans.TestingHost

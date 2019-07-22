@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
 
@@ -10,5 +10,7 @@ namespace BenchmarkGrainInterfaces.Ping
 
         [AlwaysInterleave]
         Task PingPongInterleave(IPingGrain other, int count);
+
+        Task<int> GetSiloPort();
     }
 }

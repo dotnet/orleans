@@ -39,6 +39,7 @@ using System.Reflection;
 using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
+using Orleans.Networking.Shared;
 
 namespace Orleans.Hosting
 {
@@ -121,6 +122,7 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddFromExisting<ISiloMessageCenter, MessageCenter>();
             services.TryAddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);
+            services.AddSingleton<Gateway>(sp => sp.GetRequiredService<MessageCenter>().Gateway);
             services.TryAddSingleton<Dispatcher>(sp => sp.GetRequiredService<Catalog>().Dispatcher);
             services.TryAddSingleton<InsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
@@ -338,6 +340,22 @@ namespace Orleans.Hosting
             // persistent state facet support
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
+
+            // Networking
+            services.TryAddSingleton<ConnectionManager>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, ConnectionManagerLifecycleAdapter<ISiloLifecycle>>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionMaintainer>();
+            services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
+            services.TryAddSingleton<IConnectionListenerFactory, SocketConnectionListenerFactory>();
+            services.TryAddTransient<IMessageSerializer, MessageSerializer>();
+            services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
+            services.TryAddSingleton<INetworkingTrace, NetworkingTrace>();
+
+            // Use Orleans server.
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
+            services.AddSingleton<SocketSchedulers>();
+            services.AddSingleton<SharedMemoryPool>();
         }
     }
 }

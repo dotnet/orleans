@@ -16,14 +16,11 @@ namespace Orleans.Serialization
     /// <summary>
     /// Writer for Orleans binary token streams
     /// </summary>
-    public sealed class BinaryTokenStreamWriter2<TBufferWriter> : IBinaryTokenStreamWriter where TBufferWriter : IBufferWriter<byte>
+    internal sealed class BinaryTokenStreamWriter2<TBufferWriter> : IBinaryTokenStreamWriter where TBufferWriter : IBufferWriter<byte>
     {
         private static readonly Dictionary<Type, SerializationTokenType> typeTokens;
         private static readonly Dictionary<Type, Action<BinaryTokenStreamWriter2<TBufferWriter>, object>> writers;
 
-#if SERIALIZER_SESSIONAWARE
-        private ReferencedTypeCollection referencedTypes;
-#endif
         private TBufferWriter output;
         private Memory<byte> currentBuffer;
         private int currentOffset;
@@ -167,21 +164,6 @@ namespace Orleans.Serialization
             this.Write((byte)SerializationTokenType.Null);
         }
 
-#if SERIALIZER_SESSIONAWARE
-        private uint CheckTypeWhileSerializing(Type type)
-        {
-            if (this.referencedTypes == null) return 0;
-            this.referencedTypes.TryGetReference(type, out var result);
-            return result;
-        }
-
-        private void RecordType(Type type)
-        {
-            var types = this.referencedTypes ?? (this.referencedTypes = new ReferencedTypeCollection());
-            types.RecordTypeWhileSerializing(type);
-        }
-#endif
-
         public void WriteTypeHeader(Type t, Type expected = null)
         {
             if (t == expected)
@@ -205,15 +187,7 @@ namespace Orleans.Serialization
                 this.Write((byte)token);
                 return;
             }
-#if SERIALIZER_SESSIONAWARE
-            var id = this.CheckTypeWhileSerializing(t);
-            if (id > 0)
-            {
-                this.Write((byte)SerializationTokenType.ReferencedType);
-                this.Write(id);
-                return;
-            }
-#endif
+
             if (t.GetTypeInfo().IsGenericType)
             {
                 if (typeTokens.TryGetValue(t.GetGenericTypeDefinition(), out token))
@@ -227,9 +201,6 @@ namespace Orleans.Serialization
                 }
             }
 
-#if SERIALIZER_SESSIONAWARE
-            this.RecordType(t);
-#endif
             this.Write((byte)SerializationTokenType.NamedType);
             var typeKey = t.OrleansTypeKey();
             this.Write(typeKey.Length);

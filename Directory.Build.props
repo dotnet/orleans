@@ -47,12 +47,16 @@
     <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
 
     <SystemCollectionsImmutableVersion>1.4.0</SystemCollectionsImmutableVersion>
+    <SystemRuntimeCompilerServicesUnsafeVersion>4.5.2</SystemRuntimeCompilerServicesUnsafeVersion>
     <SystemNetHttpVersion>4.3.4</SystemNetHttpVersion>
     <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
     <SystemThreadingTasksExtensionsVersion>4.5.2</SystemThreadingTasksExtensionsVersion>
-    <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
+    <SystemThreadingChannelsVersion>4.5.0</SystemThreadingChannelsVersion>
+    <SystemBuffersVersion>4.5.0</SystemBuffersVersion>
+    <SystemMemoryVersion>4.5.2</SystemMemoryVersion>
+    <SystemIOPipelinesVersion>4.5.3</SystemIOPipelinesVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>

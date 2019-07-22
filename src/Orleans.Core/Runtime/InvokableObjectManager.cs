@@ -148,7 +148,7 @@ namespace Orleans
                     InvokeMethodRequest request = null;
                     try
                     {
-                        request = (InvokeMethodRequest) message.GetDeserializedBody(this.serializationManager);
+                        request = (InvokeMethodRequest) message.BodyObject;
                     }
                     catch (Exception deserializationException)
                     {
@@ -244,7 +244,7 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private void ReportException(Message message, Exception exception)
         {
-            var request = (InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager);
+            var request = (InvokeMethodRequest)message.BodyObject;
             switch (message.Direction)
             {
                 case Message.Directions.OneWay:

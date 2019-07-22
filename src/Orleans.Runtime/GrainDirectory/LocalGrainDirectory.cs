@@ -779,7 +779,10 @@ namespace Orleans.Runtime.GrainDirectory
                 Dictionary<SiloAddress, List<ActivationAddress>> forwardlist2 = null;
                 UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardlist2, tasks, "UnregisterManyAsync");
                 forwardlist = forwardlist2;
-                this.log.LogWarning($"RegisterAsync - It seems we are not the owner of some activations, trying to forward it to {forwardlist.Count} silos (hopCount={hopCount})");
+                if (forwardlist != null)
+                {
+                    this.log.LogWarning($"RegisterAsync - It seems we are not the owner of some activations, trying to forward it to {forwardlist.Count} silos (hopCount={hopCount})");
+                }
             }
 
             // forward the requests

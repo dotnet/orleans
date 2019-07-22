@@ -9,7 +9,6 @@ namespace Orleans.Runtime
 {
     internal class SharedCallbackData
     {
-        private readonly SerializationManager serializationManager;
         public readonly Func<Message, bool> ShouldResend;
         public readonly Action<Message> Unregister;
         public readonly ILogger Logger;
@@ -21,13 +20,11 @@ namespace Orleans.Runtime
             Action<Message> unregister,
             ILogger logger,
             MessagingOptions messagingOptions,
-            SerializationManager serializationManager,
             ApplicationRequestsStatisticsGroup requestStatistics)
         {
             RequestStatistics = requestStatistics;
             this.ShouldResend = resendFunc;
             this.Unregister = unregister;
-            this.serializationManager = serializationManager;
             this.Logger = logger;
             this.MessagingOptions = messagingOptions;
             this.ResponseTimeout = messagingOptions.ResponseTimeout;
@@ -53,7 +50,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    response = (Response)message.GetDeserializedBody(this.serializationManager);
+                    response = (Response)message.BodyObject;
                 }
                 catch (Exception exc)
                 {
@@ -73,7 +70,7 @@ namespace Orleans.Runtime
                         return; // Ignore duplicates
 
                     default:
-                        rejection = message.GetDeserializedBody(this.serializationManager) as Exception;
+                        rejection = message.BodyObject as Exception;
                         if (rejection == null)
                         {
                             if (string.IsNullOrEmpty(message.RejectionInfo))
