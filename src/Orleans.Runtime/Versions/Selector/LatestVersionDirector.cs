@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Orleans.Versions.Compatibility;
@@ -9,10 +10,18 @@ namespace Orleans.Runtime.Versions.Selector
     {
         public IReadOnlyList<ushort> GetSuitableVersion(ushort requestedVersion, IReadOnlyList<ushort> availableVersions, ICompatibilityDirector compatibilityDirector)
         {
-            return new[]
+            var max = int.MinValue;
+            foreach (var version in availableVersions)
             {
-                availableVersions.Where(v => compatibilityDirector.IsCompatible(requestedVersion, v)).Max()
-            };
+                if (compatibilityDirector.IsCompatible(requestedVersion, version) && version > max)
+                {
+                    max = version;
+                }
+            }
+
+            if (max < 0) return Array.Empty<ushort>();
+
+            return new[] { (ushort)max };
         }
     }
 }
