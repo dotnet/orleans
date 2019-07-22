@@ -128,11 +128,11 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunInternal()
         {
-            var grainId = await ConnectionPreamble.Read(this.Context);
+            var (grainId, siloAddress) = await ConnectionPreamble.Read(this.Context);
 
             if (grainId.Equals(Constants.SiloDirectConnectionId))
             {
-                throw new InvalidOperationException("Unexpected direct silo connection on proxy endpoint.");
+                throw new InvalidOperationException($"Unexpected direct silo connection on proxy endpoint from {siloAddress?.ToString() ?? "unknown silo"}");
             }
 
             // refuse clients that are connecting to the wrong cluster

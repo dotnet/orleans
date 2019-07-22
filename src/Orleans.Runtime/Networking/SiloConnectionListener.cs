@@ -17,6 +17,7 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageCenter messageCenter;
         private readonly MessageFactory messageFactory;
         private readonly EndpointOptions endpointOptions;
+        private readonly ConnectionManager connectionManager;
 
         public SiloConnectionListener(
             IServiceProvider serviceProvider,
@@ -27,7 +28,8 @@ namespace Orleans.Runtime.Messaging
             INetworkingTrace trace,
             IOptions<EndpointOptions> endpointOptions,
             ILocalSiloDetails localSiloDetails,
-            ISiloStatusOracle siloStatusOracle)
+            ISiloStatusOracle siloStatusOracle,
+            ConnectionManager connectionManager)
             : base(serviceProvider, listenerFactory, connectionOptions, trace)
         {
             this.messageCenter = messageCenter;
@@ -35,6 +37,7 @@ namespace Orleans.Runtime.Messaging
             this.trace = trace;
             this.localSiloDetails = localSiloDetails;
             this.siloStatusOracle = siloStatusOracle;
+            this.connectionManager = connectionManager;
             this.endpointOptions = endpointOptions.Value;
         }
 
@@ -50,7 +53,8 @@ namespace Orleans.Runtime.Messaging
                 this.messageCenter,
                 this.messageFactory,
                 this.localSiloDetails,
-                this.siloStatusOracle);
+                this.siloStatusOracle,
+                this.connectionManager);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

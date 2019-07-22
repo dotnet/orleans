@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IServiceProvider serviceProvider;
         private readonly MessageFactory messageFactory;
+        private ConnectionManager connectionManager;
         private MessageCenter messageCenter;
 
         public SiloConnectionFactory(
@@ -35,6 +36,7 @@ namespace Orleans.Runtime.Messaging
         protected override Connection CreateConnection(ConnectionContext context)
         {
             if (this.messageCenter is null) this.messageCenter = this.serviceProvider.GetRequiredService<MessageCenter>();
+            if (this.connectionManager is null) this.connectionManager = this.serviceProvider.GetRequiredService<ConnectionManager>();
 
             return new SiloConnection(
                 context,
@@ -44,7 +46,8 @@ namespace Orleans.Runtime.Messaging
                 this.messageCenter,
                 this.messageFactory,
                 this.localSiloDetails,
-                this.siloStatusOracle);
+                this.siloStatusOracle,
+                this.connectionManager);
         }
     }
 }

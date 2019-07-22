@@ -4,6 +4,7 @@ using System.Buffers.Binary;
 using System.IO.Pipelines;
 using System.Threading.Tasks;
 using Orleans.Networking.Shared;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -11,31 +12,34 @@ namespace Orleans.Runtime.Messaging
     {
         private const int MaxPreambleLength = 1024;
 
-        internal static Task Write(ConnectionContext connection, GrainId grainId)
+        internal static Task Write(ConnectionContext connection, GrainId grainId, SiloAddress siloAddress)
         {
             var output = connection.Transport.Output;
-            var grainIdByteArray = grainId.ToByteArray();
+            var outputWriter = new PrefixingBufferWriter<byte, PipeWriter>(output, sizeof(int), 1024, MemoryPool<byte>.Shared);
+            var writer = new BinaryTokenStreamWriter2<PrefixingBufferWriter<byte, PipeWriter>>(outputWriter);
 
-            Span<byte> bytes = stackalloc byte[sizeof(int)];
-            BinaryPrimitives.WriteInt32LittleEndian(bytes, grainIdByteArray.Length);
-            var length = bytes.Length + grainIdByteArray.Length;
+            writer.Write(grainId);
+            if (!(siloAddress is null)) writer.Write(siloAddress);
+            writer.Commit();
+
+            var length = outputWriter.CommittedBytes;
 
             if (length > MaxPreambleLength)
             {
                 throw new InvalidOperationException($"Created preamble of length {length}, which is greater than maximum allowed size of {MaxPreambleLength}.");
             }
 
-            var buffer = output.GetSpan(length);
-            bytes.CopyTo(buffer);
-            new ReadOnlySpan<byte>(grainIdByteArray).CopyTo(buffer.Slice(sizeof(int)));
-            output.Advance(length);
+            Span<byte> lengthSpan = stackalloc byte[4];
+            BinaryPrimitives.WriteInt32LittleEndian(lengthSpan, length);
+            outputWriter.Complete(lengthSpan);
+            
             var flushTask = output.FlushAsync();
 
             if (flushTask.IsCompletedSuccessfully) return Task.CompletedTask;
             return flushTask.AsTask();
         }
                 
-        internal static async Task<GrainId> Read(ConnectionContext connection)
+        internal static async Task<(GrainId, SiloAddress)> Read(ConnectionContext connection)
         {
             var input = connection.Transport.Input;
 
@@ -72,11 +76,18 @@ namespace Orleans.Runtime.Messaging
                 CheckForCompletion(ref readResult);
             }
 
-            var grainIdBuffer = buffer.Slice(0, length);
-            input.AdvanceTo(grainIdBuffer.End);
-            var grainIdBytes = new byte[Math.Min(length, 1024)];
-            grainIdBuffer.CopyTo(grainIdBytes);
-            return GrainIdExtensions.FromByteArray(grainIdBytes);
+            var payloadBuffer = buffer.Slice(0, length);
+            input.AdvanceTo(payloadBuffer.End);
+
+            var reader = new BinaryTokenStreamReader2(payloadBuffer);
+            var grainId = reader.ReadGrainId();
+            SiloAddress siloAddress = null;
+            if (reader.Position < payloadBuffer.Length)
+            {
+                siloAddress = reader.ReadSiloAddress();
+            }
+
+            return (grainId, siloAddress);
 
             void CheckForCompletion(ref ReadResult r)
             {
