@@ -24,14 +24,14 @@ public interface IVersionUpgradeTestGrain : IGrainWithIntegerKey {}
 Where `X` is the version number of the grain interface, which is typically monotonically increasing.
 
 ## Grain version compatibility and placement
-When a call from a versioned grain arrive in a cluster:
+When a call from a versioned grain arrives in a cluster:
 - If no activation exists, a compatible activation will be created
 - If an activation exists:
-  - If the current one is not compatible, it will be deactivated and new compatible will be created (see [version selector strategy](version_selector_strategy.md))
-  - If the current one is compatible (see compatible grains), the call will be handled normally.
+  - If the current one is not compatible, it will be deactivated and new compatible one will be created (see [version selector strategy](version_selector_strategy.md))
+  - If the current one is compatible (see [compatible grains](compatible_grains.md)), the call will be handled normally.
 
 By default:
-- All versioned grains are supposed to be backward-compatible only (see backward compatibility guidelines) and compatible grains(Compatible-grains.md)). That means that a v1 grain can make calls to a v2 grain, but a v2 grain cannot call a v1. 
+- All versioned grains are supposed to be backward-compatible only (see [backward compatibility guidelines](backward_compatibility_guidelines.md) and [compatible grains](compatible_grains.md)). That means that a v1 grain can make calls to a v2 grain, but a v2 grain cannot call a v1. 
 - When multiple versions exist in the cluster, the new activation will be randomly placed on a compatible silo. 
 
 You can change this default behavior via the option `GrainVersioningOptions`:
