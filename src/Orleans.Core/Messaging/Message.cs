@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Orleans.CodeGeneration;
-using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Transactions;
 
@@ -21,10 +19,7 @@ namespace Orleans.Runtime
         private DateTime? _queuedTime;
 
         [NonSerialized]
-        private int? _retryCount;
-
-        [NonSerialized]
-        private int? _maxRetries;
+        private int _retryCount;
 
         public string TargetHistory
         {
@@ -39,16 +34,10 @@ namespace Orleans.Runtime
             set { _queuedTime = value; }
         }
 
-        public int? RetryCount
+        public int RetryCount
         {
             get { return _retryCount; }
             set { _retryCount = value; }
-        }
-
-        public int? MaxRetries
-        {
-            get { return _maxRetries; }
-            set { _maxRetries = value; }
         }
         
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
@@ -140,12 +129,6 @@ namespace Orleans.Runtime
         {
             get { return Headers.Id; }
             set { Headers.Id = value; }
-        }
-
-        public int ResendCount
-        {
-            get { return Headers.ResendCount; }
-            set {  Headers.ResendCount = value; }
         }
 
         public int ForwardCount
@@ -343,12 +326,6 @@ namespace Orleans.Runtime
             list.Add(address);
             CacheInvalidationHeader = list;
         }
-
-        // Resends are used by the sender, usualy due to en error to send or due to a transient rejection.
-        public bool MayResend(int maxResendCount)
-        {
-            return ResendCount < maxResendCount;
-        }
         
         /// <summary>
         /// Set by sender's placement logic when NewPlacementRequested is true
@@ -437,7 +414,6 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.REJECTION_INFO, sb, (m) => m.RejectionInfo);
             AppendIfExists(HeadersContainer.Headers.REJECTION_TYPE, sb, (m) => m.RejectionType);
             AppendIfExists(HeadersContainer.Headers.REQUEST_CONTEXT, sb, (m) => m.RequestContextData);
-            AppendIfExists(HeadersContainer.Headers.RESEND_COUNT, sb, (m) => m.ResendCount);
             AppendIfExists(HeadersContainer.Headers.RESULT, sb, (m) => m.Result);
             AppendIfExists(HeadersContainer.Headers.SENDING_ACTIVATION, sb, (m) => m.SendingActivation);
             AppendIfExists(HeadersContainer.Headers.SENDING_GRAIN, sb, (m) => m.SendingGrain);
@@ -481,7 +457,7 @@ namespace Orleans.Runtime
                         break;
                 }
             }
-            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}{9}: {10}",
+            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}: {9}",
                 IsReadOnly ? "ReadOnly " : "", //0
                 IsAlwaysInterleave ? "IsAlwaysInterleave " : "", //1
                 IsNewPlacement ? "NewPlacement " : "", // 2
@@ -490,9 +466,8 @@ namespace Orleans.Runtime
                 String.Format("{0}{1}{2}", SendingSilo, SendingGrain, SendingActivation), //5
                 String.Format("{0}{1}{2}{3}", TargetSilo, TargetGrain, TargetActivation, TargetObserverId), //6
                 Id, //7
-                ResendCount > 0 ? "[ResendCount=" + ResendCount + "]" : "", //8
-                ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "", //9
-                DebugContext); //10
+                ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "", //8
+                DebugContext); //9
         }
 
         internal void SetTargetPlacement(PlacementResult value)
@@ -610,7 +585,7 @@ namespace Orleans.Runtime
                 REJECTION_INFO = 1 << 11,
                 REJECTION_TYPE = 1 << 12,
                 READ_ONLY = 1 << 13,
-                RESEND_COUNT = 1 << 14,
+                RESEND_COUNT = 1 << 14, // Support removed. Value retained for backwards compatibility.
                 SENDING_ACTIVATION = 1 << 15,
                 SENDING_GRAIN = 1 <<16,
                 SENDING_SILO = 1 << 17,
@@ -643,7 +618,6 @@ namespace Orleans.Runtime
             private bool _isReturnedFromRemoteCluster;
             private bool _isTransactionRequired;
             private CorrelationId _id;
-            private int _resendCount;
             private int _forwardCount;
             private SiloAddress _targetSilo;
             private GrainId _targetGrain;
@@ -748,15 +722,6 @@ namespace Orleans.Runtime
                 set
                 {
                     _id = value;
-                }
-            }
-
-            public int ResendCount
-            {
-                get { return _resendCount; }
-                set
-                {
-                    _resendCount = value;
                 }
             }
 
@@ -976,8 +941,6 @@ namespace Orleans.Runtime
 
                 headers = _id == null ? headers & ~Headers.CORRELATION_ID : headers | Headers.CORRELATION_ID;
 
-                if (_resendCount != default(int))
-                    headers = headers | Headers.RESEND_COUNT;
                 if(_forwardCount != default (int))
                     headers = headers | Headers.FORWARD_COUNT;
 
@@ -1092,9 +1055,6 @@ namespace Orleans.Runtime
                         SerializationManager.SerializeInner(d.Value, context, typeof(object));
                     }
                 }
-
-                if ((headers & Headers.RESEND_COUNT) != Headers.NONE)
-                    writer.Write(input.ResendCount);
 
                 if ((headers & Headers.RESULT) != Headers.NONE)
                     writer.Write((byte)input.Result);
@@ -1229,8 +1189,8 @@ namespace Orleans.Runtime
                     result.RequestContextData = requestData;
                 }
 
-                if ((headers & Headers.RESEND_COUNT) != Headers.NONE)
-                    result.ResendCount = reader.ReadInt();
+                // Read for backwards compatibility but ignore the value.
+                if ((headers & Headers.RESEND_COUNT) != Headers.NONE) reader.ReadInt();
 
                 if ((headers & Headers.RESULT) != Headers.NONE)
                     result.Result = (Orleans.Runtime.Message.ResponseTypes)reader.ReadByte();

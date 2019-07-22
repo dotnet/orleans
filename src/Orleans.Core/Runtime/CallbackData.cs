@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Orleans.Transactions;
 
 namespace Orleans.Runtime
@@ -50,7 +49,7 @@ namespace Orleans.Runtime
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
             var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
-            OnFail(msg, error, "OnTimeout - Resend {0} for {1}", true);
+            OnFail(msg, error, isOnTimeout: true);
         }
 
         public void OnTargetSiloFail()
@@ -65,7 +64,7 @@ namespace Orleans.Runtime
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
             var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
-            OnFail(msg, error, "On silo fail - Resend {0} for {1}");
+            OnFail(msg, error, isOnTimeout: false);
         }
 
         public void DoCallback(Message response)
@@ -78,14 +77,6 @@ namespace Orleans.Runtime
             if (Interlocked.CompareExchange(ref this.completed, 1, 0) == 0)
             {
                 var requestStatistics = this.shared.RequestStatistics;
-                if (response.Result == Message.ResponseTypes.Rejection && response.RejectionType == Message.RejectionTypes.Transient)
-                {
-                    if (this.shared.ShouldResend(this.Message))
-                    {
-                        return;
-                    }
-                }
-
                 if (requestStatistics.CollectApplicationRequestsStats)
                 {
                     this.stopwatch.Stop();
@@ -101,17 +92,11 @@ namespace Orleans.Runtime
             }
         }
 
-        private void OnFail(Message msg, Message error, string resendLogMessageFormat, bool isOnTimeout = false)
+        private void OnFail(Message msg, Message error, bool isOnTimeout = false)
         {
             if (Interlocked.CompareExchange(ref this.completed, 1, 0) == 0)
             {
                 var requestStatistics = this.shared.RequestStatistics;
-                if (this.shared.MessagingOptions.ResendOnTimeout && this.shared.ShouldResend(msg))
-                {
-                    if (this.shared.Logger.IsEnabled(LogLevel.Debug)) this.shared.Logger.Debug(resendLogMessageFormat, msg.ResendCount, msg);
-                    return;
-                }
-
                 if (requestStatistics.CollectApplicationRequestsStats)
                 {
                     this.stopwatch.Stop();
