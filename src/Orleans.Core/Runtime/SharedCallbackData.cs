@@ -3,27 +3,23 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
     internal class SharedCallbackData
     {
-        public readonly Func<Message, bool> ShouldResend;
         public readonly Action<Message> Unregister;
         public readonly ILogger Logger;
         public readonly MessagingOptions MessagingOptions;
         public long ResponseTimeoutStopwatchTicks;
 
         public SharedCallbackData(
-            Func<Message, bool> resendFunc,
             Action<Message> unregister,
             ILogger logger,
             MessagingOptions messagingOptions,
             ApplicationRequestsStatisticsGroup requestStatistics)
         {
             RequestStatistics = requestStatistics;
-            this.ShouldResend = resendFunc;
             this.Unregister = unregister;
             this.Logger = logger;
             this.MessagingOptions = messagingOptions;

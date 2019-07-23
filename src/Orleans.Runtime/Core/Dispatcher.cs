@@ -601,16 +601,6 @@ namespace Orleans.Runtime
             ResendMessageImpl(message);
         }
 
-        internal bool TryResendMessage(Message message)
-        {
-            if (!message.MayResend(this.messagingOptions.MaxResendCount)) return false;
-
-            message.ResendCount = message.ResendCount + 1;
-            MessagingProcessingStatisticsGroup.OnIgcMessageResend(message);
-            ResendMessageImpl(message);
-            return true;
-        }
-
         internal bool TryForwardMessage(Message message, ActivationAddress forwardingAddress)
         {
             if (!MayForward(message, this.messagingOptions)) return false;

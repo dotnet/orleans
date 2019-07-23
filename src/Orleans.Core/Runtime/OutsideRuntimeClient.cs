@@ -133,7 +133,6 @@ namespace Orleans
                     this.loggerFactory.CreateLogger<InvokableObjectManager>());
 
                 this.sharedCallbackData = new SharedCallbackData(
-                    this.TryResendMessage,
                     msg => this.UnregisterCallback(msg.Id),
                     this.loggerFactory.CreateLogger<CallbackData>(),
                     this.clientMessagingOptions,
@@ -408,29 +407,6 @@ namespace Orleans
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Send {0}", message);
             transport.SendMessage(message);
-        }
-
-        private bool TryResendMessage(Message message)
-        {
-            if (!message.MayResend(this.clientMessagingOptions.MaxResendCount))
-            {
-                return false;
-            }
-
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resend {0}", message);
-
-            message.ResendCount = message.ResendCount + 1;
-            message.TargetHistory = message.GetTargetHistory();
-
-            if (!message.TargetGrain.IsSystemTarget)
-            {
-                message.TargetActivation = null;
-                message.TargetSilo = null;
-                message.ClearTargetAddress();
-            }
-
-            transport.SendMessage(message);
-            return true;
         }
 
         public void ReceiveResponse(Message response)

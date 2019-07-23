@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Networking.Shared;
 
 namespace Orleans.Runtime.Messaging
@@ -219,12 +220,9 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            int maxRetries = msg.MaxRetries ?? 1;
-            int retryCount = msg.RetryCount ?? 0;
-
-            if (retryCount < maxRetries)
+            if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
-                msg.RetryCount = retryCount + 1;
+                msg.RetryCount = msg.RetryCount + 1;
                 this.messageCenter.SendMessage(msg);
             }
             else
@@ -252,19 +250,17 @@ namespace Orleans.Runtime.Messaging
 
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
 
-            var retryCount = msg.RetryCount ?? 0;
-
             if (msg.Direction == Message.Directions.Request)
             {
                 this.messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, exc.ToString());
             }
-            else if (msg.Direction == Message.Directions.Response && retryCount < 1)
+            else if (msg.Direction == Message.Directions.Response && msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 // if we failed sending an original response, turn the response body into an error and reply with it.
                 // unless we have already tried sending the response multiple times.
                 msg.Result = Message.ResponseTypes.Error;
                 msg.BodyObject = Response.ExceptionResponse(exc);
-                msg.RetryCount = retryCount + 1;
+                msg.RetryCount = msg.RetryCount + 1;
                 this.messageCenter.SendMessage(msg);
             }
             else

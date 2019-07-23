@@ -725,7 +725,6 @@ namespace Orleans.Runtime
             this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
 
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.Dispatcher.TryResendMessage(msg),
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.messagingOptions,
