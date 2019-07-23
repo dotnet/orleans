@@ -57,7 +57,7 @@ namespace Orleans
         private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
 
         private readonly StageAnalysisStatisticsGroup schedulerStageStatistics;
-        private SharedCallbackData sharedCallbackData;
+        private readonly SharedCallbackData sharedCallbackData;
         private SafeTimer callbackTimer;
         public ActivationAddress CurrentActivationAddress
         {
@@ -100,6 +100,12 @@ namespace Orleans
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             this.typeMapRefreshInterval = typeManagementOptions.Value.TypeMapRefreshInterval;
+
+            this.sharedCallbackData = new SharedCallbackData(
+                msg => this.UnregisterCallback(msg.Id),
+                this.loggerFactory.CreateLogger<CallbackData>(),
+                this.clientMessagingOptions,
+                this.appRequestStatistics);
         }
 
         internal void ConsumeServices(IServiceProvider services)
@@ -132,11 +138,6 @@ namespace Orleans
                     serializationManager,
                     this.loggerFactory.CreateLogger<InvokableObjectManager>());
 
-                this.sharedCallbackData = new SharedCallbackData(
-                    msg => this.UnregisterCallback(msg.Id),
-                    this.loggerFactory.CreateLogger<CallbackData>(),
-                    this.clientMessagingOptions,
-                    this.appRequestStatistics);
                 var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
                 var minTicks = Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
                 var period = TimeSpan.FromTicks(minTicks);

@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         private readonly SiloMessagingOptions messagingOptions;
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
-        private SharedCallbackData sharedCallbackData;
+        private readonly SharedCallbackData sharedCallbackData;
         private SafeTimer callbackTimer;
 
         private ILocalGrainDirectory directory;
@@ -83,6 +83,12 @@ namespace Orleans.Runtime
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.appRequestStatistics = appRequestStatistics;
             this.schedulingOptions = schedulerOptions.Value;
+
+            this.sharedCallbackData = new SharedCallbackData(
+                msg => this.UnregisterCallback(msg.Id),
+                this.loggerFactory.CreateLogger<CallbackData>(),
+                this.messagingOptions,
+                this.appRequestStatistics);
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -723,12 +729,6 @@ namespace Orleans.Runtime
         {
             var stopWatch = Stopwatch.StartNew();
             this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
-
-            this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
-                this.loggerFactory.CreateLogger<CallbackData>(),
-                this.messagingOptions,
-                this.appRequestStatistics);
             var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
             var minTicks = Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
             var period = TimeSpan.FromTicks(minTicks);

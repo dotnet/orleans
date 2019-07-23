@@ -26,7 +26,7 @@ namespace Orleans.Runtime
 
         public ITransactionInfo TransactionInfo { get; set; }
 
-        public Message Message { get; set; } // might hold metadata used by response pipeline
+        public Message Message { get; } // might hold metadata used by response pipeline
 
         public bool IsCompleted => this.completed == 1;
 
