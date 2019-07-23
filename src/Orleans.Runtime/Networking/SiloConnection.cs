@@ -13,7 +13,9 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageCenter messageCenter;
         private readonly MessageFactory messageFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly ConnectionManager connectionManager;
         private readonly SiloAddress myAddress;
+        private SiloAddress remoteSiloAddress;
 
         public SiloConnection(
             ConnectionContext connection,
@@ -23,12 +25,14 @@ namespace Orleans.Runtime.Messaging
             MessageCenter messageCenter,
             MessageFactory messageFactory,
             ILocalSiloDetails localSiloDetails,
-            ISiloStatusOracle siloStatusOracle)
+            ISiloStatusOracle siloStatusOracle,
+            ConnectionManager connectionManager)
             : base(connection, middleware, serviceProvider, trace)
         {
             this.messageCenter = messageCenter;
             this.messageFactory = messageFactory;
             this.siloStatusOracle = siloStatusOracle;
+            this.connectionManager = connectionManager;
             this.myAddress = localSiloDetails.SiloAddress;
         }
 
@@ -152,19 +156,32 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunInternal()
         {
-            await Task.WhenAll(ReadPreamble(), WritePreamble());
+            try
+            {
+                await Task.WhenAll(ReadPreamble(), WritePreamble());
 
-            await base.RunInternal();
+                await base.RunInternal();
+            }
+            finally
+            {
+                if (!(this.remoteSiloAddress is null)) this.connectionManager.OnConnectionTerminated(this.remoteSiloAddress, this);
+            }
 
-            Task WritePreamble() => ConnectionPreamble.Write(this.Context, Constants.SiloDirectConnectionId);
+            Task WritePreamble() => ConnectionPreamble.Write(this.Context, Constants.SiloDirectConnectionId, this.myAddress);
 
             async Task ReadPreamble()
             {
-                var grainId = await ConnectionPreamble.Read(this.Context);
+                var (grainId, siloAddress) = await ConnectionPreamble.Read(this.Context);
 
                 if (!grainId.Equals(Constants.SiloDirectConnectionId))
                 {
                     throw new InvalidOperationException("Unexpected non-proxied connection on silo endpoint.");
+                }
+
+                if (siloAddress != null)
+                {
+                    this.remoteSiloAddress = siloAddress;
+                    this.connectionManager.OnConnected(siloAddress, this);
                 }
             }
         }

@@ -70,7 +70,7 @@ namespace Orleans.Runtime.Messaging
             {
                 this.messageCenter.OnGatewayConnectionOpen();
 
-                await ConnectionPreamble.Write(this.Context, this.messageCenter.ClientId);
+                await ConnectionPreamble.Write(this.Context, this.messageCenter.ClientId, siloAddress: null);
                 await base.RunInternal();
             }
             finally
