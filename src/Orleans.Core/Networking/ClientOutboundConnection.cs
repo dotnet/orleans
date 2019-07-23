@@ -1,5 +1,4 @@
 using System;
-using System.Net;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,34 +9,38 @@ using Orleans.Networking.Shared;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class ClientOutboundConnection : Connection
+    internal sealed class ClientOutboundConnection : Connection, ISiloConnection
     {
         private readonly MessageFactory messageFactory;
         private readonly ClientMessageCenter messageCenter;
         private readonly GatewayManager gatewayManager;
+        private readonly ConnectionManager connectionManager;
+        private readonly ConnectionOptions connectionOptions;
 
         public ClientOutboundConnection(
+            SiloAddress remoteSiloAddress,
             ConnectionContext connection,
             ConnectionDelegate middleware,
             MessageFactory messageFactory,
             IServiceProvider serviceProvider,
             ClientMessageCenter messageCenter,
             GatewayManager gatewayManager,
-            INetworkingTrace trace)
+            INetworkingTrace trace,
+            ConnectionManager connectionManager,
+            ConnectionOptions connectionOptions)
             : base(connection, middleware, serviceProvider, trace)
         {
             this.messageFactory = messageFactory;
             this.messageCenter = messageCenter;
             this.gatewayManager = gatewayManager;
-            if (connection.RemoteEndPoint is IPEndPoint ipEndpoint)
-            {
-                this.TargetSilo = SiloAddress.New(ipEndpoint, 0);
-            }
+            this.connectionManager = connectionManager;
+            this.connectionOptions = connectionOptions;
+            this.RemoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
         }
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
-
-        private SiloAddress TargetSilo { get; }
+        
+        public SiloAddress RemoteSiloAddress { get; }
 
         protected override void OnReceivedMessage(Message message)
         {
@@ -70,12 +73,17 @@ namespace Orleans.Runtime.Messaging
             {
                 this.messageCenter.OnGatewayConnectionOpen();
 
-                await ConnectionPreamble.Write(this.Context, this.messageCenter.ClientId, siloAddress: null);
+                await ConnectionPreamble.Write(
+                    this.Context,
+                    this.messageCenter.ClientId,
+                    this.connectionOptions.ProtocolVersion,
+                    siloAddress: null);
+
                 await base.RunInternal();
             }
             finally
             {
-                if (this.TargetSilo != null) this.gatewayManager.MarkAsDead(this.TargetSilo);
+                this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this);
                 this.messageCenter.OnGatewayConnectionClosed();
             }
         }
@@ -94,7 +102,7 @@ namespace Orleans.Runtime.Messaging
 
             if (msg.TargetSilo != null) return true;
 
-            msg.TargetSilo = this.TargetSilo;
+            msg.TargetSilo = this.RemoteSiloAddress;
             if (msg.TargetGrain.IsSystemTarget)
                 msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, msg.TargetSilo);
 

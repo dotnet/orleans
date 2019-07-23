@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
 using Orleans.Networking.Shared;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Configuration
 {
     public class ConnectionOptions
     {
         private readonly ConnectionBuilderDelegates connectionBuilder = new ConnectionBuilderDelegates();
+
+        public NetworkProtocolVersion ProtocolVersion { get; set; } = NetworkProtocolVersion.Version2_0;
 
         internal void ConfigureConnection(Action<IConnectionBuilder> configure) => this.connectionBuilder.Add(configure);
 

@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Net;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -135,7 +133,7 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void RetryMessage(Message msg, Exception ex = null);
 
-        private void CloseInternal(ConnectionAbortedException exception)
+        private void CloseInternal(ConnectionAbortedException abortException)
         {
             try
             {
@@ -152,17 +150,18 @@ namespace Orleans.Runtime.Messaging
                 this.Context.Transport.Output.CancelPendingFlush();
                 this.outgoingMessageWriter.TryComplete();
 
-                if (exception == null)
+                if (abortException == null)
                 {
                     this.Context.Abort();
                 }
                 else
                 {
-                    this.Context.Abort(exception);
+                    this.Context.Abort(abortException);
                 }
             }
-            catch
+            catch (Exception exception)
             {
+                this.Log.LogWarning("Exception while closing connection: {Exception}", exception);
             }
         }
 
@@ -199,9 +198,7 @@ namespace Orleans.Runtime.Messaging
                 Message message = default;
                 while (true)
                 {
-                    var readResultTask = input.ReadAsync();
-                    var readResult = readResultTask.IsCompletedSuccessfully ? readResultTask.GetAwaiter().GetResult() : await readResultTask;
-
+                    var readResult = await input.ReadAsync();
                     var buffer = readResult.Buffer;
 
                     if (buffer.Length >= requiredBytes)
@@ -269,8 +266,7 @@ namespace Orleans.Runtime.Messaging
 
                 while (true)
                 {
-                    var moreTask = reader.WaitToReadAsync();
-                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask;
+                    var more = await reader.WaitToReadAsync();
                     if (!more)
                     {
                         break;

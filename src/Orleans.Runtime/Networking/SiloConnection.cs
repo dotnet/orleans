@@ -8,16 +8,16 @@ using Orleans.Networking.Shared;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class SiloConnection : Connection
+    internal sealed class SiloConnection : Connection, ISiloConnection
     {
         private readonly MessageCenter messageCenter;
         private readonly MessageFactory messageFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly ConnectionManager connectionManager;
-        private readonly SiloAddress myAddress;
-        private SiloAddress remoteSiloAddress;
+        private readonly ConnectionOptions connectionOptions;
 
         public SiloConnection(
+            SiloAddress remoteSiloAddress,
             ConnectionContext connection,
             ConnectionDelegate middleware,
             IServiceProvider serviceProvider,
@@ -26,17 +26,24 @@ namespace Orleans.Runtime.Messaging
             MessageFactory messageFactory,
             ILocalSiloDetails localSiloDetails,
             ISiloStatusOracle siloStatusOracle,
-            ConnectionManager connectionManager)
+            ConnectionManager connectionManager,
+            ConnectionOptions connectionOptions)
             : base(connection, middleware, serviceProvider, trace)
         {
             this.messageCenter = messageCenter;
             this.messageFactory = messageFactory;
             this.siloStatusOracle = siloStatusOracle;
             this.connectionManager = connectionManager;
-            this.myAddress = localSiloDetails.SiloAddress;
+            this.connectionOptions = connectionOptions;
+            this.LocalSiloAddress = localSiloDetails.SiloAddress;
+            this.RemoteSiloAddress = remoteSiloAddress;
         }
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
+
+        public SiloAddress RemoteSiloAddress { get; private set; }
+
+        public SiloAddress LocalSiloAddress { get; }
 
         protected override void OnReceivedMessage(Message msg)
         {
@@ -158,20 +165,46 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                await Task.WhenAll(ReadPreamble(), WritePreamble());
+                if (this.connectionOptions.ProtocolVersion == NetworkProtocolVersion.Version2_0)
+                {
+                    // This version of the protocol does not support symmetric preamble, so either send or receive preamble depending on
+                    // Whether or not this is an inbound or outbound connection.
+                    if (this.RemoteSiloAddress is null)
+                    {
+                        // Inbound connection
+                        await ReadPreamble();
+                    }
+                    else
+                    {
+                        // Outbound connection
+                        await WritePreamble();
+                    }
+                }
+                else
+                {
+                    // Later versions of the protocol send and receive preamble at both ends of the connection.
+                    await Task.WhenAll(ReadPreamble(), WritePreamble());
+                }
 
                 await base.RunInternal();
             }
             finally
             {
-                if (!(this.remoteSiloAddress is null)) this.connectionManager.OnConnectionTerminated(this.remoteSiloAddress, this);
+                if (!(this.RemoteSiloAddress is null)) this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this);
             }
 
-            Task WritePreamble() => ConnectionPreamble.Write(this.Context, Constants.SiloDirectConnectionId, this.myAddress);
+            async Task WritePreamble()
+            {
+                await ConnectionPreamble.Write(
+                    this.Context,
+                    Constants.SiloDirectConnectionId,
+                    this.connectionOptions.ProtocolVersion,
+                    this.LocalSiloAddress);
+            }
 
             async Task ReadPreamble()
             {
-                var (grainId, siloAddress) = await ConnectionPreamble.Read(this.Context);
+                var (grainId, _, siloAddress) = await ConnectionPreamble.Read(this.Context);
 
                 if (!grainId.Equals(Constants.SiloDirectConnectionId))
                 {
@@ -180,7 +213,7 @@ namespace Orleans.Runtime.Messaging
 
                 if (siloAddress != null)
                 {
-                    this.remoteSiloAddress = siloAddress;
+                    this.RemoteSiloAddress = siloAddress;
                     this.connectionManager.OnConnected(siloAddress, this);
                 }
             }
@@ -197,7 +230,7 @@ namespace Orleans.Runtime.Messaging
 
             // Fill in the outbound message with our silo address, if it's not already set
             if (msg.SendingSilo == null)
-                msg.SendingSilo = this.myAddress;
+                msg.SendingSilo = this.LocalSiloAddress;
 
             // If we know this silo is dead, don't bother
             if (msg.TargetSilo != null && this.siloStatusOracle.IsDeadSilo(msg.TargetSilo))
@@ -214,14 +247,14 @@ namespace Orleans.Runtime.Messaging
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug(ErrorCode.MessagingSendingRejection, "Silo {SiloAddress} is rejecting message: {Message}. Reason = {Reason}", this.myAddress, msg, reason);
+                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug(ErrorCode.MessagingSendingRejection, "Silo {SiloAddress} is rejecting message: {Message}. Reason = {Reason}", this.LocalSiloAddress, msg, reason);
 
                 // Done retrying, send back an error instead
-                this.messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}");
+                this.messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Silo {this.LocalSiloAddress} is rejecting message: {msg}. Reason = {reason}");
             }
             else
             {
-                this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {SiloAddress} is dropping message: {Message}. Reason = {Reason}", this.myAddress, msg, reason);
+                this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {SiloAddress} is dropping message: {Message}. Reason = {Reason}", this.LocalSiloAddress, msg, reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }
@@ -285,7 +318,7 @@ namespace Orleans.Runtime.Messaging
                 this.Log.LogWarning(
                     (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
                     "Silo {SiloAddress} is dropping message which failed during serialization: {Message}. Exception = {Exception}",
-                    this.myAddress,
+                    this.LocalSiloAddress,
                     msg,
                     exc);
 

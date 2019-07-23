@@ -128,7 +128,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunInternal()
         {
-            var (grainId, siloAddress) = await ConnectionPreamble.Read(this.Context);
+            var (grainId, _, siloAddress) = await ConnectionPreamble.Read(this.Context);
 
             if (grainId.Equals(Constants.SiloDirectConnectionId))
             {

@@ -46,6 +46,7 @@ namespace Orleans.Runtime.Messaging
         protected override Connection CreateConnection(ConnectionContext context)
         {
             return new SiloConnection(
+                default(SiloAddress),
                 context,
                 this.ConnectionDelegate,
                 this.ServiceProvider,
@@ -54,7 +55,8 @@ namespace Orleans.Runtime.Messaging
                 this.messageFactory,
                 this.localSiloDetails,
                 this.siloStatusOracle,
-                this.connectionManager);
+                this.connectionManager,
+                this.ConnectionOptions);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

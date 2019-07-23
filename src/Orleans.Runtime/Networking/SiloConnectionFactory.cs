@@ -13,6 +13,8 @@ namespace Orleans.Runtime.Messaging
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IServiceProvider serviceProvider;
         private readonly MessageFactory messageFactory;
+        private readonly object initializationLock = new object();
+        private bool isInitialized;
         private ConnectionManager connectionManager;
         private MessageCenter messageCenter;
 
@@ -33,12 +35,12 @@ namespace Orleans.Runtime.Messaging
             this.siloStatusOracle = siloStatusOracle;
         }
 
-        protected override Connection CreateConnection(ConnectionContext context)
+        protected override Connection CreateConnection(SiloAddress address, ConnectionContext context)
         {
-            if (this.messageCenter is null) this.messageCenter = this.serviceProvider.GetRequiredService<MessageCenter>();
-            if (this.connectionManager is null) this.connectionManager = this.serviceProvider.GetRequiredService<ConnectionManager>();
+            EnsureInitialized();
 
             return new SiloConnection(
+                address,
                 context,
                 this.ConnectionDelegate,
                 this.serviceProvider,
@@ -47,7 +49,24 @@ namespace Orleans.Runtime.Messaging
                 this.messageFactory,
                 this.localSiloDetails,
                 this.siloStatusOracle,
-                this.connectionManager);
+                this.connectionManager,
+                this.ConnectionOptions);
+        }
+
+        private void EnsureInitialized()
+        {
+            if (!isInitialized)
+            {
+                lock (this.initializationLock)
+                {
+                    if (!isInitialized)
+                    {
+                        this.messageCenter = this.serviceProvider.GetRequiredService<MessageCenter>();
+                        this.connectionManager = this.serviceProvider.GetRequiredService<ConnectionManager>();
+                        this.isInitialized = true;
+                    }
+                }
+            }
         }
     }
 }
