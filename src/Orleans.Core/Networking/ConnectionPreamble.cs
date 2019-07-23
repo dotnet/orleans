@@ -12,13 +12,14 @@ namespace Orleans.Runtime.Messaging
     {
         private const int MaxPreambleLength = 1024;
 
-        internal static async ValueTask Write(ConnectionContext connection, GrainId grainId, SiloAddress siloAddress)
+        internal static async ValueTask Write(ConnectionContext connection, GrainId grainId, NetworkProtocolVersion protocolVersion, SiloAddress siloAddress)
         {
             var output = connection.Transport.Output;
             var outputWriter = new PrefixingBufferWriter<byte, PipeWriter>(output, sizeof(int), 1024, MemoryPool<byte>.Shared);
             var writer = new BinaryTokenStreamWriter2<PrefixingBufferWriter<byte, PipeWriter>>(outputWriter);
 
             writer.Write(grainId);
+            writer.Write((byte)protocolVersion);
 
             if (siloAddress is null)
             {
@@ -57,7 +58,7 @@ namespace Orleans.Runtime.Messaging
             outputWriter.Complete(lengthSpan);
         }
 
-        internal static async ValueTask<(GrainId, SiloAddress)> Read(ConnectionContext connection)
+        internal static async ValueTask<(GrainId, NetworkProtocolVersion, SiloAddress)> Read(ConnectionContext connection)
         {
             var input = connection.Transport.Input;
 
@@ -102,8 +103,10 @@ namespace Orleans.Runtime.Messaging
 
             if (reader.Position >= payloadBuffer.Length)
             {
-                return (grainId, default);
+                return (grainId, NetworkProtocolVersion.Version1, default);
             }
+
+            var protocolVersion = (NetworkProtocolVersion)reader.ReadByte();
 
             SiloAddress siloAddress;
             var token = reader.ReadToken();
@@ -119,7 +122,7 @@ namespace Orleans.Runtime.Messaging
                     throw new NotSupportedException("Unexpected token while reading connection preamble. Expected SiloAddress, encountered " + token);
             }
 
-            return (grainId, siloAddress);
+            return (grainId, protocolVersion, siloAddress);
 
             void CheckForCompletion(ref ReadResult r)
             {

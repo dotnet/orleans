@@ -14,6 +14,7 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageCenter messageCenter;
         private readonly ILocalSiloDetails siloDetails;
         private readonly MultiClusterOptions multiClusterOptions;
+        private readonly ConnectionOptions connectionOptions;
         private readonly Gateway gateway;
         private readonly OverloadDetector overloadDetector;
         private readonly MessageFactory messageFactory;
@@ -32,11 +33,13 @@ namespace Orleans.Runtime.Messaging
             INetworkingTrace trace,
             ILocalSiloDetails siloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
+            ConnectionOptions connectionOptions,
             MessageCenter messageCenter,
             ILocalSiloDetails localSiloDetails,
             ISiloStatusOracle siloStatusOracle)
             : base(connection, middleware, serviceProvider, trace)
         {
+            this.connectionOptions = connectionOptions;
             this.gateway = gateway;
             this.overloadDetector = overloadDetector;
             this.messageFactory = messageFactory;
@@ -128,7 +131,16 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunInternal()
         {
-            var (grainId, siloAddress) = await ConnectionPreamble.Read(this.Context);
+            var (grainId, protocolVersion, siloAddress) = await ConnectionPreamble.Read(this.Context);
+
+            if (protocolVersion >= NetworkProtocolVersion.Version2)
+            {
+                await ConnectionPreamble.Write(
+                    this.Context,
+                    Constants.SiloDirectConnectionId,
+                    this.connectionOptions.ProtocolVersion,
+                    this.myAddress);
+            }
 
             if (grainId.Equals(Constants.SiloDirectConnectionId))
             {

@@ -13,8 +13,11 @@ namespace Orleans.Runtime.Messaging
         private readonly IServiceProvider serviceProvider;
         private readonly MessageFactory messageFactory;
         private readonly INetworkingTrace trace;
+        private readonly object initializationLock = new object();
+        private bool isInitialized;
         private GatewayManager gatewayManager;
         private ClientMessageCenter messageCenter;
+        private ConnectionManager connectionManager;
 
         public ClientOutboundConnectionFactory(
             IServiceProvider serviceProvider,
@@ -29,18 +32,38 @@ namespace Orleans.Runtime.Messaging
             this.trace = trace;
         }
 
-        protected override Connection CreateConnection(ConnectionContext context)
+        protected override Connection CreateConnection(SiloAddress address, ConnectionContext context)
         {
-            if (this.messageCenter is null) this.messageCenter = this.serviceProvider.GetRequiredService<ClientMessageCenter>();
-            if (this.gatewayManager is null) this.gatewayManager = this.serviceProvider.GetRequiredService<GatewayManager>();
+            EnsureInitialized();
+
             return new ClientOutboundConnection(
+                address,
                 context,
                 this.ConnectionDelegate,
                 this.messageFactory,
                 this.serviceProvider,
                 this.messageCenter,
                 this.gatewayManager,
-                this.trace);
+                this.trace,
+                this.connectionManager,
+                this.ConnectionOptions);
+        }
+
+        private void EnsureInitialized()
+        {
+            if (!isInitialized)
+            {
+                lock (this.initializationLock)
+                {
+                    if (!isInitialized)
+                    {
+                        this.messageCenter = this.serviceProvider.GetRequiredService<ClientMessageCenter>();
+                        this.gatewayManager = this.serviceProvider.GetRequiredService<GatewayManager>();
+                        this.connectionManager = this.serviceProvider.GetRequiredService<ConnectionManager>();
+                        this.isInitialized = true;
+                    }
+                }
+            }
         }
     }
 }
