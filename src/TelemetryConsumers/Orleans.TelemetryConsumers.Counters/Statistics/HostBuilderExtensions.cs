@@ -21,6 +21,19 @@ namespace Orleans.Statistics
                 services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, PerfCounterEnvironmentStatistics>();
             });
         }
+
+        /// <summary>
+        /// Use Windows performance counters as source for host environment statistics
+        /// </summary>
+        public static ISiloBuilder UsePerfCounterEnvironmentStatistics(this ISiloBuilder builder)
+        {
+            return builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<PerfCounterEnvironmentStatistics>();
+                services.AddFromExisting<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>();
+                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, PerfCounterEnvironmentStatistics>();
+            });
+        }
     }
 
     public static class ClientBuilderExtensions
