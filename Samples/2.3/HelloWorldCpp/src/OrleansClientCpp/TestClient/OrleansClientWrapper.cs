@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using HelloWorld.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -59,7 +59,7 @@ namespace TestClient
             friend.SayHello("Good morning, my friend!").ContinueWith(async task =>
             {
                 var msg = await task;
-                _logger.LogInformation("\n\n{0} - \n\n", msg, "C#");
+                _logger.LogInformation("\n\n{0} - {1}\n\n", msg, "C#");
                 callback(msg);
             }).ConfigureAwait(false);
         }

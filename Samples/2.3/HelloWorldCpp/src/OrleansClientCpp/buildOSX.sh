@@ -13,7 +13,6 @@ fi
 
 # Build managed component
 echo Building Orleans TestClient Managed
-echo dotnet publish --self-contained -r osx-x64 ${SRCDIR}/TestClient/TestClient.csproj -o ${OUTDIR}
 dotnet publish --self-contained -r osx-x64 ${SRCDIR}/TestClient/TestClient.csproj -o ${OUTDIR}
 
 # Build native component

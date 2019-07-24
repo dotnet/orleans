@@ -1,9 +1,9 @@
 #/bin/bash
 
-dotnet restore
-dotnet build --no-restore
+dotnet restore HelloWorld.Build.sln
+dotnet build HelloWorld.Build.sln --no-restore
 cd src/OrleansClientCpp
-./build.sh
+./buildOSX.sh
 chmod +x bin/osx/ClientCpp
 cd ../../
 
@@ -12,4 +12,6 @@ cd ../../
 dotnet run --project ./src/SiloHost --no-build &
 sleep 10
 cd src/OrleansClientCpp/bin/osx/
-./ClientCpp &
+./ClientCpp
+cd ../../
+killall dotnet
