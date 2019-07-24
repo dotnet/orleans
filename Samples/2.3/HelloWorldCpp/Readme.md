@@ -10,6 +10,8 @@ The C++ code is based on .Net Team's sample to host the .Net Core CLR. It was ju
 ## Build and run the sample in Windows
 The easiest way to build and run the sample in Windows is to execute the `BuildAndRun.ps1` PowerShell script.
 
+> .Net Core runtime is a 64bit binary. Since this is a native application, in order to build it correctly on Windows, run `BuildAndRun.ps1` from `Visual Studio Native x64 Command Prompt`.
+
 ## Build and run the sample in non-Windows platforms
 On other platforms you will have to either first build the NuGet packages in a Windows machine (calling `Build.cmd netstandard`) and then make them available in the target platform, 
 or use the pre-release packages published in MyGet (see https://dotnet.myget.org/gallery/orleans-prerelease for more information on how to add the feed).
@@ -30,4 +32,7 @@ dotnet restore
 ```
 
 #### Running the sample
-As this sample requires some of the C++ tooling installed and to simplify running it (and avoid to install many dependencies on Visual Studio), just open the VSCode workspace and run from it. Make sure you have C++ extensions for VSCode from Microsoft installed.
+
+- VSCode: Open the `HelloWorld.code-workspace` on VSCode and run it.
+- Visual Studio 2017/2019: Install the C++ workload from Visual Studio 2017/2019 Installer. Open the `HelloWorld.sln` and run both `SiloHost` and `OrleansClientCpp` projects.
+
