@@ -7,6 +7,27 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.3.6] (changes since 2.3.5)
+
+- Non-breaking improvements
+  - ClusterClient: only call IRuntimeClient.Reset for OutsideRuntimeClient (#5694)
+  - CodeGenerator: skip empty projects (#5689)
+  - Add UseAzureTableReminderService OptionsBuilder overload (#5703)
+  - Dispose TestCluster after tests (#5715)
+  - Add validator for DevelopmentClusterMembershipOptions (#5721)
+  - Fix CategoryDiscoverer first-chance exception while debugging (#5710)
+  - Configure application parts in UseTransactions (#5741)
+  - Added better type handling to DynamoDB deserialization (#5764)
+
+- Non-breaking bug fixes
+  - Fix the test trace file name on Unix systems (#5708)
+  - Fixed DynamoDB reminder issue (#5739)
+  - Fix incorrectly configured listening ports in tests (#5751)
+  - Fix concurrency bug in TestCluster (#5754)
+  - Replace Environment.FailFast with Environment.Exit (#5759)
+  - Fix OnCompleteAsync & OnErrorAsync in StreamImpl. (#5769)
+  - Fix exception in LatestVersionSelector when there are no deployed versions of a grain. (#5720)
+
 ### [2.3.5] (changes since 2.3.4)
 
 - Non-breaking improvements
