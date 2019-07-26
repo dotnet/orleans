@@ -167,7 +167,10 @@ namespace Orleans.Runtime.Messaging
                 if (!(this.remoteSiloAddress is null)) this.connectionManager.OnConnectionTerminated(this.remoteSiloAddress, this);
             }
 
-            Task WritePreamble() => ConnectionPreamble.Write(this.Context, Constants.SiloDirectConnectionId, this.myAddress);
+            async Task WritePreamble()
+            {
+                await ConnectionPreamble.Write(this.Context, Constants.SiloDirectConnectionId, this.myAddress);
+            }
 
             async Task ReadPreamble()
             {

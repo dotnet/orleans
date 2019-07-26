@@ -12,14 +12,24 @@ namespace Orleans.Runtime.Messaging
     {
         private const int MaxPreambleLength = 1024;
 
-        internal static Task Write(ConnectionContext connection, GrainId grainId, SiloAddress siloAddress)
+        internal static async ValueTask Write(ConnectionContext connection, GrainId grainId, SiloAddress siloAddress)
         {
             var output = connection.Transport.Output;
             var outputWriter = new PrefixingBufferWriter<byte, PipeWriter>(output, sizeof(int), 1024, MemoryPool<byte>.Shared);
             var writer = new BinaryTokenStreamWriter2<PrefixingBufferWriter<byte, PipeWriter>>(outputWriter);
 
             writer.Write(grainId);
-            if (!(siloAddress is null)) writer.Write(siloAddress);
+
+            if (siloAddress is null)
+            {
+                writer.WriteNull();
+            }
+            else
+            {
+                writer.Write((byte)SerializationTokenType.SiloAddress);
+                writer.Write(siloAddress);
+            }
+
             writer.Commit();
 
             var length = outputWriter.CommittedBytes;
@@ -29,17 +39,25 @@ namespace Orleans.Runtime.Messaging
                 throw new InvalidOperationException($"Created preamble of length {length}, which is greater than maximum allowed size of {MaxPreambleLength}.");
             }
 
+            WriteLength(outputWriter, length);
+
+            var flushResult = await output.FlushAsync();
+            if (flushResult.IsCanceled)
+            {
+                throw new OperationCanceledException("Flush canceled");
+            }
+
+            return;
+        }
+
+        private static void WriteLength(PrefixingBufferWriter<byte, PipeWriter> outputWriter, int length)
+        {
             Span<byte> lengthSpan = stackalloc byte[4];
             BinaryPrimitives.WriteInt32LittleEndian(lengthSpan, length);
             outputWriter.Complete(lengthSpan);
-            
-            var flushTask = output.FlushAsync();
-
-            if (flushTask.IsCompletedSuccessfully) return Task.CompletedTask;
-            return flushTask.AsTask();
         }
-                
-        internal static async Task<(GrainId, SiloAddress)> Read(ConnectionContext connection)
+
+        internal static async ValueTask<(GrainId, SiloAddress)> Read(ConnectionContext connection)
         {
             var input = connection.Transport.Input;
 
@@ -81,10 +99,24 @@ namespace Orleans.Runtime.Messaging
 
             var reader = new BinaryTokenStreamReader2(payloadBuffer);
             var grainId = reader.ReadGrainId();
-            SiloAddress siloAddress = null;
-            if (reader.Position < payloadBuffer.Length)
+
+            if (reader.Position >= payloadBuffer.Length)
             {
-                siloAddress = reader.ReadSiloAddress();
+                return (grainId, default);
+            }
+
+            SiloAddress siloAddress;
+            var token = reader.ReadToken();
+            switch (token)
+            {
+                case SerializationTokenType.Null:
+                    siloAddress = null;
+                    break;
+                case SerializationTokenType.SiloAddress:
+                    siloAddress = reader.ReadSiloAddress();
+                    break;
+                default:
+                    throw new NotSupportedException("Unexpected token while reading connection preamble. Expected SiloAddress, encountered " + token);
             }
 
             return (grainId, siloAddress);
