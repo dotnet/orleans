@@ -1,4 +1,4 @@
-﻿@page "/todo"
+@page "/todo"
 @inject TodoService TodoService
 @implements IDisposable
 
@@ -20,7 +20,7 @@
 }
 
 <input placeholder="Something todo" @bind="@newTodo" />
-<button @onclick="@AddTodoAsync">Add Todo</button>
+<button @onclick="AddTodoAsync">Add Todo</button>
 
 @code {
 

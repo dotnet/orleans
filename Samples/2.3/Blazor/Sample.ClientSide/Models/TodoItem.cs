@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Sample.ClientSide.Models
 {
@@ -18,7 +18,9 @@ namespace Sample.ClientSide.Models
                 && OwnerKey == other.OwnerKey;
         }
 
+        /*
         public override int GetHashCode() =>
             HashCode.Combine(Key, Title, IsDone, OwnerKey);
+        */
     }
 }

@@ -1,19 +1,23 @@
-﻿using Orleans;
-using Orleans.Runtime;
-using Sample.Grains.Models;
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans;
+using Orleans.Runtime;
+using Sample.Grains.Models;
 
 namespace Sample.Grains
 {
     public class TodoGrain : Grain, ITodoGrain
     {
+        private readonly ILogger<TodoGrain> logger;
         private readonly IPersistentState<State> state;
 
+        private string GrainType => nameof(TodoGrain);
         private Guid GrainKey => this.GetPrimaryKey();
 
-        public TodoGrain([PersistentState("State")] IPersistentState<State> state)
+        public TodoGrain(ILogger<TodoGrain> logger, [PersistentState("State")] IPersistentState<State> state)
         {
+            this.logger = logger;
             this.state = state;
         }
 
@@ -34,6 +38,11 @@ namespace Sample.Grains
             // register the item with its owner list
             await GrainFactory.GetGrain<ITodoManagerGrain>(item.OwnerKey)
                 .RegisterAsync(item.Key);
+
+            // for sample debugging
+            logger.LogInformation(
+                "{@GrainType} {@GrainKey} now contains {@Todo}",
+                GrainType, GrainKey, item);
 
             // notify listeners - best effort only
             GetStreamProvider("SMS").GetStream<TodoNotification>(item.OwnerKey, nameof(ITodoGrain))
@@ -56,6 +65,11 @@ namespace Sample.Grains
 
             // clear the state
             await state.ClearStateAsync();
+
+            // for sample debugging
+            logger.LogInformation(
+                "{@GrainType} {@GrainKey} is now cleared",
+                GrainType, GrainKey);
 
             // notify listeners - best effort only
             GetStreamProvider("SMS").GetStream<TodoNotification>(ownerKey, nameof(ITodoGrain))
