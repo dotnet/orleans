@@ -4,7 +4,7 @@ Orleans ASP.NET Core Blazor Sample targetting:
 
 * .NET Core 3.0 Preview
 * Blazor 3.0 Preview
-* Orleans 2.3.5
+* Orleans 2.3.6
 
 This sample demonstrates how to integrate [ASP.NET Core Blazor](https://docs.microsoft.com/en-us/aspnet/core/blazor/?view=aspnetcore-3.0)
 with [Microsoft Orleans](https://dotnet.github.io/orleans/). This demonstrates both client-side and server-side Blazor hosting models.
@@ -15,7 +15,7 @@ The client-side sample application leverages ASP.NET Web API running alongside O
 
 Both applications are based on the [official tutorial](https://docs.microsoft.com/en-us/aspnet/core/tutorials/build-your-first-blazor-app?view=aspnetcore-3.0), adapted to showcase integration with Orleans.
 
-Note that at the time of building this sample, Blazor is still in preview, so expect things to change.
+Note that at the time of building this sample, Blazor is still in preview, so expect things to change and break.
 
 ### Prerequisites
 
