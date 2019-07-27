@@ -11,9 +11,9 @@
     <PackageReference Include="Microsoft.AspNetCore" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Versioning.ApiExplorer" Version="3.2.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="2.2.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="2.2.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="3.0.0-preview7.19362.4" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="3.0.0-preview7.19362.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="3.0.0-preview7.19362.4" />
     <PackageReference Include="Microsoft.Orleans.Server" Version="2.3.6" />
     <PackageReference Include="OrleansDashboard" Version="2.3.6" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="4.0.1" />

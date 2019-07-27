@@ -2,8 +2,8 @@
 
 Orleans ASP.NET Core Blazor Sample targetting:
 
-* .NET Core 3.0 Preview
-* Blazor 3.0 Preview
+* .NET Core 3.0 Preview 7
+* Blazor 3.0 Preview 7
 * Orleans 2.3.6
 
 This sample demonstrates how to integrate [ASP.NET Core Blazor](https://docs.microsoft.com/en-us/aspnet/core/blazor/?view=aspnetcore-3.0)
@@ -20,8 +20,8 @@ Note that at the time of building this sample, Blazor is still in preview, so ex
 ### Prerequisites
 
 * Visual Studio 2019 Preview
-* .NET Core 3.0 Preview SDK
-* Blazor 3.0 Preview Extensions 
+* .NET Core 3.0 Preview 7 SDK
+* Blazor 3.0 Preview Extensions
 
 ### How To Run
 
