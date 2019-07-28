@@ -1,9 +1,10 @@
-﻿using Microsoft.AspNetCore;
+using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Swashbuckle.AspNetCore.Swagger;
 using System.Threading;
@@ -15,10 +16,15 @@ namespace Sample.Silo.Api
     {
         private readonly IWebHost host;
 
-        public ApiService(IGrainFactory factory)
+        public ApiService(IGrainFactory factory, ILoggerProvider loggerProvider)
         {
             host = WebHost
                 .CreateDefaultBuilder()
+                .ConfigureLogging(logging =>
+                {
+                    logging.ClearProviders();
+                    logging.AddProvider(loggerProvider);
+                })
                 .ConfigureServices(services =>
                 {
                     services.AddSingleton(factory);

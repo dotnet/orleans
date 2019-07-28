@@ -1,4 +1,4 @@
-﻿@page "/fetchdata"
+@page "/fetchdata"
 @inject ApiService ApiService
 
 <h1>Weather forecast</h1>
@@ -34,7 +34,7 @@ else
     </table>
 }
 
-@functions {
+@code {
 
     private WeatherInfo[] forecasts;
 

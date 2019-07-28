@@ -1,13 +1,14 @@
-﻿using Microsoft.Extensions.Configuration;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using Orleans;
 using Orleans.Hosting;
 using Sample.Grains;
 using Sample.Silo.Api;
-using System.Threading.Tasks;
+using Serilog;
+using Serilog.Events;
 
 namespace Sample.Silo
 {
@@ -22,9 +23,13 @@ namespace Sample.Silo
                 })
                 .ConfigureLogging(builder =>
                 {
-                    builder.AddConsole();
                     builder.AddFilter("Orleans.Runtime.Management.ManagementGrain", LogLevel.Warning);
                     builder.AddFilter("Orleans.Runtime.SiloControl", LogLevel.Warning);
+                    builder.AddSerilog(new LoggerConfiguration()
+                        .WriteTo.Console()
+                        .Filter.ByExcluding(e => e.Properties["SourceContext"].ToString() == @"""Orleans.Runtime.Management.ManagementGrain""" && e.Level < LogEventLevel.Warning)
+                        .Filter.ByExcluding(e => e.Properties["SourceContext"].ToString() == @"""Orleans.Runtime.SiloControl""" && e.Level < LogEventLevel.Warning)
+                        .CreateLogger());
                 })
                 .ConfigureServices(services =>
                 {

@@ -6,8 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Client" Version="2.3.5" />
-    <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="2.3.5" />
+    <PackageReference Include="Microsoft.Orleans.Client" Version="2.3.6" />
+    <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="2.3.6" />
   </ItemGroup>
 
   <ItemGroup>
