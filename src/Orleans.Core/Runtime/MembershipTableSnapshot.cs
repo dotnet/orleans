@@ -2,7 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.Text;
 
-namespace Orleans.Runtime.MembershipService
+namespace Orleans.Runtime
 {
     internal sealed class MembershipTableSnapshot
     {
