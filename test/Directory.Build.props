@@ -24,9 +24,8 @@
     <TargetFramework>$(TestProjectTargetFramework)</TargetFramework>
   </PropertyGroup>
 
-  <!-- To make CodeLens and Test Explorer happy, we're generating full symbols -->
   <PropertyGroup>
-    <DebugType>full</DebugType>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <!-- Needed for to not to have failed tests because wrong binding redirects were generated for older packages -->
