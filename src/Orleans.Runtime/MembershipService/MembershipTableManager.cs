@@ -572,7 +572,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                await this.gossiper.GossipToRemoteSilos(gossipPartners, MembershipTableSnapshot);
+                await this.gossiper.GossipToRemoteSilos(gossipPartners, MembershipTableSnapshot, updatedSilo, updatedStatus);
             }
             catch (Exception exception)
             {

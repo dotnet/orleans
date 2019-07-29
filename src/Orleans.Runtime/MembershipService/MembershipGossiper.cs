@@ -17,15 +17,22 @@ namespace Orleans.Runtime.MembershipService
             this.log = log;
         }
 
-        public Task GossipToRemoteSilos(List<SiloAddress> gossipPartners, MembershipTableSnapshot snapshot)
+        public Task GossipToRemoteSilos(
+            List<SiloAddress> gossipPartners,
+            MembershipTableSnapshot snapshot,
+            SiloAddress updatedSilo,
+            SiloStatus updatedStatus)
         {
             if (gossipPartners.Count == 0) return Task.CompletedTask;
 
             this.log.LogInformation(
-                "Gossiping status change to {NumPartners} partners",
+                "Gossiping {Silo} status change to {Status} to {NumPartners} partners",
+                updatedSilo,
+                updatedStatus,
                 gossipPartners.Count);
+
             var systemTarget = this.serviceProvider.GetRequiredService<MembershipSystemTarget>();
-            return systemTarget.GossipToRemoteSilos(gossipPartners, snapshot);
+            return systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus);
         }
     }
 }

@@ -83,14 +83,18 @@ namespace Orleans.Runtime.MembershipService
             return this.ScheduleTask(Probe);
         }
 
-        public Task GossipToRemoteSilos(List<SiloAddress> gossipPartners, MembershipTableSnapshot snapshot)
+        public Task GossipToRemoteSilos(
+            List<SiloAddress> gossipPartners,
+            MembershipTableSnapshot snapshot,
+            SiloAddress updatedSilo,
+            SiloStatus updatedStatus)
         {
             async Task Gossip()
             {
                 var tasks = new List<Task>(gossipPartners.Count);
                 foreach (var silo in gossipPartners)
                 {
-                    tasks.Add(this.GossipToRemoteSilo(silo, snapshot));
+                    tasks.Add(this.GossipToRemoteSilo(silo, snapshot, updatedSilo, updatedStatus));
                 }
 
                 await Task.WhenAll(tasks);
@@ -99,19 +103,33 @@ namespace Orleans.Runtime.MembershipService
             return this.ScheduleTask(Gossip);
         }
 
-        private async Task GossipToRemoteSilo(SiloAddress silo, MembershipTableSnapshot snapshot)
+        private async Task GossipToRemoteSilo(
+            SiloAddress silo,
+            MembershipTableSnapshot snapshot,
+            SiloAddress updatedSilo,
+            SiloStatus updatedStatus)
         {
             if (this.log.IsEnabled(LogLevel.Trace))
             {
                 this.log.LogTrace(
-                    "-Sending status update GOSSIP notification to silo {RemoteSilo}",
+                    "-Sending status update GOSSIP notification about silo {UpdatedSilo}, status {UpdatedStatus}, to silo {RemoteSilo}",
+                    updatedSilo,
+                    updatedStatus,
                     silo);
             }
 
             try
             {
                 var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
-                await remoteOracle.MembershipChangeNotification(snapshot);
+                try
+                {
+                    await remoteOracle.MembershipChangeNotification(snapshot);
+                }
+                catch (NotImplementedException)
+                {
+                    // Fallback to "old" gossip
+                    await remoteOracle.SiloStatusChangeNotification(updatedSilo, updatedStatus);
+                }
             }
             catch (Exception exception)
             {
