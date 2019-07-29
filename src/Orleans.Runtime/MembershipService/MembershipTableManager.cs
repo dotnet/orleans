@@ -103,7 +103,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             // If we are behind, let's take directly the snapshot in param
-            this.updates.Publish(snapshot);
+            this.updates.TryPublish(snapshot);
         }
 
         private async Task<bool> RefreshInternal(bool requireCleanup)
