@@ -5,28 +5,30 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Networking.Shared;
 
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class ConnectionManager
     {
-        private static readonly TimeSpan CONNECTION_RETRY_DELAY = TimeSpan.FromMilliseconds(1000);
-        private const int MaxConnectionsPerEndpoint = 1;
-
         [ThreadStatic]
         private static int nextConnection;
 
         private readonly ConcurrentDictionary<SiloAddress, ConnectionEntry> connections = new ConcurrentDictionary<SiloAddress, ConnectionEntry>();
+        private readonly ConnectionOptions connectionOptions;
         private readonly ConnectionFactory connectionFactory;
         private readonly INetworkingTrace trace;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly object collectionLock = new object();
 
         public ConnectionManager(
+            IOptions<ConnectionOptions> connectionOptions,
             ConnectionFactory connectionBuilder,
             INetworkingTrace trace)
         {
+            this.connectionOptions = connectionOptions.Value;
             this.connectionFactory = connectionBuilder;
             this.trace = trace;
         }
@@ -51,7 +53,7 @@ namespace Orleans.Runtime.Messaging
 
         public ValueTask<Connection> GetConnection(SiloAddress endpoint)
         {
-            if (this.connections.TryGetValue(endpoint, out var entry) && entry.Connections.Length >= MaxConnectionsPerEndpoint)
+            if (this.connections.TryGetValue(endpoint, out var entry) && entry.Connections.Length >= this.connectionOptions.ConnectionsPerEndpoint)
             {
                 var result = entry.Connections;
                 nextConnection = (nextConnection + 1) % result.Length;
@@ -74,7 +76,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     entry = GetOrCreateEntry(endpoint, ref acquiredConnectionLock);
 
-                    if (entry.Connections.Length >= MaxConnectionsPerEndpoint)
+                    if (entry.Connections.Length >= this.connectionOptions.ConnectionsPerEndpoint)
                     {
                         result = entry.Connections;
                         break;
@@ -88,6 +90,7 @@ namespace Orleans.Runtime.Messaging
 
                 // Attempt to connect.
                 Connection connection = default;
+                var now = DateTime.UtcNow;
                 try
                 {
                     connection = await this.ConnectAsync(endpoint);
@@ -96,7 +99,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 catch (Exception exception)
                 {
-                    OnConnectionFailed(endpoint, DateTime.UtcNow);
+                    OnConnectionFailed(endpoint, now);
                     throw new ConnectionFailedException(
                         $"Unable to connect to endpoint {endpoint}. See {nameof(exception.InnerException)}", exception);
                 }
@@ -154,10 +157,8 @@ namespace Orleans.Runtime.Messaging
                 {
                     entry = this.GetOrCreateEntry(address, ref acquiredConnectionLock);
 
-                    // Do not add a connection multiple times.
-                    if (entry.Connections.Contains(connection)) return entry;
-
-                    return this.connections[address] = entry.WithConnections(entry.Connections.Add(connection)).WithLastFailure(default);
+                    var newConnections = entry.Connections.Contains(connection) ? entry.Connections : entry.Connections.Add(connection);
+                    return this.connections[address] = entry.WithConnections(newConnections).WithLastFailure(default);
                 }
                 finally
                 {
@@ -176,7 +177,7 @@ namespace Orleans.Runtime.Messaging
         {
             TimeSpan delta;
             if (entry.LastFailure.HasValue
-                && (delta = DateTime.UtcNow.Subtract(entry.LastFailure.Value)) < CONNECTION_RETRY_DELAY)
+                && (delta = DateTime.UtcNow.Subtract(entry.LastFailure.Value)) < this.connectionOptions.ConnectionRetryDelay)
             {
                 throw new ConnectionFailedException($"Unable to connect to {address}, will retry after {delta.TotalMilliseconds}ms");
             }
