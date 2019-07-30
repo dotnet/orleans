@@ -8,13 +8,13 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class MessageSerializer : IMessageSerializer
     {
-        private readonly OrleansSerializer<Message.HeadersContainer> messageHeadersSerializer;
+        private readonly HeadersSerializer headersSerializer;
         private readonly OrleansSerializer<object> objectSerializer;
         private readonly MemoryPool<byte> memoryPool;
 
         public MessageSerializer(SerializationManager serializationManager, SharedMemoryPool memoryPool)
         {
-            this.messageHeadersSerializer = new OrleansSerializer<Message.HeadersContainer>(serializationManager);
+            this.headersSerializer = new HeadersSerializer(serializationManager);
             this.objectSerializer = new OrleansSerializer<object>(serializationManager);
             this.memoryPool = memoryPool.Pool;
         }
@@ -60,7 +60,7 @@ namespace Orleans.Runtime.Messaging
             // build message
             try
             {
-                this.messageHeadersSerializer.Deserialize(header, out var headersContainer);
+                this.headersSerializer.Deserialize(header, out var headersContainer);
                 message = new Message
                 {
                     Headers = headersContainer
@@ -84,7 +84,7 @@ namespace Orleans.Runtime.Messaging
             var buffer = new PrefixingBufferWriter<byte, TBufferWriter>(writer, 8, 4096, this.memoryPool);
             Span<byte> lengthFields = stackalloc byte[8];
 
-            this.messageHeadersSerializer.Serialize(buffer, message.Headers);
+            this.headersSerializer.Serialize(buffer, message.Headers);
             var headerLength = buffer.CommittedBytes;
 
             this.objectSerializer.Serialize(buffer, message.BodyObject);
@@ -142,6 +142,58 @@ namespace Orleans.Runtime.Messaging
                 try
                 {
                     SerializationManager.SerializeInner(this.serializationManager, value, typeof(T), this.serializationContext, writer);
+                }
+                finally
+                {
+                    writer.Commit();
+                    this.serializationContext.Reset();
+                }
+            }
+        }
+
+        private sealed class HeadersSerializer
+        {
+            private readonly BinaryTokenStreamReader2 reader = new BinaryTokenStreamReader2();
+            private readonly SerializationContext serializationContext;
+            private readonly DeserializationContext deserializationContext;
+
+            public HeadersSerializer(SerializationManager serializationManager)
+            {
+                this.serializationContext = new SerializationContext(serializationManager);
+                this.deserializationContext = new DeserializationContext(serializationManager)
+                {
+                    StreamReader = this.reader
+                };
+            }
+
+            public void Deserialize(ReadOnlySequence<byte> input, out Message.HeadersContainer value)
+            {
+                try
+                {
+                    reader.PartialReset(input);
+                    value = (Message.HeadersContainer)Message.HeadersContainer.Deserializer(null, this.deserializationContext);
+                }
+                finally
+                {
+                    this.deserializationContext.Reset();
+                }
+            }
+
+            public void Serialize<TBufferWriter>(TBufferWriter output, Message.HeadersContainer value) where TBufferWriter : IBufferWriter<byte>
+            {
+                var streamWriter = this.serializationContext.StreamWriter;
+                if (streamWriter is BinaryTokenStreamWriter2<TBufferWriter> writer)
+                {
+                    writer.PartialReset(output);
+                }
+                else
+                {
+                    this.serializationContext.StreamWriter = writer = new BinaryTokenStreamWriter2<TBufferWriter>(output);
+                }
+
+                try
+                {
+                    Message.HeadersContainer.Serializer(value, this.serializationContext, null);
                 }
                 finally
                 {
