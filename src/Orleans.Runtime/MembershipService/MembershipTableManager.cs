@@ -317,6 +317,10 @@ namespace Orleans.Runtime.MembershipService
                     updateTask.Ignore();
                     await Task.WhenAny(Task.Delay(TimeSpan.FromMilliseconds(500)), updateTask);
 
+                    var gossipTask = this.GossipToOthers(this.myAddress, status);
+                    gossipTask.Ignore();
+                    await Task.WhenAny(Task.Delay(TimeSpan.FromMilliseconds(500)), gossipTask);
+
                     this.CurrentStatus = status;
                     return;
                 }
