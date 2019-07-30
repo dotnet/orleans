@@ -21,7 +21,7 @@ namespace Orleans.Transactions
     public class TransactionalState<TState> : ITransactionalState<TState>, ILifecycleParticipant<IGrainLifecycle>
         where TState : class, new()
     {
-        private readonly ITransactionalStateConfiguration config;
+        private readonly TransactionalStateConfiguration config;
         private readonly IGrainActivationContext context;
         private readonly ITransactionDataCopier<TState> copier;
         private readonly Dictionary<Type,object> copiers;
@@ -39,7 +39,7 @@ namespace Orleans.Transactions
         private bool detectReentrancy;
 
         public TransactionalState(
-            ITransactionalStateConfiguration transactionalStateConfiguration, 
+            TransactionalStateConfiguration transactionalStateConfiguration, 
             IGrainActivationContext context, 
             ITransactionDataCopier<TState> copier, 
             IProviderRuntime runtime,
@@ -209,7 +209,7 @@ namespace Orleans.Transactions
         {
             if (ct.IsCancellationRequested) return;
 
-            this.participantId = new ParticipantId(this.config.StateName, this.context.GrainInstance.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.Manager);
+            this.participantId = new ParticipantId(this.config.StateName, this.context.GrainInstance.GrainReference, this.config.SupportedRoles);
 
             this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.context.GrainIdentity.IdentityString}");
 
