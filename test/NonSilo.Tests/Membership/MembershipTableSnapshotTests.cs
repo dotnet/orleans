@@ -1,8 +1,7 @@
-﻿using System;
+using System;
 using System.Linq;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.MembershipService;
 using Xunit;
 
 namespace NonSilo.Tests.Membership

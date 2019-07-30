@@ -145,7 +145,7 @@ namespace NonSilo.Tests.Membership
             // Transition to joining.
             this.membershipGossiper.ClearReceivedCalls();
             await manager.UpdateStatus(SiloStatus.Joining);
-            await this.membershipGossiper.ReceivedWithAnyArgs().GossipToRemoteSilos(default, default, default);
+            await this.membershipGossiper.ReceivedWithAnyArgs().GossipToRemoteSilos(default, default, default, default);
             Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
             Assert.Equal(SiloStatus.Joining, manager.MembershipTableSnapshot.LocalSilo.Status);
 

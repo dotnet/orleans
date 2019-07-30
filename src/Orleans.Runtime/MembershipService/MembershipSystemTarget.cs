@@ -46,6 +46,11 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
+        public async Task MembershipChangeNotification(MembershipTableSnapshot snapshot)
+        {
+            await this.membershipTableManager.RefreshFromSnapshot(snapshot);
+        }
+
         /// <summary>
         /// Send a ping to a remote silo. This is intended to be called from a <see cref="SiloHealthMonitor"/>
         /// in order to initiate the call from the <see cref="MembershipSystemTarget"/>'s context
@@ -78,14 +83,18 @@ namespace Orleans.Runtime.MembershipService
             return this.ScheduleTask(Probe);
         }
 
-        public Task GossipToRemoteSilos(SiloAddress updatedSilo, SiloStatus updatedStatus, List<SiloAddress> gossipPartners)
+        public Task GossipToRemoteSilos(
+            List<SiloAddress> gossipPartners,
+            MembershipTableSnapshot snapshot,
+            SiloAddress updatedSilo,
+            SiloStatus updatedStatus)
         {
             async Task Gossip()
             {
                 var tasks = new List<Task>(gossipPartners.Count);
                 foreach (var silo in gossipPartners)
                 {
-                    tasks.Add(this.GossipToRemoteSilo(silo, updatedSilo, updatedStatus));
+                    tasks.Add(this.GossipToRemoteSilo(silo, snapshot, updatedSilo, updatedStatus));
                 }
 
                 await Task.WhenAll(tasks);
@@ -94,7 +103,11 @@ namespace Orleans.Runtime.MembershipService
             return this.ScheduleTask(Gossip);
         }
 
-        private async Task GossipToRemoteSilo(SiloAddress silo, SiloAddress updatedSilo, SiloStatus updatedStatus)
+        private async Task GossipToRemoteSilo(
+            SiloAddress silo,
+            MembershipTableSnapshot snapshot,
+            SiloAddress updatedSilo,
+            SiloStatus updatedStatus)
         {
             if (this.log.IsEnabled(LogLevel.Trace))
             {
@@ -108,7 +121,15 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
-                await remoteOracle.SiloStatusChangeNotification(updatedSilo, updatedStatus);
+                try
+                {
+                    await remoteOracle.MembershipChangeNotification(snapshot);
+                }
+                catch (NotImplementedException)
+                {
+                    // Fallback to "old" gossip
+                    await remoteOracle.SiloStatusChangeNotification(updatedSilo, updatedStatus);
+                }
             }
             catch (Exception exception)
             {

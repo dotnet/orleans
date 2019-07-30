@@ -18,9 +18,10 @@ namespace Orleans.Runtime.MembershipService
         }
 
         public Task GossipToRemoteSilos(
+            List<SiloAddress> gossipPartners,
+            MembershipTableSnapshot snapshot,
             SiloAddress updatedSilo,
-            SiloStatus updatedStatus,
-            List<SiloAddress> gossipPartners)
+            SiloStatus updatedStatus)
         {
             if (gossipPartners.Count == 0) return Task.CompletedTask;
 
@@ -29,8 +30,9 @@ namespace Orleans.Runtime.MembershipService
                 updatedSilo,
                 updatedStatus,
                 gossipPartners.Count);
+
             var systemTarget = this.serviceProvider.GetRequiredService<MembershipSystemTarget>();
-            return systemTarget.GossipToRemoteSilos(updatedSilo, updatedStatus, gossipPartners);
+            return systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus);
         }
     }
 }
