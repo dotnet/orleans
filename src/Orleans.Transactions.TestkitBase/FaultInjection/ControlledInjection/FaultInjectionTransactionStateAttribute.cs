@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -47,7 +47,7 @@ namespace Orleans.Transactions.TestKit
 
         public IFaultInjectionTransactionalState<TState> Create<TState>(IFaultInjectionTransactionalStateConfiguration config) where TState : class, new()
         {
-            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(this.context.ActivationServices, config as ITransactionalStateConfiguration, this.serializerSettings, this.context);
+            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(this.context.ActivationServices, new TransactionalStateConfiguration(config), this.serializerSettings, this.context);
             FaultInjectionTransactionalState<TState> deactivationTransactionalState = ActivatorUtilities.CreateInstance<FaultInjectionTransactionalState<TState>>(this.context.ActivationServices, transactionalState, this.context);
             deactivationTransactionalState.Participate(context.ObservableLifecycle);
             return deactivationTransactionalState;

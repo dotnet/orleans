@@ -165,7 +165,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         public MaxStateTransactionalGrain(ITransactionalStateFactory stateFactory,
             ILoggerFactory loggerFactory)
             : base(Enumerable.Range(0, TransactionTestConstants.MaxCoordinatedTransactions)
-                .Select(i => stateFactory.Create<BitArrayState>(new TransactionalStateAttribute($"data{i}", TransactionTestConstants.TransactionStore)))
+                .Select(i => stateFactory.Create<BitArrayState>(new TransactionalStateConfiguration(new TransactionalStateAttribute($"data{i}", TransactionTestConstants.TransactionStore))))
                 .ToArray(),
                   loggerFactory)
         {
