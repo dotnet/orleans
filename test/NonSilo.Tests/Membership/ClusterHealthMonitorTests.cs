@@ -94,6 +94,7 @@ namespace NonSilo.Tests.Membership
 
             var clusterMembershipOptions = new ClusterMembershipOptions();
             var monitor = new ClusterHealthMonitor(
+                this.localSiloDetails,
                 this.manager,
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
                 Options.Create(clusterMembershipOptions),

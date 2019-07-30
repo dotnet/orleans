@@ -83,6 +83,7 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)this.manager).Participate(this.lifecycle);
 
             this.clusterHealthMonitor = new ClusterHealthMonitor(
+                this.localSiloDetails,
                 this.manager,
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
                 this.clusterMembershipOptions,

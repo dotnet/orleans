@@ -19,6 +19,7 @@ namespace Orleans.Runtime.MembershipService
     internal class ClusterHealthMonitor : ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor.ITestAccessor
     {
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
+        private readonly ILocalSiloDetails localSiloDetails;
         private readonly MembershipTableManager tableManager;
         private readonly ILogger<ClusterHealthMonitor> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
@@ -40,6 +41,7 @@ namespace Orleans.Runtime.MembershipService
         }
 
         public ClusterHealthMonitor(
+            ILocalSiloDetails localSiloDetails,
             MembershipTableManager tableManager,
             ILogger<ClusterHealthMonitor> log,
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
@@ -47,6 +49,7 @@ namespace Orleans.Runtime.MembershipService
             IServiceProvider serviceProvider,
             IAsyncTimerFactory timerFactory)
         {
+            this.localSiloDetails = localSiloDetails;
             this.tableManager = tableManager;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
@@ -231,10 +234,8 @@ namespace Orleans.Runtime.MembershipService
             ImmutableDictionary<SiloAddress, SiloHealthMonitor> monitoredSilos,
             DateTime now)
         {
-            var localSiloAddress = membership.LocalSilo.SiloAddress;
-
             // If I am still not fully functional, I should not be probing others.
-            if (!membership.Entries.TryGetValue(localSiloAddress, out var self) || !IsFunctionalForMembership(self.Status))
+            if (!membership.Entries.TryGetValue(this.localSiloDetails.SiloAddress, out var self) || !IsFunctionalForMembership(self.Status))
             {
                 return ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
             }
@@ -271,7 +272,7 @@ namespace Orleans.Runtime.MembershipService
                 var candidate = tmpList[(myIndex + i + 1) % tmpList.Count];
                 var candidateEntry = membership.Entries[candidate];
 
-                if (candidate.IsSameLogicalSilo(localSiloAddress)) continue;
+                if (candidate.IsSameLogicalSilo(this.localSiloDetails.SiloAddress)) continue;
 
                 bool isSuspected = candidateEntry.GetFreshVotes(now, this.clusterMembershipOptions.DeathVoteExpirationTimeout).Count > 0;
                 if (isSuspected)
