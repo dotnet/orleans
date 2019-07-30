@@ -98,6 +98,19 @@ namespace Orleans.Runtime.MembershipService
             await pending;
         }
 
+        public async Task RefreshFromSnapshot(MembershipTableSnapshot snapshot)
+        {
+            // Check if a refresh is underway
+            var pending = this.pendingRefresh;
+            if (pending != null && !pending.IsCompleted)
+            {
+                await pending;
+            }
+
+            // If we are behind, let's take directly the snapshot in param
+            this.updates.TryPublish(snapshot);
+        }
+
         private async Task<bool> RefreshInternal(bool requireCleanup)
         {
             var table = await this.membershipTableProvider.ReadAll();
@@ -586,7 +599,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                await this.gossiper.GossipToRemoteSilos(updatedSilo, updatedStatus, gossipPartners);
+                await this.gossiper.GossipToRemoteSilos(gossipPartners, MembershipTableSnapshot, updatedSilo, updatedStatus);
             }
             catch (Exception exception)
             {
