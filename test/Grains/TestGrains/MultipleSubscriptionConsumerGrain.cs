@@ -58,7 +58,7 @@ namespace UnitTests.Grains
             consumerCount++;
             // subscribe
             StreamSubscriptionHandle<int> handle = await stream.SubscribeAsync(
-                (e, t) => OnNext(e, t, countCapture, count),
+                (items) => OnNext(items, countCapture, count),
                 e => OnError(e, countCapture, error));
 
             // track counter
@@ -85,7 +85,7 @@ namespace UnitTests.Grains
             consumerCount++;
             // subscribe
             StreamSubscriptionHandle<int> newhandle = await handle.ResumeAsync(
-                (e, t) => OnNext(e, t, countCapture, counters.Item1),
+                (items) => OnNext(items, countCapture, counters.Item1),
                 e => OnError(e, countCapture, counters.Item2));
 
             // track counter
@@ -149,15 +149,18 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        private Task OnNext(int e, StreamSequenceToken token, int countCapture, Counter count)
+        private Task OnNext(IList<SequentialItem<int>> items, int countCapture, Counter count)
         {
-            logger.Info("Got next event {0} on handle {1}", e, countCapture);
-            var contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
-            if (!String.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
+            foreach(SequentialItem<int> item in items)
             {
-                throw new Exception(String.Format("Got the wrong RequestContext value {0}.", contextValue));
+                logger.Info("Got next event {0} on handle {1}", item.Item, countCapture);
+                var contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
+                if (!String.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
+                {
+                    throw new Exception(String.Format("Got the wrong RequestContext value {0}.", contextValue));
+                }
+                count.Increment();
             }
-            count.Increment();
             return Task.CompletedTask;
         }
 
