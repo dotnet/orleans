@@ -21,8 +21,8 @@ namespace NonSilo.Tests.Membership
                 Table());
 
             Assert.Equal(localSiloEntry.Status, snapshot.GetSiloStatus(silo));
-            Assert.Equal(silo, snapshot.LocalSilo.SiloAddress);
-            Assert.Equal(localSiloEntry.Status, snapshot.LocalSilo.Status);
+            Assert.Equal(silo, snapshot.Entries[silo].SiloAddress);
+            Assert.Equal(localSiloEntry.Status, snapshot.Entries[silo].Status);
             Assert.Contains(snapshot.Entries, e => e.Key.Equals(silo) && e.Value.Status == localSiloEntry.Status);
         }
 
@@ -41,8 +41,8 @@ namespace NonSilo.Tests.Membership
                     Entry(Silo("127.0.0.1:200@1"), SiloStatus.Active)));
             
             Assert.Equal(localSiloEntry.Status, snapshot.GetSiloStatus(silo));
-            Assert.Equal(silo, snapshot.LocalSilo.SiloAddress);
-            Assert.Equal(localSiloEntry.Status, snapshot.LocalSilo.Status);
+            Assert.Equal(silo, snapshot.Entries[silo].SiloAddress);
+            Assert.Equal(localSiloEntry.Status, snapshot.Entries[silo].Status);
             Assert.Contains(snapshot.Entries, e => e.Key.Equals(silo) && e.Value.Status == localSiloEntry.Status);
         }
 

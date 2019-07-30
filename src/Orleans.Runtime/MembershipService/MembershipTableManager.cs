@@ -57,7 +57,6 @@ namespace Orleans.Runtime.MembershipService
             this.log = log;
             this.siloLifecycle = siloLifecycle;
             this.snapshot = new MembershipTableSnapshot(
-                    this.CreateLocalSiloEntry(this.CurrentStatus),
                     MembershipVersion.MinValue,
                     ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
             this.updates = new AsyncEnumerable<MembershipTableSnapshot>(
@@ -100,6 +99,18 @@ namespace Orleans.Runtime.MembershipService
             if (pending != null && !pending.IsCompleted)
             {
                 await pending;
+            }
+
+            this.log.LogInformation("Received cluster membership snapshot via gossip: {Snapshot}", snapshot);
+
+            if (snapshot.Entries.TryGetValue(this.myAddress, out var localSiloEntry))
+            {
+                if (localSiloEntry.Status == SiloStatus.Dead && this.CurrentStatus != SiloStatus.Dead)
+                {
+                    var msg = $"I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {(localSiloEntry.ToFullString(full: true))}.";
+                    this.log.Warn(ErrorCode.MembershipFoundMyselfDead1, msg);
+                    this.KillMyselfLocally(msg);
+                }
             }
 
             // If we are behind, let's take directly the snapshot in param
@@ -403,30 +414,24 @@ namespace Orleans.Runtime.MembershipService
                 return (myTuple.Item1.Copy(), myTuple.Item2);
             }
 
-            return (this.CreateLocalSiloEntry(currentStatus), null);
-        }
-
-        private MembershipEntry CreateLocalSiloEntry(SiloStatus status)
-        {
-            var assy = Assembly.GetEntryAssembly() ?? typeof(MembershipTableManager).Assembly;
-            var roleName = assy.GetName().Name;
-
-            return new MembershipEntry
+            var result = new MembershipEntry
             {
                 SiloAddress = this.localSiloDetails.SiloAddress,
 
                 HostName = this.localSiloDetails.DnsHostName,
                 SiloName = this.localSiloDetails.Name,
 
-                Status = status,
+                Status = currentStatus,
                 ProxyPort = this.localSiloDetails.GatewayAddress?.Endpoint?.Port ?? 0,
 
-                RoleName = roleName,
+                RoleName = (Assembly.GetEntryAssembly() ?? typeof(MembershipTableManager).Assembly).GetName().Name,
 
                 SuspectTimes = new List<Tuple<SiloAddress, DateTime>>(),
                 StartTime = this.siloStartTime,
                 IAmAliveTime = DateTime.UtcNow
             };
+
+            return (result, null);
         }
 
         private void ProcessTableUpdate(MembershipTableData table, string caller)
