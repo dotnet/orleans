@@ -110,10 +110,10 @@ namespace NonSilo.Tests.Membership
             var initialSnapshot = manager.MembershipTableSnapshot;
             Assert.NotNull(initialSnapshot);
             Assert.NotNull(initialSnapshot.Entries);
-            Assert.NotNull(initialSnapshot.LocalSilo);
-            Assert.Equal(SiloStatus.Created, initialSnapshot.LocalSilo.Status);
-            Assert.Equal(this.localSiloDetails.Name, initialSnapshot.LocalSilo.SiloName);
-            Assert.Equal(this.localSiloDetails.DnsHostName, initialSnapshot.LocalSilo.HostName);
+            var localSiloEntry = initialSnapshot.Entries[this.localSilo];
+            Assert.Equal(SiloStatus.Created, localSiloEntry.Status);
+            Assert.Equal(this.localSiloDetails.Name, localSiloEntry.SiloName);
+            Assert.Equal(this.localSiloDetails.DnsHostName, localSiloEntry.HostName);
             Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
 
             Assert.NotNull(manager.MembershipTableUpdates);
@@ -147,7 +147,8 @@ namespace NonSilo.Tests.Membership
             await manager.UpdateStatus(SiloStatus.Joining);
             await this.membershipGossiper.ReceivedWithAnyArgs().GossipToRemoteSilos(default, default, default, default);
             Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
-            Assert.Equal(SiloStatus.Joining, manager.MembershipTableSnapshot.LocalSilo.Status);
+            localSiloEntry = manager.MembershipTableSnapshot.Entries[this.localSilo];
+            Assert.Equal(SiloStatus.Joining, localSiloEntry.Status);
 
             // An update should have been issued.
             currentEnumerator = changes.GetAsyncEnumerator();
@@ -226,10 +227,10 @@ namespace NonSilo.Tests.Membership
             var snapshot = manager.MembershipTableSnapshot;
             Assert.NotNull(snapshot);
             Assert.NotNull(snapshot.Entries);
-            Assert.NotNull(snapshot.LocalSilo);
-            Assert.Equal(SiloStatus.Created, snapshot.LocalSilo.Status);
-            Assert.Equal(this.localSiloDetails.Name, snapshot.LocalSilo.SiloName);
-            Assert.Equal(this.localSiloDetails.DnsHostName, snapshot.LocalSilo.HostName);
+            var localSiloEntry = snapshot.Entries[this.localSilo];
+            Assert.Equal(SiloStatus.Created, localSiloEntry.Status);
+            Assert.Equal(this.localSiloDetails.Name, localSiloEntry.SiloName);
+            Assert.Equal(this.localSiloDetails.DnsHostName, localSiloEntry.HostName);
             Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
 
             Assert.NotNull(manager.MembershipTableUpdates);
@@ -259,8 +260,9 @@ namespace NonSilo.Tests.Membership
 
             // Transition to joining.
             await manager.UpdateStatus(SiloStatus.Joining);
+            snapshot = manager.MembershipTableSnapshot;
             Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
-            Assert.Equal(SiloStatus.Joining, manager.MembershipTableSnapshot.LocalSilo.Status);
+            Assert.Equal(SiloStatus.Joining, snapshot.Entries[localSilo].Status);
 
             Assert.True(membershipUpdates.MoveNextAsync().Result);
             Assert.True(membershipUpdates.MoveNextAsync().Result);

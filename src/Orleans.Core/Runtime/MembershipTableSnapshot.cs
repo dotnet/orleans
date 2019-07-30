@@ -7,18 +7,15 @@ namespace Orleans.Runtime
     internal sealed class MembershipTableSnapshot
     {
         public MembershipTableSnapshot(
-            MembershipEntry localSilo,
             MembershipVersion version,
             ImmutableDictionary<SiloAddress, MembershipEntry> entries)
         {
-            this.LocalSilo = localSilo;
             this.Version = version;
             this.Entries = entries;
         }
 
         public static MembershipTableSnapshot Create(MembershipEntry localSiloEntry, MembershipTableData table)
         {
-            if (localSiloEntry is null) throw new ArgumentNullException(nameof(localSiloEntry));
             if (table is null) throw new ArgumentNullException(nameof(table));
 
             var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
@@ -41,10 +38,35 @@ namespace Orleans.Runtime
             }
 
             var version = new MembershipVersion(table.Version.Version);
-            return new MembershipTableSnapshot(localSiloEntry, version, entries.ToImmutable());
+            return new MembershipTableSnapshot(version, entries.ToImmutable());
         }
 
-        public MembershipEntry LocalSilo { get; }
+        public static MembershipTableSnapshot Create(MembershipEntry localSiloEntry, MembershipTableSnapshot snapshot)
+        {
+            if (snapshot is null) throw new ArgumentNullException(nameof(snapshot));
+
+            var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
+            if (snapshot.Entries != null)
+            {
+                foreach (var item in snapshot.Entries)
+                {
+                    var entry = item.Value;
+                    entries.Add(entry.SiloAddress, entry);
+                }
+            }
+
+            if (entries.TryGetValue(localSiloEntry.SiloAddress, out var existing))
+            {
+                entries[localSiloEntry.SiloAddress] = existing.WithStatus(localSiloEntry.Status);
+            }
+            else
+            {
+                entries[localSiloEntry.SiloAddress] = localSiloEntry;
+            }
+
+            return new MembershipTableSnapshot(snapshot.Version, entries.ToImmutable());
+        }
+
         public MembershipVersion Version { get; }
         public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; }
 

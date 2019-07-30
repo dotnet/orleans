@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -61,10 +62,10 @@ namespace Orleans.Runtime.MembershipService
             this.EXP_BACKOFF_ERROR_MAX = backOffMax;
 
             this.siloLifecycle = siloLifecycle;
+            var initialEntries = ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.SetItem(this.myAddress, this.CreateLocalSiloEntry(this.CurrentStatus));
             this.snapshot = new MembershipTableSnapshot(
-                    this.CreateLocalSiloEntry(this.CurrentStatus),
                     MembershipVersion.MinValue,
-                    ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
+                    initialEntries);
             this.updates = new AsyncEnumerable<MembershipTableSnapshot>(
                 (previous, proposed) => proposed.Version > previous.Version,
                 this.snapshot)
@@ -105,6 +106,24 @@ namespace Orleans.Runtime.MembershipService
             if (pending != null && !pending.IsCompleted)
             {
                 await pending;
+            }
+
+            this.log.LogInformation("Received cluster membership snapshot via gossip: {Snapshot}", snapshot);
+
+            if (snapshot.Entries.TryGetValue(this.myAddress, out var localSiloEntry))
+            {
+                if (localSiloEntry.Status == SiloStatus.Dead && this.CurrentStatus != SiloStatus.Dead)
+                {
+                    var msg = $"I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {(localSiloEntry.ToFullString(full: true))}.";
+                    this.log.Warn(ErrorCode.MembershipFoundMyselfDead1, msg);
+                    this.KillMyselfLocally(msg);
+                }
+
+                snapshot = MembershipTableSnapshot.Create(localSiloEntry.WithStatus(this.CurrentStatus), snapshot);
+            }
+            else
+            {
+                snapshot = MembershipTableSnapshot.Create(this.CreateLocalSiloEntry(this.CurrentStatus), snapshot);
             }
 
             // If we are behind, let's take directly the snapshot in param
@@ -430,14 +449,12 @@ namespace Orleans.Runtime.MembershipService
                 return (myTuple.Item1.Copy(), myTuple.Item2);
             }
 
-            return (this.CreateLocalSiloEntry(currentStatus), null);
+            var result = CreateLocalSiloEntry(currentStatus);
+            return (result, null);
         }
 
-        private MembershipEntry CreateLocalSiloEntry(SiloStatus status)
+        private MembershipEntry CreateLocalSiloEntry(SiloStatus currentStatus)
         {
-            var assy = Assembly.GetEntryAssembly() ?? typeof(MembershipTableManager).Assembly;
-            var roleName = assy.GetName().Name;
-
             return new MembershipEntry
             {
                 SiloAddress = this.localSiloDetails.SiloAddress,
@@ -445,10 +462,10 @@ namespace Orleans.Runtime.MembershipService
                 HostName = this.localSiloDetails.DnsHostName,
                 SiloName = this.localSiloDetails.Name,
 
-                Status = status,
+                Status = currentStatus,
                 ProxyPort = this.localSiloDetails.GatewayAddress?.Endpoint?.Port ?? 0,
 
-                RoleName = roleName,
+                RoleName = (Assembly.GetEntryAssembly() ?? typeof(MembershipTableManager).Assembly).GetName().Name,
 
                 SuspectTimes = new List<Tuple<SiloAddress, DateTime>>(),
                 StartTime = this.siloStartTime,
