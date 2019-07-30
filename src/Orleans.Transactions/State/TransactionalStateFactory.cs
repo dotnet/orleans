@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -16,7 +16,7 @@ namespace Orleans.Transactions
             this.serializerSettings = GetJsonSerializerSettings(typeResolver, grainFactory);
         }
 
-        public ITransactionalState<TState> Create<TState>(ITransactionalStateConfiguration config) where TState : class, new()
+        public ITransactionalState<TState> Create<TState>(TransactionalStateConfiguration config) where TState : class, new()
         {
             TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(this.context.ActivationServices, config, this.serializerSettings, this.context);
             transactionalState.Participate(context.ObservableLifecycle);
