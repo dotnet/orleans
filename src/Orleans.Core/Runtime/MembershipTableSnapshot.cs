@@ -41,6 +41,32 @@ namespace Orleans.Runtime
             return new MembershipTableSnapshot(version, entries.ToImmutable());
         }
 
+        public static MembershipTableSnapshot Create(MembershipEntry localSiloEntry, MembershipTableSnapshot snapshot)
+        {
+            if (snapshot is null) throw new ArgumentNullException(nameof(snapshot));
+
+            var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
+            if (snapshot.Entries != null)
+            {
+                foreach (var item in snapshot.Entries)
+                {
+                    var entry = item.Value;
+                    entries.Add(entry.SiloAddress, entry);
+                }
+            }
+
+            if (entries.TryGetValue(localSiloEntry.SiloAddress, out var existing))
+            {
+                entries[localSiloEntry.SiloAddress] = existing.WithStatus(localSiloEntry.Status);
+            }
+            else
+            {
+                entries[localSiloEntry.SiloAddress] = localSiloEntry;
+            }
+
+            return new MembershipTableSnapshot(snapshot.Version, entries.ToImmutable());
+        }
+
         public MembershipVersion Version { get; }
         public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; }
 

@@ -260,6 +260,7 @@ namespace NonSilo.Tests.Membership
 
             // Transition to joining.
             await manager.UpdateStatus(SiloStatus.Joining);
+            snapshot = manager.MembershipTableSnapshot;
             Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
             Assert.Equal(SiloStatus.Joining, snapshot.Entries[localSilo].Status);
 

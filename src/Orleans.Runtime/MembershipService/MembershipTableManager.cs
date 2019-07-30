@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -56,9 +57,10 @@ namespace Orleans.Runtime.MembershipService
             this.myAddress = this.localSiloDetails.SiloAddress;
             this.log = log;
             this.siloLifecycle = siloLifecycle;
+            var initialEntries = ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.SetItem(this.myAddress, this.CreateLocalSiloEntry(this.CurrentStatus));
             this.snapshot = new MembershipTableSnapshot(
                     MembershipVersion.MinValue,
-                    ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
+                    initialEntries);
             this.updates = new AsyncEnumerable<MembershipTableSnapshot>(
                 (previous, proposed) => proposed.Version > previous.Version,
                 this.snapshot)
@@ -111,6 +113,12 @@ namespace Orleans.Runtime.MembershipService
                     this.log.Warn(ErrorCode.MembershipFoundMyselfDead1, msg);
                     this.KillMyselfLocally(msg);
                 }
+
+                snapshot = MembershipTableSnapshot.Create(localSiloEntry.WithStatus(this.CurrentStatus), snapshot);
+            }
+            else
+            {
+                snapshot = MembershipTableSnapshot.Create(this.CreateLocalSiloEntry(this.CurrentStatus), snapshot);
             }
 
             // If we are behind, let's take directly the snapshot in param
@@ -414,7 +422,13 @@ namespace Orleans.Runtime.MembershipService
                 return (myTuple.Item1.Copy(), myTuple.Item2);
             }
 
-            var result = new MembershipEntry
+            var result = CreateLocalSiloEntry(currentStatus);
+            return (result, null);
+        }
+
+        private MembershipEntry CreateLocalSiloEntry(SiloStatus currentStatus)
+        {
+            return new MembershipEntry
             {
                 SiloAddress = this.localSiloDetails.SiloAddress,
 
@@ -430,8 +444,6 @@ namespace Orleans.Runtime.MembershipService
                 StartTime = this.siloStartTime,
                 IAmAliveTime = DateTime.UtcNow
             };
-
-            return (result, null);
         }
 
         private void ProcessTableUpdate(MembershipTableData table, string caller)
