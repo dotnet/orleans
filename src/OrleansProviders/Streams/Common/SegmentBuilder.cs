@@ -1,7 +1,7 @@
-﻿
+
 using System;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
     /// Utility class for encoding data into an ArraySegment.
@@ -18,6 +18,16 @@ namespace Orleans.ServiceBus.Providers
             return (bytes == null || bytes.Length == 0)
                 ? sizeof(int)
                 : bytes.Length + sizeof(int);
+        }
+
+        /// <summary>
+        /// Calculates how much space will be needed to append the provided bytes into the segment.
+        /// </summary>
+        public static int CalculateAppendSize(ArraySegment<byte> segment)
+        {
+            return (segment.Count == 0)
+                ? sizeof(int)
+                : segment.Count + sizeof(int);
         }
 
         /// <summary>
@@ -55,6 +65,25 @@ namespace Orleans.ServiceBus.Providers
             {
                 Array.Copy(bytes, 0, segment.Array, segment.Offset + writerOffset, bytes.Length);
                 writerOffset += bytes.Length;
+            }
+        }
+
+        /// <summary>
+        /// Appends an array of bytes to the end of the segment
+        /// </summary>
+        public static void Append(ArraySegment<byte> segment, ref int writerOffset, ArraySegment<byte> append)
+        {
+            if (segment.Array == null)
+            {
+                throw new ArgumentNullException(nameof(segment));
+            }
+
+            Array.Copy(BitConverter.GetBytes(append.Count), 0, segment.Array, segment.Offset + writerOffset, sizeof(int));
+            writerOffset += sizeof(int);
+            if (append.Count != 0)
+            {
+                Array.Copy(append.Array, append.Offset, segment.Array, segment.Offset + writerOffset, append.Count);
+                writerOffset += append.Count;
             }
         }
 

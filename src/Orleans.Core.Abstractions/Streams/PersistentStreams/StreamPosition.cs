@@ -1,8 +1,7 @@
-﻿
-using System;
-using Orleans.Streams;
 
-namespace Orleans.Providers.Streams.Common
+using System;
+
+namespace Orleans.Streams
 {
     /// <summary>
     /// Stream position uniquely identifies the position of an event in a stream.
@@ -37,6 +36,5 @@ namespace Orleans.Providers.Streams.Common
         /// Position in the stream
         /// </summary>
         public StreamSequenceToken SequenceToken { get; }
-
     }
 }

@@ -16,6 +16,11 @@ namespace Orleans.Streams
         {
             configurator.Configure(configureOptions);
         }
+
+        public static void UseDataAdapter(this IEventHubStreamConfigurator configurator, Func<IServiceProvider, string, IEventHubDataAdapter> factory)
+        {
+            configurator.ConfigureComponent(factory);
+        }
     }
 
     public interface ISiloEventHubStreamConfigurator : IEventHubStreamConfigurator, ISiloRecoverableStreamConfigurator { }

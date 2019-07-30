@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
@@ -16,13 +16,6 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             public Guid StreamGuid { get; set; }
             public EventSequenceTokenV2 SequenceToken { get; set; }
-        }
-
-        private struct TestCachedMessage
-        {
-            public Guid StreamGuid { get; set; }
-            public long SequenceNumber { get; set; }
-            public int EventIndex { get; set; }
         }
 
         private class TestBatchContainer : IBatchContainer
@@ -47,46 +40,9 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
-        private class TestCacheDataComparer : ICacheDataComparer<TestCachedMessage>
+        private class TestCacheDataAdapter : ICacheDataAdapter
         {
-            public static readonly ICacheDataComparer<TestCachedMessage> Instance = new TestCacheDataComparer();
-
-            public int Compare(TestCachedMessage cachedMessage, StreamSequenceToken token)
-            {
-                var myToken = new EventSequenceTokenV2(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
-                return myToken.CompareTo(token);
-            }
-
-            public bool Equals(TestCachedMessage cachedMessage, IStreamIdentity streamIdentity)
-            {
-                return cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid)==0;
-            }
-        }
-
-        private class TestCacheDataAdapter : ICacheDataAdapter<TestQueueMessage, TestCachedMessage>
-        {
-            public Action<FixedSizeBuffer> OnBlockAllocated { set; private get; }
-
-            public StreamPosition QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
-            {
-                StreamPosition streamPosition = GetStreamPosition(queueMessage);
-                cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
-                cachedMessage.SequenceNumber = queueMessage.SequenceToken.SequenceNumber;
-                cachedMessage.EventIndex = queueMessage.SequenceToken.EventIndex;
-                return streamPosition;
-            }
-
-            public DateTime? GetMessageEnqueueTimeUtc(ref TestCachedMessage message)
-            {
-                return null;
-            }
-
-            public DateTime? GetMessageDequeueTimeUtc(ref TestCachedMessage message)
-            {
-                return null;
-            }
-
-            public IBatchContainer GetBatchContainer(ref TestCachedMessage cachedMessage)
+            public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
             {
                 return new TestBatchContainer()
                 {
@@ -95,27 +51,38 @@ namespace UnitTests.OrleansRuntime.Streams
                 };
             }
 
-            public StreamSequenceToken GetSequenceToken(ref TestCachedMessage cachedMessage)
+            public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
             {
                 return new EventSequenceTokenV2(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
             }
-
-            public StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
-            {
-                IStreamIdentity streamIdentity = new StreamIdentity(queueMessage.StreamGuid, null);
-                StreamSequenceToken sequenceToken = queueMessage.SequenceToken;
-                return new StreamPosition(streamIdentity, sequenceToken);
-            }
         }
 
-        private class MyTestPooled : IObjectPool<CachedMessageBlock<TestCachedMessage>>
+        private StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
         {
-            public CachedMessageBlock<TestCachedMessage> Allocate()
+            IStreamIdentity streamIdentity = new StreamIdentity(queueMessage.StreamGuid, null);
+            StreamSequenceToken sequenceToken = queueMessage.SequenceToken;
+            return new StreamPosition(streamIdentity, sequenceToken);
+        }
+
+        private CachedMessage QueueMessageToCachedMessage(TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
+        {
+            StreamPosition streamPosition = GetStreamPosition(queueMessage);
+            return new CachedMessage
             {
-                return new CachedMessageBlock<TestCachedMessage>(TestBlockSize){Pool = this};
+                StreamGuid = streamPosition.StreamIdentity.Guid,
+                SequenceNumber = queueMessage.SequenceToken.SequenceNumber,
+                EventIndex = queueMessage.SequenceToken.EventIndex,
+            };
+        }
+
+        private class MyTestPooled : IObjectPool<CachedMessageBlock>
+        {
+            public CachedMessageBlock Allocate()
+            {
+                return new CachedMessageBlock(TestBlockSize){Pool = this};
             }
 
-            public void Free(CachedMessageBlock<TestCachedMessage> resource)
+            public void Free(CachedMessageBlock resource)
             {
             }
         }
@@ -123,9 +90,9 @@ namespace UnitTests.OrleansRuntime.Streams
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void Add1Remove1Test()
         {
-            IObjectPool<CachedMessageBlock<TestCachedMessage>> pool = new MyTestPooled();
-            ICacheDataAdapter<TestQueueMessage, TestCachedMessage> dataAdapter = new TestCacheDataAdapter();
-            CachedMessageBlock<TestCachedMessage> block = pool.Allocate();
+            IObjectPool<CachedMessageBlock> pool = new MyTestPooled();
+            ICacheDataAdapter dataAdapter = new TestCacheDataAdapter();
+            CachedMessageBlock block = pool.Allocate();
 
             AddAndCheck(block, dataAdapter, 0, -1);
             RemoveAndCheck(block, 0, 0);
@@ -134,9 +101,9 @@ namespace UnitTests.OrleansRuntime.Streams
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void Add2Remove1UntilFull()
         {
-            IObjectPool<CachedMessageBlock<TestCachedMessage>> pool = new MyTestPooled();
-            ICacheDataAdapter<TestQueueMessage, TestCachedMessage> dataAdapter = new TestCacheDataAdapter();
-            CachedMessageBlock<TestCachedMessage> block = pool.Allocate();
+            IObjectPool<CachedMessageBlock> pool = new MyTestPooled();
+            ICacheDataAdapter dataAdapter = new TestCacheDataAdapter();
+            CachedMessageBlock block = pool.Allocate();
             int first = 0;
             int last = -1;
 
@@ -165,9 +132,9 @@ namespace UnitTests.OrleansRuntime.Streams
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void FirstMessageWithSequenceNumberTest()
         {
-            IObjectPool<CachedMessageBlock<TestCachedMessage>> pool = new MyTestPooled();
-            ICacheDataAdapter<TestQueueMessage, TestCachedMessage> dataAdapter = new TestCacheDataAdapter();
-            CachedMessageBlock<TestCachedMessage> block = pool.Allocate();
+            IObjectPool<CachedMessageBlock> pool = new MyTestPooled();
+            ICacheDataAdapter dataAdapter = new TestCacheDataAdapter();
+            CachedMessageBlock block = pool.Allocate();
             int last = -1;
             int sequenceNumber = 0;
 
@@ -178,20 +145,20 @@ namespace UnitTests.OrleansRuntime.Streams
                 last++;
                 sequenceNumber += 2;
             }
-            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(0), TestCacheDataComparer.Instance));
-            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(1), TestCacheDataComparer.Instance));
-            Assert.Equal(block.NewestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber - 2), TestCacheDataComparer.Instance));
-            Assert.Equal(block.NewestMessageIndex - 1, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber - 3), TestCacheDataComparer.Instance));
-            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber / 2), TestCacheDataComparer.Instance));
-            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber / 2 + 1), TestCacheDataComparer.Instance));
+            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(0)));
+            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(1)));
+            Assert.Equal(block.NewestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber - 2)));
+            Assert.Equal(block.NewestMessageIndex - 1, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber - 3)));
+            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber / 2)));
+            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber / 2 + 1)));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void NextInStreamTest()
         {
-            IObjectPool<CachedMessageBlock<TestCachedMessage>> pool = new MyTestPooled();
-            ICacheDataAdapter<TestQueueMessage, TestCachedMessage> dataAdapter = new TestCacheDataAdapter();
-            CachedMessageBlock<TestCachedMessage> block = pool.Allocate();
+            IObjectPool<CachedMessageBlock> pool = new MyTestPooled();
+            ICacheDataAdapter dataAdapter = new TestCacheDataAdapter();
+            CachedMessageBlock block = pool.Allocate();
             int last = 0;
             int sequenceNumber = 0;
             // define 2 streams
@@ -215,37 +182,37 @@ namespace UnitTests.OrleansRuntime.Streams
 
             // get index of first stream
             int streamIndex;
-            Assert.True(block.TryFindFirstMessage(streams[0], TestCacheDataComparer.Instance, out streamIndex));
+            Assert.True(block.TryFindFirstMessage(streams[0], dataAdapter, out streamIndex));
             Assert.Equal(0, streamIndex);
-            Assert.Equal(0, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceTokenV2).SequenceNumber);
+            Assert.Equal(0, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
 
             // find stream1 messages
             int iteration = 1;
-            while (block.TryFindNextMessage(streamIndex + 1, streams[0], TestCacheDataComparer.Instance, out streamIndex))
+            while (block.TryFindNextMessage(streamIndex + 1, streams[0], dataAdapter, out streamIndex))
             {
                 Assert.Equal(iteration * 2, streamIndex);
-                Assert.Equal(iteration * 4, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceTokenV2).SequenceNumber);
+                Assert.Equal(iteration * 4, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
                 iteration++;
             }
             Assert.Equal(iteration, TestBlockSize / 2);
 
             // get index of first stream
-            Assert.True(block.TryFindFirstMessage(streams[1], TestCacheDataComparer.Instance, out streamIndex));
+            Assert.True(block.TryFindFirstMessage(streams[1], dataAdapter, out streamIndex));
             Assert.Equal(1, streamIndex);
-            Assert.Equal(2, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceTokenV2).SequenceNumber);
+            Assert.Equal(2, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
 
             // find stream1 messages
             iteration = 1;
-            while (block.TryFindNextMessage(streamIndex + 1, streams[1], TestCacheDataComparer.Instance, out streamIndex))
+            while (block.TryFindNextMessage(streamIndex + 1, streams[1], dataAdapter, out streamIndex))
             {
                 Assert.Equal(iteration * 2 + 1, streamIndex);
-                Assert.Equal(iteration * 4 + 2, (block.GetSequenceToken(streamIndex, dataAdapter) as EventSequenceTokenV2).SequenceNumber);
+                Assert.Equal(iteration * 4 + 2, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
                 iteration++;
             }
             Assert.Equal(iteration, TestBlockSize / 2);
         }
 
-        private void AddAndCheck(CachedMessageBlock<TestCachedMessage> block, ICacheDataAdapter<TestQueueMessage, TestCachedMessage> dataAdapter, int first, int last, int sequenceNumber = 1)
+        private void AddAndCheck(CachedMessageBlock block, ICacheDataAdapter dataAdapter, int first, int last, int sequenceNumber = 1)
         {
             var message = new TestQueueMessage
             {
@@ -255,13 +222,13 @@ namespace UnitTests.OrleansRuntime.Streams
             AddAndCheck(block, dataAdapter, message, first, last);
         }
 
-        private void AddAndCheck(CachedMessageBlock<TestCachedMessage> block, ICacheDataAdapter<TestQueueMessage, TestCachedMessage> dataAdapter, TestQueueMessage message, int first, int last)
+        private void AddAndCheck(CachedMessageBlock block, ICacheDataAdapter dataAdapter, TestQueueMessage message, int first, int last)
         {
             Assert.Equal(first, block.OldestMessageIndex);
             Assert.Equal(last, block.NewestMessageIndex);
             Assert.True(block.HasCapacity);
 
-            block.Add(message, DateTime.UtcNow, dataAdapter);
+            block.Add(QueueMessageToCachedMessage(message, DateTime.UtcNow));
             last++;
 
             Assert.Equal(first > last, block.IsEmpty);
@@ -272,7 +239,7 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.True(block.GetSequenceToken(last, dataAdapter).Equals(message.SequenceToken));
         }
 
-        private void RemoveAndCheck(CachedMessageBlock<TestCachedMessage> block, int first, int last)
+        private void RemoveAndCheck(CachedMessageBlock block, int first, int last)
         {
             Assert.Equal(first, block.OldestMessageIndex);
             Assert.Equal(last, block.NewestMessageIndex);
