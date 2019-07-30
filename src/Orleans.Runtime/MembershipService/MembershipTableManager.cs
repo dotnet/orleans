@@ -344,6 +344,10 @@ namespace Orleans.Runtime.MembershipService
                             "Failed to update status to dead in the alotted time during shutdown");
                     }
 
+                    var gossipTask = this.GossipToOthers(this.myAddress, status);
+                    gossipTask.Ignore();
+                    await Task.WhenAny(Task.Delay(TimeSpan.FromMilliseconds(500)), gossipTask);
+
                     this.CurrentStatus = status;
                     return;
                 }
