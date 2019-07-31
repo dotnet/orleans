@@ -109,7 +109,7 @@ namespace Orleans.Transactions.State
             }
             catch(Exception ex)
             {
-                this.logger.LogWarning($"Error occured while cleaning up transaction {transactionId} from commit log.  Will retry.", ex);
+                this.logger.LogWarning(ex, "Error occured while cleaning up transaction {TransactionId} from commit log.  Will retry.", transactionId);
             }
 
             return false;
@@ -118,7 +118,7 @@ namespace Orleans.Transactions.State
         // Tracks the effort to notify a participant, will not call again once it succeeds.
         private struct Confirmation
         {
-            private readonly ParticipantId paricipant;
+            private readonly ParticipantId participant;
             private readonly Guid transactionId;
             private readonly DateTime timestamp;
             private readonly Func<Task> call;
@@ -128,7 +128,7 @@ namespace Orleans.Transactions.State
 
             public Confirmation(ParticipantId paricipant, Guid transactionId, DateTime timestamp, Func<Task> call, ILogger logger)
             {
-                this.paricipant = paricipant;
+                this.participant = paricipant;
                 this.transactionId = transactionId;
                 this.timestamp = timestamp;
                 this.call = call;
@@ -145,10 +145,10 @@ namespace Orleans.Transactions.State
                 {
                     await this.pending;
                     this.complete = true;
-                } catch(Exception)
+                } catch(Exception ex)
                 {
                     this.pending = null;
-                    logger.LogWarning($"Confirmation of transactation {transactionId} with timestamp {timestamp} to participant {paricipant} failed.  Retrying");
+                    logger.LogWarning(ex, "Confirmation of transaction {TransactionId} with timestamp {Timestamp} to participant {Participant} failed.  Retrying", this.transactionId, this.timestamp, this.participant);
                 }
                 return this.complete;
             }
