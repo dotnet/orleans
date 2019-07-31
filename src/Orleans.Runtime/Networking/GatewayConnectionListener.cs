@@ -15,7 +15,6 @@ namespace Orleans.Runtime.Messaging
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IOptions<MultiClusterOptions> multiClusterOptions;
         private readonly MessageCenter messageCenter;
-        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly EndpointOptions endpointOptions;
         private readonly MessageFactory messageFactory;
         private readonly OverloadDetector overloadDetector;
@@ -32,8 +31,7 @@ namespace Orleans.Runtime.Messaging
             ILocalSiloDetails localSiloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
             IOptions<EndpointOptions> endpointOptions,
-            MessageCenter messageCenter,
-            ISiloStatusOracle siloStatusOracle)
+            MessageCenter messageCenter)
             : base(serviceProvider, listenerFactory, connectionOptions, trace)
         {
             this.messageFactory = messageFactory;
@@ -43,7 +41,6 @@ namespace Orleans.Runtime.Messaging
             this.localSiloDetails = localSiloDetails;
             this.multiClusterOptions = multiClusterOptions;
             this.messageCenter = messageCenter;
-            this.siloStatusOracle = siloStatusOracle;
             this.endpointOptions = endpointOptions.Value;
         }
 
@@ -63,8 +60,7 @@ namespace Orleans.Runtime.Messaging
                 this.multiClusterOptions,
                 this.ConnectionOptions,
                 this.messageCenter,
-                this.localSiloDetails,
-                this.siloStatusOracle);
+                this.localSiloDetails);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

@@ -14,6 +14,7 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly MessageCenter messageCenter;
         private readonly ConnectionManager connectionManager;
+        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly ILogger logger;
         private bool stopped;
 
@@ -33,10 +34,12 @@ namespace Orleans.Runtime.Messaging
         internal OutboundMessageQueue(
             MessageCenter mc,
             ILogger<OutboundMessageQueue> logger,
-            ConnectionManager senderManager)
+            ConnectionManager senderManager,
+            ISiloStatusOracle siloStatusOracle)
         {
             messageCenter = mc;
             this.connectionManager = senderManager;
+            this.siloStatusOracle = siloStatusOracle;
             this.logger = logger;
             stopped = false;
         }
@@ -89,6 +92,25 @@ namespace Orleans.Runtime.Messaging
                 {
                     logger.Info(ErrorCode.Messaging_SimulatedMessageLoss, "Message blocked by test");
                     messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message blocked by test");
+                    return;
+                }
+
+                if (this.siloStatusOracle.IsDeadSilo(msg.TargetSilo))
+                {
+                    MessagingStatisticsGroup.OnFailedSentMessage(msg);
+                    var reason = $"Target {msg.TargetSilo.ToLongString()} silo is known to be dead";
+
+                    if (logger.IsEnabled(LogLevel.Debug))
+                    {
+                        logger.LogDebug(
+                          (int)ErrorCode.MessagingSendingRejection,
+                          "Silo {siloAddress} is rejecting message: {message}. Reason = {reason}",
+                          messageCenter.MyAddress,
+                          msg,
+                          reason);
+                    }
+
+                    this.messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, reason);
                     return;
                 }
 

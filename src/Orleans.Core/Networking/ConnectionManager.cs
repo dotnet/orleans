@@ -261,7 +261,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void Remove(SiloAddress siloAddress, Connection connection)
+        private void Remove(SiloAddress siloAddress, Connection connection)
         {
             if (connection is null) return;
 

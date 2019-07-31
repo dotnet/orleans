@@ -10,7 +10,6 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly INetworkingTrace trace;
         private readonly ILocalSiloDetails localSiloDetails;
-        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IServiceProvider serviceProvider;
         private readonly MessageFactory messageFactory;
         private readonly object initializationLock = new object();
@@ -24,15 +23,13 @@ namespace Orleans.Runtime.Messaging
             IConnectionFactory connectionFactory,
             MessageFactory messageFactory,
             INetworkingTrace trace,
-            ILocalSiloDetails localSiloDetails,
-            ISiloStatusOracle siloStatusOracle)
+            ILocalSiloDetails localSiloDetails)
             : base(connectionFactory, serviceProvider, connectionOptions)
         {
             this.serviceProvider = serviceProvider;
             this.messageFactory = messageFactory;
             this.trace = trace;
             this.localSiloDetails = localSiloDetails;
-            this.siloStatusOracle = siloStatusOracle;
         }
 
         protected override Connection CreateConnection(SiloAddress address, ConnectionContext context)
@@ -48,7 +45,6 @@ namespace Orleans.Runtime.Messaging
                 this.messageCenter,
                 this.messageFactory,
                 this.localSiloDetails,
-                this.siloStatusOracle,
                 this.connectionManager,
                 this.ConnectionOptions);
         }
