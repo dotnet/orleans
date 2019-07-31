@@ -61,6 +61,7 @@ namespace Orleans.Runtime.Messaging
                 this.trace,
                 this.localSiloDetails,
                 this.multiClusterOptions,
+                this.ConnectionOptions,
                 this.messageCenter,
                 this.localSiloDetails,
                 this.siloStatusOracle);

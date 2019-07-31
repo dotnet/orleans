@@ -215,7 +215,7 @@ namespace Orleans.Runtime.Messaging
                         address);
                 }
 
-                var connection = await this.connectionFactory.ConnectAsync(address.Endpoint, this.cancellation.Token);
+                var connection = await this.connectionFactory.ConnectAsync(address, this.cancellation.Token);
 
                 _ = Task.Run(async () =>
                 {
@@ -244,7 +244,7 @@ namespace Orleans.Runtime.Messaging
                     else
                     {
                         this.trace.LogInformation(
-                            "Connection to endpoint {EndPoint} closed.",
+                            "Connection to endpoint {EndPoint} closed",
                             address);
                     }
                 });
