@@ -203,12 +203,20 @@ namespace Orleans.Streams
 
         public Task CompleteStream()
         {
-            return this.observer == null ? Task.CompletedTask : this.observer.OnCompletedAsync();
+            return this.observer is null
+                ? this.batchObserver is null
+                    ? Task.CompletedTask
+                    : this.batchObserver.OnCompletedAsync()
+                : this.observer.OnCompletedAsync();
         }
 
         public Task ErrorInStream(Exception ex)
         {
-            return this.observer == null ? Task.CompletedTask : this.observer.OnErrorAsync(ex);
+            return this.observer is null
+                ? this.batchObserver is null
+                    ? Task.CompletedTask
+                    : this.batchObserver.OnErrorAsync(ex)
+                : this.observer.OnErrorAsync(ex);
         }
 
         internal bool SameStreamId(StreamId streamId)
