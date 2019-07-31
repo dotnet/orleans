@@ -180,6 +180,10 @@ namespace Orleans.Runtime.Messaging
                 && !Constants.SystemMembershipTableId.Equals(msg.TargetGrain))
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
+                if (this.log.IsEnabled(LogLevel.Warning))
+                {
+                    this.log.LogWarning("Dropping message {Message} since this silo is blocking application messages", msg);
+                }
             }
             else
             {
