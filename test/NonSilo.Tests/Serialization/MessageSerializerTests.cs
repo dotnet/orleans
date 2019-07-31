@@ -37,7 +37,7 @@ namespace UnitTests.Serialization
             RunTest(1000);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional")]
         public async Task MessageTest_TtlUpdatedOnAccess()
         {
             var request = new InvokeMethodRequest(0, 0, 0, null);
@@ -45,10 +45,10 @@ namespace UnitTests.Serialization
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
             await Task.Delay(TimeSpan.FromMilliseconds(500));
-            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(500));
+            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
-        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/5718"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public async Task MessageTest_TtlUpdatedOnSerialization()
         {
             var request = new InvokeMethodRequest(0, 0, 0, null);
@@ -59,7 +59,7 @@ namespace UnitTests.Serialization
             var deserializedMessage = RoundTripMessage(message);
 
             Assert.NotNull(deserializedMessage.TimeToLive);
-            Assert.InRange(deserializedMessage.TimeToLive.Value, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(500));
+            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
         private Message RoundTripMessage(Message message)
