@@ -14,7 +14,6 @@ namespace Orleans.Runtime.Messaging
     internal abstract class ConnectionListener
     {
         private readonly IConnectionListenerFactory listenerFactory;
-        private readonly ConnectionOptions connectionOptions;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly ConcurrentDictionary<Connection, Task> connections = new ConcurrentDictionary<Connection, Task>(ReferenceEqualsComparer.Instance);
         private readonly INetworkingTrace trace;
@@ -30,7 +29,7 @@ namespace Orleans.Runtime.Messaging
         {
             this.ServiceProvider = serviceProvider;
             this.listenerFactory = listenerFactory;
-            this.connectionOptions = connectionOptions.Value;
+            this.ConnectionOptions = connectionOptions.Value;
             this.trace = trace;
         }
 
@@ -39,6 +38,8 @@ namespace Orleans.Runtime.Messaging
         protected IServiceProvider ServiceProvider { get; }
 
         public int ConnectionCount => this.connections.Count;
+
+        protected ConnectionOptions ConnectionOptions { get; }
 
         protected abstract Connection CreateConnection(ConnectionContext context);
 
@@ -54,7 +55,7 @@ namespace Orleans.Runtime.Messaging
 
                     // Configure the connection builder using the user-defined options.
                     var connectionBuilder = new ConnectionBuilder(this.ServiceProvider);
-                    this.connectionOptions.ConfigureConnectionBuilder(connectionBuilder);
+                    this.ConnectionOptions.ConfigureConnectionBuilder(connectionBuilder);
                     Connection.ConfigureBuilder(connectionBuilder);
                     return this.connectionDelegate = connectionBuilder.Build();
                 }

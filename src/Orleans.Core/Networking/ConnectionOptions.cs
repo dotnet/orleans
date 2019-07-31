@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Orleans.Networking.Shared;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Configuration
 {
@@ -9,7 +10,12 @@ namespace Orleans.Configuration
         private readonly ConnectionBuilderDelegates connectionBuilder = new ConnectionBuilderDelegates();
 
         /// <summary>
-        /// The number of outbound connections to maintain for each endpoint.
+        /// The network protocol version to negotiate with.
+        /// </summary>
+        public NetworkProtocolVersion ProtocolVersion { get; set; } = NetworkProtocolVersion.Version1;
+
+        /// <summary>
+        /// The number of connections to maintain for each endpoint.
         /// </summary>
         public int ConnectionsPerEndpoint { get; set; } = 1;
 

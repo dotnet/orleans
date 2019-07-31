@@ -9,13 +9,9 @@ using Orleans.Networking.Shared;
 namespace Orleans.Runtime.Messaging
 {
     internal abstract class ConnectionFactory
-#if NETSTANDARD2_1
-        : IAsyncDisposable
-#endif
     {
         private readonly IConnectionFactory connectionFactory;
         private readonly IServiceProvider serviceProvider;
-        private readonly ConnectionOptions connectionOptions;
         private ConnectionDelegate connectionDelegate;
 
         protected ConnectionFactory(
@@ -25,8 +21,10 @@ namespace Orleans.Runtime.Messaging
         {
             this.connectionFactory = connectionFactory;
             this.serviceProvider = serviceProvider;
-            this.connectionOptions = connectionOptions.Value;
+            this.ConnectionOptions = connectionOptions.Value;
         }
+
+        protected ConnectionOptions ConnectionOptions { get; }
 
         protected ConnectionDelegate ConnectionDelegate
         {
@@ -40,19 +38,19 @@ namespace Orleans.Runtime.Messaging
 
                     // Configure the connection builder using the user-defined options.
                     var connectionBuilder = new ConnectionBuilder(this.serviceProvider);
-                    this.connectionOptions.ConfigureConnectionBuilder(connectionBuilder);
+                    this.ConnectionOptions.ConfigureConnectionBuilder(connectionBuilder);
                     Connection.ConfigureBuilder(connectionBuilder);
                     return this.connectionDelegate = connectionBuilder.Build();
                 }
             }
         }
 
-        protected abstract Connection CreateConnection(ConnectionContext context);
+        protected abstract Connection CreateConnection(SiloAddress address, ConnectionContext context);
 
-        public async ValueTask<Connection> ConnectAsync(EndPoint endpoint, CancellationToken cancellationToken)
+        public async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
         {
-            var connectionContext = await this.connectionFactory.ConnectAsync(endpoint, cancellationToken);
-            var connection = this.CreateConnection(connectionContext);
+            var connectionContext = await this.connectionFactory.ConnectAsync(address.Endpoint, cancellationToken);
+            var connection = this.CreateConnection(address, connectionContext);
             return connection;
         }
     }
