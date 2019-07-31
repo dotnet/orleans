@@ -174,7 +174,7 @@ namespace Orleans.Runtime.Messaging
                         // Inbound connection
                         var protocolVersion = await ReadPreamble();
 
-                        // To support graceful transition to higher protocol versions, send a preamble the remote endpoint supports it.
+                        // To support graceful transition to higher protocol versions, send a preamble if the remote endpoint supports it.
                         if (protocolVersion >= NetworkProtocolVersion.Version2)
                         {
                             await WritePreamble();
@@ -194,7 +194,7 @@ namespace Orleans.Runtime.Messaging
                         // Inbound connection
                         var protocolVersion = await ReadPreamble();
 
-                        // To support graceful transition from lower protocol versions, only send a preamble the remote endpoint supports it.
+                        // To support graceful transition from lower protocol versions, only send a preamble if the remote endpoint supports it.
                         if (protocolVersion >= NetworkProtocolVersion.Version2)
                         {
                             await WritePreamble();
