@@ -21,7 +21,6 @@ namespace Orleans.Runtime.Messaging
         private readonly CounterStatistic loadSheddingCounter;
         private readonly CounterStatistic gatewayTrafficCounter;
         private readonly SiloAddress myAddress;
-        private readonly ISiloStatusOracle siloStatusOracle;
 
         public GatewayInboundConnection(
             ConnectionContext connection,
@@ -35,8 +34,7 @@ namespace Orleans.Runtime.Messaging
             IOptions<MultiClusterOptions> multiClusterOptions,
             ConnectionOptions connectionOptions,
             MessageCenter messageCenter,
-            ILocalSiloDetails localSiloDetails,
-            ISiloStatusOracle siloStatusOracle)
+            ILocalSiloDetails localSiloDetails)
             : base(connection, middleware, serviceProvider, trace)
         {
             this.connectionOptions = connectionOptions;
@@ -49,7 +47,6 @@ namespace Orleans.Runtime.Messaging
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.gatewayTrafficCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
             this.myAddress = localSiloDetails.SiloAddress;
-            this.siloStatusOracle = siloStatusOracle;
         }
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
@@ -191,13 +188,6 @@ namespace Orleans.Runtime.Messaging
             // Fill in the outbound message with our silo address, if it's not already set
             if (msg.SendingSilo == null)
                 msg.SendingSilo = this.myAddress;
-
-            // If we know this silo is dead, don't bother
-            if (msg.TargetSilo != null && this.siloStatusOracle.IsDeadSilo(msg.TargetSilo))
-            {
-                FailMessage(msg, String.Format("Target {0} silo is known to be dead", msg.TargetSilo.ToLongString()));
-                return false;
-            }
 
             return true;
         }

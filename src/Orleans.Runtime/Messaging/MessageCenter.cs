@@ -42,11 +42,11 @@ namespace Orleans.Runtime.Messaging
         public MessageCenter(
             ILocalSiloDetails siloDetails,
             IOptions<SiloMessagingOptions> messagingOptions,
-            IOptions<NetworkingOptions> networkingOptions,
             MessageFactory messageFactory,
             Factory<MessageCenter, Gateway> gatewayFactory,
             ILoggerFactory loggerFactory,
             IOptions<StatisticsOptions> statisticsOptions,
+            ISiloStatusOracle siloStatusOracle,
             ConnectionManager senderManager)
         {
             this.messagingOptions = messagingOptions.Value;
@@ -55,23 +55,20 @@ namespace Orleans.Runtime.Messaging
             this.log = loggerFactory.CreateLogger<MessageCenter>();
             this.messageFactory = messageFactory;
             this.MyAddress = siloDetails.SiloAddress;
-            this.Initialize(networkingOptions, statisticsOptions);
+
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
+
+            inboundQueue = new InboundMessageQueue(this.loggerFactory.CreateLogger<InboundMessageQueue>(), statisticsOptions);
+            OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager, siloStatusOracle);
+
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Completed initialization.");
+
             if (siloDetails.GatewayAddress != null)
             {
                 Gateway = gatewayFactory(this);
             }
 
             messageHandlers = new Action<Message>[Enum.GetValues(typeof(Message.Categories)).Length];
-        }
-
-        private void Initialize(IOptions<NetworkingOptions> networkingOptions, IOptions<StatisticsOptions> statisticsOptions)
-        {
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
-
-            inboundQueue = new InboundMessageQueue(this.loggerFactory.CreateLogger<InboundMessageQueue>(), statisticsOptions);
-            OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager);
-
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Completed initialization.");
         }
 
         public void Start()

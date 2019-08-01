@@ -12,7 +12,6 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly MessageCenter messageCenter;
         private readonly MessageFactory messageFactory;
-        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly ConnectionManager connectionManager;
         private readonly ConnectionOptions connectionOptions;
 
@@ -25,14 +24,12 @@ namespace Orleans.Runtime.Messaging
             MessageCenter messageCenter,
             MessageFactory messageFactory,
             ILocalSiloDetails localSiloDetails,
-            ISiloStatusOracle siloStatusOracle,
             ConnectionManager connectionManager,
             ConnectionOptions connectionOptions)
             : base(connection, middleware, serviceProvider, trace)
         {
             this.messageCenter = messageCenter;
             this.messageFactory = messageFactory;
-            this.siloStatusOracle = siloStatusOracle;
             this.connectionManager = connectionManager;
             this.connectionOptions = connectionOptions;
             this.LocalSiloAddress = localSiloDetails.SiloAddress;
@@ -255,13 +252,6 @@ namespace Orleans.Runtime.Messaging
             if (msg.SendingSilo == null)
                 msg.SendingSilo = this.LocalSiloAddress;
 
-            // If we know this silo is dead, don't bother
-            if (msg.TargetSilo != null && this.siloStatusOracle.IsDeadSilo(msg.TargetSilo))
-            {
-                FailMessage(msg, $"Target {msg.TargetSilo.ToLongString()} silo is known to be dead");
-                return false;
-            }
-
             return true;
         }
 
@@ -285,13 +275,6 @@ namespace Orleans.Runtime.Messaging
         protected override void RetryMessage(Message msg, Exception ex = null)
         {
             if (msg == null) return;
-
-            // If we know this silo is dead, don't bother
-            if (msg.TargetSilo != null && this.siloStatusOracle.IsDeadSilo(msg.TargetSilo))
-            {
-                FailMessage(msg, $"Target {msg.TargetSilo.ToLongString()} silo is known to be dead");
-                return;
-            }
 
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {

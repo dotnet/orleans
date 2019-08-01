@@ -13,7 +13,6 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly INetworkingTrace trace;
         private readonly ILocalSiloDetails localSiloDetails;
-        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly MessageCenter messageCenter;
         private readonly MessageFactory messageFactory;
         private readonly EndpointOptions endpointOptions;
@@ -28,7 +27,6 @@ namespace Orleans.Runtime.Messaging
             INetworkingTrace trace,
             IOptions<EndpointOptions> endpointOptions,
             ILocalSiloDetails localSiloDetails,
-            ISiloStatusOracle siloStatusOracle,
             ConnectionManager connectionManager)
             : base(serviceProvider, listenerFactory, connectionOptions, trace)
         {
@@ -36,7 +34,6 @@ namespace Orleans.Runtime.Messaging
             this.messageFactory = messageFactory;
             this.trace = trace;
             this.localSiloDetails = localSiloDetails;
-            this.siloStatusOracle = siloStatusOracle;
             this.connectionManager = connectionManager;
             this.endpointOptions = endpointOptions.Value;
         }
@@ -54,7 +51,6 @@ namespace Orleans.Runtime.Messaging
                 this.messageCenter,
                 this.messageFactory,
                 this.localSiloDetails,
-                this.siloStatusOracle,
                 this.connectionManager,
                 this.ConnectionOptions);
         }
