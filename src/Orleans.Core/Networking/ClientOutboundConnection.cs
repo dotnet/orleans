@@ -92,7 +92,6 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                this.gatewayManager.MarkAsDead(this.RemoteSiloAddress);
                 this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this);
                 this.messageCenter.OnGatewayConnectionClosed();
             }
