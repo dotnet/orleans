@@ -37,17 +37,14 @@ namespace Orleans.Transactions.TestKit
     public class FaultInjectionTransactionalStateFactory : IFaultInjectionTransactionalStateFactory
     {
         private IGrainActivationContext context;
-        private JsonSerializerSettings serializerSettings;
-        public FaultInjectionTransactionalStateFactory(IGrainActivationContext context, ITypeResolver typeResolver, IGrainFactory grainFactory)
+        public FaultInjectionTransactionalStateFactory(IGrainActivationContext context)
         {
             this.context = context;
-            this.serializerSettings =
-                TransactionalStateFactory.GetJsonSerializerSettings(typeResolver, grainFactory);
         }
 
         public IFaultInjectionTransactionalState<TState> Create<TState>(IFaultInjectionTransactionalStateConfiguration config) where TState : class, new()
         {
-            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(this.context.ActivationServices, new TransactionalStateConfiguration(config), this.serializerSettings, this.context);
+            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(this.context.ActivationServices, new TransactionalStateConfiguration(config), this.context);
             FaultInjectionTransactionalState<TState> deactivationTransactionalState = ActivatorUtilities.CreateInstance<FaultInjectionTransactionalState<TState>>(this.context.ActivationServices, transactionalState, this.context);
             deactivationTransactionalState.Participate(context.ObservableLifecycle);
             return deactivationTransactionalState;
