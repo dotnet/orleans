@@ -548,8 +548,6 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                initStage = ActivationInitializationStage.SetupState;
-
                 initStage = ActivationInitializationStage.InvokeActivate;
                 await InvokeActivate(activation, requestContextData);
 
@@ -640,21 +638,6 @@ namespace Orleans.Runtime
                             RerouteAllQueuedMessages(activation, null,
                                 "Failed RegisterActivationInGrainDirectory", exception);
                         }
-                        break;
-
-                    case ActivationInitializationStage.SetupState: // failed to setup persistent state
-
-                        logger.Warn(ErrorCode.Catalog_Failed_SetupActivationState,
-                            string.Format("Failed to SetupActivationState for {0}.", activation), exception);
-                        // Need to undo the registration we just did earlier
-                        if (activation.IsUsingGrainDirectory)
-                        {
-                            scheduler.RunOrQueueTask(
-                                () => directory.UnregisterAsync(address, UnregistrationCause.Force),
-                                SchedulingContext).Ignore();
-                        }
-
-                        RerouteAllQueuedMessages(activation, null, "Failed SetupActivationState", exception);
                         break;
 
                     case ActivationInitializationStage.InvokeActivate: // failed to InvokeActivate
