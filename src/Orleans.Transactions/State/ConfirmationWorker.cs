@@ -21,9 +21,17 @@ namespace Orleans.Transactions.State
         private readonly Func<StorageBatch<TState>> getStorageBatch;
         private readonly ILogger logger;
         private readonly ITimerManager timerManager;
+        private readonly IActivationLifetime activationLifetime;
         private readonly HashSet<Guid> pending;
 
-        public ConfirmationWorker(IOptions<TransactionalStateOptions> options, ParticipantId me, BatchWorker storageWorker, Func<StorageBatch<TState>> getStorageBatch, ILogger logger, ITimerManager timerManager)
+        public ConfirmationWorker(
+            IOptions<TransactionalStateOptions> options,
+            ParticipantId me,
+            BatchWorker storageWorker,
+            Func<StorageBatch<TState>> getStorageBatch,
+            ILogger logger,
+            ITimerManager timerManager,
+            IActivationLifetime activationLifetime)
         {
             this.options = options.Value;
             this.me = me;
@@ -31,12 +39,13 @@ namespace Orleans.Transactions.State
             this.getStorageBatch = getStorageBatch;
             this.logger = logger;
             this.timerManager = timerManager;
+            this.activationLifetime = activationLifetime;
             this.pending = new HashSet<Guid>();
         }
 
         public void Add(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
         {
-            if(!IsConfirmed(transactionId))
+            if (!IsConfirmed(transactionId))
             {
                 this.pending.Add(transactionId);
                 SendConfirmation(transactionId, timestamp, participants).Ignore();
@@ -67,18 +76,36 @@ namespace Orleans.Transactions.State
                         this.logger))
                     .ToList();
 
+            if (confirmations.Count == 0) return;
+
             // attempts to confirm all, will retry every ConfirmationRetryDelay until all succeed
-            while ((await Task.WhenAll(confirmations.Select(c => c.Confirmed()))).Any(b => !b))
+            var ct = this.activationLifetime.OnDeactivating;
+            while (!ct.IsCancellationRequested && await HasPendingConfirmations(confirmations))
             {
-               await this.timerManager.Delay(this.options.ConfirmationRetryDelay);
+                await this.timerManager.Delay(this.options.ConfirmationRetryDelay);
+            }
+
+            async Task<bool> HasPendingConfirmations(List<Confirmation> values)
+            {
+                using (this.activationLifetime.BlockDeactivation())
+                {
+                    var results = await Task.WhenAll(confirmations.Select(c => c.Confirmed()));
+                    return results.Any(b => !b);
+                }
             }
         }
 
         // retries collect until it succeeds
         private async Task Collect(Guid transactionId)
         {
-            while (!await TryCollect(transactionId))
+            var ct = this.activationLifetime.OnDeactivating;
+            while (!ct.IsCancellationRequested)
             {
+                using (this.activationLifetime.BlockDeactivation())
+                {
+                    if (await TryCollect(transactionId)) break;
+                }
+
                 await this.timerManager.Delay(this.options.ConfirmationRetryDelay);
             }
         }
@@ -145,7 +172,8 @@ namespace Orleans.Transactions.State
                 {
                     await this.pending;
                     this.complete = true;
-                } catch(Exception ex)
+                }
+                catch (Exception ex)
                 {
                     this.pending = null;
                     logger.LogWarning(ex, "Confirmation of transaction {TransactionId} with timestamp {Timestamp} to participant {Participant} failed.  Retrying", this.transactionId, this.timestamp, this.participant);
