@@ -88,8 +88,16 @@ namespace NonSilo.Tests.Membership
             {
                 Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
             }
+
+            while (!stopped.IsCompleted)
+            {
+                while (timerCalls.TryDequeue(out var call)) call.Completion.TrySetResult(false);
+                await Task.Delay(15);
+            }
+
             await stopped;
         }
+
         private static async Task Until(Func<bool> condition)
         {
             var maxTimeout = 40_000;
