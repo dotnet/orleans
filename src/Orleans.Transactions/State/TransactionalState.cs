@@ -5,8 +5,6 @@ using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
@@ -25,11 +23,9 @@ namespace Orleans.Transactions
         private readonly IGrainActivationContext context;
         private readonly ITransactionDataCopier<TState> copier;
         private readonly Dictionary<Type,object> copiers;
-        private readonly IProviderRuntime runtime;
         private readonly IGrainRuntime grainRuntime;
         private readonly ILoggerFactory loggerFactory;
-        private readonly JsonSerializerSettings serializerSettings;
-
+        private readonly ActivationLifetime activationLifetime;
         private ILogger logger;
         private ParticipantId participantId;
         private TransactionQueue<TState> queue;
@@ -41,22 +37,18 @@ namespace Orleans.Transactions
         public TransactionalState(
             TransactionalStateConfiguration transactionalStateConfiguration, 
             IGrainActivationContext context, 
-            ITransactionDataCopier<TState> copier, 
-            IProviderRuntime runtime,
+            ITransactionDataCopier<TState> copier,
             IGrainRuntime grainRuntime,
-            ILoggerFactory loggerFactory, 
-            JsonSerializerSettings serializerSettings
-            )
+            ILoggerFactory loggerFactory)
         {
             this.config = transactionalStateConfiguration;
             this.context = context;
             this.copier = copier;
-            this.runtime = runtime;
             this.grainRuntime = grainRuntime;
             this.loggerFactory = loggerFactory;
-            this.serializerSettings = serializerSettings;
             this.copiers = new Dictionary<Type, object>();
             this.copiers.Add(typeof(TState), copier);
+            this.activationLifetime = new ActivationLifetime(this.context);
         }
 
         /// <summary>
@@ -221,7 +213,7 @@ namespace Orleans.Transactions
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
             var timerManager = this.context.ActivationServices.GetRequiredService<ITimerManager>();
-            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, clock, logger, timerManager);
+            this.queue = new TransactionQueue<TState>(options, this.participantId, deactivate, storage, clock, logger, timerManager, this.activationLifetime);
 
             setupResourceFactory(this.context, this.config.StateName, queue);
 

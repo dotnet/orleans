@@ -9,16 +9,14 @@ namespace Orleans.Transactions
     public class TransactionalStateFactory : ITransactionalStateFactory
     {
         private IGrainActivationContext context;
-        private JsonSerializerSettings serializerSettings;
-        public TransactionalStateFactory(IGrainActivationContext context, ITypeResolver typeResolver, IGrainFactory grainFactory)
+        public TransactionalStateFactory(IGrainActivationContext context)
         {
             this.context = context;
-            this.serializerSettings = GetJsonSerializerSettings(typeResolver, grainFactory);
         }
 
         public ITransactionalState<TState> Create<TState>(TransactionalStateConfiguration config) where TState : class, new()
         {
-            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(this.context.ActivationServices, config, this.serializerSettings, this.context);
+            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(this.context.ActivationServices, config, this.context);
             transactionalState.Participate(context.ObservableLifecycle);
             return transactionalState;
         }
