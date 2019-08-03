@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -230,10 +231,7 @@ namespace NonSilo.Tests.Membership
                 Assert.Equal(0, ((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes);
             }
 
-            var stopped = this.lifecycle.OnStop();
-            while (!this.timerCalls.TryDequeue(out timer)) await Task.Delay(1);
-            timer.Completion.TrySetResult(false);
-            await stopped;
+            await StopLifecycle();
         }
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
@@ -245,6 +243,19 @@ namespace NonSilo.Tests.Membership
             var maxTimeout = 40_000;
             while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
             Assert.True(maxTimeout > 0);
+        }
+
+        private async Task StopLifecycle(CancellationToken cancellation = default)
+        {
+            var stopped = this.lifecycle.OnStop(cancellation);
+
+            while (!stopped.IsCompleted)
+            {
+                while (this.timerCalls.TryDequeue(out var call)) call.Completion.TrySetResult(false);
+                await Task.Delay(15);
+            }
+
+            await stopped;
         }
     }
 }
