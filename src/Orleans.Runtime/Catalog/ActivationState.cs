@@ -1,4 +1,4 @@
-﻿namespace Orleans.Runtime
+namespace Orleans.Runtime
 {
     internal enum ActivationState
     {
@@ -19,8 +19,12 @@
         ///// </summary>
         Deactivating,
         /// <summary>
-        /// Tombstone for activation that was unable to be properly created
+        /// Tombstone for activation that is not registered in the Directory
         /// </summary>
         Invalid,
+        /// <summary>
+        /// Tombstone for activation that threw an exception in OnActivateAsync
+        /// </summary>
+        FailedToActivate,
     }
 }
