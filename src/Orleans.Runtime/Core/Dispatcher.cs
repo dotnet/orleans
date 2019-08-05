@@ -399,6 +399,17 @@ namespace Orleans.Runtime
         {
             lock (targetActivation)
             {
+                if (targetActivation.State == ActivationState.Invalid || targetActivation.State == ActivationState.FailedToActivate)
+                {
+                    ProcessRequestToInvalidActivation(
+                        message,
+                        targetActivation.Address,
+                        targetActivation.ForwardingAddress,
+                        "HandleIncomingRequest",
+                        rejectMessages: targetActivation.State == ActivationState.FailedToActivate);
+                    return;
+                }
+
                 if (targetActivation.Grain.IsGrain && message.IsUsingInterfaceVersions)
                 {
                     var request = (InvokeMethodRequest)message.BodyObject;
@@ -406,12 +417,6 @@ namespace Orleans.Runtime
                     var currentVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
                     if (!compatibilityDirector.IsCompatible(request.InterfaceVersion, currentVersion))
                         catalog.DeactivateActivationOnIdle(targetActivation);
-                }
-
-                if (targetActivation.State == ActivationState.Invalid || targetActivation.State == ActivationState.Deactivating)
-                {
-                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "HandleIncomingRequest");
-                    return;
                 }
 
                 // Now we can actually scheduler processing of this request
@@ -445,6 +450,9 @@ namespace Orleans.Runtime
                 case ActivationData.EnqueueMessageResult.ErrorInvalidActivation:
                     ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest");
                     break;
+                case ActivationData.EnqueueMessageResult.ErrorActivateFailed:
+                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest", rejectMessages: true);
+                    break;
                 case ActivationData.EnqueueMessageResult.ErrorStuckActivation:
                     // Avoid any new call to this activation
                     catalog.DeactivateStuckActivation(targetActivation);
@@ -468,8 +476,9 @@ namespace Orleans.Runtime
             Message message, 
             ActivationAddress oldAddress, 
             ActivationAddress forwardingAddress, 
-            string failedOperation, 
-            Exception exc = null)
+            string failedOperation,
+            Exception exc = null,
+            bool rejectMessages = false)
         {
             // Just use this opportunity to invalidate local Cache Entry as well. 
             if (oldAddress != null)
@@ -477,9 +486,18 @@ namespace Orleans.Runtime
                 this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
             }
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
-            scheduler.QueueWorkItem(new ClosureWorkItem(
-                () => TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc)),
-                catalog.SchedulingContext);
+            if (rejectMessages)
+            {
+                scheduler.QueueWorkItem(new ClosureWorkItem(
+                    () => RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation)),
+                    catalog.SchedulingContext);
+            }
+            else
+            {
+                scheduler.QueueWorkItem(new ClosureWorkItem(
+                    () => TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc)),
+                    catalog.SchedulingContext);
+            }
         }
 
         internal void ProcessRequestsToInvalidActivation(
