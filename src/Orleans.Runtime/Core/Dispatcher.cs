@@ -416,7 +416,15 @@ namespace Orleans.Runtime
                     var compatibilityDirector = compatibilityDirectorManager.GetDirector(request.InterfaceId);
                     var currentVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
                     if (!compatibilityDirector.IsCompatible(request.InterfaceVersion, currentVersion))
+                    {
                         catalog.DeactivateActivationOnIdle(targetActivation);
+                        ProcessRequestToInvalidActivation(
+                            message,
+                            targetActivation.Address,
+                            targetActivation.ForwardingAddress,
+                            "HandleIncomingRequest - Incompatible request");
+                        return;
+                    }
                 }
 
                 // Now we can actually scheduler processing of this request
