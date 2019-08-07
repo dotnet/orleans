@@ -262,15 +262,7 @@ namespace Orleans.Runtime
         {
             lock (targetActivation)
             {
-                if (targetActivation.State == ActivationState.Invalid)
-                {
-                    ProcessRequestToInvalidActivation(
-                        message,
-                        targetActivation.Address,
-                        targetActivation.ForwardingAddress,
-                        "ReceiveRequest");
-                }
-                else if (!ActivationMayAcceptRequest(targetActivation, message))
+                if (!ActivationMayAcceptRequest(targetActivation, message))
                 {
                     // Check for deadlock before Enqueueing.
                     if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
