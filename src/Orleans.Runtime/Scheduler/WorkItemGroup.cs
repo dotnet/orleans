@@ -235,19 +235,19 @@ namespace Orleans.Runtime.Scheduler
             {
                 this.log.LogWarning(
                     (int)ErrorCode.SchedulerEnqueueWorkWhenShutdown,
-                    "Enqueuing task {Task} to a work item group which should have terminated. "
+                     "Enqueuing task {Task} to a work item group which should have terminated. "
                     + "Likely reasons are that the task is not being 'awaited' properly or a TaskScheduler was captured and is being used to schedule tasks "
-                    + "after a grain has been deactivated.\nWorkItemGroup: {Status}",
+                    + "after a grain has been deactivated.\nWorkItemGroup: {Status}\nTask.AsyncState: {TaskState}\n{Stack}",
                     OrleansTaskExtentions.ToString(task),
-                    this.DumpStatus());
+                    this.DumpStatus(),
+                    task.AsyncState,
+                    Utils.GetStackTrace());
 
                 this.lastShutdownWarningTimestamp = now;
             }
             else if (ValueStopwatch.FromTimestamp(this.lastShutdownWarningTimestamp, now).Elapsed > this.masterScheduler.StoppedWorkItemGroupWarningInterval)
             {
                 // Upgrade the warning to an error after 1 minute, include a stack trace, and continue to log up to once per minute.
-                var stackTrace = Utils.GetStackTrace();
-                
                 this.log.LogError(
                     (int)ErrorCode.SchedulerEnqueueWorkWhenShutdown,
                     "Enqueuing task {Task} to a work item group which should have terminated. "
@@ -256,7 +256,7 @@ namespace Orleans.Runtime.Scheduler
                     OrleansTaskExtentions.ToString(task),
                     this.DumpStatus(),
                     task.AsyncState,
-                    stackTrace);
+                    Utils.GetStackTrace());
 
                 this.lastShutdownWarningTimestamp = now;
             }
