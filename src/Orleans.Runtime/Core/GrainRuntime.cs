@@ -114,7 +114,7 @@ namespace Orleans.Runtime
 
             if (context.ActivationContext is SchedulingContext schedulingContext
                 && schedulingContext.Activation is ActivationData activation
-                && activation.State == ActivationState.Invalid)
+                && (activation.State == ActivationState.Invalid || activation.State == ActivationState.FailedToActivate))
             {
                 // Move exceptions into local functions to help inlining this method.
                 ThrowInvalidActivation(activation);

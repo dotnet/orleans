@@ -400,6 +400,7 @@ namespace Orleans.Runtime
             Success,
             ErrorInvalidActivation,
             ErrorStuckActivation,
+            ErrorActivateFailed,
         }
 
         /// <summary>
@@ -415,6 +416,12 @@ namespace Orleans.Runtime
                     logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
                         "Cannot enqueue message to invalid activation {0} : {1}", this.ToDetailedString(), message);
                     return EnqueueMessageResult.ErrorInvalidActivation;
+                }
+                if (State == ActivationState.FailedToActivate)
+                {
+                    logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
+                        "Cannot enqueue message to activation that failed in OnActivate {0} : {1}", this.ToDetailedString(), message);
+                    return EnqueueMessageResult.ErrorActivateFailed;
                 }
                 if (State == ActivationState.Deactivating)
                 {
