@@ -46,7 +46,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal SiloAddress MyAddress { get; private set; }
 
-        internal IGrainDirectoryCache<IReadOnlyList<Tuple<SiloAddress, ActivationId>>> DirectoryCache { get; private set; }
+        internal IGrainDirectoryCache DirectoryCache { get; private set; }
         internal GrainDirectoryPartition DirectoryPartition { get; private set; }
 
         public RemoteGrainDirectory RemoteGrainDirectory { get; private set; }
@@ -117,7 +117,7 @@ namespace Orleans.Runtime.GrainDirectory
             membershipCache = new HashSet<SiloAddress>();
             ClusterId = clusterId;
 
-            DirectoryCache = GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCache(grainDirectoryOptions.Value);
+            DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(grainDirectoryOptions.Value);
             /* TODO - investigate dynamic config changes using IOptions - jbragg
                         clusterConfig.OnConfigChange("Globals/Caching", () =>
                         {
@@ -128,10 +128,9 @@ namespace Orleans.Runtime.GrainDirectory
                         });
             */
             maintainer =
-                GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCacheMaintainer(
+                GrainDirectoryCacheFactory.CreateGrainDirectoryCacheMaintainer(
                     this,
                     this.DirectoryCache,
-                    activations => activations.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList().AsReadOnly(),
                     grainFactory, 
                     executorService,
                     loggerFactory);
@@ -1157,7 +1156,7 @@ namespace Orleans.Runtime.GrainDirectory
             return siloAddr.GetConsistentHashCode() <= hash && (!excludeMySelf || !siloAddr.Equals(MyAddress));
         }
 
-        private static void RemoveActivations(IGrainDirectoryCache<IReadOnlyList<Tuple<SiloAddress, ActivationId>>> directoryCache, GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> activations, int version, Func<Tuple<SiloAddress, ActivationId>, bool> doRemove)
+        private static void RemoveActivations(IGrainDirectoryCache directoryCache, GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> activations, int version, Func<Tuple<SiloAddress, ActivationId>, bool> doRemove)
         {
             int removeCount = activations.Count(doRemove);
             if (removeCount == 0)
