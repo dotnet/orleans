@@ -199,11 +199,9 @@ namespace Orleans.Runtime.Messaging
                 Message message = default;
                 while (true)
                 {
-                    var readResultTask = input.ReadAsync();
-                    var readResult = readResultTask.IsCompletedSuccessfully ? readResultTask.GetAwaiter().GetResult() : await readResultTask;
+                    var readResult = await input.ReadAsync();
 
                     var buffer = readResult.Buffer;
-
                     if (buffer.Length >= requiredBytes)
                     {
                         do
@@ -269,8 +267,7 @@ namespace Orleans.Runtime.Messaging
 
                 while (true)
                 {
-                    var moreTask = reader.WaitToReadAsync();
-                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask;
+                    var more = await reader.WaitToReadAsync();
                     if (!more)
                     {
                         break;
@@ -295,8 +292,7 @@ namespace Orleans.Runtime.Messaging
                         this.OnMessageSerializationFailure(message, exception);
                     }
 
-                    var flushTask = output.FlushAsync();
-                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask;
+                    var flushResult = await output.FlushAsync();
                     if (flushResult.IsCompleted || flushResult.IsCanceled || connectionClosed.IsCancellationRequested)
                     {
                         break;
