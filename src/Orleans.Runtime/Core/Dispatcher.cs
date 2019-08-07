@@ -240,8 +240,8 @@ namespace Orleans.Runtime
             {
                 if (targetActivation.State == ActivationState.Invalid || targetActivation.State == ActivationState.FailedToActivate)
                 {
-                    logger.Warn(ErrorCode.Dispatcher_Receive_InvalidActivation,
-                        "Response received for {state} activation {message}", targetActivation.State, message);
+                    logger.Warn((int)ErrorCode.Dispatcher_Receive_InvalidActivation,
+                        "Response received for {State} activation {Message}", targetActivation.State, message);
                     MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Invalid");
                     return;
                 }
