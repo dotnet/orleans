@@ -4,11 +4,11 @@ using System.Text;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class AdaptiveGrainDirectoryCache<TValue> : IGrainDirectoryCache<TValue>
+    internal class AdaptiveGrainDirectoryCache : IGrainDirectoryCache
     {
         internal class GrainDirectoryCacheEntry
         {
-            internal TValue Value { get; private set; }
+            internal IReadOnlyList<Tuple<SiloAddress, ActivationId>> Value { get; private set; }
 
             internal DateTime Created { get; set; }
 
@@ -24,7 +24,7 @@ namespace Orleans.Runtime.GrainDirectory
             /// </summary>
             internal int NumAccesses { get; set; }
 
-            internal GrainDirectoryCacheEntry(TValue value, int etag, DateTime created, TimeSpan expirationTimer)
+            internal GrainDirectoryCacheEntry(IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int etag, DateTime created, TimeSpan expirationTimer)
             {
                 Value = value;
                 ETag = etag;
@@ -71,7 +71,7 @@ namespace Orleans.Runtime.GrainDirectory
             IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_CACHE_SIZE, () => cache.Count);
         }
 
-        public void AddOrUpdate(GrainId key, TValue value, int version)
+        public void AddOrUpdate(GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int version)
         {            
             var entry = new GrainDirectoryCacheEntry(value, version, DateTime.UtcNow, initialExpirationTimer);
 
@@ -90,9 +90,9 @@ namespace Orleans.Runtime.GrainDirectory
             cache.Clear();
         }
 
-        public bool LookUp(GrainId key, out TValue result, out int version)
+        public bool LookUp(GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result, out int version)
         {
-            result = default(TValue);
+            result = default(IReadOnlyList<Tuple<SiloAddress, ActivationId>>);
             version = default(int);
             NumAccesses++;      // for stats
 
@@ -109,16 +109,16 @@ namespace Orleans.Runtime.GrainDirectory
             return true;
         }
 
-        public IReadOnlyList<Tuple<GrainId, TValue, int>> KeyValues
+        public IReadOnlyList<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> KeyValues
         {
             get
             {
-                var result = new List<Tuple<GrainId, TValue, int>>();
+                var result = new List<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>>();
                 IEnumerator<KeyValuePair<GrainId, GrainDirectoryCacheEntry>> enumerator = GetStoredEntries();
                 while (enumerator.MoveNext())
                 {
                     var current = enumerator.Current;
-                    result.Add(new Tuple<GrainId, TValue, int>(current.Key, current.Value.Value, current.Value.ETag));
+                    result.Add(new Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>(current.Key, current.Value.Value, current.Value.ETag));
                 }
                 return result;
             }
