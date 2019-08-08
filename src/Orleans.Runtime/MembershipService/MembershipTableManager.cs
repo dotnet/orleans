@@ -759,9 +759,9 @@ namespace Orleans.Runtime.MembershipService
                 {
                     if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Successfully updated {0} status to Dead in the Membership table.", entry.SiloAddress);
 
-                    GossipToOthers(entry.SiloAddress, entry.Status).Ignore();
                     var table = await membershipTableProvider.ReadAll();
                     this.ProcessTableUpdate(table, "DeclareDead");
+                    GossipToOthers(entry.SiloAddress, entry.Status).Ignore();
                     return true;
                 }
                 
