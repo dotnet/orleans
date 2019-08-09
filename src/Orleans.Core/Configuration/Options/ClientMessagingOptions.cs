@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Sockets;
 
 namespace Orleans.Configuration
@@ -26,5 +27,10 @@ namespace Orleans.Configuration
         /// The Interface attribute specifies the name of the network interface to use to work out an IP address for this machine.
         /// </summary>
         public string NetworkInterfaceName { get; set; }
+
+        /// <summary>
+        /// The IP address used for cluster client.
+        /// </summary>
+        public IPAddress LocalAddress { get; set; }
     }
 }
