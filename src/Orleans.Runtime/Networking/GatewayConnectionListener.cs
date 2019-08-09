@@ -16,6 +16,7 @@ namespace Orleans.Runtime.Messaging
         private readonly IOptions<MultiClusterOptions> multiClusterOptions;
         private readonly MessageCenter messageCenter;
         private readonly EndpointOptions endpointOptions;
+        private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly MessageFactory messageFactory;
         private readonly OverloadDetector overloadDetector;
         private readonly Gateway gateway;
@@ -23,6 +24,7 @@ namespace Orleans.Runtime.Messaging
         public GatewayConnectionListener(
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
+            IOptions<SiloConnectionOptions> siloConnectionOptions,
             IConnectionListenerFactory listenerFactory,
             MessageFactory messageFactory,
             OverloadDetector overloadDetector,
@@ -35,6 +37,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionManager connectionManager)
             : base(serviceProvider, listenerFactory, connectionOptions, connectionManager, trace)
         {
+            this.siloConnectionOptions = siloConnectionOptions.Value;
             this.messageFactory = messageFactory;
             this.overloadDetector = overloadDetector;
             this.gateway = gateway;
@@ -62,6 +65,13 @@ namespace Orleans.Runtime.Messaging
                 this.ConnectionOptions,
                 this.messageCenter,
                 this.localSiloDetails);
+        }
+
+        protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
+        {
+            var configureDelegate = (SiloConnectionOptions.ISiloConnectionBuilderOptions)this.siloConnectionOptions;
+            configureDelegate.ConfigureGatewayInboundBuilder(connectionBuilder);
+            base.ConfigureConnectionBuilder(connectionBuilder);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

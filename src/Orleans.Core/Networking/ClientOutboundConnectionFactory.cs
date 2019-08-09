@@ -7,26 +7,28 @@ using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class ClientOutboundConnectionFactory : ConnectionFactory
+    internal sealed class ClientOutboundConnectionFactory : ConnectionFactory, IConnectionDirectionFeature
     {
         private readonly IServiceProvider serviceProvider;
+        private readonly ClientConnectionOptions clientConnectionOptions;
         private readonly MessageFactory messageFactory;
         private readonly INetworkingTrace trace;
         private readonly object initializationLock = new object();
         private bool isInitialized;
-        private GatewayManager gatewayManager;
         private ClientMessageCenter messageCenter;
         private ConnectionManager connectionManager;
 
         public ClientOutboundConnectionFactory(
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
+            IOptions<ClientConnectionOptions> clientConnectionOptions,
             IConnectionFactory connectionFactory,
             MessageFactory messageFactory,
             INetworkingTrace trace)
             : base(connectionFactory, serviceProvider, connectionOptions)
         {
             this.serviceProvider = serviceProvider;
+            this.clientConnectionOptions = clientConnectionOptions.Value;
             this.messageFactory = messageFactory;
             this.trace = trace;
         }
@@ -47,6 +49,20 @@ namespace Orleans.Runtime.Messaging
                 this.ConnectionOptions);
         }
 
+        protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
+        {
+            connectionBuilder.Use(next =>
+            {
+                return async context =>
+                {
+                    context.Features.Set<IConnectionDirectionFeature>(this);
+                    await next(context);
+                };
+            });
+            this.clientConnectionOptions.ConfigureConnectionBuilder(connectionBuilder);
+            base.ConfigureConnectionBuilder(connectionBuilder);
+        }
+
         private void EnsureInitialized()
         {
             if (!isInitialized)
@@ -56,12 +72,13 @@ namespace Orleans.Runtime.Messaging
                     if (!isInitialized)
                     {
                         this.messageCenter = this.serviceProvider.GetRequiredService<ClientMessageCenter>();
-                        this.gatewayManager = this.serviceProvider.GetRequiredService<GatewayManager>();
                         this.connectionManager = this.serviceProvider.GetRequiredService<ConnectionManager>();
                         this.isInitialized = true;
                     }
                 }
             }
         }
+
+        bool IConnectionDirectionFeature.IsOutboundConnection => true;
     }
 }

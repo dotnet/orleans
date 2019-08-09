@@ -40,6 +40,11 @@ set TESTS=^
 %CMDHOME%\test\Transactions\Orleans.Transactions.Azure.Test,^
 %CMDHOME%\test\TestInfrastructure\Orleans.TestingHost.Tests,^
 %CMDHOME%\test\DependencyInjection.Tests
+
+:: Add to TESTS once dotnet-xunit supports .NET Core 3.0 (post dotnet-xunit v2.4.1)
+rem %CMDHOME%\test\Orleans.Connections.Security.Tests
+rem %CMDHOME%\test\NetCore.Tests
+
 rem %CMDHOME%\test\Analyzers.Tests
 
 if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait Category=BVT -trait Category=SlowBVT

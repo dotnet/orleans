@@ -26,11 +26,11 @@ namespace Orleans.Runtime.Messaging
 
         public ConnectionManager(
             IOptions<ConnectionOptions> connectionOptions,
-            ConnectionFactory connectionBuilder,
+            ConnectionFactory connectionFactory,
             INetworkingTrace trace)
         {
             this.connectionOptions = connectionOptions.Value;
-            this.connectionFactory = connectionBuilder;
+            this.connectionFactory = connectionFactory;
             this.trace = trace;
         }
 
