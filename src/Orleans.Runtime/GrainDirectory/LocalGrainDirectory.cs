@@ -20,29 +20,6 @@ namespace Orleans.Runtime.GrainDirectory
         MarshalByRefObject,
         ILocalGrainDirectory, ISiloStatusListener
     {
-        /// <summary>
-        /// list of silo members sorted by the hash value of their address
-        /// </summary>
-        private readonly List<SiloAddress> mutableMembershipRingList = new List<SiloAddress>();
-        private readonly HashSet<SiloAddress> mutableMembershipCache = new HashSet<SiloAddress>();
-        private readonly object writeLock = new object();
-
-        private DirectoryMembership directoryMembership = DirectoryMembership.Default;
-
-        private class DirectoryMembership
-        {
-            public DirectoryMembership(ImmutableList<SiloAddress> membershipRingList, ImmutableHashSet<SiloAddress> membershipCache)
-            {
-                this.MembershipRingList = membershipRingList;
-                this.MembershipCache = membershipCache;
-            }
-
-            public static DirectoryMembership Default { get; }  = new DirectoryMembership(ImmutableList<SiloAddress>.Empty, ImmutableHashSet<SiloAddress>.Empty);
-
-            public ImmutableList<SiloAddress> MembershipRingList { get; }
-            public ImmutableHashSet<SiloAddress> MembershipCache { get; }
-        }        
-
         private readonly DedicatedAsynchAgent maintainer;
         private readonly ILogger log;
         private readonly SiloAddress seed;
@@ -50,7 +27,9 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IMultiClusterOracle multiClusterOracle;
         private readonly IInternalGrainFactory grainFactory;
+        private readonly object writeLock = new object();
         private Action<SiloAddress, SiloStatus> catalogOnSiloRemoved;
+        private DirectoryMembership directoryMembership = DirectoryMembership.Default;
 
         // Consider: move these constants into an apropriate place
         internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
@@ -1177,6 +1156,20 @@ namespace Orleans.Runtime.GrainDirectory
         public bool IsSiloInCluster(SiloAddress silo)
         {
             return this.directoryMembership.MembershipCache.Contains(silo);
+        }
+
+        private class DirectoryMembership
+        {
+            public DirectoryMembership(ImmutableList<SiloAddress> membershipRingList, ImmutableHashSet<SiloAddress> membershipCache)
+            {
+                this.MembershipRingList = membershipRingList;
+                this.MembershipCache = membershipCache;
+            }
+
+            public static DirectoryMembership Default { get; } = new DirectoryMembership(ImmutableList<SiloAddress>.Empty, ImmutableHashSet<SiloAddress>.Empty);
+
+            public ImmutableList<SiloAddress> MembershipRingList { get; }
+            public ImmutableHashSet<SiloAddress> MembershipCache { get; }
         }
     }
 }
