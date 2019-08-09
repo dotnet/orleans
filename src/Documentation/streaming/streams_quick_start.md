@@ -40,7 +40,7 @@ var streamProvider = GetStreamProvider("SMSProvider");
 var stream = streamProvider.GetStream<int>(guid, "RANDOMDATA");
 ```
 
-As you can see our stream has a GUID and a namespace. This will make it easy to identify unique streams. For example, in a chat room namespace can "Rooms" and GUID be the owning RoomGrain's GUID.
+As you can see our stream has a GUID and a namespace. This will make it easy to identify unique streams. For example, a chat room the namespace can be "Rooms" and GUID can be the owning RoomGrain's GUID.
 
 Here we use the GUID of some known chat room. Now using the `OnNext` method of the stream we can push data to it. Let's do it inside a timer and using random numbers. You could use any other data type for the stream as well.
 
@@ -77,9 +77,9 @@ var stream = streamProvider.GetStream<int>(guid, "RANDOMDATA");
 await stream.SubscribeAsync<int>(async (data, token) => Console.WriteLine(data));
 ```
 
-We are all set now. The only requirement is that something triggers our producer grain's creation and then it will registers the timer and starts sending random ints to all interested parties.
+We are all set now. The only requirement is that something triggers our producer grain's creation and then it will register the timer and start sending random ints to all interested parties.
 
-Again, this guide skips lots of details and is only good for showing the big picture. Read other parts of this manual and other resources on RX to gain a good understanding on what is available and how.
+Again, this guide skips lots of details and is only good for showing the big picture. Read other parts of this manual and other resources on RX to gain a good understanding of what is available and how.
 
 Reactive programming can be a very powerful approach to solve many problems. You could for example use LINQ in the subscriber to filter numbers and do all sorts of interesting stuff.
 
