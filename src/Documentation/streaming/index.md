@@ -66,24 +66,24 @@ After reading it you should read the [Streams Programming APIs](streams_programm
 
 ## Streams Programming APIs
 
-A [Streams Programming APIs](streams_programming_APIs.md) provides detailed description of the programming APIs.
+A [Streams Programming APIs](streams_programming_APIs.md) provides a detailed description of the programming APIs.
 
 ## Stream Providers
 
-Streams can come via physical channels of various shapes and forms and can have different semantics. Orleans Streaming is designed to support this diversity via the concept of **Stream Providers**, which is an extensibility point in the system. Orleans currently has implementation of two stream providers: TCP based **Simple Message Stream Provider** and Azure Queue based **Azure Queue Stream Provider**.
+Streams can come via physical channels of various shapes and forms and can have different semantics. Orleans Streaming is designed to support this diversity via the concept of **Stream Providers**, which is an extensibility point in the system. Orleans currently has implementations of two stream providers: TCP based **Simple Message Stream Provider** and Azure Queue based **Azure Queue Stream Provider**.
 More details on Steam Providers can be found at [Stream Providers](stream_providers.md).
 
 
 ## Stream Semantics
 
-**Stream Subsription Semantics**:
-Orleans Streams guarantee Sequential Consistency for Stream Subsription operations. Specificaly, when consumer subscribes to a stream, once the `Task` representing the subsription operation was successfuly resolved, the consumer will see all events that were generated after it has subscribed. In addition, Rewindable streams allow to subscribe from an arbitrary point in time in the past by using `StreamSequenceToken` (more details can be found [here](stream_providers.md)).
+**Stream Subscription Semantics**:
+Orleans Streams guarantee Sequential Consistency for Stream Subscription operations. Specifically, when a consumer subscribes to a stream, once the `Task` representing the subscription operation was successfuly resolved, the consumer will see all events that were generated after it has subscribed. In addition, Rewindable streams allow to subscribe from an arbitrary point in time in the past by using `StreamSequenceToken` (more details can be found [here](stream_providers.md)).
 
 **Individual Stream Events Delivery Guarantees**:
-Individual event delivery guarantees depend on individual stream providers. Some provide only best-effort at-most-once delivery (such as Simple Message Streams), while others provide at-least-once delivery (such as Azure Queue Streams). It is even possible to build a stream provider that will guarantee exactly-once delivery (we don't have such a provider yet, but it is possible to build one.
+Individual event delivery guarantees depend on individual stream providers. Some provide only best-effort at-most-once delivery (such as Simple Message Streams (SMS)), while others provide at-least-once delivery (such as Azure Queue Streams). It is even possible to build a stream provider that will guarantee exactly-once delivery (we don't have such a provider yet, but it is possible to build one).
 
 **Events Delivery Order**:
-Event order also depends on a particular stream provider. In SMS streams, the producer explicitelly controls the order of events seen by the consumer by controlling the way it publishes them. Azure Queue streams do not guarantee FIFO order, since the underlaying Azure Queues do not guarantee order in failure cases. Applications can also control their own stream delivery ordering, by using `StreamSequenceToken`.
+Event order also depends on a particular stream provider. In SMS streams, the producer explicitly controls the order of events seen by the consumer by controlling the way it publishes them. Azure Queue streams do not guarantee FIFO order, since the underlying Azure Queues do not guarantee order in failure cases. Applications can also control their own stream delivery ordering by using `StreamSequenceToken`.
 
 ## Streams Implementation
 
