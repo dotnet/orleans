@@ -7,10 +7,9 @@ namespace Orleans.Runtime.Utilities
     {
         public static int FindIndex<T>(this ImmutableArray<T> collection, Func<T, bool> predicate)
         {
-            var index = 0;
-            foreach (var item in collection)
+            for(var index=0; index <collection.Length; index++)
             {
-                if (predicate(item)) return index;
+                if (predicate(collection[index])) return index;
             }
 
             return -1;
