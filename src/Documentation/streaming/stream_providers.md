@@ -9,8 +9,7 @@ title: Orleans Stream Providers
 Streams can come in different shapes and forms.
 Some streams may deliver events over direct TCP links, while others deliver events via durable queues.
 Different stream types may use different batching strategies, different caching algorithms, or different back pressure procedures.
-We did not want to constrain streaming applications to only a small subset of those behavioral choices.
-Instead, **Stream Providers** are extensibility points to Orleans Streaming Runtime that allow users to implement any type of stream.
+To avoid constraining streaming applications to only a subset of those behavioral choices, **Stream Providers** are extensibility points to Orleans Streaming Runtime that allow users to implement any type of stream.
 This extensibility point is similar in spirit to [Orleans Storage Providers](https://github.com/dotnet/orleans/wiki/Custom%20Storage%20Providers).
 Orleans currently ships with many stream providers, including : [Simple Message Stream Provider](https://github.com/dotnet/orleans/blob/master/src/Orleans.Core/Streams/SimpleMessageStream/SimpleMessageStreamProvider.cs) and [Azure Queue Stream Provider](https://github.com/OrleansContrib/Orleans.Indexing/blob/master/src/OrleansAzureUtils/Providers/Streams/AzureQueue/AzureQueueStreamProvider.cs).
 
