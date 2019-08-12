@@ -31,20 +31,22 @@ For example, to include all three providers (of course, you probably won't need 
   <Provider Type="Orleans.EventSourcing.CustomStorage.LogConsistencyProvider" Name="CustomStorage" />
 </LogConsistencyProviders>
 ```
-The same can be achieved programmatically. Assuming the project contains the `Microsoft.Orleans.EventSourcing` package, and `config` is a `ClusterConfiguration` object:
+The same can be achieved programmatically. Moving forward to 2.0.0 stable, ClientConfiguration and ClusterConfiguration no longer exist! It has now been replaced by a ClientBuilder and a SiloBuilder (notice there is no cluster builder). 
 
 ```csharp
-using Orleans.Runtime.Configuration; // pick up the necessary extension methods
-
-config.AddLogStorageBasedLogConsistencyProvider("LogStorage");
-config.AddStateStorageBasedLogConsistencyProvider("StateStorage");
-config.AddCustomStorageBasedLogConsistencyProvider("CustomStorage");
+builder.AddLogStorageBasedLogConsistencyProvider("LogStorage")
 ```
 
 ## Grain Class Attributes
 
 Each journaled grain class must have a `LogConsistencyProvider` attribute to specify the log-consistency provider. Some providers additionally require a `StorageProvider` attribute.
+Eg:
+[StorageProvider(ProviderName = "OrleansLocalStorage")]
+[LogConsistencyProvider(ProviderName = "LogStorage")]
+    public class EventSourcedBankAccountGrain : JournaledGrain<BankAccountState>, IEventSourcedBankAccountGrain
+  {}
 
+So here "OrleansLocalStorage" is being used for storing the grain state, where was "LogStorage" is the in-memory storage provider for EventSourcing events.
 
 ### LogConsistencyProvider Attributes
 
@@ -76,3 +78,5 @@ It is possible to omit the `LogConsistencyProvider` and/or the `StorageProvider`
   <Provider Type="Orleans.Storage.MemoryStorage" Name="Default" />
 </StorageProviders>
 ```
+
+
