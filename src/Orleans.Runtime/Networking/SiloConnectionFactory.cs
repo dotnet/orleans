@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -16,6 +18,7 @@ namespace Orleans.Runtime.Messaging
         private bool isInitialized;
         private ConnectionManager connectionManager;
         private MessageCenter messageCenter;
+        private ISiloStatusOracle siloStatusOracle;
 
         public SiloConnectionFactory(
             IServiceProvider serviceProvider,
@@ -30,6 +33,15 @@ namespace Orleans.Runtime.Messaging
             this.messageFactory = messageFactory;
             this.trace = trace;
             this.localSiloDetails = localSiloDetails;
+        }
+
+        public override ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
+        {
+            EnsureInitialized();
+
+            if (this.siloStatusOracle.IsDeadSilo(address)) throw new ConnectionAbortedException($"Denying connection to known-dead silo {address}");
+
+            return base.ConnectAsync(address, cancellationToken);
         }
 
         protected override Connection CreateConnection(SiloAddress address, ConnectionContext context)
@@ -59,6 +71,7 @@ namespace Orleans.Runtime.Messaging
                     {
                         this.messageCenter = this.serviceProvider.GetRequiredService<MessageCenter>();
                         this.connectionManager = this.serviceProvider.GetRequiredService<ConnectionManager>();
+                        this.siloStatusOracle = this.serviceProvider.GetRequiredService<ISiloStatusOracle>();
                         this.isInitialized = true;
                     }
                 }

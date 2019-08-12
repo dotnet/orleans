@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -30,6 +32,13 @@ namespace Orleans.Runtime.Messaging
             this.serviceProvider = serviceProvider;
             this.messageFactory = messageFactory;
             this.trace = trace;
+        }
+
+        public override ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
+        {
+            EnsureInitialized();
+
+            return base.ConnectAsync(address, cancellationToken);
         }
 
         protected override Connection CreateConnection(SiloAddress address, ConnectionContext context)
