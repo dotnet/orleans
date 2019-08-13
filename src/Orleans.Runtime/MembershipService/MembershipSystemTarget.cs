@@ -33,22 +33,22 @@ namespace Orleans.Runtime.MembershipService
                 this.log.LogTrace("-Received GOSSIP SiloStatusChangeNotification about {Silo} status {Status}. Going to read the table.", updatedSilo, status);
             }
 
-            try
-            {
-                await this.membershipTableManager.Refresh();
-            }
-            catch (Exception exception)
-            {
-                this.log.LogError(
-                    (int)ErrorCode.MembershipGossipProcessingFailure,
-                    "Error refreshing membership table: {Exception}",
-                    exception);
-            }
+            await ReadTable();
         }
 
         public async Task MembershipChangeNotification(MembershipTableSnapshot snapshot)
         {
-            await this.membershipTableManager.RefreshFromSnapshot(snapshot);
+            if (snapshot.Version != MembershipVersion.MinValue)
+            {
+                await this.membershipTableManager.RefreshFromSnapshot(snapshot);
+            }
+            else
+            {
+                if (this.log.IsEnabled(LogLevel.Trace))
+                    this.log.LogTrace("-Received GOSSIP MembershipChangeNotification with MembershipVersion.MinValue. Going to read the table");
+
+                await ReadTable();
+            }
         }
 
         /// <summary>
@@ -136,6 +136,21 @@ namespace Orleans.Runtime.MembershipService
                 this.log.LogError(
                     (int)ErrorCode.MembershipGossipSendFailure,
                     "Exception while sending gossip notification to remote silo {Silo}: {Exception}", silo, exception);
+            }
+        }
+
+        private async Task ReadTable()
+        {
+            try
+            {
+                await this.membershipTableManager.Refresh();
+            }
+            catch (Exception exception)
+            {
+                this.log.LogError(
+                    (int)ErrorCode.MembershipGossipProcessingFailure,
+                    "Error refreshing membership table: {Exception}",
+                    exception);
             }
         }
     }

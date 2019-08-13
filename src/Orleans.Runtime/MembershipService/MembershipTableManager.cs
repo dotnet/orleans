@@ -62,7 +62,7 @@ namespace Orleans.Runtime.MembershipService
                     MembershipVersion.MinValue,
                     initialEntries);
             this.updates = new AsyncEnumerable<MembershipTableSnapshot>(
-                (previous, proposed) => proposed.Version > previous.Version,
+                (previous, proposed) => proposed.Version == MembershipVersion.MinValue || proposed.Version > previous.Version,
                 this.snapshot)
             {
                 OnPublished = update => Interlocked.Exchange(ref this.snapshot, update)
@@ -96,6 +96,9 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task RefreshFromSnapshot(MembershipTableSnapshot snapshot)
         {
+            if (snapshot.Version == MembershipVersion.MinValue)
+                throw new ArgumentException("Cannot call RefreshFromSnapshot with Version == MembershipVersion.MinValue");
+
             // Check if a refresh is underway
             var pending = this.pendingRefresh;
             if (pending != null && !pending.IsCompleted)

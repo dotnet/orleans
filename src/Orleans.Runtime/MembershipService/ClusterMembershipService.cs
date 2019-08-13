@@ -23,7 +23,7 @@ namespace Orleans.Runtime
         {
             this.snapshot = membershipTableManager.MembershipTableSnapshot.CreateClusterMembershipSnapshot();
             this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
-                (previous, proposed) => proposed.Version > previous.Version,
+                (previous, proposed) => proposed.Version == MembershipVersion.MinValue || proposed.Version > previous.Version,
                 this.snapshot)
             {
                 OnPublished = update => Interlocked.Exchange(ref this.snapshot, update)
@@ -39,7 +39,8 @@ namespace Orleans.Runtime
 
         public ValueTask Refresh(MembershipVersion targetVersion)
         {
-            if (targetVersion != default && this.snapshot.Version >= targetVersion) return default;
+            if (targetVersion != default && targetVersion != MembershipVersion.MinValue && this.snapshot.Version >= targetVersion)
+                return default;
 
             return RefreshAsync(targetVersion);
 
