@@ -83,7 +83,7 @@ namespace Orleans.Runtime.MembershipService
                 {
                     var snapshot = enumerator.Current.CreateClusterMembershipSnapshot();
 
-                    var update = (previous is null) ? snapshot.AsUpdate() : snapshot.CreateUpdate(previous);
+                    var update = (previous is null || snapshot.Version == MembershipVersion.MinValue) ? snapshot.AsUpdate() : snapshot.CreateUpdate(previous);
                     this.NotifyObservers(update);
                     previous = snapshot;
                 }
