@@ -90,7 +90,6 @@ namespace Orleans.Runtime.Messaging
 
                 // Attempt to connect.
                 Connection connection = default;
-                var now = DateTime.UtcNow;
                 try
                 {
                     connection = await this.ConnectAsync(endpoint);
@@ -99,7 +98,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 catch (Exception exception)
                 {
-                    OnConnectionFailed(endpoint, now);
+                    OnConnectionFailed(endpoint, DateTime.UtcNow);
                     throw new ConnectionFailedException(
                         $"Unable to connect to endpoint {endpoint}. See {nameof(exception.InnerException)}", exception);
                 }
