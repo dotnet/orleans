@@ -37,7 +37,9 @@ namespace Orleans.Runtime
                 entries[localSiloEntry.SiloAddress] = localSiloEntry;
             }
 
-            var version = new MembershipVersion(table.Version.Version);
+            var version = (table.Version.Version == 0 && table.Version.VersionEtag == "0")
+                ? MembershipVersion.MinValue
+                : new MembershipVersion(table.Version.Version);
             return new MembershipTableSnapshot(version, entries.ToImmutable());
         }
 
