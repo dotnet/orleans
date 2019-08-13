@@ -62,7 +62,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }
-            var cloudMsg = this.dataAdapter.ToQueueMessage(streamGuid, streamNamespace, events, requestContext);
+            var cloudMsg = this.dataAdapter.ToQueueMessage(streamGuid, streamNamespace, events, null, requestContext);
             await queue.AddQueueMessage(cloudMsg);
         }
     }

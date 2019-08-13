@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
-using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -14,7 +13,7 @@ using ServiceBus.Tests.TestStreamProviders.EventHub;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.ServiceBus.Providers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -39,22 +38,21 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create, b=>
+                        .AddEventHubStreams(StreamProviderName, b=>
                         {
-                            b.Configure<EventHubOptions>(ob => ob.Configure(options =>
-                              {
-                                  options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                                  options.ConsumerGroup = EHConsumerGroup;
-                                  options.Path = EHPath;
-                              }));
-                            b.UseStaticClusterConfigDeploymentBalancer();
-                            b.ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(
-                                EventHubCheckpointerFactory.CreateFactory,
-                                ob => ob.Configure(options =>
-                                {
-                                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                                    options.PersistInterval = TimeSpan.FromSeconds(1);
-                                }));
+                            b.ConfigureEventHub(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
+                            }));
+                            b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.PersistInterval = TimeSpan.FromSeconds(1);
+                            }));
+                            b.UseDynamicClusterConfigDeploymentBalancer();
+                            b.UseDataAdapter((s,n) => ActivatorUtilities.CreateInstance<StreamPerPartitionDataAdapter>(s));
                         });
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore");
@@ -66,13 +64,16 @@ namespace ServiceBus.Tests.StreamingTests
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
                     clientBuilder
-                        .AddPersistentStreams(StreamProviderName, StreamPerPartitionEventHubStreamAdapterFactory.Create, b=>b
-                            .Configure<EventHubOptions>(ob=>ob.Configure(options =>
+                        .AddEventHubStreams(StreamProviderName, b=>
+                        {
+                            b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
                                 options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                                 options.ConsumerGroup = EHConsumerGroup;
                                 options.Path = EHPath;
-                            })));
+                            }));
+                            b.UseDataAdapter((s, n) => ActivatorUtilities.CreateInstance<StreamPerPartitionDataAdapter>(s));
+                        });
                 }
             }
         }
@@ -101,7 +102,7 @@ namespace ServiceBus.Tests.StreamingTests
 
             // subscribe to each partition
             List<Task> becomeConsumersTasks = consumers
-                .Select( (consumer, i) => consumer.BecomeConsumer(StreamPerPartitionEventHubStreamAdapterFactory.GetPartitionGuid(i.ToString()), null, StreamProviderName))
+                .Select( (consumer, i) => consumer.BecomeConsumer(StreamPerPartitionDataAdapter.GetPartitionGuid(i.ToString()), null, StreamProviderName))
                 .ToList();
             await Task.WhenAll(becomeConsumersTasks);
 
