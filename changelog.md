@@ -7,6 +7,17 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.4.1] (changes since 2.4.0)
+
+- Non-breaking improvements
+  - Added ClientMessagingOptions.LocalAddress to ignore ConfigUtilities.GetLocalIPAddress that automatic pickups network interfaces. (#5838)
+  - Handle the case where the clustering provider does not support TableVersion (#5863)
+
+- Non-breaking bug fixes
+  - Call ProcessTableUpdate before GossipToOthers (#5842)
+  - Fix potential deadlock between Catalog and LocalGrainDirectory (#5844)
+  - Log options on silo and client startup (#5859)
+
 ### [2.4.0] (changes since 2.3.0)
 
 - Non-breaking improvements
