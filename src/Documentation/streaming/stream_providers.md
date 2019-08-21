@@ -16,11 +16,11 @@ Orleans currently ships with many stream providers, including : [Simple Message 
 ## Simple Message Stream Provider
 
 Simple Message Stream Provider, also known as the SMS provider, delivers events over TCP by utilizing regular Orleans grain messaging.
-Since events in SMS are delivered over unreliable TCP links, SMS does _not_ guarantee reliable event delivery and does not automatically resend failed messages for SMS streams.
-The producer of the SMS stream has a way to know if its event was successfully received and processed or not: by default the call to `stream.OnNextAsync` returns a `Task` that represents the processing status of the stream consumer.
+Since events in SMS are delivered over unreliable TCP links, SMS does _not_ guarantee reliable event delivery and does not automatically resend failed messages for SMS streams. 
+By default the producer's call to `stream.OnNextAsync` returns a `Task` that represents the processing status of the stream consumer, which tells the producer whether the consumer successfully received and processed the event.
 If this Task fails, the producer can decide to send the same event again, thus achieving reliability on the application level.
-Although individual stream messages delivery is best effort, SMS streams themselves are reliable.
-That is, the subscriber-to-producer binding performed by Pub Sub is fully reliable.
+Although stream message delivery is best effort, SMS streams themselves are reliable.
+That is, the subscriber-to-producer binding performed by Pub-Sub is fully reliable.
 
 ## Azure Queue (AQ) Stream Provider
 
