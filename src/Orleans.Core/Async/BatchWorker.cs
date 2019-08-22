@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Timers.Internal;
 
@@ -32,6 +33,11 @@ namespace Orleans
         
         /// <summary>Implement this member in derived classes to define what constitutes a work cycle</summary>
         protected abstract Task Work();
+
+        /// <summary>
+        /// The cancellation used to cancel this batch worker.
+        /// </summary>
+        protected CancellationToken CancellationToken { get; set; } = CancellationToken.None;
 
         /// <summary>
         /// Notify the worker that there is more work.
@@ -82,7 +88,7 @@ namespace Orleans
 
         private async Task ScheduleNotify(DateTime time, DateTime now)
         {
-            await TimerManager.Delay(time - now);
+            await TimerManager.Delay(time - now, this.CancellationToken);
 
             if (scheduledNotify == time)
             {
@@ -240,9 +246,10 @@ namespace Orleans
     {
         private readonly Func<Task> work;
 
-        public BatchWorkerFromDelegate(Func<Task> work)
+        public BatchWorkerFromDelegate(Func<Task> work, CancellationToken cancellationToken = default(CancellationToken))
         {
             this.work = work;
+            this.CancellationToken = cancellationToken;
         }
 
         protected override Task Work()
