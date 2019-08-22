@@ -226,7 +226,6 @@ namespace Orleans.Runtime.Messaging
         {
             private readonly TimeSpan clientDropTimeout;
             internal Queue<Message> PendingToSend { get; private set; }
-            internal Queue<List<Message>> PendingBatchesToSend { get; private set; }
             internal GatewayInboundConnection Connection { get; private set; }
             internal DateTime DisconnectedSince { get; private set; }
             internal GrainId Id { get; private set; }
@@ -238,7 +237,6 @@ namespace Orleans.Runtime.Messaging
                 Id = id;
                 this.clientDropTimeout = clientDropTimeout;
                 PendingToSend = new Queue<Message>();
-                PendingBatchesToSend = new Queue<List<Message>>();
             }
 
             internal void RecordDisconnection()
@@ -353,7 +351,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             public void Send(ClientState clientState, Message msg)
-            {                
+            {
                 // This should never happen -- but make sure to handle it reasonably, just in case
                 if (clientState == null)
                 {
@@ -378,56 +376,61 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                // if disconnected - queue for later.
-                if (!clientState.IsConnected)
+                lock (clientState.PendingToSend)
                 {
+                    // if disconnected - queue for later.
+                    if (!clientState.IsConnected)
+                    {
+                        if (msg == null) return;
+
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Queued message {0} for client {1}", msg, msg.TargetGrain);
+                        clientState.PendingToSend.Enqueue(msg);
+                        return;
+                    }
+
+                    // if the queue is non empty - drain it first.
+                    if (clientState.PendingToSend.Count > 0)
+                    {
+                        if (msg != null)
+                            clientState.PendingToSend.Enqueue(msg);
+
+                        // For now, drain in-line, although in the future this should happen in yet another asynch agent
+                        Drain(clientState);
+                        return;
+                    }
+                    // the queue was empty AND we are connected.
+
+                    // If the request includes a message to send, send it (or enqueue it for later)
                     if (msg == null) return;
 
-                    if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Queued message {0} for client {1}", msg, msg.TargetGrain);
-                    clientState.PendingToSend.Enqueue(msg);
-                    return;
-                }
-
-                // if the queue is non empty - drain it first.
-                if (clientState.PendingToSend.Count > 0)
-                {
-                    if (msg != null)
+                    if (!Send(msg, clientState))
+                    {
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Queued message {0} for client {1}", msg, msg.TargetGrain);
                         clientState.PendingToSend.Enqueue(msg);
-                    
-                    // For now, drain in-line, although in the future this should happen in yet another asynch agent
-                    Drain(clientState);
-                    return;
-                }
-                // the queue was empty AND we are connected.
-
-                // If the request includes a message to send, send it (or enqueue it for later)
-                if (msg == null) return;
-
-                if (!Send(msg, clientState))
-                {
-                    if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Queued message {0} for client {1}", msg, msg.TargetGrain);
-                    clientState.PendingToSend.Enqueue(msg);
-                }
-                else
-                {
-                    if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Sent message {0} to client {1}", msg, msg.TargetGrain);
+                    }
+                    else
+                    {
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Sent message {0} to client {1}", msg, msg.TargetGrain);
+                    }
                 }
             }
 
             private void Drain(ClientState clientState)
             {
-                // For now, drain in-line, although in the future this should happen in yet another asynch agent
-                while (clientState.PendingToSend.Count > 0)
+                lock (clientState.PendingToSend)
                 {
-                    var m = clientState.PendingToSend.Peek();
-                    if (Send(m, clientState))
+                    while (clientState.PendingToSend.Count > 0)
                     {
-                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Sent queued message {0} to client {1}", m, clientState.Id);
-                        clientState.PendingToSend.Dequeue();
-                    }
-                    else
-                    {
-                        return;
+                        var m = clientState.PendingToSend.Peek();
+                        if (Send(m, clientState))
+                        {
+                            if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Sent queued message {0} to client {1}", m, clientState.Id);
+                            clientState.PendingToSend.Dequeue();
+                        }
+                        else
+                        {
+                            return;
+                        }
                     }
                 }
             }
