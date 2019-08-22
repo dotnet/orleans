@@ -486,9 +486,10 @@ namespace Orleans.Runtime.GrainDirectory
                     if (Seed == null)
                     {
                         var errorMsg =
-                            $"MembershipTable cannot run without Seed node. Please check your silo configuration make sure it specifies a SeedNode element. " +
-                            $"This is in either the configuration file or the {nameof(NetworkingOptions)} configuration. " +
-                            " Alternatively, you may want to use reliable membership, such as Azure Table.";
+                            $"Development clustering cannot run without a primary silo. " +
+                            $"Please configure {nameof(DevelopmentClusterMembershipOptions)}.{nameof(DevelopmentClusterMembershipOptions.PrimarySiloEndpoint)} " +
+                            "or provide a primary silo address to the UseDevelopmentClustering extension. " +
+                            "Alternatively, you may want to use reliable membership, such as Azure Table.";
                         throw new ArgumentException(errorMsg, "grainId = " + grainId);
                     }
                 }
