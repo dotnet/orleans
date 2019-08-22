@@ -64,7 +64,7 @@ namespace Orleans.Transactions.State
             this.Clock = new CausalClock(clock);
             this.logger = logger;
             this.activationLifetime = activationLifetime;
-            this.storageWorker = new BatchWorkerFromDelegate(StorageWork);
+            this.storageWorker = new BatchWorkerFromDelegate(StorageWork, this.activationLifetime.OnDeactivating);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, activationLifetime);
             this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager, activationLifetime);
             this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();

@@ -13,7 +13,8 @@ namespace Orleans.Transactions.State
 
         public ActivationLifetime(IGrainActivationContext activationContext)
         {
-            activationContext.ObservableLifecycle.Subscribe(GrainLifecycleStage.Activate, this);
+            activationContext.ObservableLifecycle.Subscribe(GrainLifecycleStage.First, this);
+            activationContext.ObservableLifecycle.Subscribe(GrainLifecycleStage.Last, this);
         }
 
         public CancellationToken OnDeactivating => this.onDeactivating.Token;
