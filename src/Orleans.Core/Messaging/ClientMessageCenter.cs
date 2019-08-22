@@ -199,6 +199,8 @@ namespace Orleans.Messaging
                     try
                     {
                         var connection = await task;
+
+                        // If the connection returned is null then the message was already rejected due to a failure.
                         if (connection is null) return;
 
                         connection.Send(message);

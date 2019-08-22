@@ -202,6 +202,7 @@ namespace Orleans.Runtime.Messaging
         private async Task<Connection> ConnectAsync(SiloAddress address)
         {
             await Task.Yield();
+            CancellationTokenSource openConnectionCancellation = default;
 
             try
             {
@@ -212,7 +213,13 @@ namespace Orleans.Runtime.Messaging
                         address);
                 }
 
-                var connection = await this.connectionFactory.ConnectAsync(address, this.cancellation.Token);
+                // Cancel pending connection attempts either when the host terminates or after the configured time limit.
+                openConnectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.cancellation.Token);
+                openConnectionCancellation.CancelAfter(this.connectionOptions.OpenConnectionTimeout);
+
+                var connection = await this.connectionFactory.ConnectAsync(address, openConnectionCancellation.Token)
+                    .AsTask()
+                    .WithCancellation(openConnectionCancellation.Token);
 
                 _ = Task.Run(async () =>
                 {
@@ -260,6 +267,10 @@ namespace Orleans.Runtime.Messaging
 
                 throw new ConnectionFailedException(
                     $"Unable to connect to endpoint {address}. See {nameof(exception.InnerException)}", exception);
+            }
+            finally
+            {
+                openConnectionCancellation?.Dispose();
             }
         }
 
