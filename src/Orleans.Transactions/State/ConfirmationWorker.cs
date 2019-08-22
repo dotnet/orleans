@@ -80,7 +80,8 @@ namespace Orleans.Transactions.State
 
             // attempts to confirm all, will retry every ConfirmationRetryDelay until all succeed
             var ct = this.activationLifetime.OnDeactivating;
-            var hasPendingConfirmations = true;
+
+            bool hasPendingConfirmations = true;
             while (!ct.IsCancellationRequested && hasPendingConfirmations)
             {
                 using (this.activationLifetime.BlockDeactivation())
@@ -89,12 +90,13 @@ namespace Orleans.Transactions.State
                     hasPendingConfirmations = false;
                     foreach (var confirmed in confirmationResults)
                     {
-                        hasPendingConfirmations |= !confirmed;
+                        if (!confirmed)
+                        {
+                            hasPendingConfirmations = true;
+                            await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
+                            break;
+                        }
                     }
-
-                    if (!hasPendingConfirmations) break;
-
-                    await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
                 }
             }
         }
