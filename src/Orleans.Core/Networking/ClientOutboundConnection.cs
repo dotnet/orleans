@@ -13,7 +13,6 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly MessageFactory messageFactory;
         private readonly ClientMessageCenter messageCenter;
-        private readonly GatewayManager gatewayManager;
         private readonly ConnectionManager connectionManager;
         private readonly ConnectionOptions connectionOptions;
 
@@ -24,7 +23,6 @@ namespace Orleans.Runtime.Messaging
             MessageFactory messageFactory,
             IServiceProvider serviceProvider,
             ClientMessageCenter messageCenter,
-            GatewayManager gatewayManager,
             INetworkingTrace trace,
             ConnectionManager connectionManager,
             ConnectionOptions connectionOptions)
@@ -32,7 +30,6 @@ namespace Orleans.Runtime.Messaging
         {
             this.messageFactory = messageFactory;
             this.messageCenter = messageCenter;
-            this.gatewayManager = gatewayManager;
             this.connectionManager = connectionManager;
             this.connectionOptions = connectionOptions;
             this.RemoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
