@@ -124,7 +124,7 @@ namespace Orleans.Runtime.Messaging
                 if (this.Log.IsEnabled(LogLevel.Information))
                 {
                     this.Log.LogInformation(
-                        "Closing connection with remote endpoint {EndPoint}. Stack = {Stack}",
+                        "Closing connection with remote endpoint {EndPoint}",
                         this.RemoteEndPoint,
                         Environment.StackTrace);
                 }
