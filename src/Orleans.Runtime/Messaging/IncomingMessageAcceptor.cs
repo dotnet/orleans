@@ -666,22 +666,31 @@ namespace Orleans.Runtime.Messaging
                         }
                         catch (Exception exception)
                         {
-                            // If deserialization completely failed or the message was one-way, rethrow the exception
-                            // so that it can be handled at another level.
-                            if (msg == null || msg.Direction != Message.Directions.Request)
+                            // If deserialization completely failed rethrow the exception so that it can be handled at another level.
+                            if (msg == null)
                             {
+                                // Logging will be done in the other catch statement
                                 throw;
                             }
 
-                            // The message body was not successfully decoded, but the headers were.
-                            // Send a fast fail to the caller.
-                            MessagingStatisticsGroup.OnRejectedMessage(msg);
-                            var response = this.messageFactory.CreateResponseMessage(msg);
-                            response.Result = Message.ResponseTypes.Error;
-                            response.BodyObject = Response.ExceptionResponse(exception);
-                            
-                            // Send the error response and continue processing the next message.
-                            this.IMA.MessageCenter.SendMessage(response);
+                            IMA.Log.Error(
+                                ErrorCode.MessagingProcessReceiveBufferException,
+                                $"Exception when deserializing message {msg}",
+                                exception);
+
+                            // If header was successfully deserialized, send an error back
+                            if (msg.Direction == Message.Directions.Request)
+                            {
+                                // The message body was not successfully decoded, but the headers were.
+                                // Send a fast fail to the caller.
+                                MessagingStatisticsGroup.OnRejectedMessage(msg);
+                                var response = this.messageFactory.CreateResponseMessage(msg);
+                                response.Result = Message.ResponseTypes.Error;
+                                response.BodyObject = Response.ExceptionResponse(exception);
+
+                                // Send the error response and continue processing the next message.
+                                this.IMA.MessageCenter.SendMessage(response);
+                            }
                         }
                     }
                 }
