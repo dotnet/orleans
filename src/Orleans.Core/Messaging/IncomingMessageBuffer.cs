@@ -172,10 +172,13 @@ namespace Orleans.Runtime
             this.deserializationContext.Reset();
             this.deserializationContext.StreamReader.Reset(header);
 
-            msg = new Message
-            {
-                Headers = SerializationManager.DeserializeMessageHeaders(this.deserializationContext)
-            };
+            // First deserialize headers
+            var headers = SerializationManager.DeserializeMessageHeaders(this.deserializationContext);
+
+            // Do not call inline SerializationManager.DeserializeMessageHeaders in there, we want msg to be null
+            // if headers deserialization failed
+            msg = new Message { Headers = headers };
+
             try
             {
                 if (this.supportForwarding)

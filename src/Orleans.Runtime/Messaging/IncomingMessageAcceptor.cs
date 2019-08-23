@@ -668,7 +668,7 @@ namespace Orleans.Runtime.Messaging
                         {
                             // If deserialization completely failed or the message was one-way, rethrow the exception
                             // so that it can be handled at another level.
-                            if (msg?.Headers == null || msg.Direction != Message.Directions.Request)
+                            if (msg == null || msg.Direction != Message.Directions.Request)
                             {
                                 throw;
                             }
