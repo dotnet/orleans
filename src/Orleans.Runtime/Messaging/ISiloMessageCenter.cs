@@ -19,6 +19,9 @@ namespace Orleans.Runtime.Messaging
         void BlockApplicationMessages();
 
         Func<SiloAddress, bool> SiloDeadOracle { get; set; }
+
         void SetHostedClient(IHostedClient client);
+
+        void CloseCommunicationWith(SiloAddress silo);
     }
 }

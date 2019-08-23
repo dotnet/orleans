@@ -296,5 +296,11 @@ namespace Orleans.Runtime.Messaging
             if(log.IsEnabled(LogLevel.Debug)) log.Debug("BlockApplicationMessages");
             IsBlockingApplicationMessages = true;
         }
+
+        public void CloseCommunicationWith(SiloAddress silo)
+        {
+            this.SocketManager.InvalidateEntry(silo.Endpoint);
+            this.ima.CloseSocketFrom(silo.Endpoint.Address);
+        }
     }
 }

@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime.MembershipService
@@ -21,6 +22,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly MembershipTableManager tableManager;
+        private readonly ISiloMessageCenter messageCenter;
         private readonly ILogger<ClusterHealthMonitor> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
@@ -43,6 +45,7 @@ namespace Orleans.Runtime.MembershipService
         public ClusterHealthMonitor(
             ILocalSiloDetails localSiloDetails,
             MembershipTableManager tableManager,
+            ISiloMessageCenter messageCenter,
             ILogger<ClusterHealthMonitor> log,
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IFatalErrorHandler fatalErrorHandler,
@@ -51,6 +54,7 @@ namespace Orleans.Runtime.MembershipService
         {
             this.localSiloDetails = localSiloDetails;
             this.tableManager = tableManager;
+            this.messageCenter = messageCenter;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
@@ -220,6 +224,8 @@ namespace Orleans.Runtime.MembershipService
                 try
                 {
                     await this.tableManager.TryToSuspectOrKill(monitor.SiloAddress);
+                    // Force reset the socket used in both direction
+                    this.messageCenter.CloseCommunicationWith(monitor.SiloAddress);
                 }
                 catch (Exception exception)
                 {

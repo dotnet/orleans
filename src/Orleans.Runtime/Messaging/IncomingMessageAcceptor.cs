@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Serialization;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -108,6 +109,23 @@ namespace Orleans.Runtime.Messaging
             lock (Lockable)
             {
                 ClearSockets();
+            }
+        }
+
+        public void CloseSocketFrom(IPAddress src)
+        {
+            lock (Lockable)
+            {
+                var sockets = OpenReceiveSockets
+                    .Where(s => src.Equals((s.RemoteEndPoint as IPEndPoint)?.Address))
+                    .ToList();
+
+                if (sockets.Count == 1)
+                {
+                    // If for some reason there is multiple silos that share the same IP address,
+                    // we don't want to kill ALL connections from this address.
+                    SafeCloseSocket(sockets[0]);
+                }
             }
         }
 

@@ -36,6 +36,7 @@ namespace NonSilo.Tests.Membership
         private readonly MembershipTableManager manager;
         private readonly ClusterHealthMonitor clusterHealthMonitor;
         private readonly MembershipAgent agent;
+        private readonly MockSiloMessageCenter messageCenter;
 
         public MembershipAgentTests(ITestOutputHelper output)
         {
@@ -80,11 +81,13 @@ namespace NonSilo.Tests.Membership
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
                 timerFactory: new AsyncTimerFactory(this.loggerFactory),
                 this.lifecycle);
+            this.messageCenter = new MockSiloMessageCenter();
             ((ILifecycleParticipant<ISiloLifecycle>)this.manager).Participate(this.lifecycle);
 
             this.clusterHealthMonitor = new ClusterHealthMonitor(
                 this.localSiloDetails,
                 this.manager,
+                this.messageCenter,
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
                 this.clusterMembershipOptions,
                 this.fatalErrorHandler,
