@@ -50,6 +50,8 @@ namespace Orleans.Messaging
             catch (Exception ex)
             {
                 buffer.Reset();
+                gatewayConnection.MarkAsDisconnected(socket);
+                socket = null;
                 Log.Warn(ErrorCode.ProxyClientUnhandledExceptionWhileReceiving, $"Unexpected/unhandled exception while receiving: {ex}. Restarting gateway receiver for {gatewayConnection.Address}.", ex);
                 throw;
             }
