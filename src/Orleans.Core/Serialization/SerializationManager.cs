@@ -66,6 +66,8 @@ namespace Orleans.Serialization
         private static readonly RuntimeTypeHandle byteArrayTypeHandle = typeof(byte[]).TypeHandle;
         
         internal int LargeObjectSizeThreshold { get; }
+        internal int MaxMessageHeaderSize { get; }
+        internal int MaxMessageBodySize { get; }
 
         private readonly IServiceProvider serviceProvider;
         private readonly ITypeResolver typeResolver;
@@ -83,9 +85,13 @@ namespace Orleans.Serialization
             ILoggerFactory loggerFactory,
             ITypeResolver typeResolver,
             SerializationStatisticsGroup serializationStatistics,
-            int largeMessageWarningThreshold)
+            int largeMessageWarningThreshold,
+            int maxMessageHeaderSize,
+            int maxMessageBodySize)
         {
             this.LargeObjectSizeThreshold = largeMessageWarningThreshold;
+            this.MaxMessageHeaderSize = maxMessageHeaderSize;
+            this.MaxMessageBodySize = maxMessageBodySize;
 
             logger = loggerFactory.CreateLogger<SerializationManager>();
             this.serviceProvider = serviceProvider;
@@ -1546,6 +1552,14 @@ namespace Orleans.Serialization
             }
 
             return headers;
+        }
+
+        internal void CheckHeaderAndBodyLengths(int headerLength, int bodyLength)
+        {
+            if (headerLength < 0 || headerLength > this.MaxMessageHeaderSize)
+                throw new OrleansException($"Invalid header size: {headerLength} (max configured value is {this.MaxMessageHeaderSize}, see {nameof(MessagingOptions.MaxMessageHeaderSize)})");
+            if (bodyLength < 0 || bodyLength > this.MaxMessageBodySize)
+                throw new OrleansException($"Invalid body size: {bodyLength} (max configured value is {this.MaxMessageBodySize}, see {nameof(MessagingOptions.MaxMessageBodySize)})");
         }
         
         private bool TryLookupExternalSerializer(Type t, out IExternalSerializer serializer)

@@ -76,5 +76,19 @@ namespace Orleans.Configuration
         /// </summary>
         public int LargeMessageWarningThreshold { get; set; } = DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD;
         public const int DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
+
+        /// <summary>
+        /// The maximum size, in bytes, of the header for a message. The runtime will forcibly close the connection
+        /// if the header size is greater than this value.
+        /// </summary>
+        public int MaxMessageHeaderSize { get; set; } = DEFAULT_MAX_MESSAGE_HEADER_SIZE;
+        public const int DEFAULT_MAX_MESSAGE_HEADER_SIZE = 1048576; // 1MB
+
+        /// <summary>
+        /// The maximum size, in bytes, of the body for a message. The runtime will forcibly close the connection
+        /// if the body size is greater than this value.
+        /// </summary>
+        public int MaxMessageBodySize { get; set; } = DEFAULT_MAX_MESSAGE_BODY_SIZE;
+        public const int DEFAULT_MAX_MESSAGE_BODY_SIZE = 1073741824; // 10MB
     }
 }

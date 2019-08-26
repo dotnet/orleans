@@ -514,6 +514,9 @@ namespace Orleans.Runtime
             int headerLength = context.StreamWriter.CurrentOffset;
             int bodyLength = BufferLength(bodyBytes);
 
+            // Throw if invalid headerLength or bodyLength
+            serializationManager.CheckHeaderAndBodyLengths(headerLength, bodyLength);
+
             var bytes = new List<ArraySegment<byte>>();
             bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(headerLength)));
             bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(bodyLength)));
