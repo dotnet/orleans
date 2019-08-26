@@ -41,10 +41,13 @@ namespace UnitTests.StreamingTests
                 {
                     hostBuilder
                         .AddPersistentStreams(StreamProviderName,
-                            GeneratorAdapterFactory.Create, b => b
-                        .Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options=>options.TotalQueueCount = TotalQueueCount))
-                        .UseDynamicClusterConfigDeploymentBalancer()
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                            GeneratorAdapterFactory.Create,
+                            b =>
+                            {
+                                b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                                b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount));
+                                b.UseDynamicClusterConfigDeploymentBalancer();
+                            });
                 }
             }
         }
@@ -59,14 +62,14 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task ValidateControllableGeneratedStreamsTest()
         {
-            this.fixture.Client.Logger().Info("************************ ValidateControllableGeneratedStreamsTest *********************************");
+            this.fixture.Logger.Info("************************ ValidateControllableGeneratedStreamsTest *********************************");
             await ValidateControllableGeneratedStreams();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Validate2ControllableGeneratedStreamsTest()
         {
-            this.fixture.Client.Logger().Info("************************ Validate2ControllableGeneratedStreamsTest *********************************");
+            this.fixture.Logger.Info("************************ Validate2ControllableGeneratedStreamsTest *********************************");
             await ValidateControllableGeneratedStreams();
             await ValidateControllableGeneratedStreams();
         }

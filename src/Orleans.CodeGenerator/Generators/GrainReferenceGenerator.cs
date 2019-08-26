@@ -293,7 +293,9 @@ namespace Orleans.CodeGenerator.Generators
                 var mapping = values.ToDictionary(m => (int) m.ConstantValue, m => m.Name);
                 if (!mapping.TryGetValue(txRequirement, out var value))
                 {
-                    throw new NotSupportedException($"Transaction requirement {txRequirement} on method {method} was not understood.");
+                    throw new NotSupportedException(
+                        $"Transaction requirement {txRequirement} on method {method} was not understood."
+                        + $" Known values: {string.Join(", ", mapping.Select(kv => $"{kv.Key} ({kv.Value})"))}");
                 }
 
                 switch (value)

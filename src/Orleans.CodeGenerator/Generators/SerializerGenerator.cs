@@ -476,8 +476,7 @@ namespace Orleans.CodeGenerator.Generators
         /// </summary>
         private static IMethodSymbol GetEmptyConstructor(INamedTypeSymbol type, SemanticModel model)
         {
-            return type.GetMembers()
-                .OfType<IMethodSymbol>()
+            return type.GetDeclaredInstanceMembers<IMethodSymbol>()
                 .FirstOrDefault(method => method.MethodKind == MethodKind.Constructor && method.Parameters.Length == 0 && model.IsAccessible(0, method));
         }
 
@@ -487,7 +486,7 @@ namespace Orleans.CodeGenerator.Generators
         private static List<FieldInfoMember> GetFields(WellKnownTypes wellKnownTypes, SemanticModel model, INamedTypeSymbol type, ILogger logger)
         {
             var result = new List<FieldInfoMember>();
-            foreach (var field in type.GetDeclaredMembers<IFieldSymbol>())
+            foreach (var field in type.GetDeclaredInstanceMembers<IFieldSymbol>())
             {
                 if (ShouldSerializeField(wellKnownTypes, field))
                 {
@@ -514,7 +513,7 @@ namespace Orleans.CodeGenerator.Generators
                     {
                         hasUnsupportedRefAsmBase = true;
                     }
-                    foreach (var field in baseType.GetDeclaredMembers<IFieldSymbol>())
+                    foreach (var field in baseType.GetDeclaredInstanceMembers<IFieldSymbol>())
                     {
                         if (hasUnsupportedRefAsmBase) referenceAssemblyHasFields = true;
                         if (ShouldSerializeField(wellKnownTypes, field))
@@ -667,12 +666,13 @@ namespace Orleans.CodeGenerator.Generators
 
         private static bool IsValueTypeFieldsShallowCopyable(WellKnownTypes wellKnownTypes, ITypeSymbol type, HashSet<ITypeSymbol> examining)
         {
-            foreach (var field in type.GetAllMembers<IFieldSymbol>())
+            foreach (var field in type.GetInstanceMembers<IFieldSymbol>())
             {
+                if (field.IsStatic) continue;
+
                 if (!(field.Type is INamedTypeSymbol fieldType))
                 {
-                    throw new NotSupportedException(
-                        $"Field {field} in type {type} is not an {nameof(INamedTypeSymbol)} and therefore is not supported. Type is {field.Type.GetType()}");
+                    return false;
                 }
 
                 if (type.Equals(fieldType)) return false;
@@ -770,7 +770,7 @@ namespace Orleans.CodeGenerator.Generators
 
                     var name = propertyName.Groups[1].Value;
                     var candidates = this.targetType
-                        .GetAllMembers<IPropertySymbol>()
+                        .GetInstanceMembers<IPropertySymbol>()
                         .Where(p => string.Equals(name, p.Name, StringComparison.Ordinal) && !p.IsAbstract)
                         .ToArray();
 

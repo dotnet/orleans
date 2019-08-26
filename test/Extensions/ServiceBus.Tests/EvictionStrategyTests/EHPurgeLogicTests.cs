@@ -247,12 +247,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             eventData.SetEnqueuedTimeUtc(now);
             return eventData;
         }
-
-        private NodeConfiguration GetNodeConfiguration()
-        {
-            return new NodeConfiguration();
-        }
-
+        
         private Task<IStreamQueueCheckpointer<string>> CheckPointerFactory(string partition)
         {
             return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
@@ -263,8 +258,12 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCacheForTesting)}.{partition}");
             var evictionStrategy = new EHEvictionStrategyForTesting(cacheLogger, null, null, this.purgePredicate);
             this.evictionStrategyList.Add(evictionStrategy);
-            var cache = new EventHubQueueCacheForTesting(checkpointer, new MockEventHubCacheAdaptor(this.serializationManager, this.bufferPool),
-                EventHubDataComparer.Instance, cacheLogger, evictionStrategy);
+            var cache = new EventHubQueueCacheForTesting(
+                this.bufferPool,
+                new MockEventHubCacheAdaptor(this.serializationManager),
+                evictionStrategy,
+                checkpointer,
+                cacheLogger);
             cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
             this.cacheList.Add(cache);
             return cache;

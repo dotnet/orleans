@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Providers;
@@ -85,13 +86,18 @@ namespace UnitTests.Grains
 
     public class StreamLifecycleTestGrainBase : Grain<StreamLifecycleTestGrainState>
     {
-        protected Logger logger;
+        protected ILogger logger;
         protected string _lastProviderName;
         protected IStreamProvider _streamProvider;
 
 #if COUNT_ACTIVATE_DEACTIVATE
         private IActivateDeactivateWatcherGrain watcher;
 #endif
+
+        public StreamLifecycleTestGrainBase(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         protected Task RecordActivate()
         {
@@ -120,7 +126,7 @@ namespace UnitTests.Grains
 
             if (State.Stream != null && State.Stream.Guid != streamId)
             {
-                if (logger.IsVerbose) logger.Verbose("Stream already exists for StreamId={0} StreamProvider={1} - Resetting", State.Stream, providerToUse);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Stream already exists for StreamId={0} StreamProvider={1} - Resetting", State.Stream, providerToUse);
 
                 // Note: in this test, we are deliberately not doing Unsubscribe consumers, just discard old stream and let auto-cleanup functions do their thing.
                 State.ConsumerSubscriptionHandles.Clear();
@@ -130,7 +136,7 @@ namespace UnitTests.Grains
                 State.Stream = null;
             }
 
-            if (logger.IsVerbose) logger.Verbose("InitStream StreamId={0} StreamProvider={1}", streamId, providerToUse);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InitStream StreamId={0} StreamProvider={1}", streamId, providerToUse);
 
             if (providerToUse != _lastProviderName)
             {
@@ -141,7 +147,7 @@ namespace UnitTests.Grains
             State.Stream = stream;
             State.StreamProviderName = providerToUse;
 
-            if (logger.IsVerbose) logger.Verbose("InitStream returning with Stream={0} with ref type = {1}", State.Stream, State.Stream.GetType().FullName);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InitStream returning with Stream={0} with ref type = {1}", State.Stream, State.Stream.GetType().FullName);
         }
     }
 
@@ -151,7 +157,7 @@ namespace UnitTests.Grains
         protected readonly ISiloRuntimeClient runtimeClient;
         protected readonly IStreamProviderRuntime streamProviderRuntime;
 
-        public StreamLifecycleConsumerGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime)
+        public StreamLifecycleConsumerGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime, ILoggerFactory loggerFactory) : base(loggerFactory)
         {
             this.runtimeClient = runtimeClient;
             this.streamProviderRuntime = streamProviderRuntime;
@@ -161,8 +167,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger(GetType().Name + "-" + IdentityString);
-            if (logger.IsVerbose) logger.Verbose("OnActivateAsync");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnActivateAsync");
 
             await RecordActivate();
 
@@ -179,7 +184,7 @@ namespace UnitTests.Grains
                     logger.Info("ReconnectConsumerHandles SubscriptionHandles={0} Grain={1}", Utils.EnumerableToString(handles), this.AsReference<IStreamLifecycleConsumerGrain>());
                     foreach (var handle in handles)
                     {
-                        var observer = new MyStreamObserver<int>(logger);
+                        var observer = new MyStreamObserver<int>(this.logger);
                         StreamSubscriptionHandle<int> subsHandle = await handle.ResumeAsync(observer);
                         Observers.Add(subsHandle, observer);
                     }
@@ -187,25 +192,25 @@ namespace UnitTests.Grains
             }
             else
             {
-                if (logger.IsVerbose) logger.Verbose("Not conected to stream yet.");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Not conected to stream yet.");
             }
         }
         public override async Task OnDeactivateAsync()
         {
-            if (logger.IsVerbose) logger.Verbose("OnDeactivateAsync");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnDeactivateAsync");
             await RecordDeactivate();
         }
 
         public Task<int> GetReceivedCount()
         {
             int numReceived = Observers.Sum(o => o.Value.NumItems);
-            if (logger.IsVerbose) logger.Verbose("ReceivedCount={0}", numReceived);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ReceivedCount={0}", numReceived);
             return Task.FromResult(numReceived);
         }
         public Task<int> GetErrorsCount()
         {
             int numErrors = Observers.Sum(o => o.Value.NumErrors);
-            if (logger.IsVerbose) logger.Verbose("ErrorsCount={0}", numErrors);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ErrorsCount={0}", numErrors);
             return Task.FromResult(numErrors);
         }
 
@@ -217,7 +222,7 @@ namespace UnitTests.Grains
 
         public virtual async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
         {
-            if (logger.IsVerbose) logger.Verbose("BecomeConsumer StreamId={0} StreamProvider={1} Grain={2}", streamId, providerToUse, this.AsReference<IStreamLifecycleConsumerGrain>());
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BecomeConsumer StreamId={0} StreamProvider={1} Grain={2}", streamId, providerToUse, this.AsReference<IStreamLifecycleConsumerGrain>());
             InitStream(streamId, streamNamespace, providerToUse);
             var observer = new MyStreamObserver<int>(logger);
             var subsHandle = await State.Stream.SubscribeAsync(observer);
@@ -252,7 +257,7 @@ namespace UnitTests.Grains
 
         public async Task RemoveConsumer(Guid streamId, string streamNamespace, string providerName, StreamSubscriptionHandle<int> subsHandle)
         {
-            if (logger.IsVerbose) logger.Verbose("RemoveConsumer StreamId={0} StreamProvider={1}", streamId, providerName);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("RemoveConsumer StreamId={0} StreamProvider={1}", streamId, providerName);
             if (State.ConsumerSubscriptionHandles.Count == 0) throw new InvalidOperationException("Not a Consumer");
             await subsHandle.UnsubscribeAsync();
             Observers.Remove(subsHandle);
@@ -279,14 +284,14 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     internal class FilteredStreamConsumerGrain : StreamLifecycleConsumerGrain, IFilteredStreamConsumerGrain
     {
-        private static Logger _logger;
-
+        private static ILogger staticLogger;
         private const int FilterDataOdd = 1;
         private const int FilterDataEven = 2;
 
-        public FilteredStreamConsumerGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime)
-            : base(runtimeClient, streamProviderRuntime)
+        public FilteredStreamConsumerGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime, ILoggerFactory loggerFactory)
+            : base(runtimeClient, streamProviderRuntime, loggerFactory)
         {
+            staticLogger = loggerFactory.CreateLogger<FilteredStreamConsumerGrain>();
         }
 
         public override Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName)
@@ -296,9 +301,8 @@ namespace UnitTests.Grains
 
         public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName, bool sendEvensOnly)
         {
-            _logger = logger;
-            if (logger.IsVerbose)
-                logger.Verbose("BecomeConsumer StreamId={0} StreamProvider={1} Filter={2} Grain={3}",
+            if (logger.IsEnabled(LogLevel.Debug))
+                logger.LogDebug("BecomeConsumer StreamId={0} StreamProvider={1} Filter={2} Grain={3}",
                 streamId, providerName, sendEvensOnly, this.AsReference<IFilteredStreamConsumerGrain>());
             InitStream(streamId, streamNamespace, providerName);
 
@@ -347,9 +351,10 @@ namespace UnitTests.Grains
             }
             int val = (int) item;
             bool result = val % 2 == 0;
-            if (_logger != null) _logger.Info("FilterIsEven(Stream={0},FilterData={1},Item={2}) Filter = {3}", stream, filterData, item, result);
+            if (staticLogger != null) staticLogger.Info("FilterIsEven(Stream={0},FilterData={1},Item={2}) Filter = {3}", stream, filterData, item, result);
             return result;
         }
+
         public static bool FilterIsOdd(IStreamIdentity stream, object filterData, object item)
         {
             if (!FilterDataOdd.Equals(filterData))
@@ -358,9 +363,10 @@ namespace UnitTests.Grains
             }
             int val = (int) item;
             bool result = val % 2 == 1;
-            if (_logger != null) _logger.Info("FilterIsOdd(Stream={0},FilterData={1},Item={2}) Filter = {3}", stream, filterData, item, result);
+            if (staticLogger != null) staticLogger.Info("FilterIsOdd(Stream={0},FilterData={1},Item={2}) Filter = {3}", stream, filterData, item, result);
             return result;
         }
+
         // Function is not static, so cannot be used as a filter predicate function.
         public bool BadFunc(IStreamIdentity stream, object filterData, object item)
         {
@@ -371,39 +377,42 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     public class StreamLifecycleProducerGrain : StreamLifecycleTestGrainBase, IStreamLifecycleProducerGrain
     {
+        public StreamLifecycleProducerGrain(ILoggerFactory loggerFactory) : base(loggerFactory)
+        {
+        }
+
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger(GetType().Name + "-" + IdentityString);
-            if (logger.IsVerbose) logger.Verbose("OnActivateAsync");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnActivateAsync");
 
             await RecordActivate();
 
             if (State.Stream != null && State.StreamProviderName != null)
             {
-                if (logger.IsVerbose) logger.Verbose("Reconnected to stream {0}", State.Stream);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Reconnected to stream {0}", State.Stream);
             }
             else
             {
-                if (logger.IsVerbose) logger.Verbose("Not connected to stream yet.");
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Not connected to stream yet.");
             }
         }
         public override async Task OnDeactivateAsync()
         {
-            if (logger.IsVerbose) logger.Verbose("OnDeactivateAsync");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnDeactivateAsync");
             await RecordDeactivate();
         }
 
         public Task<int> GetSendCount()
         {
             int result = State.NumMessagesSent;
-            if (logger.IsVerbose) logger.Verbose("GetSendCount={0}", result);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetSendCount={0}", result);
             return Task.FromResult(result);
         }
 
         public Task<int> GetErrorsCount()
         {
             int result = State.NumErrors;
-            if (logger.IsVerbose) logger.Verbose("GetErrorsCount={0}", result);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetErrorsCount={0}", result);
             return Task.FromResult(result);
         }
 
@@ -416,13 +425,13 @@ namespace UnitTests.Grains
         public async Task SendItem(int item)
         {
             if (!State.IsProducer || State.Stream == null) throw new InvalidOperationException("Not a Producer");
-            if (logger.IsVerbose) logger.Verbose("SendItem Item={0}", item);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("SendItem Item={0}", item);
             Exception error = null;
             try
             {
                 await State.Stream.OnNextAsync(item);
 
-                if (logger.IsVerbose) logger.Verbose("Successful SendItem " + item);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Successful SendItem " + item);
                 State.NumMessagesSent++;
             }
             catch (Exception exc)
@@ -437,12 +446,12 @@ namespace UnitTests.Grains
             {
                 throw new AggregateException(error);
             }
-            if (logger.IsVerbose) logger.Verbose("Finished SendItem for Item={0}", item);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Finished SendItem for Item={0}", item);
         }
 
         public async Task BecomeProducer(Guid streamId, string streamNamespace, string providerName)
         {
-            if (logger.IsVerbose) logger.Verbose("BecomeProducer StreamId={0} StreamProvider={1}", streamId, providerName);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BecomeProducer StreamId={0} StreamProvider={1}", streamId, providerName);
             InitStream(streamId, streamNamespace, providerName);
             State.IsProducer = true;
 
@@ -450,7 +459,7 @@ namespace UnitTests.Grains
             await State.Stream.OnNextAsync(0);
             State.NumMessagesSent++;
             await WriteStateAsync();
-            if (logger.IsVerbose) logger.Verbose("Finished BecomeProducer for StreamId={0} StreamProvider={1}", streamId, providerName);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Finished BecomeProducer for StreamId={0} StreamProvider={1}", streamId, providerName);
         }
 
         public async Task ClearGrain()
@@ -463,13 +472,13 @@ namespace UnitTests.Grains
 
         public async Task DoDeactivateNoClose()
         {
-            if (logger.IsVerbose) logger.Verbose("DoDeactivateNoClose");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("DoDeactivateNoClose");
 
             State.IsProducer = false;
             State.Stream = null;
             await WriteStateAsync();
 
-            if (logger.IsVerbose) logger.Verbose("Calling DeactivateOnIdle");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Calling DeactivateOnIdle");
             DeactivateOnIdle();
         }
     }
@@ -480,9 +489,9 @@ namespace UnitTests.Grains
         internal int NumItems { get; private set; }
         internal int NumErrors { get; private set; }
 
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
-        internal MyStreamObserver(Logger logger)
+        internal MyStreamObserver(ILogger logger)
         {
             this.logger = logger;
         }
@@ -491,9 +500,9 @@ namespace UnitTests.Grains
         {
             NumItems++;
 
-            if (logger != null && logger.IsVerbose)
+            if (logger != null && logger.IsEnabled(LogLevel.Debug))
             {
-                logger.Verbose("Received OnNextAsync - Item={0} - Total Items={1} Errors={2}", item, NumItems, NumErrors);
+                logger.LogDebug("Received OnNextAsync - Item={0} - Total Items={1} Errors={2}", item, NumItems, NumErrors);
             }
 
             return Task.CompletedTask;
@@ -523,7 +532,7 @@ namespace UnitTests.Grains
 
     public class ClosedTypeStreamObserver : MyStreamObserver<AsyncObserverArg>
     {
-        public ClosedTypeStreamObserver(Logger logger) : base(logger)
+        public ClosedTypeStreamObserver(ILogger logger) : base(logger)
         {
         }
     }

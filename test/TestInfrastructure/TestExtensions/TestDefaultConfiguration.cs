@@ -4,9 +4,7 @@ using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Primitives;
-using Newtonsoft.Json;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Extensions;
 
 namespace TestExtensions
 {
@@ -31,6 +29,13 @@ namespace TestExtensions
         public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
+
+        public static bool GetValue(string key, out string value)
+        {
+            value = defaultConfiguration.GetValue(key, default(string));
+
+            return value != null;
+        }
 
         private static IConfiguration BuildDefaultConfiguration()
         {
@@ -103,15 +108,6 @@ namespace TestExtensions
 
         public static void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureBuilder(() =>
-            {
-                if (builder.Properties.TryGetValue(nameof(LegacyTestClusterConfiguration), out var legacyConfigObj) &&
-                    legacyConfigObj is LegacyTestClusterConfiguration legacyConfig)
-                {
-                    legacyConfig.ClusterConfiguration.AdjustForTestEnvironment(DataConnectionString);
-                    legacyConfig.ClientConfiguration.AdjustForTestEnvironment(DataConnectionString);
-                }
-            });
             builder.ConfigureHostConfiguration(ConfigureHostConfiguration);
         }
     }

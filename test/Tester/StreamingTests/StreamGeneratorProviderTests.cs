@@ -43,11 +43,17 @@ namespace UnitTests.StreamingTests
                 {
                     hostBuilder
                         .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(StreamProviderName, (s, n) => GeneratorConfig))
-                        .AddPersistentStreams(StreamProviderName, GeneratorAdapterFactory.Create, b=>b
-                            .ConfigurePullingAgent(ob => ob.Configure(options => { options.BatchContainerBatchSize = 10; }))
-                            .Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options => options.TotalQueueCount = TotalQueueCount))
-                            .UseDynamicClusterConfigDeploymentBalancer()
-                            .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                        .AddPersistentStreams(
+                            StreamProviderName,
+                            GeneratorAdapterFactory.Create,
+                            b =>
+                            {
+                                b.ConfigurePullingAgent(ob => ob.Configure(options => { options.BatchContainerBatchSize = 10; }));
+                                b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount));
+                                b.UseDynamicClusterConfigDeploymentBalancer();
+                                b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                            });
+
                 }
             }
         }

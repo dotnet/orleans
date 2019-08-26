@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -45,6 +45,15 @@ namespace Orleans.CodeGenerator.Utilities
             }
 
             foreach (var t in type.TypeArguments) yield return t;
+        }
+
+        public static IEnumerable<INamedTypeSymbol> GetNestedHierarchy(this INamedTypeSymbol type)
+        {
+            while (type != null)
+            {
+                yield return type;
+                type = type.ContainingType;
+            }
         }
 
         public static string GetGenericTypeSuffix(this INamedTypeSymbol type)
@@ -192,25 +201,27 @@ namespace Orleans.CodeGenerator.Utilities
             }
         }
 
-        public static IEnumerable<TSymbol> GetDeclaredMembers<TSymbol>(this ITypeSymbol type) where TSymbol : ISymbol
+        public static IEnumerable<TSymbol> GetDeclaredInstanceMembers<TSymbol>(this ITypeSymbol type) where TSymbol : ISymbol
         {
             foreach (var candidate in type.GetMembers())
             {
+                if (candidate.IsStatic) continue;
                 if (candidate is TSymbol symbol) yield return symbol;
             }
         }
 
-        public static IEnumerable<TSymbol> GetAllMembers<TSymbol>(this ITypeSymbol type) where TSymbol : ISymbol
+        public static IEnumerable<TSymbol> GetInstanceMembers<TSymbol>(this ITypeSymbol type) where TSymbol : ISymbol
         {
             foreach (var candidate in type.GetMembers())
             {
+                if (candidate.IsStatic) continue;
                 if (candidate is TSymbol symbol) yield return symbol;
             }
 
             var baseType = type.BaseType;
             if (baseType != null)
             {
-                foreach (var t in baseType.GetAllMembers<TSymbol>()) yield return t;
+                foreach (var t in baseType.GetInstanceMembers<TSymbol>()) yield return t;
             }
         }
 

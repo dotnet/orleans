@@ -93,7 +93,7 @@ namespace Orleans.Runtime
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
             hasToRefreshClusterGrainInterfaceMap = true;
-            if (status == SiloStatus.Active)
+            if (status == SiloStatus.Active && !updatedSilo.Equals(this.Silo))
             {
                 if (this.logger.IsEnabled(LogLevel.Information))
                 {
@@ -131,7 +131,7 @@ namespace Orleans.Runtime
 
                 foreach (var siloAddress in activeSilos.Keys)
                 {
-                    if (siloAddress.Equals(this.Silo)) continue;
+                    if (siloAddress.IsSameLogicalSilo(this.Silo)) continue;
 
                     GrainInterfaceMap value;
                     if (knownSilosClusterGrainInterfaceMap.TryGetValue(siloAddress, out value))

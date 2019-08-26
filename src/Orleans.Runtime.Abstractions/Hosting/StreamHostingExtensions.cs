@@ -43,7 +43,8 @@ namespace Orleans.Hosting
             Action<SimpleMessageStreamProviderOptions> configureOptions)
 
         {
-            return AddSimpleMessageStreamProvider(builder, name, b => b.Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
+            return AddSimpleMessageStreamProvider(builder, name, b => b
+                .Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
         }
 
         /// <summary>
@@ -90,7 +91,8 @@ namespace Orleans.Hosting
             Action<SimpleMessageStreamProviderOptions> configureOptions)
 
         {
-            return AddSimpleMessageStreamProvider(builder, name, b => b.Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
+            return AddSimpleMessageStreamProvider(builder, name, b => b
+                .Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
         }
 
         /// <summary>

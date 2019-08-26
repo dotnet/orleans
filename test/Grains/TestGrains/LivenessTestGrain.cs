@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -9,9 +10,13 @@ namespace UnitTests.Grains
     internal class LivenessTestGrain : Grain, ILivenessTestGrain
     {
         private string label;
-        private Logger logger;
-        private IDisposable timer;
+        private ILogger logger;
         private Guid uniqueId;
+
+        public LivenessTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
@@ -19,7 +24,6 @@ namespace UnitTests.Grains
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             uniqueId = Guid.NewGuid();
-            logger = this.GetLogger("LivenessTestGrain " + uniqueId);
             label = this.GetPrimaryKeyLong().ToString();
             logger.Info("OnActivateAsync");
 
@@ -47,7 +51,7 @@ namespace UnitTests.Grains
         public Task StartTimer()
         {
             logger.Info("StartTimer.");
-            timer = base.RegisterTimer(TimerTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+            base.RegisterTimer(TimerTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
             
             return Task.CompletedTask;
         }

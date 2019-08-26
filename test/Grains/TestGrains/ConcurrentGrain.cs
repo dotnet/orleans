@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -11,15 +12,19 @@ namespace UnitTests.Grains
 {
     public class ConcurrentGrain : Grain, IConcurrentGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private List<IConcurrentGrain> children;
         private int index;
         private int callNumber;
 
+        public ConcurrentGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public async Task Initialize(int ind)
         {
-            index = ind;
-            logger = this.GetLogger("ConcurrentGrain-" + index);
+            this.index = ind;
             logger.Info("Initialize(" + index + ")");
             if (index == 0)
             {
@@ -81,7 +86,6 @@ namespace UnitTests.Grains
         public Task Initialize_2(int ind)
         {
             index = ind;
-            logger = this.GetLogger("ConcurrentGrain-" + index);
             logger.Info("Initialize(" + index + ")");
             return Task.CompletedTask;
         }
@@ -106,20 +110,23 @@ namespace UnitTests.Grains
             logger.Info("TailCall_Resolver");
             return another.TailCall_Resolve();
         }
-
     }
 
     [Reentrant]
     public class ConcurrentReentrantGrain : Grain, IConcurrentReentrantGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private int index;
         private TaskCompletionSource<int> resolver;
+
+        public ConcurrentReentrantGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public Task Initialize_2(int ind)
         {
             index = ind;
-            logger = this.GetLogger("ConcurrentReentrantGrain-" + index);
             logger.Info("Initialize(" + index + ")");
             return Task.CompletedTask;
         }

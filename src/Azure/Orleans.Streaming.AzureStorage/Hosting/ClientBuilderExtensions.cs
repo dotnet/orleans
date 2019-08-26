@@ -1,7 +1,6 @@
 using System;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Streaming;
 
 namespace Orleans.Hosting
 {
@@ -12,7 +11,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static IClientBuilder AddAzureQueueStreams(this IClientBuilder builder,
             string name,
-            Action<IClusterClientAzureQueueStreamConfigurator> configure)
+            Action<ClusterClientAzureQueueStreamConfigurator> configure)
         {
             //the constructor wires up DI with AzureQueueStream, so has to be called regardless configure is null or not
             var configurator = new ClusterClientAzureQueueStreamConfigurator(name, builder);

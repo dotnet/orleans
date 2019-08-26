@@ -1,5 +1,7 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -12,18 +14,19 @@ namespace UnitTests.Grains
         private DateTime activated;
 
         private ICollectionTestGrain other;
-        private Logger logger;
+        private ILogger logger;
         private int counter;
         private static int staticCounter;
 
-        protected virtual Logger Logger()
+        protected virtual ILogger Logger()
         {
             return logger;
         }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(String.Format("CollectionTestGrain {0} {1} on {2}.", Identity, Data.ActivationId, RuntimeIdentity));
+            logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
+                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", Identity, Data.ActivationId, RuntimeIdentity));
             logger.Info("OnActivateAsync.");
             activated = DateTime.UtcNow;
             counter = 0;
@@ -105,18 +108,19 @@ namespace UnitTests.Grains
     [Reentrant]
     public class ReentrantCollectionTestGrain : CollectionTestGrain, ICollectionTestGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private int counter;
         private static int staticCounter;
 
-        protected override Logger Logger()
+        protected override ILogger Logger()
         {
             return logger;
         }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(String.Format("ReentrantCollectionTestGrain {0} {1} on {2}.", Identity, Data.ActivationId, RuntimeIdentity));
+            logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
+                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", Identity, Data.ActivationId, RuntimeIdentity));
             logger.Info("OnActivateAsync.");
             counter = 0;
             return Task.CompletedTask;

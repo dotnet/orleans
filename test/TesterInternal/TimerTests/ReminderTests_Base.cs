@@ -1,4 +1,4 @@
-﻿//#define USE_SQL_SERVER
+//#define USE_SQL_SERVER
 
 using System;
 using System.Collections.Generic;
@@ -44,14 +44,13 @@ namespace UnitTests.TimerTests
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
 
-            ClientConfiguration configuration = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
             var filters = new LoggerFilterOptions();
 #if DEBUG
             filters.AddFilter("Storage", LogLevel.Trace);
             filters.AddFilter("Reminder", LogLevel.Trace);
 #endif
 
-            log = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(configuration.ClientName, configuration.ClusterId), filters).CreateLogger<ReminderTests_Base>();
+            log = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("client", DateTime.Now.ToString("yyyyMMdd_hhmmss")), filters).CreateLogger<ReminderTests_Base>();
         }
 
         public IGrainFactory GrainFactory { get; }

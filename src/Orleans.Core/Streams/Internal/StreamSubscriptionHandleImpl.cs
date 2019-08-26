@@ -121,7 +121,20 @@ namespace Orleans.Streams
                     return this.expectedToken;
             }
 
-            await NextItem(item, currentToken);
+            T typedItem;
+            try
+            {
+                typedItem = (T)item;
+            }
+            catch (InvalidCastException)
+            {
+                // We got an illegal item on the stream -- close it with a Cast exception
+                throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
+            }
+
+            await ((this.observer != null)
+                ? NextItem(typedItem, currentToken)
+                : NextItems(new[] { Tuple.Create(typedItem, currentToken) }));
 
             // check again, in case the expectedToken was changed indiretly via ResumeAsync()
             if (this.expectedToken != null)
@@ -160,28 +173,17 @@ namespace Orleans.Streams
             }
         }
 
-        private Task NextItem(object item, StreamSequenceToken token)
+        private Task NextItem(T item, StreamSequenceToken token)
         {
-            T typedItem;
-            try
-            {
-                typedItem = (T)item;
-            }
-            catch (InvalidCastException)
-            {
-                // We got an illegal item on the stream -- close it with a Cast exception
-                throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
-            }
-
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
             if (this.observer == null || !IsValid)
                 return Task.CompletedTask;
 
-            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, typedItem))
+            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, item))
                 return Task.CompletedTask;
 
-            return this.observer.OnNextAsync(typedItem, token);
+            return this.observer.OnNextAsync(item, token);
         }
 
         private Task NextItems(IEnumerable<Tuple<T, StreamSequenceToken>> items)
@@ -201,12 +203,20 @@ namespace Orleans.Streams
 
         public Task CompleteStream()
         {
-            return this.observer == null ? Task.CompletedTask : this.observer.OnCompletedAsync();
+            return this.observer is null
+                ? this.batchObserver is null
+                    ? Task.CompletedTask
+                    : this.batchObserver.OnCompletedAsync()
+                : this.observer.OnCompletedAsync();
         }
 
         public Task ErrorInStream(Exception ex)
         {
-            return this.observer == null ? Task.CompletedTask : this.observer.OnErrorAsync(ex);
+            return this.observer is null
+                ? this.batchObserver is null
+                    ? Task.CompletedTask
+                    : this.batchObserver.OnErrorAsync(ex)
+                : this.observer.OnErrorAsync(ex);
         }
 
         internal bool SameStreamId(StreamId streamId)

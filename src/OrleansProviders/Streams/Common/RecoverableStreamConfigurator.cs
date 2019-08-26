@@ -1,25 +1,21 @@
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
 using System;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 
 namespace Orleans.Streams
 {
-    public interface ISiloRecoverableStreamConfigurator : ISiloPersistentStreamConfigurator
-    {
-    }
+    public interface ISiloRecoverableStreamConfigurator : ISiloPersistentStreamConfigurator {}
 
     public static class SiloRecoverableStreamConfiguratorExtensions
     {
-        public static ISiloRecoverableStreamConfigurator ConfigureStatistics(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamStatisticOptions>> configureOptions)
+        public static void ConfigureStatistics(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamStatisticOptions>> configureOptions)
         {
-            configurator.Configure<StreamStatisticOptions>(configureOptions);
-            return configurator;
+            configurator.Configure(configureOptions);
         }
-        public static ISiloRecoverableStreamConfigurator ConfigureCacheEviction(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamCacheEvictionOptions>> configureOptions)
+        public static void ConfigureCacheEviction(this ISiloRecoverableStreamConfigurator configurator, Action<OptionsBuilder<StreamCacheEvictionOptions>> configureOptions)
         {
-            configurator.Configure<StreamCacheEvictionOptions>(configureOptions);
-            return configurator;
+            configurator.Configure(configureOptions);
         }
     }
 
@@ -28,8 +24,9 @@ namespace Orleans.Streams
         public SiloRecoverableStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
             : base(name, configureDelegate, adapterFactory)
         {
-            this.configureDelegate(services => services.ConfigureNamedOptionForLogging<StreamStatisticOptions>(name)
-            .ConfigureNamedOptionForLogging<StreamCacheEvictionOptions>(name));
+            this.ConfigureDelegate(services => services
+                .ConfigureNamedOptionForLogging<StreamStatisticOptions>(name)
+                .ConfigureNamedOptionForLogging<StreamCacheEvictionOptions>(name));
         }
     }
 }

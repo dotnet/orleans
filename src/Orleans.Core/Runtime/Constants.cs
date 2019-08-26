@@ -11,7 +11,6 @@ namespace Orleans.Runtime
         // We assume that clock skew between silos and between clients and silos is always less than 1 second
         public static readonly TimeSpan MAXIMUM_CLOCK_SKEW = TimeSpan.FromSeconds(1);
 
-        public const string MEMORY_STORAGE_PROVIDER_NAME = "MemoryStore";
         public const string DATA_CONNECTION_STRING_NAME = "DataConnectionString";
         public const string ADO_INVARIANT_NAME = "AdoInvariant";
         public const string DATA_CONNECTION_FOR_REMINDERS_STRING_NAME = "DataConnectionStringForReminders";

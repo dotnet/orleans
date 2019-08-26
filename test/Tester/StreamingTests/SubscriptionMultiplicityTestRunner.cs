@@ -253,7 +253,7 @@ namespace UnitTests.StreamingTests
             }
 
             // unsubscribe from the rest of the subscriptions
-            expectedSubscriptions.ForEach( async h => await consumer.StopConsuming(h));
+            await Task.WhenAll(expectedSubscriptions.Select(h => consumer.StopConsuming(h)));
 
             // query actuall subscriptions again
             actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);

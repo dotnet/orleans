@@ -13,12 +13,12 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Number of event batches in stream prior to this event batch
         /// </summary>
-        public long SequenceNumber { get; set; }
-        
+        public override long SequenceNumber { get; protected set; }
+
         /// <summary>
         /// Number of events in batch prior to this event
         /// </summary>
-        public int EventIndex { get; set; }
+        public override int EventIndex { get; protected set; }
 
         /// <summary>
         /// Sequence token constructor

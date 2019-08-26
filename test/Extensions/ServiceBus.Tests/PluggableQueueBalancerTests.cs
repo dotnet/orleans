@@ -34,14 +34,18 @@ namespace ServiceBus.Tests
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore")
-                        .AddPersistentStreams(StreamProviderName,
-                            EventDataGeneratorAdapterFactory.Create, b=>b
-                        .Configure<EventDataGeneratorStreamOptions>(ob => ob.Configure(
-                            options =>
+                        .AddPersistentStreams(
+                            StreamProviderName,
+                            EventDataGeneratorAdapterFactory.Create,
+                            b=>
                             {
-                                options.EventHubPartitionCount = TotalQueueCount;
-                            }))
-                         .ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n)));
+                                b.Configure<EventDataGeneratorStreamOptions>(ob => ob.Configure(
+                                options =>
+                                {
+                                    options.EventHubPartitionCount = TotalQueueCount;
+                                }));
+                                b.ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n));
+                            });
                 }
             }
         }

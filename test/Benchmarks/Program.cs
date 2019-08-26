@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using BenchmarkDotNet.Running;
+using Benchmarks.ActivationData;
 using Benchmarks.MapReduce;
 using Benchmarks.Serialization;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
-using Benchmarks.ActivationData;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Toolchains.CsProj;
 
 namespace Benchmarks
 {
@@ -98,34 +101,64 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
-            ["Ping"] = () =>
-            {
-                RunBenchmark(
-                    "Running Ping benchmark",
-                    () =>
-                    {
-                        var benchmark = new PingBenchmark();
-                        benchmark.Setup();
-                        return benchmark;
-                    },
-                    benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
-                    benchmark => benchmark.Teardown());
-            },
             ["SequentialPing"] = () =>
             {
-                BenchmarkRunner.Run<SequentialPingBenchmark>();
+                BenchmarkRunner.Run<PingBenchmark>();
+            },
+            ["ConcurrentPing"] = () =>
+            {
+                {
+                    Console.WriteLine("## Client to Silo ##");
+                    var test = new PingBenchmark(numSilos: 1, startClient: true);
+                    test.PingConcurrent().GetAwaiter().GetResult();
+                    test.Shutdown().GetAwaiter().GetResult();
+                }
+                GC.Collect();
+                {
+                    Console.WriteLine("## Client to 2 Silos ##");
+                    var test = new PingBenchmark(numSilos: 2, startClient: true);
+                    test.PingConcurrent().GetAwaiter().GetResult();
+                    test.Shutdown().GetAwaiter().GetResult();
+                }
+                GC.Collect();
+                {
+                    Console.WriteLine("## Hosted Client ##");
+                    var test = new PingBenchmark(numSilos: 1, startClient: false);
+                    test.PingConcurrentHostedClient().GetAwaiter().GetResult();
+                    test.Shutdown().GetAwaiter().GetResult();
+                }
+                GC.Collect();
+                {
+                    // All calls are cross-silo because the calling silo doesn't have any grain classes.
+                    Console.WriteLine("## Silo to Silo ##");
+                    var test = new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true);
+                    test.PingConcurrentHostedClient().GetAwaiter().GetResult();
+                    test.Shutdown().GetAwaiter().GetResult();
+                }
+            },
+            ["ConcurrentPing_OneSilo"] = () =>
+            {
+                new PingBenchmark(numSilos: 1, startClient: true).PingConcurrent().GetAwaiter().GetResult();
+            },
+            ["ConcurrentPing_TwoSilos"] = () =>
+            {
+                new PingBenchmark(numSilos: 2, startClient: true).PingConcurrent().GetAwaiter().GetResult();
+            },
+            ["ConcurrentPing_HostedClient"] = () =>
+            {
+                new PingBenchmark(numSilos: 1, startClient: false).PingConcurrentHostedClient().GetAwaiter().GetResult();
+            },
+            ["ConcurrentPing_SiloToSilo"] = () =>
+            {
+                new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient().GetAwaiter().GetResult();                
             },
             ["PingForever"] = () =>
             {
-                new SequentialPingBenchmark().PingForever().GetAwaiter().GetResult();
+                new PingBenchmark().PingForever().GetAwaiter().GetResult();
             },
             ["PingPongForever"] = () =>
             {
-                new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
-            },
-            ["PingPongForeverSaturate"] = () =>
-            {
-                new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
+                new PingBenchmark().PingPongForever().GetAwaiter().GetResult();
             },
             ["GrainStorage.Memory"] = () =>
             {

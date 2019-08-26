@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.Extensions.Options;
@@ -47,6 +47,8 @@ namespace Orleans.Configuration
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
+
+        public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
 
         /// <summary>
         /// Whether storage string payload should be formatted in Xml.

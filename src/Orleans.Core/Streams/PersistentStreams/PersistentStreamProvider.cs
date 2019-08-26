@@ -100,11 +100,13 @@ namespace Orleans.Providers.Streams.Common
         private async Task Close(CancellationToken token)
         {
             if (!stateManager.PresetState(ProviderState.Closed)) return;
-            var siloRuntime = this.runtime as ISiloSideStreamProviderRuntime;
-            if (siloRuntime != null)
+            
+            var manager = this.pullingAgentManager;
+            if (manager != null)
             {
-                await pullingAgentManager.Stop();
+                await manager.Stop();
             }
+
             stateManager.CommitState();
         }
 
@@ -167,8 +169,8 @@ namespace Orleans.Providers.Streams.Common
 
         public static IStreamProvider Create(IServiceProvider services, string name)
         {
-            var pubsubOptions = services.GetRequiredService<IOptionsSnapshot<StreamPubSubOptions>>().Get(name);
-            var initOptions = services.GetRequiredService<IOptionsSnapshot<StreamLifecycleOptions>>().Get(name);
+            var pubsubOptions = services.GetRequiredService<IOptionsMonitor<StreamPubSubOptions>>().Get(name);
+            var initOptions = services.GetRequiredService<IOptionsMonitor<StreamLifecycleOptions>>().Get(name);
             return ActivatorUtilities.CreateInstance<PersistentStreamProvider>(services, name, pubsubOptions, initOptions);
         }
 

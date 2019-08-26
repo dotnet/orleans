@@ -7,6 +7,11 @@ namespace Orleans.Storage
 {
     public class StorageProviderUtils
     {
+        /// <summary>
+        /// ETag of value "*" to match any etag for conditional table operations (update, nerge, delete).
+        /// </summary>
+        public const string ANY_ETAG = "*";
+
         public static int PositiveHash(GrainReference grainReference, int hashRange)
         {
             int hash = unchecked((int)grainReference.GetUniformHashCode());

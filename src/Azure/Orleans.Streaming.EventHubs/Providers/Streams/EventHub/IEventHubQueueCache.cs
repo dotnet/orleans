@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;

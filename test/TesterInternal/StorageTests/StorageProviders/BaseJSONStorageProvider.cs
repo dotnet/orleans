@@ -1,4 +1,4 @@
-﻿//*********************************************************
+//*********************************************************
 //    Copyright (c) Microsoft. All rights reserved.
 //    
 //    Apache 2.0 License
@@ -27,7 +27,7 @@ namespace Samples.StorageProviders
     /// <summary>
     /// Base class for JSON-based grain storage providers.
     /// </summary>
-    public abstract class BaseJSONStorageProvider : IStorageProvider
+    public abstract class BaseJSONStorageProvider : IGrainStorage
     {
         /// <summary>
         /// Storage provider name
@@ -45,18 +45,6 @@ namespace Samples.StorageProviders
         /// </summary>
         protected BaseJSONStorageProvider()
         {
-        }
-
-        /// <summary>
-        /// Initializes the storage provider.
-        /// </summary>
-        /// <param name="name">The name of this provider instance.</param>
-        /// <param name="providerRuntime">A Orleans runtime object managing all storage providers.</param>
-        /// <param name="config">Configuration info for this provider instance.</param>
-        /// <returns>Completion promise for this operation.</returns>
-        public virtual Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            return Task.CompletedTask;
         }
 
         /// <summary>

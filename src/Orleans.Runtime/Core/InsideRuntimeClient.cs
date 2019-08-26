@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         private readonly SiloMessagingOptions messagingOptions;
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
-        private SharedCallbackData sharedCallbackData;
+        private readonly SharedCallbackData sharedCallbackData;
         private SafeTimer callbackTimer;
 
         private ILocalGrainDirectory directory;
@@ -83,6 +83,12 @@ namespace Orleans.Runtime
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.appRequestStatistics = appRequestStatistics;
             this.schedulingOptions = schedulerOptions.Value;
+
+            this.sharedCallbackData = new SharedCallbackData(
+                msg => this.UnregisterCallback(msg.Id),
+                this.loggerFactory.CreateLogger<CallbackData>(),
+                this.messagingOptions,
+                this.appRequestStatistics);
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -121,6 +127,7 @@ namespace Orleans.Runtime
             string genericArguments = null)
         {
             var message = this.messageFactory.CreateMessage(request, options);
+            EventSourceUtils.EmitEvent(message, OrleansInsideRuntimeClientEvent.SendRequestAction);
             SendRequestMessage(target, message, context, debugContext, options, genericArguments);
         }
 
@@ -216,6 +223,7 @@ namespace Orleans.Runtime
 
         public void SendResponse(Message request, Response response)
         {
+            EventSourceUtils.EmitEvent(request, OrleansInsideRuntimeClientEvent.SendResponseAction);
             // Don't process messages that have already timed out
             if (request.IsExpired)
             {
@@ -317,7 +325,7 @@ namespace Orleans.Runtime
                 object resultObject;
                 try
                 {
-                    var request = (InvokeMethodRequest) message.GetDeserializedBody(this.serializationManager);
+                    var request = (InvokeMethodRequest) message.BodyObject;
                     if (request.Arguments != null)
                     {
                         CancellationSourcesExtension.RegisterCancellationTokens(target, request, this.loggerFactory, logger, this, this.cancellationTokenRuntime);
@@ -355,12 +363,12 @@ namespace Orleans.Runtime
                     if (message.Direction == Message.Directions.OneWay)
                     {
                         invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message, exc1);
+                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(exc1), exc1);
                     }
                     else if (invokeExceptionLogger.IsEnabled(LogLevel.Debug))
                     {
                         invokeExceptionLogger.Debug(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message, exc1);
+                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(exc1), exc1);
                     }
 
                     if (transactionInfo != null)
@@ -588,6 +596,7 @@ namespace Orleans.Runtime
 
         public void ReceiveResponse(Message message)
         {
+            EventSourceUtils.EmitEvent(message, OrleansInsideRuntimeClientEvent.ReceiveResponseAction);
             if (message.Result == Message.ResponseTypes.Rejection)
             {
                 if (!message.TargetSilo.Matches(this.MySilo))
@@ -662,7 +671,6 @@ namespace Orleans.Runtime
 
         public void Reset(bool cleanup)
         {
-            throw new InvalidOperationException();
         }
 
         /// <inheritdoc />
@@ -721,14 +729,6 @@ namespace Orleans.Runtime
         {
             var stopWatch = Stopwatch.StartNew();
             this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
-
-            this.sharedCallbackData = new SharedCallbackData(
-                msg => this.Dispatcher.TryResendMessage(msg),
-                msg => this.UnregisterCallback(msg.Id),
-                this.loggerFactory.CreateLogger<CallbackData>(),
-                this.messagingOptions,
-                this.serializationManager,
-                this.appRequestStatistics);
             var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
             var minTicks = Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
             var period = TimeSpan.FromTicks(minTicks);
@@ -863,11 +863,12 @@ namespace Orleans.Runtime
         private void OnCallbackExpiryTick(object state)
         {
             var currentStopwatchTicks = Stopwatch.GetTimestamp();
+            var responseTimeout = this.messagingOptions.ResponseTimeout;
             foreach (var pair in callbacks)
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.messagingOptions.ResponseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(responseTimeout);
             }
         }
     }

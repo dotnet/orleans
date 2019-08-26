@@ -1,10 +1,9 @@
-﻿using Orleans.Runtime;
-using Orleans.Runtime.Host;
 using System;
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Runtime.Host;
+using Orleans.Configuration;
 
 namespace Orleans.Streams
 {
@@ -16,10 +15,10 @@ namespace Orleans.Streams
         /// This Balancer uses both the information about the full set of silos as reported by Azure role code and 
         /// the information from Membership oracle about currently active (alive) silos and rebalances queues from non active silos.
         /// </summary>
-        public static ISiloPersistentStreamConfigurator UseDynamicAzureDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator, 
+        public static void UseDynamicAzureDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator, 
             TimeSpan? siloMaturityPeriod = null)
         {
-            return configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(
+            configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(
                 (s, n) => DeploymentBasedQueueBalancer.Create(s, n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())),
                 options => options.Configure(op =>
                 {
@@ -36,10 +35,10 @@ namespace Orleans.Streams
         /// does NOT use the information from Membership oracle about currently alive silos. 
         /// That is, it does not rebalance queues based on dynamic changes in the cluster Membership.
         /// </summary>
-        public static ISiloPersistentStreamConfigurator UseStaticAzureDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator,
+        public static void UseStaticAzureDeploymentBalancer(this ISiloPersistentStreamConfigurator configurator,
            TimeSpan? siloMaturityPeriod = null)
         {
-            return configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(
+            configurator.ConfigurePartitionBalancing<DeploymentBasedQueueBalancerOptions>(
                 (s, n) => DeploymentBasedQueueBalancer.Create(s, n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())),
                 options => options.Configure(op =>
                 {
@@ -54,10 +53,11 @@ namespace Orleans.Streams
         /// Requires silo running in Azure.
         /// This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
         /// </summary>
-        public static ISiloPersistentStreamConfigurator UseAzureDeploymentLeaseBasedBalancer(this ISiloPersistentStreamConfigurator configurator,
+        public static void UseAzureDeploymentLeaseBasedBalancer(this ISiloPersistentStreamConfigurator configurator,
            Action<OptionsBuilder<LeaseBasedQueueBalancerOptions>> configureOptions = null)
         {
-            return configurator.ConfigurePartitionBalancing<LeaseBasedQueueBalancerOptions>((s,n)=>LeaseBasedQueueBalancer.Create(s,n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())), configureOptions);
+            configurator.ConfigurePartitionBalancing(
+                (s,n)=>LeaseBasedQueueBalancer.Create(s,n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())), configureOptions);
         }
     }
 }

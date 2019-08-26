@@ -5,9 +5,12 @@ using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Configuration.Validators;
 using Orleans.Hosting;
+using Orleans.Messaging;
 using Orleans.Metadata;
+using Orleans.Networking.Shared;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Statistics;
 using Orleans.Streams;
@@ -23,7 +26,8 @@ namespace Orleans
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
 
-            services.TryAddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
+            services.AddSingleton<ClientOptionsLogger>();
+            services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
@@ -85,6 +89,21 @@ namespace Orleans
 
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
+
+            // TODO: abstract or move into some options.
+            services.AddSingleton<SocketSchedulers>();
+            services.AddSingleton<SharedMemoryPool>();
+
+            // Networking
+            services.TryAddSingleton<ConnectionManager>();
+            services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ConnectionManagerLifecycleAdapter<IClusterClientLifecycle>>();
+            services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
+            services.TryAddTransient<IMessageSerializer, MessageSerializer>();
+            services.TryAddSingleton<ConnectionFactory, ClientOutboundConnectionFactory>();
+            services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
+            services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
+            services.AddSingleton<GatewayManager>();
+            services.TryAddSingleton<INetworkingTrace, NetworkingTrace>();
         }
     }
 }

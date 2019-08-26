@@ -44,7 +44,10 @@ namespace Tester.AzureUtils.Streaming
         
         public void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, TestDefaultConfiguration.DataConnectionString).Wait();
+            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            {
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, TestDefaultConfiguration.DataConnectionString).Wait();
+            }
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("Halo")]
@@ -57,7 +60,7 @@ namespace Tester.AzureUtils.Streaming
                 QueueNames = azureQueueNames
             };
             var serializationManager = this.fixture.Services.GetService<SerializationManager>();
-            var clusterOptions = this.fixture.Services.GetService<IOptions<ClusterOptions>>();
+            var clusterOptions = this.fixture.Services.GetRequiredService<IOptions<ClusterOptions>>();
             var queueCacheOptions = new SimpleQueueCacheOptions();
             var queueDataAdapter = new AzureQueueDataAdapterV2(serializationManager);
             var adapterFactory = new AzureQueueAdapterFactory(

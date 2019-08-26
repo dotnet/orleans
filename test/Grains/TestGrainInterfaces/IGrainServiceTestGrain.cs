@@ -13,12 +13,6 @@ namespace UnitTests.GrainInterfaces
         Task<bool> CallHasInit();
         Task<string> GetServiceConfigProperty();
         Task<string> EchoViaExtension(string what);
-
-        Task<string> GetHelloWorldUsingCustomService_Legacy();
-        Task<string> GetServiceConfigProperty_Legacy(string propertyName);
-        Task<bool> CallHasStarted_Legacy();
-        Task<bool> CallHasStartedInBackground_Legacy();
-        Task<bool> CallHasInit_Legacy();
     }
 
     public interface IEchoExtension : IGrainExtension

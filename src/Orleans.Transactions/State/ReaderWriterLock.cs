@@ -21,11 +21,11 @@ namespace Orleans.Transactions.State
         private BatchWorker lockWorker;
         private BatchWorker storageWorker;
         private readonly ILogger logger;
+        private readonly IActivationLifetime activationLifetime;
 
         // the linked list of lock groups
         // the head is the group that is currently holding the lock
         private LockGroup currentGroup = null;
-        private const int maxGroupSize = 20;
 
         // cache the last known minimum so we don't have to recompute it as much
         private DateTime cachedMin = DateTime.MaxValue;
@@ -51,13 +51,15 @@ namespace Orleans.Transactions.State
             IOptions<TransactionalStateOptions> options,
             TransactionQueue<TState> queue,
             BatchWorker storageWorker,
-            ILogger logger)
+            ILogger logger,
+            IActivationLifetime activationLifetime)
         {
             this.options = options.Value;
             this.queue = queue;
             this.storageWorker = storageWorker;
             this.logger = logger;
-            this.lockWorker = new BatchWorkerFromDelegate(LockWork);
+            this.activationLifetime = activationLifetime;
+            this.lockWorker = new BatchWorkerFromDelegate(LockWork, this.activationLifetime.OnDeactivating);
         }
 
         public async Task<TResult> EnterLock<TResult>(Guid transactionId, DateTime priority,
@@ -275,108 +277,114 @@ namespace Orleans.Transactions.State
 
         private async Task LockWork()
         {
-            var now = DateTime.UtcNow;
-
-            if (currentGroup != null)
+            // Stop pumping lock work if this activation is stopping/stopped.
+            if (this.activationLifetime.OnDeactivating.IsCancellationRequested) return;
+            using (this.activationLifetime.BlockDeactivation())
             {
-                // check if there are any group members that are ready to exit the lock
-                if (currentGroup.Count > 0)
+                var now = DateTime.UtcNow;
+
+                if (currentGroup != null)
                 {
-                    if (LockExits(out var single, out var multiple))
+                    // check if there are any group members that are ready to exit the lock
+                    if (currentGroup.Count > 0)
                     {
-                        if (single != null)
+                        if (LockExits(out var single, out var multiple))
                         {
-                            await this.queue.EnqueueCommit(single);
-                        }
-                        else if (multiple != null)
-                        {
-                            foreach (var r in multiple)
+                            if (single != null)
                             {
-                                await this.queue.EnqueueCommit(r);
+                                await this.queue.EnqueueCommit(single);
                             }
+                            else if (multiple != null)
+                            {
+                                foreach (var r in multiple)
+                                {
+                                    await this.queue.EnqueueCommit(r);
+                                }
+                            }
+
+                            lockWorker.Notify();
+                            storageWorker.Notify();
                         }
 
-                        lockWorker.Notify();
-                        storageWorker.Notify();
-                    }
-
-                    else if (currentGroup.Deadline.HasValue)
-                    {
-                        if (currentGroup.Deadline.Value < now)
+                        else if (currentGroup.Deadline.HasValue)
                         {
-                            // the lock group has timed out.
-                            string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
-                            TimeSpan late = now - currentGroup.Deadline.Value;
-                            logger.LogWarning("Break-lock timeout for transactions {TransactionIds}. {Late}ms late", txlist, Math.Floor(late.TotalMilliseconds));
-                            await AbortExecutingTransactions();
-                            lockWorker.Notify();
+                            if (currentGroup.Deadline.Value < now)
+                            {
+                                // the lock group has timed out.
+                                string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
+                                TimeSpan late = now - currentGroup.Deadline.Value;
+                                logger.LogWarning("Break-lock timeout for transactions {TransactionIds}. {Late}ms late", txlist, Math.Floor(late.TotalMilliseconds));
+                                await AbortExecutingTransactions();
+                                lockWorker.Notify();
+                            }
+                            else
+                            {
+                                if (logger.IsEnabled(LogLevel.Trace))
+                                    logger.Trace("recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
+
+                                // check again when the group expires
+                                lockWorker.Notify(currentGroup.Deadline.Value);
+                            }
                         }
                         else
                         {
-                            if (logger.IsEnabled(LogLevel.Trace))
-                                logger.Trace("recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
-
-                            // check again when the group expires
-                            lockWorker.Notify(currentGroup.Deadline.Value);
+                            string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
+                            logger.LogWarning("Deadline not set for transactions {TransactionIds}", txlist);
                         }
-                    } else
-                    {
-                        string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
-                        logger.LogWarning("Deadline not set for transactions {TransactionIds}", txlist);
                     }
-                }
 
-                else
-                {
-                    // the lock is empty, a new group can enter
-                    currentGroup = currentGroup.Next;
-
-                    if (currentGroup != null)
+                    else
                     {
-                        currentGroup.Deadline = now + this.options.LockTimeout;
+                        // the lock is empty, a new group can enter
+                        currentGroup = currentGroup.Next;
 
-                        // discard expired waiters that have no chance to succeed
-                        // because they have been waiting for the lock for a longer timespan than the 
-                        // total transaction timeout
-                        List<Guid> expiredWaiters = null;
-                        foreach (var kvp in currentGroup)
+                        if (currentGroup != null)
                         {
-                            if (now > kvp.Value.Deadline)
-                            {
-                                if (expiredWaiters == null)
-                                    expiredWaiters = new List<Guid>();
-                                expiredWaiters.Add(kvp.Key);
+                            currentGroup.Deadline = now + this.options.LockTimeout;
 
-                                if (logger.IsEnabled(LogLevel.Trace))
-                                    logger.Trace($"expire-lock-waiter {kvp.Key}");
-                            }
-                        }
-
-                        if (expiredWaiters != null)
-                        {
-                            foreach (var guid in expiredWaiters)
-                            {
-                                currentGroup.Remove(guid);
-                            }
-                        }
-
-                        if (logger.IsEnabled(LogLevel.Trace))
-                        {
-                            logger.Trace($"lock groupsize={currentGroup.Count} deadline={currentGroup.Deadline:o}");
+                            // discard expired waiters that have no chance to succeed
+                            // because they have been waiting for the lock for a longer timespan than the 
+                            // total transaction timeout
+                            List<Guid> expiredWaiters = null;
                             foreach (var kvp in currentGroup)
-                                logger.Trace($"enter-lock {kvp.Key}");
-                        }
-
-                        // execute all the read and update tasks
-                        if (currentGroup.Tasks != null)
-                        {
-                            foreach (var t in currentGroup.Tasks)
                             {
-                                t();
-                            }
-                        }
+                                if (now > kvp.Value.Deadline)
+                                {
+                                    if (expiredWaiters == null)
+                                        expiredWaiters = new List<Guid>();
+                                    expiredWaiters.Add(kvp.Key);
 
-                        lockWorker.Notify();
+                                    if (logger.IsEnabled(LogLevel.Trace))
+                                        logger.Trace($"expire-lock-waiter {kvp.Key}");
+                                }
+                            }
+
+                            if (expiredWaiters != null)
+                            {
+                                foreach (var guid in expiredWaiters)
+                                {
+                                    currentGroup.Remove(guid);
+                                }
+                            }
+
+                            if (logger.IsEnabled(LogLevel.Trace))
+                            {
+                                logger.Trace($"lock groupsize={currentGroup.Count} deadline={currentGroup.Deadline:o}");
+                                foreach (var kvp in currentGroup)
+                                    logger.Trace($"enter-lock {kvp.Key}");
+                            }
+
+                            // execute all the read and update tasks
+                            if (currentGroup.Tasks != null)
+                            {
+                                foreach (var t in currentGroup.Tasks)
+                                {
+                                    t();
+                                }
+                            }
+
+                            lockWorker.Notify();
+                        }
                     }
                 }
             }
@@ -405,7 +413,7 @@ namespace Orleans.Transactions.State
 
                     // if we have not found a place to insert this op yet, and there is room, and no conflicts, use this one
                     if (group == null
-                        && pos.FillCount < maxGroupSize
+                        && pos.FillCount < this.options.MaxLockGroupSize
                         && !HasConflict(isRead, DateTime.MaxValue, guid, pos, out var resolvable))
                     {
                         group = pos;

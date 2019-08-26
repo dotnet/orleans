@@ -22,13 +22,6 @@ namespace Consul.Tests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             ConsulTestUtils.EnsureConsul();
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.DataConnectionString = ConsulTestUtils.CONSUL_ENDPOINT;
-                legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
-                legacy.ClusterConfiguration.PrimaryNode = null;
-                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
-            });
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
         }

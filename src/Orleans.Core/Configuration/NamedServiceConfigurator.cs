@@ -1,56 +1,59 @@
 using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
+    public interface INamedServiceConfigurator
+    {
+        string Name { get; }
+        Action<Action<IServiceCollection>> ConfigureDelegate { get; }
+    }
+
     /// <summary>
     /// Component configurator base class for names services
     /// This associates any configurations or subcomponents with the same name as the service being configured
     /// </summary>
-    /// <typeparam name="TConfigurator"></typeparam>
-    public abstract class NamedServiceConfigurator<TConfigurator> : IComponentConfigurator<TConfigurator>
-        where TConfigurator : class, IComponentConfigurator<TConfigurator>
+    public class NamedServiceConfigurator : INamedServiceConfigurator
     {
-        protected readonly string name;
-        protected readonly Action<Action<IServiceCollection>> configureDelegate;
+        public string Name { get; }
+        public Action<Action<IServiceCollection>> ConfigureDelegate { get; }
 
-        protected NamedServiceConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate)
+        public NamedServiceConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate)
         {
-            this.name = name;
-            this.configureDelegate = configureDelegate;
+            this.Name = name;
+            this.ConfigureDelegate = configureDelegate;
         }
+    }
 
-        public TConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions)
+    public static class NamedServiceConfiguratorExtensions
+    {
+        public static void Configure<TOptions>(this INamedServiceConfigurator configurator, Action<OptionsBuilder<TOptions>> configureOptions)
             where TOptions : class, new()
         {
-            this.configureDelegate(services =>
+            configurator.ConfigureDelegate(services =>
             {
-                configureOptions?.Invoke(services.AddOptions<TOptions>(this.name));
-                services.ConfigureNamedOptionForLogging<TOptions>(this.name);
+                configureOptions?.Invoke(services.AddOptions<TOptions>(configurator.Name));
+                services.ConfigureNamedOptionForLogging<TOptions>(configurator.Name);
             });
-            return this as TConfigurator;
         }
 
-        public TConfigurator ConfigureComponent<TOptions, TComponent>(Func<IServiceProvider, string, TComponent> factory, Action<OptionsBuilder<TOptions>> configureOptions = null)
+        public static void ConfigureComponent<TOptions, TComponent>(this INamedServiceConfigurator configurator, Func<IServiceProvider, string, TComponent> factory, Action<OptionsBuilder<TOptions>> configureOptions = null)
             where TOptions : class, new()
             where TComponent : class
         {
-            this.Configure<TOptions>(configureOptions);
-            this.ConfigureComponent<TComponent>(factory);
-            return this as TConfigurator;
+            configurator.Configure(configureOptions);
+            configurator.ConfigureComponent(factory);
         }
 
-        public TConfigurator ConfigureComponent<TComponent>(Func<IServiceProvider, string, TComponent> factory)
+        public static void ConfigureComponent<TComponent>(this INamedServiceConfigurator configurator, Func<IServiceProvider, string, TComponent> factory)
            where TComponent : class
         {
-            this.configureDelegate(services =>
+            configurator.ConfigureDelegate(services =>
             {
-                services.AddSingletonNamedService<TComponent>(name, factory);
+                services.AddSingletonNamedService(configurator.Name, factory);
             });
-            return this as TConfigurator;
         }
     }
 }

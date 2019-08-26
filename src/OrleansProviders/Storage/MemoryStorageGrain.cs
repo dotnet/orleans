@@ -41,7 +41,7 @@ namespace Orleans.Storage
             var grainState = storage.GetGrainState(grainStoreKey);
             return Task.FromResult(grainState);
         }
-        
+
         public Task<string> WriteStateAsync(string stateStore, string grainStoreKey, IGrainState grainState)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("WriteStateAsync for {0} grain: {1} eTag: {2}", stateStore, grainStoreKey, grainState.ETag);
@@ -129,8 +129,8 @@ namespace Orleans.Storage
                 if (string.IsNullOrEmpty(currentETag) && receivedEtag == null)
                     return;
 
-                // if current state and new state have matching etags, we're good
-                if (receivedEtag == currentETag)
+                // if current state and new state have matching etags, or we're to ignore the ETag, we're good
+                if (receivedEtag == currentETag || receivedEtag == StorageProviderUtils.ANY_ETAG)
                     return;
 
                 // else we have an etag mismatch
@@ -151,6 +151,7 @@ namespace Orleans.Storage
                     ETag = string.Empty;
                 }
                 public object State { get; set; }
+                public Type Type => typeof(object);
                 public string ETag { get; set; }
             }
             private static readonly IGrainState Deleted = new DeletedState();

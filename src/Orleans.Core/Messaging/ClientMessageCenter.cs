@@ -3,14 +3,18 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Text;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Networking.Shared;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 
 namespace Orleans.Messaging
@@ -38,27 +42,7 @@ namespace Orleans.Messaging
     // dead, and any buckets assigned to the connection are unassigned (so that the next message sent will cause a new gateway to be selected).
     // There is no assumption that this death is permanent; the system will try to reuse the gateway every 5 minutes.
     // 
-    // The list of known gateways is managed by the GatewayManager class. See comments there for details...
-    // =======================================================================================================================================
-    // Locking and lock protocol:
-    // The ClientMessageCenter instance itself may be accessed by many client threads simultaneously, and each GatewayConnection instance
-    // is accessed by its own thread, by the thread for its Receiver, and potentially by client threads from within the ClientMessageCenter.
-    // Thus, we need locks to protect the various data structured from concurrent modifications.
-    // 
-    // Each GatewayConnection instance has a "lockable" field that is used to lock local information. This lock is used by both the GatewayConnection
-    // thread and the Receiver thread.
-    // 
-    // The ClientMessageCenter instance also has a "lockable" field. This lock is used by any client thread running methods within the instance.
-    // 
-    // Note that we take care to ensure that client threads never need locked access to GatewayConnection state and GatewayConnection threads never need
-    // locked access to ClientMessageCenter state. Thus, we don't need to worry about lock ordering across these objects.
-    // 
-    // Finally, the GatewayManager instance within the ClientMessageCenter has two collections, knownGateways and knownDead, that it needs to
-    // protect with locks. Rather than using a "lockable" field, each collection is lcoked to protect the collection.
-    // All sorts of threads can run within the GatewayManager, including client threads and GatewayConnection threads, so we need to
-    // be careful about locks here. The protocol we use is to always take GatewayManager locks last, to only take them within GatewayManager methods,
-    // and to always release them before returning from the method. In addition, we never simultaneously hold the knownGateways and knownDead locks,
-    // so there's no need to worry about the order in which we take and release those locks.
+    // The list of known gateways is managed by the GatewayManager class. See comments there for details.
     // </summary>
     internal class ClientMessageCenter : IMessageCenter, IDisposable
     {
@@ -71,70 +55,64 @@ namespace Orleans.Messaging
         public IRuntimeClient RuntimeClient { get; }
         internal bool Running { get; private set; }
 
-        internal readonly GatewayManager GatewayManager;
-        internal readonly BlockingCollection<Message> PendingInboundMessages;
-        private readonly Dictionary<Uri, GatewayConnection> gatewayConnections;
+        private readonly GatewayManager gatewayManager;
+        internal readonly Channel<Message> PendingInboundMessages;
+        private readonly Action<Message>[] messageHandlers;
         private int numMessages;
         // The grainBuckets array is used to select the connection to use when sending an ordered message to a grain.
         // Requests are bucketed by GrainID, so that all requests to a grain get routed through the same bucket.
         // Each bucket holds a (possibly null) weak reference to a GatewayConnection object. That connection instance is used
         // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
         // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
-        private readonly WeakReference[] grainBuckets;
+        private readonly WeakReference<Connection>[] grainBuckets;
         private readonly ILogger logger;
-        private readonly object lockable;
         public SiloAddress MyAddress { get; private set; }
         private readonly QueueTrackingStatistic queueTracking;
         private int numberOfConnectedGateways = 0;
         private readonly MessageFactory messageFactory;
         private readonly IClusterConnectionStatusListener connectionStatusListener;
-        private readonly ILoggerFactory loggerFactory;
-        private readonly TimeSpan openConnectionTimeout;
-        private readonly ExecutorService executorService;
+        private readonly ConnectionManager connectionManager;
         private StatisticsLevel statisticsLevel;
 
         public ClientMessageCenter(
-            IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             IPAddress localAddress,
             int gen,
             GrainId clientId,
-            IGatewayListProvider gatewayListProvider,
             SerializationManager serializationManager,
             IRuntimeClient runtimeClient,
             MessageFactory messageFactory,
             IClusterConnectionStatusListener connectionStatusListener,
-            ExecutorService executorService,
             ILoggerFactory loggerFactory,
-            IOptions<NetworkingOptions> networkingOptions,
-            IOptions<StatisticsOptions> statisticsOptions)
+            IOptions<StatisticsOptions> statisticsOptions,
+            ConnectionManager connectionManager,
+            GatewayManager gatewayManager)
         {
-            this.loggerFactory = loggerFactory;
-            this.openConnectionTimeout = networkingOptions.Value.OpenConnectionTimeout;
+            this.messageHandlers = new Action<Message>[Enum.GetValues(typeof(Message.Categories)).Length];
+            this.connectionManager = connectionManager;
             this.SerializationManager = serializationManager;
-            this.executorService = executorService;
-            lockable = new object();
             MyAddress = SiloAddress.New(new IPEndPoint(localAddress, 0), gen);
             ClientId = clientId;
             this.RuntimeClient = runtimeClient;
             this.messageFactory = messageFactory;
             this.connectionStatusListener = connectionStatusListener;
             Running = false;
-            GatewayManager = new GatewayManager(gatewayOptions.Value, gatewayListProvider, loggerFactory);
-            PendingInboundMessages = new BlockingCollection<Message>();
-            gatewayConnections = new Dictionary<Uri, GatewayConnection>();
+            this.gatewayManager = gatewayManager;
+            PendingInboundMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                AllowSynchronousContinuations = false
+            });
             numMessages = 0;
-            grainBuckets = new WeakReference[clientMessagingOptions.Value.ClientSenderBuckets];
+            this.grainBuckets = new WeakReference<Connection>[clientMessagingOptions.Value.ClientSenderBuckets];
             logger = loggerFactory.CreateLogger<ClientMessageCenter>();
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(
                 StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT,
                 () =>
                 {
-                    lock (gatewayConnections)
-                    {
-                        return gatewayConnections.Values.Count(conn => conn.IsLive);
-                    }
+                    return connectionManager.ConnectionCount;
                 });
             statisticsLevel = statisticsOptions.Value.CollectionLevel;
             if (statisticsLevel.CollectQueueStats())
@@ -153,60 +131,108 @@ namespace Orleans.Messaging
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client started");
         }
 
-        public void PrepareToStop()
-        {
-            // put any pre stop logic here.
-        }
-
         public void Stop()
         {
             Running = false;
 
             Utils.SafeExecute(() =>
             {
-                PendingInboundMessages.CompleteAdding();
+                PendingInboundMessages.Writer.TryComplete();
             });
 
             if (this.statisticsLevel.CollectQueueStats())
             {
                 queueTracking.OnStopExecution();
             }
-            GatewayManager.Stop();
+            gatewayManager.Stop();
+        }
 
-            foreach (var gateway in gatewayConnections.Values.ToArray())
+        public ChannelReader<Message> GetReader(Message.Categories type) => PendingInboundMessages.Reader;
+
+        public void OnReceivedMessage(Message message)
+        {
+            var handler = this.messageHandlers[(int)message.Category];
+            if (handler != null)
             {
-                gateway.Stop();
+                handler(message);
+            }
+            else
+            {
+                if (!PendingInboundMessages.Writer.TryWrite(message))
+                {
+                    this.logger.LogWarning($"{nameof(ClientMessageCenter)} dropping message {message} because inbound queue is closed.");
+                }
             }
         }
 
         public void SendMessage(Message msg)
         {
-            GatewayConnection gatewayConnection = null;
-            bool startRequired = false;
-
             if (!Running)
             {
                 this.logger.Error(ErrorCode.ProxyClient_MsgCtrNotRunning, $"Ignoring {msg} because the Client message center is not running");
                 return;
             }
 
-            // If there's a specific gateway specified, use it
-            if (msg.TargetSilo != null && GatewayManager.GetLiveGateways().Contains(msg.TargetSilo.ToGatewayUri()))
+            var connectionTask = this.GetGatewayConnection(msg);
+            if (connectionTask.IsCompletedSuccessfully)
             {
-                Uri addr = msg.TargetSilo.ToGatewayUri();
-                lock (lockable)
+                var connection = connectionTask.Result;
+                if (connection is null) return;
+
+                connection.Send(msg);
+
+                if (this.logger.IsEnabled(LogLevel.Trace))
                 {
-                    if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
+                    this.logger.Trace(
+                        ErrorCode.ProxyClient_QueueRequest,
+                        "Sending message {0} via gateway {1}",
+                        msg,
+                        connection.RemoteEndpoint);
+                }
+            }
+            else
+            {
+                _ = SendAsync(connectionTask, msg);
+
+                async Task SendAsync(ValueTask<Connection> task, Message message)
+                {
+                    try
                     {
-                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, executorService, this.loggerFactory, this.openConnectionTimeout);
-                        gatewayConnections[addr] = gatewayConnection;
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Creating gateway to {0} for pre-addressed message", addr);
-                        startRequired = true;
+                        var connection = await task;
+                        if (connection is null) return;
+
+                        connection.Send(message);
+
+                        if (this.logger.IsEnabled(LogLevel.Trace))
+                        {
+                            this.logger.Trace(
+                                ErrorCode.ProxyClient_QueueRequest,
+                                "Sending message {0} via gateway {1}",
+                                message,
+                                connection.RemoteEndpoint);
+                        }
+                    }
+                    catch
+                    {
+                        this.SendMessage(message);
                     }
                 }
             }
+        }
+
+        private ValueTask<Connection> GetGatewayConnection(Message msg)
+        {
+            // If there's a specific gateway specified, use it
+            if (msg.TargetSilo != null && gatewayManager.GetLiveGateways().Contains(msg.TargetSilo))
+            {
+                var connectionTask = this.connectionManager.GetConnection(msg.TargetSilo);
+                if (connectionTask.IsCompletedSuccessfully) return connectionTask;
+
+                return ConnectAsync(msg.TargetSilo, connectionTask, msg, directGatewayMessage: true);
+            }
+
             // For untargeted messages to system targets, and for unordered messages, pick a next connection in round robin fashion.
-            else if (msg.TargetGrain.IsSystemTarget || msg.IsUnordered)
+            if (msg.TargetGrain.IsSystemTarget || msg.IsUnordered)
             {
                 // Get the cached list of live gateways.
                 // Pick a next gateway name in a round robin fashion.
@@ -214,102 +240,133 @@ namespace Orleans.Messaging
                 // If Yes, use it.
                 // If not, create a new GatewayConnection and start it.
                 // If start fails, we will mark this connection as dead and remove it from the GetCachedLiveGatewayNames.
-                lock (lockable)
+                int msgNumber = Interlocked.Increment(ref numMessages);
+                var gatewayAddresses = gatewayManager.GetLiveGateways();
+                int numGateways = gatewayAddresses.Count;
+                if (numGateways == 0)
                 {
-                    int msgNumber = numMessages;
-                    numMessages = unchecked(numMessages + 1);
-                    IList<Uri> gatewayNames = GatewayManager.GetLiveGateways();
-                    int numGateways = gatewayNames.Count;
-                    if (numGateways == 0)
-                    {
-                        RejectMessage(msg, "No gateways available");
-                        logger.Warn(ErrorCode.ProxyClient_CannotSend, "Unable to send message {0}; gateway manager state is {1}", msg, GatewayManager);
-                        return;
-                    }
-                    Uri addr = gatewayNames[msgNumber % numGateways];
-                    if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
-                    {
-                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.executorService, this.loggerFactory, this.openConnectionTimeout);
-                        gatewayConnections[addr] = gatewayConnection;
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_CreatedGatewayUnordered, "Creating gateway to {0} for unordered message to grain {1}", addr, msg.TargetGrain);
-                        startRequired = true;
-                    }
-                    // else - Fast path - we've got a live gatewayConnection to use
+                    RejectMessage(msg, "No gateways available");
+                    logger.Warn(ErrorCode.ProxyClient_CannotSend, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
+                    return new ValueTask<Connection>(default(Connection));
                 }
+
+                var gatewayAddress = gatewayAddresses[msgNumber % numGateways];
+
+                var connectionTask = this.connectionManager.GetConnection(gatewayAddress);
+                if (connectionTask.IsCompletedSuccessfully) return connectionTask;
+
+                return ConnectAsync(gatewayAddress, connectionTask, msg, directGatewayMessage: false);
             }
+
             // Otherwise, use the buckets to ensure ordering.
-            else
+            var index = msg.TargetGrain.GetHashCode_Modulo((uint)grainBuckets.Length);
+
+            // Repeated from above, at the declaration of the grainBuckets array:
+            // Requests are bucketed by GrainID, so that all requests to a grain get routed through the same bucket.
+            // Each bucket holds a (possibly null) weak reference to a GatewayConnection object. That connection instance is used
+            // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
+            // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
+            WeakReference<Connection> weakRef = grainBuckets[index];
+
+            if (weakRef != null && weakRef.TryGetTarget(out var existingConnection) && existingConnection.IsValid)
             {
-                var index = msg.TargetGrain.GetHashCode_Modulo((uint)grainBuckets.Length);
-                lock (lockable)
+                return new ValueTask<Connection>(existingConnection);
+            }
+
+            var addr = gatewayManager.GetLiveGateway();
+            if (addr == null)
+            {
+                RejectMessage(msg, "No gateways available");
+                logger.Warn(ErrorCode.ProxyClient_CannotSend_NoGateway, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
+                return new ValueTask<Connection>(default(Connection));
+            }
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
+
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(
+                ErrorCode.ProxyClient_CreatedGatewayToGrain,
+                "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X",
+                addr,
+                msg.TargetGrain,
+                index,
+                msg.TargetGrain.GetHashCode().ToString("x"));
+
+            var gatewayConnection = this.connectionManager.GetConnection(addr);
+            if (gatewayConnection.IsCompletedSuccessfully)
+            {
+                var result = this.TryUpdateConnection(index, gatewayConnection.Result, weakRef);
+                if (result == null) return this.GetGatewayConnection(msg);
+                return new ValueTask<Connection>(result);
+            }
+
+            return AddToBucketAsync(index, msg, gatewayConnection, weakRef, addr);
+
+            async ValueTask<Connection> AddToBucketAsync(
+                uint i,
+                Message message,
+                ValueTask<Connection> c,
+                WeakReference<Connection> existing,
+                SiloAddress gatewayAddress)
+            {
+                try
                 {
-                    // Repeated from above, at the declaration of the grainBuckets array:
-                    // Requests are bucketed by GrainID, so that all requests to a grain get routed through the same bucket.
-                    // Each bucket holds a (possibly null) weak reference to a GatewayConnection object. That connection instance is used
-                    // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
-                    // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
-                    var weakRef = grainBuckets[index];
-                    if ((weakRef != null) && weakRef.IsAlive)
-                    {
-                        gatewayConnection = weakRef.Target as GatewayConnection;
-                    }
-                    if ((gatewayConnection == null) || !gatewayConnection.IsLive)
-                    {
-                        var addr = GatewayManager.GetLiveGateway();
-                        if (addr == null)
-                        {
-                            RejectMessage(msg, "No gateways available");
-                            logger.Warn(ErrorCode.ProxyClient_CannotSend_NoGateway, "Unable to send message {0}; gateway manager state is {1}", msg, GatewayManager);
-                            return;
-                        }
-                        if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
-                        if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
-                        {
-                            gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.executorService, this.loggerFactory, this.openConnectionTimeout);
-                            gatewayConnections[addr] = gatewayConnection;
-                            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_CreatedGatewayToGrain, "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X", addr, msg.TargetGrain, index,
-                                               msg.TargetGrain.GetHashCode().ToString("x"));
-                            startRequired = true;
-                        }
-                        grainBuckets[index] = new WeakReference(gatewayConnection);
-                    }
+                    var connection = await c;
+
+                    var result = this.TryUpdateConnection(i, connection, existing);
+                    if (result == null) return await this.GetGatewayConnection(message);
+                    return result;
+                }
+                catch (Exception)
+                {
+                    this.gatewayManager.MarkAsDead(gatewayAddress);
+                    return await this.GetGatewayConnection(message);
                 }
             }
 
-            if (startRequired)
+            async ValueTask<Connection> ConnectAsync(
+                SiloAddress gateway,
+                ValueTask<Connection> connectionTask,
+                Message message,
+                bool directGatewayMessage)
             {
-                gatewayConnection.Start();
-
-                if (!gatewayConnection.IsLive)
+                Connection result = default;
+                try
                 {
-                    // if failed to start Gateway connection (failed to connect), try sending this msg to another Gateway.
-                    RejectOrResend(msg);
-                    return;
+                    return result = await connectionTask;
                 }
-            }
-
-            try
-            {
-                gatewayConnection.QueueRequest(msg);
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_QueueRequest, "Sending message {0} via gateway {1}", msg, gatewayConnection.Address);
-            }
-            catch (InvalidOperationException)
-            {
-                // This exception can be thrown if the gateway connection we selected was closed since we checked (i.e., we lost the race)
-                // If this happens, we reject if the message is targeted to a specific silo, or try again if not
-                RejectOrResend(msg);
+                catch (Exception exception) when (directGatewayMessage)
+                {
+                    RejectMessage(message, string.Format("Target silo {0} is unavailable", message.TargetSilo), exception);
+                    return null;
+                }
+                finally
+                {
+                    if (result is null) this.gatewayManager.MarkAsDead(gateway);
+                }
             }
         }
 
-        private void RejectOrResend(Message msg)
+        private Connection TryUpdateConnection(uint index, Connection connection, WeakReference<Connection> existing)
         {
-            if (msg.TargetSilo != null)
+            WeakReference<Connection> result;
+            var replacement = new WeakReference<Connection>(connection);
+            var newWeakRef = Interlocked.CompareExchange(ref grainBuckets[index], replacement, existing);
+            if (newWeakRef == existing)
             {
-                RejectMessage(msg, String.Format("Target silo {0} is unavailable", msg.TargetSilo));
+                result = replacement;
             }
             else
             {
-                SendMessage(msg);
+                result = newWeakRef;
+            }
+
+            if (result != null && result.TryGetTarget(out var existingConnection))
+            {
+                return existingConnection;
+            }
+            else
+            {
+                // If the reference has expired, retry with this non-expired reference.
+                return this.TryUpdateConnection(index, connection, result);
             }
         }
 
@@ -325,49 +382,9 @@ namespace Orleans.Messaging
             return GetTypeManager(silo, grainFactory).GetImplicitStreamSubscriberTable(silo);
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        public Message WaitMessage(Message.Categories type, CancellationToken ct)
-        {
-            try
-            {
-                return PendingInboundMessages.Take(ct);
-            }
-            catch (ThreadAbortException exc)
-            {
-                // Silo may be shutting-down, so downgrade to verbose log
-                logger.Debug(ErrorCode.ProxyClient_ThreadAbort, "Received thread abort exception -- exiting. {0}", exc);
-                Thread.ResetAbort();
-                return null;
-            }
-            catch (OperationCanceledException exc)
-            {
-                logger.Debug(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);
-                return null;
-            }
-            catch (ObjectDisposedException exc)
-            {
-                logger.Debug(ErrorCode.ProxyClient_OperationCancelled, "Received Object Disposed exception -- exiting. {0}", exc);
-                return null;
-            }
-            catch (InvalidOperationException exc)
-            {
-                logger.Debug(ErrorCode.ProxyClient_OperationCancelled, "Received Invalid Operation exception -- exiting. {0}", exc);
-                return null;
-            }
-            catch (Exception ex)
-            {
-                logger.Error(ErrorCode.ProxyClient_ReceiveError, "Unexpected error getting an inbound message", ex);
-                return null;
-            }
-        }
-
         public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)
         {
-        }
-
-        internal void QueueIncomingMessage(Message msg)
-        {
-            PendingInboundMessages.Add(msg);
+            this.messageHandlers[(int)category] = handler;
         }
 
         public void RejectMessage(Message msg, string reason, Exception exc = null)
@@ -382,28 +399,9 @@ namespace Orleans.Messaging
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
-                QueueIncomingMessage(error);
+                var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
+                OnReceivedMessage(error);
             }
-        }
-
-        /// <summary>
-        /// For testing use only
-        /// </summary>
-        public void Disconnect()
-        {
-            foreach (var connection in gatewayConnections.Values.ToArray())
-            {
-                connection.Stop();
-            }
-        }
-
-        /// <summary>
-        /// For testing use only.
-        /// </summary>
-        public void Reconnect()
-        {
-            throw new NotImplementedException("Reconnect");
         }
 
         public int SendQueueLength
@@ -423,14 +421,14 @@ namespace Orleans.Messaging
 
         private SiloAddress GetLiveGatewaySiloAddress()
         {
-            var gateway = GatewayManager.GetLiveGateway();
+            var gateway = gatewayManager.GetLiveGateway();
 
             if (gateway == null)
             {
                 throw new OrleansException("Not connected to a gateway");
             }
 
-            return gateway.ToSiloAddress();
+            return gateway;
         }
 
         internal void UpdateClientId(GrainId clientId)
@@ -463,13 +461,8 @@ namespace Orleans.Messaging
 
         public void Dispose()
         {
-            PendingInboundMessages.Dispose();
-            if (gatewayConnections != null)
-                foreach (var item in gatewayConnections)
-                {
-                    item.Value.Dispose();
-                }
-            GatewayManager.Dispose();
+            PendingInboundMessages.Writer.TryComplete();
+            gatewayManager.Dispose();
         }
     }
 }

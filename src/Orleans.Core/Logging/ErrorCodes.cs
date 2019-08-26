@@ -440,6 +440,7 @@ namespace Orleans
         Catalog_FinishGrainDeactivateAndCleanupStreams_Exception = CatalogBase + 44,
         Catalog_DeactivateAllActivations                = CatalogBase + 45,
         Catalog_ActivationCollector_BadState_3          = CatalogBase + 46,
+        Catalog_UnregisterAsync                         = CatalogBase + 47,
 
         MembershipBase                         = Runtime + 600,
         MembershipCantWriteLivenessDisabled    = Runtime_Error_100225, // Backward compatability
@@ -505,6 +506,8 @@ namespace Orleans
         MembershipStartingIAmAliveTimer        = MembershipBase + 60,
         MembershipJoiningPreconditionFailure   = MembershipBase + 61,
         MembershipCleanDeadEntriesFailure      = MembershipBase + 62,
+        MembershipJoining                      = MembershipBase + 63,
+        MembershipFailedToJoin                 = MembershipBase + 64,
 
         NSMembershipStarting                   = MembershipBase + 70,
         NSMembershipBecomeActive               = MembershipBase + 71,
@@ -590,6 +593,7 @@ namespace Orleans
         ProxyClient_StartDone                       = ProxyClientBase + 29,
         ProxyClient_OGC_TargetNotFound_2            = ProxyClientBase + 30,
         ProxyClient_AppDomain_Unload                = ProxyClientBase + 31,
+        ProxyClient_GatewayUnknownStatus            = ProxyClientBase + 32,
 
         MessagingBase                           = Runtime + 1000,
         Messaging_IMA_DroppingConnection        = MessagingBase + 1,
@@ -653,7 +657,7 @@ namespace Orleans
         SchedulerTurnTooLong2                   = SchedulerBase + 14,
         SchedulerTurnTooLong3                   = SchedulerBase + 15,
         SchedulerWorkGroupShuttingDown          = SchedulerBase + 16,
-        SchedulerNotEnqueuWorkWhenShutdown      = SchedulerBase + 17,
+        SchedulerEnqueueWorkWhenShutdown        = SchedulerBase + 17,
         SchedulerNotExecuteWhenShutdown         = SchedulerBase + 18,
         SchedulerAppTurnsStopped_1              = SchedulerBase + 19,
         SchedulerWorkGroupStopping              = SchedulerBase + 20,

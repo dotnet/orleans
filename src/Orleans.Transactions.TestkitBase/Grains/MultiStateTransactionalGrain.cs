@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Orleans.Transactions.Abstractions;
 using System;
 using System.Linq;
@@ -18,7 +18,7 @@ namespace Orleans.Transactions.TestKit
         public MaxStateTransactionalGrain(ITransactionalStateFactory stateFactory,
             ILoggerFactory loggerFactory)
             : base(Enumerable.Range(0, TransactionTestConstants.MaxCoordinatedTransactions)
-                .Select(i => stateFactory.Create<GrainData>(new TransactionalStateAttribute($"data{i}", TransactionTestConstants.TransactionStore)))
+                .Select(i => stateFactory.Create<GrainData>(new TransactionalStateConfiguration(new TransactionalStateAttribute($"data{i}", TransactionTestConstants.TransactionStore))))
                 .ToArray(),
                   loggerFactory)
         {

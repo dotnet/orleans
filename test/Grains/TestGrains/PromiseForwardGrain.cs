@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 using UnitTests.GrainInterfaces;
@@ -10,7 +10,6 @@ namespace UnitTests.Grains
     {
         public int A { get; set; }
         public int EventDelay { get; set; }
-        public ObserverSubscriptionManager<ISimpleGrainObserver> Observers { get; set; }
     }
 
     /// <summary>
@@ -77,26 +76,6 @@ namespace UnitTests.Grains
                 MySimpleGrain = GrainFactory.GetGrain<ISimpleGrain>((new Random()).Next(), SimpleGrain.SimpleGrainNamePrefix);
 
             return MySimpleGrain;
-        }
-
-        public Task Subscribe(ISimpleGrainObserver observer)
-        {
-            State.Observers.Subscribe(observer);
-            return Task.CompletedTask;
-        }
-
-        public Task Unsubscribe(ISimpleGrainObserver observer)
-        {
-            State.Observers.Unsubscribe(observer);
-            return Task.CompletedTask;
-        }
-
-        protected void RaiseStateUpdateEvent()
-        {
-            State.Observers.Notify((ISimpleGrainObserver observer) =>
-            {
-                observer.StateChanged(State.A, b);
-            });
         }
 
         public Task<int> A

@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -14,13 +15,18 @@ namespace UnitTests.Grains
     {
         public const string SimpleGrainNamePrefix = "UnitTests.Grains.SimpleG";
 
-        protected Logger logger;
+        protected ILogger logger;
+
+        public SimpleGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         protected int A { get; set; }
         protected int B { get; set; }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(String.Format("{0}-{1}-{2}", typeof(SimpleGrain).Name, base.IdentityString, base.RuntimeIdentity));
             logger.Info("Activate.");
             return Task.CompletedTask;
         }

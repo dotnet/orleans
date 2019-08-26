@@ -60,6 +60,12 @@ namespace Orleans.Runtime
 
         private SiloAddress(IPEndPoint endpoint, int gen)
         {
+            // Normalize endpoints
+            if (endpoint.Address.IsIPv4MappedToIPv6)
+            {
+                endpoint = new IPEndPoint(endpoint.Address.MapToIPv4(), endpoint.Port);
+            }
+
             Endpoint = endpoint;
             Generation = gen;
         }
@@ -264,6 +270,20 @@ namespace Orleans.Runtime
                 ((Generation == other.Generation));
         }
 
+        internal bool IsSameLogicalSilo(SiloAddress other)
+        {
+            return other != null && this.Endpoint.Address.Equals(other.Endpoint.Address) && this.Endpoint.Port == other.Endpoint.Port;
+        }
+
+        public bool IsSuccessorOf(SiloAddress other)
+        {
+            return IsSameLogicalSilo(other) && this.Generation != 0 && other.Generation != 0 && this.Generation > other.Generation;
+        }
+
+        public bool IsPredecessorOf(SiloAddress other)
+        {
+            return IsSameLogicalSilo(other) && this.Generation != 0 && other.Generation != 0 && this.Generation < other.Generation;
+        }
 
         // non-generic version of CompareTo is needed by some contexts. Just calls generic version.
         public int CompareTo(object obj)

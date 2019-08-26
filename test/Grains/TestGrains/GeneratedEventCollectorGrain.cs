@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
@@ -16,19 +17,34 @@ namespace TestGrains
     {
         public const string StreamNamespace = "Generated";
 
-        private Logger logger;
+        private ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
         private int accumulated;
 
+        public GeneratedEventCollectorGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger("GeneratedEvenCollectorGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             var streamProvider = GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(this.GetPrimaryKey(), StreamNamespace);
 
-            await stream.SubscribeAsync(OnNextAsync);
+            IList<StreamSubscriptionHandle<GeneratedEvent>> handles = await stream.GetAllSubscriptionHandles();
+            if (handles.Count == 0)
+            {
+                await stream.SubscribeAsync(OnNextAsync);
+            }
+            else
+            {
+                foreach (StreamSubscriptionHandle<GeneratedEvent> handle in handles)
+                {
+                    await handle.ResumeAsync(OnNextAsync);
+                }
+            }
         }
 
         public Task OnNextAsync(IList<SequentialItem<GeneratedEvent>> items)

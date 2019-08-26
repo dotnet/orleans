@@ -6,6 +6,8 @@ using Xunit;
 namespace BondUtils.Tests.Serialization
 {
     using System.Reflection;
+    using Orleans;
+    using Orleans.Configuration;
     using Orleans.Serialization;
 
     public class BondSerializationTests
@@ -15,13 +17,8 @@ namespace BondUtils.Tests.Serialization
         public BondSerializationTests()
         {
             this.environment = SerializationTestEnvironment.InitializeWithDefaults(
-                new ClientConfiguration
-                {
-                    SerializationProviders =
-                    {
-                        typeof(BondSerializer)
-                    }
-                });
+                builder => builder.Configure<SerializationProviderOptions>(
+                    options => options.SerializationProviders.Add(typeof(BondSerializer))));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]

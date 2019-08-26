@@ -1,6 +1,8 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans.Hosting
@@ -8,6 +10,7 @@ namespace Orleans.Hosting
     internal class SiloWrapper : ISiloHost
     {
         private readonly Silo silo;
+        private readonly SiloApplicationLifetime applicationLifetime;
         private bool isDisposing;
 
         public SiloWrapper(Silo silo, IServiceProvider services)
@@ -15,6 +18,9 @@ namespace Orleans.Hosting
             this.Services = services;
             this.silo = silo;
             this.Stopped = silo.SiloTerminated;
+
+            // It is fine for this field to be null in the case that the silo is not the host.
+            this.applicationLifetime = services.GetService<IApplicationLifetime>() as SiloApplicationLifetime;
         }
 
         /// <inheritdoc />
@@ -24,16 +30,24 @@ namespace Orleans.Hosting
         public Task Stopped { get; }
 
         /// <inheritdoc />
-        public Task StartAsync(CancellationToken cancellationToken)
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
-            return this.silo.StartAsync(cancellationToken);
+            await this.silo.StartAsync(cancellationToken).ConfigureAwait(false);
+            this.applicationLifetime?.NotifyStarted();
         }
 
         /// <inheritdoc />
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            await silo.StopAsync(cancellationToken);
-            await this.Stopped;
+            try
+            {
+                this.applicationLifetime?.StopApplication();
+                await silo.StopAsync(cancellationToken);
+            }
+            finally
+            {
+                this.applicationLifetime?.NotifyStopped();
+            }
         }
 
         /// <inheritdoc />

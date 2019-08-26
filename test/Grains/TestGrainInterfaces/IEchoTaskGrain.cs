@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
@@ -14,6 +14,7 @@ namespace UnitTests.GrainInterfaces
 
         Task<string> Echo(string data);
         Task<string> EchoError(string data);
+        Task<Nullable<DateTime>> EchoNullable(Nullable<DateTime> value);
     }
 
     public interface IEchoTaskGrain : IGrainWithGuidKey

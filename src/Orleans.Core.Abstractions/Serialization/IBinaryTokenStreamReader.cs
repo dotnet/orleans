@@ -7,19 +7,8 @@ namespace Orleans.Serialization
 {
     public interface IBinaryTokenStreamReader
     {
-        /// <summary>
-        /// Resets this instance with the provided data.
-        /// </summary>
-        /// <param name="buffs">The underlying buffers.</param>
-        void Reset(IList<ArraySegment<byte>> buffs);
-
         /// <summary> Current read position in the stream. </summary>
         int CurrentPosition { get; }
-
-        /// <summary>
-        /// Gets the total length.
-        /// </summary>
-        int Length { get; }
 
         /// <summary>
         /// Creates a copy of the current stream reader.
@@ -118,5 +107,7 @@ namespace Orleans.Serialization
         /// <param name="array">Array to output the data to.</param>
         /// <param name="n">Number of bytes to read.</param>
         void ReadBlockInto(Array array, int n);
+
+        byte PeekByte();
     }
 }

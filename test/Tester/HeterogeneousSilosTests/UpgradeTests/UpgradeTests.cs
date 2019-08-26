@@ -10,8 +10,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
     public class MinimumVersionTests : UpgradeTestsBase
     {
-        protected override VersionSelectorStrategy VersionSelectorStrategy => MinimumVersion.Singleton;
-        protected override CompatibilityStrategy CompatibilityStrategy => BackwardCompatible.Singleton;
+        protected override Type VersionSelectorStrategy => typeof(MinimumVersion);
+        protected override Type CompatibilityStrategy => typeof(BackwardCompatible);
         
         [Fact]
         public Task AlwaysCreateActivationWithMinimumVersion()
@@ -24,8 +24,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
     public class LatestVersionTests : UpgradeTestsBase
     {
-        protected override VersionSelectorStrategy VersionSelectorStrategy => LatestVersion.Singleton;
-        protected override CompatibilityStrategy CompatibilityStrategy => BackwardCompatible.Singleton;
+        protected override Type VersionSelectorStrategy => typeof(LatestVersion);
+        protected override Type CompatibilityStrategy => typeof(BackwardCompatible);
 
         [Fact]
         public Task AlwaysCreateActivationWithLatestVersion()
@@ -54,8 +54,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
     public class AllVersionsCompatibleTests : UpgradeTestsBase
     {
-        protected override VersionSelectorStrategy VersionSelectorStrategy => LatestVersion.Singleton;
-        protected override CompatibilityStrategy CompatibilityStrategy => AllVersionsCompatible.Singleton;
+        protected override Type VersionSelectorStrategy => typeof(LatestVersion);
+        protected override Type CompatibilityStrategy => typeof(AllVersionsCompatible);
 
         [Fact]
         public Task DoNotUpgradeProxyCallNoPendingRequest()
@@ -77,8 +77,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
     public class RandomCompatibleVersionTests : UpgradeTestsBase
     {
-        protected override VersionSelectorStrategy VersionSelectorStrategy => AllCompatibleVersions.Singleton;
-        protected override CompatibilityStrategy CompatibilityStrategy => AllVersionsCompatible.Singleton;
+        protected override Type VersionSelectorStrategy => typeof(AllCompatibleVersions);
+        protected override Type CompatibilityStrategy => typeof(AllVersionsCompatible);
 
         [Fact]
         public async Task CreateActivationWithBothVersion()

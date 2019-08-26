@@ -6,16 +6,9 @@
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
   <PropertyGroup>
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);612,618</WarningsNotAsErrors>
-    <NoWarn>$(NoWarn);FS2003,612,618</NoWarn>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);1591</NoWarn>
-    <!-- Needed for tests to force the generation of binding redirects -->
-    <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
+    <NoWarn>$(NoWarn);FS2003;1591</NoWarn>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
 
@@ -24,9 +17,8 @@
     <TargetFramework>$(TestProjectTargetFramework)</TargetFramework>
   </PropertyGroup>
 
-  <!-- To make CodeLens and Test Explorer happy, we're generating full symbols -->
   <PropertyGroup>
-    <DebugType>full</DebugType>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <!-- Needed for to not to have failed tests because wrong binding redirects were generated for older packages -->

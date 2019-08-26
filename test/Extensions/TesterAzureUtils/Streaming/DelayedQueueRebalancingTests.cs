@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Logging;
@@ -38,11 +40,15 @@ namespace Tester.AzureUtils.Streaming
             // Define a cluster of 4, but 2 will be stopped.
             builder.CreateSiloAsync = AppDomainSiloHandle.Create;
             builder.Options.InitialSilosCount = 2;
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClientConfiguration.Gateways = legacy.ClientConfiguration.Gateways.Take(1).ToList();
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+        }
+
+        private class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<StaticGatewayListProviderOptions>(options => options.Gateways = options.Gateways.Take(1).ToList());
+            }
         }
 
         private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -50,19 +56,19 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddAzureQueueStreams(adapterName, b => b
-                        .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
-                            (options, dep) =>
-                            {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                        }))
-                        .UseDynamicClusterConfigDeploymentBalancer(SILO_IMMATURE_PERIOD))
+                    .AddAzureQueueStreams(adapterName, b =>
+                    {
+                        b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
+                        }));
+                        b.UseDynamicClusterConfigDeploymentBalancer(SILO_IMMATURE_PERIOD);
+                    })
                     .Configure<StaticClusterDeploymentOptions>(op =>
                     {
                         op.SiloNames = new List<string>() {"Primary", "Secondary_1", "Secondary_2", "Secondary_3"};
                     });
-
                 hostBuilder.AddMemoryGrainStorage("PubSubStore");
             }
         }
@@ -70,9 +76,12 @@ namespace Tester.AzureUtils.Streaming
         public override void Dispose()
         {
             base.Dispose();
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, 
-                AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), 
-                TestDefaultConfiguration.DataConnectionString).Wait();
+            if (this.HostedCluster != null)
+            {
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                    TestDefaultConfiguration.DataConnectionString).Wait();
+            }
         }
 
         [SkippableFact, TestCategory("Functional")]

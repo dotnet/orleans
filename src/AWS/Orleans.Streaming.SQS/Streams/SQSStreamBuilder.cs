@@ -19,7 +19,7 @@ namespace Orleans.Streams
                     .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
             });
 
-            this.configureDelegate(services =>
+            this.ConfigureDelegate(services =>
             {
                 services.ConfigureNamedOptionForLogging<SqsOptions>(name)
                     .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
@@ -29,9 +29,10 @@ namespace Orleans.Streams
 
         public SiloSqsStreamConfigurator ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)
         {
-            this.Configure<SqsOptions>(configureOptions);
+            this.Configure(configureOptions);
             return this;
         }
+
         public SiloSqsStreamConfigurator ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
         {
             this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
@@ -65,8 +66,9 @@ namespace Orleans.Streams
 
         public ClusterClientSqsStreamConfigurator ConfigureSqs(Action<OptionsBuilder<SqsOptions>> configureOptions)
         {
-            this.Configure<SqsOptions>(configureOptions);
+            this.Configure(configureOptions);
             return this;
+
         }
 
         public ClusterClientSqsStreamConfigurator ConfigurePartitioning(int numOfparitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)

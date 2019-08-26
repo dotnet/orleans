@@ -24,10 +24,6 @@ namespace Tester.StreamingTests
             private const int partitionCount = 8;
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    AdjustConfig(legacy.ClusterConfiguration);
-                });
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
             }
@@ -36,24 +32,18 @@ namespace Tester.StreamingTests
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b => b
-                    .ConfigurePartitioning(partitionCount)
-                    .Configure<StreamPullingAgentOptions>(ob => ob.Configure(options =>
-                    {
-                        options.BatchContainerBatchSize = 10;
-                    })));
+                            .ConfigurePartitioning(partitionCount));
             }
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder) => hostBuilder.AddMemoryGrainStorage("PubSubStore")
-                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b => b
-                    .ConfigurePartitioning(partitionCount));
-            }
-
-            private static void AdjustConfig(ClusterConfiguration config)
-            {
-                // register stream provider
-                config.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
+                public void Configure(ISiloHostBuilder hostBuilder) =>
+                    hostBuilder
+                    .AddMemoryGrainStorage("PubSubStore")
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(
+                        StreamProviderName,
+                        b => b.ConfigurePartitioning(partitionCount))
+                    .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
             }
         }
 

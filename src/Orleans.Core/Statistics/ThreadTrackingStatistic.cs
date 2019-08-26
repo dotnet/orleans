@@ -171,10 +171,6 @@ namespace Orleans.Runtime
             {
                 // If this is the first function call where client has connected, we ensure execution timers are started and context switches are tracked
                 firstStart = false;
-                if (this.statisticsLevel.CollectContextSwitchesStats())
-                {
-                    TrackContextSwitches();
-                }
                 OnStartExecution();
             }
             else
@@ -215,40 +211,6 @@ namespace Orleans.Runtime
                     NumRequests += (ulong)num;
                 }
             }
-        }
-
-        private void TrackContextSwitches()
-        {
-#if BUILD_FLAVOR_LEGACY
-            // TODO: this temporary exclusion should be resolved by #2147
-            PerformanceCounterCategory allThreadsWithPerformanceCounters = new PerformanceCounterCategory("Thread");
-            PerformanceCounter[] performanceCountersForThisThread = null;
-
-            // Iterate over all "Thread" category performance counters on system (includes numerous processes)
-            foreach (string threadName in allThreadsWithPerformanceCounters.GetInstanceNames())
-            {
-                // Obtain those performance counters for the OrleansHost
-                if (threadName.Contains("OrleansHost") && threadName.EndsWith("/" + Thread.CurrentThread.ManagedThreadId))
-                {
-                    performanceCountersForThisThread = allThreadsWithPerformanceCounters.GetCounters(threadName);
-                    break;
-                }
-            }
-
-            // In the case that the performance was not obtained correctly (this condition is null), we simply will not have stats for context switches
-            if (performanceCountersForThisThread == null) return;
-
-            // Look at all performance counters for this thread
-            foreach (PerformanceCounter performanceCounter in performanceCountersForThisThread)
-            {
-                // Find performance counter for context switches
-                if (performanceCounter.CounterName == CONTEXT_SWTICH_COUNTER_NAME)
-                {
-                    // Use raw value for logging, should show total context switches
-                    FloatValueStatistic.FindOrCreate(new StatisticName(StatisticNames.THREADS_CONTEXT_SWITCHES, Name), () => (float)performanceCounter.RawValue, CounterStorage.LogOnly);
-                }
-            }
-#endif
         }
     }
 }

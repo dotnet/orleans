@@ -1,4 +1,4 @@
-﻿CREATE TABLE Storage
+CREATE TABLE Storage
 (
     grainidhash integer NOT NULL,
     grainidn0 bigint NOT NULL,
@@ -9,7 +9,7 @@
     serviceid character varying(150)  NOT NULL,
     payloadbinary bytea,
     payloadxml xml,
-    payloadjson jsonb,
+    payloadjson text,
     modifiedon timestamp without time zone NOT NULL,
     version integer
 );
@@ -28,7 +28,7 @@ CREATE OR REPLACE FUNCTION writetostorage(
     _serviceid character varying,
     _grainstateversion integer,
     _payloadbinary bytea,
-    _payloadjson jsonb,
+    _payloadjson text,
     _payloadxml xml)
     RETURNS TABLE(newgrainstateversion integer)
     LANGUAGE 'plpgsql'
@@ -148,7 +148,7 @@ VALUES
 (
     'WriteToStorageKey','
 
-        select * from WriteToStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion, @PayloadBinary, CAST(@PayloadJson AS jsonb), CAST(@PayloadXml AS xml));
+        select * from WriteToStorage(@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @GrainStateVersion, @PayloadBinary, @PayloadJson, CAST(@PayloadXml AS xml));
 ');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)

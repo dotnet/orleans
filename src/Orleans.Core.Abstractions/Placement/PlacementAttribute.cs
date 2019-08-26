@@ -1,9 +1,8 @@
-﻿using System;
+using System;
 using Orleans.Runtime;
 
 namespace Orleans.Placement
 {
-
     /// <summary>
     /// Base for all placement policy marker attributes.
     /// </summary>

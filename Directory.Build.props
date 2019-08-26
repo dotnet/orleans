@@ -47,12 +47,16 @@
     <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
 
     <SystemCollectionsImmutableVersion>1.4.0</SystemCollectionsImmutableVersion>
-    <SystemNetHttpVersion>4.3.3</SystemNetHttpVersion>
+    <SystemRuntimeCompilerServicesUnsafeVersion>4.5.2</SystemRuntimeCompilerServicesUnsafeVersion>
+    <SystemNetHttpVersion>4.3.4</SystemNetHttpVersion>
     <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
-    <SystemThreadingTasksExtensionsVersion>4.4.0</SystemThreadingTasksExtensionsVersion>
-    <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
+    <SystemThreadingTasksExtensionsVersion>4.5.2</SystemThreadingTasksExtensionsVersion>
+    <SystemThreadingChannelsVersion>4.5.0</SystemThreadingChannelsVersion>
+    <SystemBuffersVersion>4.5.0</SystemBuffersVersion>
+    <SystemMemoryVersion>4.5.2</SystemMemoryVersion>
+    <SystemIOPipelinesVersion>4.5.3</SystemIOPipelinesVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>
@@ -93,15 +97,17 @@
     <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
     <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
     <NpgsqlVersion>3.1.9</NpgsqlVersion>
-    <NSubstituteVersion>1.10.0</NSubstituteVersion>
+    <NSubstituteVersion>4.2.0</NSubstituteVersion>
+    <NSubstituteAnalyzersCSharpVersion>1.0.10</NSubstituteAnalyzersCSharpVersion>
     <ZooKeeperNetExVersion>3.4.12.1</ZooKeeperNetExVersion>
 
     <!-- Test related packages -->
-    <MicrosoftTestSdkVersion>15.5.0</MicrosoftTestSdkVersion>
-    <BenchmarkDotNetVersion>0.11.3</BenchmarkDotNetVersion>
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
-    <XunitSkippableFactVersion>1.3.3</XunitSkippableFactVersion>
-    <xUnitVersion>2.3.1</xUnitVersion>
+    <MicrosoftTestSdkVersion>16.0.1</MicrosoftTestSdkVersion>
+    <BenchmarkDotNetVersion>0.11.4</BenchmarkDotNetVersion>
+    <XunitSkippableFactVersion>1.3.12</XunitSkippableFactVersion>
+    <DotNetxUnitVersion>2.3.1</DotNetxUnitVersion>
+    <xUnitVersion>2.4.1</xUnitVersion>
     <NodaTimeVersion>2.2.2</NodaTimeVersion>
 
     <!-- Tooling related packages -->
@@ -111,7 +117,7 @@
   <!-- Versioning properties -->
   <PropertyGroup>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.3.0</VersionPrefix>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.5.0</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
@@ -130,8 +136,6 @@
     <OrleansRuntimeAbstractionsVersion>2.3.0</OrleansRuntimeAbstractionsVersion>
     <OrleansCoreVersion>2.3.0</OrleansCoreVersion>
     <OrleansRuntimeVersion>2.3.0</OrleansRuntimeVersion>
-    <OrleansCoreLegacyVersion>2.3.0</OrleansCoreLegacyVersion>
-    <OrleansRuntimeLegacyVersion>2.3.0</OrleansRuntimeLegacyVersion>
     <OrleansProvidersVersion>2.3.0</OrleansProvidersVersion>
     <OrleansExtensionsVersion>2.3.0</OrleansExtensionsVersion>
     <OrleansEventSourcingVersion>2.3.0</OrleansEventSourcingVersion>
@@ -162,8 +166,6 @@
     <OrleansRuntimeAbstractionsVersion>$(VersionPrefix)</OrleansRuntimeAbstractionsVersion>
     <OrleansCoreVersion>$(VersionPrefix)</OrleansCoreVersion>
     <OrleansRuntimeVersion>$(VersionPrefix)</OrleansRuntimeVersion>
-    <OrleansCoreLegacyVersion>$(VersionPrefix)</OrleansCoreLegacyVersion>
-    <OrleansRuntimeLegacyVersion>$(VersionPrefix)</OrleansRuntimeLegacyVersion>
     <OrleansProvidersVersion>$(VersionPrefix)</OrleansProvidersVersion>
     <OrleansExtensionsVersion>$(VersionPrefix)</OrleansExtensionsVersion>
     <OrleansEventSourcingVersion>$(VersionPrefix)</OrleansEventSourcingVersion>

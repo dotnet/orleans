@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
@@ -13,15 +14,19 @@ namespace UnitTests.Grains
     public class TestGrain : Grain, ITestGrain
     {
         private string label;
-        private Logger logger;
+        private ILogger logger;
         private IDisposable timer;
+
+        public TestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
             if (this.GetPrimaryKeyLong() == -2)
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
-            logger = this.GetLogger("TestGrain " + Data.Address);
             label = this.GetPrimaryKeyLong().ToString();
             logger.Info("OnActivateAsync");
 
@@ -132,7 +137,12 @@ namespace UnitTests.Grains
     internal class GuidTestGrain : Grain, IGuidTestGrain
     {
         private string label;
-        private Logger logger;
+        private ILogger logger;
+
+        public GuidTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
@@ -140,7 +150,6 @@ namespace UnitTests.Grains
             //    throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             label = this.GetPrimaryKey().ToString();
-            logger = this.GetLogger("GuidTestGrain " + Data.Address);
             logger.Info("OnActivateAsync");
 
             return Task.CompletedTask;

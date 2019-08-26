@@ -19,7 +19,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             watcher.Clear().Wait();
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             watcher.Clear().Wait();
         }

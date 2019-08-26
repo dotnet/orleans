@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -79,6 +79,14 @@ namespace Orleans.CodeGenerator.Utilities
 
         public static TypeSyntax ToTypeSyntax(this ITypeSymbol typeSymbol)
         {
+            if (typeSymbol is IErrorTypeSymbol error)
+            {
+                Console.WriteLine(
+                    $"Warning: attempted to get TypeSyntax for unknown (error) type, \"{error}\"."
+                    + $" Possible reason: {error.CandidateReason}."
+                    + $" Possible candidates: {string.Join(", ", error.CandidateSymbols.Select(s => s.ToDisplayString()))}");
+            }
+
             if (typeSymbol is INamedTypeSymbol named) return named.ToTypeSyntax();
             return ParseTypeName(typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
         }

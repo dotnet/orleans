@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
@@ -21,11 +22,15 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class EchoGrain : Grain<EchoTaskGrainState>, IEchoGrain
     {
-        private Logger logger;
+        private ILogger logger;
+
+        public EchoGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger();
             logger.Info(GetType().FullName + " created");
             return base.OnActivateAsync();
         }
@@ -48,17 +53,20 @@ namespace UnitTests.Grains
             State.LastEcho = data;
             throw new Exception(data);
         }
+
+        public Task<DateTime?> EchoNullable(DateTime? value) => Task.FromResult(value);
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
     internal class EchoTaskGrain : Grain<EchoTaskGrainState>, IEchoTaskGrain
     {
         private readonly IInternalGrainFactory internalGrainFactory;
-        private Logger logger;
+        private ILogger logger;
 
-        public EchoTaskGrain(IInternalGrainFactory internalGrainFactory)
+        public EchoTaskGrain(IInternalGrainFactory internalGrainFactory, ILogger<EchoTaskGrain> logger)
         {
             this.internalGrainFactory = internalGrainFactory;
+            this.logger = logger;
         }
 
         public Task<int> GetMyIdAsync() { return Task.FromResult(State.MyId); } 
@@ -66,7 +74,6 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger();
             logger.Info(GetType().FullName + " created");
             return base.OnActivateAsync();
         }
@@ -181,11 +188,15 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class BlockingEchoTaskGrain : Grain<EchoTaskGrainState>, IBlockingEchoTaskGrain
     {
-        private Logger logger;
+        private ILogger logger;
+
+        public BlockingEchoTaskGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger();
             logger.Info(GetType().FullName + " created");
             return base.OnActivateAsync();
         }
@@ -270,11 +281,15 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class ReentrantBlockingEchoTaskGrain : Grain<EchoTaskGrainState>, IReentrantBlockingEchoTaskGrain
     {
-        private Logger logger;
+        private ILogger logger;
+
+        public ReentrantBlockingEchoTaskGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger();
             logger.Info(GetType().FullName + " created");
             return base.OnActivateAsync();
         }

@@ -19,9 +19,14 @@ using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests
 {
-    public class TestState : TestKit.ITestState
+    public class TestState : IEquatable<TestState>
     {
-        public int state { get; set; } = 1;
+        public int State { get; set; }
+
+        public bool Equals(TestState other)
+        {
+            return other == null?false:this.State.Equals(other.State);
+        }
     }
 
     public class AzureTransactionalStateStorageTests : TransactionalStateStorageTestRunnerxUnit<TestState>, IClassFixture<TestFixture>
@@ -29,7 +34,7 @@ namespace Orleans.Transactions.Azure.Tests
         private const string tableName = "StateStorageTests";
         private const string partition = "testpartition";
         public AzureTransactionalStateStorageTests(TestFixture fixture, ITestOutputHelper testOutput)
-            :base(()=>StateStorageFactory(fixture), ()=>new TestState(), fixture.GrainFactory, testOutput)
+            :base(()=>StateStorageFactory(fixture), (seed)=>new TestState(){State = seed}, fixture.GrainFactory, testOutput)
         {
         }
 

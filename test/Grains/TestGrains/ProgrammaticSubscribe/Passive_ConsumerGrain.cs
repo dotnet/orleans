@@ -1,4 +1,5 @@
-﻿using Orleans;
+using Microsoft.Extensions.Logging;
+using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -12,13 +13,18 @@ namespace UnitTests.Grains
 {
     public class Passive_ConsumerGrain : Grain, IPassive_ConsumerGrain, IStreamSubscriptionObserver
     {
-        internal Logger logger;
+        internal ILogger logger;
         private List<ICounterObserver> consumerObservers;
         private List<StreamSubscriptionHandle<IFruit>> consumerHandles;
         private int onAddCalledCount;
+
+        public Passive_ConsumerGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(this.GetType().Name + base.IdentityString);
             logger.Info("OnActivateAsync");
             onAddCalledCount = 0;
             consumerObservers = new List<ICounterObserver>();
@@ -73,10 +79,15 @@ namespace UnitTests.Grains
 
     public class Jerk_ConsumerGrain : Grain, IJerk_ConsumerGrain, IStreamSubscriptionObserver
     {
-        internal Logger logger;
+        internal ILogger logger;
+
+        public Jerk_ConsumerGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger("Jerk_ConsumerGrain" + base.IdentityString);
             logger.Info("OnActivateAsync");
             return Task.CompletedTask;
         }
@@ -97,11 +108,11 @@ namespace UnitTests.Grains
     public class CounterObserver<T> : IAsyncObserver<T>, ICounterObserver
     {
         public int NumConsumed { get; private set; }
-        private Logger logger;
-        internal CounterObserver(Logger logger)
+        private ILogger logger;
+        internal CounterObserver(ILogger logger)
         {
             this.NumConsumed = 0;
-            this.logger = logger.GetSubLogger(this.GetType().Name);
+            this.logger = logger;
         }
 
         public Task OnNextAsync(T item, StreamSequenceToken token = null)
@@ -130,5 +141,9 @@ namespace UnitTests.Grains
     {
         public const string StreamNameSpace = "ImplicitSubscriptionSpace11";
         public const string StreamNameSpace2 = "ImplicitSubscriptionSpace22";
+
+        public ImplicitSubscribeGrain(ILoggerFactory loggerFactory) : base(loggerFactory)
+        {
+        }
     }
 }
