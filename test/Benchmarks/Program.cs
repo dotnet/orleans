@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using BenchmarkDotNet.Running;
-using Benchmarks.ActivationData;
 using Benchmarks.MapReduce;
 using Benchmarks.Serialization;
 using Benchmarks.Ping;
@@ -194,19 +193,6 @@ namespace Benchmarks
                 {
                     var benchmark = new GrainStorageBenchmark();
                     benchmark.AzureBlobSetup();
-                    return benchmark;
-                },
-                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
-                benchmark => benchmark.Teardown());
-            },
-            ["ActivationData"] = () =>
-            {
-                RunBenchmark(
-                "Testing activation data memory usage",
-                () =>
-                {
-                    var benchmark = new MemoryBenchmark();
-                    benchmark.Setup();
                     return benchmark;
                 },
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
