@@ -146,10 +146,7 @@ namespace UnitTests.Serialization
             {
                 StreamReader = new BinaryTokenStreamReader(headerList)
             };
-            var deserializedMessage = new Message
-            {
-                Headers = SerializationManager.DeserializeMessageHeaders(context)
-            };
+            var deserializedMessage = new Message(SerializationManager.DeserializeMessageHeaders(context));
             deserializedMessage.SetBodyBytes(bodyList);
             return deserializedMessage;
         }

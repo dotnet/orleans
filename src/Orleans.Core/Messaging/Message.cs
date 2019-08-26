@@ -63,9 +63,14 @@ namespace Orleans.Runtime
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
-        
-        static Message()
+
+        public Message() : this(new HeadersContainer())
         {
+        }
+
+        public Message(HeadersContainer headers)
+        {
+            this.Headers = headers;
         }
 
         public enum Categories
@@ -99,7 +104,7 @@ namespace Orleans.Runtime
             CacheInvalidation
         }
 
-        internal HeadersContainer Headers { get; set; } = new HeadersContainer();
+        internal HeadersContainer Headers { get; }
 
         public Categories Category
         {
@@ -437,13 +442,6 @@ namespace Orleans.Runtime
 
             var stream = new BinaryTokenStreamReader(bytes);
             return serializationManager.Deserialize(stream);
-        }
-
-        public Message()
-        {
-            bodyObject = null;
-            bodyBytes = null;
-            headerBytes = null;
         }
         
         /// <summary>

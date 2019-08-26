@@ -181,8 +181,7 @@ namespace Orleans.Runtime
 
             // Do not call inline SerializationManager.DeserializeMessageHeaders in there, we want msg to be null
             // if headers deserialization failed
-            msg = new Message { Headers = headers };
-
+            msg = new Message(headers);
             try
             {
                 if (this.supportForwarding)
