@@ -151,7 +151,9 @@ namespace Orleans.TestingHost
                 new NullLoggerFactory(),
                 new CachedTypeResolver(),
                 new SerializationStatisticsGroup(Options.Create(new StatisticsOptions {CollectionLevel = StatisticsLevel.Info})),
-                MessagingOptions.DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD);
+                MessagingOptions.DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD,
+                MessagingOptions.DEFAULT_MAX_MESSAGE_HEADER_SIZE,
+                MessagingOptions.DEFAULT_MAX_MESSAGE_BODY_SIZE);
             serializationManager.RegisterSerializers(applicationPartManager);
             return serializationManager;
         }

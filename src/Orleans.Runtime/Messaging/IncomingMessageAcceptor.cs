@@ -45,8 +45,14 @@ namespace Orleans.Runtime.Messaging
         protected SocketDirection SocketDirection { get; private set; }
 
         // Used for holding enough info to handle receive completion
-        internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection, MessageFactory messageFactory, SerializationManager serializationManager,
-            ExecutorService executorService, ILoggerFactory loggerFactory)
+        internal IncomingMessageAcceptor(
+            MessageCenter msgCtr,
+            IPEndPoint here,
+            SocketDirection socketDirection,
+            MessageFactory messageFactory,
+            SerializationManager serializationManager,
+            ExecutorService executorService,
+            ILoggerFactory loggerFactory)
             :base(executorService, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
@@ -429,7 +435,11 @@ namespace Orleans.Runtime.Messaging
             var poolWrapper = new SaeaPoolWrapper(readEventArgs);
 
             // Creates with incomplete state: IMA should be set before using
-            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper, this.MessageFactory, this.serializationManager, this.loggerFactory);
+            readEventArgs.UserToken = new ReceiveCallbackContext(
+                poolWrapper,
+                this.MessageFactory,
+                this.serializationManager,
+                this.loggerFactory);
             allocatedSocketEventArgsCounter.Increment();
             return poolWrapper;
         }
@@ -643,7 +653,11 @@ namespace Orleans.Runtime.Messaging
             public IncomingMessageAcceptor IMA { get; internal set; }
             public SaeaPoolWrapper SaeaPoolWrapper { get; }
 
-            public ReceiveCallbackContext(SaeaPoolWrapper poolWrapper, MessageFactory messageFactory, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+            public ReceiveCallbackContext(
+                SaeaPoolWrapper poolWrapper,
+                MessageFactory messageFactory,
+                SerializationManager serializationManager,
+                ILoggerFactory loggerFactory)
             {
                 this.messageFactory = messageFactory;
                 SaeaPoolWrapper = poolWrapper;

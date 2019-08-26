@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -147,6 +148,9 @@ namespace Orleans.Runtime
                 // read lengths
                 headerLength = BitConverter.ToInt32(lengthBuffer, 0);
                 bodyLength = BitConverter.ToInt32(lengthBuffer, 4);
+
+                // Check lengths
+                this.serializationManager.CheckHeaderAndBodyLengths(headerLength, bodyLength);
             }
 
             // If message is too big for current buffer size, grow

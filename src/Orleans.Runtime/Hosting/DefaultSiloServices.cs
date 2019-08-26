@@ -249,7 +249,9 @@ namespace Orleans.Hosting
 
             // Serialization
             services.TryAddSingleton<SerializationManager>(sp=>ActivatorUtilities.CreateInstance<SerializationManager>(sp,
-                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.LargeMessageWarningThreshold));
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.LargeMessageWarningThreshold,
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize,
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize));
             services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
             services.TryAddSingleton<IFieldUtils, FieldUtils>();
             services.AddSingleton<BinaryFormatterSerializer>();
