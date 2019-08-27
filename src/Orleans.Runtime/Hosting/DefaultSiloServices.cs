@@ -348,7 +348,9 @@ namespace Orleans.Hosting
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionMaintainer>();
             services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
             services.TryAddSingleton<IConnectionListenerFactory, SocketConnectionListenerFactory>();
-            services.TryAddTransient<IMessageSerializer, MessageSerializer>();
+            services.TryAddTransient<IMessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(sp,
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize,
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize));
             services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
             services.TryAddSingleton<INetworkingTrace, NetworkingTrace>();
 
