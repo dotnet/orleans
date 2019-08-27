@@ -4,8 +4,6 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Net;
-using System.Runtime.CompilerServices;
-using System.ServiceModel.Security.Tokens;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
