@@ -1,9 +1,11 @@
 using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Net;
 using System.Runtime.CompilerServices;
+using System.ServiceModel.Security.Tokens;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -99,6 +101,40 @@ namespace UnitTests.Serialization
             var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
             var writer = pipe.Writer;
             Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref writer, message));
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_DeserializeHeaderTooBig()
+        {
+            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
+            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
+
+            DeserializeFakeMessage(maxHeaderSize + 1, maxBodySize - 1);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_DeserializeBodyTooBig()
+        {
+            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
+            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
+
+            DeserializeFakeMessage(maxHeaderSize - 1, maxBodySize + 1);
+        }
+
+        private void DeserializeFakeMessage(int headerSize, int bodySize)
+        {
+            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+            var writer = pipe.Writer;
+
+            Span<byte> lengthFields = stackalloc byte[8];
+            BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerSize);
+            BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), bodySize);
+            writer.Write(lengthFields);
+            writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+
+            pipe.Reader.TryRead(out var readResult);
+            var reader = readResult.Buffer;
+            Assert.Throws<OrleansException>(() => this.messageSerializer.TryRead(ref reader, out var message));
         }
 
         private Message RoundTripMessage(Message message)
