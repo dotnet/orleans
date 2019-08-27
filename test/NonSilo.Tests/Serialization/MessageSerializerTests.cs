@@ -6,7 +6,9 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using TestExtensions;
@@ -60,6 +62,43 @@ namespace UnitTests.Serialization
 
             Assert.NotNull(deserializedMessage.TimeToLive);
             Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_SerializeHeaderTooBig()
+        {
+            try
+            {
+                // Create a ridiculously big RequestContext
+                var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
+                RequestContext.Set("big_object", new byte[maxHeaderSize + 1]);
+
+                var request = new InvokeMethodRequest(0, 0, 0, null);
+                var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+
+                var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+                var writer = pipe.Writer;
+                Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref writer, message));
+            }
+            finally
+            {
+                RequestContext.Clear();
+            }
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_SerializeBodyTooBig()
+        {
+            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
+
+            // Create a request with a ridiculously big argument
+            var arg = new byte[maxBodySize + 1];
+            var request = new InvokeMethodRequest(0, 0, 0, new[] { arg });
+            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+
+            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+            var writer = pipe.Writer;
+            Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref writer, message));
         }
 
         private Message RoundTripMessage(Message message)
