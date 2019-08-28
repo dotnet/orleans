@@ -76,13 +76,13 @@ namespace Orleans.Configuration
         /// if the header size is greater than this value.
         /// </summary>
         public int MaxMessageHeaderSize { get; set; } = DEFAULT_MAX_MESSAGE_HEADER_SIZE;
-        public const int DEFAULT_MAX_MESSAGE_HEADER_SIZE = 1048576; // 1MB
+        public const int DEFAULT_MAX_MESSAGE_HEADER_SIZE = 10485760; // 10MB
 
         /// <summary>
         /// The maximum size, in bytes, of the body for a message. The runtime will forcibly close the connection
         /// if the body size is greater than this value.
         /// </summary>
         public int MaxMessageBodySize { get; set; } = DEFAULT_MAX_MESSAGE_BODY_SIZE;
-        public const int DEFAULT_MAX_MESSAGE_BODY_SIZE = 1073741824; // 10MB
+        public const int DEFAULT_MAX_MESSAGE_BODY_SIZE = 104857600; // 100MB
     }
 }
