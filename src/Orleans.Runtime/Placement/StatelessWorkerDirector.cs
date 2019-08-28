@@ -25,12 +25,21 @@ namespace Orleans.Runtime.Placement
 
         public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            // If the current silo is not shutting down, place locally
+            var compatibleSilos = context.GetCompatibleSilos(target);
+
+            // If the current silo is not shutting down, place locally if we are compatible
             if (!context.LocalSiloStatus.IsTerminating())
-                return Task.FromResult(context.LocalSilo);
+            {
+                foreach (var silo in compatibleSilos)
+                {
+                    if (silo == context.LocalSilo)
+                    {
+                        return Task.FromResult(context.LocalSilo);
+                    }
+                }
+            }
 
             // otherwise, place somewhere else
-            var compatibleSilos = context.GetCompatibleSilos(target);
             return Task.FromResult(compatibleSilos[random.Next(compatibleSilos.Count)]);
         }
 
