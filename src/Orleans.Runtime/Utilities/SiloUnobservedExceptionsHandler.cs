@@ -19,6 +19,15 @@ namespace Orleans.Runtime
         /// <summary>
         /// Configure silo with unobserved exception handler
         /// </summary>
+        public static ISiloBuilder UseSiloUnobservedExceptionsHandler(this ISiloBuilder siloBuilder)
+        {
+            siloBuilder.ConfigureServices(services => services.TryAddSingleton<SiloUnobservedExceptionsHandler>());
+            return siloBuilder;
+        }
+
+        /// <summary>
+        /// Configure silo with unobserved exception handler
+        /// </summary>
         public static ISiloHostBuilder UseSiloUnobservedExceptionsHandler(this ISiloHostBuilder siloBuilder)
         {
             siloBuilder.ConfigureServices(services => services.TryAddSingleton<SiloUnobservedExceptionsHandler>());
@@ -29,7 +38,7 @@ namespace Orleans.Runtime
     internal class SiloUnobservedExceptionsHandler : IDisposable
     {
         private readonly ILogger logger;
-        
+
         public SiloUnobservedExceptionsHandler(ILogger<SiloUnobservedExceptionsHandler> logger)
         {
             this.logger = logger;
