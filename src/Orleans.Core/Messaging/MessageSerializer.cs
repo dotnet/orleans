@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
+using Orleans.Configuration;
 using Orleans.Networking.Shared;
 using Orleans.Serialization;
 
@@ -11,12 +12,20 @@ namespace Orleans.Runtime.Messaging
         private readonly HeadersSerializer headersSerializer;
         private readonly OrleansSerializer<object> objectSerializer;
         private readonly MemoryPool<byte> memoryPool;
+        private readonly int maxHeaderLength;
+        private readonly int maxBodyLength;
 
-        public MessageSerializer(SerializationManager serializationManager, SharedMemoryPool memoryPool)
+        public MessageSerializer(
+            SerializationManager serializationManager,
+            SharedMemoryPool memoryPool,
+            int maxHeaderSize,
+            int maxBodySize)
         {
             this.headersSerializer = new HeadersSerializer(serializationManager);
             this.objectSerializer = new OrleansSerializer<object>(serializationManager);
             this.memoryPool = memoryPool.Pool;
+            this.maxHeaderLength = maxHeaderSize;
+            this.maxBodyLength = maxBodySize;
         }
 
         public int TryRead(ref ReadOnlySequence<byte> input, out Message message)
@@ -35,6 +44,9 @@ namespace Orleans.Runtime.Messaging
             }
 
             var (headerLength, bodyLength) = ReadLengths(input);
+
+            // Check lengths
+            ThrowIfLengthsInvalid(headerLength, bodyLength);
 
             var requiredBytes = 8 + headerLength + bodyLength;
             if (input.Length < requiredBytes)
@@ -94,7 +106,19 @@ namespace Orleans.Runtime.Messaging
 
             var bodyLength = buffer.CommittedBytes - headerLength;
             BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), bodyLength);
+
+            // Before completing, check lengths
+            ThrowIfLengthsInvalid(headerLength, bodyLength);
+
             buffer.Complete(lengthFields);
+        }
+
+        private void ThrowIfLengthsInvalid(int headerLength, int bodyLength)
+        {
+            if (headerLength <= 0 || headerLength > this.maxHeaderLength)
+                throw new OrleansException($"Invalid header size: {headerLength} (max configured value is {this.maxHeaderLength}, see {nameof(MessagingOptions.MaxMessageHeaderSize)})");
+            if (bodyLength < 0 || bodyLength > this.maxBodyLength)
+                throw new OrleansException($"Invalid body size: {bodyLength} (max configured value is {this.maxBodyLength}, see {nameof(MessagingOptions.MaxMessageBodySize)})");
         }
 
         private sealed class OrleansSerializer<T>
