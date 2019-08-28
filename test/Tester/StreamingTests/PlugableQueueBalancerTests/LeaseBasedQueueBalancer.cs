@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
@@ -23,6 +23,11 @@ namespace Tester.StreamingTests
         {
             await this.leaseManagerGrain.SetQueuesAsLeases(queueMapper.GetAllQueues());
             await GetInitialLease();
+        }
+
+        public Task Shutdown()
+        {
+            return Task.CompletedTask;
         }
 
         public IEnumerable<QueueId> GetMyQueues()

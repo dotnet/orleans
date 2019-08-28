@@ -3,18 +3,13 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.LeaseProviders;
 using Orleans.Providers;
-using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
@@ -39,32 +34,24 @@ namespace Tester.AzureUtils.Lease
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            private static void ConfigureServices(IServiceCollection services)
-            {
-                var leaseProviderConfig = new AzureBlobLeaseProviderConfig()
-                {
-                    DataConnectionString = TestDefaultConfiguration.DataConnectionString,
-                    BlobContainerName = "test-container-leasebasedqueuebalancer"
-                };
-                services.AddSingleton<AzureBlobLeaseProviderConfig>(leaseProviderConfig);
-                services.AddTransient<AzureBlobLeaseProvider>()
-                    .ConfigureNamedOptionForLogging<LeaseBasedQueueBalancerOptions>(StreamProviderName);
-                services.AddOptions<LeaseBasedQueueBalancerOptions>(StreamProviderName).Configure(options =>
-               {
-                   options.LeaseProviderType = typeof(AzureBlobLeaseProvider);
-                   options.LeaseLength = TimeSpan.FromSeconds(15);
-               });
-                
-            }
-
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .ConfigureServices(ConfigureServices)
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>
                     {
                         b.ConfigurePartitioning(totalQueueCount);
-                        b.UseClusterConfigDeploymentLeaseBasedBalancer();
+                        b.UseAzureBlobLeaseProvider(ob => ob.Configure(options =>
+                        {
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.BlobContainerName = "test-container-leasebasedqueuebalancer";
+                        }));
+                        b.UseLeaseBasedQueueBalancer(ob => ob.Configure(options =>
+                        {
+                            options.LeaseLength = TimeSpan.FromSeconds(15);
+                            options.LeaseRenewPeriod = TimeSpan.FromSeconds(5);
+                            options.MinLeaseAquisitionPeriod = TimeSpan.FromSeconds(10);
+                            options.MaxLeaseAquisitionPeriod = TimeSpan.FromSeconds(15);
+                        }));
                     });
                 hostBuilder
                     .AddMemoryGrainStorage("PubSubStore");

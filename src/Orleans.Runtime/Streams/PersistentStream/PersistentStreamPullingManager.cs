@@ -106,7 +106,7 @@ namespace Orleans.Streams
                 queuePrintTimer.Dispose();
                 this.queuePrintTimer = null;
             }
-            (this.queueBalancer as IDisposable)?.Dispose();
+            await this.queueBalancer.Shutdown();
             this.queueBalancer = null; 
         }
 
