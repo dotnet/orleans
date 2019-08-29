@@ -1,4 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.LeaseProviders;
@@ -37,14 +40,15 @@ namespace Tester.AzureUtils.Lease
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .UseAzureBlobLeaseProvider(ob => ob.Configure<IOptions<ClusterOptions>>((options, cluster) =>
+                    {
+                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.BlobContainerName = "cluster-" + cluster.Value.ClusterId + "-leases";
+                    }))
+                    .UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString)
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>
                     {
                         b.ConfigurePartitioning(totalQueueCount);
-                        b.UseAzureBlobLeaseProvider(ob => ob.Configure(options =>
-                        {
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.BlobContainerName = "test-container-leasebasedqueuebalancer";
-                        }));
                         b.UseLeaseBasedQueueBalancer(ob => ob.Configure(options =>
                         {
                             options.LeaseLength = TimeSpan.FromSeconds(15);
@@ -52,8 +56,8 @@ namespace Tester.AzureUtils.Lease
                             options.MinLeaseAquisitionPeriod = TimeSpan.FromSeconds(10);
                             options.MaxLeaseAquisitionPeriod = TimeSpan.FromSeconds(15);
                         }));
-                    });
-                hostBuilder
+                    })
+                    .ConfigureLogging(builder => builder.AddFilter($"LeaseBasedQueueBalancer-{StreamProviderName}", LogLevel.Trace))
                     .AddMemoryGrainStorage("PubSubStore");
             }
         }
@@ -63,16 +67,16 @@ namespace Tester.AzureUtils.Lease
         {
             var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
             //6 queue and 4 silo, then each agent manager should own queues/agents in range of [1, 2]
-            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(1, 2, mgmtGrain, lastTry), TimeOut);
+            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, mgmtGrain, lastTry), TimeOut);
             //stop one silo, 6 queues, 3 silo, then each agent manager should own 2 queues 
             await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos[0]);
-            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
+            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, mgmtGrain, lastTry), TimeOut);
             //stop another silo, 6 queues, 2 silo, then each agent manager should own 3 queues
             await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos[0]);
-            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(3, 3, mgmtGrain, lastTry), TimeOut);
+            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(3, mgmtGrain, lastTry), TimeOut);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
             this.HostedCluster.StartAdditionalSilo(true);
-            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
+            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, mgmtGrain, lastTry), TimeOut);
         }
 
         [SkippableFact]
@@ -80,32 +84,39 @@ namespace Tester.AzureUtils.Lease
         {
             var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
             //6 queue and 4 silo, then each agent manager should own queues/agents in range of [1, 2]
-            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(1, 2, mgmtGrain, lastTry), TimeOut);
+            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, mgmtGrain, lastTry), TimeOut);
             //stop one silo, 6 queues, 3 silo, then each agent manager should own 2 queues 
             await this.HostedCluster.KillSiloAsync(this.HostedCluster.SecondarySilos[0]);
-            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
+            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, mgmtGrain, lastTry), TimeOut);
             //stop another silo, 6 queues, 2 silo, then each agent manager should own 3 queues
             await this.HostedCluster.KillSiloAsync(this.HostedCluster.SecondarySilos[0]);
-            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(3, 3, mgmtGrain, lastTry), TimeOut);
+            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(3, mgmtGrain, lastTry), TimeOut);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
             this.HostedCluster.StartAdditionalSilo(true);
-            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
+            await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, mgmtGrain, lastTry), TimeOut);
         }
 
-        public static async Task<bool> AgentManagerOwnCorrectAmountOfAgents(int expectedAgentCountMin, int expectedAgentCountMax, IManagementGrain mgmtGrain, bool assertIsTrue)
+        public static async Task<bool> AgentManagerOwnCorrectAmountOfAgents(int expectedAgentCountMax, IManagementGrain mgmtGrain, bool assertIsTrue)
         {
             await Task.Delay(TimeSpan.FromSeconds(10));
+            bool result;
             try
             {
-                if (assertIsTrue)
-                {
-                    throw new OrleansException($"AgentManager doesn't own correct amount of agents");
-                }
-
-                var agentStarted = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
-                return agentStarted.All(startedAgentInEachSilo => Convert.ToInt32(startedAgentInEachSilo) >= expectedAgentCountMin && Convert.ToInt32(startedAgentInEachSilo) <= expectedAgentCountMax);
+                object[] agentStarted = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
+                int sum = agentStarted.Sum(startedAgentInEachSilo => Convert.ToInt32(startedAgentInEachSilo));
+                result = totalQueueCount == sum &&
+                    agentStarted.All(startedAgentInEachSilo => Convert.ToInt32(startedAgentInEachSilo) <= expectedAgentCountMax);
             }
-            catch { return false; }
+            catch
+            {
+                result = false;
+            }
+
+            if (!result && assertIsTrue)
+            {
+                throw new OrleansException($"AgentManager doesn't own correct amount of agents");
+            }
+            return result;
         }
     }
 }

@@ -111,7 +111,7 @@ namespace Orleans.Streams
                     .Select(member => member.SiloAddress));
 
                 // if active list has changed, track new list and notify
-                if(current.SetEquals(update))
+                if(!current.SetEquals(update))
                 {
                     current = update;
                     OnClusterMembershipChange(current);

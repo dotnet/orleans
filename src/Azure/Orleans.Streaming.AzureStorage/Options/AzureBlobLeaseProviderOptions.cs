@@ -4,6 +4,7 @@ namespace Orleans.Configuration
     {
         [RedactConnectionString]
         public string DataConnectionString { get; set; }
-        public string BlobContainerName { get; set; }
+        public string BlobContainerName { get; set; } = DefaultBlobContainerName;
+        public const string DefaultBlobContainerName = "Leases";
     }
 }

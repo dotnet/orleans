@@ -9,7 +9,6 @@ using Orleans.LeaseProviders;
 using Orleans.Runtime;
 using Orleans.Configuration;
 using Orleans.Timers;
-using System.Threading;
 
 namespace Orleans.Streams
 {
@@ -165,9 +164,16 @@ namespace Orleans.Streams
             return this.myQueues.Select(queue => queue.QueueId);
         }
 
-        private Task MaintainLeases(object state)
+        private async Task MaintainLeases(object state)
         {
-            return this.executor.AddNext(this.MaintainLeases);
+            try
+            {
+                await this.executor.AddNext(this.MaintainLeases);
+            }
+            catch (Exception ex)
+            {
+                this.Logger.LogError(ex, "Maintaining leases failed");
+            }
         }
 
         private async Task MaintainLeases()
@@ -183,9 +189,15 @@ namespace Orleans.Streams
             await NotifyOnChange(oldQueues);
         }
 
-        private Task AcquireLeasesToMeetMaxResponsibility(object state)
+        private async Task AcquireLeasesToMeetMaxResponsibility(object state)
         {
-            return this.executor.AddNext(this.AcquireLeasesToMeetMaxResponsibility);
+            try
+            {
+                await this.executor.AddNext(this.AcquireLeasesToMeetMaxResponsibility);
+            } catch(Exception ex)
+            {
+                this.Logger.LogError(ex, "Acquiring max leases failed");
+            }
         }
 
         private async Task AcquireLeasesToMeetMaxResponsibility()
@@ -208,9 +220,16 @@ namespace Orleans.Streams
             }
         }
 
-        private Task AcquireLeasesToMeetMinResponsibility(object state)
+        private async Task AcquireLeasesToMeetMinResponsibility(object state)
         {
-            return this.executor.AddNext(this.AcquireLeasesToMeetMinResponsibility);
+            try
+            {
+                await this.executor.AddNext(this.AcquireLeasesToMeetMinResponsibility);
+            }
+            catch (Exception ex)
+            {
+                this.Logger.LogError(ex, "Acquiring min leases failed");
+            }
         }
 
         private async Task AcquireLeasesToMeetMinResponsibility()
@@ -236,6 +255,10 @@ namespace Orleans.Streams
         private async Task ReleaseLeasesToMeetResponsibility()
         {
             if (base.Cancellation.IsCancellationRequested) return;
+            if (this.Logger.IsEnabled(LogLevel.Trace))
+            {
+                this.Logger.LogTrace("ReleaseLeasesToMeetResponsibility. QueueCount: {QueueCount}, MaximumResponsibility: {MaximumResponsibility}", this.myQueues.Count, this.maximumResponsibility);
+            }
             int queueCountToRelease = this.myQueues.Count - this.maximumResponsibility;
             if (queueCountToRelease <= 0)
                 return;
@@ -253,19 +276,24 @@ namespace Orleans.Streams
         private async Task AcquireLeasesToMeetExpectation(int expectedTotalLeaseCount)
         {
             if (base.Cancellation.IsCancellationRequested) return;
+            if (this.Logger.IsEnabled(LogLevel.Trace))
+            {
+                this.Logger.LogTrace("AcquireLeasesToMeetExpectation. QueueCount: {QueueCount}, ExpectedTotalLeaseCount: {ExpectedTotalLeaseCount}", this.myQueues.Count, expectedTotalLeaseCount);
+            }
+
             int leasesToAquire = expectedTotalLeaseCount - this.myQueues.Count;
             if (leasesToAquire <= 0) return;
 
             // tracks how many remaining possible leases there are.
             int possibleLeaseCount = this.queueSelector.Count - this.myQueues.Count;
-            // try to acquire leases until we have no more to aquire or no more possible
-            while (leasesToAquire > 0 && possibleLeaseCount > 0)
+            if (this.Logger.IsEnabled(LogLevel.Debug))
             {
-                if(this.Logger.IsEnabled(LogLevel.Debug))
-                {
-                    this.Logger.LogDebug("Holding leased for {QueueCount} queues.  Trying to acquire {AquireQueueCount} queues to reach {TargetQueueCount}", this.myQueues.Count, leasesToAquire, expectedTotalLeaseCount);
-                }
+                this.Logger.LogDebug("Holding leased for {QueueCount} queues.  Trying to acquire {AquireQueueCount} queues to reach {TargetQueueCount} of a possible {PossibleLeaseCount}", this.myQueues.Count, leasesToAquire, expectedTotalLeaseCount, possibleLeaseCount);
+            }
 
+            // try to acquire leases until we have no more to aquire or no more possible
+            while (!base.Cancellation.IsCancellationRequested && leasesToAquire > 0 && possibleLeaseCount > 0)
+            {
                 //select new queues to acquire
                 List<QueueId> expectedQueues = this.queueSelector.NextSelection(leasesToAquire, this.myQueues.Select(queue=>queue.QueueId).ToList());
                 // build lease request from each queue
@@ -280,13 +308,42 @@ namespace Orleans.Streams
                 //add successfully acquired queue to myQueues list
                 for (int i = 0; i < results.Length; i++)
                 {
-                    if (results[i].StatusCode == ResponseCode.OK)
+                    AcquireLeaseResult result = results[i];
+                    switch (result.StatusCode)
                     {
-                        this.myQueues.Add(new AcquiredQueue(expectedQueues[i], results[i].AcquiredLease));
+                        case ResponseCode.OK:
+                            {
+                                this.myQueues.Add(new AcquiredQueue(expectedQueues[i], result.AcquiredLease));
+                                break;
+                            }
+                        case ResponseCode.TransientFailure:
+                            {
+                                this.Logger.LogWarning(result.FailureException, "Failed to aquire lease {LeaseKey} due to transient error.", result.AcquiredLease.ResourceKey);
+                                break;
+                            }
+                        // this is expected much of the time
+                        case ResponseCode.LeaseNotAvailable:
+                            {
+                                if (this.Logger.IsEnabled(LogLevel.Debug))
+                                {
+                                    this.Logger.LogDebug(result.FailureException, "Failed to aquire lease {LeaseKey} due to {Reason}.", result.AcquiredLease.ResourceKey, result.StatusCode);
+                                }
+                                break;
+                            }
+                        // An acquire call should not return this code, so log as error
+                        case ResponseCode.InvalidToken:
+                            {
+                                this.Logger.LogError(result.FailureException, "Failed to aquire lease {LeaseKey} unexpected invalid token.", result.AcquiredLease.ResourceKey);
+                                break;
+                            }
                     }
                 }
                 possibleLeaseCount -= expectedQueues.Count;
                 leasesToAquire = expectedTotalLeaseCount - this.myQueues.Count;
+                if (this.Logger.IsEnabled(LogLevel.Debug))
+                {
+                    this.Logger.LogDebug("Holding leased for {QueueCount} queues.  Trying to acquire {AquireQueueCount} queues to reach {TargetQueueCount} of a possible {PossibleLeaseCount} lease", this.myQueues.Count, leasesToAquire, expectedTotalLeaseCount, possibleLeaseCount);
+                }
             }
 
             this.Logger.LogInformation("Holding leases for {QueueCount} of an expected {MinQueueCount} to {MaxQueueCount} queues.", this.myQueues.Count, this.minimumResponsibility, this.maximumResponsibility);
@@ -295,6 +352,10 @@ namespace Orleans.Streams
         private async Task RenewLeases()
         {
             if (base.Cancellation.IsCancellationRequested) return;
+            if (this.Logger.IsEnabled(LogLevel.Trace))
+            {
+                this.Logger.LogTrace("RenewLeases. QueueCount: {QueueCount}", this.myQueues.Count);
+            }
             if (this.myQueues.Count <= 0)
                 return;
             var results = await this.leaseProvider.Renew(LeaseCategory, this.myQueues.Select(queue => queue.AcquiredLease).ToArray());
@@ -302,10 +363,26 @@ namespace Orleans.Streams
             //update myQueues list with successfully renewed leases
             for (int i = 0; i < results.Count(); i++)
             {
-                var result = results[i];
-                if (result.StatusCode == ResponseCode.OK)
+                AcquireLeaseResult result = results[i];
+                switch (result.StatusCode)
                 {
-                    updatedQueues.Add(new AcquiredQueue(this.myQueues[i].QueueId, result.AcquiredLease));
+                    case ResponseCode.OK:
+                        {
+                            updatedQueues.Add(new AcquiredQueue(this.myQueues[i].QueueId, result.AcquiredLease));
+                            break;
+                        }
+                    case ResponseCode.TransientFailure:
+                        {
+                            this.Logger.LogWarning(result.FailureException, "Failed to renew lease {LeaseKey} due to transient error.", result.AcquiredLease.ResourceKey);
+                            break;
+                        }
+                    // these can occure if lease has expired and/or someone else has taken it
+                    case ResponseCode.InvalidToken:
+                    case ResponseCode.LeaseNotAvailable:
+                        {
+                            this.Logger.LogWarning(result.FailureException, "Failed to renew lease {LeaseKey} due to {Reason}.", result.AcquiredLease.ResourceKey, result.StatusCode);
+                            break;
+                        }
                 }
             }
             this.myQueues.Clear();
@@ -326,7 +403,20 @@ namespace Orleans.Streams
         protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
         {
             if (base.Cancellation.IsCancellationRequested) return;
-            this.executor.AddNext(() => UpdateResponsibilities(activeSilos)).Ignore();
+            ScheduleUpdateResponsibilities(activeSilos).Ignore();
+        }
+
+        private async Task ScheduleUpdateResponsibilities(HashSet<SiloAddress> activeSilos)
+        {
+            if (base.Cancellation.IsCancellationRequested) return;
+            try
+            {
+                await this.executor.AddNext(() => UpdateResponsibilities(activeSilos));
+            }
+            catch (Exception ex)
+            {
+                this.Logger.LogError(ex, "Updating Responsibilities");
+            }
         }
 
         private async Task UpdateResponsibilities(HashSet<SiloAddress> activeSilos)
@@ -344,7 +434,11 @@ namespace Orleans.Streams
                 this.minimumResponsibility = this.maximumResponsibility;
             }
 
-            await AcquireLeasesToMeetMinResponsibility();
+            if (this.Logger.IsEnabled(LogLevel.Debug))
+            {
+                this.Logger.LogDebug("Updating Responsibilities for {QueueCount} queue over {SiloCount} silos. Need {MinQueueCount} to {MaxQueueCount} queues, have {MyQueueCount}",
+                    this.allQueues.Count, activeSiloCount, this.minimumResponsibility, this.maximumResponsibility, this.myQueues.Count);
+            }
 
             if (this.myQueues.Count < this.minimumResponsibility && this.leaseMinAquisitionTimer == null)
             {
@@ -360,6 +454,8 @@ namespace Orleans.Streams
             {
                 this.leaseMaintenanceTimer = this.timerRegistry.RegisterTimer(null, this.MaintainLeases, null, this.options.LeaseRenewPeriod, this.options.LeaseRenewPeriod);
             }
+
+            await AcquireLeasesToMeetMinResponsibility();
         }
     }
 }

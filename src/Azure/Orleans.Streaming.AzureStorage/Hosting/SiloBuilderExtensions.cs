@@ -73,6 +73,21 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure silo to use azure blob lease provider
         /// </summary>
+        public static ISiloHostBuilder UseAzureBlobLeaseProvider(this ISiloHostBuilder builder, Action<OptionsBuilder<AzureBlobLeaseProviderOptions>> configureOptions)
+        {
+            builder.ConfigureServices(services =>
+            {
+                configureOptions?.Invoke(services.AddOptions<AzureBlobLeaseProviderOptions>());
+                services.ConfigureFormatter<AzureBlobLeaseProviderOptions>();
+                services.AddTransient<AzureBlobLeaseProvider>();
+                services.AddFromExisting<ILeaseProvider, AzureBlobLeaseProvider>();
+            });
+            return builder;
+        }
+
+        /// <summary>
+        /// Configure silo to use azure blob lease provider
+        /// </summary>
         public static void UseAzureBlobLeaseProvider(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<AzureBlobLeaseProviderOptions>> configureOptions)
         {
             configurator.ConfigureComponent(AzureBlobLeaseProvider.Create, configureOptions);
