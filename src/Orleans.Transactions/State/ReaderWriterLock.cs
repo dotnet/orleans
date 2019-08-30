@@ -59,7 +59,7 @@ namespace Orleans.Transactions.State
             this.storageWorker = storageWorker;
             this.logger = logger;
             this.activationLifetime = activationLifetime;
-            this.lockWorker = new BatchWorkerFromDelegate(LockWork);
+            this.lockWorker = new BatchWorkerFromDelegate(LockWork, this.activationLifetime.OnDeactivating);
         }
 
         public async Task<TResult> EnterLock<TResult>(Guid transactionId, DateTime priority,
