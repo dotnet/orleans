@@ -226,7 +226,6 @@ namespace Orleans.Runtime
             if (rejection.Result == Message.ResponseTypes.Rejection)
             {
                 Transport.SendMessage(rejection);
-                rejection.ReleaseBodyAndHeaderBuffers();
             }
             else
             {
