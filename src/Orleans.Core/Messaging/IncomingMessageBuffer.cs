@@ -177,7 +177,11 @@ namespace Orleans.Runtime
             this.deserializationContext.StreamReader.Reset(header);
 
             // First deserialize headers
+            var position = this.deserializationContext.StreamReader.CurrentPosition;
             var headers = SerializationManager.DeserializeMessageHeaders(this.deserializationContext);
+            var bytesConsumed = this.deserializationContext.StreamReader.CurrentPosition - position;
+            if (bytesConsumed != this.headerLength)
+                throw new OrleansException($"Header was supposed to have a size of {this.headerLength}, but deserialization only consumed {bytesConsumed}");
 
             // Do not call inline SerializationManager.DeserializeMessageHeaders in there, we want msg to be null
             // if headers deserialization failed
