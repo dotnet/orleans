@@ -60,13 +60,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloBuilder UseAzureBlobLeaseProvider(this ISiloBuilder builder, Action<OptionsBuilder<AzureBlobLeaseProviderOptions>> configureOptions)
         {
-            builder.ConfigureServices(services =>
-            {
-                configureOptions?.Invoke(services.AddOptions<AzureBlobLeaseProviderOptions>());
-                services.ConfigureFormatter<AzureBlobLeaseProviderOptions>();
-                services.AddTransient<AzureBlobLeaseProvider>();
-                services.AddFromExisting<ILeaseProvider, AzureBlobLeaseProvider>();
-            });
+            builder.ConfigureServices(services => ConfigureAzureBlobLeaseProviderServices(services, configureOptions));
             return builder;
         }
 
@@ -75,14 +69,17 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder UseAzureBlobLeaseProvider(this ISiloHostBuilder builder, Action<OptionsBuilder<AzureBlobLeaseProviderOptions>> configureOptions)
         {
-            builder.ConfigureServices(services =>
-            {
-                configureOptions?.Invoke(services.AddOptions<AzureBlobLeaseProviderOptions>());
-                services.ConfigureFormatter<AzureBlobLeaseProviderOptions>();
-                services.AddTransient<AzureBlobLeaseProvider>();
-                services.AddFromExisting<ILeaseProvider, AzureBlobLeaseProvider>();
-            });
+            builder.ConfigureServices(services => ConfigureAzureBlobLeaseProviderServices(services, configureOptions));
             return builder;
+        }
+
+        private static void ConfigureAzureBlobLeaseProviderServices(IServiceCollection services, Action<OptionsBuilder<AzureBlobLeaseProviderOptions>> configureOptions)
+        {
+            configureOptions?.Invoke(services.AddOptions<AzureBlobLeaseProviderOptions>());
+            services.AddTransient<IConfigurationValidator, AzureBlobLeaseProviderOptionsValidator>();
+            services.ConfigureFormatter<AzureBlobLeaseProviderOptions>();
+            services.AddTransient<AzureBlobLeaseProvider>();
+            services.AddFromExisting<ILeaseProvider, AzureBlobLeaseProvider>();
         }
 
         /// <summary>
@@ -90,6 +87,10 @@ namespace Orleans.Hosting
         /// </summary>
         public static void UseAzureBlobLeaseProvider(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<AzureBlobLeaseProviderOptions>> configureOptions)
         {
+            configurator.ConfigureDelegate(services =>
+            {
+                services.AddTransient(sp => AzureBlobLeaseProviderOptionsValidator.Create(sp, configurator.Name));
+            });
             configurator.ConfigureComponent(AzureBlobLeaseProvider.Create, configureOptions);
         }
     }

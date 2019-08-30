@@ -21,26 +21,29 @@ namespace Orleans.Streams
 
         protected CancellationToken Cancellation => this.cts.Token;
 
+        protected SiloAddress SiloAddress { get; }
+
         protected ILogger Logger { get; }
 
-        protected QueueBalancerBase(IServiceProvider ps, ILogger logger)
-            : this(ps.GetRequiredService<IClusterMembershipService>(), logger)
+        protected QueueBalancerBase(IServiceProvider sp, ILogger logger)
+            : this(sp.GetRequiredService<IClusterMembershipService>(), sp.GetRequiredService<ILocalSiloDetails>(), logger)
         {
         }
 
         /// <summary>
         /// This should be primary constructor once IAsyncEnumerable is released
         /// </summary>
-        private QueueBalancerBase(IClusterMembershipService clusterMembership, ILogger logger)
+        private QueueBalancerBase(IClusterMembershipService clusterMembership, ILocalSiloDetails localSiloDetails, ILogger logger)
         {
             this.clusterMembershipUpdates = clusterMembership.MembershipUpdates;
+            this.SiloAddress = localSiloDetails.SiloAddress;
             this.Logger = logger;
             this.queueBalanceListeners = new List<IStreamQueueBalanceListener>();
             this.cts = new CancellationTokenSource();
         }
 
-    /// <inheritdoc/>
-    public abstract IEnumerable<QueueId> GetMyQueues();
+        /// <inheritdoc/>
+        public abstract IEnumerable<QueueId> GetMyQueues();
 
         /// <inheritdoc/>
         public virtual Task Initialize(IStreamQueueMapper queueMapper)

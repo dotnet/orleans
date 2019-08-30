@@ -450,6 +450,17 @@ namespace Orleans.TestingHost
             {
                 // do NOT stop, just kill directly, to simulate crash.
                 await StopSiloAsync(instance, false);
+                if (Primary == instance)
+                {
+                    Primary = null;
+                }
+                else
+                {
+                    lock (additionalSilos)
+                    {
+                        additionalSilos.Remove(instance);
+                    }
+                }
             }
         }
 

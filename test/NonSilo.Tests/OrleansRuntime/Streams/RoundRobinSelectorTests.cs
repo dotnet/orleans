@@ -1,8 +1,11 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Streams;
+using System;
+using System.Data;
+using System.Runtime.CompilerServices;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
@@ -12,11 +15,12 @@ namespace UnitTests.OrleansRuntime.Streams
         private const int ResourceCount = 10;
         private readonly IResourceSelector<string> resourceSelector;
         private readonly List<string> resources;
+        private readonly Random random = new Random();
 
         public RoundRobinSelectorTests(ITestOutputHelper output) : base(output)
         {
             this.resources = Enumerable.Range(0, ResourceCount).Select(i => $"resource_{i}").ToList();
-            this.resourceSelector = new RoundRobinSelector<string>(this.resources);
+            this.resourceSelector = new RoundRobinSelector<string>(this.resources, this.random);
         }
 
         [Fact]
@@ -42,7 +46,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var duplicateResources = new List<string>(this.resources);
             duplicateResources.AddRange(this.resources);
-            var resourceSelectorWithDuplicates = new RoundRobinSelector<string>(duplicateResources);
+            var resourceSelectorWithDuplicates = new RoundRobinSelector<string>(duplicateResources, this.random);
             base.NextSelectionWontReSelectExistingSelections(this.resources, resourceSelectorWithDuplicates);
         }
     }
