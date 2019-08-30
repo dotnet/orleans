@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
@@ -20,14 +20,14 @@ namespace Orleans
     /// </summary>
     public class LifecycleSubject : ILifecycleSubject
     {
-        private readonly ConcurrentDictionary<object, OrderedObserver> subscribers;
+        private readonly List<OrderedObserver> subscribers;
         private readonly ILogger logger;
         private int? highStage = null;
 
         public LifecycleSubject(ILogger<LifecycleSubject> logger)
         {
             this.logger = logger;
-            this.subscribers = new ConcurrentDictionary<object, OrderedObserver>();
+            this.subscribers = new List<OrderedObserver>();
         }
 
         protected virtual string GetStageName(int stage) => stage.ToString();
@@ -82,7 +82,7 @@ namespace Orleans
             if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
             try
             {
-                foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers.Values
+                foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers
                     .GroupBy(orderedObserver => orderedObserver.Stage)
                     .OrderBy(group => group.Key))
                 {
@@ -136,7 +136,7 @@ namespace Orleans
             // if not started, do nothing
             if (!this.highStage.HasValue) return;
             var loggedCancellation = false;
-            foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers.Values
+            foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers
                 .GroupBy(orderedObserver => orderedObserver.Stage)
                 .OrderByDescending(group => group.Key)
                 // skip all until we hit the highest started stage
@@ -181,8 +181,8 @@ namespace Orleans
             if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
 
             var orderedObserver = new OrderedObserver(stage, observer);
-            this.subscribers.TryAdd(orderedObserver, orderedObserver);
-            return new Disposable(() => this.subscribers.TryRemove(orderedObserver, out _));
+            this.subscribers.Add(orderedObserver);
+            return new Disposable(() => this.subscribers.Remove(orderedObserver));
         }
 
         private class Disposable : IDisposable
