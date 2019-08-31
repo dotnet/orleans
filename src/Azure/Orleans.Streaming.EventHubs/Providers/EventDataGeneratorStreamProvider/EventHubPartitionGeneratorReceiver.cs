@@ -1,10 +1,8 @@
-﻿using Microsoft.Azure.EventHubs;
+using Microsoft.Azure.EventHubs;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Orleans.ServiceBus.Providers.Testing

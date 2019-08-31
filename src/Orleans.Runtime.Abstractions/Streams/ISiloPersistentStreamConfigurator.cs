@@ -1,8 +1,9 @@
 using System;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     public interface ISiloPersistentStreamConfigurator : IPersistentStreamConfigurator { }
 

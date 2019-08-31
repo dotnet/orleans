@@ -7,8 +7,9 @@ using Orleans.Providers.Streams.Common;
 using Orleans.ApplicationParts;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Configuration;
 
-namespace Orleans.Configuration
+namespace Orleans.Hosting
 {
     public interface IAzureQueueStreamConfigurator : INamedServiceConfigurator { }
 
@@ -65,10 +66,6 @@ namespace Orleans.Configuration
     }
 
     public interface IClusterClientAzureQueueStreamConfigurator : IAzureQueueStreamConfigurator, IClusterClientPersistentStreamConfigurator { }
-
-    public static class ClusterClientAzureQueueStreamConfiguratorExtensions
-    {
-    }
 
     public class ClusterClientAzureQueueStreamConfigurator : ClusterClientPersistentStreamConfigurator, IClusterClientAzureQueueStreamConfigurator
     {

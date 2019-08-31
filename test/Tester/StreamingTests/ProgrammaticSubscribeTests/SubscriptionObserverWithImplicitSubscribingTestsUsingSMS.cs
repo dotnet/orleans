@@ -1,15 +1,8 @@
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using System;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Orleans;
 using Orleans.Hosting;
 using TestExtensions;
-using UnitTests.GrainInterfaces;
 using Xunit;
-using UnitTests.Grains.ProgrammaticSubscribe;
 using Xunit.Abstractions;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests

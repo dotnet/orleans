@@ -4,8 +4,6 @@ using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
-using Orleans.Runtime.Configuration;
-using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.Streaming;

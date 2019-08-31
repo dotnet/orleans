@@ -1,12 +1,12 @@
-using Orleans.Configuration;
-using OrleansAWSUtils.Streams;
 using System;
-using Orleans.Providers.Streams.Common;
-using Orleans.ApplicationParts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using OrleansAWSUtils.Streams;
+using Orleans.Providers.Streams.Common;
+using Orleans.ApplicationParts;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     public class SiloSqsStreamConfigurator : SiloPersistentStreamConfigurator
     {

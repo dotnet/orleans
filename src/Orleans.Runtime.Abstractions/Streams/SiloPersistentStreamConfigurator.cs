@@ -5,8 +5,9 @@ using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Storage;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     public class PersistentStreamStorageConfigurationValidator : IConfigurationValidator
     {

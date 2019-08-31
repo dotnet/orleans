@@ -2,7 +2,6 @@ using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Hosting;
-using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.StreamingTests;
