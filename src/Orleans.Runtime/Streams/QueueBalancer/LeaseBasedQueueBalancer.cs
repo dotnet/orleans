@@ -22,12 +22,12 @@ namespace Orleans.Streams
     {
         private class AcquiredQueue 
         {
-            public int LeaseId { get; set; }
+            public int LeaseOrder { get; set; }
             public QueueId QueueId { get; set; }
             public AcquiredLease AcquiredLease { get; set; }
-            public AcquiredQueue(int leaseId, QueueId queueId, AcquiredLease lease)
+            public AcquiredQueue(int order, QueueId queueId, AcquiredLease lease)
             {
-                this.LeaseId = leaseId;
+                this.LeaseOrder = order;
                 this.QueueId = queueId;
                 this.AcquiredLease = lease;
             }
@@ -43,7 +43,7 @@ namespace Orleans.Streams
         private IDisposable leaseAquisitionTimer;
         private IResourceSelector<QueueId> queueSelector;
         private int responsibility;
-        private int leaseId;
+        private int leaseOrder;
 
         /// <summary>
         /// Constructor
@@ -189,7 +189,7 @@ namespace Orleans.Streams
             //  being moved.
             // TODO: Consider making this behavior configurable/plugable - jbragg
             AcquiredLease[] queuesToGiveUp = this.myQueues
-                .OrderBy(queue => leaseId)
+                .OrderBy(queue => queue.LeaseOrder)
                 .Take(queueCountToRelease)
                 .Select(queue => queue.AcquiredLease)
                 .ToArray();
@@ -226,7 +226,7 @@ namespace Orleans.Streams
                 this.Logger.LogDebug("Holding leased for {QueueCount} queues.  Trying to acquire {AquireQueueCount} queues to reach {TargetQueueCount} of a possible {PossibleLeaseCount}", this.myQueues.Count, leasesToAquire, expectedTotalLeaseCount, possibleLeaseCount);
             }
 
-            Stopwatch sw = Stopwatch.StartNew();
+            ValueStopwatch sw = ValueStopwatch.StartNew();
             // try to acquire leases until we have no more to aquire or no more possible
             while (!base.Cancellation.IsCancellationRequested && leasesToAquire > 0 && possibleLeaseCount > 0)
             {
@@ -249,7 +249,7 @@ namespace Orleans.Streams
                     {
                         case ResponseCode.OK:
                             {
-                                this.myQueues.Add(new AcquiredQueue(this.leaseId++, expectedQueues[i], result.AcquiredLease));
+                                this.myQueues.Add(new AcquiredQueue(this.leaseOrder++, expectedQueues[i], result.AcquiredLease));
                                 break;
                             }
                         case ResponseCode.TransientFailure:
@@ -287,7 +287,7 @@ namespace Orleans.Streams
                 }
                 if (sw.Elapsed > timeout)
                 {
-                    // blown are alotted time, try again next period
+                    // blown our alotted time, try again next period
                     break;
                 }
             }
@@ -380,11 +380,13 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        /// Greedy silos
+        /// Checks to see if this balancer should be greedy, which means it attempts to grab one
+        ///   more queue than the non-greedy balancers.
         /// </summary>
-        /// <param name="overflow"></param>
-        /// <param name="activeSilos"></param>
-        /// <returns></returns>
+        /// <param name="overflow">number of free queues, assuming all balancers meet their minimum responsibilities</param>
+        /// <param name="activeSilos">number of active silos hosting queues</param>
+        /// <returns>bool - true indicates that the balancer should try to acquire one
+        ///   more queue than the non-greedy balancers</returns>
         private bool AmGreedy(int overflow, HashSet<SiloAddress> activeSilos)
         {
             // If using multiple stream providers, this will select the same silos to be greedy for
@@ -416,12 +418,22 @@ namespace Orleans.Streams
 
             if (this.myQueues.Count < this.responsibility && this.leaseAquisitionTimer == null)
             {
-                this.leaseAquisitionTimer = this.timerRegistry.RegisterTimer(null, this.AcquireLeasesToMeetResponsibility, null, this.options.LeaseAquisitionPeriod, this.options.LeaseAquisitionPeriod);
+                this.leaseAquisitionTimer = this.timerRegistry.RegisterTimer(
+                    null,
+                    this.AcquireLeasesToMeetResponsibility,
+                    null,
+                    this.options.LeaseAquisitionPeriod,
+                    this.options.LeaseAquisitionPeriod);
             }
 
             if (this.leaseMaintenanceTimer == null)
             {
-                this.leaseMaintenanceTimer = this.timerRegistry.RegisterTimer(null, this.MaintainLeases, null, this.options.LeaseRenewPeriod, this.options.LeaseRenewPeriod);
+                this.leaseMaintenanceTimer = this.timerRegistry.RegisterTimer(
+                    null,
+                    this.MaintainLeases,
+                    null,
+                    this.options.LeaseRenewPeriod,
+                    this.options.LeaseRenewPeriod);
             }
 
             await this.AcquireLeasesToMeetResponsibility();
