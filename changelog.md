@@ -7,6 +7,27 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [1.5.9] (changes since 1.5.8)
+
+- Non-breaking bug fixes
+  - Do not call release header/body on a message in the dispatcher (#5921)
+
+### [2.4.2] (changes since 2.4.1)
+
+- Non-breaking improvements
+  - Close connection on serialization error, to avoid data corruption from client. (#5899)
+  - Add details to grain invocation exception logs (#5895)
+  - Add hard limits for message header and body size (#5908)
+  - Cleanup Message constructors & Headers assignment (#5902)
+  - Remove SAEA pooling (#5915)
+  - Fix default value for MaxMessageHeaderSize and MaxMessageBodySize (#5916)
+  - Improve graceful deactivation of grains performing transaction work (#5887) (#5897)
+  - When deserializling headers, check that we consumed all bytes (#5910)
+
+- Non-breaking bug fixes
+  - Fix header deserialization error handling (#5901)
+  - Do not call release header/body on a message in the dispatcher (#5920)
+
 ### [3.0.0-beta1] (changes since 2.3.0)
 
 - Non-breaking improvements
