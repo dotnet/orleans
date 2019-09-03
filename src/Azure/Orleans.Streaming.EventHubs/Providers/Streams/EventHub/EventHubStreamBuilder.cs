@@ -5,8 +5,9 @@ using Orleans.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.ApplicationParts;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     public interface IEventHubStreamConfigurator : INamedServiceConfigurator {}
 

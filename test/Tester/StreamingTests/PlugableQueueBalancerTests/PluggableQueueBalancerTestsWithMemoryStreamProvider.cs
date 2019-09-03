@@ -2,13 +2,10 @@ using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
-using Orleans.Runtime.Configuration;
-using Orleans.Storage;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
-using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.StreamingTests.PlugableQueueBalancerTests

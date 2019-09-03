@@ -1,5 +1,4 @@
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
 using System;
 using Orleans.Providers.Streams.Common;
@@ -7,7 +6,7 @@ using Orleans.ApplicationParts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     public class SiloPubSubStreamConfigurator<TDataAdapter> : SiloPersistentStreamConfigurator
          where TDataAdapter : IPubSubDataAdapter

@@ -4,8 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Host;
 using Orleans.Configuration;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     public static class SiloPersistentStreamConfiguratorExtension
     {

@@ -12,7 +12,6 @@ using Xunit.Abstractions;
 using System.Threading.Tasks;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using UnitTests.StorageTests;
 using Orleans.Storage;
 using Orleans.Providers;
