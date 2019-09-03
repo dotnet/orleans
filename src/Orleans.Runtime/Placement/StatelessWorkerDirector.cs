@@ -32,7 +32,7 @@ namespace Orleans.Runtime.Placement
             {
                 foreach (var silo in compatibleSilos)
                 {
-                    if (silo == context.LocalSilo)
+                    if (silo.Equals(context.LocalSilo))
                     {
                         return Task.FromResult(context.LocalSilo);
                     }
