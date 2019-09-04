@@ -118,11 +118,19 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (id <= this.highestCompletedProbeId)
                 {
-                    this.log.Info("Ignoring success result for ping #{ProbeNumber} from {Silo} since a later probe has already completed", diagnosticProbeNumber, this.SiloAddress);
+                    this.log.Info(
+                        "Ignoring success result for ping #{ProbeNumber} from {Silo} since a later probe has already completed. Highest ({HighestCompletedProbeId}) > Current ({CurrentProbeId})",
+                        diagnosticProbeNumber,
+                        this.SiloAddress,
+                        this.highestCompletedProbeId,
+                        id);
                 }
                 else if (this.stoppingCancellation.IsCancellationRequested)
                 {
-                    this.log.Info("Ignoring success result for ping #{ProbeNumber} from {Silo} since this monitor has been stopped", diagnosticProbeNumber, this.SiloAddress);
+                    this.log.Info(
+                        "Ignoring success result for ping #{ProbeNumber} from {Silo} since this monitor has been stopped",
+                        diagnosticProbeNumber,
+                        this.SiloAddress);
                 }
                 else
                 {
@@ -145,11 +153,19 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (id <= this.highestCompletedProbeId)
                 {
-                    this.log.Info("Ignoring failure result for ping #{ProbeNumber} from {Silo} since a later probe has already completed", diagnosticProbeNumber, this.SiloAddress);
+                    this.log.Info(
+                        "Ignoring failure result for ping #{ProbeNumber} from {Silo} since a later probe has already completed. Highest ({HighestCompletedProbeId}) > Current ({CurrentProbeId})",
+                        diagnosticProbeNumber,
+                        this.SiloAddress,
+                        this.highestCompletedProbeId,
+                        id);
                 }
                 else if (this.stoppingCancellation.IsCancellationRequested)
                 {
-                    this.log.Info("Ignoring failure result for ping #{ProbeNumber} from {Silo} since this monitor has been stopped", diagnosticProbeNumber, this.SiloAddress);
+                    this.log.Info(
+                        "Ignoring failure result for ping #{ProbeNumber} from {Silo} since this monitor has been stopped",
+                        diagnosticProbeNumber,
+                        this.SiloAddress);
                 }
                 else
                 {
