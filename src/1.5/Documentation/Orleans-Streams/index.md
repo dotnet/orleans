@@ -97,7 +97,7 @@ The [Orleans Streams Extensibility](Streams-Extensibility.md) describes how to e
 
 ## Code Samples
 
-More examples of how to use streaming APIs within a grain can be found [here](https://github.com/dotnet/orleans/blob/master/test/TestGrains/SampleStreamingGrain.cs). We plan to create more samples in the future.
+More examples of how to use streaming APIs within a grain can be found [here](https://github.com/dotnet/orleans/blob/78345e4764a634c1feed7efb48e858504b69c8d1/test/Grains/TestGrains/SampleStreamingGrain.cs). We plan to create more samples in the future.
 
 
 ## More Material
