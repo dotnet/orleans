@@ -1,7 +1,9 @@
-﻿using Xunit.Abstractions;
+using Xunit.Abstractions;
 using Orleans.LeaseProviders;
 using TestExtensions;
 using TestExtensions.Runners;
+using Orleans.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Tester.AzureUtils.Lease
 {
@@ -16,11 +18,11 @@ namespace Tester.AzureUtils.Lease
         private static ILeaseProvider CreateLeaseProvider()
         {
             TestUtils.CheckForAzureStorage();
-            return new AzureBlobLeaseProvider(new AzureBlobLeaseProviderConfig()
+            return new AzureBlobLeaseProvider(Options.Create(new AzureBlobLeaseProviderOptions()
             {
                 DataConnectionString = TestDefaultConfiguration.DataConnectionString,
                 BlobContainerName = "test-blob-container-name"
-            });
+            }));
         }
     }
 }
