@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract Connection CreateConnection(SiloAddress address, ConnectionContext context);
 
-        public async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
+        public virtual async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
         {
             var connectionContext = await this.connectionFactory.ConnectAsync(address.Endpoint, cancellationToken);
             var connection = this.CreateConnection(address, connectionContext);

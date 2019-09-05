@@ -1,6 +1,7 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Messaging;
@@ -43,7 +44,6 @@ namespace Orleans.Runtime.Messaging
                 this.messageFactory,
                 this.serviceProvider,
                 this.messageCenter,
-                this.gatewayManager,
                 this.trace,
                 this.connectionManager,
                 this.ConnectionOptions);
