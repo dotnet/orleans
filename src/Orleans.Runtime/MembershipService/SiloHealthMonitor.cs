@@ -77,12 +77,16 @@ namespace Orleans.Runtime.MembershipService
 
             var id = Interlocked.Increment(ref this.nextProbeId);
             var probeTask = this.PerformProbe(id, diagnosticProbeNumber, cancellation);
-            await Task.WhenAny(this.stopping, probeTask);
-            
-            return this.missedProbes;
+            var resultTask = await Task.WhenAny(this.stopping, probeTask);
+
+            // If the probe finished and the result was valid then return the number of missed probes.
+            if (ReferenceEquals(resultTask, probeTask) && probeTask.GetAwaiter().GetResult()) return this.missedProbes;
+
+            // The probe was superseded or the monitor is being shutdown.
+            return -1;
         }
 
-        private async Task PerformProbe(long id, int diagnosticProbeNumber, CancellationToken cancellation)
+        private async Task<bool> PerformProbe(long id, int diagnosticProbeNumber, CancellationToken cancellation)
         {
             try
             {
@@ -91,21 +95,21 @@ namespace Orleans.Runtime.MembershipService
 
                 if (ReferenceEquals(task, probeCancellation))
                 {
-                    this.RecordFailure(id, diagnosticProbeNumber, new OperationCanceledException("The ping attempt was cancelled"));
+                    return this.RecordFailure(id, diagnosticProbeNumber, new OperationCanceledException("The ping attempt was cancelled"));
                 }
                 else
                 {
                     await task;
-                    this.RecordSuccess(id, diagnosticProbeNumber);
+                    return this.RecordSuccess(id, diagnosticProbeNumber);
                 }
             }
             catch (Exception exception)
             {
-                this.RecordFailure(id, diagnosticProbeNumber, exception);
+                return this.RecordFailure(id, diagnosticProbeNumber, exception);
             }
         }
 
-        private void RecordSuccess(long id, int diagnosticProbeNumber)
+        private bool RecordSuccess(long id, int diagnosticProbeNumber)
         {
             if (this.log.IsEnabled(LogLevel.Trace))
             {
@@ -124,6 +128,7 @@ namespace Orleans.Runtime.MembershipService
                         this.SiloAddress,
                         this.highestCompletedProbeId,
                         id);
+                    return false;
                 }
                 else if (this.stoppingCancellation.IsCancellationRequested)
                 {
@@ -131,16 +136,18 @@ namespace Orleans.Runtime.MembershipService
                         "Ignoring success result for ping #{ProbeNumber} from {Silo} since this monitor has been stopped",
                         diagnosticProbeNumber,
                         this.SiloAddress);
+                    return false;
                 }
                 else
                 {
                     this.highestCompletedProbeId = id;
                     Interlocked.Exchange(ref this.missedProbes, 0);
+                    return true;
                 }
             }
         }
 
-        private void RecordFailure(long id, int diagnosticProbeNumber, Exception failureReason)
+        private bool RecordFailure(long id, int diagnosticProbeNumber, Exception failureReason)
         {
             if (this.log.IsEnabled(LogLevel.Trace))
             {
@@ -159,6 +166,7 @@ namespace Orleans.Runtime.MembershipService
                         this.SiloAddress,
                         this.highestCompletedProbeId,
                         id);
+                    return false;
                 }
                 else if (this.stoppingCancellation.IsCancellationRequested)
                 {
@@ -166,6 +174,7 @@ namespace Orleans.Runtime.MembershipService
                         "Ignoring failure result for ping #{ProbeNumber} from {Silo} since this monitor has been stopped",
                         diagnosticProbeNumber,
                         this.SiloAddress);
+                    return false;
                 }
                 else
                 {
@@ -182,6 +191,8 @@ namespace Orleans.Runtime.MembershipService
                     {
                         this.log.LogTrace("Current number of failed probes for {Silo}: {MissedProbes}", this.SiloAddress, missed);
                     }
+
+                    return true;
                 }
             }
         }
