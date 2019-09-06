@@ -3,7 +3,7 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.Pipelines;
 using System.Threading.Tasks;
-using Orleans.Networking.Shared;
+using Microsoft.AspNetCore.Connections;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging

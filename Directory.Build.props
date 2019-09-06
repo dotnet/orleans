@@ -47,21 +47,22 @@
     <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
 
     <SystemCollectionsImmutableVersion>1.4.0</SystemCollectionsImmutableVersion>
-    <SystemRuntimeCompilerServicesUnsafeVersion>4.5.2</SystemRuntimeCompilerServicesUnsafeVersion>
+    <SystemRuntimeCompilerServicesUnsafeVersion>4.6.0-preview9.19421.4</SystemRuntimeCompilerServicesUnsafeVersion>
     <SystemNetHttpVersion>4.3.4</SystemNetHttpVersion>
     <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
-    <SystemThreadingTasksExtensionsVersion>4.5.2</SystemThreadingTasksExtensionsVersion>
+    <SystemThreadingTasksExtensionsVersion>4.5.3</SystemThreadingTasksExtensionsVersion>
     <SystemThreadingChannelsVersion>4.5.0</SystemThreadingChannelsVersion>
     <SystemBuffersVersion>4.5.0</SystemBuffersVersion>
-    <SystemMemoryVersion>4.5.2</SystemMemoryVersion>
-    <SystemIOPipelinesVersion>4.5.3</SystemIOPipelinesVersion>
+    <SystemMemoryVersion>4.5.3</SystemMemoryVersion>
+    <SystemIOPipelinesVersion>4.6.0-preview9.19421.4</SystemIOPipelinesVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>2.8.2</MicrosoftCodeAnalysisVersion>
 
+    <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0-preview9.19424.4</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
     <MicrosoftExtensionsConfigurationBinderVersion>2.1.1</MicrosoftExtensionsConfigurationBinderVersion>
     <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.1.1</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
     <MicrosoftExtensionsConfigurationJsonVersion>2.1.1</MicrosoftExtensionsConfigurationJsonVersion>

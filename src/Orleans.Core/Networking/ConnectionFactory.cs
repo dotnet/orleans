@@ -2,9 +2,9 @@ using System;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Networking.Shared;
 
 namespace Orleans.Runtime.Messaging
 {

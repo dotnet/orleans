@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>NonSilo.Tests</RootNamespace>
     <AssemblyName>NonSilo.Tests</AssemblyName>
@@ -85,9 +85,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />
-    <PackageReference Include="System.IO.Pipelines" Version="$(SystemIOPipelinesVersion)" />
-    <PackageReference Include="System.Threading.Tasks.Extensions" Version="$(SystemThreadingTasksExtensionsVersion)" />
-    <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
     <DotNetCliToolReference Include="dotnet-xunit" Version="$(DotNetxUnitVersion)" />
     <PackageReference Include="NSubstitute" Version="$(NSubstituteVersion)" />
