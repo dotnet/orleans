@@ -13,7 +13,7 @@ namespace Orleans.Networking.Shared
         /// </remarks>
         public int IOQueueCount { get; set; } = Math.Min(Environment.ProcessorCount, 16);
 
-        public bool NoDelay { get; set; }
+        public bool NoDelay { get; set; } = true;
 
         internal Func<MemoryPool<byte>> MemoryPoolFactory { get; set; } = () => KestrelMemoryPool.Create();
     }
