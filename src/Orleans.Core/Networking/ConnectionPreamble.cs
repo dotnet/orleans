@@ -96,33 +96,39 @@ namespace Orleans.Runtime.Messaging
             }
 
             var payloadBuffer = buffer.Slice(0, length);
-            input.AdvanceTo(payloadBuffer.End);
 
-            var reader = new BinaryTokenStreamReader2(payloadBuffer);
-            var grainId = reader.ReadGrainId();
-
-            if (reader.Position >= payloadBuffer.Length)
+            try
             {
-                return (grainId, NetworkProtocolVersion.Version1, default);
+                var reader = new BinaryTokenStreamReader2(payloadBuffer);
+                var grainId = reader.ReadGrainId();
+
+                if (reader.Position >= payloadBuffer.Length)
+                {
+                    return (grainId, NetworkProtocolVersion.Version1, default);
+                }
+
+                var protocolVersion = (NetworkProtocolVersion)reader.ReadByte();
+
+                SiloAddress siloAddress;
+                var token = reader.ReadToken();
+                switch (token)
+                {
+                    case SerializationTokenType.Null:
+                        siloAddress = null;
+                        break;
+                    case SerializationTokenType.SiloAddress:
+                        siloAddress = reader.ReadSiloAddress();
+                        break;
+                    default:
+                        throw new NotSupportedException("Unexpected token while reading connection preamble. Expected SiloAddress, encountered " + token);
+                }
+
+                return (grainId, protocolVersion, siloAddress);
             }
-
-            var protocolVersion = (NetworkProtocolVersion)reader.ReadByte();
-
-            SiloAddress siloAddress;
-            var token = reader.ReadToken();
-            switch (token)
+            finally
             {
-                case SerializationTokenType.Null:
-                    siloAddress = null;
-                    break;
-                case SerializationTokenType.SiloAddress:
-                    siloAddress = reader.ReadSiloAddress();
-                    break;
-                default:
-                    throw new NotSupportedException("Unexpected token while reading connection preamble. Expected SiloAddress, encountered " + token);
+                input.AdvanceTo(payloadBuffer.End);
             }
-
-            return (grainId, protocolVersion, siloAddress);
 
             void CheckForCompletion(ref ReadResult r)
             {
