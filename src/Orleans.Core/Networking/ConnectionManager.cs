@@ -49,7 +49,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public Task Closed => closedTaskCompletionSource.Task;
+        public Task Closed => this.closedTaskCompletionSource.Task;
 
         public ImmutableArray<SiloAddress> GetConnectedAddresses() => this.connections.Keys.ToImmutableArray();
 
