@@ -74,7 +74,7 @@ namespace Orleans.Runtime.Messaging
         {
             lock (lockable)
             {
-                logger.LogInformation((int)ErrorCode.GatewayClientOpenedSocket, "Recorded opened connection from endpoint {EndPoint}, client ID {ClientId}.", connection.RemoteEndPoint, clientId);
+                logger.LogInformation((int)ErrorCode.GatewayClientOpenedSocket, "Recorded opened connection from endpoint {EndPoint}, client ID {ClientId}.", connection.RemoteEndpoint, clientId);
                 ClientState clientState;
                 if (clients.TryGetValue(clientId, out clientState))
                 {
@@ -111,7 +111,7 @@ namespace Orleans.Runtime.Messaging
                 logger.LogInformation(
                     (int)ErrorCode.GatewayClientClosedSocket,
                     "Recorded closed socket from endpoint {Endpoint}, client ID {clientId}.",
-                    connection.RemoteEndPoint?.ToString() ?? "null",
+                    connection.RemoteEndpoint?.ToString() ?? "null",
                     clientState.Id);
             }
         }
