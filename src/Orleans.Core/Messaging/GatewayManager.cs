@@ -141,7 +141,7 @@ namespace Orleans.Messaging
         /// <returns></returns>
         public SiloAddress GetLiveGateway()
         {
-            List<SiloAddress> live = GetLiveGateways();
+            IList<SiloAddress> live = GetLiveGateways();
             int count = live.Count;
             if (count > 0)
             {

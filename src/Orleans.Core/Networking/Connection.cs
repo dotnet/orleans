@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -21,7 +23,6 @@ namespace Orleans.Runtime.Messaging
             SingleWriter = false,
             AllowSynchronousContinuations = false
         };
-
         private readonly ConnectionDelegate middleware;
         private readonly IServiceProvider serviceProvider;
         private readonly Channel<Message> outgoingMessages;
@@ -44,18 +45,14 @@ namespace Orleans.Runtime.Messaging
 
             // Set the connection on the connection context so that it can be retrieved by the middleware.
             this.Context.Features.Set<Connection>(this);
-
-            this.RemoteEndPoint = NormalizeEndpoint(this.Context.RemoteEndPoint);
-            this.LocalEndPoint = NormalizeEndpoint(this.Context.LocalEndPoint);
             this.IsValid = true;
         }
 
         public ConnectionContext Context { get; }
         protected INetworkingTrace Log { get; }
         protected abstract IMessageCenter MessageCenter { get; }
-        public virtual EndPoint RemoteEndPoint { get; }
-        public virtual EndPoint LocalEndPoint { get; }
-
+        public virtual EndPoint RemoteEndpoint => this.Context.RemoteEndPoint;
+        public virtual EndPoint LocalEndpoint => this.Context.LocalEndPoint;
         public bool IsValid { get; private set; }
 
         public static void ConfigureBuilder(ConnectionBuilder builder) => builder.Run(OnConnectedDelegate);
@@ -117,20 +114,14 @@ namespace Orleans.Runtime.Messaging
         
         public void Close(ConnectionAbortedException exception = default)
         {
-            lock (this.lockObj)
+            if (this.Log.IsEnabled(LogLevel.Information))
             {
-                if (!this.IsValid) return;
-
-                if (this.Log.IsEnabled(LogLevel.Information))
-                {
-                    this.Log.LogInformation(
-                        "Closing connection with remote endpoint {EndPoint}. Stack = {Stack}",
-                        this.RemoteEndPoint,
-                        Environment.StackTrace);
-                }
-
-                this.CloseInternal(exception);
+                this.Log.LogInformation(
+                    "Closing connection with remote endpoint {EndPoint}",
+                    this.RemoteEndpoint);
             }
+
+            this.CloseInternal(exception);
         }
 
         /// <summary>
@@ -146,30 +137,32 @@ namespace Orleans.Runtime.Messaging
 
         private void CloseInternal(ConnectionAbortedException exception)
         {
-            lock (this.lockObj)
+            try
             {
-                try
+                if (!this.IsValid) return;
+
+                lock (this.lockObj)
                 {
                     if (!this.IsValid) return;
                     this.IsValid = false;
-
-                    // Try to gracefully stop the reader/writer loops.
-                    this.Context.Transport.Input.CancelPendingRead();
-                    this.Context.Transport.Output.CancelPendingFlush();
-                    this.outgoingMessageWriter.TryComplete();
-
-                    if (exception == null)
-                    {
-                        this.Context.Abort();
-                    }
-                    else
-                    {
-                        this.Context.Abort(exception);
-                    }
                 }
-                catch
+
+                // Try to gracefully stop the reader/writer loops.
+                this.Context.Transport.Input.CancelPendingRead();
+                this.Context.Transport.Output.CancelPendingFlush();
+                this.outgoingMessageWriter.TryComplete();
+
+                if (exception == null)
                 {
+                    this.Context.Abort();
                 }
+                else
+                {
+                    this.Context.Abort(exception);
+                }
+            }
+            catch
+            {
             }
         }
 
@@ -197,8 +190,8 @@ namespace Orleans.Runtime.Messaging
                 {
                     this.Log.LogDebug(
                         "Starting to process messages from remote endpoint {RemoteEndPoint} to local endpoint {LocalEndPoint}",
-                        this.RemoteEndPoint,
-                        this.LocalEndPoint);
+                        this.RemoteEndpoint,
+                        this.LocalEndpoint);
                 }
 
                 input = this.Context.Transport.Input;
@@ -227,8 +220,8 @@ namespace Orleans.Runtime.Messaging
                                 this.Log.LogWarning(
                                     "Exception reading message {Message} from remote endpoint {RemoteEndPoint} to local endpoint {LocalEndPoint}: {Exception}",
                                     message,
-                                    this.RemoteEndPoint,
-                                    this.LocalEndPoint,
+                                    this.RemoteEndpoint,
+                                    this.LocalEndpoint,
                                     exception);
 
                                 this.OnReceiveMessageFailure(message, exception);
@@ -241,15 +234,16 @@ namespace Orleans.Runtime.Messaging
                     input.AdvanceTo(buffer.Start, buffer.End);
                 }
             }
+            catch (ConnectionAbortedException) { }
             finally
             {
-                input?.Complete();
+                input.Complete();
 
                 if (this.Log.IsEnabled(LogLevel.Debug))
                 {
                     this.Log.LogDebug(
                         "Completed processing messages from remote endpoint {EndPoint}",
-                        this.RemoteEndPoint);
+                        this.RemoteEndpoint);
                 }
             }
         }
@@ -267,8 +261,8 @@ namespace Orleans.Runtime.Messaging
                 {
                     this.Log.LogDebug(
                         "Starting to process messages from local endpoint {LocalEndPoint} to remote endpoint {RemoteEndPoint}",
-                        this.LocalEndPoint,
-                        this.RemoteEndPoint);
+                        this.LocalEndpoint,
+                        this.RemoteEndpoint);
                 }
 
                 while (true)
@@ -293,7 +287,7 @@ namespace Orleans.Runtime.Messaging
                         this.Log.LogWarning(
                             "Exception writing message {Message} to remote endpoint {EndPoint}: {Exception}",
                             message,
-                            this.RemoteEndPoint,
+                            this.RemoteEndpoint,
                             exception);
                         this.OnMessageSerializationFailure(message, exception);
                     }
@@ -307,15 +301,16 @@ namespace Orleans.Runtime.Messaging
                     inflight.Clear();
                 }
             }
+            catch (ConnectionAbortedException) { }
             finally
             {
-                output?.Complete();
+                output.Complete();
 
                 if (this.Log.IsEnabled(LogLevel.Debug))
                 {
                     this.Log.LogDebug(
                         "Completed processing messages to remote endpoint {EndPoint}",
-                        this.RemoteEndPoint);
+                        this.RemoteEndpoint);
                 }
             }
         }
@@ -337,8 +332,8 @@ namespace Orleans.Runtime.Messaging
                     if (this.Log.IsEnabled(LogLevel.Information))
                     {
                         this.Log.LogInformation(
-                            "Rerouting messages for remote endpoint {EndPoint}",
-                            this.RemoteEndPoint?.ToString() ?? "(never connected)");
+                            "Rerouting messages from remote endpoint {EndPoint}",
+                            this.RemoteEndpoint?.ToString() ?? "(never connected)");
                     }
 
                     // Wait some time before re-sending the first time around.
@@ -352,9 +347,9 @@ namespace Orleans.Runtime.Messaging
             if (i > 0 && this.Log.IsEnabled(LogLevel.Information))
             {
                 this.Log.LogInformation(
-                    "Rerouted {Count} messages for remote endpoint {EndPoint}",
+                    "Rerouted {Count} messages from remote endpoint {EndPoint}",
                     i,
-                    this.RemoteEndPoint?.ToString() ?? "(never connected)");
+                    this.RemoteEndpoint?.ToString() ?? "(never connected)");
             }
         }
 
@@ -365,25 +360,12 @@ namespace Orleans.Runtime.Messaging
                 this.Log.LogDebug(
                     "Rerouting message {Message} from remote endpoint {EndPoint}",
                     message,
-                    this.RemoteEndPoint?.ToString() ?? "(never connected)");
+                    this.RemoteEndpoint?.ToString() ?? "(never connected)");
             }
 
             ThreadPool.UnsafeQueueUserWorkItem(
                 msg => this.RetryMessage((Message)msg),
                 message);
-        }
-
-        private static EndPoint NormalizeEndpoint(EndPoint endpoint)
-        {
-            if (!(endpoint is IPEndPoint ep)) return endpoint;
-
-            // Normalize endpoints
-            if (ep.Address.IsIPv4MappedToIPv6)
-            {
-                return new IPEndPoint(ep.Address.MapToIPv4(), ep.Port);
-            }
-
-            return ep;
         }
     }
 }
