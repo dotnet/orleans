@@ -21,6 +21,7 @@ namespace Orleans.Runtime.Messaging
         private readonly INetworkingTrace trace;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly object lockObj = new object();
+        private readonly TaskCompletionSource<int> closedTaskCompletionSource = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ConnectionManager(
             IOptions<ConnectionOptions> connectionOptions,
@@ -47,6 +48,8 @@ namespace Orleans.Runtime.Messaging
                 return count;
             }
         }
+
+        public Task Closed => closedTaskCompletionSource.Task;
 
         public ImmutableArray<SiloAddress> GetConnectedAddresses() => this.connections.Keys.ToImmutableArray();
 
@@ -332,6 +335,10 @@ namespace Orleans.Runtime.Messaging
             catch (Exception exception)
             {
                 this.trace?.LogWarning("Exception during shutdown: {Exception}", exception);
+            }
+            finally
+            {
+                this.closedTaskCompletionSource.TrySetResult(0);
             }
         }
 

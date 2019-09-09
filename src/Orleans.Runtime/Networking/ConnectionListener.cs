@@ -14,6 +14,7 @@ namespace Orleans.Runtime.Messaging
     internal abstract class ConnectionListener
     {
         private readonly IConnectionListenerFactory listenerFactory;
+        private readonly ConnectionManager connectionManager;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly ConcurrentDictionary<Connection, Task> connections = new ConcurrentDictionary<Connection, Task>(ReferenceEqualsComparer.Instance);
         private readonly INetworkingTrace trace;
@@ -25,10 +26,12 @@ namespace Orleans.Runtime.Messaging
             IServiceProvider serviceProvider,
             IConnectionListenerFactory listenerFactory,
             IOptions<ConnectionOptions> connectionOptions,
+            ConnectionManager connectionManager,
             INetworkingTrace trace)
         {
             this.ServiceProvider = serviceProvider;
             this.listenerFactory = listenerFactory;
+            this.connectionManager = connectionManager;
             this.ConnectionOptions = connectionOptions.Value;
             this.trace = trace;
         }
@@ -122,9 +125,9 @@ namespace Orleans.Runtime.Messaging
                         await connectionTask;
                     }
                 }
-                catch
+                catch (Exception exception)
                 {
-                    // Swallow exceptions here.
+                    this.trace.LogDebug(exception, "Connection {@Connection} terminated with an exception", connection);
                 }
                 finally
                 {
@@ -161,7 +164,7 @@ namespace Orleans.Runtime.Messaging
 
                 var cycles = 0;
                 var exception = new ConnectionAbortedException("Shutting down");
-                while (this.ConnectionCount > 0 && !cancellationToken.IsCancellationRequested)
+                while (this.ConnectionCount > 0)
                 {
                     foreach (var connection in this.connections.Keys.ToImmutableList())
                     {
@@ -175,11 +178,16 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     await Task.Delay(10);
+
+                    if (cancellationToken.IsCancellationRequested) break;
+
                     if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount > 0)
                     {
                         this.trace?.LogWarning("Waiting for {NumRemaining} connections to terminate", this.ConnectionCount);
                     }
                 }
+
+                await this.connectionManager.Closed;
 
                 await listenerStop;
                 if (this.listener != null)

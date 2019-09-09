@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Messaging
             IOptions<EndpointOptions> endpointOptions,
             ILocalSiloDetails localSiloDetails,
             ConnectionManager connectionManager)
-            : base(serviceProvider, listenerFactory, connectionOptions, trace)
+            : base(serviceProvider, listenerFactory, connectionOptions, connectionManager, trace)
         {
             this.messageCenter = messageCenter;
             this.messageFactory = messageFactory;

@@ -31,8 +31,9 @@ namespace Orleans.Runtime.Messaging
             ILocalSiloDetails localSiloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
             IOptions<EndpointOptions> endpointOptions,
-            MessageCenter messageCenter)
-            : base(serviceProvider, listenerFactory, connectionOptions, trace)
+            MessageCenter messageCenter,
+            ConnectionManager connectionManager)
+            : base(serviceProvider, listenerFactory, connectionOptions, connectionManager, trace)
         {
             this.messageFactory = messageFactory;
             this.overloadDetector = overloadDetector;
