@@ -181,6 +181,8 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        public override string ToString() => $"Local: {this.LocalEndPoint}, Remote: {this.RemoteEndPoint}, ConnectionId: {this.Context.ConnectionId}";
+
         protected abstract void OnReceivedMessage(Message message);
 
         protected abstract void OnReceiveMessageFailure(Message message, Exception exception);

@@ -130,6 +130,8 @@ namespace Orleans.Runtime.Messaging
         {
             lock (this.lockObj)
             {
+                this.trace.LogInformation("Connection {Connection} failed with {Silo}", address);
+
                 var entry = this.GetOrCreateEntry(address);
                 if (entry.LastFailure.HasValue)
                 {
@@ -153,6 +155,8 @@ namespace Orleans.Runtime.Messaging
         {
             lock (this.lockObj)
             {
+                this.trace.LogInformation("Connection {Connection} established with {Silo}", connection, address);
+
                 var entry = this.GetOrCreateEntry(address);
                 var newConnections = entry.Connections.Contains(connection) ? entry.Connections : entry.Connections.Add(connection);
                 entry.LastFailure = default;
@@ -166,6 +170,8 @@ namespace Orleans.Runtime.Messaging
 
             lock (this.lockObj)
             {
+                this.trace.LogInformation("Connection {Connection} terminated with silo {Silo}", connection, address);
+
                 if (this.connections.TryGetValue(address, out var entry))
                 {
                     entry.Connections = entry.Connections.Remove(connection);
@@ -220,6 +226,13 @@ namespace Orleans.Runtime.Messaging
                 var connection = await this.connectionFactory.ConnectAsync(address, openConnectionCancellation.Token)
                     .AsTask()
                     .WithCancellation(openConnectionCancellation.Token);
+
+                if (this.trace.IsEnabled(LogLevel.Information))
+                {
+                    this.trace.LogInformation(
+                        "Connected to endpoint {EndPoint}",
+                        address);
+                }
 
                 _ = Task.Run(async () =>
                 {
