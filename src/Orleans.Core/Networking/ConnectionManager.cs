@@ -242,7 +242,7 @@ namespace Orleans.Runtime.Messaging
                     }
                     else
                     {
-                        this.trace.LogInformation(
+                        this.trace.LogDebug(
                             "Connection to endpoint {EndPoint} closed",
                             address);
                     }
