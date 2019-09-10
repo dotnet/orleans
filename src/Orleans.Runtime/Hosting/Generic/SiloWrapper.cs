@@ -20,7 +20,7 @@ namespace Orleans.Hosting
             this.Stopped = silo.SiloTerminated;
 
             // It is fine for this field to be null in the case that the silo is not the host.
-            this.applicationLifetime = services.GetService<IApplicationLifetime>() as SiloApplicationLifetime;
+            this.applicationLifetime = services.GetService<IHostApplicationLifetime>() as SiloApplicationLifetime;
         }
 
         /// <inheritdoc />

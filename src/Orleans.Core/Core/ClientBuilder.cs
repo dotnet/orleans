@@ -51,7 +51,7 @@ namespace Orleans
                     services.AddSingleton(this.hostingEnvironment);
                     services.AddSingleton(this.hostBuilderContext);
                     services.AddSingleton(this.appConfiguration);
-                    services.AddSingleton<IApplicationLifetime, ClientApplicationLifetime>();
+                    services.AddSingleton<IHostApplicationLifetime, ClientApplicationLifetime>();
                     services.AddOptions();
                     services.AddLogging();
                 });
