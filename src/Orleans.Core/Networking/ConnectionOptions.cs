@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Orleans.Networking.Shared;
+using Microsoft.AspNetCore.Connections;
 using Orleans.Runtime.Messaging;
 
 namespace Orleans.Configuration

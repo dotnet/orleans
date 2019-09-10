@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <PackageReference Include="System.Data.Common" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Memory" Version="$(SystemMemoryVersion)" />
   </ItemGroup>
 
   <ItemGroup>

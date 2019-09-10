@@ -2,10 +2,10 @@ using System;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
-using Orleans.Networking.Shared;
 
 namespace Orleans.Runtime.Messaging
 {

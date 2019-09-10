@@ -39,6 +39,7 @@ using System.Reflection;
 using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
+using Microsoft.AspNetCore.Connections;
 using Orleans.Networking.Shared;
 
 namespace Orleans.Hosting
