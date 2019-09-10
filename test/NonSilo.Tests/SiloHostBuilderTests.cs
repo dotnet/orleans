@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
@@ -73,11 +74,17 @@ namespace NonSilo.Tests
         public void SiloBuilderTest()
         {
             var host = new HostBuilder()
-                .UseOrleans(siloBuilder =>
+                .UseOrleans((ctx, siloBuilder) =>
                 {
                     siloBuilder
+                        .UseLocalhostClustering()
                         .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
                         .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
+                })
+                .UseDefaultServiceProvider((context, options) =>
+                {
+                    options.ValidateScopes = true;
+                    options.ValidateOnBuild = true;
                 })
                 .Build();
 
