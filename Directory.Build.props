@@ -60,7 +60,7 @@
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>2.8.2</MicrosoftCodeAnalysisVersion>
+    <MicrosoftCodeAnalysisVersion>3.3.1-beta3-final</MicrosoftCodeAnalysisVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0-preview9.19424.4</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
     <MicrosoftExtensionsConfigurationBinderVersion>2.1.1</MicrosoftExtensionsConfigurationBinderVersion>
