@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>AWSUtils.Tests</RootNamespace>
     <AssemblyName>AWSUtils.Tests</AssemblyName>
@@ -18,7 +18,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\AWS\OrleansAWSUtils\OrleansAWSUtils.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Clustering.DynamoDB\Orleans.Clustering.DynamoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Persistence.DynamoDB\Orleans.Persistence.DynamoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Reminders.DynamoDB\Orleans.Reminders.DynamoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Streaming.SQS\Orleans.Streaming.SQS.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
