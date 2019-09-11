@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>Tester.AdoNet</RootNamespace>
     <AssemblyName>Tester.AdoNet</AssemblyName>
@@ -34,7 +34,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\AdoNet\OrleansSQLUtils\OrleansSQLUtils.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\Orleans.Reminders.AdoNet.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
