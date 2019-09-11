@@ -48,12 +48,11 @@ namespace Orleans.Runtime.Messaging
             var requestContext = msg.RequestContextData;
             if (requestContext != null &&
                 requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out var pingObj) &&
-                pingObj is bool &&
-                (bool)pingObj)
+                pingObj is int pingNumber)
             {
                 MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
 
-                if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.Trace("Responding to Ping from {0}", msg.SendingSilo);
+                if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.LogTrace("Responding to Ping #{PingNumber} from {Silo}", pingNumber, msg.SendingSilo);
 
                 if (!msg.TargetSilo.Equals(messageCenter.MyAddress)) // got ping that is not destined to me. For example, got a ping to my older incarnation.
                 {

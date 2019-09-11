@@ -30,7 +30,7 @@ namespace Orleans.Configuration
         public TimeSpan OpenConnectionTimeout { get; set; } = DEFAULT_OPENCONNECTION_TIMEOUT;
         public static readonly TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT = TimeSpan.FromSeconds(5);
 
-        internal void ConfigureConnection(Action<IConnectionBuilder> configure) => this.connectionBuilder.Add(configure);
+        public void ConfigureConnection(Action<IConnectionBuilder> configure) => this.connectionBuilder.Add(configure);
 
         internal void ConfigureConnectionBuilder(IConnectionBuilder builder) => this.connectionBuilder.Invoke(builder);
 

@@ -104,8 +104,10 @@ namespace Orleans.Runtime.Messaging
             {
                 // Swallow any exceptions here.
             }
-
-            _ = this.RerouteMessages();
+            finally
+            {
+                _ = this.RerouteMessages();
+            }
         }
 
         protected virtual async Task RunInternal()
@@ -260,7 +262,6 @@ namespace Orleans.Runtime.Messaging
         {
             PipeWriter output = default;
             var serializer = this.serviceProvider.GetRequiredService<IMessageSerializer>();
-            var connectionClosed = this.Context.ConnectionClosed;
             try
             {
                 output = this.Context.Transport.Output;
@@ -301,7 +302,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     var flushResult = await output.FlushAsync();
-                    if (flushResult.IsCompleted || flushResult.IsCanceled || connectionClosed.IsCancellationRequested)
+                    if (flushResult.IsCompleted || flushResult.IsCanceled)
                     {
                         break;
                     }
