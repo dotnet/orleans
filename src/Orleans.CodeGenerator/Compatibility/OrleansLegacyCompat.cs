@@ -414,7 +414,7 @@ namespace Orleans.CodeGenerator.Compatibility
                 return true;
             }
 
-            if (type.IsGenericType && type.GetNestedHierarchy().All(t => t.ConstructedFrom == t))
+            if (type.IsGenericType && type.GetNestedHierarchy().All(t => t.ConstructedFrom.Equals(t)))
             {
                 typeParamsLength = type.GetHierarchyTypeArguments().Count();
                 return true;
