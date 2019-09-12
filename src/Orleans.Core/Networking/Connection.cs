@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -55,6 +56,9 @@ namespace Orleans.Runtime.Messaging
         protected abstract IMessageCenter MessageCenter { get; }
         public virtual EndPoint RemoteEndPoint { get; }
         public virtual EndPoint LocalEndPoint { get; }
+        protected CounterStatistic MessageReceivedCounter { get; set; }
+        protected CounterStatistic MessageSentCounter { get; set; }
+        protected abstract ConnectionDirection ConnectionDirection { get; }
 
         public bool IsValid { get; private set; }
 
@@ -219,9 +223,11 @@ namespace Orleans.Runtime.Messaging
                         {
                             try
                             {
-                                requiredBytes = serializer.TryRead(ref buffer, out message);
+                                int headerLength, bodyLength;
+                                (requiredBytes, headerLength, bodyLength) = serializer.TryRead(ref buffer, out message);
                                 if (requiredBytes == 0)
                                 {
+                                    MessagingStatisticsGroup.OnMessageReceive(this.MessageReceivedCounter, message, bodyLength + headerLength, headerLength, this.ConnectionDirection);
                                     this.OnReceivedMessage(message);
                                     message = null;
                                 }
@@ -288,7 +294,8 @@ namespace Orleans.Runtime.Messaging
                         while (inflight.Count < inflight.Capacity && reader.TryRead(out message) && this.PrepareMessageForSend(message))
                         {
                             inflight.Add(message);
-                            serializer.Write(ref output, message);
+                            var (headerLength, bodyLength) = serializer.Write(ref output, message);
+                            MessagingStatisticsGroup.OnMessageSend(this.MessageSentCounter, message, headerLength + bodyLength, headerLength, this.ConnectionDirection);
                         }
                     }
                     catch (Exception exception) when (message != default)

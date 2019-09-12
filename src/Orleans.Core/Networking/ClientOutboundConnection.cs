@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -33,11 +34,15 @@ namespace Orleans.Runtime.Messaging
             this.connectionManager = connectionManager;
             this.connectionOptions = connectionOptions;
             this.RemoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
+            this.MessageReceivedCounter = MessagingStatisticsGroup.GetMessageReceivedCounter(this.RemoteSiloAddress);
+            this.MessageSentCounter = MessagingStatisticsGroup.GetMessageSendCounter(this.RemoteSiloAddress);
         }
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
         
         public SiloAddress RemoteSiloAddress { get; }
+
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.ClientToGateway;
 
         protected override void OnReceivedMessage(Message message)
         {
@@ -66,6 +71,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunInternal()
         {
+            Exception error = default;
             try
             {
                 this.messageCenter.OnGatewayConnectionOpen();
@@ -87,9 +93,13 @@ namespace Orleans.Runtime.Messaging
 
                 await base.RunInternal();
             }
+            catch (Exception exception) when ((error = exception) is null)
+            {
+                Debug.Fail("Execution should not be able to reach this point.");
+            }
             finally
             {
-                this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this);
+                this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this, error);
                 this.messageCenter.OnGatewayConnectionClosed();
             }
         }

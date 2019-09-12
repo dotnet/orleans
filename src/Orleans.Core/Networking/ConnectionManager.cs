@@ -130,8 +130,6 @@ namespace Orleans.Runtime.Messaging
         {
             lock (this.lockObj)
             {
-                this.trace.LogInformation("Connection {Connection} failed with {Silo}", address);
-
                 var entry = this.GetOrCreateEntry(address);
                 if (entry.LastFailure.HasValue)
                 {
@@ -155,23 +153,21 @@ namespace Orleans.Runtime.Messaging
         {
             lock (this.lockObj)
             {
-                this.trace.LogInformation("Connection {Connection} established with {Silo}", connection, address);
-
                 var entry = this.GetOrCreateEntry(address);
                 var newConnections = entry.Connections.Contains(connection) ? entry.Connections : entry.Connections.Add(connection);
                 entry.LastFailure = default;
                 entry.Connections = newConnections;
             }
+
+            this.trace.LogInformation("Connection {Connection} established with {Silo}", connection, address);
         }
 
-        public void OnConnectionTerminated(SiloAddress address, Connection connection)
+        public void OnConnectionTerminated(SiloAddress address, Connection connection, Exception exception)
         {
             if (connection is null) return;
 
             lock (this.lockObj)
             {
-                this.trace.LogInformation("Connection {Connection} terminated with silo {Silo}", connection, address);
-
                 if (this.connections.TryGetValue(address, out var entry))
                 {
                     entry.Connections = entry.Connections.Remove(connection);
@@ -187,6 +183,22 @@ namespace Orleans.Runtime.Messaging
                         if (!c.IsValid) entry.Connections = entry.Connections.Remove(c);
                     }
                 }
+            }
+
+            if (exception != null)
+            {
+                this.trace.LogWarning(
+                    "Connection {Connection} to endpoint {EndPoint} terminated with exception {Exception}",
+                    connection,
+                    address,
+                    exception);
+            }
+            else
+            {
+                this.trace.LogDebug(
+                    "Connection {Connection} to endpoint {EndPoint} closed",
+                    connection,
+                    address);
             }
         }
 
@@ -249,21 +261,7 @@ namespace Orleans.Runtime.Messaging
                         error = exception;
                     }
 
-                    this.OnConnectionTerminated(address, connection);
-
-                    if (error != null)
-                    {
-                        this.trace.LogWarning(
-                            "Connection to endpoint {EndPoint} terminated with exception {Exception}",
-                            address,
-                            error);
-                    }
-                    else
-                    {
-                        this.trace.LogDebug(
-                            "Connection to endpoint {EndPoint} closed",
-                            address);
-                    }
+                    this.OnConnectionTerminated(address, connection, error);
                 });
 
                 this.OnConnected(address, connection);

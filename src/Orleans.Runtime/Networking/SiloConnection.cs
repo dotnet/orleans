@@ -1,10 +1,13 @@
 using System;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -42,17 +45,24 @@ namespace Orleans.Runtime.Messaging
 
         public SiloAddress LocalSiloAddress { get; }
 
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+
         protected override void OnReceivedMessage(Message msg)
         {
             // See it's a Ping message, and if so, short-circuit it
             var requestContext = msg.RequestContextData;
             if (requestContext != null &&
                 requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out var pingObj) &&
-                pingObj is int pingNumber)
+                pingObj is bool isPing
+                && isPing)
             {
                 MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
 
-                if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.LogTrace("Responding to Ping #{PingNumber} from {Silo}", pingNumber, msg.SendingSilo);
+                if (this.Log.IsEnabled(LogLevel.Trace))
+                {
+                    var objectId = RuntimeHelpers.GetHashCode(msg);
+                    this.Log.LogTrace("Responding to Ping from {Silo} with object id {ObjectId}. Message {Message}", msg.SendingSilo, objectId, msg);
+                }
 
                 if (!msg.TargetSilo.Equals(messageCenter.MyAddress)) // got ping that is not destined to me. For example, got a ping to my older incarnation.
                 {
@@ -159,6 +169,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunInternal()
         {
+            Exception error = default;
             try
             {
                 if (this.connectionOptions.ProtocolVersion == NetworkProtocolVersion.Version1)
@@ -203,11 +214,20 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
 
+                this.MessageReceivedCounter = MessagingStatisticsGroup.GetMessageReceivedCounter(this.RemoteSiloAddress);
+                this.MessageSentCounter = MessagingStatisticsGroup.GetMessageSendCounter(this.RemoteSiloAddress);
                 await base.RunInternal();
+            }
+            catch (Exception exception) when ((error = exception) is null)
+            {
+                Debug.Fail("Execution should not be able to reach this point.");
             }
             finally
             {
-                if (!(this.RemoteSiloAddress is null)) this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this);
+                if (!(this.RemoteSiloAddress is null))
+                {
+                    this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this, error);
+                }
             }
 
             async Task WritePreamble()

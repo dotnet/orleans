@@ -144,7 +144,8 @@ namespace UnitTests.Serialization
 
             pipe.Reader.TryRead(out var readResult);
             var reader = readResult.Buffer;
-            Assert.Equal(0, this.messageSerializer.TryRead(ref reader, out var deserializedMessage));
+            var (requiredBytes, _, _) = this.messageSerializer.TryRead(ref reader, out var deserializedMessage);
+            Assert.Equal(0, requiredBytes);
             return deserializedMessage;
         }
 
