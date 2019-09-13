@@ -10,31 +10,16 @@ namespace Orleans.Streams
     [Serializable]
     public abstract class StreamSequenceToken : IEquatable<StreamSequenceToken>, IComparable<StreamSequenceToken>
     {
-        /// <summary>
-        /// Number of event batches in stream prior to this event batch
-        /// </summary>
-        public abstract long SequenceNumber { get; protected set;  }
+        public abstract byte[] SequenceToken { get; }
 
-        /// <summary>
-        /// Number of events in batch prior to this event
-        /// </summary>
-        public abstract int EventIndex { get; protected set; }
+        public virtual bool Equals(StreamSequenceToken other) => new ReadOnlySpan<byte>(this.SequenceToken).SequenceEqual(other.SequenceToken);
 
-        public abstract bool Equals(StreamSequenceToken other);
-
-        public abstract int CompareTo(StreamSequenceToken other);
+        public virtual int CompareTo(StreamSequenceToken other) => new ReadOnlySpan<byte>(this.SequenceToken).SequenceCompareTo(other.SequenceToken);
     }
 
     public static class StreamSequenceTokenUtilities
     {
-        static public bool Newer(this StreamSequenceToken me, StreamSequenceToken other)
-        {
-            return me.CompareTo(other) > 0;
-        }
-
-        static public bool Older(this StreamSequenceToken me, StreamSequenceToken other)
-        {
-            return me.CompareTo(other) < 0;
-        }
+        static public bool Newer(this StreamSequenceToken me, StreamSequenceToken other) => me.CompareTo(other) > 0;
+        static public bool Older(this StreamSequenceToken me, StreamSequenceToken other) => me.CompareTo(other) < 0;
     }
 }

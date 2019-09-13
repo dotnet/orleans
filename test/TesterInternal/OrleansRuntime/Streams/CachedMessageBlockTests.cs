@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using Xunit;
@@ -9,6 +10,7 @@ namespace UnitTests.OrleansRuntime.Streams
 {
     public class CachedMessageBlockTests
     {
+        private static byte[] offsetToken = new byte[0];
         private const int TestBlockSize = 100;
         private readonly Guid StreamGuid = Guid.NewGuid();
 
@@ -42,18 +44,14 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private class TestCacheDataAdapter : ICacheDataAdapter
         {
-            public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
+            public IBatchContainer GetBatchContainer(in CachedMessage cachedMessage)
             {
+                StreamIdentityToken streamIdentiyToken = new StreamIdentityToken(cachedMessage.StreamIdToken().ToArray());
                 return new TestBatchContainer()
                 {
-                    StreamGuid = cachedMessage.StreamGuid,
-                    SequenceToken = new EventSequenceToken(cachedMessage.SequenceNumber, cachedMessage.EventIndex)
+                    StreamGuid = streamIdentiyToken.Guid,
+                    SequenceToken = new EventSequenceTokenV2(cachedMessage.SequenceToken().ToArray())
                 };
-            }
-
-            public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
-            {
-                return new EventSequenceTokenV2(cachedMessage.SequenceNumber, cachedMessage.EventIndex);
             }
         }
 
@@ -67,24 +65,21 @@ namespace UnitTests.OrleansRuntime.Streams
         private CachedMessage QueueMessageToCachedMessage(TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
         {
             StreamPosition streamPosition = GetStreamPosition(queueMessage);
-            return new CachedMessage
-            {
-                StreamGuid = streamPosition.StreamIdentity.Guid,
-                SequenceNumber = queueMessage.SequenceToken.SequenceNumber,
-                EventIndex = queueMessage.SequenceToken.EventIndex,
-            };
+            return CachedMessage.Create(
+                streamPosition.SequenceToken.SequenceToken,
+                StreamIdentityToken.Create(streamPosition.StreamIdentity),
+                offsetToken,
+                offsetToken,
+                dequeueTimeUtc - TimeSpan.FromSeconds(1),
+                dequeueTimeUtc,
+                (size) => new ArraySegment<byte>(new byte[size]));
         }
 
         private class MyTestPooled : IObjectPool<CachedMessageBlock>
         {
             public CachedMessageBlock Allocate()
-            {
-                return new CachedMessageBlock(TestBlockSize){Pool = this};
-            }
-
-            public void Free(CachedMessageBlock resource)
-            {
-            }
+                => new CachedMessageBlock(TestBlockSize) { Pool = this };
+            public void Free(CachedMessageBlock resource) {}
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -145,12 +140,12 @@ namespace UnitTests.OrleansRuntime.Streams
                 last++;
                 sequenceNumber += 2;
             }
-            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(0)));
-            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(1)));
-            Assert.Equal(block.NewestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber - 2)));
-            Assert.Equal(block.NewestMessageIndex - 1, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber - 3)));
-            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber / 2)));
-            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(new EventSequenceTokenV2(sequenceNumber / 2 + 1)));
+            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(EventSequenceToken.GenerateToken(0,0)));
+            Assert.Equal(block.OldestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(EventSequenceToken.GenerateToken(1, 0)));
+            Assert.Equal(block.NewestMessageIndex, block.GetIndexOfFirstMessageLessThanOrEqualTo(EventSequenceToken.GenerateToken(sequenceNumber - 2, 0)));
+            Assert.Equal(block.NewestMessageIndex - 1, block.GetIndexOfFirstMessageLessThanOrEqualTo(EventSequenceToken.GenerateToken(sequenceNumber - 3, 0)));
+            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(EventSequenceToken.GenerateToken(sequenceNumber/2, 0)));
+            Assert.Equal(50, block.GetIndexOfFirstMessageLessThanOrEqualTo(EventSequenceToken.GenerateToken(sequenceNumber / 2 + 1, 0)));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -182,31 +177,35 @@ namespace UnitTests.OrleansRuntime.Streams
 
             // get index of first stream
             int streamIndex;
-            Assert.True(block.TryFindFirstMessage(streams[0], dataAdapter, out streamIndex));
+            Assert.True(block.TryFindFirstMessage(StreamIdentityToken.Create(streams[0]), out streamIndex));
             Assert.Equal(0, streamIndex);
-            Assert.Equal(0, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
+            EventSequenceToken.Parse(block.GetSequenceToken(streamIndex).ToArray(), out long seqNum, out int ignore);
+            Assert.Equal(0, seqNum);
 
             // find stream1 messages
             int iteration = 1;
-            while (block.TryFindNextMessage(streamIndex + 1, streams[0], dataAdapter, out streamIndex))
+            while (block.TryFindNextMessage(streamIndex + 1, StreamIdentityToken.Create(streams[0]), out streamIndex))
             {
                 Assert.Equal(iteration * 2, streamIndex);
-                Assert.Equal(iteration * 4, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
+                EventSequenceToken.Parse(block.GetSequenceToken(streamIndex).ToArray(), out seqNum, out ignore);
+                Assert.Equal(iteration * 4, seqNum);
                 iteration++;
             }
             Assert.Equal(iteration, TestBlockSize / 2);
 
             // get index of first stream
-            Assert.True(block.TryFindFirstMessage(streams[1], dataAdapter, out streamIndex));
+            Assert.True(block.TryFindFirstMessage(StreamIdentityToken.Create(streams[1]), out streamIndex));
             Assert.Equal(1, streamIndex);
-            Assert.Equal(2, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
+            EventSequenceToken.Parse(block.GetSequenceToken(streamIndex).ToArray(), out seqNum, out ignore);
+            Assert.Equal(2, seqNum);
 
             // find stream1 messages
             iteration = 1;
-            while (block.TryFindNextMessage(streamIndex + 1, streams[1], dataAdapter, out streamIndex))
+            while (block.TryFindNextMessage(streamIndex + 1, StreamIdentityToken.Create(streams[1]), out streamIndex))
             {
                 Assert.Equal(iteration * 2 + 1, streamIndex);
-                Assert.Equal(iteration * 4 + 2, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
+                EventSequenceToken.Parse(block.GetSequenceToken(streamIndex).ToArray(), out seqNum, out ignore);
+                Assert.Equal(iteration * 4 + 2, seqNum);
                 iteration++;
             }
             Assert.Equal(iteration, TestBlockSize / 2);
@@ -236,7 +235,9 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal(first, block.OldestMessageIndex);
             Assert.Equal(last, block.NewestMessageIndex);
 
-            Assert.True(block.GetSequenceToken(last, dataAdapter).Equals(message.SequenceToken));
+            EventSequenceToken.Parse(block.GetSequenceToken(last).ToArray(), out long seqNum, out int ignore);
+
+            Assert.True(seqNum.Equals(message.SequenceToken.SequenceNumber));
         }
 
         private void RemoveAndCheck(CachedMessageBlock block, int first, int last)

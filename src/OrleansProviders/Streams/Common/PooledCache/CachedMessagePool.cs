@@ -12,8 +12,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Allocates a pool of cached message blocks.
         /// </summary>
-        /// <param name="cacheDataAdapter"></param>
-        public CachedMessagePool(ICacheDataAdapter cacheDataAdapter)
+        public CachedMessagePool()
         {
             messagePool = new ObjectPool<CachedMessageBlock>(
                 () => new CachedMessageBlock());
@@ -23,15 +22,15 @@ namespace Orleans.Providers.Streams.Common
         /// Allocates a message in a block and returns the block the message is in.
         /// </summary>
         /// <returns></returns>
-        public CachedMessageBlock AllocateMessage(CachedMessage message)
+        public CachedMessageBlock AllocateMessage(in CachedMessage message)
         {
-            CachedMessageBlock returnBlock = currentMessageBlock ?? (currentMessageBlock = messagePool.Allocate());
+            CachedMessageBlock returnBlock = this.currentMessageBlock ?? (this.currentMessageBlock = this.messagePool.Allocate());
             returnBlock.Add(message);
 
             // blocks at capacity are eligable for purge, so we don't want to be holding on to them.
-            if (!currentMessageBlock.HasCapacity)
+            if (!this.currentMessageBlock.HasCapacity)
             {
-                currentMessageBlock = messagePool.Allocate();
+                this.currentMessageBlock = this.messagePool.Allocate();
             }
 
             return returnBlock;

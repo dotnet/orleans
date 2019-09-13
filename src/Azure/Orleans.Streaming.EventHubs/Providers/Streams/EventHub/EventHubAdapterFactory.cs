@@ -24,7 +24,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Data adapter
         /// </summary>
-        protected readonly IEventHubDataAdapter dataAdapter;
+        protected readonly EventHubDataAdapter dataAdapter;
 
         /// <summary>
         /// Orleans logging
@@ -113,7 +113,7 @@ namespace Orleans.ServiceBus.Providers
             EventHubStreamCachePressureOptions cacheOptions, 
             StreamCacheEvictionOptions cacheEvictionOptions,
             StreamStatisticOptions statisticOptions,
-            IEventHubDataAdapter dataAdapter,
+            EventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
             SerializationManager serializationManager,
             ITelemetryProducer telemetryProducer,
@@ -313,8 +313,8 @@ namespace Orleans.ServiceBus.Providers
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
-            IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
-                ?? services.GetService<IEventHubDataAdapter>()
+            EventHubDataAdapter dataAdapter = services.GetServiceByName<EventHubDataAdapter>(name)
+                ?? services.GetService<EventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
             var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter);
             factory.Init();

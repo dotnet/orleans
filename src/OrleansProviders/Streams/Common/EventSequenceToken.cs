@@ -1,5 +1,6 @@
 using System;
-using System.Globalization;
+using System.Linq;
+using System.Net;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -13,12 +14,17 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Number of event batches in stream prior to this event batch
         /// </summary>
-        public override long SequenceNumber { get; protected set; }
+        public long SequenceNumber { get; protected set; }
 
         /// <summary>
         /// Number of events in batch prior to this event
         /// </summary>
-        public override int EventIndex { get; protected set; }
+        public int EventIndex { get; protected set; }
+
+        [NonSerialized] // not serialized to prevent breaking backwards compatability with earlier version
+        private byte[] sequenceToken;
+        public override byte[] SequenceToken
+            => this.sequenceToken ?? (this.sequenceToken = GenerateToken(this.SequenceNumber, this.EventIndex));
 
         /// <summary>
         /// Sequence token constructor
@@ -26,8 +32,8 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="seqNumber"></param>
         public EventSequenceToken(long seqNumber)
         {
-            SequenceNumber = seqNumber;
-            EventIndex = 0;
+            this.SequenceNumber = seqNumber;
+            this.EventIndex = 0;
         }
 
         /// <summary>
@@ -37,8 +43,8 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="eventInd"></param>
         public EventSequenceToken(long seqNumber, int eventInd)
         {
-            SequenceNumber = seqNumber;
-            EventIndex = eventInd;
+            this.SequenceNumber = seqNumber;
+            this.EventIndex = eventInd;
         }
 
         /// <summary>
@@ -47,73 +53,36 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="eventInd"></param>
         /// <returns></returns>
         public EventSequenceToken CreateSequenceTokenForEvent(int eventInd)
-        {
-            return new EventSequenceToken(SequenceNumber, eventInd);
-        }
-
-        /// <summary>
-        /// Determines whether the specified object is equal to the current object.
-        /// </summary>
-        /// <returns>
-        /// true if the specified object  is equal to the current object; otherwise, false.
-        /// </returns>
-        /// <param name="obj">The object to compare with the current object. </param><filterpriority>2</filterpriority>
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as EventSequenceToken);
-        }
-
-        /// <summary>
-        /// Indicates whether the current object is equal to another object of the same type.
-        /// </summary>
-        /// <returns>
-        /// true if the current object is equal to the <paramref name="other"/> parameter; otherwise, false.
-        /// </returns>
-        /// <param name="other">An object to compare with this object.</param>
-        public override bool Equals(StreamSequenceToken other)
-        {
-            var token = other as EventSequenceToken;
-            return token != null && (token.SequenceNumber == SequenceNumber &&
-                                     token.EventIndex == EventIndex);
-        }
-
-        /// <summary>
-        /// Compares the current object with another object of the same type.
-        /// </summary>
-        /// <returns>
-        /// A value that indicates the relative order of the objects being compared. The return value has the following meanings: Value Meaning Less than zero This object is less than the <paramref name="other"/> parameter.Zero This object is equal to <paramref name="other"/>. Greater than zero This object is greater than <paramref name="other"/>. 
-        /// </returns>
-        /// <param name="other">An object to compare with this object.</param>
-        public override int CompareTo(StreamSequenceToken other)
-        {
-            if (other == null)
-                return 1;
-            
-            var token = other as EventSequenceToken;
-            if (token == null)
-                throw new ArgumentOutOfRangeException("other");
-            
-            int difference = SequenceNumber.CompareTo(token.SequenceNumber);
-            return difference != 0 ? difference : EventIndex.CompareTo(token.EventIndex);
-        }
+            => new EventSequenceToken(this.SequenceNumber, eventInd);
 
         /// <summary>
         /// GetHashCode method for current EventSequenceToken
         /// </summary>
         /// <returns> Hash code for current EventSequenceToken object </returns>
         public override int GetHashCode()
-        {
-            // why 397?
-            return (EventIndex * 397) ^ SequenceNumber.GetHashCode();
-        }
+            => (this.EventIndex * 397) ^ this.SequenceNumber.GetHashCode();
 
         /// <summary>
         /// ToString method
         /// </summary>
         /// <returns> A string which represent current EventSequenceToken object </returns>
         public override string ToString()
+            => $"[EventSequenceToken: SeqNum={this.SequenceNumber}, EventIndex={this.EventIndex}]";
+
+        public static byte[] GenerateToken(long sequenceNumber, int eventIndex)
         {
-            return string.Format(CultureInfo.InvariantCulture, "[EventSequenceToken: SeqNum={0}, EventIndex={1}]", SequenceNumber, EventIndex);
+            byte[] sequenceNumberBytes = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(sequenceNumber));
+            byte[] eventIndexBytes = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(eventIndex));
+            byte[] tokenBytes = new byte[sequenceNumberBytes.Length + eventIndexBytes.Length];
+            sequenceNumberBytes.CopyTo(tokenBytes, 0);
+            eventIndexBytes.CopyTo(tokenBytes, sequenceNumberBytes.Length);
+            return tokenBytes;
+        }
+
+        public static void Parse(byte[] token, out long sequenceNumber, out int eventIndex)
+        {
+            sequenceNumber = IPAddress.NetworkToHostOrder(BitConverter.ToInt64(token, 0));
+            eventIndex = IPAddress.NetworkToHostOrder(BitConverter.ToInt32(token, sizeof(long)));
         }
     }
 }

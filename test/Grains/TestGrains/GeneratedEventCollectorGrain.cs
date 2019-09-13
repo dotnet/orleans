@@ -21,14 +21,14 @@ namespace TestGrains
         private IAsyncStream<GeneratedEvent> stream;
         private int accumulated;
 
-        public GeneratedEventCollectorGrain(ILoggerFactory loggerFactory)
+        public GeneratedEventCollectorGrain(ILogger<GeneratedEventCollectorGrain> logger)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            this.logger = logger;
         }
 
         public override async Task OnActivateAsync()
         {
-            logger.Info("OnActivateAsync");
+            logger.Info($"{this.IdentityString} - OnActivateAsync");
 
             var streamProvider = GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(this.GetPrimaryKey(), StreamNamespace);
@@ -50,11 +50,13 @@ namespace TestGrains
         public Task OnNextAsync(IList<SequentialItem<GeneratedEvent>> items)
         {
             this.accumulated += items.Count;
-            logger.Info("Received {Count} generated event.  Accumulated {Accumulated} events so far.", items.Count, this.accumulated);
-            if (items.Last().Item.EventType == GeneratedEvent.GeneratedEventType.Fill)
+            var last = items.Last();
+            this.logger.Info("{Identity} - Received {Count} generated event with last token {Token}.  Accumulated {Accumulated} events so far.", this.IdentityString, items.Count, last.Token, this.accumulated);
+            if (last.Item.EventType == GeneratedEvent.GeneratedEventType.Fill)
             {
                 return Task.CompletedTask;
             }
+            this.logger.Info("{Identity} - Received report event.  Total acccumulated: {Accumulated}.", this.IdentityString, this.accumulated);
             var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
             return reporter.ReportResult(this.GetPrimaryKey(), GeneratedStreamTestConstants.StreamProviderName, StreamNamespace, this.accumulated);
         }

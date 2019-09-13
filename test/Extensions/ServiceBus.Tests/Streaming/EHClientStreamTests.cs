@@ -68,8 +68,7 @@ namespace ServiceBus.Tests.StreamingTests
                                 options.PersistInterval = TimeSpan.FromSeconds(10);
                             }));
                     })
-                    .AddMemoryGrainStorage("PubSubStore")
-                    .ConfigureServices(services => services.TryAddSingleton<IEventHubDataAdapter, EventHubDataAdapter>());
+                    .AddMemoryGrainStorage("PubSubStore");
             }
         }
 
@@ -84,8 +83,7 @@ namespace ServiceBus.Tests.StreamingTests
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
-                        })))
-                    .ConfigureServices(services => services.TryAddSingleton<IEventHubDataAdapter, EventHubDataAdapter>());
+                        })));
             }
         }
 

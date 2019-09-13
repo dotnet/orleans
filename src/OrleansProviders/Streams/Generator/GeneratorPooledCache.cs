@@ -5,18 +5,20 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
 using System.Linq;
-using Microsoft.Extensions.Logging;
+using Orleans.Providers.Abstractions;
 
 namespace Orleans.Providers.Streams.Generator
 {
     /// <summary>
     /// Pooled cache for generator stream provider
     /// </summary>
-    public class GeneratorPooledCache : IQueueCache, ICacheDataAdapter
+    public class GeneratorPooledCache : IQueueCache
     {
+        private static readonly byte[] offsetToken = new byte[0];
+
         private readonly IObjectPool<FixedSizeBuffer> bufferPool;
         private readonly SerializationManager serializationManager;
-        private readonly IEvictionStrategy evictionStrategy;
+        private readonly IFiFoEvictionStrategy<CachedMessage> evictionStrategy;
         private readonly PooledQueueCache cache;
 
         private FixedSizeBuffer currentBuffer;
@@ -25,94 +27,67 @@ namespace Orleans.Providers.Streams.Generator
         /// Pooled cache for generator stream provider
         /// </summary>
         /// <param name="bufferPool"></param>
-        /// <param name="logger"></param>
         /// <param name="serializationManager"></param>
         /// <param name="cacheMonitor"></param>
         /// <param name="monitorWriteInterval">monitor write interval.  Only triggered for active caches.</param>
-        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, ILogger logger, SerializationManager serializationManager, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+        public GeneratorPooledCache(IObjectPool<FixedSizeBuffer> bufferPool, SerializationManager serializationManager, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             this.bufferPool = bufferPool;
             this.serializationManager = serializationManager;
-            cache = new PooledQueueCache(this, logger, cacheMonitor, monitorWriteInterval);
+            cache = new PooledQueueCache(cacheMonitor, monitorWriteInterval);
             TimePurgePredicate purgePredicate = new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10));
-            this.evictionStrategy = new ChronologicalEvictionStrategy(logger, purgePredicate, cacheMonitor, monitorWriteInterval) {PurgeObservable = cache};
-        }
-
-        public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
-        {
-            //Deserialize payload
-            int readOffset = 0;
-            ArraySegment<byte> payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
-            var stream = new BinaryTokenStreamReader(payload);
-            object payloadObject = this.serializationManager.Deserialize(stream);
-            return new GeneratedBatchContainer(cachedMessage.StreamGuid, cachedMessage.StreamNamespace,
-                payloadObject, new EventSequenceTokenV2(cachedMessage.SequenceNumber));
-        }
-
-        public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
-        {
-            return new EventSequenceTokenV2(cachedMessage.SequenceNumber);
+            this.evictionStrategy = new ChronologicalEvictionStrategy(purgePredicate, cacheMonitor, monitorWriteInterval);
         }
 
         private CachedMessage QueueMessageToCachedMessage(GeneratedBatchContainer queueMessage, DateTime dequeueTimeUtc)
         {
-            StreamPosition streamPosition = GetStreamPosition(queueMessage);
-            return new CachedMessage()
-            {
-                StreamGuid = streamPosition.StreamIdentity.Guid,
-                StreamNamespace = streamPosition.StreamIdentity.Namespace != null ? string.Intern(streamPosition.StreamIdentity.Namespace) : null,
-                SequenceNumber = queueMessage.RealToken.SequenceNumber,
-                EnqueueTimeUtc = queueMessage.EnqueueTimeUtc,
-                DequeueTimeUtc = dequeueTimeUtc,
-                Segment = SerializeMessageIntoPooledSegment(queueMessage)
-            };
+            StreamPosition streamPosition = this.GetStreamPosition(queueMessage);
+            return CachedMessage.Create(
+                streamPosition.SequenceToken.SequenceToken,
+                StreamIdentityToken.Create(streamPosition.StreamIdentity),
+                offsetToken,
+                this.serializationManager.SerializeToByteArray(queueMessage.Payload),
+                queueMessage.EnqueueTimeUtc,
+                dequeueTimeUtc,
+                this.GetSegment);
         }
 
         // Placed object message payload into a segment from a buffer pool.  When this get's too big, older blocks will be purged
-        private ArraySegment<byte> SerializeMessageIntoPooledSegment(GeneratedBatchContainer queueMessage)
+        private ArraySegment<byte> GetSegment(int size)
         {
-            byte[] serializedPayload = this.serializationManager.SerializeToByteArray(queueMessage.Payload);
-            // get size of namespace, offset, partitionkey, properties, and payload
-            int size = SegmentBuilder.CalculateAppendSize(serializedPayload);
-
             // get segment
             ArraySegment<byte> segment;
-            if (currentBuffer == null || !currentBuffer.TryGetSegment(size, out segment))
+            if (this.currentBuffer == null || !this.currentBuffer.TryGetSegment(size, out segment))
             {
                 // no block or block full, get new block and try again
-                currentBuffer = bufferPool.Allocate();
+                this.currentBuffer = this.bufferPool.Allocate();
                 //call EvictionStrategy's OnBlockAllocated method
-                this.evictionStrategy.OnBlockAllocated(currentBuffer);
+                this.evictionStrategy.OnBlockAllocated(this.currentBuffer);
                 // if this fails with clean block, then requested size is too big
-                if (!currentBuffer.TryGetSegment(size, out segment))
+                if (!this.currentBuffer.TryGetSegment(size, out segment))
                 {
                     string errmsg = $"Message size is to big. MessageSize: {size}";
-                    throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
+                    throw new ArgumentOutOfRangeException(nameof(size), errmsg);
                 }
             }
-
-            // encode namespace, offset, partitionkey, properties and payload into segment
-            int writeOffset = 0;
-            SegmentBuilder.Append(segment, ref writeOffset, serializedPayload);
-
             return segment;
         }
 
         private StreamPosition GetStreamPosition(GeneratedBatchContainer queueMessage)
-        {
-            return new StreamPosition(new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace), queueMessage.RealToken);
-        }
+            => new StreamPosition(new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace), queueMessage.RealToken);
 
         private class Cursor : IQueueCacheCursor
         {
             private readonly PooledQueueCache cache;
+            private readonly SerializationManager serializationManager;
             private readonly object cursor;
             private IBatchContainer current;
 
-            public Cursor(PooledQueueCache cache, IStreamIdentity streamIdentity, StreamSequenceToken token)
+            public Cursor(PooledQueueCache cache, SerializationManager serializationManager, IStreamIdentity streamIdentity, StreamSequenceToken token)
             {
                 this.cache = cache;
-                cursor = cache.GetCursor(streamIdentity, token);
+                this.serializationManager = serializationManager;
+                this.cursor = cache.GetCursor(StreamIdentityToken.Create(streamIdentity), token.SequenceToken);
             }
 
             public void Dispose()
@@ -122,18 +97,22 @@ namespace Orleans.Providers.Streams.Generator
             public IBatchContainer GetCurrent(out Exception exception)
             {
                 exception = null;
-                return current;
+                return this.current;
             }
 
             public bool MoveNext()
             {
-                IBatchContainer next;
-                if (!cache.TryGetNextMessage(cursor, out next))
+                if (!this.cache.TryGetNextMessage(this.cursor, out CachedMessage next))
                 {
                     return false;
                 }
 
-                current = next;
+                var stream = new BinaryTokenStreamReader(next.Payload().ToArray());
+                object payloadObject = this.serializationManager.Deserialize(stream);
+                StreamIdentityToken streamIdentityToken = new StreamIdentityToken(next.StreamIdToken().ToArray());
+                this.current = new GeneratedBatchContainer(streamIdentityToken.Guid, streamIdentityToken.Namespace,
+                    payloadObject, new EventSequenceTokenV2(next.SequenceToken().ToArray()));
+
                 return true;
             }
 
@@ -149,7 +128,7 @@ namespace Orleans.Providers.Streams.Generator
         /// <summary>
         /// The limit of the maximum number of items that can be added
         /// </summary>
-        public int GetMaxAddCount() { return 100; }
+        public int GetMaxAddCount() => 100;
 
         /// <summary>
         /// Add messages to the cache
@@ -160,9 +139,9 @@ namespace Orleans.Providers.Streams.Generator
             DateTime utcNow = DateTime.UtcNow;
             List<CachedMessage> generatedMessages = messages
                 .Cast<GeneratedBatchContainer>()
-                .Select(batch => QueueMessageToCachedMessage(batch, utcNow))
+                .Select(batch => this.QueueMessageToCachedMessage(batch, utcNow))
                 .ToList();
-            cache.Add(generatedMessages, utcNow);
+            this.cache.Add(generatedMessages, utcNow);
         }
 
         /// <summary>
@@ -173,7 +152,7 @@ namespace Orleans.Providers.Streams.Generator
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
         {
             purgedItems = null;
-            this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+            this.evictionStrategy.TryEvict(this.cache, DateTime.UtcNow);
             return false;
         }
 
@@ -185,16 +164,11 @@ namespace Orleans.Providers.Streams.Generator
         /// <param name="token"></param>
         /// <returns></returns>
         public IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
-        {
-            return new Cursor(cache, streamIdentity, token);
-        }
+            => new Cursor(this.cache, this.serializationManager, streamIdentity, token);
 
         /// <summary>
         /// Returns true if this cache is under pressure.
         /// </summary>
-        public bool IsUnderPressure()
-        {
-            return false;
-        }
+        public bool IsUnderPressure() => false;
     }
 }

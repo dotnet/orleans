@@ -7,7 +7,7 @@ namespace Orleans.Streams
     /// Stream position uniquely identifies the position of an event in a stream.
     /// If acquiring a stream position for a batch of events, the stream position will be of the first event in the batch.
     /// </summary>
-    public class StreamPosition
+    public struct StreamPosition
     {
         /// <summary>
         /// Stream position consists of the stream identity and the sequence token
@@ -16,16 +16,8 @@ namespace Orleans.Streams
         /// <param name="sequenceToken"></param>
         public StreamPosition(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)
         {
-            if (streamIdentity == null)
-            {
-                throw new ArgumentNullException("streamIdentity");
-            }
-            if (sequenceToken == null)
-            {
-                throw new ArgumentNullException("sequenceToken");
-            }
-            StreamIdentity = streamIdentity;
-            SequenceToken = sequenceToken;
+            this.StreamIdentity = streamIdentity ?? throw new ArgumentNullException("streamIdentity");
+            this.SequenceToken = sequenceToken ?? throw new ArgumentNullException("sequenceToken");
         }
         /// <summary>
         /// Identity of the stream

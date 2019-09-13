@@ -1,16 +1,14 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
+using Orleans.Providers.Abstractions;
 
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
     /// Eviction strategy that evicts data based off of age.
     /// </summary>
-    public class ChronologicalEvictionStrategy : IEvictionStrategy
+    public class ChronologicalEvictionStrategy : IFiFoEvictionStrategy<CachedMessage>
     {
-        private readonly ILogger logger;
         private readonly TimePurgePredicate timePurge;
         /// <summary>
         /// Buffers which are currently in use in the cache
@@ -22,19 +20,9 @@ namespace Orleans.Providers.Streams.Common
         private readonly PeriodicAction periodicMonitoring;
         private long cacheSizeInByte;
 
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="logger"></param>
-        /// <param name="timePurage"></param>
-        /// <param name="cacheMonitor"></param>
-        /// <param name="monitorWriteInterval">"Interval to write periodic statistics.  Only triggered for active caches.</param>
-        public ChronologicalEvictionStrategy(ILogger logger, TimePurgePredicate timePurage, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+        public ChronologicalEvictionStrategy(TimePurgePredicate timePurge, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
-            if (logger == null) throw new ArgumentException(nameof(logger));
-            if (timePurage == null) throw new ArgumentException(nameof(timePurage));
-            this.logger = logger;
-            this.timePurge = timePurage;
+            this.timePurge = timePurge ?? throw new ArgumentException(nameof(timePurge));
             this.inUseBuffers = new Queue<FixedSizeBuffer>();
 
             // monitoring
@@ -47,30 +35,15 @@ namespace Orleans.Providers.Streams.Common
             this.cacheSizeInByte = 0;
         }
 
-        private void ReportCacheSize()
-        {
-            this.cacheMonitor.ReportCacheSize(this.cacheSizeInByte);
-        }
-
-        /// <inheritdoc />
-        public IPurgeObservable PurgeObservable { private get; set; }
-
-        /// <summary>
-        /// Called with the newest item in the cache and last item purged after a cache purge has run.
-        /// For ordered reliable queues we shouldn't need to notify on every purged event, only on the last event 
-        ///   of every set of events that get purged.
-        /// </summary>
-        public Action<CachedMessage?, CachedMessage?> OnPurged { get; set; }
+        private void ReportCacheSize() => this.cacheMonitor.ReportCacheSize(this.cacheSizeInByte);
 
         /// <inheritdoc />
         public void OnBlockAllocated(FixedSizeBuffer newBlock)
         {
-            if (this.PurgeObservable.IsEmpty && this.currentBuffer != null
-                && this.inUseBuffers.Contains(this.currentBuffer) && this.inUseBuffers.Count == 1)
+            if(this.currentBuffer != null)
             {
-                this.inUseBuffers.Dequeue().Dispose();
+                this.inUseBuffers.Enqueue(this.currentBuffer);
             }
-            this.inUseBuffers.Enqueue(newBlock);
             this.currentBuffer = newBlock;
             //report metrics
             this.cacheSizeInByte += newBlock.SizeInByte;
@@ -78,100 +51,82 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public void PerformPurge(DateTime nowUtc)
+        public bool TryEvict(IFiFoEvictableCache<CachedMessage> cache, in DateTime nowUtc)
         {
-            PerformPurgeInternal(nowUtc);
+            bool itemsWerePurged = this.PerformPurgeInternal(cache, nowUtc);
             this.periodicMonitoring?.TryAction(nowUtc);
+            return itemsWerePurged;
         }
 
-        private void PerformPurgeInternal(DateTime nowUtc)
+        private bool PerformPurgeInternal(IFiFoEvictableCache<CachedMessage> cache, in DateTime nowUtc)
         {
             //if the cache is empty, then nothing to purge, return
-            if (this.PurgeObservable.IsEmpty)
-                return;
+            if (!cache.Oldest.HasValue) return false;
+
             int itemsPurged = 0;
-            CachedMessage neweswtMessageInCache = this.PurgeObservable.Newest.Value;
+            CachedMessage neweswtMessageInCache = cache.Newest.Value;
             CachedMessage? lastMessagePurged = null;
-            while (!this.PurgeObservable.IsEmpty)
+            while (cache.Oldest.HasValue)
             {
-                var oldestMessageInCache = this.PurgeObservable.Oldest.Value;
-                if (!ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, nowUtc))
+                var oldestMessageInCache = cache.Oldest.Value;
+                if (!this.ShouldPurge(ref oldestMessageInCache, ref neweswtMessageInCache, nowUtc))
                 {
                     break;
                 }
                 lastMessagePurged = oldestMessageInCache;
                 itemsPurged++;
-                this.PurgeObservable.RemoveOldestMessage();
+                cache.RemoveOldestMessage();
             }
+
             //if nothing got purged, return
-            if (itemsPurged == 0)
-                return;
+            if (itemsPurged == 0) return false;
 
             //items got purged, time to conduct follow up actions 
             this.cacheMonitor?.TrackMessagesPurged(itemsPurged);
-            OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
-            FreePurgedBuffers(lastMessagePurged, this.PurgeObservable.Oldest);
-            ReportPurge(this.logger, this.PurgeObservable, itemsPurged);
+            this.FreePurgedBuffers(lastMessagePurged, cache.Oldest);
+
+            return true;
         }
 
         private void FreePurgedBuffers(CachedMessage? lastMessagePurged, CachedMessage? oldestMessageInCache)
         {
             if (this.inUseBuffers.Count <= 0 || !lastMessagePurged.HasValue)
                 return;
-            int memoryReleasedInByte = 0;
-            object IdOfLastPurgedBufferId = lastMessagePurged?.Segment.Array;
+            int memoryReleasedInBytes = 0;
+            object IdOfLastPurgedBufferId = lastMessagePurged?.Id;
             // IdOfLastBufferInCache will be null if cache is empty after purge
-            object IdOfLastBufferInCacheId = oldestMessageInCache?.Segment.Array;
             //all buffers older than LastPurgedBuffer should be purged 
-            while (this.inUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
+            while (this.inUseBuffers.Count > 0 && this.inUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
             {
                 var purgedBuffer = this.inUseBuffers.Dequeue();
-                memoryReleasedInByte += purgedBuffer.SizeInByte;
+                memoryReleasedInBytes += purgedBuffer.SizeInByte;
                 purgedBuffer.Dispose();
             }
             // if last purged message does not share buffer with remaining messages in cache and cache is not empty
             //then last purged buffer should be purged too
+            object IdOfLastBufferInCacheId = oldestMessageInCache?.Id;
             if (IdOfLastBufferInCacheId != null && IdOfLastPurgedBufferId != IdOfLastBufferInCacheId)
             {
                 var purgedBuffer = this.inUseBuffers.Dequeue();
-                memoryReleasedInByte += purgedBuffer.SizeInByte;
+                memoryReleasedInBytes += purgedBuffer.SizeInByte;
                 purgedBuffer.Dispose();
             }
             //report metrics
-            if (memoryReleasedInByte > 0)
+            if (memoryReleasedInBytes > 0)
             {
-                this.cacheSizeInByte -= memoryReleasedInByte;
-                this.cacheMonitor?.TrackMemoryReleased(memoryReleasedInByte);
+                this.cacheSizeInByte -= memoryReleasedInBytes;
+                this.cacheMonitor?.TrackMemoryReleased(memoryReleasedInBytes);
             }
         }
 
         // Given a purge cached message, indicates whether it should be purged from the cache
-        private bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, DateTime nowUtc)
+        private bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, in DateTime nowUtc)
         {
             TimeSpan timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
             // age of message relative to the most recent event in the cache.
             TimeSpan relativeAge =  newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
 
-            return timePurge.ShouldPurgFromTime(timeInCache, relativeAge);
-        }
-
-        /// <summary>
-        /// Logs cache purge activity
-        /// </summary>
-        /// <param name="logger"></param>
-        /// <param name="purgeObservable"></param>
-        /// <param name="itemsPurged"></param>
-        private static void ReportPurge(ILogger logger, IPurgeObservable purgeObservable, int itemsPurged)
-        {
-            if (!logger.IsEnabled(LogLevel.Debug))
-                return;
-            int itemCountAfterPurge = purgeObservable.ItemCount;
-            var itemCountBeforePurge = itemCountAfterPurge + itemsPurged;
-            if (itemCountAfterPurge == 0)
-            {
-                logger.Debug("BlockPurged: cache empty");
-            }
-            logger.Debug($"BlockPurged: PurgeCount: {itemCountBeforePurge - itemCountAfterPurge}, CacheSize: {itemCountAfterPurge}");
+            return this.timePurge.ShouldPurgFromTime(timeInCache, relativeAge);
         }
     }
 }

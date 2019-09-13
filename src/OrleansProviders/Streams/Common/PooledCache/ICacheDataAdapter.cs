@@ -1,5 +1,4 @@
 
-using System;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -17,13 +16,6 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="cachedMessage"></param>
         /// <returns></returns>
-        IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage);
-
-        /// <summary>
-        /// Gets the stream sequence token from a cached message.
-        /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <returns></returns>
-        StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage);
+        IBatchContainer GetBatchContainer(in CachedMessage cachedMessage);
     }
 }

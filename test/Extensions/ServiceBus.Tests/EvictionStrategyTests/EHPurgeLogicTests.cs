@@ -24,6 +24,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     [TestCategory("EventHub"), TestCategory("Streaming")]
     public class EHPurgeLogicTests
     {
+        private static byte[] Payload = new byte[128];
         private CachePressureInjectionMonitor cachePressureInjectionMonitor;
         private PurgeDecisionInjectionPredicate purgePredicate;
         private SerializationManager serializationManager;
@@ -174,7 +175,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.receiver2.TryPurgeFromCache(out ignore);
 
             //Each cache should have all buffers purged, except for current buffer
-            this.evictionStrategyList.ForEach(strategy => Assert.Single(strategy.InUseBuffers));
+            this.evictionStrategyList.ForEach(strategy => Assert.Empty(strategy.InUseBuffers));
             var oldBuffersInCaches = new List<FixedSizeBuffer>();
             this.evictionStrategyList.ForEach(strategy => {
                 foreach (var inUseBuffer in strategy.InUseBuffers)
@@ -236,8 +237,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         private EventData MakeEventData(long sequenceNumber)
         {
-            byte[] ignore = { 12, 23 };
-            var eventData = new EventData(ignore);
+            var eventData = new EventData(Payload);
             DateTime now = DateTime.UtcNow;
             var offSet = Guid.NewGuid().ToString() + now.ToString();
             eventData.SetOffset(offSet);
@@ -245,6 +245,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             eventData.SetSequenceNumber(sequenceNumber);
             //set enqueue time
             eventData.SetEnqueuedTimeUtc(now);
+            eventData.SetPartitionKey(Guid.NewGuid().ToString());
             return eventData;
         }
         
@@ -256,7 +257,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private IEventHubQueueCache CacheFactory(string partition, IStreamQueueCheckpointer<string> checkpointer, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer)
         {
             var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCacheForTesting)}.{partition}");
-            var evictionStrategy = new EHEvictionStrategyForTesting(cacheLogger, null, null, this.purgePredicate);
+            var evictionStrategy = new EHEvictionStrategyForTesting(null, null, this.purgePredicate);
             this.evictionStrategyList.Add(evictionStrategy);
             var cache = new EventHubQueueCacheForTesting(
                 this.bufferPool,

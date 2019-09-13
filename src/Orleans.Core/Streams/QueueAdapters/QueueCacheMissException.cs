@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.Serialization;
 
 namespace Orleans.Streams
@@ -20,32 +21,37 @@ namespace Orleans.Streams
         public QueueCacheMissException(string message) : base(message) { }
         public QueueCacheMissException(string message, Exception inner) : base(message, inner) { }
 
+        public QueueCacheMissException(byte[] requested, in ArraySegment<byte> low, in ArraySegment<byte> high)
+            : this(Convert.ToBase64String(requested), Convert.ToBase64String(low.ToArray()), Convert.ToBase64String(high.ToArray()))
+        {
+        }
+
         public QueueCacheMissException(StreamSequenceToken requested, StreamSequenceToken low, StreamSequenceToken high)
             : this(requested.ToString(), low.ToString(), high.ToString())
         {
         }
 
         public QueueCacheMissException(string requested, string low, string high)
-            : this(String.Format(CultureInfo.InvariantCulture, MESSAGE_FORMAT, requested, low, high))
+            : this(string.Format(CultureInfo.InvariantCulture, MESSAGE_FORMAT, requested, low, high))
         {
-            Requested = requested;
-            Low = low;
-            High = high;
+            this.Requested = requested;
+            this.Low = low;
+            this.High = high;
         }
 
         public QueueCacheMissException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            Requested = info.GetString("Requested");
-            Low = info.GetString("Low");
-            High = info.GetString("High");
+            this.Requested = info.GetString("Requested");
+            this.Low = info.GetString("Low");
+            this.High = info.GetString("High");
         }
 
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            info.AddValue("Requested", Requested);
-            info.AddValue("Low", Low);
-            info.AddValue("High", High);
+            info.AddValue("Requested", this.Requested);
+            info.AddValue("Low", this.Low);
+            info.AddValue("High", this.High);
             base.GetObjectData(info, context);
         }
     }

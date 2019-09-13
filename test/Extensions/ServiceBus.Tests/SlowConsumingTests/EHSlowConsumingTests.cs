@@ -28,8 +28,8 @@ namespace ServiceBus.Tests.SlowConsumingTests
         private const string StreamNamespace = "EHTestsNamespace";
         private static readonly string CheckpointNamespace = Guid.NewGuid().ToString();
         private static readonly TimeSpan monitorPressureWindowSize = TimeSpan.FromSeconds(3);
-        private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
-        private const double flowControlThredhold = 0.6;
+        private static readonly TimeSpan timeout = TimeSpan.FromMinutes(1);
+        private const double flowControlThredhold = 0.3;
 
         private readonly Fixture fixture;
 

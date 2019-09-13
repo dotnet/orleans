@@ -1,26 +1,10 @@
-﻿
+
 using System;
 using System.Globalization;
 using Orleans.Providers.Streams.Common;
 
 namespace Orleans.ServiceBus.Providers
 {
-    /// <summary>
-    /// Location of a message within an EventHub partition
-    /// </summary>
-    public interface IEventHubPartitionLocation
-    {
-        /// <summary>
-        /// Offset of the message within an EventHub partition
-        /// </summary>
-        string EventHubOffset { get; }
-
-        /// <summary>
-        /// EventHub sequence id of the message
-        /// </summary>
-        long SequenceNumber { get; }
-    }
-
     /// <summary>
     /// Event Hub messages consist of a batch of application layer events, so EventHub tokens contain three pieces of information.
     /// EventHubOffset - this is a unique value per partition that is used to start reading from this message in the partition.
@@ -31,7 +15,7 @@ namespace Orleans.ServiceBus.Providers
     ///   and ordering of application layer events within an EventHub message.
     /// </summary>
     [Serializable]
-    public class EventHubSequenceToken : EventSequenceToken, IEventHubPartitionLocation
+    public class EventHubSequenceToken : EventSequenceToken
     {
         /// <summary>
         /// Offset of the message within an EventHub partition
@@ -47,15 +31,13 @@ namespace Orleans.ServiceBus.Providers
         public EventHubSequenceToken(string eventHubOffset, long sequenceNumber, int eventIndex)
             : base(sequenceNumber, eventIndex)
         {
-            EventHubOffset = eventHubOffset;
+            this.EventHubOffset = eventHubOffset;
         }
 
         /// <summary>Returns a string that represents the current object.</summary>
         /// <returns>A string that represents the current object.</returns>
         /// <filterpriority>2</filterpriority>
         public override string ToString()
-        {
-            return string.Format(CultureInfo.InvariantCulture, "EventHubSequenceToken(EventHubOffset: {0}, SequenceNumber: {1}, EventIndex: {2})", EventHubOffset, SequenceNumber, EventIndex);
-        }
+            => $"EventHubSequenceToken(EventHubOffset: {this.EventHubOffset}, SequenceNumber: {this.SequenceNumber}, EventIndex: {this.EventIndex}";
     }
 }

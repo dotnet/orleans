@@ -24,7 +24,8 @@ namespace Orleans.Streams
             if (ReferenceEquals(null, other)) return false;
             if (ReferenceEquals(this, other)) return true;
             if (other.GetType() != GetType()) return false;
-            return Equals(Token, other.Token);
+            if (this.Token is null) return other.Token is null;
+            return this.Token.Equals(other.Token);
         }
 
         public override bool Equals(object obj)
@@ -39,7 +40,7 @@ namespace Orleans.Streams
         {
             unchecked
             {
-                return (GetType().GetHashCode() * 397) ^ (Token != null ? Token.GetHashCode() : 0);
+                return (GetType().GetHashCode() * 397) ^ (this.Token != null ? Token.GetHashCode() : 0);
             }
         }
     }

@@ -108,7 +108,6 @@ namespace Orleans.ServiceBus.Providers
                 this.checkpointer = await this.checkpointerFactory(this.settings.Partition);
                 if(this.cache != null)
                 {
-                    this.cache.Dispose();
                     this.cache = null;
                 }
                 this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory, this.telemetryProducer);
@@ -249,8 +248,8 @@ namespace Orleans.ServiceBus.Providers
                 {
                     closeTask = localReceiver.CloseAsync();
                 }
-                // dispose of cache
-                localCache?.Dispose();
+
+                localCache =null;
 
                 // finish return receiver closing task
                 await closeTask;

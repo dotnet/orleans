@@ -18,7 +18,7 @@ namespace Orleans.Hosting
             configurator.Configure(configureOptions);
         }
 
-        public static void UseDataAdapter(this IEventHubStreamConfigurator configurator, Func<IServiceProvider, string, IEventHubDataAdapter> factory)
+        public static void UseDataAdapter(this IEventHubStreamConfigurator configurator, Func<IServiceProvider, string, EventHubDataAdapter> factory)
         {
             configurator.ConfigureComponent(factory);
         }
