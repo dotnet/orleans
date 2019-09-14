@@ -68,28 +68,28 @@
     <PackageReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.AspNetCore.Cors" Version="2.2.0" />
     <PackageReference Include="Microsoft.ASPNETCore.MVC.Api.Analyzers" Version="2.2.6" />
-    <PackageReference Include="Microsoft.Azure.KeyVault" Version="3.0.3" />
-    <PackageReference Include="Microsoft.Azure.Services.AppAuthentication" Version="1.2.0" />
+    <PackageReference Include="Microsoft.Azure.KeyVault" Version="3.0.4" />
+    <PackageReference Include="Microsoft.Azure.Services.AppAuthentication" Version="1.3.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="2.2.0" />
     <PackageReference Include="microsoft.extensions.http.polly" Version="2.2.0" />
     <PackageReference Include="microsoft.extensions.logging" Version="2.2.0" />
     <PackageReference Include="microsoft.extensions.logging.console" Version="2.2.0" />
-    <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="2.4.1" />
-    <PackageReference Include="Microsoft.Orleans.Client" Version="2.4.1" />
-    <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="2.4.1" />
-    <PackageReference Include="Microsoft.Orleans.OrleansTelemetryConsumers.Counters" Version="2.4.1" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="2.4.2" />
+    <PackageReference Include="Microsoft.Orleans.Client" Version="2.4.2" />
+    <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="2.4.2" />
+    <PackageReference Include="Microsoft.Orleans.OrleansTelemetryConsumers.Counters" Version="2.4.2" />
     <PackageReference Include="NetEscapades.AspNetCore.SecurityHeaders" Version="0.9.0" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="2.2.3" />
-    <PackageReference Include="polly" Version="7.1.0" />
+    <PackageReference Include="polly" Version="7.1.1" />
     <PackageReference Include="Polly.Extensions.Http" Version="3.0.0" />
-    <PackageReference Include="refit" Version="4.7.9" />
-    <PackageReference Include="refit.httpclientfactory" Version="4.7.9" />
-    <PackageReference Include="SecurityCodeScan" Version="3.2.0">
+    <PackageReference Include="refit" Version="4.7.51" />
+    <PackageReference Include="refit.httpclientfactory" Version="4.7.51" />
+    <PackageReference Include="SecurityCodeScan" Version="3.3.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Serilog.AspNetCore" Version="2.1.1" />
+    <PackageReference Include="Serilog.AspNetCore" Version="3.0.0" />
     <PackageReference Include="Serilog.Enrichers.Environment" Version="2.1.3" />
     <PackageReference Include="Serilog.Enrichers.Process" Version="2.0.1" />
     <PackageReference Include="Serilog.Enrichers.Thread" Version="3.1.0" />
@@ -99,8 +99,8 @@
     <PackageReference Include="Serilog.Sinks.File" Version="4.0.0" />
     <PackageReference Include="Serilog.Sinks.Literate" Version="3.0.0" />
     <PackageReference Include="Serilog.Sinks.RollingFile" Version="3.3.0" />
-    <PackageReference Include="Serilog.Extensions.Logging" Version="2.0.4" />
-    <PackageReference Include="Serilog.Sinks.XUnit" Version="1.0.8" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="3.0.1" />
+    <PackageReference Include="Serilog.Sinks.XUnit" Version="1.0.21" />
     <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="4.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="4.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="4.0.1" />
