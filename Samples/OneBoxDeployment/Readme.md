@@ -1,5 +1,7 @@
 # A sample on developing and testing a reliable Orleans cluster locally
 
+This sample shows how one can develop, test and deploy a cluster in reliable configuration locally.
+
 Orleans is a building block to develop smart, resilient software-intensive cyber-physical systems. Such software systems do not exist in isolation and can fail in many ways, sometimes for technical reasons, because of reasons of the business context in which they operate or due to any other reason. The purpose of this sample is to show one way of building a system that allows the developing team to build, debug, test and learn, even "feel" in controlled, everyday working way how their system as a whole functions and behaves and learn its logical limits. This should increase confidence within the team that they understand the limits and can pin-point and solve problems quickly when they eventually emerge. Consequently this enhances the communication with the stakeholders and increase the probability of success of a given projects or via enhanced learning the future projects.
 
 Cyber-physical systems are often large, complex and dynamic, need to cope with external threats and optimize their behaviour and the software reflects this reality. It is likely cost and time prohibitive to asses risk of components in separation if possible at all. Also it is not possible to prepare and prevent foreseeable events, but it is possible to build resilience in systems and to the teams building such systems so they can quickly recover by locating faults and adapting. This should in turn instil confidence to communications when faced with time limits or address [cross-cutting concerns](https://en.wikipedia.org/wiki/Cross-cutting_concern) and consequently increase project success factor. Actor systems such as Orleans can make this easier.
@@ -47,7 +49,9 @@ To debug the API also Orleans silo needs to be started. To do that select soluti
 
 - [ ] Add [Trill](https://github.com/microsoft/Trill).
 
-- [ ] Add [FASTER](https://github.com/microsoft/FASTER/).
+- [ ] Add [FASTER](https://github.com/microsoft/FASTER).
+
+- [ ] Add [BenchmarkDotNet](https://github.com/dotnet/BenchmarkDotNet) to (integration) tests. Can the results be saved in a well comparable form between runs?
 
 - [ ] Add example and tests of a conflation case.
 
