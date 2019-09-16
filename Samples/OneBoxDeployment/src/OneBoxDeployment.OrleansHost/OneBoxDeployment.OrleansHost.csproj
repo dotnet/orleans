@@ -35,12 +35,12 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="2.2.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.2.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="2.2.0" />
-    <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="2.4.1" />
-    <PackageReference Include="Microsoft.Orleans.EventSourcing" Version="2.3.5" />
-    <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="2.4.1" />
-    <PackageReference Include="Microsoft.Orleans.OrleansTelemetryConsumers.Counters" Version="2.4.1" />
-    <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet" Version="2.4.1" />
-    <PackageReference Include="Microsoft.Orleans.Reminders.AdoNet" Version="2.4.1" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="2.4.2" />
+    <PackageReference Include="Microsoft.Orleans.EventSourcing" Version="2.4.2" />
+    <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="2.4.2" />
+    <PackageReference Include="Microsoft.Orleans.OrleansTelemetryConsumers.Counters" Version="2.4.2" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet" Version="2.4.2" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.AdoNet" Version="2.4.2" />
     <PackageReference Include="System.Data.SqlClient" Version="4.6.1" />
   </ItemGroup>
 
