@@ -505,8 +505,17 @@ namespace Orleans.Runtime
                 CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
                 throw new NonExistentActivationException(msg, address, placement is StatelessWorkerPlacement);
             }
-   
-            SetupActivationInstance(result, grainType, genericArguments);
+
+            try
+            {
+                SetupActivationInstance(result, grainType, genericArguments);
+            }
+            catch
+            {
+                // Exception was thrown when trying to constuct the grain
+                UnregisterMessageTarget(result);
+                throw;
+            }
             activatedPromise = InitActivation(result, grainType, genericArguments, requestContextData);
             return result;
         }
