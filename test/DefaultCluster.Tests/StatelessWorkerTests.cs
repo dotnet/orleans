@@ -28,6 +28,17 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        public async Task StatelessWorkerThrowExceptionConstructor()
+        {
+            var grain = this.GrainFactory.GetGrain<IStatelessWorkerExceptionGrain>(0);
+
+            for (int i=0; i<100; i++)
+            {
+                await Assert.ThrowsAsync<OrleansException>(() => grain.Ping());
+            }
+        }
+
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerActivationsPerSiloDoNotExceedMaxLocalWorkersCount()
         {
             var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
