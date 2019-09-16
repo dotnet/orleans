@@ -112,6 +112,7 @@
     <Compile Include="ISimpleGenericGrain.cs" />
     <Compile Include="CodegenTestInterfaces.cs" />
     <Compile Include="ISimpleGrainWithAsyncMethods.cs" />
+    <Compile Include="IStatelessWorkerExceptionGrain.cs" />
     <Compile Include="IStatelessWorkerGrain.cs" />
     <Compile Include="ISimpleObserverableGrain.cs" />
     <Compile Include="IObserverGrain.cs" />
