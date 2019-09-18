@@ -50,11 +50,7 @@ namespace Orleans.Runtime.Messaging
         protected override void OnReceivedMessage(Message msg)
         {
             // See it's a Ping message, and if so, short-circuit it
-            var requestContext = msg.RequestContextData;
-            if (requestContext != null &&
-                requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out var pingObj) &&
-                pingObj is bool isPing
-                && isPing)
+            if (msg.IsPing())
             {
                 MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
 
@@ -144,6 +140,11 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceiveMessageFailure(Message message, Exception exception)
         {
+            if (message?.Headers != null && message.IsPing())
+            {
+                this.Log.LogWarning("Failed to receive ping message {Message}", message);
+            }
+
             // If deserialization completely failed or the message was one-way, rethrow the exception
             // so that it can be handled at another level.
             if (message?.Headers == null || message.Direction != Message.Directions.Request)
@@ -164,6 +165,11 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnSendMessageFailure(Message message, string error)
         {
+            if (message?.Headers != null && message.IsPing())
+            {
+                this.Log.LogWarning("Failed to send ping message {Message}", message);
+            }
+
             this.FailMessage(message, error);
         }
 
@@ -264,6 +270,11 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Send);
+                if (msg.IsPing())
+                {
+                    this.Log.LogWarning("Droppping expired ping message {Message}", msg);
+                }
+
                 return false;
             }
 
@@ -271,11 +282,21 @@ namespace Orleans.Runtime.Messaging
             if (msg.SendingSilo == null)
                 msg.SendingSilo = this.LocalSiloAddress;
 
+            if (msg.IsPing())
+            {
+                this.Log.LogInformation("Sending ping message {Message}", msg);
+            }
+
             return true;
         }
 
         public void FailMessage(Message msg, string reason)
         {
+            if (msg?.Headers != null && msg.IsPing())
+            {
+                this.Log.LogWarning("Failed ping message {Message}", msg);
+            }
+
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
@@ -294,6 +315,11 @@ namespace Orleans.Runtime.Messaging
         protected override void RetryMessage(Message msg, Exception ex = null)
         {
             if (msg == null) return;
+
+            if (msg?.Headers != null && msg.IsPing())
+            {
+                this.Log.LogWarning("Retrying ping message {Message}", msg);
+            }
 
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
