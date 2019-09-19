@@ -287,6 +287,15 @@ namespace Orleans.Runtime.Messaging
                 this.Log.LogInformation("Sending ping message {Message}", msg);
             }
 
+            if (this.RemoteSiloAddress is object && msg.TargetSilo is object && !this.RemoteSiloAddress.Equals(msg.TargetSilo))
+            {
+                this.Log.LogWarning(
+                    "Attempting to send message addressed to {TargetSilo} to connection with {RemoteSiloAddress}. Message {Message}",
+                    msg.TargetSilo,
+                    this.RemoteSiloAddress,
+                    msg);
+            }
+
             return true;
         }
 

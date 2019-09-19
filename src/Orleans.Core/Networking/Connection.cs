@@ -14,8 +14,7 @@ namespace Orleans.Runtime.Messaging
 {
     internal abstract class Connection
     {
-        public static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
-        public static readonly object ContextItemKey = new object();
+        private static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
         private static readonly UnboundedChannelOptions OutgoingMessageChannelOptions = new UnboundedChannelOptions
         {
             SingleReader = true,
