@@ -15,6 +15,7 @@ namespace Orleans.Runtime.Messaging
     internal abstract class Connection
     {
         private static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
+        private static readonly Action<object> OnConnectionClosedDelegate = state => ((Connection)state).CloseInternal(new ConnectionAbortedException("Connection closed"));
         private static readonly UnboundedChannelOptions OutgoingMessageChannelOptions = new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -48,6 +49,7 @@ namespace Orleans.Runtime.Messaging
 
             this.RemoteEndPoint = NormalizeEndpoint(this.Context.RemoteEndPoint);
             this.LocalEndPoint = NormalizeEndpoint(this.Context.LocalEndPoint);
+            this.IsValid = true;
         }
 
         public ConnectionContext Context { get; }
@@ -63,75 +65,41 @@ namespace Orleans.Runtime.Messaging
 
         public static void ConfigureBuilder(ConnectionBuilder builder) => builder.Run(OnConnectedDelegate);
 
-        public static async Task OnConnectedAsync(ConnectionContext context)
-        {
-            var connection = context.Features.Get<Connection>();
-
-            lock (connection.lockObj)
-            {
-                connection.IsValid = true;
-
-                connection.closeRegistration = context.ConnectionClosed.Register(
-                state => ((Connection)state).CloseInternal(new ConnectionAbortedException("Connection closed")),
-                connection);
-            }
-
-            await connection.RunInternal();
-        }
-
         public async Task Run()
         {
             Exception error = default;
             try
             {
+                // Eventually calls through to OnConnectedAsync (unless the connection delegate has been misconfigured)
                 await this.middleware(this.Context);
             }
             catch (Exception exception)
             {
                 error = exception;
             }
-
-            try
-            {
-                if (error is ConnectionAbortedException abortedException)
-                {
-                    this.CloseInternal(abortedException);
-                }
-                else if (error != null)
-                {
-                    this.CloseInternal(new ConnectionAbortedException(
-                        $"Connection aborted. See {nameof(Exception.InnerException)}",
-                        error));
-                }
-                else if (error == null)
-                {
-                    this.CloseInternal(new ConnectionAbortedException("Connection processing completed without error"));
-                }
-
-                await this.Context.DisposeAsync();
-            }
-            catch (Exception exception)
-            {
-                // Swallow any exceptions here.
-                this.Log.LogWarning(exception, "Exception closing or disposing connection with remote endpoint {EndPoint}: {Exception}", this.RemoteEndPoint, exception);
-            }
             finally
             {
-                _ = this.RerouteMessages();
+                this.CloseInternal(error);
+                this.RerouteMessages().Ignore();
+                await this.Context.DisposeAsync();
             }
         }
 
-        protected virtual async Task RunInternal()
+        private static Task OnConnectedAsync(ConnectionContext context)
         {
-            var outgoingTask = Task.Run(this.ProcessOutgoing);
-            var incomingTask = Task.Run(this.ProcessIncoming);
-            await Task.WhenAll(outgoingTask, incomingTask);
+            var connection = context.Features.Get<Connection>();
+
+            lock (connection.lockObj)
+            {
+                connection.closeRegistration = context.ConnectionClosed.Register(OnConnectionClosedDelegate, connection);
+            }
+
+            return connection.RunInternal();
         }
-        
-        public void Close(ConnectionAbortedException exception = default)
-        {
-            this.CloseInternal(exception);
-        }
+
+        protected virtual Task RunInternal() => Task.WhenAll(this.ProcessIncoming(), this.ProcessOutgoing());
+
+        public void Close(ConnectionAbortedException exception = default) => this.CloseInternal(exception);
 
         /// <summary>
         /// Called immediately prior to transporting a message.
@@ -144,7 +112,7 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void RetryMessage(Message msg, Exception ex = null);
 
-        private void CloseInternal(ConnectionAbortedException exception)
+        private void CloseInternal(Exception exception)
         {
             if (!this.IsValid) return;
 
@@ -170,17 +138,24 @@ namespace Orleans.Runtime.Messaging
                     this.Context.Transport.Output.CancelPendingFlush();
                     this.outgoingMessageWriter.TryComplete();
 
-                    if (exception == null)
+                    if (exception is null)
                     {
                         this.Context.Abort();
                     }
                     else
                     {
-                        this.Context.Abort(exception);
+                        var abortedException = exception as ConnectionAbortedException
+                            ?? new ConnectionAbortedException(
+                                    $"Connection closed. See {nameof(Exception.InnerException)}",
+                                    exception);
+
+                        this.Context.Abort(abortedException);
                     }
                 }
-                catch
+                catch (Exception innerException)
                 {
+                    // Swallow any exceptions here.
+                    this.Log.LogWarning(innerException, "Exception closing connection with remote endpoint {EndPoint}: {Exception}", this.RemoteEndPoint, innerException);
                 }
             }
         }
@@ -203,6 +178,9 @@ namespace Orleans.Runtime.Messaging
 
         private async Task ProcessIncoming()
         {
+            await Task.Yield();
+
+            Exception error = default;
             PipeReader input = default;
             var serializer = this.serviceProvider.GetRequiredService<IMessageSerializer>();
             try
@@ -264,7 +242,7 @@ namespace Orleans.Runtime.Messaging
                     "Exception while processing messages from remote endpoint {EndPoint}: {Exception}",
                     this.RemoteEndPoint,
                     exception);
-                throw;
+                error = exception;
             }
             finally
             {
@@ -276,11 +254,16 @@ namespace Orleans.Runtime.Messaging
                         "Completed processing messages from remote endpoint {EndPoint}",
                         this.RemoteEndPoint);
                 }
+
+                this.CloseInternal(error);
             }
         }
 
         private async Task ProcessOutgoing()
         {
+            await Task.Yield();
+
+            Exception error = default;   
             PipeWriter output = default;
             var serializer = this.serviceProvider.GetRequiredService<IMessageSerializer>();
             try
@@ -339,7 +322,7 @@ namespace Orleans.Runtime.Messaging
                     "Exception while processing messages to remote endpoint {EndPoint}: {Exception}",
                     this.RemoteEndPoint,
                     exception);
-                throw;
+                error = exception;
             }
             finally
             {
@@ -351,19 +334,24 @@ namespace Orleans.Runtime.Messaging
                         "Completed processing messages to remote endpoint {EndPoint}",
                         this.RemoteEndPoint);
                 }
+
+                this.CloseInternal(error);
             }
         }
 
         private async Task RerouteMessages()
         {
-            var i = 0;
-            foreach (var message in this.inflight)
+            lock (this.lockObj)
             {
-                this.OnSendMessageFailure(message, "Connection terminated");
+                foreach (var message in this.inflight)
+                {
+                    this.OnSendMessageFailure(message, "Connection terminated");
+                }
+
+                this.inflight.Clear();
             }
 
-            this.inflight.Clear();
-
+            var i = 0;
             while (this.outgoingMessages.Reader.TryRead(out var message))
             {
                 if (i == 0)
