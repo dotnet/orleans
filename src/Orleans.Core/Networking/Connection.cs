@@ -98,6 +98,7 @@ namespace Orleans.Runtime.Messaging
                 connection.closeRegistration = context.ConnectionClosed.Register(OnConnectionClosedDelegate, connection);
             }
 
+            NetworkingStatisticsGroup.OnOpenedSocket(connection.ConnectionDirection);
             return connection.RunInternal();
         }
 
@@ -126,6 +127,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (!this.IsValid) return;
                     this.IsValid = false;
+                    NetworkingStatisticsGroup.OnClosedSocket(this.ConnectionDirection);
 
                     this.closeRegistration.Dispose();
                     this.closeRegistration = default;

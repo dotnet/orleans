@@ -94,7 +94,6 @@ namespace Orleans.Runtime.Messaging
                 clientState.RecordConnection(connection);
                 clientConnections[connection] = clientState;
                 clientRegistrar.ClientAdded(clientId);
-                NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
             }
         }
 
@@ -245,7 +244,6 @@ namespace Orleans.Runtime.Messaging
 
                 DisconnectedSince = DateTime.UtcNow;
                 Connection = null;
-                NetworkingStatisticsGroup.OnClosedGatewayDuplexSocket();
             }
 
             internal void RecordConnection(GatewayInboundConnection connection)

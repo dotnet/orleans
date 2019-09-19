@@ -18,7 +18,7 @@ namespace Orleans.Runtime.Counters
         {
             MessagingStatisticsGroup.Init();
             MessagingProcessingStatisticsGroup.Init();
-            NetworkingStatisticsGroup.Init(true);
+            NetworkingStatisticsGroup.Init();
             StorageStatisticsGroup.Init();
             this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, true, serializationStatistics, loggerFactory);
             this.countersPublisher = new CountersStatistics(statisticsOptions.Value.PerfCountersWriteInterval, telemetryProducer, loggerFactory);
