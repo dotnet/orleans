@@ -38,9 +38,9 @@ namespace Orleans.Runtime.Messaging
             INetworkingTrace trace)
         {
             this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
-            this.middleware = middleware;
-            this.serviceProvider = serviceProvider;
-            this.Log = trace;
+            this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
+            this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+            this.Log = trace ?? throw new ArgumentNullException(nameof(trace));
             this.outgoingMessages = Channel.CreateUnbounded<Message>(OutgoingMessageChannelOptions);
             this.outgoingMessageWriter = this.outgoingMessages.Writer;
 
@@ -208,9 +208,9 @@ namespace Orleans.Runtime.Messaging
             var serializer = this.serviceProvider.GetRequiredService<IMessageSerializer>();
             try
             {
-                if (this.Log.IsEnabled(LogLevel.Debug))
+                if (this.Log.IsEnabled(LogLevel.Information))
                 {
-                    this.Log.LogDebug(
+                    this.Log.LogInformation(
                         "Starting to process messages from remote endpoint {RemoteEndPoint} to local endpoint {LocalEndPoint}",
                         this.RemoteEndPoint,
                         this.LocalEndPoint);
@@ -258,13 +258,22 @@ namespace Orleans.Runtime.Messaging
                     input.AdvanceTo(buffer.Start, buffer.End);
                 }
             }
+            catch (Exception exception)
+            {
+                this.Log.LogWarning(
+                    exception,
+                    "Exception while processing messages from remote endpoint {EndPoint}: {Exception}",
+                    this.RemoteEndPoint,
+                    exception);
+                throw;
+            }
             finally
             {
                 input?.Complete();
 
-                if (this.Log.IsEnabled(LogLevel.Debug))
+                if (this.Log.IsEnabled(LogLevel.Information))
                 {
-                    this.Log.LogDebug(
+                    this.Log.LogInformation(
                         "Completed processing messages from remote endpoint {EndPoint}",
                         this.RemoteEndPoint);
                 }
@@ -279,9 +288,9 @@ namespace Orleans.Runtime.Messaging
             {
                 output = this.Context.Transport.Output;
                 var reader = this.outgoingMessages.Reader;
-                if (this.Log.IsEnabled(LogLevel.Debug))
+                if (this.Log.IsEnabled(LogLevel.Information))
                 {
-                    this.Log.LogDebug(
+                    this.Log.LogInformation(
                         "Starting to process messages from local endpoint {LocalEndPoint} to remote endpoint {RemoteEndPoint}",
                         this.LocalEndPoint,
                         this.RemoteEndPoint);
@@ -324,13 +333,22 @@ namespace Orleans.Runtime.Messaging
                     inflight.Clear();
                 }
             }
+            catch (Exception exception)
+            {
+                this.Log.LogWarning(
+                    exception,
+                    "Exception while processing messages to remote endpoint {EndPoint}: {Exception}",
+                    this.RemoteEndPoint,
+                    exception);
+                throw;
+            }
             finally
             {
                 output?.Complete();
 
-                if (this.Log.IsEnabled(LogLevel.Debug))
+                if (this.Log.IsEnabled(LogLevel.Information))
                 {
-                    this.Log.LogDebug(
+                    this.Log.LogInformation(
                         "Completed processing messages to remote endpoint {EndPoint}",
                         this.RemoteEndPoint);
                 }
@@ -377,9 +395,9 @@ namespace Orleans.Runtime.Messaging
 
         private void RerouteMessage(Message message)
         {
-            if (this.Log.IsEnabled(LogLevel.Debug))
+            if (this.Log.IsEnabled(LogLevel.Information))
             {
-                this.Log.LogDebug(
+                this.Log.LogInformation(
                     "Rerouting message {Message} from remote endpoint {EndPoint}",
                     message,
                     this.RemoteEndPoint?.ToString() ?? "(never connected)");
