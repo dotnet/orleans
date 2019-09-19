@@ -79,13 +79,10 @@ namespace Orleans.Runtime
         private static HistogramValueStatistic receiveMsgSizeHistogram;
         private const int NUM_MSG_SIZE_HISTOGRAM_CATEGORIES = 31;
 
-        internal static void Init(bool silo)
+        internal static void Init()
         {
-            if (silo)
-            {
-                LocalMessagesSent = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_SENT_LOCALMESSAGES);
-                ConnectedClientCount = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_CONNECTED_CLIENTS, false);
-            }
+            LocalMessagesSent = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_SENT_LOCALMESSAGES);
+            ConnectedClientCount = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_CONNECTED_CLIENTS, false);
 
             MessagesSentTotal = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_SENT_MESSAGES_TOTAL);
             MessagesSentPerDirection = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
@@ -129,18 +126,15 @@ namespace Orleans.Runtime
 
             perSocketDirectionStatsSend = new PerSocketDirectionStats[Enum.GetValues(typeof(ConnectionDirection)).Length];
             perSocketDirectionStatsReceive = new PerSocketDirectionStats[Enum.GetValues(typeof(ConnectionDirection)).Length];
-            if (silo)
-            {
-                perSocketDirectionStatsSend[(int)ConnectionDirection.SiloToSilo] = new PerSocketDirectionStats(true, ConnectionDirection.SiloToSilo);
-                perSocketDirectionStatsSend[(int)ConnectionDirection.GatewayToClient] = new PerSocketDirectionStats(true, ConnectionDirection.GatewayToClient);
-                perSocketDirectionStatsReceive[(int)ConnectionDirection.SiloToSilo] = new PerSocketDirectionStats(false, ConnectionDirection.SiloToSilo);
-                perSocketDirectionStatsReceive[(int)ConnectionDirection.GatewayToClient] = new PerSocketDirectionStats(false, ConnectionDirection.GatewayToClient);
-            }
-            else
-            {
-                perSocketDirectionStatsSend[(int)ConnectionDirection.ClientToGateway] = new PerSocketDirectionStats(true, ConnectionDirection.ClientToGateway);
-                perSocketDirectionStatsReceive[(int)ConnectionDirection.ClientToGateway] = new PerSocketDirectionStats(false, ConnectionDirection.ClientToGateway);
-            }
+
+            perSocketDirectionStatsSend[(int)ConnectionDirection.SiloToSilo] = new PerSocketDirectionStats(true, ConnectionDirection.SiloToSilo);
+            perSocketDirectionStatsReceive[(int)ConnectionDirection.SiloToSilo] = new PerSocketDirectionStats(false, ConnectionDirection.SiloToSilo);
+
+            perSocketDirectionStatsSend[(int)ConnectionDirection.GatewayToClient] = new PerSocketDirectionStats(true, ConnectionDirection.GatewayToClient);
+            perSocketDirectionStatsReceive[(int)ConnectionDirection.GatewayToClient] = new PerSocketDirectionStats(false, ConnectionDirection.GatewayToClient);
+
+            perSocketDirectionStatsSend[(int)ConnectionDirection.ClientToGateway] = new PerSocketDirectionStats(true, ConnectionDirection.ClientToGateway);
+            perSocketDirectionStatsReceive[(int)ConnectionDirection.ClientToGateway] = new PerSocketDirectionStats(false, ConnectionDirection.ClientToGateway);
 
             perSiloSendCounters = new ConcurrentDictionary<string, CounterStatistic>();
             perSiloReceiveCounters = new ConcurrentDictionary<string, CounterStatistic>();

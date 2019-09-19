@@ -1,4 +1,4 @@
-﻿namespace Orleans.Runtime
+namespace Orleans.Runtime
 {
     internal class NetworkingStatisticsGroup
     {
@@ -36,7 +36,7 @@
             }
             else
             {
-                closedClientToGatewayDuplexSockets = CounterStatistic.FindOrCreate(StatisticNames.NETWORKING_SOCKETS_CLIENTTOGATEWAY_DUPLEX_CLOSED );
+                closedClientToGatewayDuplexSockets = CounterStatistic.FindOrCreate(StatisticNames.NETWORKING_SOCKETS_CLIENTTOGATEWAY_DUPLEX_CLOSED);
                 openedClientToGatewayDuplexSockets = CounterStatistic.FindOrCreate(StatisticNames.NETWORKING_SOCKETS_CLIENTTOGATEWAY_DUPLEX_OPENED);
             }
         }

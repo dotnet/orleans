@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Counters
             ITelemetryProducer telemetryProducer,
             ILoggerFactory loggerFactory)
         {
-            MessagingStatisticsGroup.Init(true);
+            MessagingStatisticsGroup.Init();
             MessagingProcessingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init(true);
             StorageStatisticsGroup.Init();
