@@ -39,8 +39,6 @@ namespace Orleans.Runtime.Messaging
             this.RemoteSiloAddress = remoteSiloAddress;
         }
 
-        protected override IMessageCenter MessageCenter => this.messageCenter;
-
         public SiloAddress RemoteSiloAddress { get; private set; }
 
         public SiloAddress LocalSiloAddress { get; }

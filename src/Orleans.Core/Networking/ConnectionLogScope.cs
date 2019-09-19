@@ -1,19 +1,18 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Globalization;
 
 namespace Orleans.Runtime.Messaging
 {
     internal class ConnectionLogScope : IReadOnlyList<KeyValuePair<string, object>>
     {
-        private readonly string _connectionId;
+        private readonly Connection _connection;
 
         private string _cachedToString;
 
-        public ConnectionLogScope(string connectionId)
+        public ConnectionLogScope(Connection connection)
         {
-            _connectionId = connectionId;
+            _connection = connection;
         }
 
         public KeyValuePair<string, object> this[int index]
@@ -22,14 +21,24 @@ namespace Orleans.Runtime.Messaging
             {
                 if (index == 0)
                 {
-                    return new KeyValuePair<string, object>("ConnectionId", _connectionId);
+                    return new KeyValuePair<string, object>(nameof(Connection.ConnectionId), _connection.ConnectionId);
+                }
+
+                if (index == 1)
+                {
+                    return new KeyValuePair<string, object>(nameof(Connection.LocalEndPoint), _connection.LocalEndPoint);
+                }
+
+                if (index == 2)
+                {
+                    return new KeyValuePair<string, object>(nameof(Connection.RemoteEndPoint), _connection.RemoteEndPoint);
                 }
 
                 throw new ArgumentOutOfRangeException(nameof(index));
             }
         }
 
-        public int Count => 1;
+        public int Count => 3;
 
         public IEnumerator<KeyValuePair<string, object>> GetEnumerator()
         {
@@ -48,10 +57,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (_cachedToString == null)
             {
-                _cachedToString = string.Format(
-                    CultureInfo.InvariantCulture,
-                    "ConnectionId:{0}",
-                    _connectionId);
+                _cachedToString = _connection.ToString();
             }
 
             return _cachedToString;

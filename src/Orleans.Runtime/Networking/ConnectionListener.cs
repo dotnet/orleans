@@ -206,7 +206,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (this.trace.IsEnabled(LogLevel.Critical))
             {
-                return this.trace.BeginScope(new ConnectionLogScope(connection.Context.ConnectionId));
+                return this.trace.BeginScope(new ConnectionLogScope(connection));
             }
 
             return null;

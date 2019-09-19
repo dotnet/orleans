@@ -52,19 +52,23 @@ namespace Orleans.Runtime.Messaging
             this.IsValid = true;
         }
 
-        public ConnectionContext Context { get; }
-        protected INetworkingTrace Log { get; }
-        protected abstract IMessageCenter MessageCenter { get; }
+        public string ConnectionId => this.Context?.ConnectionId;
         public virtual EndPoint RemoteEndPoint { get; }
         public virtual EndPoint LocalEndPoint { get; }
         protected CounterStatistic MessageReceivedCounter { get; set; }
         protected CounterStatistic MessageSentCounter { get; set; }
+        protected ConnectionContext Context { get; }
+        protected INetworkingTrace Log { get; }
         protected abstract ConnectionDirection ConnectionDirection { get; }
 
         public bool IsValid { get; private set; }
 
         public static void ConfigureBuilder(ConnectionBuilder builder) => builder.Run(OnConnectedDelegate);
 
+        /// <summary>
+        /// Start processing this connection.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> which completes when the connection terminates and has completed processing.</returns>
         public async Task Run()
         {
             Exception error = default;
@@ -125,6 +129,7 @@ namespace Orleans.Runtime.Messaging
 
                     this.closeRegistration.Dispose();
                     this.closeRegistration = default;
+
                     if (this.Log.IsEnabled(LogLevel.Information))
                     {
                         this.Log.LogInformation(
@@ -188,7 +193,7 @@ namespace Orleans.Runtime.Messaging
                 if (this.Log.IsEnabled(LogLevel.Information))
                 {
                     this.Log.LogInformation(
-                        "Starting to process messages from remote endpoint {RemoteEndPoint} to local endpoint {LocalEndPoint}",
+                        "Starting to process messages from remote endpoint {Remote} to local endpoint {Local}",
                         this.RemoteEndPoint,
                         this.LocalEndPoint);
                 }
@@ -219,7 +224,7 @@ namespace Orleans.Runtime.Messaging
                             catch (Exception exception)
                             {
                                 this.Log.LogWarning(
-                                    "Exception reading message {Message} from remote endpoint {RemoteEndPoint} to local endpoint {LocalEndPoint}: {Exception}",
+                                    "Exception reading message {Message} from remote endpoint {Remote} to local endpoint {Local}: {Exception}",
                                     message,
                                     this.RemoteEndPoint,
                                     this.LocalEndPoint,
@@ -273,7 +278,7 @@ namespace Orleans.Runtime.Messaging
                 if (this.Log.IsEnabled(LogLevel.Information))
                 {
                     this.Log.LogInformation(
-                        "Starting to process messages from local endpoint {LocalEndPoint} to remote endpoint {RemoteEndPoint}",
+                        "Starting to process messages from local endpoint {Local} to remote endpoint {Remote}",
                         this.LocalEndPoint,
                         this.RemoteEndPoint);
                 }

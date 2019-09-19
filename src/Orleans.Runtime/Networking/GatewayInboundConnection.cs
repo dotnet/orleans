@@ -50,8 +50,6 @@ namespace Orleans.Runtime.Messaging
             this.MessageSentCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
         }
 
-        protected override IMessageCenter MessageCenter => this.messageCenter;
-
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.GatewayToClient;
 
         protected override void OnReceivedMessage(Message msg)
