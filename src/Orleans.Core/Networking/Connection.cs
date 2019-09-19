@@ -29,6 +29,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ChannelWriter<Message> outgoingMessageWriter;
         private readonly object lockObj = new object();
         private readonly List<Message> inflight = new List<Message>(4);
+        private CancellationTokenRegistration closeRegistration;
 
         protected Connection(
             ConnectionContext connection,
@@ -48,7 +49,6 @@ namespace Orleans.Runtime.Messaging
 
             this.RemoteEndPoint = NormalizeEndpoint(this.Context.RemoteEndPoint);
             this.LocalEndPoint = NormalizeEndpoint(this.Context.LocalEndPoint);
-            this.IsValid = true;
         }
 
         public ConnectionContext Context { get; }
@@ -67,9 +67,16 @@ namespace Orleans.Runtime.Messaging
         public static async Task OnConnectedAsync(ConnectionContext context)
         {
             var connection = context.Features.Get<Connection>();
-            context.ConnectionClosed.Register(
+
+            lock (connection.lockObj)
+            {
+                connection.IsValid = true;
+
+                connection.closeRegistration = context.ConnectionClosed.Register(
                 state => ((Connection)state).CloseInternal(new ConnectionAbortedException("Connection closed")),
                 connection);
+            }
+
             await connection.RunInternal();
         }
 
@@ -104,9 +111,10 @@ namespace Orleans.Runtime.Messaging
 
                 await this.Context.DisposeAsync();
             }
-            catch
+            catch (Exception exception)
             {
                 // Swallow any exceptions here.
+                this.Log.LogWarning(exception, "Exception closing or disposing connection with remote endpoint {EndPoint}: {Exception}", this.RemoteEndPoint, exception);
             }
             finally
             {
@@ -123,20 +131,7 @@ namespace Orleans.Runtime.Messaging
         
         public void Close(ConnectionAbortedException exception = default)
         {
-            lock (this.lockObj)
-            {
-                if (!this.IsValid) return;
-
-                if (this.Log.IsEnabled(LogLevel.Information))
-                {
-                    this.Log.LogInformation(
-                        "Closing connection with remote endpoint {EndPoint}",
-                        this.RemoteEndPoint,
-                        Environment.StackTrace);
-                }
-
-                this.CloseInternal(exception);
-            }
+            this.CloseInternal(exception);
         }
 
         /// <summary>
@@ -152,12 +147,24 @@ namespace Orleans.Runtime.Messaging
 
         private void CloseInternal(ConnectionAbortedException exception)
         {
+            if (!this.IsValid) return;
+
             lock (this.lockObj)
             {
                 try
                 {
                     if (!this.IsValid) return;
                     this.IsValid = false;
+
+                    this.closeRegistration.Dispose();
+                    this.closeRegistration = default;
+                    if (this.Log.IsEnabled(LogLevel.Information))
+                    {
+                        this.Log.LogInformation(
+                            "Closing connection with remote endpoint {EndPoint}",
+                            this.RemoteEndPoint,
+                            Environment.StackTrace);
+                    }
 
                     // Try to gracefully stop the reader/writer loops.
                     this.Context.Transport.Input.CancelPendingRead();

@@ -123,11 +123,12 @@ namespace Orleans.Runtime.Messaging
                         var connectionTask = connection.Run();
                         this.connections.TryAdd(connection, connectionTask);
                         await connectionTask;
+                        this.trace.LogInformation("Connection {@Connection} terminated", connection);
                     }
                 }
                 catch (Exception exception)
                 {
-                    this.trace.LogDebug(exception, "Connection {@Connection} terminated with an exception", connection);
+                    this.trace.LogInformation(exception, "Connection {@Connection} terminated with an exception", connection);
                 }
                 finally
                 {
