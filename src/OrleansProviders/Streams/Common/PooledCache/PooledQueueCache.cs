@@ -100,7 +100,10 @@ namespace Orleans.Providers.Streams.Common
             // If nothing in cache, unset token, and wait for more data.
             if (this.First == null || this.First.IsEmpty)
             {
-                cursor.State = CursorStates.Unset;
+                if(cursor.State != CursorStates.Idle)
+                {
+                    cursor.State = CursorStates.Unset;
+                }
                 cursor.SequenceToken = sequenceToken;
                 return;
             }
@@ -130,10 +133,18 @@ namespace Orleans.Providers.Streams.Common
             CachedMessage oldestMessage = this.Last.OldestMessage;
             if (oldestMessage.Compare(sequenceToken) > 0)
             {
-                // throw cache miss exception
-                throw new QueueCacheMissException(sequenceToken,
-                    this.Last.GetOldestSequenceToken(),
-                    this.First.GetNewestSequenceToken());
+                if (cursor.State != CursorStates.Idle)
+                {
+                    // throw cache miss exception
+                    throw new QueueCacheMissException(sequenceToken,
+                        this.Last.GetOldestSequenceToken(),
+                        this.First.GetNewestSequenceToken());
+                }
+                // we were idle and got woken up, so something must have shown up for us, start from back and walk forward
+                cursor.State = CursorStates.Unset;
+                cursor.CurrentBlock = this.Last;
+                cursor.Index = this.Last.OldestMessageIndex;
+                sequenceToken = cursor.SequenceToken = this.Last.GetOldestSequenceToken().ToArray();
             }
 
             // Find block containing sequence number, starting from the newest and working back to oldest
@@ -271,6 +282,10 @@ namespace Orleans.Providers.Streams.Common
 
         private void Add(in CachedMessage message)
         {
+            if(this.First != null && First.NewestMessage.Compare(message.SequenceToken()) >= 0 )
+            {
+                throw new IndexOutOfRangeException();
+            }
             // allocate message from pool
             CachedMessageBlock block = pool.AllocateMessage(message);
 
