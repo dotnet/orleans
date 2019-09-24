@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,6 +16,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ClientMessageCenter messageCenter;
         private readonly ConnectionManager connectionManager;
         private readonly ConnectionOptions connectionOptions;
+        private readonly SiloAddress remoteSiloAddress;
 
         public ClientOutboundConnection(
             SiloAddress remoteSiloAddress,
@@ -32,12 +34,12 @@ namespace Orleans.Runtime.Messaging
             this.messageCenter = messageCenter;
             this.connectionManager = connectionManager;
             this.connectionOptions = connectionOptions;
-            this.RemoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
+            this.remoteSiloAddress = remoteSiloAddress ?? throw new ArgumentNullException(nameof(remoteSiloAddress));
+            this.MessageReceivedCounter = MessagingStatisticsGroup.GetMessageReceivedCounter(this.remoteSiloAddress);
+            this.MessageSentCounter = MessagingStatisticsGroup.GetMessageSendCounter(this.remoteSiloAddress);
         }
 
-        protected override IMessageCenter MessageCenter => this.messageCenter;
-        
-        public SiloAddress RemoteSiloAddress { get; }
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.ClientToGateway;
 
         protected override void OnReceivedMessage(Message message)
         {
@@ -66,6 +68,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunInternal()
         {
+            Exception error = default;
             try
             {
                 this.messageCenter.OnGatewayConnectionOpen();
@@ -87,9 +90,13 @@ namespace Orleans.Runtime.Messaging
 
                 await base.RunInternal();
             }
+            catch (Exception exception) when ((error = exception) is null)
+            {
+                Debug.Fail("Execution should not be able to reach this point.");
+            }
             finally
             {
-                this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this);
+                this.connectionManager.OnConnectionTerminated(this.remoteSiloAddress, this, error);
                 this.messageCenter.OnGatewayConnectionClosed();
             }
         }
@@ -108,7 +115,7 @@ namespace Orleans.Runtime.Messaging
 
             if (msg.TargetSilo != null) return true;
 
-            msg.TargetSilo = this.RemoteSiloAddress;
+            msg.TargetSilo = this.remoteSiloAddress;
             if (msg.TargetGrain.IsSystemTarget)
                 msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, msg.TargetSilo);
 

@@ -37,7 +37,7 @@ namespace NonSilo.Tests.Membership
 
         public ClusterHealthMonitorTests(ITestOutputHelper output)
         {
-            MessagingStatisticsGroup.Init(true);
+            MessagingStatisticsGroup.Init();
             this.output = output;
             this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(this.output) });
 

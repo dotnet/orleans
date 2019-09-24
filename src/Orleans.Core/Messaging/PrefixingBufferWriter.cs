@@ -21,11 +21,6 @@ namespace Orleans.Runtime.Messaging
         private readonly MemoryPool<T> memoryPool;
 
         /// <summary>
-        /// The underlying buffer writer.
-        /// </summary>
-        private readonly TBufferWriter innerWriter;
-
-        /// <summary>
         /// The length of the header.
         /// </summary>
         private readonly int expectedPrefixSize;
@@ -34,6 +29,11 @@ namespace Orleans.Runtime.Messaging
         /// A hint from our owner at the size of the payload that follows the header.
         /// </summary>
         private readonly int payloadSizeHint;
+
+        /// <summary>
+        /// The underlying buffer writer.
+        /// </summary>
+        private TBufferWriter innerWriter;
 
         /// <summary>
         /// The memory reserved for the header from the <see cref="innerWriter"/>.
@@ -61,26 +61,20 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// Initializes a new instance of the <see cref="PrefixingBufferWriter{T, TBufferWriter}"/> class.
         /// </summary>
-        /// <param name="innerWriter">The underlying writer that should ultimately receive the prefix and payload.</param>
         /// <param name="prefixSize">The length of the header to reserve space for. Must be a positive number.</param>
         /// <param name="payloadSizeHint">A hint at the expected max size of the payload. The real size may be more or less than this, but additional copying is avoided if it does not exceed this amount. If 0, a reasonable guess is made.</param>
         /// <param name="memoryPool"></param>
-        public PrefixingBufferWriter(TBufferWriter innerWriter, int prefixSize, int payloadSizeHint, MemoryPool<T> memoryPool)
+        public PrefixingBufferWriter(int prefixSize, int payloadSizeHint, MemoryPool<T> memoryPool)
         {
             if (prefixSize <= 0)
             {
                 ThrowPrefixSize();
             }
 
-            this.innerWriter = innerWriter;
-
-            // TODO: clean up this equals
-            if (innerWriter.Equals(default(TBufferWriter))) ThrowInnerWriter();
             this.expectedPrefixSize = prefixSize;
             this.payloadSizeHint = payloadSizeHint;
             this.memoryPool = memoryPool;
             void ThrowPrefixSize() => throw new ArgumentOutOfRangeException(nameof(prefixSize));
-            void ThrowInnerWriter() => throw new ArgumentNullException(nameof(innerWriter));
         }
 
         public int CommittedBytes { get; private set; }
@@ -174,12 +168,22 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void PartialReset()
+        /// <summary>
+        /// Resets this instance to a reusable state.
+        /// </summary>
+        /// <param name="writer">The underlying writer that should ultimately receive the prefix and payload.</param>
+        public void Reset(TBufferWriter writer)
         {
             this.advanced = 0;
             this.CommittedBytes = 0;
             this.privateWriter?.Dispose();
             this.privateWriter = null;
+            this.prefixMemory = default;
+            this.realMemory = default;
+
+            if (writer.Equals(default(TBufferWriter))) ThrowInnerWriter();
+            void ThrowInnerWriter() => throw new ArgumentNullException(nameof(writer));
+            this.innerWriter = writer;
         }
 
         /// <summary>

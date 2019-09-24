@@ -80,10 +80,9 @@ namespace Orleans.Runtime.MembershipService
                 members.Length,
                 Utils.EnumerableToString(members));
 
-            var pingCancellation = new CancellationTokenSource(this.clusterMembershipOptions.ProbeTimeout).Token;
             foreach (var silo in members)
             {
-                tasks.Add(this.createMonitor(silo).Probe(Interlocked.Increment(ref this.probeNumber), pingCancellation));
+                tasks.Add(this.createMonitor(silo).Probe(Interlocked.Increment(ref this.probeNumber), CancellationToken.None));
             }
 
             try

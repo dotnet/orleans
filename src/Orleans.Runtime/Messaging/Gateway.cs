@@ -74,7 +74,7 @@ namespace Orleans.Runtime.Messaging
         {
             lock (lockable)
             {
-                logger.LogInformation((int)ErrorCode.GatewayClientOpenedSocket, "Recorded opened connection from endpoint {EndPoint}, client ID {ClientId}.", connection.RemoteEndpoint, clientId);
+                logger.LogInformation((int)ErrorCode.GatewayClientOpenedSocket, "Recorded opened connection from endpoint {EndPoint}, client ID {ClientId}.", connection.RemoteEndPoint, clientId);
                 ClientState clientState;
                 if (clients.TryGetValue(clientId, out clientState))
                 {
@@ -94,7 +94,6 @@ namespace Orleans.Runtime.Messaging
                 clientState.RecordConnection(connection);
                 clientConnections[connection] = clientState;
                 clientRegistrar.ClientAdded(clientId);
-                NetworkingStatisticsGroup.OnOpenedGatewayDuplexSocket();
             }
         }
 
@@ -111,7 +110,7 @@ namespace Orleans.Runtime.Messaging
                 logger.LogInformation(
                     (int)ErrorCode.GatewayClientClosedSocket,
                     "Recorded closed socket from endpoint {Endpoint}, client ID {clientId}.",
-                    connection.RemoteEndpoint?.ToString() ?? "null",
+                    connection.RemoteEndPoint?.ToString() ?? "null",
                     clientState.Id);
             }
         }
@@ -245,7 +244,6 @@ namespace Orleans.Runtime.Messaging
 
                 DisconnectedSince = DateTime.UtcNow;
                 Connection = null;
-                NetworkingStatisticsGroup.OnClosedGatewayDuplexSocket();
             }
 
             internal void RecordConnection(GatewayInboundConnection connection)

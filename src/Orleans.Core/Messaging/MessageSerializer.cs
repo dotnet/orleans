@@ -9,11 +9,14 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class MessageSerializer : IMessageSerializer
     {
+        private const int FramingLength = Message.LENGTH_HEADER_SIZE;
+        private const int MessageSizeHint = 4096;
         private readonly HeadersSerializer headersSerializer;
         private readonly OrleansSerializer<object> objectSerializer;
         private readonly MemoryPool<byte> memoryPool;
         private readonly int maxHeaderLength;
         private readonly int maxBodyLength;
+        private object bufferWriter;
 
         public MessageSerializer(
             SerializationManager serializationManager,
@@ -28,50 +31,39 @@ namespace Orleans.Runtime.Messaging
             this.maxBodyLength = maxBodySize;
         }
 
-        public int TryRead(ref ReadOnlySequence<byte> input, out Message message)
+        public (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message message)
         {
             message = default;
-            if (input.Length < 8)
+            if (input.Length < FramingLength)
             {
-                return 8;
+                return (FramingLength, 0, 0);
             }
 
-            (int, int) ReadLengths(ReadOnlySequence<byte> b)
-            {
-                Span<byte> lengthBytes = stackalloc byte[8];
-                b.Slice(0, 8).CopyTo(lengthBytes);
-                return (BinaryPrimitives.ReadInt32LittleEndian(lengthBytes), BinaryPrimitives.ReadInt32LittleEndian(lengthBytes.Slice(4)));
-            }
-
-            var (headerLength, bodyLength) = ReadLengths(input);
+            Span<byte> lengthBytes = stackalloc byte[FramingLength];
+            input.Slice(input.Start, FramingLength).CopyTo(lengthBytes);
+            var headerLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
+            var bodyLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes.Slice(4));
 
             // Check lengths
             ThrowIfLengthsInvalid(headerLength, bodyLength);
 
-            var requiredBytes = 8 + headerLength + bodyLength;
+            var requiredBytes = FramingLength + headerLength + bodyLength;
             if (input.Length < requiredBytes)
             {
                 message = default;
-                return requiredBytes;
+                return (requiredBytes, 0, 0);
             }
 
-            if (headerLength == 0)
-            {
-                input = input.Slice(requiredBytes);
-                message = default;
-                return requiredBytes;
-            }
-
-            // decode header
-            var header = input.Slice(Message.LENGTH_HEADER_SIZE, headerLength);
-
-            // decode body
-            int bodyOffset = Message.LENGTH_HEADER_SIZE + headerLength;
-            var body = input.Slice(bodyOffset, bodyLength);
-
-            // build message
             try
             {
+                // decode header
+                var header = input.Slice(FramingLength, headerLength);
+
+                // decode body
+                int bodyOffset = FramingLength + headerLength;
+                var body = input.Slice(bodyOffset, bodyLength);
+
+                // build message
                 this.headersSerializer.Deserialize(header, out var headersContainer);
                 message = new Message
                 {
@@ -82,19 +74,24 @@ namespace Orleans.Runtime.Messaging
                 // Separating the two allows for these kinds of errors to be propagated back to the caller.
                 this.objectSerializer.Deserialize(body, out var bodyObject);
                 message.BodyObject = bodyObject;
+
+                return (0, headerLength, bodyLength);
             }
             finally
             {
                 input = input.Slice(requiredBytes);
             }
-
-            return 0;
         }
 
-        public void Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
+        public (int HeaderLength, int BodyLength) Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
-            var buffer = new PrefixingBufferWriter<byte, TBufferWriter>(writer, 8, 4096, this.memoryPool);
-            Span<byte> lengthFields = stackalloc byte[8];
+            if (!(this.bufferWriter is PrefixingBufferWriter<byte, TBufferWriter> buffer))
+            {
+                this.bufferWriter = buffer = new PrefixingBufferWriter<byte, TBufferWriter>(FramingLength, MessageSizeHint, this.memoryPool);
+            }
+
+            buffer.Reset(writer);
+            Span<byte> lengthFields = stackalloc byte[FramingLength];
 
             this.headersSerializer.Serialize(buffer, message.Headers);
             var headerLength = buffer.CommittedBytes;
@@ -111,6 +108,7 @@ namespace Orleans.Runtime.Messaging
             ThrowIfLengthsInvalid(headerLength, bodyLength);
 
             buffer.Complete(lengthFields);
+            return (headerLength, bodyLength);
         }
 
         private void ThrowIfLengthsInvalid(int headerLength, int bodyLength)

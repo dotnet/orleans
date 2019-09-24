@@ -28,7 +28,7 @@ namespace Tester.ClientConnectionTests
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.Configure<NetworkingOptions>(options => options.OpenConnectionTimeout = Timeout);
+                hostBuilder.Configure<ConnectionOptions>(options => options.OpenConnectionTimeout = Timeout);
             }
         }
 

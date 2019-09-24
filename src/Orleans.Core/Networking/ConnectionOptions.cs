@@ -24,7 +24,13 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan ConnectionRetryDelay { get; set; } = TimeSpan.FromSeconds(1);
 
-        internal void ConfigureConnection(Action<IConnectionBuilder> configure) => this.connectionBuilder.Add(configure);
+        /// <summary>
+        /// The timeout before a connection open is assumed to have failed
+        /// </summary>
+        public TimeSpan OpenConnectionTimeout { get; set; } = DEFAULT_OPENCONNECTION_TIMEOUT;
+        public static readonly TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT = TimeSpan.FromSeconds(5);
+
+        public void ConfigureConnection(Action<IConnectionBuilder> configure) => this.connectionBuilder.Add(configure);
 
         internal void ConfigureConnectionBuilder(IConnectionBuilder builder) => this.connectionBuilder.Invoke(builder);
 

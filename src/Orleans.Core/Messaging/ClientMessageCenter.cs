@@ -45,6 +45,7 @@ namespace Orleans.Messaging
     // </summary>
     internal class ClientMessageCenter : IMessageCenter, IDisposable
     {
+        private readonly object grainBucketUpdateLock = new object();
         internal readonly SerializationManager SerializationManager;
 
         internal static readonly TimeSpan MINIMUM_INTERCONNECT_DELAY = TimeSpan.FromMilliseconds(100);   // wait one tenth of a second between connect attempts
@@ -186,7 +187,7 @@ namespace Orleans.Messaging
                         ErrorCode.ProxyClient_QueueRequest,
                         "Sending message {0} via gateway {1}",
                         msg,
-                        connection.RemoteEndpoint);
+                        connection.RemoteEndPoint);
                 }
             }
             else
@@ -198,6 +199,8 @@ namespace Orleans.Messaging
                     try
                     {
                         var connection = await task;
+
+                        // If the connection returned is null then the message was already rejected due to a failure.
                         if (connection is null) return;
 
                         connection.Send(message);
@@ -208,12 +211,26 @@ namespace Orleans.Messaging
                                 ErrorCode.ProxyClient_QueueRequest,
                                 "Sending message {0} via gateway {1}",
                                 message,
-                                connection.RemoteEndpoint);
+                                connection.RemoteEndPoint);
                         }
                     }
-                    catch
+                    catch (Exception exception)
                     {
-                        this.SendMessage(message);
+                        if (message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
+                        {
+                            ++message.RetryCount;
+
+                            _ = Task.Factory.StartNew(
+                                state => this.SendMessage((Message)state),
+                                message,
+                                CancellationToken.None,
+                                TaskCreationOptions.DenyChildAttach,
+                                TaskScheduler.Default);
+                        }
+                        else
+                        {
+                            this.RejectMessage(message, $"Unable to send message due to exception {exception}", exception);
+                        }
                     }
                 }
             }
@@ -224,7 +241,8 @@ namespace Orleans.Messaging
             // If there's a specific gateway specified, use it
             if (msg.TargetSilo != null && gatewayManager.GetLiveGateways().Contains(msg.TargetSilo))
             {
-                var connectionTask = this.connectionManager.GetConnection(msg.TargetSilo);
+                var siloAddress = SiloAddress.New(msg.TargetSilo.Endpoint, 0);
+                var connectionTask = this.connectionManager.GetConnection(siloAddress);
                 if (connectionTask.IsCompletedSuccessfully) return connectionTask;
 
                 return ConnectAsync(msg.TargetSilo, connectionTask, msg, directGatewayMessage: true);
@@ -292,32 +310,28 @@ namespace Orleans.Messaging
             var gatewayConnection = this.connectionManager.GetConnection(addr);
             if (gatewayConnection.IsCompletedSuccessfully)
             {
-                var result = this.TryUpdateConnection(index, gatewayConnection.Result, weakRef);
-                if (result == null) return this.GetGatewayConnection(msg);
-                return new ValueTask<Connection>(result);
+                this.UpdateBucket(index, gatewayConnection.Result);
+                return gatewayConnection;
             }
 
-            return AddToBucketAsync(index, msg, gatewayConnection, weakRef, addr);
+            return AddToBucketAsync(index, gatewayConnection, addr);
 
             async ValueTask<Connection> AddToBucketAsync(
-                uint i,
-                Message message,
-                ValueTask<Connection> c,
-                WeakReference<Connection> existing,
+                uint bucketIndex,
+                ValueTask<Connection> connectionTask,
                 SiloAddress gatewayAddress)
             {
                 try
                 {
-                    var connection = await c;
-
-                    var result = this.TryUpdateConnection(i, connection, existing);
-                    if (result == null) return await this.GetGatewayConnection(message);
-                    return result;
+                    var connection = await connectionTask.ConfigureAwait(false);
+                    this.UpdateBucket(bucketIndex, connection);
+                    return connection;
                 }
-                catch (Exception)
+                catch
                 {
                     this.gatewayManager.MarkAsDead(gatewayAddress);
-                    return await this.GetGatewayConnection(message);
+                    this.UpdateBucket(bucketIndex, null);
+                    throw;
                 }
             }
 
@@ -344,28 +358,13 @@ namespace Orleans.Messaging
             }
         }
 
-        private Connection TryUpdateConnection(uint index, Connection connection, WeakReference<Connection> existing)
+        private void UpdateBucket(uint index, Connection connection)
         {
-            WeakReference<Connection> result;
-            var replacement = new WeakReference<Connection>(connection);
-            var newWeakRef = Interlocked.CompareExchange(ref grainBuckets[index], replacement, existing);
-            if (newWeakRef == existing)
+            lock (this.grainBucketUpdateLock)
             {
-                result = replacement;
-            }
-            else
-            {
-                result = newWeakRef;
-            }
-
-            if (result != null && result.TryGetTarget(out var existingConnection))
-            {
-                return existingConnection;
-            }
-            else
-            {
-                // If the reference has expired, retry with this non-expired reference.
-                return this.TryUpdateConnection(index, connection, result);
+                var value = this.grainBuckets[index] ?? new WeakReference<Connection>(connection);
+                value.SetTarget(connection);
+                this.grainBuckets[index] = value;
             }
         }
 

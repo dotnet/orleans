@@ -16,9 +16,9 @@ namespace Orleans.Runtime.Counters
             ITelemetryProducer telemetryProducer,
             ILoggerFactory loggerFactory)
         {
-            MessagingStatisticsGroup.Init(true);
+            MessagingStatisticsGroup.Init();
             MessagingProcessingStatisticsGroup.Init();
-            NetworkingStatisticsGroup.Init(true);
+            NetworkingStatisticsGroup.Init();
             StorageStatisticsGroup.Init();
             this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, true, serializationStatistics, loggerFactory);
             this.countersPublisher = new CountersStatistics(statisticsOptions.Value.PerfCountersWriteInterval, telemetryProducer, loggerFactory);

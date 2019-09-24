@@ -32,14 +32,12 @@ namespace Orleans.Runtime
     internal class StatisticNames
     {
         // Networking
-        public static readonly StatisticName NETWORKING_SOCKETS_SILO_SENDING_CLOSED         = new StatisticName("Networking.Sockets.Silo.Sending.Closed");
-        public static readonly StatisticName NETWORKING_SOCKETS_SILO_SENDING_OPENED         = new StatisticName("Networking.Sockets.Silo.Sending.Opened");
-        public static readonly StatisticName NETWORKING_SOCKETS_SILO_RECEIVING_CLOSED       = new StatisticName("Networking.Sockets.Silo.Receiving.Closed");
-        public static readonly StatisticName NETWORKING_SOCKETS_SILO_RECEIVING_OPENED       = new StatisticName("Networking.Sockets.Silo.Receiving.Opened");
-        public static readonly StatisticName NETWORKING_SOCKETS_GATEWAYTOCLIENT_DUPLEX_CLOSED    = new StatisticName("Networking.Sockets.GatewayToClient.Duplex.Closed");
-        public static readonly StatisticName NETWORKING_SOCKETS_GATEWAYTOCLIENT_DUPLEX_OPENED    = new StatisticName("Networking.Sockets.GatewayToClient.Duplex.Opened");
-        public static readonly StatisticName NETWORKING_SOCKETS_CLIENTTOGATEWAY_DUPLEX_CLOSED    = new StatisticName("Networking.Sockets.ClientToGateway.Duplex.Closed");
-        public static readonly StatisticName NETWORKING_SOCKETS_CLIENTTOGATEWAY_DUPLEX_OPENED    = new StatisticName("Networking.Sockets.ClientToGateway.Duplex.Opened");
+        public static readonly StatisticName NETWORKING_SOCKETS_SILO_CLOSED         = new StatisticName("Networking.Sockets.Silo.Closed");
+        public static readonly StatisticName NETWORKING_SOCKETS_SILO_OPENED         = new StatisticName("Networking.Sockets.Silo.Opened");
+        public static readonly StatisticName NETWORKING_SOCKETS_GATEWAYTOCLIENT_CLOSED    = new StatisticName("Networking.Sockets.GatewayToClient.Closed");
+        public static readonly StatisticName NETWORKING_SOCKETS_GATEWAYTOCLIENT_OPENED    = new StatisticName("Networking.Sockets.GatewayToClient.Opened");
+        public static readonly StatisticName NETWORKING_SOCKETS_CLIENTTOGATEWAY_CLOSED    = new StatisticName("Networking.Sockets.ClientToGateway.Closed");
+        public static readonly StatisticName NETWORKING_SOCKETS_CLIENTTOGATEWAY_OPENED    = new StatisticName("Networking.Sockets.ClientToGateway.Opened");
 
         // Messaging
         public static readonly StatisticName MESSAGING_SENT_MESSAGES_TOTAL                  = new StatisticName("Messaging.Sent.Messages.Total");

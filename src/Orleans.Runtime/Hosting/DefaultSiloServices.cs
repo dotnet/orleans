@@ -283,7 +283,7 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<SchedulingOptions>();
             services.ConfigureFormatter<PerformanceTuningOptions>();
             services.ConfigureFormatter<SerializationProviderOptions>();
-            services.ConfigureFormatter<NetworkingOptions>();
+            services.ConfigureFormatter<ConnectionOptions>();
             services.ConfigureFormatter<SiloMessagingOptions>();
             services.ConfigureFormatter<TypeManagementOptions>();
             services.ConfigureFormatter<ClusterMembershipOptions>();

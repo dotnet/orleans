@@ -1,10 +1,13 @@
 using System;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -36,24 +39,24 @@ namespace Orleans.Runtime.Messaging
             this.RemoteSiloAddress = remoteSiloAddress;
         }
 
-        protected override IMessageCenter MessageCenter => this.messageCenter;
-
         public SiloAddress RemoteSiloAddress { get; private set; }
 
         public SiloAddress LocalSiloAddress { get; }
 
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+
         protected override void OnReceivedMessage(Message msg)
         {
             // See it's a Ping message, and if so, short-circuit it
-            var requestContext = msg.RequestContextData;
-            if (requestContext != null &&
-                requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out var pingObj) &&
-                pingObj is bool &&
-                (bool)pingObj)
+            if (msg.IsPing())
             {
                 MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
 
-                if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.Trace("Responding to Ping from {0}", msg.SendingSilo);
+                if (this.Log.IsEnabled(LogLevel.Trace))
+                {
+                    var objectId = RuntimeHelpers.GetHashCode(msg);
+                    this.Log.LogTrace("Responding to Ping from {Silo} with object id {ObjectId}. Message {Message}", msg.SendingSilo, objectId, msg);
+                }
 
                 if (!msg.TargetSilo.Equals(messageCenter.MyAddress)) // got ping that is not destined to me. For example, got a ping to my older incarnation.
                 {
@@ -135,6 +138,11 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceiveMessageFailure(Message message, Exception exception)
         {
+            if (message?.Headers != null && message.IsPing())
+            {
+                this.Log.LogWarning("Failed to receive ping message {Message}", message);
+            }
+
             // If deserialization completely failed or the message was one-way, rethrow the exception
             // so that it can be handled at another level.
             if (message?.Headers == null || message.Direction != Message.Directions.Request)
@@ -155,11 +163,17 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnSendMessageFailure(Message message, string error)
         {
+            if (message?.Headers != null && message.IsPing())
+            {
+                this.Log.LogWarning("Failed to send ping message {Message}", message);
+            }
+
             this.FailMessage(message, error);
         }
 
         protected override async Task RunInternal()
         {
+            Exception error = default;
             try
             {
                 if (this.connectionOptions.ProtocolVersion == NetworkProtocolVersion.Version1)
@@ -204,11 +218,20 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
 
+                this.MessageReceivedCounter = MessagingStatisticsGroup.GetMessageReceivedCounter(this.RemoteSiloAddress);
+                this.MessageSentCounter = MessagingStatisticsGroup.GetMessageSendCounter(this.RemoteSiloAddress);
                 await base.RunInternal();
+            }
+            catch (Exception exception) when ((error = exception) is null)
+            {
+                Debug.Fail("Execution should not be able to reach this point.");
             }
             finally
             {
-                if (!(this.RemoteSiloAddress is null)) this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this);
+                if (!(this.RemoteSiloAddress is null))
+                {
+                    this.connectionManager.OnConnectionTerminated(this.RemoteSiloAddress, this, error);
+                }
             }
 
             async Task WritePreamble()
@@ -245,6 +268,11 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Send);
+                if (msg.IsPing())
+                {
+                    this.Log.LogWarning("Droppping expired ping message {Message}", msg);
+                }
+
                 return false;
             }
 
@@ -252,11 +280,30 @@ namespace Orleans.Runtime.Messaging
             if (msg.SendingSilo == null)
                 msg.SendingSilo = this.LocalSiloAddress;
 
+            if (msg.IsPing())
+            {
+                this.Log.LogInformation("Sending ping message {Message}", msg);
+            }
+
+            if (this.RemoteSiloAddress is object && msg.TargetSilo is object && !this.RemoteSiloAddress.Equals(msg.TargetSilo))
+            {
+                this.Log.LogWarning(
+                    "Attempting to send message addressed to {TargetSilo} to connection with {RemoteSiloAddress}. Message {Message}",
+                    msg.TargetSilo,
+                    this.RemoteSiloAddress,
+                    msg);
+            }
+
             return true;
         }
 
         public void FailMessage(Message msg, string reason)
         {
+            if (msg?.Headers != null && msg.IsPing())
+            {
+                this.Log.LogWarning("Failed ping message {Message}", msg);
+            }
+
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
@@ -275,6 +322,11 @@ namespace Orleans.Runtime.Messaging
         protected override void RetryMessage(Message msg, Exception ex = null)
         {
             if (msg == null) return;
+
+            if (msg?.Headers != null && msg.IsPing())
+            {
+                this.Log.LogWarning("Retrying ping message {Message}", msg);
+            }
 
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {

@@ -72,7 +72,7 @@ namespace Orleans.Messaging
 
             roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : rand.Next(knownGateways.Count);
 
-            this.knownGateways = cachedLiveGateways = knownGateways.Select(gw => gw.ToSiloAddress()).ToList();
+            this.knownGateways = cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
 
             lastRefreshTime = DateTime.UtcNow;
             if (ListProvider.IsUpdatable)
@@ -141,7 +141,7 @@ namespace Orleans.Messaging
         /// <returns></returns>
         public SiloAddress GetLiveGateway()
         {
-            IList<SiloAddress> live = GetLiveGateways();
+            List<SiloAddress> live = GetLiveGateways();
             int count = live.Count;
             if (count > 0)
             {
@@ -204,7 +204,7 @@ namespace Orleans.Messaging
         {
             try
             {
-                UpdateLiveGatewaysSnapshot(gateways.Select(gw => gw.ToSiloAddress()), ListProvider.MaxStaleness);
+                UpdateLiveGatewaysSnapshot(gateways.Select(gw => gw.ToGatewayAddress()), ListProvider.MaxStaleness);
             }
             catch (Exception exc)
             {
@@ -220,7 +220,7 @@ namespace Orleans.Messaging
                 if (ListProvider == null || !ListProvider.IsUpdatable) return;
 
                 // the listProvider.GetGateways() is not under lock.
-                var refreshedGateways = ListProvider.GetGateways().GetResult().Select(gw => gw.ToSiloAddress()).ToList();
+                var refreshedGateways = ListProvider.GetGateways().GetResult().Select(gw => gw.ToGatewayAddress()).ToList();
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
                     logger.LogDebug("Discovered {GatewayCount} gateways: {Gateways}", refreshedGateways.Count, Utils.EnumerableToString(refreshedGateways));
@@ -249,12 +249,14 @@ namespace Orleans.Messaging
                 this.knownGateways = refreshedGateways as List<SiloAddress> ?? refreshedGateways.ToList();
                 foreach (SiloAddress trial in knownGateways)
                 {
+                    var address = trial.Generation == 0 ? trial : SiloAddress.New(trial.Endpoint, 0);
+
                     // We consider a node to be dead if we recorded it is dead due to socket error
                     // and it was recorded (diedAt) not too long ago (less than maxStaleness ago).
                     // The latter is to cover the case when the Gateway provider returns an outdated list that does not yet reflect the actually recently died Gateway.
                     // If it has passed more than maxStaleness - we assume maxStaleness is the upper bound on Gateway provider freshness.
                     var isDead = false;
-                    if (knownDead.TryGetValue(trial, out var diedAt))
+                    if (knownDead.TryGetValue(address, out var diedAt))
                     {
                         if (now.Subtract(diedAt) < maxStaleness)
                         {
@@ -263,13 +265,13 @@ namespace Orleans.Messaging
                         else
                         {
                             // Remove stale entries.
-                            knownDead.Remove(trial);
+                            knownDead.Remove(address);
                         }
                     }
 
                     if (!isDead)
                     {
-                        live.Add(trial);
+                        live.Add(address);
                     }
                 }
 
@@ -302,20 +304,24 @@ namespace Orleans.Messaging
             }
         }
 
-        private void AbortEvictedGatewayConnections(IList<SiloAddress> liveGateways)
+        private void AbortEvictedGatewayConnections(List<SiloAddress> liveGateways)
         {
             if (this.connectionManager == null) return;
-
-            var liveGatewayEndpoints = new HashSet<SiloAddress>();
-            foreach (var endpoint in liveGateways)
-            {
-                liveGatewayEndpoints.Add(endpoint);
-            }
 
             var connectedGateways = this.connectionManager.GetConnectedAddresses();
             foreach (var address in connectedGateways)
             {
-                if (!liveGatewayEndpoints.Contains(address))
+                var isLiveGateway = false;
+                foreach (var live in liveGateways)
+                {
+                    if (live.Matches(address))
+                    {
+                        isLiveGateway = true;
+                        break;
+                    }
+                }
+
+                if (!isLiveGateway)
                 {
                     if (logger.IsEnabled(LogLevel.Information))
                     {

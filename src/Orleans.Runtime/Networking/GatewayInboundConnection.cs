@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -19,7 +20,6 @@ namespace Orleans.Runtime.Messaging
         private readonly OverloadDetector overloadDetector;
         private readonly MessageFactory messageFactory;
         private readonly CounterStatistic loadSheddingCounter;
-        private readonly CounterStatistic gatewayTrafficCounter;
         private readonly SiloAddress myAddress;
 
         public GatewayInboundConnection(
@@ -45,11 +45,12 @@ namespace Orleans.Runtime.Messaging
             this.messageCenter = messageCenter;
             this.multiClusterOptions = multiClusterOptions.Value;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
-            this.gatewayTrafficCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
             this.myAddress = localSiloDetails.SiloAddress;
+            this.MessageReceivedCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
+            this.MessageSentCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
         }
 
-        protected override IMessageCenter MessageCenter => this.messageCenter;
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.GatewayToClient;
 
         protected override void OnReceivedMessage(Message msg)
         {
@@ -59,8 +60,6 @@ namespace Orleans.Runtime.Messaging
                 msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
                 return;
             }
-
-            gatewayTrafficCounter.Increment();
 
             // return address translation for geo clients (replace sending address cli/* with gcl/*)
             if (this.multiClusterOptions.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)

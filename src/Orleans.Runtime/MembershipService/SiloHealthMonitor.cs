@@ -70,12 +70,13 @@ namespace Orleans.Runtime.MembershipService
         /// <returns>The number of failed probes since the last successful probe.</returns>
         public async Task<int> Probe(int diagnosticProbeNumber, CancellationToken cancellation)
         {
+            var id = Interlocked.Increment(ref this.nextProbeId);
+
             if (this.log.IsEnabled(LogLevel.Trace))
             {
-                this.log.LogTrace("Going to send Ping #{ProbeNumber} to probe silo {Silo}", diagnosticProbeNumber, this.SiloAddress);
+                this.log.LogTrace("Going to send Ping #{ProbeNumber}/{Id} to probe silo {Silo}", diagnosticProbeNumber, id, this.SiloAddress);
             }
 
-            var id = Interlocked.Increment(ref this.nextProbeId);
             var probeTask = this.PerformProbe(id, diagnosticProbeNumber, cancellation);
             var resultTask = await Task.WhenAny(this.stopping, probeTask);
 
@@ -95,7 +96,7 @@ namespace Orleans.Runtime.MembershipService
 
                 if (ReferenceEquals(task, probeCancellation))
                 {
-                    return this.RecordFailure(id, diagnosticProbeNumber, new OperationCanceledException("The ping attempt was cancelled"));
+                    return this.RecordFailure(id, diagnosticProbeNumber, new OperationCanceledException($"The ping attempt was cancelled. Ping #{diagnosticProbeNumber}/{id}"));
                 }
                 else
                 {
@@ -113,7 +114,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (this.log.IsEnabled(LogLevel.Trace))
             {
-                this.log.LogTrace("Got successful ping response for ping #{ProbeNumber} from {Silo}", diagnosticProbeNumber, this.SiloAddress);
+                this.log.LogTrace("Got successful ping response for ping #{ProbeNumber}/{Id} from {Silo}", diagnosticProbeNumber, id, this.SiloAddress);
             }
 
             MessagingStatisticsGroup.OnPingReplyReceived(this.SiloAddress);
@@ -123,8 +124,9 @@ namespace Orleans.Runtime.MembershipService
                 if (id <= this.highestCompletedProbeId)
                 {
                     this.log.Info(
-                        "Ignoring success result for ping #{ProbeNumber} from {Silo} since a later probe has already completed. Highest ({HighestCompletedProbeId}) > Current ({CurrentProbeId})",
+                        "Ignoring success result for ping #{ProbeNumber}/{Id} from {Silo} since a later probe has already completed. Highest ({HighestCompletedProbeId}) > Current ({CurrentProbeId})",
                         diagnosticProbeNumber,
+                        id,
                         this.SiloAddress,
                         this.highestCompletedProbeId,
                         id);
@@ -133,8 +135,9 @@ namespace Orleans.Runtime.MembershipService
                 else if (this.stoppingCancellation.IsCancellationRequested)
                 {
                     this.log.Info(
-                        "Ignoring success result for ping #{ProbeNumber} from {Silo} since this monitor has been stopped",
+                        "Ignoring success result for ping #{ProbeNumber}/{Id} from {Silo} since this monitor has been stopped",
                         diagnosticProbeNumber,
+                        id,
                         this.SiloAddress);
                     return false;
                 }
@@ -151,7 +154,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (this.log.IsEnabled(LogLevel.Trace))
             {
-                this.log.LogTrace("Got failed ping response for ping #{ProbeNumber} from {Silo}: {Exception}", diagnosticProbeNumber, this.SiloAddress, failureReason);
+                this.log.LogTrace("Got failed ping response for ping #{ProbeNumber}/{Id} from {Silo}: {Exception}", diagnosticProbeNumber, id, this.SiloAddress, failureReason);
             }
 
             MessagingStatisticsGroup.OnPingReplyMissed(this.SiloAddress);
@@ -161,8 +164,9 @@ namespace Orleans.Runtime.MembershipService
                 if (id <= this.highestCompletedProbeId)
                 {
                     this.log.Info(
-                        "Ignoring failure result for ping #{ProbeNumber} from {Silo} since a later probe has already completed. Highest ({HighestCompletedProbeId}) > Current ({CurrentProbeId})",
+                        "Ignoring failure result for ping #{ProbeNumber}/{Id} from {Silo} since a later probe has already completed. Highest completed id ({HighestCompletedProbeId})",
                         diagnosticProbeNumber,
+                        id,
                         this.SiloAddress,
                         this.highestCompletedProbeId,
                         id);
@@ -171,8 +175,9 @@ namespace Orleans.Runtime.MembershipService
                 else if (this.stoppingCancellation.IsCancellationRequested)
                 {
                     this.log.Info(
-                        "Ignoring failure result for ping #{ProbeNumber} from {Silo} since this monitor has been stopped",
+                        "Ignoring failure result for ping #{ProbeNumber}/{Id} from {Silo} since this monitor has been stopped",
                         diagnosticProbeNumber,
+                        id,
                         this.SiloAddress);
                     return false;
                 }
@@ -183,8 +188,9 @@ namespace Orleans.Runtime.MembershipService
 
                     this.log.LogWarning(
                         (int)ErrorCode.MembershipMissedPing,
-                        "Did not get ping response for ping #{ProbeNumber} from {Silo}: {Exception}",
+                        "Did not get ping response for ping #{ProbeNumber}/{Id} from {Silo}: {Exception}",
                         diagnosticProbeNumber,
+                        id,
                         this.SiloAddress,
                         failureReason);
                     if (this.log.IsEnabled(LogLevel.Trace))

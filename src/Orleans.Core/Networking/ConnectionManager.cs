@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
@@ -21,7 +20,8 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionFactory connectionFactory;
         private readonly INetworkingTrace trace;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
-        private readonly object collectionLock = new object();
+        private readonly object lockObj = new object();
+        private readonly TaskCompletionSource<int> closedTaskCompletionSource = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ConnectionManager(
             IOptions<ConnectionOptions> connectionOptions,
@@ -49,162 +49,179 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        public Task Closed => this.closedTaskCompletionSource.Task;
+
         public ImmutableArray<SiloAddress> GetConnectedAddresses() => this.connections.Keys.ToImmutableArray();
 
         public ValueTask<Connection> GetConnection(SiloAddress endpoint)
         {
-            if (this.connections.TryGetValue(endpoint, out var entry) && entry.Connections.Length >= this.connectionOptions.ConnectionsPerEndpoint)
+            if (this.connections.TryGetValue(endpoint, out var entry) && entry.TryGetConnection(out var connection))
             {
-                var result = entry.Connections;
-                nextConnection = (nextConnection + 1) % result.Length;
-                var connection = result[nextConnection];
-                if (connection.IsValid) return new ValueTask<Connection>(connection);
+                var pendingAttempt = entry.PendingConnection;
+                if (!entry.HasSufficientConnections && (pendingAttempt is null || pendingAttempt.IsCompleted))
+                {
+                    this.GetConnectionAsync(entry.Endpoint).Ignore();
+                }
+
+                // Return the existing connection.
+                return new ValueTask<Connection>(connection);
             }
 
-            return GetConnectionAsync(endpoint);
+            // Start a new connection attempt since there are no suitable connections.
+            return new ValueTask<Connection>(this.GetConnectionAsync(endpoint));
         }
 
-        private async ValueTask<Connection> GetConnectionAsync(SiloAddress endpoint)
+        private async Task<Connection> GetConnectionAsync(SiloAddress endpoint)
         {
-            ImmutableArray<Connection> result;
-            ConnectionEntry entry = default;
-            var acquiredConnectionLock = false;
-            try
+            while (true)
             {
-                // Lock the entry to ensure it will not be removed while the connectio attempt is occuring.
-                while (!acquiredConnectionLock)
-                {
-                    entry = GetOrCreateEntry(endpoint, ref acquiredConnectionLock);
+                await Task.Yield();
+                this.cancellation.Token.ThrowIfCancellationRequested();
 
-                    if (entry.Connections.Length >= this.connectionOptions.ConnectionsPerEndpoint)
+                ConnectionEntry entry;
+                Task pendingAttempt;
+                lock (this.lockObj)
+                {
+                    entry = this.GetOrCreateEntry(endpoint);
+
+                    // Remove defunct connections.
+                    foreach (var c in entry.Connections)
                     {
-                        result = entry.Connections;
-                        break;
+                        if (!c.IsValid) entry.Connections = entry.Connections.Remove(c);
                     }
 
-                    ThrowIfRecentFailure(endpoint, entry);
+                    // If there are sufficient connections available then return an existing connection.
+                    if (entry.HasSufficientConnections && entry.TryGetConnection(out var connection))
+                    {
+                        return connection;
+                    }
 
-                    // Wait a short time before reattempting to acquire the lock
-                    await Task.Delay(10);
+                    entry.ThrowIfRecentConnectionFailure();
+
+                    pendingAttempt = entry.PendingConnection;
+
+                    // If there is no pending attempt then start one, otherwise the pending attempt will be awaited before reevaluating.
+                    if (pendingAttempt is null)
+                    {
+                        // Initiate a new connection.
+                        pendingAttempt = entry.PendingConnection = this.ConnectAsync(endpoint);
+                    }
                 }
 
-                // Attempt to connect.
-                Connection connection = default;
                 try
                 {
-                    connection = await this.ConnectAsync(endpoint);
-                    entry = OnConnectedInternal(endpoint, connection);
-                    result = entry.Connections;
+                    await pendingAttempt;
                 }
-                catch (Exception exception)
+                finally
                 {
-                    OnConnectionFailed(endpoint, DateTime.UtcNow);
-                    throw new ConnectionFailedException(
-                        $"Unable to connect to endpoint {endpoint}. See {nameof(exception.InnerException)}", exception);
+                    lock (this.lockObj)
+                    {
+                        // Clear the completed attempt.
+                        if (ReferenceEquals(pendingAttempt, entry.PendingConnection))
+                        {
+                            entry.PendingConnection = null;
+                        }
+                    }
                 }
             }
-            finally
-            {
-                if (acquiredConnectionLock) entry.ReleaseLock();
-            }
-
-            nextConnection = (nextConnection + 1) % result.Length;
-            return result[nextConnection];
         }
 
         private void OnConnectionFailed(SiloAddress address, DateTime lastFailure)
         {
-            bool acquiredConnectionLock = false;
-            ConnectionEntry entry = default;
-            lock (this.collectionLock)
+            lock (this.lockObj)
             {
-                try
+                var entry = this.GetOrCreateEntry(address);
+                if (entry.LastFailure.HasValue)
                 {
-                    entry = this.GetOrCreateEntry(address, ref acquiredConnectionLock);
+                    var ticks = Math.Max(lastFailure.Ticks, entry.LastFailure.Value.Ticks);
+                    lastFailure = new DateTime(ticks);
+                }
 
-                    if (entry.LastFailure.HasValue)
+                // Remove defunct connections.
+                var connections = entry.Connections;
+                foreach (var c in connections)
+                {
+                    if (!c.IsValid) connections = connections.Remove(c);
+                }
+
+                entry.LastFailure = lastFailure;
+                entry.Connections = connections;
+            }
+        }
+
+        public void OnConnected(SiloAddress address, Connection connection)
+        {
+            lock (this.lockObj)
+            {
+                var entry = this.GetOrCreateEntry(address);
+                var newConnections = entry.Connections.Contains(connection) ? entry.Connections : entry.Connections.Add(connection);
+                entry.LastFailure = default;
+                entry.Connections = newConnections;
+            }
+
+            this.trace.LogInformation("Connection {Connection} established with {Silo}", connection, address);
+        }
+
+        public void OnConnectionTerminated(SiloAddress address, Connection connection, Exception exception)
+        {
+            if (connection is null) return;
+
+            lock (this.lockObj)
+            {
+                if (this.connections.TryGetValue(address, out var entry))
+                {
+                    entry.Connections = entry.Connections.Remove(connection);
+
+                    if (entry.Connections.Length == 0 && entry.PendingConnection is null)
                     {
-                        var ticks = Math.Max(lastFailure.Ticks, entry.LastFailure.Value.Ticks);
-                        lastFailure = new DateTime(ticks);
+                        // Remove the entire entry.
+                        this.connections.TryRemove(address, out _);
                     }
 
-                    // Clean up defunct connections
-                    var connections = entry.Connections;
-                    foreach (var c in connections)
+                    foreach (var c in entry.Connections)
                     {
-                        if (!c.IsValid) connections = connections.Remove(c);
+                        if (!c.IsValid) entry.Connections = entry.Connections.Remove(c);
                     }
-
-                    this.connections[address] = entry.WithLastFailure(lastFailure).WithConnections(connections);
-                }
-                finally
-                {
-                    if (acquiredConnectionLock) entry.ReleaseLock();
                 }
             }
-        }
 
-        public void OnConnected(SiloAddress address, Connection connection) => OnConnectedInternal(address, connection);
-
-        private ConnectionEntry OnConnectedInternal(SiloAddress address, Connection connection)
-        {
-            bool acquiredConnectionLock = false;
-            ConnectionEntry entry = default;
-            lock (this.collectionLock)
+            if (exception != null)
             {
-                try
-                {
-                    entry = this.GetOrCreateEntry(address, ref acquiredConnectionLock);
-
-                    var newConnections = entry.Connections.Contains(connection) ? entry.Connections : entry.Connections.Add(connection);
-                    return this.connections[address] = entry.WithConnections(newConnections).WithLastFailure(default);
-                }
-                finally
-                {
-                    if (acquiredConnectionLock) entry.ReleaseLock();
-                }
+                this.trace.LogWarning(
+                    "Connection {Connection} to endpoint {EndPoint} terminated with exception {Exception}",
+                    connection,
+                    address,
+                    exception);
             }
-        }
-
-        public void OnConnectionTerminated(SiloAddress address, Connection connection)
-        {
-            this.Remove(address, connection);
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private void ThrowIfRecentFailure(SiloAddress address, ConnectionEntry entry)
-        {
-            TimeSpan delta;
-            if (entry.LastFailure.HasValue
-                && (delta = DateTime.UtcNow.Subtract(entry.LastFailure.Value)) < this.connectionOptions.ConnectionRetryDelay)
+            else
             {
-                throw new ConnectionFailedException($"Unable to connect to {address}, will retry after {delta.TotalMilliseconds}ms");
+                this.trace.LogDebug(
+                    "Connection {Connection} to endpoint {EndPoint} closed",
+                    connection,
+                    address);
             }
         }
 
-        private ConnectionEntry GetOrCreateEntry(SiloAddress address, ref bool locked)
+        private ConnectionEntry GetOrCreateEntry(SiloAddress address)
         {
-            lock (this.collectionLock)
+            lock (this.lockObj)
             {
                 if (!this.connections.TryGetValue(address, out var entry))
                 {
-                    // Initialize the entry for this endpoint
-                    entry = ConnectionEntry.CreateNew();
-                    locked = entry.TryLock();
-
+                    // Initialize the entry for this endpoint.
+                    entry = new ConnectionEntry(this.connectionOptions, address, ImmutableArray<Connection>.Empty, default);
                     this.connections[address] = entry;
-                }
-                else
-                {
-                    locked = entry.TryLock();
                 }
 
                 return entry;
             }
         }
 
-        private async ValueTask<Connection> ConnectAsync(SiloAddress address)
+        private async Task<Connection> ConnectAsync(SiloAddress address)
         {
+            await Task.Yield();
+            CancellationTokenSource openConnectionCancellation = default;
+
             try
             {
                 if (this.trace.IsEnabled(LogLevel.Information))
@@ -214,7 +231,20 @@ namespace Orleans.Runtime.Messaging
                         address);
                 }
 
-                var connection = await this.connectionFactory.ConnectAsync(address, this.cancellation.Token);
+                // Cancel pending connection attempts either when the host terminates or after the configured time limit.
+                openConnectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.cancellation.Token);
+                openConnectionCancellation.CancelAfter(this.connectionOptions.OpenConnectionTimeout);
+
+                var connection = await this.connectionFactory.ConnectAsync(address, openConnectionCancellation.Token)
+                    .AsTask()
+                    .WithCancellation(openConnectionCancellation.Token);
+
+                if (this.trace.IsEnabled(LogLevel.Information))
+                {
+                    this.trace.LogInformation(
+                        "Connected to endpoint {EndPoint}",
+                        address);
+                }
 
                 _ = Task.Run(async () =>
                 {
@@ -231,104 +261,61 @@ namespace Orleans.Runtime.Messaging
                         error = exception;
                     }
 
-                    this.Remove(address, connection);
-
-                    if (error != null)
-                    {
-                        this.trace.LogWarning(
-                            "Connection to endpoint {EndPoint} terminated with exception {Exception}",
-                            address,
-                            error);
-                    }
-                    else
-                    {
-                        this.trace.LogInformation(
-                            "Connection to endpoint {EndPoint} closed",
-                            address);
-                    }
+                    this.OnConnectionTerminated(address, connection, error);
                 });
 
+                this.OnConnected(address, connection);
                 return connection;
             }
             catch (Exception exception)
             {
+                this.OnConnectionFailed(address, DateTime.UtcNow);
+
                 this.trace.LogWarning(
                     "Connection attempt to endpoint {EndPoint} failed with exception {Exception}",
                     address,
                     exception);
-                throw;
+
+                throw new ConnectionFailedException(
+                    $"Unable to connect to endpoint {address}. See {nameof(exception.InnerException)}", exception);
             }
-        }
-
-        private void Remove(SiloAddress siloAddress, Connection connection)
-        {
-            if (connection is null) return;
-
-            lock (this.collectionLock)
+            finally
             {
-                if (this.connections.TryGetValue(siloAddress, out var existing))
-                {
-                    var updated = existing.WithConnections(existing.Connections.Remove(connection));
-
-                    if (updated.Connections.Length == 0)
-                    {
-                        // Remove the entire entry.
-                        var acquiredConnectionLock = false;
-                        try
-                        {
-                            acquiredConnectionLock = existing.TryLock();
-                            this.connections.TryRemove(siloAddress, out _);
-                        }
-                        finally
-                        {
-                            if (acquiredConnectionLock) existing.ReleaseLock();
-                        }
-                    }
-                    else
-                    {
-                        // Remove just the single connection.
-                        this.connections[siloAddress] = updated;
-                    }
-                }
+                openConnectionCancellation?.Dispose();
             }
         }
 
         public void Abort(SiloAddress endpoint)
         {
-            lock (this.collectionLock)
+            ConnectionEntry entry;
+            lock (this.lockObj)
             {
-                if (!this.connections.TryGetValue(endpoint, out var entry))
+                if (!this.connections.TryGetValue(endpoint, out entry))
                 {
-                    // Already removed
                     return;
                 }
 
-                if (!entry.Connections.IsDefault)
+                lock (this.lockObj)
                 {
-                    var exception = new ConnectionAbortedException($"Aborting connection to {endpoint}");
-                    foreach (var connection in entry.Connections)
-                    {
-                        try
-                        {
-                            connection.Close(exception);
-                        }
-                        catch
-                        {
-                        }
-                    }
-                }
-
-                var acquiredConnectionLock = false;
-                try
-                {
-                    if (acquiredConnectionLock = entry.TryLock())
+                    if (entry.PendingConnection is null)
                     {
                         this.connections.TryRemove(endpoint, out _);
                     }
                 }
-                finally
+            }
+
+            if (entry is ConnectionEntry && !entry.Connections.IsDefault)
+            {
+                var exception = new ConnectionAbortedException($"Aborting connection to {endpoint}");
+                foreach (var connection in entry.Connections)
                 {
-                    if (acquiredConnectionLock) entry.ReleaseLock();
+                    try
+                    {
+                        connection.Close(exception);
+                    }
+                    catch
+                    {
+                    }
                 }
             }
         }
@@ -371,54 +358,100 @@ namespace Orleans.Runtime.Messaging
             {
                 this.trace?.LogWarning("Exception during shutdown: {Exception}", exception);
             }
+            finally
+            {
+                this.closedTaskCompletionSource.TrySetResult(0);
+            }
         }
 
         private IDisposable BeginConnectionScope(Connection connection)
         {
             if (this.trace.IsEnabled(LogLevel.Critical))
             {
-                return this.trace.BeginScope(new ConnectionLogScope(connection.Context.ConnectionId));
+                return this.trace.BeginScope(new ConnectionLogScope(connection));
             }
 
             return null;
         }
 
-        private struct ConnectionEntry
+        private class ConnectionEntry
         {
-            public readonly DateTime? LastFailure;
-            public readonly ImmutableArray<Connection> Connections;
-            private readonly int[] lockObj;
+            private readonly ConnectionOptions connectionOptions;
 
-            private ConnectionEntry(
+            public ConnectionEntry(
+                ConnectionOptions connectionOptions,
+                SiloAddress endpoint,
                 ImmutableArray<Connection> connections,
-                DateTime? lastFailure,
-                int[] lockObject)
+                DateTime? lastFailure)
             {
+                this.connectionOptions = connectionOptions;
+                this.Endpoint = endpoint;
                 this.Connections = connections;
                 this.LastFailure = lastFailure;
-                this.lockObj = lockObject;
             }
 
-            public static ConnectionEntry CreateNew() => new ConnectionEntry(ImmutableArray<Connection>.Empty, default, new int[1]);
+            public Task PendingConnection { get; set; }
+            public DateTime? LastFailure { get; set; }
+            public ImmutableArray<Connection> Connections { get; set; }
+            public SiloAddress Endpoint { get; }
 
-            public ConnectionEntry WithLastFailure(DateTime? lastFailure)
+            public TimeSpan RemainingRetryDelay
             {
-                return new ConnectionEntry(this.Connections, lastFailure, this.lockObj);
+                get
+                {
+                    var lastFailure = this.LastFailure;
+                    if (lastFailure.HasValue)
+                    {
+                        var now = DateTime.UtcNow;
+                        var retryAfter = lastFailure.Value.Add(this.connectionOptions.ConnectionRetryDelay);
+                        var remainingDelay = retryAfter.Subtract(now);
+                        if (remainingDelay > TimeSpan.Zero)
+                        {
+                            return remainingDelay;
+                        }
+                    }
+
+                    return TimeSpan.Zero;
+                }
             }
 
-            public ConnectionEntry WithConnections(ImmutableArray<Connection> connections)
+            public bool HasSufficientConnections
             {
-                return new ConnectionEntry(connections, this.LastFailure, this.lockObj);
+                get
+                {
+                    var connections = this.Connections;
+                    return !connections.IsDefaultOrEmpty && connections.Length >= this.connectionOptions.ConnectionsPerEndpoint;
+                }
             }
 
-            public bool TryLock()
+            public bool TryGetConnection(out Connection connection)
             {
-                return Interlocked.CompareExchange(ref this.lockObj[0], 1, 0) == 0;
+                connection = default;
+                var connections = this.Connections;
+                if (connections.IsDefaultOrEmpty)
+                {
+                    return false;
+                }
+
+                nextConnection = (nextConnection + 1) % connections.Length;
+                var result = connections[nextConnection];
+
+                if (result.IsValid)
+                {
+                    connection = result;
+                    return true;
+                }
+
+                return false;
             }
 
-            public void ReleaseLock()
+            public void ThrowIfRecentConnectionFailure()
             {
-                if (this.lockObj != default) Interlocked.Exchange(ref this.lockObj[0], 0);
+                var remainingDelay = this.RemainingRetryDelay;
+                if (remainingDelay > TimeSpan.Zero)
+                {
+                    throw new ConnectionFailedException($"Unable to connect to {this.Endpoint}, will retry after {remainingDelay.TotalMilliseconds}ms");
+                }
             }
         }
     }
