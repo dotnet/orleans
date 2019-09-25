@@ -116,23 +116,25 @@ namespace Orleans.Runtime.Messaging
 
             async Task RunConnection(Connection connection)
             {
-                try
+                await Task.Yield();
+
+                using (this.BeginConnectionScope(connection))
                 {
-                    using (this.BeginConnectionScope(connection))
+                    try
                     {
                         var connectionTask = connection.Run();
                         this.connections.TryAdd(connection, connectionTask);
                         await connectionTask;
                         this.trace.LogInformation("Connection {@Connection} terminated", connection);
                     }
-                }
-                catch (Exception exception)
-                {
-                    this.trace.LogInformation(exception, "Connection {@Connection} terminated with an exception", connection);
-                }
-                finally
-                {
-                    this.connections.TryRemove(connection, out _);
+                    catch (Exception exception)
+                    {
+                        this.trace.LogInformation(exception, "Connection {@Connection} terminated with an exception", connection);
+                    }
+                    finally
+                    {
+                        this.connections.TryRemove(connection, out _);
+                    }
                 }
             }
         }
