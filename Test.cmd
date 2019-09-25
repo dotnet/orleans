@@ -40,7 +40,7 @@ set TESTS=^
 %CMDHOME%\test\Transactions\Orleans.Transactions.Azure.Test,^
 %CMDHOME%\test\TestInfrastructure\Orleans.TestingHost.Tests,^
 %CMDHOME%\test\DependencyInjection.Tests,^
-%CMDHOME%\test\Analyzers.Tests
+rem %CMDHOME%\test\Analyzers.Tests
 
 if []==[%TEST_FILTERS%] set TEST_FILTERS=-trait Category=BVT -trait Category=SlowBVT
 
