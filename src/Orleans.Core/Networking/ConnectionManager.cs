@@ -73,6 +73,8 @@ namespace Orleans.Runtime.Messaging
 
         private async Task<Connection> GetConnectionAsync(SiloAddress endpoint)
         {
+            RequestContext.Clear();
+
             while (true)
             {
                 await Task.Yield();
