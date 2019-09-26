@@ -49,6 +49,8 @@
   <PropertyGroup>
     <!-- System packages -->
     <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
+    <SystemDataSqlClientVersion>4.7.0</SystemDataSqlClientVersion>
+    <SystemDataCommonVersion>4.3.0</SystemDataCommonVersion>
 
     <SystemCollectionsImmutableVersion>1.4.0</SystemCollectionsImmutableVersion>
     <SystemRuntimeCompilerServicesUnsafeVersion>4.6.0</SystemRuntimeCompilerServicesUnsafeVersion>
@@ -67,17 +69,17 @@
     <MicrosoftCodeAnalysisVersion>3.3.1</MicrosoftCodeAnalysisVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
-    <MicrosoftExtensionsConfigurationBinderVersion>2.1.1</MicrosoftExtensionsConfigurationBinderVersion>
-    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.1.1</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
-    <MicrosoftExtensionsConfigurationJsonVersion>2.1.1</MicrosoftExtensionsConfigurationJsonVersion>
-    <MicrosoftExtensionsConfigurationVersion>2.1.1</MicrosoftExtensionsConfigurationVersion>
-    <MicrosoftExtensionsDependencyInjectionVersion>2.1.1</MicrosoftExtensionsDependencyInjectionVersion>
-    <MicrosoftExtensionsDependencyModelVersion>2.0.0</MicrosoftExtensionsDependencyModelVersion>
-    <MicrosoftExtensionsLoggingVersion>2.0.0</MicrosoftExtensionsLoggingVersion>
-    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>2.1.1</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
-    <MicrosoftExtensionsOptionsVersion>2.1.1</MicrosoftExtensionsOptionsVersion>
-    <MicrosoftExtensionsHostingAbstractionsVersion>2.1.0</MicrosoftExtensionsHostingAbstractionsVersion>
-    <MicrosoftExtensionsHostingVersion>2.1.0</MicrosoftExtensionsHostingVersion>
+    <MicrosoftExtensionsConfigurationBinderVersion>3.0.0</MicrosoftExtensionsConfigurationBinderVersion>
+    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>3.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
+    <MicrosoftExtensionsConfigurationJsonVersion>3.0.0</MicrosoftExtensionsConfigurationJsonVersion>
+    <MicrosoftExtensionsConfigurationVersion>3.0.0</MicrosoftExtensionsConfigurationVersion>
+    <MicrosoftExtensionsDependencyInjectionVersion>3.0.0</MicrosoftExtensionsDependencyInjectionVersion>
+    <MicrosoftExtensionsDependencyModelVersion>3.0.0</MicrosoftExtensionsDependencyModelVersion>
+    <MicrosoftExtensionsLoggingVersion>3.0.0</MicrosoftExtensionsLoggingVersion>
+    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>3.0.0</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
+    <MicrosoftExtensionsOptionsVersion>3.0.0</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsHostingAbstractionsVersion>3.0.0</MicrosoftExtensionsHostingAbstractionsVersion>
+    <MicrosoftExtensionsHostingVersion>3.0.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
     <MicrosoftAzureEventHubsVersion>2.2.1</MicrosoftAzureEventHubsVersion>
