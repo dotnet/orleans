@@ -8,7 +8,7 @@ namespace Orleans.Hosting
     /// <summary>
     /// Allows consumers to perform cleanup during a graceful shutdown.
     /// </summary>
-    internal abstract class ApplicationLifetime : IApplicationLifetime
+    internal abstract class ApplicationLifetime : IHostApplicationLifetime
     {
         private readonly CancellationTokenSource startedSource = new CancellationTokenSource();
         private readonly CancellationTokenSource stoppingSource = new CancellationTokenSource();

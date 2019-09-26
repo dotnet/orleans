@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions.Internal;
 using Orleans.Runtime;
 
 namespace Orleans.Logging
@@ -137,7 +134,6 @@ namespace Orleans.Logging
         /// <inheritdoc />
         public IDisposable BeginScope<TState>(TState state)
         {
-            //TODO: implemente scope 
             return NullScope.Instance;
         }
 
@@ -146,11 +142,25 @@ namespace Orleans.Logging
         {
             return true;
         }
+
         /// <inheritdoc />
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
             this.output.Log(logLevel, eventId, state, exception, formatter, this.category);
 
+        }
+
+        private class NullScope : IDisposable
+        {
+            public static NullScope Instance { get; } = new NullScope();
+
+            private NullScope()
+            {
+            }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

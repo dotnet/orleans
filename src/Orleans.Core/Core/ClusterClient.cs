@@ -66,7 +66,7 @@ namespace Orleans
             }
 
             // It is fine for this field to be null in the case that the client is not the host.
-            this.applicationLifetime = runtimeClient.ServiceProvider.GetService<IApplicationLifetime>() as ClientApplicationLifetime;
+            this.applicationLifetime = runtimeClient.ServiceProvider.GetService<IHostApplicationLifetime>() as ClientApplicationLifetime;
         }
 
         /// <inheritdoc />

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGenerator.MSBuild;
 
@@ -47,7 +48,6 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
                 return -2;
             }
 
-            var loggerFactory = new LoggerFactory();
             using (new AssemblyResolver())
             {
                 var cmd = new CodeGeneratorCommand();
@@ -119,9 +119,16 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
                     }
                 }
 
-                loggerFactory.AddConsole(logLevel);
-                loggerFactory.AddDebug(logLevel);
-                cmd.Log = loggerFactory.CreateLogger("Orleans.CodeGenerator");
+                var services = new ServiceCollection()
+                    .AddLogging(logging =>
+                    {
+                        logging
+                        .SetMinimumLevel(logLevel)
+                        .AddConsole()
+                        .AddDebug();
+                    })
+                    .BuildServiceProvider();
+                cmd.Log = services.GetRequiredService<ILoggerFactory>().CreateLogger("Orleans.CodeGenerator");
                 var stopwatch = Stopwatch.StartNew();
                 var ok = cmd.Execute(CancellationToken.None).GetAwaiter().GetResult();
                 cmd.Log.LogInformation($"Total code generation time: {stopwatch.ElapsedMilliseconds}ms.");

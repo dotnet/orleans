@@ -147,7 +147,7 @@ namespace Orleans.Hosting
                     services.AddSingleton(this.hostingEnvironment);
                     services.AddSingleton(this.hostBuilderContext);
                     services.AddSingleton(this.appConfiguration);
-                    services.AddSingleton<IApplicationLifetime, SiloApplicationLifetime>();
+                    services.AddSingleton<IHostApplicationLifetime, SiloApplicationLifetime>();
                     services.AddOptions();
                     services.AddLogging();
                 });
