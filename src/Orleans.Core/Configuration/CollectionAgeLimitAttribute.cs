@@ -8,11 +8,11 @@ namespace Orleans.Configuration
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public class CollectionAgeLimitAttribute : Attribute
     {
-        public const int DefaultAgeMinutes = 10;
+        public readonly TimeSpan MinAgeLimit = TimeSpan.FromMinutes(1);
 
-        public int Days { get; set; } = 0;
-        public int Hours { get; set; } = 0;
-        public int Minutes { get; set; } = 0;
+        public int Days { get; set; } 
+        public int Hours { get; set; } 
+        public int Minutes { get; set; } 
 
         public bool AlwaysActive { get; set; }
 
@@ -23,8 +23,8 @@ namespace Orleans.Configuration
                 var span = AlwaysActive
                 ? TimeSpan.FromDays(short.MaxValue)
                 : TimeSpan.FromDays(Days) + TimeSpan.FromHours(Hours) + TimeSpan.FromMinutes(Minutes);
-                return span < TimeSpan.FromMinutes(DefaultAgeMinutes)
-                    ? TimeSpan.FromMinutes(DefaultAgeMinutes)
+                return span <= TimeSpan.Zero
+                    ? MinAgeLimit
                     : span;
             }
         }
