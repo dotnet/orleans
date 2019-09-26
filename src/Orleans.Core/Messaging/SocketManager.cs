@@ -199,9 +199,9 @@ namespace Orleans.Runtime
             var e = new SocketAsyncEventArgs();
             e.RemoteEndPoint = endPoint;
             e.Completed += (sender, eventArgs) => signal.Set();
-            s.ConnectAsync(e);
+            bool pending = s.ConnectAsync(e);
 
-            if (!signal.WaitOne(connectionTimeout))
+            if (pending && !signal.WaitOne(connectionTimeout))
                 throw new TimeoutException($"Connection to {endPoint} could not be established in {connectionTimeout}");
 
             if (e.SocketError != SocketError.Success || !s.Connected)
