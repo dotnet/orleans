@@ -70,7 +70,7 @@ namespace Orleans.Configuration
         /// Specifies the maximum time that a request can take before the activation is reported as "blocked"
         /// </summary>
         public TimeSpan MaxRequestProcessingTime { get; set; } = DEFAULT_MAX_REQUEST_PROCESSING_TIME;
-        public static readonly TimeSpan DEFAULT_MAX_REQUEST_PROCESSING_TIME = GrainCollectionOptions.DEFAULT_COLLECTION_AGE_LIMIT;
+        public static readonly TimeSpan DEFAULT_MAX_REQUEST_PROCESSING_TIME = CollectionAgeLimitAttribute.DEFAULT_COLLECTION_AGE_LIMIT;
 
         /// <summary>
         /// For test only - Do not use in production
