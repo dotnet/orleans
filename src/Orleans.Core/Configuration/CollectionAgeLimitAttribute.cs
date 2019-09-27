@@ -10,9 +10,9 @@ namespace Orleans.Configuration
     {
         public readonly TimeSpan MinAgeLimit = TimeSpan.FromMinutes(1);
 
-        public int Days { get; set; } 
-        public int Hours { get; set; } 
-        public int Minutes { get; set; } 
+        public double Days { get; set; } 
+        public double Hours { get; set; } 
+        public double Minutes { get; set; } 
 
         public bool AlwaysActive { get; set; }
 
