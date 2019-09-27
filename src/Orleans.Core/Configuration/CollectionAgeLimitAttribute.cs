@@ -8,6 +8,8 @@ namespace Orleans.Configuration
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public class CollectionAgeLimitAttribute : Attribute
     {
+        public static readonly TimeSpan DEFAULT_COLLECTION_AGE_LIMIT = TimeSpan.FromHours(2);
+
         public readonly TimeSpan MinAgeLimit = TimeSpan.FromMinutes(1);
 
         public double Days { get; set; } 
