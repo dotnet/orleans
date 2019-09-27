@@ -18,8 +18,9 @@ namespace Orleans.Configuration
         /// <summary>
         /// Default period of inactivity necessary for a grain to be available for collection and deactivation.
         /// </summary>
-        public TimeSpan CollectionAge { get; set; } = DEFAULT_COLLECTION_AGE_LIMIT;
-        public static readonly TimeSpan DEFAULT_COLLECTION_AGE_LIMIT = TimeSpan.FromHours(2);
+        public TimeSpan CollectionAge { get; set; } = CollectionAgeLimitAttribute.DEFAULT_COLLECTION_AGE_LIMIT;
+        [Obsolete("Use CollectionAgeLimitAttribute.DEFAULT_COLLECTION_AGE_LIMIT instead")]
+        public static readonly TimeSpan DEFAULT_COLLECTION_AGE_LIMIT = CollectionAgeLimitAttribute.DEFAULT_COLLECTION_AGE_LIMIT;
 
         /// <summary>
         /// Period of inactivity necessary for a grain to be available for collection and deactivation by grain type.

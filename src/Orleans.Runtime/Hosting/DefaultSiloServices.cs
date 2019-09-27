@@ -326,7 +326,7 @@ namespace Orleans.Hosting
                         if (attr != null)
                         {
                             var className = TypeUtils.GetFullName(grainClass.ClassType);
-                            options.ClassSpecificCollectionAge[className] = TimeSpan.FromMinutes(attr.Minutes);
+                            options.ClassSpecificCollectionAge[className] = attr.Amount;
                         }
                     }
                 });
