@@ -14,7 +14,7 @@
   <PropertyGroup Condition="'$(OrleansCodeGeneratorAssembly)' == ''">
     <CoreAssembly20>$(MSBuildThisFileDirectory)..\tasks\netcoreapp2.0\Orleans.CodeGeneration.Build.dll</CoreAssembly20>
     <CoreAssembly21>$(MSBuildThisFileDirectory)..\tasks\netcoreapp2.1\Orleans.CodeGeneration.Build.dll</CoreAssembly21>
-    <FullAssembly>$(MSBuildThisFileDirectory)..\tasks\net461\Orleans.CodeGeneration.Build.exe</FullAssembly>
+    <FullAssembly>$(MSBuildThisFileDirectory)..\tasks\net472\Orleans.CodeGeneration.Build.exe</FullAssembly>
 
     <CoreAssembly Condition="$(TargetFramework.Equals('netcoreapp2.0')) or $(TargetFramework.Equals('netstandard2.0'))">$(CoreAssembly20)</CoreAssembly>
     <CoreAssembly Condition="$(TargetFramework.Equals('netcoreapp2.1')) or $(TargetFramework.Equals('netstandard2.1'))">$(CoreAssembly21)</CoreAssembly>

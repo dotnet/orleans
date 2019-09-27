@@ -42,7 +42,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <TestProjectTargetFramework>net461</TestProjectTargetFramework>
+    <TestProjectTargetFramework>net472</TestProjectTargetFramework>
   </PropertyGroup>
 
   <!-- Shared Package Versions -->

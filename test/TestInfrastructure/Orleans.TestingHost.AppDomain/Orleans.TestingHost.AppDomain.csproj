@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework>net461</TargetFramework>
+    <TargetFramework>net472</TargetFramework>
     <AssemblyName>Orleans.TestingHost.AppDomain</AssemblyName>
     <RootNamespace>Orleans.TestingHost.AppDomain</RootNamespace>
   </PropertyGroup>
