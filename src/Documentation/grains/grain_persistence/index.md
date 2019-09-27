@@ -576,7 +576,7 @@ This happen so that one chooses a format, e.g. [Simple Binary Encoding (SBE)](ht
 The built-in (de)serializers have been built using this method. The [OrleansStorageDefault<format>(De)Serializer](https://github.com/dotnet/orleans/tree/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider) can be used as examples
 on how to implement other formats.
 
-When the (de)serializers have been implemented, they need to ba added to the `StorageSerializationPicker` property in [AdoNetGrainStorage](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/AdoNetGrainStorage.cs).
+When the (de)serializers have been implemented, they need to be added to the `StorageSerializationPicker` property in [AdoNetGrainStorage](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/AdoNetGrainStorage.cs).
 This is an implementation of [IStorageSerializationPicker](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/IStorageSerializationPicker.cs). By default
 [StorageSerializationPicker](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Orleans.Persistence.AdoNet/Storage/Provider/StorageSerializationPicker.cs) will be used. And example of changing data storage format
 or using (de)serializers can be seen at [RelationalStorageTests](https://github.com/dotnet/orleans/blob/master/test/Extensions/TesterAdoNet/StorageTests/Relational/RelationalStorageTests.cs).
