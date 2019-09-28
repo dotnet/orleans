@@ -37,12 +37,17 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="$(MicrosoftExtensionsLoggingVersion)" />
     <PackageReference Include="Microsoft.Build" Version="$(MicrosoftBuildVersion)" />
     <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildVersion)" />
-    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="$(MicrosoftBuildVersion)" />
-    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
   </ItemGroup>
+
+  <!-- Packages included explicitly to prevent build warnings about inconsistent versions -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Win32.Registry" Version="$(MicrosoftWin32RegistryVersion)" />
+    <PackageReference Include="System.CodeDom" Version="$(SystemCodeDomVersion)" />
+  </ItemGroup>
+
 
   <Target Name="PostBuildPublish" AfterTargets="Build">
     <!-- So that we can create a nuget package which includes all dependencies, we publish the build. -->

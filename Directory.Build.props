@@ -57,17 +57,19 @@
     <SystemNetHttpVersion>4.3.4</SystemNetHttpVersion>
     <SystemReflectionMetadataVersion>1.7.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.6.0</SystemReflectionTypeExtensionsVersion>
-    <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
+    <SystemValueTupleVersion>4.5.0</SystemValueTupleVersion>
     <SystemReflectionEmitVersion>4.6.0</SystemReflectionEmitVersion>
     <SystemThreadingTasksExtensionsVersion>4.5.3</SystemThreadingTasksExtensionsVersion>
     <SystemThreadingChannelsVersion>4.6.0</SystemThreadingChannelsVersion>
     <SystemBuffersVersion>4.5.0</SystemBuffersVersion>
     <SystemMemoryVersion>4.5.3</SystemMemoryVersion>
     <SystemIOPipelinesVersion>4.6.0</SystemIOPipelinesVersion>
+    <SystemCodeDomVersion>4.6.0</SystemCodeDomVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>
+    <MicrosoftBuildVersion>16.3.0</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>3.3.1</MicrosoftCodeAnalysisVersion>
+    <MicrosoftWin32RegistryVersion>4.6.0</MicrosoftWin32RegistryVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
     <MicrosoftExtensionsConfigurationBinderVersion>3.0.0</MicrosoftExtensionsConfigurationBinderVersion>

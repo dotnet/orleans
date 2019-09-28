@@ -46,10 +46,17 @@
     <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildVersion)" />
     <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildVersion)" />
   </ItemGroup>
+
+  <!-- Packages included explicitly to prevent build warnings about inconsistent versions -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Win32.Registry" Version="$(MicrosoftWin32RegistryVersion)" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- This must come after all other PackageReference elements -->
     <PackageReference Update="@(PackageReference)" PrivateAssets="All" Publish="true" />
   </ItemGroup>
+  
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj">
       <PrivateAssets>all</PrivateAssets>
