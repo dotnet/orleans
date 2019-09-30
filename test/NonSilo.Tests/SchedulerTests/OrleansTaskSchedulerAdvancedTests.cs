@@ -17,7 +17,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.SchedulerTests
 {
-    public class OrleansTaskSchedulerAdvancedTests : MarshalByRefObject, IDisposable
+    public class OrleansTaskSchedulerAdvancedTests : IDisposable
     {
         private readonly ITestOutputHelper output;
         private OrleansTaskScheduler orleansTaskScheduler;

@@ -17,7 +17,6 @@ using System.Collections.Immutable;
 namespace Orleans.Runtime.GrainDirectory
 {
     internal class LocalGrainDirectory :
-        MarshalByRefObject,
         ILocalGrainDirectory, ISiloStatusListener
     {
         private readonly DedicatedAsynchAgent maintainer;
