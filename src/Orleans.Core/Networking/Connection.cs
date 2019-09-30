@@ -29,7 +29,6 @@ namespace Orleans.Runtime.Messaging
         private readonly ChannelWriter<Message> outgoingMessageWriter;
         private readonly object lockObj = new object();
         private readonly List<Message> inflight = new List<Message>(4);
-        private CancellationTokenRegistration closeRegistration;
 
         protected Connection(
             ConnectionContext connection,
@@ -94,11 +93,7 @@ namespace Orleans.Runtime.Messaging
         private static Task OnConnectedAsync(ConnectionContext context)
         {
             var connection = context.Features.Get<Connection>();
-
-            lock (connection.lockObj)
-            {
-                connection.closeRegistration = context.ConnectionClosed.Register(OnConnectionClosedDelegate, connection);
-            }
+            context.ConnectionClosed.Register(OnConnectionClosedDelegate, connection);
 
             NetworkingStatisticsGroup.OnOpenedSocket(connection.ConnectionDirection);
             return connection.RunInternal();
@@ -130,9 +125,6 @@ namespace Orleans.Runtime.Messaging
                     if (!this.IsValid) return;
                     this.IsValid = false;
                     NetworkingStatisticsGroup.OnClosedSocket(this.ConnectionDirection);
-
-                    this.closeRegistration.Dispose();
-                    this.closeRegistration = default;
 
                     if (this.Log.IsEnabled(LogLevel.Information))
                     {
