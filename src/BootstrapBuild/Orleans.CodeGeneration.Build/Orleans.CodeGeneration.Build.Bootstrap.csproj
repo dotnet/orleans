@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
   <PropertyGroup>
-    <TargetFramework>net472</TargetFramework>
+    <TargetFramework>net461</TargetFramework>
     <TargetFramework Condition="'$(OS)' != 'Windows_NT'">netcoreapp3.0</TargetFramework>
     <AssemblyName>Orleans.CodeGeneration.Build</AssemblyName>
     <OutputType>Exe</OutputType>
