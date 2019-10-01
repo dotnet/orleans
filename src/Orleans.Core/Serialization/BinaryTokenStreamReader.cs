@@ -565,7 +565,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Gets the total length.
         /// </summary>
-        public int Length => this.totalLength;
+        public long Length => this.totalLength;
 
         /// <summary>
         /// Creates a copy of the current stream reader.
