@@ -83,14 +83,16 @@ namespace Orleans.TestingHost
             return this;
         }
 
-        public void AddSiloBuilderConfigurator<TSiloBuilderConfigurator>() where TSiloBuilderConfigurator : ISiloBuilderConfigurator, new()
+        public TestClusterBuilder AddSiloBuilderConfigurator<TSiloBuilderConfigurator>() where TSiloBuilderConfigurator : ISiloBuilderConfigurator, new()
         {
             this.Options.SiloBuilderConfiguratorTypes.Add(typeof(TSiloBuilderConfigurator).AssemblyQualifiedName);
+            return this;
         }
 
-        public void AddClientBuilderConfigurator<TClientBuilderConfigurator>() where TClientBuilderConfigurator : IClientBuilderConfigurator, new()
+        public TestClusterBuilder AddClientBuilderConfigurator<TClientBuilderConfigurator>() where TClientBuilderConfigurator : IClientBuilderConfigurator, new()
         {
             this.Options.ClientBuilderConfiguratorTypes.Add(typeof(TClientBuilderConfigurator).AssemblyQualifiedName);
+            return this;
         }
 
         public TestCluster Build()
