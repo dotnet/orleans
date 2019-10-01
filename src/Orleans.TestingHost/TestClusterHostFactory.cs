@@ -12,12 +12,12 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.TestHooks;
 using Orleans.Configuration;
-using Orleans.Logging;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using Orleans.Statistics;
 using Orleans.TestingHost.Utils;
+using Orleans.TestingHost.Logging;
 
 namespace Orleans.TestingHost
 {

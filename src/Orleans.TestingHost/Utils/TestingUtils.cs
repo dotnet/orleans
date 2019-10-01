@@ -7,8 +7,8 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Logging;
 using Orleans.Serialization;
+using Orleans.TestingHost.Logging;
 
 namespace Orleans.TestingHost.Utils
 {

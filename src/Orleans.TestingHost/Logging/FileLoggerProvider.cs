@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using System;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.Logging
+namespace Orleans.TestingHost.Logging
 {
     /// <summary>
     /// FileLoggerProvider implements ILoggerProvider, creates <see cref="FileLogger"/>
