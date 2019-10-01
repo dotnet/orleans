@@ -12,6 +12,7 @@ using UnitTests.Grains;
 
 namespace TestGrains
 {
+    [RegexImplicitStreamSubscription("THIS.WONT.MATCH.ONLY.FOR.TESTING.SERIALIZATION")]
     [ImplicitStreamSubscription(StreamNamespace)]
     public class GeneratedEventCollectorGrain : Grain, IGeneratedEventCollectorGrain
     {
