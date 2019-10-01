@@ -6,12 +6,12 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-namespace Orleans.Logging
+namespace Orleans.TestingHost.Logging
 {
     /// <summary>
     /// The log output which all <see cref="FileLogger"/> share to log messages to 
     /// </summary>
-    public class FileLoggingOutput 
+    public class FileLoggingOutput
     {
         private readonly TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
         private DateTime lastFlush = DateTime.UtcNow;
@@ -67,8 +67,8 @@ namespace Orleans.Logging
             if (logLevel == LogLevel.Error)
                 message = "!!!!!!!!!! " + message;
 
-            string exc = LogFormatter.PrintException(exception);
-            string msg = String.Format("[{0} {1}\t{2}\t{3}\t{4}]\t{5}\t{6}",
+            var exc = LogFormatter.PrintException(exception);
+            var msg = string.Format("[{0} {1}\t{2}\t{3}\t{4}]\t{5}\t{6}",
                 LogFormatter.PrintDate(timestamp),           //0
                 Thread.CurrentThread.ManagedThreadId,   //1
                 logLevel.ToString(),    //2
