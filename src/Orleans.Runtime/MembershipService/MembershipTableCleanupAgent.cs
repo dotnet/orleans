@@ -5,14 +5,13 @@ using System.Threading.Tasks;
 using System.Threading;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
-using System.Net.Http.Headers;
 
 namespace Orleans.Runtime.MembershipService
 {
     /// <summary>
     /// Responsible for cleaning up dead membership table entries.
     /// </summary>
-    internal class MembershipTableCleanupAgent : ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    internal class MembershipTableCleanupAgent : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly ClusterMembershipOptions clusterMembershipOptions;
         private readonly IMembershipTable membershipTableProvider;
@@ -98,6 +97,12 @@ namespace Orleans.Runtime.MembershipService
                 this.cleanupDefunctSilosTimer?.Dispose();
                 await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }
+        }
+
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime)
+        {
+            var ok = this.cleanupDefunctSilosTimer?.CheckHealth(lastCheckTime) ?? true;
+            return ok;
         }
     }
 }

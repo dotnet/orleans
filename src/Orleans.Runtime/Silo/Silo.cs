@@ -73,7 +73,6 @@ namespace Orleans.Runtime
         private readonly TimeSpan initTimeout;
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
         private readonly Catalog catalog;
-        private readonly List<IHealthCheckParticipant> healthCheckParticipants = new List<IHealthCheckParticipant>();
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
@@ -180,7 +179,6 @@ namespace Orleans.Runtime
 
             // The scheduler
             scheduler = Services.GetRequiredService<OrleansTaskScheduler>();
-            healthCheckParticipants.Add(scheduler);
 
             runtimeClient = Services.GetRequiredService<InsideRuntimeClient>();
 
@@ -321,11 +319,6 @@ namespace Orleans.Runtime
 
         private async Task InjectDependencies()
         {
-            if (siloStatusOracle is IHealthCheckParticipant)
-            {
-                healthCheckParticipants.Add((IHealthCheckParticipant)siloStatusOracle);
-            }
-
             catalog.SiloStatusOracle = this.siloStatusOracle;
             this.siloStatusOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
 
@@ -489,7 +482,8 @@ namespace Orleans.Runtime
 
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
-                this.platformWatchdog = new Watchdog(statisticsOptions.LogWriteInterval, this.healthCheckParticipants, this.executorService, this.loggerFactory);
+                var healthCheckParticipants = this.Services.GetService<IEnumerable<IHealthCheckParticipant>>().ToList();
+                this.platformWatchdog = new Watchdog(statisticsOptions.LogWriteInterval, healthCheckParticipants, this.executorService, this.loggerFactory);
                 this.platformWatchdog.Start();
                 if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo platform watchdog started successfully."); }
             }

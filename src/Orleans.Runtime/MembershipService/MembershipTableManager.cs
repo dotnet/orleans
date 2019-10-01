@@ -3,13 +3,11 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime.MembershipService
@@ -778,7 +776,7 @@ namespace Orleans.Runtime.MembershipService
 
         bool IHealthCheckable.CheckHealth(DateTime lastCheckTime)
         {
-            bool ok = this.membershipUpdateTimer.CheckHealth(lastCheckTime);
+            var ok = this.membershipUpdateTimer.CheckHealth(lastCheckTime);
             return ok;
         }
 
