@@ -4,7 +4,7 @@ namespace Orleans
     /// <summary>
     /// The set of error types used by the Orleans runtime libraries for logging errors.
     /// </summary>
-    internal enum ErrorCode
+    public enum ErrorCode
     {
         Runtime = 100000,
         Runtime_Error_100001 = Runtime + 1,

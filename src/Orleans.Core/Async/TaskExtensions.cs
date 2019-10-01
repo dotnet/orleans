@@ -7,7 +7,7 @@ using Orleans.Runtime;
 
 namespace Orleans
 {
-    internal static class OrleansTaskExtentions
+    public static class OrleansTaskExtentions
     {
         internal static readonly Task<object> CanceledTask = TaskFromCanceled<object>();
         internal static readonly Task<object> CompletedTask = Task.FromResult(default(object));
@@ -202,7 +202,7 @@ namespace Orleans
         }
 
 
-        internal static void WaitWithThrow(this Task task, TimeSpan timeout)
+        public static void WaitWithThrow(this Task task, TimeSpan timeout)
         {
             if (!task.Wait(timeout))
             {

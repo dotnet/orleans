@@ -6,7 +6,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// The Utils class contains a variety of utility methods for use in application and grain code.
     /// </summary>
-    internal static class StandardExtensions
+    public static class StandardExtensions
     {
         public static TimeSpan Multiply(this TimeSpan timeSpan, double value)
         {

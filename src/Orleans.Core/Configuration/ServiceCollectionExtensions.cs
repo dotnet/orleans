@@ -14,7 +14,7 @@ namespace Orleans.Configuration
         /// <typeparam name="TService">The service type being provided.</typeparam>
         /// <typeparam name="TImplementation">The implementation of <typeparamref name="TService"/>.</typeparam>
         /// <param name="services">The service collection.</param>
-        internal static void AddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
+        public static void AddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
         {
             var registration = services.FirstOrDefault(service => service.ServiceType == typeof(TImplementation));
             if (registration != null)
@@ -33,7 +33,7 @@ namespace Orleans.Configuration
         /// <typeparam name="TService">The service type being provided.</typeparam>
         /// <typeparam name="TImplementation">The implementation of <typeparamref name="TService"/>.</typeparam>
         /// <param name="services">The service collection.</param>
-        internal static void TryAddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
+        public static void TryAddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
         {
             var providedService = services.FirstOrDefault(service => service.ServiceType == typeof(TService));
             if (providedService == null)
