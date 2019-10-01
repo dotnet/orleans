@@ -50,7 +50,6 @@ namespace UnitTests.Serialization
         {
             Default,
             BinaryFormatterFallbackSerializer,
-            IlBasedFallbackSerializer,
             NoFallback
         }
 
@@ -604,20 +603,6 @@ namespace UnitTests.Serialization
             var expectedMessage = "Non-serializable exception of type " +
                                     typeof(UnserializableException).OrleansTypeName() + ": " + message;
             Assert.Contains(expectedMessage, result.Message); //Exception message is wrong after round trip of unserializable exception
-        }
-
-        [Theory, TestCategory("Functional")]
-        [InlineData(SerializerToUse.IlBasedFallbackSerializer)]
-        public void Serialize_UnserializableException_IlFallback(SerializerToUse serializerToUse)
-        {
-            var environment = InitializeSerializer(serializerToUse);
-            const string Message = "This is a test message";
-
-            // throw the exception so that stack trace is populated
-            var source = Assert.Throws<UnserializableException>((Action)(() => { throw new UnserializableException(Message); }));
-            object deserialized = OrleansSerializationLoop(environment.SerializationManager, source);
-            var result = Assert.IsAssignableFrom<UnserializableException>(deserialized);
-            Assert.Contains(Message, result.Message);
         }
 
         [Theory, TestCategory("Functional")]

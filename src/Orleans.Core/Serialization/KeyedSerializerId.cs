@@ -1,3 +1,5 @@
+using System;
+
 namespace Orleans.Serialization
 {
     /// <summary>
@@ -8,6 +10,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Removed.
         /// </summary>
+        [Obsolete(message: "Support for this serializer has been removed", error: true)]
         ILBasedSerializer = 1,
 
         /// <summary>
