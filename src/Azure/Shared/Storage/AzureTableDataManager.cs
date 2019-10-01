@@ -53,10 +53,6 @@ namespace Orleans.Transactions.AzureStorage
 
         public CloudTable Table => tableReference;
 
-#if !ORLEANS_TRANSACTIONS
-        private readonly CounterStatistic numServerBusy = CounterStatistic.FindOrCreate(StatisticNames.AZURE_SERVER_BUSY, true);
-#endif
-
         /// <summary>
         /// Constructor
         /// </summary>

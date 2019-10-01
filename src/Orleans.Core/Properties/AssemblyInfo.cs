@@ -10,7 +10,6 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Orleans.TelemetryConsumers.Linux")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost.AppDomain")]
-[assembly: InternalsVisibleTo("OrleansProviders")]
 
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("DefaultCluster.Tests")]

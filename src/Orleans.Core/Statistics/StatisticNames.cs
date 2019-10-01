@@ -2,7 +2,7 @@ using System;
 
 namespace Orleans.Runtime
 {
-    internal class StatisticName
+    public class StatisticName
     {
         public string Name { get; private set; }
 
@@ -22,14 +22,14 @@ namespace Orleans.Runtime
         }
     }
 
-    internal class StatisticNameFormat : StatisticName
+    public class StatisticNameFormat : StatisticName
     {
         public StatisticNameFormat(string name) : base(name)
         {
         }
     }
 
-    internal class StatisticNames
+    public class StatisticNames
     {
         // Networking
         public static readonly StatisticName NETWORKING_SOCKETS_SILO_CLOSED         = new StatisticName("Networking.Sockets.Silo.Closed");
