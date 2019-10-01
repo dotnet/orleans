@@ -43,6 +43,8 @@ namespace Orleans.Serialization
             this.bufferSize = this.currentSpan.Length;
             this.previousBuffersSize = 0;
         }
+
+        public long Length => this.input.Length;
         
         public long Position
         {

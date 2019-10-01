@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Net;
 using Orleans.Runtime;
 
@@ -7,8 +6,11 @@ namespace Orleans.Serialization
 {
     public interface IBinaryTokenStreamReader
     {
-        /// <summary> Current read position in the stream. </summary>
+        /// <summary>Current read position in the stream.</summary>
         int CurrentPosition { get; }
+
+        /// <summary>Gets the total length of the stream.</summary>
+        long Length { get; }
 
         /// <summary>
         /// Creates a copy of the current stream reader.
