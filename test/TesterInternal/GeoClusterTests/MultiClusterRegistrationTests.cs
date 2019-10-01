@@ -228,7 +228,7 @@ namespace UnitTests.GeoClusterTests
             }
         }
 
-        public class ClusterTestListener : MarshalByRefObject, IClusterTestListener, IAsyncObserver<int>
+        public class ClusterTestListener : IClusterTestListener, IAsyncObserver<int>
         {
             public ClusterTestListener(Action<int> oncall)
             {
