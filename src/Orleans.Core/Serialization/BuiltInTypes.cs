@@ -80,7 +80,10 @@ namespace Orleans.Serialization
             }
 
             var innerList = new List<T>(collection.Count);
-            innerList.AddRange(collection.Select(element => (T)SerializationManager.DeepCopyInner(element, context)));
+            foreach (var element in collection)
+            {
+                innerList.Add((T)SerializationManager.DeepCopyInner(element, context));
+            }
 
             var retVal = new ReadOnlyCollection<T>(innerList);
             context.RecordCopy(original, retVal);
@@ -148,7 +151,11 @@ namespace Orleans.Serialization
             // set the list capacity, to avoid list resizing.
             var retVal = new List<T>(list.Count);
             context.RecordCopy(original, retVal);
-            retVal.AddRange(list.Select(element => (T)SerializationManager.DeepCopyInner(element, context)));
+            foreach (var element in list)
+            {
+                retVal.Add((T)SerializationManager.DeepCopyInner(element, context));
+            }
+
             return retVal;
         }
 
