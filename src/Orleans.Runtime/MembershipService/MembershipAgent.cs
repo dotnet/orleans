@@ -12,7 +12,7 @@ namespace Orleans.Runtime.MembershipService
     /// <summary>
     /// Responsible for updating membership table with details about the local silo.
     /// </summary>
-    internal class MembershipAgent : ILifecycleParticipant<ISiloLifecycle>, IDisposable, MembershipAgent.ITestAccessor
+    internal class MembershipAgent : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable, MembershipAgent.ITestAccessor
     {
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly MembershipTableManager tableManager;
@@ -345,6 +345,12 @@ namespace Orleans.Runtime.MembershipService
         public void Dispose()
         {
             this.iAmAliveTimer.Dispose();
+        }
+
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime)
+        {
+            var ok = this.iAmAliveTimer.CheckHealth(lastCheckTime);
+            return ok;
         }
     }
 }

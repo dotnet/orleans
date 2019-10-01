@@ -107,6 +107,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
             services.TryAddSingleton<OrleansTaskScheduler>();
+            services.AddFromExisting<IHealthCheckParticipant, OrleansTaskScheduler>();
             services.TryAddSingleton<GrainFactory>(sp => sp.GetService<InsideRuntimeClient>().ConcreteGrainFactory);
             services.TryAddFromExisting<IGrainFactory, GrainFactory>();
             services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
@@ -151,10 +152,13 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracle>();
             services.AddSingleton<ClusterHealthMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor>();
+            services.AddFromExisting<IHealthCheckParticipant, ClusterHealthMonitor>();
             services.AddSingleton<MembershipAgent>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipAgent>();
+            services.AddFromExisting<IHealthCheckParticipant, MembershipAgent>();
             services.AddSingleton<MembershipTableCleanupAgent>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableCleanupAgent>();
+            services.AddFromExisting<IHealthCheckParticipant, MembershipTableCleanupAgent>();
             services.AddSingleton<SiloStatusListenerManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloStatusListenerManager>();
             services.AddSingleton<ClusterMembershipService>();
