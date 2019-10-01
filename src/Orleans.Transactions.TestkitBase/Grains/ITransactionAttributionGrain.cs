@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -78,6 +78,7 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        [Serializable]
         private class NoAttributionGrain : ITransactionAttributionGrain
         {
             private INoAttributionGrain grain;
@@ -93,6 +94,7 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        [Serializable]
         private class SuppressAttributionGrain : ITransactionAttributionGrain
         {
             private ISuppressAttributionGrain grain;
@@ -108,6 +110,7 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        [Serializable]
         private class CreateOrJoinAttributionGrain : ITransactionAttributionGrain
         {
             private ICreateOrJoinAttributionGrain grain;
@@ -123,6 +126,7 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        [Serializable]
         private class CreateAttributionGrain : ITransactionAttributionGrain
         {
             private ICreateAttributionGrain grain;
@@ -138,6 +142,7 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        [Serializable]
         private class JoinAttributionGrain : ITransactionAttributionGrain
         {
             private IJoinAttributionGrain grain;
@@ -153,6 +158,7 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        [Serializable]
         private class SupportedAttributionGrain : ITransactionAttributionGrain
         {
             private ISupportedAttributionGrain grain;
@@ -168,6 +174,7 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        [Serializable]
         private class NotAllowedAttributionGrain : ITransactionAttributionGrain
         {
             private INotAllowedAttributionGrain grain;
