@@ -624,7 +624,7 @@ namespace Orleans
         Messaging_IMA_ExceptionAccepting        = MessagingBase + 26,
         Messaging_IMA_BadBufferReceived         = MessagingBase + 27,
         Messaging_IMA_ActivationOverloaded      = MessagingBase + 28,
-        Messaging_Gateway_SerializationError    = MessagingBase + 29,
+        Messaging_SerializationError            = MessagingBase + 29,
         Messaging_UnableToDeserializeBody       = MessagingBase + 30,
         Messaging_Dispatcher_TryForward         = MessagingBase + 31,
         Messaging_Dispatcher_TryForwardFailed   = MessagingBase + 32,

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
@@ -33,11 +34,13 @@ namespace Orleans.Runtime.Messaging
         protected Connection(
             ConnectionContext connection,
             ConnectionDelegate middleware,
+            MessageFactory messageFactory,
             IServiceProvider serviceProvider,
             INetworkingTrace trace)
         {
             this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
             this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
+            this.MessageFactory = messageFactory ?? throw new ArgumentNullException(nameof(messageFactory));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             this.Log = trace ?? throw new ArgumentNullException(nameof(trace));
             this.outgoingMessages = Channel.CreateUnbounded<Message>(OutgoingMessageChannelOptions);
@@ -59,6 +62,8 @@ namespace Orleans.Runtime.Messaging
         protected ConnectionContext Context { get; }
         protected INetworkingTrace Log { get; }
         protected abstract ConnectionDirection ConnectionDirection { get; }
+        protected MessageFactory MessageFactory { get; }
+        protected abstract IMessageCenter MessageCenter { get; }
 
         public bool IsValid { get; private set; }
 
@@ -109,8 +114,6 @@ namespace Orleans.Runtime.Messaging
         /// <param name="msg"></param>
         /// <returns>Whether or not to continue transporting the message.</returns>
         protected abstract bool PrepareMessageForSend(Message msg);
-
-        protected abstract void OnMessageSerializationFailure(Message msg, Exception exc);
 
         protected abstract void RetryMessage(Message msg, Exception ex = null);
 
@@ -173,8 +176,6 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void OnReceivedMessage(Message message);
 
-        protected abstract void OnReceiveMessageFailure(Message message, Exception exception);
-
         protected abstract void OnSendMessageFailure(Message message, string error);
 
         private async Task ProcessIncoming()
@@ -217,17 +218,8 @@ namespace Orleans.Runtime.Messaging
                                     message = null;
                                 }
                             }
-                            catch (Exception exception)
+                            catch (Exception exception) when (this.HandleReceiveMessageFailure(message, exception))
                             {
-                                this.Log.LogWarning(
-                                    "Exception reading message {Message} from remote endpoint {Remote} to local endpoint {Local}: {Exception}",
-                                    message,
-                                    this.RemoteEndPoint,
-                                    this.LocalEndPoint,
-                                    exception);
-
-                                this.OnReceiveMessageFailure(message, exception);
-                                break;
                             }
                         } while (requiredBytes == 0);
                     }
@@ -299,11 +291,6 @@ namespace Orleans.Runtime.Messaging
                     }
                     catch (Exception exception) when (message != default)
                     {
-                        this.Log.LogWarning(
-                            "Exception writing message {Message} to remote endpoint {EndPoint}: {Exception}",
-                            message,
-                            this.RemoteEndPoint,
-                            exception);
                         this.OnMessageSerializationFailure(message, exception);
                     }
 
@@ -407,6 +394,94 @@ namespace Orleans.Runtime.Messaging
             }
 
             return ep;
+        }
+
+        /// <summary>
+        /// Handles a message receive failure.
+        /// </summary>
+        /// <returns><see langword="true"/> if the exception should not be caught and <see langword="false"/> if it should be caught.</returns>
+        private bool HandleReceiveMessageFailure(Message message, Exception exception)
+        {
+            this.Log.LogWarning(
+                "Exception reading message {Message} from remote endpoint {Remote} to local endpoint {Local}: {Exception}",
+                message,
+                this.RemoteEndPoint,
+                this.LocalEndPoint,
+                exception);
+
+            // If deserialization completely failed, rethrow the exception so that it can be handled at another level.
+            if (message?.Headers is null)
+            {
+                // Returning false here informs the caller that the exception should not be caught.
+                return false;
+            }
+
+            // The message body was not successfully decoded, but the headers were.
+            MessagingStatisticsGroup.OnRejectedMessage(message);
+
+            if (message.Direction == Message.Directions.Request)
+            {
+                // Send a fast fail to the caller.
+                var response = this.MessageFactory.CreateResponseMessage(message);
+                response.Result = Message.ResponseTypes.Error;
+                response.BodyObject = Response.ExceptionResponse(exception);
+
+                // Send the error response and continue processing the next message.
+                this.Send(response);
+            }
+            else if (message.Direction == Message.Directions.Response)
+            {
+                // If the message was a response, propagate the exception to the intended recipient.
+                message.Result = Message.ResponseTypes.Error;
+                message.BodyObject = Response.ExceptionResponse(exception);
+                this.MessageCenter.OnReceivedMessage(message);
+            }
+
+            // The exception has been handled by propagating it onwards.
+            return true;
+        }
+
+        private void OnMessageSerializationFailure(Message message, Exception exception)
+        {
+            // we only get here if we failed to serialize the msg (or any other catastrophic failure).
+            // Request msg fails to serialize on the sender, so we just enqueue a rejection msg.
+            // Response msg fails to serialize on the responding silo, so we try to send an error response back.
+            this.Log.LogWarning(
+                (int)ErrorCode.Messaging_SerializationError,
+                "Unexpected error serializing message {Message}: {Exception}",
+                message,
+                exception);
+
+            MessagingStatisticsGroup.OnFailedSentMessage(message);
+
+            if (message.Direction == Message.Directions.Request)
+            {
+                var response = this.MessageFactory.CreateResponseMessage(message);
+                response.Result = Message.ResponseTypes.Error;
+                response.BodyObject = Response.ExceptionResponse(exception);
+
+                this.MessageCenter.OnReceivedMessage(response);
+            }
+            else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
+            {
+                // If we failed sending an original response, turn the response body into an error and reply with it.
+                // unless we have already tried sending the response multiple times.
+                message.Result = Message.ResponseTypes.Error;
+                message.BodyObject = Response.ExceptionResponse(exception);
+                ++message.RetryCount;
+
+                this.Send(message);
+            }
+            else
+            {
+                this.Log.LogWarning(
+                    (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
+                    "Dropping message which failed during serialization: {Message}. Exception = {Exception}",
+                    message,
+                    exception);
+
+                MessagingStatisticsGroup.OnDroppedSentMessage(message);
+            }
         }
     }
 }
