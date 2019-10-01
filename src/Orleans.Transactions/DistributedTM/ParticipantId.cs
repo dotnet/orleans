@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Orleans.Concurrency;
@@ -37,6 +37,7 @@ namespace Orleans.Transactions
             return $"ParticipantId.{Name}.{Reference}";
         }
 
+        [Serializable]
         private class IdComparer : IEqualityComparer<ParticipantId>
         {
             public bool Equals(ParticipantId x, ParticipantId y)
