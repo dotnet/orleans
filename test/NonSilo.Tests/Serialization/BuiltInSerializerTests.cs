@@ -57,8 +57,7 @@ namespace UnitTests.Serialization
         public static IEnumerable<object[]> FallbackSerializers = new[]
         {
             new object[] { SerializerToUse.Default },
-            new object[] { SerializerToUse.BinaryFormatterFallbackSerializer },
-            new object[] { SerializerToUse.IlBasedFallbackSerializer }
+            new object[] { SerializerToUse.BinaryFormatterFallbackSerializer }
         };
 
         private SerializationTestEnvironment InitializeSerializer(SerializerToUse serializerToUse)
@@ -75,11 +74,6 @@ namespace UnitTests.Serialization
                     Type fallback;
                     switch (serializerToUse)
                     {
-                        case SerializerToUse.IlBasedFallbackSerializer:
-#pragma warning disable CS0618 // Type or member is obsolete
-                            fallback = typeof(ILBasedSerializer);
-#pragma warning restore CS0618 // Type or member is obsolete
-                            break;
                         case SerializerToUse.BinaryFormatterFallbackSerializer:
                             fallback = typeof(BinaryFormatterSerializer);
                             break;

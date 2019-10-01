@@ -16,7 +16,6 @@ namespace Benchmarks.Serialization
     {
         Default,
         BinaryFormatterFallbackSerializer,
-        IlBasedFallbackSerializer,
         ProtoBufNet
     }
 
@@ -29,11 +28,6 @@ namespace Benchmarks.Serialization
             switch (serializerToUse)
             {
                 case SerializerToUse.Default:
-                    break;
-                case SerializerToUse.IlBasedFallbackSerializer:
-#pragma warning disable CS0618 // Type or member is obsolete
-                    fallback = typeof(ILBasedSerializer);
-#pragma warning restore CS0618 // Type or member is obsolete
                     break;
                 case SerializerToUse.BinaryFormatterFallbackSerializer:
                     fallback = typeof(BinaryFormatterSerializer);
@@ -58,7 +52,7 @@ namespace Benchmarks.Serialization
             this.serializationManager = client.ServiceProvider.GetRequiredService<SerializationManager>();
         }
         
-        [Params(SerializerToUse.IlBasedFallbackSerializer, SerializerToUse.Default, SerializerToUse.ProtoBufNet)]
+        [Params(SerializerToUse.Default, SerializerToUse.ProtoBufNet)]
         public SerializerToUse Serializer { get; set; }
 
         private OuterClass.SomeConcreteClass complexClass;
