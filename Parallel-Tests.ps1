@@ -7,6 +7,19 @@ param(
 $maxDegreeOfParallelism = 4
 $failed = $false
 
+if( 
+    [Console]::InputEncoding -is [Text.UTF8Encoding] -and 
+    [Console]::InputEncoding.GetPreamble().Length -ne 0 
+) { 
+    Write-Host Setting [Console]::InputEncoding
+    [Console]::InputEncoding = New-Object Text.UTF8Encoding $false 
+} 
+else 
+{
+    Write-Host Not changing [Console]::InputEncoding
+}
+
+
 function Receive-CompletedJobs {
     $succeeded = $true
     foreach($job in (Get-Job | Where-Object { $_.State -ne 'Running' }))
