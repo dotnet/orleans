@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
@@ -18,7 +17,6 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionOptions connectionOptions;
         private readonly Gateway gateway;
         private readonly OverloadDetector overloadDetector;
-        private readonly MessageFactory messageFactory;
         private readonly CounterStatistic loadSheddingCounter;
         private readonly SiloAddress myAddress;
 
@@ -35,12 +33,11 @@ namespace Orleans.Runtime.Messaging
             ConnectionOptions connectionOptions,
             MessageCenter messageCenter,
             ILocalSiloDetails localSiloDetails)
-            : base(connection, middleware, serviceProvider, trace)
+            : base(connection, middleware, messageFactory, serviceProvider, trace)
         {
             this.connectionOptions = connectionOptions;
             this.gateway = gateway;
             this.overloadDetector = overloadDetector;
-            this.messageFactory = messageFactory;
             this.siloDetails = siloDetails;
             this.messageCenter = messageCenter;
             this.multiClusterOptions = multiClusterOptions.Value;
@@ -51,6 +48,8 @@ namespace Orleans.Runtime.Messaging
         }
 
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.GatewayToClient;
+
+        protected override IMessageCenter MessageCenter => this.messageCenter;
 
         protected override void OnReceivedMessage(Message msg)
         {
@@ -71,7 +70,7 @@ namespace Orleans.Runtime.Messaging
             if (this.overloadDetector.Overloaded)
             {
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message rejection = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
+                Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
                 this.messageCenter.TryDeliverToProxy(rejection);
                 if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug("Rejecting a request due to overloading: {0}", msg.ToString());
                 loadSheddingCounter.Increment();
@@ -79,7 +78,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             SiloAddress targetAddress = this.gateway.TryToReroute(msg);
-            msg.SendingSilo = this.messageCenter.MyAddress;
+            msg.SendingSilo = this.myAddress;
 
             if (targetAddress == null)
             {
@@ -90,8 +89,8 @@ namespace Orleans.Runtime.Messaging
 
                 if (msg.TargetGrain.IsSystemTarget)
                 {
-                    msg.TargetSilo = this.messageCenter.MyAddress;
-                    msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, this.messageCenter.MyAddress);
+                    msg.TargetSilo = this.myAddress;
+                    msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, this.myAddress);
                 }
 
                 MessagingStatisticsGroup.OnMessageReRoute(msg);
@@ -103,26 +102,6 @@ namespace Orleans.Runtime.Messaging
                 msg.TargetSilo = targetAddress;
                 this.messageCenter.SendMessage(msg);
             }
-        }
-
-        protected override void OnReceiveMessageFailure(Message msg, Exception exception)
-        {
-            // If deserialization completely failed or the message was one-way, rethrow the exception
-            // so that it can be handled at another level.
-            if (msg?.Headers == null || msg.Direction != Message.Directions.Request)
-            {
-                ExceptionDispatchInfo.Capture(exception).Throw();
-            }
-
-            // The message body was not successfully decoded, but the headers were.
-            // Send a fast fail to the caller.
-            MessagingStatisticsGroup.OnRejectedMessage(msg);
-            var response = this.messageFactory.CreateResponseMessage(msg);
-            response.Result = Message.ResponseTypes.Error;
-            response.BodyObject = Response.ExceptionResponse(exception);
-
-            // Send the error response and continue processing the next message.
-            this.messageCenter.SendMessage(response);
         }
 
         protected override async Task RunInternal()
@@ -226,45 +205,6 @@ namespace Orleans.Runtime.Messaging
                 }
                 reason.Append("Msg is: ").Append(msg);
                 FailMessage(msg, reason.ToString());
-            }
-        }
-
-        protected override void OnMessageSerializationFailure(Message msg, Exception exc)
-        {
-            // we only get here if we failed to serialize the msg (or any other catastrophic failure).
-            // Request msg fails to serialize on the sending silo, so we just enqueue a rejection msg.
-            // Response msg fails to serialize on the responding silo, so we try to send an error response back.
-            this.Log.LogWarning(
-                (int)ErrorCode.MessagingUnexpectedSendError,
-                "Unexpected error serializing message {Message}: {Exception}",
-                msg,
-                exc);
-
-            MessagingStatisticsGroup.OnFailedSentMessage(msg);
-
-            if (msg.Direction == Message.Directions.Request)
-            {
-                this.messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, exc.ToString());
-            }
-            else if (msg.Direction == Message.Directions.Response && msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
-            {
-                // if we failed sending an original response, turn the response body into an error and reply with it.
-                // unless we have already tried sending the response multiple times.
-                msg.Result = Message.ResponseTypes.Error;
-                msg.BodyObject = Response.ExceptionResponse(exc);
-                msg.RetryCount = msg.RetryCount + 1;
-                this.messageCenter.SendMessage(msg);
-            }
-            else
-            {
-                this.Log.LogWarning(
-                    (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
-                    "Silo {SiloAddress} is dropping message which failed during serialization: {Message}. Exception = {Exception}",
-                    this.myAddress,
-                    msg,
-                    exc);
-
-                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }
 

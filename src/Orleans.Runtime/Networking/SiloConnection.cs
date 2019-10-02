@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
@@ -15,7 +14,6 @@ namespace Orleans.Runtime.Messaging
     {
         private static readonly Response PingResponse = new Response(null);
         private readonly MessageCenter messageCenter;
-        private readonly MessageFactory messageFactory;
         private readonly ConnectionManager connectionManager;
         private readonly ConnectionOptions connectionOptions;
 
@@ -30,10 +28,9 @@ namespace Orleans.Runtime.Messaging
             ILocalSiloDetails localSiloDetails,
             ConnectionManager connectionManager,
             ConnectionOptions connectionOptions)
-            : base(connection, middleware, serviceProvider, trace)
+            : base(connection, middleware, messageFactory, serviceProvider, trace)
         {
             this.messageCenter = messageCenter;
-            this.messageFactory = messageFactory;
             this.connectionManager = connectionManager;
             this.connectionOptions = connectionOptions;
             this.LocalSiloAddress = localSiloDetails.SiloAddress;
@@ -46,33 +43,14 @@ namespace Orleans.Runtime.Messaging
 
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
 
+        protected override IMessageCenter MessageCenter => this.messageCenter;
+
         protected override void OnReceivedMessage(Message msg)
         {
             // See it's a Ping message, and if so, short-circuit it
             if (msg.IsPing())
             {
-                MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
-
-                if (this.Log.IsEnabled(LogLevel.Trace))
-                {
-                    var objectId = RuntimeHelpers.GetHashCode(msg);
-                    this.Log.LogTrace("Responding to Ping from {Silo} with object id {ObjectId}. Message {Message}", msg.SendingSilo, objectId, msg);
-                }
-
-                if (!msg.TargetSilo.Equals(messageCenter.MyAddress)) // got ping that is not destined to me. For example, got a ping to my older incarnation.
-                {
-                    MessagingStatisticsGroup.OnRejectedMessage(msg);
-                    Message rejection = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
-                        $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {messageCenter.MyAddress.ToLongString()}. " +
-                        $"The rejected ping message is {msg}.");
-                    messageCenter.OutboundQueue.SendMessage(rejection);
-                }
-                else
-                {
-                    var response = this.messageFactory.CreateResponseMessage(msg);
-                    response.BodyObject = PingResponse;
-                    this.messageCenter.SendMessage(response);
-                }
+                this.HandlePingMessage(msg);
                 return;
             }
 
@@ -94,14 +72,14 @@ namespace Orleans.Runtime.Messaging
                 if (msg.Direction != Message.Directions.Request) return;
 
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                var reject = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping");
-                this.messageCenter.SendMessage(reject);
+                var rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping");
+                this.Send(rejection);
                 return;
             }
 
             // Make sure the message is for us. Note that some control messages may have no target
             // information, so a null target silo is OK.
-            if ((msg.TargetSilo == null) || msg.TargetSilo.Matches(messageCenter.MyAddress))
+            if ((msg.TargetSilo == null) || msg.TargetSilo.Matches(this.LocalSiloAddress))
             {
                 // See if it's a message for a client we're proxying.
                 if (messageCenter.IsProxying && messageCenter.TryDeliverToProxy(msg)) return;
@@ -111,7 +89,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            if (!msg.TargetSilo.Endpoint.Equals(messageCenter.MyAddress.Endpoint))
+            if (!msg.TargetSilo.Endpoint.Equals(this.LocalSiloAddress.Endpoint))
             {
                 // If the message is for some other silo altogether, then we need to forward it.
                 if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.Trace("Forwarding message {0} from {1} to silo {2}", msg.Id, msg.SendingSilo, msg.TargetSilo);
@@ -124,42 +102,55 @@ namespace Orleans.Runtime.Messaging
             if (msg.Direction == Message.Directions.Request)
             {
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message rejection = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Transient,
-                    string.Format("The target silo is no longer active: target was {0}, but this silo is {1}. The rejected message is {2}.",
-                        msg.TargetSilo.ToLongString(), messageCenter.MyAddress.ToLongString(), msg));
+                var rejection = this.MessageFactory.CreateRejectionResponse(
+                    msg,
+                    Message.RejectionTypes.Transient,
+                    $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {this.LocalSiloAddress.ToLongString()}. The rejected message is {msg}.");
 
                 // Invalidate the remote caller's activation cache entry.
-                if (msg.TargetAddress != null) rejection.AddToCacheInvalidationHeader(msg.TargetAddress);
+                if (msg.TargetAddress != null)
+                {
+                    rejection.AddToCacheInvalidationHeader(msg.TargetAddress);
+                }
 
-                messageCenter.OutboundQueue.SendMessage(rejection);
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug("Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
-                    msg.TargetSilo.ToLongString(), messageCenter.MyAddress.ToLongString(), msg);
+                this.Send(rejection);
+
+                if (this.Log.IsEnabled(LogLevel.Debug))
+                {
+                    this.Log.Debug(
+                        "Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
+                        msg.TargetSilo.ToLongString(),
+                        this.LocalSiloAddress.ToLongString(),
+                        msg);
+                }
             }
         }
 
-        protected override void OnReceiveMessageFailure(Message message, Exception exception)
+        private void HandlePingMessage(Message msg)
         {
-            if (message?.Headers != null && message.IsPing())
+            MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
+
+            if (this.Log.IsEnabled(LogLevel.Trace))
             {
-                this.Log.LogWarning("Failed to receive ping message {Message}", message);
+                var objectId = RuntimeHelpers.GetHashCode(msg);
+                this.Log.LogTrace("Responding to Ping from {Silo} with object id {ObjectId}. Message {Message}", msg.SendingSilo, objectId, msg);
             }
 
-            // If deserialization completely failed or the message was one-way, rethrow the exception
-            // so that it can be handled at another level.
-            if (message?.Headers == null || message.Direction != Message.Directions.Request)
+            if (!msg.TargetSilo.Equals(this.LocalSiloAddress))
             {
-                ExceptionDispatchInfo.Capture(exception).Throw();
+                // Got ping that is not destined to me. For example, got a ping to my older incarnation.
+                MessagingStatisticsGroup.OnRejectedMessage(msg);
+                Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
+                    $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {this.LocalSiloAddress.ToLongString()}. " +
+                    $"The rejected ping message is {msg}.");
+                this.Send(rejection);
             }
-
-            // The message body was not successfully decoded, but the headers were.
-            // Send a fast fail to the caller.
-            MessagingStatisticsGroup.OnRejectedMessage(message);
-            var response = this.messageFactory.CreateResponseMessage(message);
-            response.Result = Message.ResponseTypes.Error;
-            response.BodyObject = Response.ExceptionResponse(exception);
-
-            // Send the error response and continue processing the next message.
-            this.messageCenter.SendMessage(response);
+            else
+            {
+                var response = this.MessageFactory.CreateResponseMessage(msg);
+                response.BodyObject = PingResponse;
+                this.Send(response);
+            }
         }
 
         protected override void OnSendMessageFailure(Message message, string error)
@@ -343,45 +334,6 @@ namespace Orleans.Runtime.Messaging
                 }
                 reason.Append("Msg is: ").Append(msg);
                 FailMessage(msg, reason.ToString());
-            }
-        }
-
-        protected override void OnMessageSerializationFailure(Message msg, Exception exc)
-        {
-            // we only get here if we failed to serialize the msg (or any other catastrophic failure).
-            // Request msg fails to serialize on the sending silo, so we just enqueue a rejection msg.
-            // Response msg fails to serialize on the responding silo, so we try to send an error response back.
-            this.Log.LogWarning(
-                (int)ErrorCode.MessagingUnexpectedSendError,
-                "Unexpected error serializing message {Message}: {Exception}",
-                msg,
-                exc);
-
-            MessagingStatisticsGroup.OnFailedSentMessage(msg);
-
-            if (msg.Direction == Message.Directions.Request)
-            {
-                this.messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, exc.ToString());
-            }
-            else if (msg.Direction == Message.Directions.Response && msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
-            {
-                // if we failed sending an original response, turn the response body into an error and reply with it.
-                // unless we have already tried sending the response multiple times.
-                msg.Result = Message.ResponseTypes.Error;
-                msg.BodyObject = Response.ExceptionResponse(exc);
-                msg.RetryCount = msg.RetryCount + 1;
-                this.messageCenter.SendMessage(msg);
-            }
-            else
-            {
-                this.Log.LogWarning(
-                    (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
-                    "Silo {SiloAddress} is dropping message which failed during serialization: {Message}. Exception = {Exception}",
-                    this.LocalSiloAddress,
-                    msg,
-                    exc);
-
-                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }
     }

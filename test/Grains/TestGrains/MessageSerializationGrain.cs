@@ -1,42 +1,63 @@
-﻿using Orleans.CodeGeneration;
+using System;
+using System.Threading.Tasks;
+
+using Orleans;
+
+using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    using System;
-    using System.Threading.Tasks;
-
-    using Orleans;
-    using Orleans.Serialization;
-
-    using UnitTests.GrainInterfaces;
-    
     public class MessageSerializationGrain : Grain, IMessageSerializationGrain
     {
-        public Task Send(UndeserializableType input) => Task.FromResult(input);
-        public Task<UnserializableType> Get() => Task.FromResult(new UnserializableType());
+        private IMessageSerializationGrain grainOnOtherSilo;
 
-        public async Task SendToOtherSilo()
+        public Task SendUnserializable(UnserializableType input) => Task.CompletedTask;
+        public Task SendUndeserializable(UndeserializableType input) => Task.CompletedTask;
+        public Task<UnserializableType> GetUnserializable() => Task.FromResult(new UnserializableType());
+        public Task<UndeserializableType> GetUndeserializable() => Task.FromResult(new UndeserializableType());
+
+        public async Task SendUndeserializableToOtherSilo()
         {
             var otherGrain = await GetGrainOnOtherSilo();
 
             // Message that grain in a way which should fail.
-            await otherGrain.Send(new UndeserializableType(35));
+            await otherGrain.SendUndeserializable(new UndeserializableType(35));
         }
 
-        public async Task GetFromOtheSilo()
+        public async Task GetUnserializableFromOtherSilo()
         {
             var otherGrain = await GetGrainOnOtherSilo();
 
             // Message that grain in a way which should fail.
-            await otherGrain.Get();
+            await otherGrain.GetUnserializable();
         }
 
-        public Task SendToClient(IMessageSerializationClientObject obj) => obj.Send(new UndeserializableType(35));
+        public async Task SendUnserializableToOtherSilo()
+        {
+            var otherGrain = await GetGrainOnOtherSilo();
 
-        public Task GetFromClient(IMessageSerializationClientObject obj) => obj.Get();
+            // Message that grain in a way which should fail.
+            await otherGrain.SendUnserializable(new UnserializableType());
+        }
+
+        public async Task GetUndeserializableFromOtherSilo()
+        {
+            var otherGrain = await GetGrainOnOtherSilo();
+
+            // Message that grain in a way which should fail.
+            await otherGrain.GetUndeserializable();
+        }
+
+        public Task SendUndeserializableToClient(IMessageSerializationClientObject obj) => obj.SendUndeserializable(new UndeserializableType(35));
+        public Task SendUnserializableToClient(IMessageSerializationClientObject obj) => obj.SendUnserializable(new UnserializableType());
+
+        public Task GetUnserializableFromClient(IMessageSerializationClientObject obj) => obj.GetUnserializable();
+        public Task GetUndeserializableFromClient(IMessageSerializationClientObject obj) => obj.GetUndeserializable();
 
         private async Task<IMessageSerializationGrain> GetGrainOnOtherSilo()
         {
+            if (this.grainOnOtherSilo != null) return this.grainOnOtherSilo;
+
             // Find a grain on another silo.
             IMessageSerializationGrain otherGrain;
             var id = this.GetPrimaryKeyLong();
@@ -45,13 +66,13 @@ namespace UnitTests.Grains
             {
                 otherGrain = this.GrainFactory.GetGrain<IMessageSerializationGrain>(++id);
                 var otherIdentity = await otherGrain.GetSiloIdentity();
-                if (!String.Equals(otherIdentity, currentSiloIdentity))
+                if (!string.Equals(otherIdentity, currentSiloIdentity))
                 {
                     break;
                 }
             }
 
-            return otherGrain;
+            return this.grainOnOtherSilo = otherGrain;
         }
 
         public Task<string> GetSiloIdentity()
