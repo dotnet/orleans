@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Scheduler;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.ReminderService
 {

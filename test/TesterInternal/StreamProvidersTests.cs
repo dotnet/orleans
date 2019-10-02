@@ -15,6 +15,7 @@ using Orleans.Runtime;
 using UnitTests.StorageTests;
 using Orleans.Storage;
 using Orleans.Providers;
+using Orleans.Internal;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace UnitTests.Streaming

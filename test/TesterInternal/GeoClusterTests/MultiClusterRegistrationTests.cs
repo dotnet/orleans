@@ -1,18 +1,17 @@
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.TestingHost;
-using TestExtensions;
 using TestGrainInterfaces;
 using Tests.GeoClusterTests;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Hosting;
+using Orleans.Internal;
 
 namespace UnitTests.GeoClusterTests
 {

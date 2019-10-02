@@ -16,6 +16,7 @@ using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Configuration.Internal;
 
 namespace Tester
 {

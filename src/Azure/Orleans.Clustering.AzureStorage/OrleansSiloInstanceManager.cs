@@ -10,6 +10,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 using Orleans.Clustering.AzureStorage;
 using Orleans.Clustering.AzureStorage.Utilities;
+using Orleans.Internal;
 
 namespace Orleans.AzureUtils
 {

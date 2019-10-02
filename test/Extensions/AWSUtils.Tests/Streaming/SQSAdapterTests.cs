@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
@@ -17,6 +17,7 @@ using Xunit;
 using Xunit.Abstractions;
 using OrleansAWSUtils.Storage;
 using Orleans.Configuration;
+using Orleans.Internal;
 
 namespace AWSUtils.Tests.Streaming
 {

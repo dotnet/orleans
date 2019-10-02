@@ -1,6 +1,7 @@
 #define LOG_MEMORY_PERF_COUNTERS
 
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 using Orleans.Runtime;
 using System;
 using System.Diagnostics;

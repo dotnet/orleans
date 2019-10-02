@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.MembershipService
 {

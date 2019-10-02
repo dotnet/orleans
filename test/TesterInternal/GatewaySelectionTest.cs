@@ -10,7 +10,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
+using Orleans.Internal;
 using Xunit;
 using Xunit.Abstractions;
 

@@ -1,6 +1,5 @@
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.LogConsistency;
 using Orleans.TestingHost;
 using System;
@@ -9,8 +8,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
-using TestExtensions;
 using Orleans.EventSourcing.Common;
+using Orleans.Internal;
 using Tester;
 using Orleans.Hosting;
 

@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using Orleans.Internal;
 using Orleans.Runtime;
 
 namespace TestExtensions

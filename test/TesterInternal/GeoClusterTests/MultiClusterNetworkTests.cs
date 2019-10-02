@@ -5,14 +5,13 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.MultiCluster;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MultiClusterNetwork;
 using Xunit;
 using Xunit.Abstractions;
-using Tester;
 using Orleans.TestingHost;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Orleans.Internal;
 
 namespace Tests.GeoClusterTests
 {

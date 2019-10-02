@@ -10,7 +10,7 @@ using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 
 namespace UnitTests
 {

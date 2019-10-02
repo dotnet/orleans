@@ -8,11 +8,10 @@ using Orleans;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using TestGrainInterfaces;
-using Orleans.Runtime.Configuration;
+using Orleans.Internal;
 using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
-using Tester;
 using Orleans.Hosting;
 using Orleans.Configuration;
 

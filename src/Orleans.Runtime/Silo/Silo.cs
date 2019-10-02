@@ -27,6 +27,7 @@ using Orleans.Versions;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Serialization;
+using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
