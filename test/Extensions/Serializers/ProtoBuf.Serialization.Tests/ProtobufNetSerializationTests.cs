@@ -24,7 +24,7 @@ namespace ProtoBuf.Serialization.Tests
 
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
         public void ProtoBufSerializationTest_2_DirectProtoBufNet()
         {
             var person = CreatePerson();

@@ -81,7 +81,7 @@ namespace UnitTests.General
             Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("BVT"), TestCategory("RequestContext")]
         public async Task RequestContext_LegacyActivityId_Simple()
         {
             Guid activityId = Guid.NewGuid();

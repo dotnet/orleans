@@ -18,7 +18,7 @@ namespace DefaultCluster.Tests.GeoClusterTests
             return this.GrainFactory.GetGrain<ISimpleGlobalSingleInstanceGrain>(GetRandomGrainId(), SimpleGrainNamePrefix);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GeoCluster")]
+        [Fact, TestCategory("BVT"), TestCategory("GeoCluster")]
         public async Task SimpleGlobalSingleInstanceGrainTest()
         {
             int i = 0;

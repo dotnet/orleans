@@ -24,14 +24,14 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             watcher.Clear().Wait();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task WatcherGrain_GetGrain()
         {
             IActivateDeactivateWatcherGrain grain = this.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(1);
             await grain.Clear();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Activate_Simple()
         {
             int id = random.Next();
@@ -42,7 +42,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 0, activation, "After activation");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Deactivate_Simple()
         {
             int id = random.Next();
@@ -58,7 +58,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Reactivate_Simple()
         {
             int id = random.Next();
@@ -79,7 +79,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Activate_TailCall()
         {
             int id = random.Next();
@@ -90,7 +90,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 0, activation, "After activation");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Deactivate_TailCall()
         {
             int id = random.Next();
@@ -106,7 +106,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Reactivate_TailCall()
         {
             int id = random.Next();
@@ -127,7 +127,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("Reentrancy")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("Reentrancy")]
         public async Task LongRunning_Deactivate()
         {
             int id = random.Next();
@@ -152,7 +152,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(2, 1, new[] { activation, activation2 }, "After reactivation");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task BadActivate_Await()
         {
             try
@@ -170,7 +170,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task BadActivate_GetValue()
         {
             try
@@ -188,7 +188,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task BadActivate_Await_ViaOtherGrain()
         {
             try
@@ -206,7 +206,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Constructor_Bad_Await()
         {
             try
@@ -229,7 +229,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task Constructor_CreateGrainReference()
         {
             int id = random.Next();
@@ -239,7 +239,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             Assert.NotNull(activation);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task TaskAction_Deactivate()
         {
             int id = random.Next();
@@ -255,7 +255,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 1, activation.ToString());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task DeactivateOnIdleWhileActivate()
         {
             int id = random.Next();

@@ -56,7 +56,7 @@ namespace UnitTests.StreamingTests
             logger = this.fixture.Logger;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void SampleStreamingTests_StreamTypeMismatch_ShouldThrowOrleansException()
         {
             var streamId = Guid.NewGuid();
@@ -67,7 +67,7 @@ namespace UnitTests.StreamingTests
                 });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task SampleStreamingTests_1()
         {
             this.logger.Info("************************ SampleStreamingTests_1 *********************************");

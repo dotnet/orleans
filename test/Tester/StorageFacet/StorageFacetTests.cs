@@ -50,13 +50,13 @@ namespace Tester
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
+        [Fact, TestCategory("BVT"), TestCategory("Facet")]
         public Task ExampleStorageFacetHappyPath()
         {
             return ExampleStorageHappyPath<IStorageFacetGrain>();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
+        [Fact, TestCategory("BVT"), TestCategory("Facet")]
         public Task ExampleStorageFactoryHappyPath()
         {
             return ExampleStorageHappyPath<IStorageFactoryGrain>();
@@ -76,13 +76,13 @@ namespace Tester
             Assert.Equal("Table:second-ActivateCalled:True, StateType:String", info[1]);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
+        [Fact, TestCategory("BVT"), TestCategory("Facet")]
         public Task ExampleStorageFacetDefaultPath()
         {
             return ExampleStorageDefaultPath<IStorageDefaultFacetGrain>();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
+        [Fact, TestCategory("BVT"), TestCategory("Facet")]
         public Task ExampleStorageFactoryDefaultPath()
         {
             return ExampleStorageDefaultPath<IStorageDefaultFactoryGrain>();

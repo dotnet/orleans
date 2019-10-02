@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 using TestExtensions;
@@ -33,7 +33,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(x, y);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void RWReferencesInvalidCastException()
         {
             Assert.Throws<InvalidCastException>(() =>
@@ -43,7 +43,7 @@ namespace DefaultCluster.Tests.General
             });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task MultifacetFactory()
         {
             IMultifacetFactoryTestGrain factory = this.GrainFactory.GetGrain<IMultifacetFactoryTestGrain>(GetRandomGrainId());
@@ -56,7 +56,7 @@ namespace DefaultCluster.Tests.General
             
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cast")]
+        [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Multifacet_InterfacesAsArguments()
         {
             IMultifacetFactoryTestGrain factory = this.GrainFactory.GetGrain<IMultifacetFactoryTestGrain>(GetRandomGrainId());

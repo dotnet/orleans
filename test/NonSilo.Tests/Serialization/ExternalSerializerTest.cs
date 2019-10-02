@@ -20,13 +20,13 @@ namespace UnitTests.Serialization
                     options => options.SerializationProviders.Add(typeof(FakeSerializer))));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void SerializationTests_CustomSerializerInitialized()
         {
             Assert.True(FakeSerializer.Initialized, "The fake serializer wasn't discovered");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void SerializationTests_CustomSerializerIsSupportedType()
         {
             var data = new FakeSerialized { SomeData = "some data" };
@@ -35,7 +35,7 @@ namespace UnitTests.Serialization
             Assert.True(FakeSerializer.IsSupportedTypeCalled, "type discovery failed");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void SerializationTests_ThatSerializeAndDeserializeWereInvoked()
         {
             var data = new FakeSerialized { SomeData = "some data" };
@@ -44,7 +44,7 @@ namespace UnitTests.Serialization
             Assert.True(FakeSerializer.DeserializeCalled);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void SerializationTests_ThatCopyWasInvoked()
         {
             var data = new FakeSerialized { SomeData = "some data" };
@@ -52,7 +52,7 @@ namespace UnitTests.Serialization
             Assert.True(FakeSerializer.DeepCopyCalled);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void SerializationTests_ExternalSerializerUsedEvenIfCodegenDidntGenerateSerializersForIt()
         {
             var data = new FakeSerializedWithNoCodegenSerializers { SomeData = "some data", SomeMoreData = "more data" };

@@ -202,7 +202,7 @@ namespace Tester.AzureUtils.Streaming
                 this.HostedCluster.StartAdditionalSilo);
         }
 
-        //[SkippableFact, TestCategory("BVT"), TestCategory("Functional")]
+        //[SkippableFact, TestCategory("BVT")]
         /*public async Task AQ_18_MultipleStreams_1J_1F_ManyProducerGrainsManyConsumerGrains()
         {
             var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 18, false);

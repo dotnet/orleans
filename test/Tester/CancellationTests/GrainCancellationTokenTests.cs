@@ -21,7 +21,7 @@ namespace UnitTests.CancellationTests
             this.fixture = fixture;
         }
 
-        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
@@ -35,7 +35,7 @@ namespace UnitTests.CancellationTests
             await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
         }
 
-        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
@@ -51,7 +51,7 @@ namespace UnitTests.CancellationTests
             await Task.WhenAll(grainTasks);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
         public async Task TokenPassingWithoutCancellation_NoExceptionShouldBeThrown()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
@@ -66,7 +66,7 @@ namespace UnitTests.CancellationTests
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
         public async Task PreCancelledTokenPassing()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
@@ -76,7 +76,7 @@ namespace UnitTests.CancellationTests
             await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
         public async Task CancellationTokenCallbacksExecutionContext()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
@@ -88,7 +88,7 @@ namespace UnitTests.CancellationTests
             Assert.True(result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
         public async Task CancellationTokenCallbacksTaskSchedulerContext()
         {
             var grains = await GetGrains<bool>(false);
@@ -120,7 +120,7 @@ namespace UnitTests.CancellationTests
             Assert.True(false, "No exception was thrown");
         }
 
-        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
@@ -129,7 +129,7 @@ namespace UnitTests.CancellationTests
             await GrainGrainCancellation(false, delay);
         }
 
-        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
@@ -138,7 +138,7 @@ namespace UnitTests.CancellationTests
             await GrainGrainCancellation(true, delay);
         }
 
-        [SkippableTheory(Skip="https://github.com/dotnet/orleans/issues/5654"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [SkippableTheory(Skip="https://github.com/dotnet/orleans/issues/5654"), TestCategory("BVT"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]
@@ -147,7 +147,7 @@ namespace UnitTests.CancellationTests
             await ClientGrainGrainTokenPassing(delay, true);
         }
 
-        [Theory, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Cancellation")]
+        [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
         [InlineData(0)]
         [InlineData(10)]
         [InlineData(300)]

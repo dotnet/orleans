@@ -30,7 +30,7 @@ namespace UnitTests.General
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task BasicExceptionPropagation()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -41,7 +41,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", exception.Message);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void ExceptionContainsOriginalStackTrace()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -57,7 +57,7 @@ namespace UnitTests.General
             Assert.Contains("ThrowsInvalidOperationException", exception.StackTrace);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task ExceptionContainsOriginalStackTraceWhenRethrowingLocally()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -76,7 +76,7 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task ExceptionPropagationDoesNotUnwrapAggregateExceptions()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -87,7 +87,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", nestedEx.Message);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task ExceptionPropagationDoesNoFlattenAggregateExceptions()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -99,7 +99,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", doubleNestedEx.Message);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task TaskCancelationPropagation()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -107,7 +107,7 @@ namespace UnitTests.General
                 () => grain.Canceled());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task GrainForwardingExceptionPropagation()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -118,7 +118,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", exception.Message);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task GrainForwardingExceptionPropagationDoesNotUnwrapAggregateExceptions()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -130,7 +130,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", nestedEx.Message);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task SynchronousExceptionThrownShouldResultInFaultedTask()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -147,7 +147,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", exception2.Message);
         }
 
-        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
+        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT")]
         public void ExceptionPropagationForwardsEntireAggregateException()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -173,7 +173,7 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task SynchronousAggregateExceptionThrownShouldResultInFaultedTaskWithOriginalAggregateExceptionUnmodifiedAsInnerException()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());

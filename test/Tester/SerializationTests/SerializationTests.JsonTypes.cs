@@ -22,7 +22,7 @@ namespace UnitTests.Serialization
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("JSON")]
         public void SerializationTests_JObject_Example1()
         {
             const string json = @"{ 
@@ -38,7 +38,7 @@ namespace UnitTests.Serialization
             Assert.Equal(input.ToString(), output.ToString());
         }
         
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("JSON")]
         public void SerializationTests_Json_InnerTypes_TypeNameHandling()
         {
             var original = new RootType();
@@ -55,7 +55,7 @@ namespace UnitTests.Serialization
             Assert.Equal(original, orleansDeser);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("JSON")]
         public void SerializationTests_Json_InnerTypes_NoTypeNameHandling()
         {
             var original = new RootType();
@@ -84,7 +84,7 @@ namespace UnitTests.Serialization
             //Assert.Equal(jsonDeser, orleansJsonDeser);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("JSON")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("JSON")]
         public void SerializationTests_Json_POCO()
         {
             var obj = new SimplePOCO();

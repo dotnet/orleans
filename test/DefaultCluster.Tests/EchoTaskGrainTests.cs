@@ -267,7 +267,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(expectedEcho, received); // CallMethodTask_Await
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoTaskGrain_Await_Reentrant()
         {
             IReentrantBlockingEchoTaskGrain g = this.GrainFactory.GetGrain<IReentrantBlockingEchoTaskGrain>(GetRandomGrainId());

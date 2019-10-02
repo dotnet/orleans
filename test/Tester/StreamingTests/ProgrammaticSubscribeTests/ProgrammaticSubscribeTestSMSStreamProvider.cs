@@ -7,7 +7,7 @@ using Xunit.Abstractions;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 {
-    [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Functional")]
+    [TestCategory("BVT"), TestCategory("Streaming")]
     public class ProgrammaticSubscribeTestSMSStreamProvider : ProgrammaticSubcribeTestsRunner, IClassFixture<ProgrammaticSubscribeTestSMSStreamProvider.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
