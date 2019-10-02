@@ -18,4 +18,17 @@
     </Otherwise>
   </Choose>
 
+  <Choose>
+    <When Condition="$(OrleansCoreVersion) == $(VersionPrefix)">
+      <ItemGroup>
+        <ProjectReference Include="..\..\..\src\Orleans.Core\Orleans.Core.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Core" Version="$(OrleansCoreVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
 </Project>
