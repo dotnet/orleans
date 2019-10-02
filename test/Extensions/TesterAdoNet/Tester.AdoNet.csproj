@@ -8,7 +8,7 @@
   <ItemGroup>
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
     <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
-    <PackageReference Include="System.Data.SqlClient" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Data.SqlClient" Version="$(SystemDataSqlClientVersion)" />
     <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
     <PackageReference Include="Microsoft.Data.SQLite" Version="$(MicrosoftDataSQLiteVersion)" />
     <PackageReference Include="Npgsql" Version="$(NpgsqlVersion)" />

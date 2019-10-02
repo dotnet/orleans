@@ -10,8 +10,8 @@
 
   <PropertyGroup Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
     <Asm>Orleans.CodeGenerator.MSBuild.Bootstrap</Asm>
-    <OrleansCodeGenCoreAssembly>$(MSBuildThisFileDirectory)../src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/netcoreapp2.0/$(Asm).dll</OrleansCodeGenCoreAssembly>
-    <OrleansCodeGenTasksAssembly>$(MSBuildThisFileDirectory)../src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/netcoreapp2.0/Orleans.CodeGenerator.MSBuild.Tasks.dll</OrleansCodeGenTasksAssembly>
+    <OrleansCodeGenCoreAssembly>$(MSBuildThisFileDirectory)../src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/netcoreapp3.0/$(Asm).dll</OrleansCodeGenCoreAssembly>
+    <OrleansCodeGenTasksAssembly>$(MSBuildThisFileDirectory)../src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/netcoreapp3.0/Orleans.CodeGenerator.MSBuild.Tasks.dll</OrleansCodeGenTasksAssembly>
     <OrleansBootstrapBuildProject>$(MSBuildThisFileDirectory)../src/BootstrapBuild/Orleans.CodeGenerator.MSBuild.Bootstrap/Orleans.CodeGenerator.MSBuild.Bootstrap.csproj</OrleansBootstrapBuildProject>
   </PropertyGroup>
 
@@ -20,7 +20,7 @@
       <Project>{CB36EF45-6E90-443F-AEE4-394677068147}</Project>
       <Name>Orleans.CodeGenerator.MSBuild.Bootstrap</Name>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <AssetTargetFallback>netcoreapp2.0</AssetTargetFallback>
+      <AssetTargetFallback>netcoreapp3.0</AssetTargetFallback>
       <!-- Workaround. See: https://github.com/dotnet/sdk/issues/939#issuecomment-284641613 -->
       <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
       <UndefineProperties>TargetFramework</UndefineProperties>

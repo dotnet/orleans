@@ -12,7 +12,7 @@
          Orleans_CodeGeneratorTargetFramework;">
 
   <PropertyGroup>
-    <Orleans_CodeGeneratorTargetFramework>netcoreapp2.0</Orleans_CodeGeneratorTargetFramework>
+    <Orleans_CodeGeneratorTargetFramework>netcoreapp3.0</Orleans_CodeGeneratorTargetFramework>
     <Orleans_DotNetHost Condition="'$(DotNetFromPath)' == 'true'">dotnet</Orleans_DotNetHost>
     <Orleans_CoreAssembly Condition="'$(OrleansCodeGenCoreAssembly)' != ''">$(OrleansCodeGenCoreAssembly)</Orleans_CoreAssembly>
     <Orleans_CoreAssembly Condition="'$(Orleans_CoreAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\$(Orleans_CodeGeneratorTargetFramework)\Orleans.CodeGenerator.MSBuild.dll</Orleans_CoreAssembly>

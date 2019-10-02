@@ -48,25 +48,28 @@
   <!-- Shared Package Versions -->
   <PropertyGroup>
     <!-- System packages -->
-    <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
+    <SystemRuntimeVersion>4.3.1</SystemRuntimeVersion>
     <SystemDataSqlClientVersion>4.7.0</SystemDataSqlClientVersion>
     <SystemDataCommonVersion>4.3.0</SystemDataCommonVersion>
 
-    <SystemCollectionsImmutableVersion>1.4.0</SystemCollectionsImmutableVersion>
+    <SystemCollectionsImmutableVersion>1.6.0</SystemCollectionsImmutableVersion>
     <SystemRuntimeCompilerServicesUnsafeVersion>4.6.0</SystemRuntimeCompilerServicesUnsafeVersion>
     <SystemNetHttpVersion>4.3.4</SystemNetHttpVersion>
-    <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
-    <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
-    <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
+    <SystemReflectionMetadataVersion>1.7.0</SystemReflectionMetadataVersion>
+    <SystemReflectionTypeExtensionsVersion>4.6.0</SystemReflectionTypeExtensionsVersion>
+    <SystemValueTupleVersion>4.5.0</SystemValueTupleVersion>
+    <SystemReflectionEmitVersion>4.6.0</SystemReflectionEmitVersion>
     <SystemThreadingTasksExtensionsVersion>4.5.3</SystemThreadingTasksExtensionsVersion>
-    <SystemThreadingChannelsVersion>4.5.0</SystemThreadingChannelsVersion>
+    <SystemThreadingChannelsVersion>4.6.0</SystemThreadingChannelsVersion>
     <SystemBuffersVersion>4.5.0</SystemBuffersVersion>
     <SystemMemoryVersion>4.5.3</SystemMemoryVersion>
     <SystemIOPipelinesVersion>4.6.0</SystemIOPipelinesVersion>
+    <SystemCodeDomVersion>4.6.0</SystemCodeDomVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>
+    <MicrosoftBuildVersion>16.3.0</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>3.3.1</MicrosoftCodeAnalysisVersion>
+    <MicrosoftWin32RegistryVersion>4.6.0</MicrosoftWin32RegistryVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
     <MicrosoftExtensionsConfigurationBinderVersion>3.0.0</MicrosoftExtensionsConfigurationBinderVersion>
@@ -85,7 +88,7 @@
     <MicrosoftAzureEventHubsVersion>2.2.1</MicrosoftAzureEventHubsVersion>
     <MicrosoftDataSQLiteVersion>2.0.0</MicrosoftDataSQLiteVersion>
     <MicrosoftPowerShell5ReferenceAssembliesVersion>1.1.0</MicrosoftPowerShell5ReferenceAssembliesVersion>
-    <MicrosoftServiceFabricServicesVersion>3.0.472</MicrosoftServiceFabricServicesVersion>
+    <MicrosoftServiceFabricServicesVersion>3.4.664</MicrosoftServiceFabricServicesVersion>
     <WindowsAzureStorageVersion>8.2.1</WindowsAzureStorageVersion>
 
     <FSharpCoreVersion>4.5.2</FSharpCoreVersion>
@@ -110,7 +113,7 @@
 
     <!-- Test related packages -->
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
-    <MicrosoftTestSdkVersion>16.0.1</MicrosoftTestSdkVersion>
+    <MicrosoftTestSdkVersion>16.3.0</MicrosoftTestSdkVersion>
     <BenchmarkDotNetVersion>0.11.4</BenchmarkDotNetVersion>
     <XunitSkippableFactVersion>1.3.12</XunitSkippableFactVersion>
     <DotNetxUnitVersion>2.3.1</DotNetxUnitVersion>
@@ -118,7 +121,7 @@
     <NodaTimeVersion>2.2.2</NodaTimeVersion>
 
     <!-- Tooling related packages -->
-    <SourceLinkVersion>2.7.6</SourceLinkVersion>
+    <SourceLinkVersion>2.8.3</SourceLinkVersion>
   </PropertyGroup>
 
   <!-- Versioning properties -->
