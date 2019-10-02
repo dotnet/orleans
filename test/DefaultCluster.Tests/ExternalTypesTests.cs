@@ -14,14 +14,14 @@ namespace DefaultCluster.Tests.General
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public async Task ExternalTypesTest_GrainWithAbstractExternalTypeParam()
         {
             var grainWitAbstractTypeParam = this.GrainFactory.GetGrain<IExternalTypeGrain>(0);
             await grainWitAbstractTypeParam.GetAbstractModel(new List<NameObjectCollectionBase>() { new NameValueCollection() });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public async Task ExternalTypesTest_GrainWithEnumExternalTypeParam()
         {
             var grainWithEnumTypeParam = this.GrainFactory.GetGrain<IExternalTypeGrain>(0);

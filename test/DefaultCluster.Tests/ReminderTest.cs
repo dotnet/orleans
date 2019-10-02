@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -11,7 +11,7 @@ namespace DefaultCluster.Tests
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Reminders")]
+        [Fact, TestCategory("BVT"), TestCategory("Reminders")]
         public async Task SimpleGrainGetGrain()
         {
             IReminderTestGrain grain = this.GrainFactory.GetGrain<IReminderTestGrain>(GetRandomGrainId());

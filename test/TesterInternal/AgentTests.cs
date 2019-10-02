@@ -44,7 +44,7 @@ namespace UnitTests
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task DedicatedAsynchAgentRestartsTest()
         {
             IAgentTestGrain grain = this.fixture.GrainFactory.GetGrain<IAgentTestGrain>(GetRandomGrainId());

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
@@ -17,14 +17,14 @@ namespace DefaultCluster.Tests.StorageTests
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task MemoryStorageProvider_RestoreStateTest()
         {
             var grainWithState = this.GrainFactory.GetGrain<IInitialStateGrain>(0);
             Assert.NotNull(await grainWithState.GetNames());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task MemoryStorageProvider_NullState()
         {
             var grainWithState = this.GrainFactory.GetGrain<INullStateGrain>(0);
@@ -34,7 +34,7 @@ namespace DefaultCluster.Tests.StorageTests
             await grainWithState.SetStateAndDeactivate(new NullableState { Name = "Thrall" });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task MemoryStorageProvider_WriteReadStateTest()
         {
             var grainWithState = this.GrainFactory.GetGrain<IInitialStateGrain>(0);
@@ -59,7 +59,7 @@ namespace DefaultCluster.Tests.StorageTests
             Assert.Equal("Alice", names[1]);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task MemoryStorageGrainEnforcesEtagsTest()
         {
             var memoryStorageGrain = this.GrainFactory.GetGrain<IMemoryStorageGrain>(random.Next());

@@ -21,7 +21,7 @@ namespace UnitTests.Serialization
             Assert.Equal<T>(input,output);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
         public void SerializationTests_ImmutableCollections_Dictionary()
         {
             var original = ImmutableDictionary.CreateBuilder<string, string>();
@@ -32,14 +32,14 @@ namespace UnitTests.Serialization
             RoundTripCollectionSerializationTest(dict);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
         public void SerializationTests_ImmutableCollections_Array()
         {
             var original = ImmutableArray.Create("1","2","3");
             RoundTripCollectionSerializationTest(original);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
         public void SerializationTests_ImmutableCollections_ArrayDefault()
         {
             var input = default(ImmutableArray<int>);
@@ -47,35 +47,35 @@ namespace UnitTests.Serialization
             Assert.Equal(input, output);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
         public void SerializationTests_ImmutableCollections_HashSet()
         {
             var original = ImmutableHashSet.Create("1", "2", "3");
             RoundTripCollectionSerializationTest(original);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
         public void SerializationTests_ImmutableCollections_List()
         {
             var original = ImmutableList.Create("1", "2", "3");
             RoundTripCollectionSerializationTest(original);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
         public void SerializationTests_ImmutableCollections_Queue()
         {
             var original = ImmutableQueue.Create("1", "2", "3");
             RoundTripCollectionSerializationTest(original);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
         public void SerializationTests_ImmutableCollections_SortedSet()
         {
             var original = ImmutableSortedSet.Create("1", "2", "3");
             RoundTripCollectionSerializationTest(original);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("ImmutableCollections"), TestCategory("Serialization")]
         public void SerializationTests_ImmutableCollections_SortedDictionary()
         {
             var original = ImmutableSortedDictionary.CreateBuilder<string, string>();

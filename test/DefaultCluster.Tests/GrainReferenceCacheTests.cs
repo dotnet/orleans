@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
@@ -13,7 +13,7 @@ namespace DefaultCluster.Tests.General
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
+        [Fact, TestCategory("BVT"), TestCategory("GetGrain"), TestCategory("Cache")]
         public void GetGrain()
         {
             int size = 1;
@@ -33,7 +33,7 @@ namespace DefaultCluster.Tests.General
             //Assert.Equal(id, grain.A.Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
+        [Fact, TestCategory("BVT"), TestCategory("GetGrain"), TestCategory("Cache")]
         public void GetGrain2()
         {
             int size = 1;
@@ -64,7 +64,7 @@ namespace DefaultCluster.Tests.General
             //Assert.Equal(id1, grain1.A.Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GetGrain"), TestCategory("Cache")]
+        [Fact, TestCategory("BVT"), TestCategory("GetGrain"), TestCategory("Cache")]
         public void Get2GrainsFromCache()
         {
             int size = 2;

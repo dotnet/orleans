@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using NodaTime;
 using Orleans.Serialization;
 using TestExtensions;
@@ -13,7 +13,7 @@ namespace DefaultCluster.Tests
         {
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("BVT"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void Serialization_LargeTestData()
         {
             var data = new LargeTestData
@@ -32,7 +32,7 @@ namespace DefaultCluster.Tests
             Assert.IsAssignableFrom<LargeTestData>(copy);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("BVT"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void Serialization_ValueTypePhase1()
         {
             ValueTypeTestData data = new ValueTypeTestData(4);

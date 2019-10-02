@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
@@ -14,7 +14,7 @@ namespace DefaultCluster.Tests
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_Ambiguous()
         {
             Assert.Throws<OrleansException>(() =>
@@ -23,14 +23,14 @@ namespace DefaultCluster.Tests
             });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_Ambiguous_WithDefault()
         {
             var g = this.GrainFactory.GetGrain<IBase4>(GetRandomGrainId());
             Assert.False(g.Foo().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_WithFullName()
         {
             var grainFullName = typeof(BaseGrain).FullName;
@@ -38,14 +38,14 @@ namespace DefaultCluster.Tests
             Assert.True(g.Foo().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_WithPrefix()
         {
             var g = this.GrainFactory.GetGrain<IBase>(GetRandomGrainId(), BaseGrain.GrainPrefix);
             Assert.True(g.Foo().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_AmbiguousPrefix()
         {
             Assert.Throws<OrleansException>(() =>
@@ -54,7 +54,7 @@ namespace DefaultCluster.Tests
             });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_WrongPrefix()
         {
             Assert.Throws<ArgumentException>(() =>
@@ -63,7 +63,7 @@ namespace DefaultCluster.Tests
             });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_Derived_NoPrefix()
         {
             var g = this.GrainFactory.GetGrain<IDerivedFromBase>(GetRandomGrainId());
@@ -71,7 +71,7 @@ namespace DefaultCluster.Tests
             Assert.True(g.Bar().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_Derived_WithFullName()
         {
             var grainFullName = typeof(DerivedFromBaseGrain).FullName;
@@ -80,7 +80,7 @@ namespace DefaultCluster.Tests
             Assert.True(g.Bar().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_Derived_WithFullName_FromBase()
         {
             var grainFullName = typeof(DerivedFromBaseGrain).FullName;
@@ -88,7 +88,7 @@ namespace DefaultCluster.Tests
             Assert.False(g.Foo().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_Derived_WithPrefix()
         {
             var g = this.GrainFactory.GetGrain<IDerivedFromBase>(GetRandomGrainId(), "UnitTests.Grains");
@@ -96,7 +96,7 @@ namespace DefaultCluster.Tests
             Assert.True(g.Bar().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_Derived_WithWrongPrefix()
         {
             Assert.Throws<ArgumentException>(() =>
@@ -105,14 +105,14 @@ namespace DefaultCluster.Tests
             });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_OneImplementation_NoPrefix()
         {
             var g = this.GrainFactory.GetGrain<IBase1>(GetRandomGrainId());
             Assert.False(g.Foo().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_OneImplementation_Prefix()
         {
             var grainFullName = typeof(BaseGrain1).FullName;
@@ -120,7 +120,7 @@ namespace DefaultCluster.Tests
             Assert.False(g.Foo().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_MultipleUnrelatedInterfaces()
         {
             var g1 = this.GrainFactory.GetGrain<IBase3>(GetRandomGrainId());
@@ -129,14 +129,14 @@ namespace DefaultCluster.Tests
             Assert.True(g2.Bar().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetStringGrain()
         {
             var g = this.GrainFactory.GetGrain<IStringGrain>(Guid.NewGuid().ToString());
             Assert.True(g.Foo().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Factory"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGuidGrain()
         {
             var g = this.GrainFactory.GetGrain<IGuidGrain>(Guid.NewGuid());

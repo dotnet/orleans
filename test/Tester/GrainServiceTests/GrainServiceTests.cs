@@ -34,7 +34,7 @@ namespace Tester
 
         public IGrainFactory GrainFactory { get; set; }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task SimpleInvokeGrainService()
         {
             IGrainServiceTestGrain grain = this.GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
@@ -44,7 +44,7 @@ namespace Tester
             Assert.Equal("abc", prop);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceWasStarted()
         {
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
@@ -52,7 +52,7 @@ namespace Tester
             Assert.True(prop);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceWasStartedInBackground()
         {
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
@@ -60,7 +60,7 @@ namespace Tester
             Assert.True(prop);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceWasInit()
         {
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
@@ -68,7 +68,7 @@ namespace Tester
             Assert.True(prop);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceExtensionTest()
         {
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);

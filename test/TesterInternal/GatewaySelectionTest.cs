@@ -33,7 +33,7 @@ namespace UnitTests.MessageCenterTests
             this.output = output;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
+        [Fact, TestCategory("BVT"), TestCategory("Gateway")]
         public void GatewaySelection()
         {
             var listProvider = new TestListProvider(gatewayAddressUris);

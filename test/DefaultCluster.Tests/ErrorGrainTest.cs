@@ -26,7 +26,7 @@ namespace DefaultCluster.Tests
             this.output = output;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         public async Task ErrorGrain_GetGrain()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
@@ -34,7 +34,7 @@ namespace DefaultCluster.Tests
             int ignored = await grain.GetA();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         public async Task ErrorHandlingLocalError()
         {
             LocalErrorGrain localGrain = new LocalErrorGrain();
@@ -53,7 +53,7 @@ namespace DefaultCluster.Tests
             Assert.True(intPromise.Status == TaskStatus.Faulted);                
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         // check that grain that throws an error breaks its promise and later Wait and GetValue on it will throw
         public void ErrorHandlingGrainError1()
         {
@@ -85,7 +85,7 @@ namespace DefaultCluster.Tests
             Assert.True(intPromise.Status == TaskStatus.Faulted);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         // check that premature wait finishes on time with false.
         public void ErrorHandlingTimedMethod()
         {
@@ -108,7 +108,7 @@ namespace DefaultCluster.Tests
             Assert.True(promise.Status == TaskStatus.RanToCompletion);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         // check that premature wait finishes on time but does not throw with false and later wait throws.
         public void ErrorHandlingTimedMethodWithError()
         {
@@ -151,7 +151,7 @@ namespace DefaultCluster.Tests
             await Task.WhenAll(tasks).WithTimeout(TimeSpan.FromSeconds(20));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("GrainReference")]
+        [Fact, TestCategory("BVT"), TestCategory("ErrorHandling"), TestCategory("GrainReference")]
         public void ArgumentTypes_ListOfGrainReferences()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
@@ -163,7 +163,7 @@ namespace DefaultCluster.Tests
             if (!ok) throw new TimeoutException();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("AsynchronyPrimitives"), TestCategory("ErrorHandling")]
+        [Fact, TestCategory("BVT"), TestCategory("AsynchronyPrimitives"), TestCategory("ErrorHandling")]
         public async Task AC_DelayedExecutor_2()
         {
             var grainFullName = typeof(ErrorGrain).FullName;
@@ -173,7 +173,7 @@ namespace DefaultCluster.Tests
             Assert.True(result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("SimpleGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("SimpleGrain")]
         public void SimpleGrain_AsyncMethods()
         {
             ISimpleGrainWithAsyncMethods grain = this.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(GetRandomGrainId());
@@ -187,7 +187,7 @@ namespace DefaultCluster.Tests
             Assert.Equal(300, intPromise.Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("SimpleGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("SimpleGrain")]
         public void SimpleGrain_PromiseForward()
         {
             ISimpleGrain forwardGrain = this.GrainFactory.GetGrain<IPromiseForwardGrain>(GetRandomGrainId());
@@ -196,7 +196,7 @@ namespace DefaultCluster.Tests
             Assert.Equal(30, result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("SimpleGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("SimpleGrain")]
         public void SimpleGrain_GuidDistribution()
         {
             int n = 0x1111;

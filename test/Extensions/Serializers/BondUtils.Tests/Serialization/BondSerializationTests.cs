@@ -21,7 +21,7 @@ namespace BondUtils.Tests.Serialization
                     options => options.SerializationProviders.Add(typeof(BondSerializer))));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void SimpleBondSchemaSerializationTest()
         {
             var schema = new SimpleBondSchema { SomeValue = int.MaxValue };
@@ -30,7 +30,7 @@ namespace BondUtils.Tests.Serialization
             Assert.Equal(schema.SomeValue, output.SomeValue); //The serialization didn't preserve the proper value
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void SimpleGenericBondSchemaSerializationTest()
         {
             var schema = new SimpleGenericSchema<int> { SomeValue = int.MaxValue };
@@ -39,7 +39,7 @@ namespace BondUtils.Tests.Serialization
             Assert.Equal(schema.SomeValue, output.SomeValue); //The serialization didn't preserve the proper value
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void SimpleNestedGenericBondSchemaSerializationTest()
         {
             var schema = new SimpleGenericSchema<SimpleGenericSchema<SimpleBondSchema>>
@@ -59,7 +59,7 @@ namespace BondUtils.Tests.Serialization
             Assert.Equal(schema.SomeValue.SomeValue.SomeValue, output.SomeValue.SomeValue.SomeValue); //The serialization didn't preserve the proper value
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void SimpleBondSchemaCopyTest()
         {
             var schema = new SimpleBondSchema { SomeValue = int.MaxValue };
@@ -68,7 +68,7 @@ namespace BondUtils.Tests.Serialization
             Assert.Equal(schema.SomeValue, output.SomeValue); //The serialization didn't preserve the proper value
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void SimpleGenericBondSchemaCopyTest()
         {
             var schema = new SimpleGenericSchema<int> { SomeValue = int.MaxValue };
@@ -77,7 +77,7 @@ namespace BondUtils.Tests.Serialization
             Assert.Equal(schema.SomeValue, output.SomeValue); //The serialization didn't preserve the proper value
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void SimpleNestedGenericBondSchemaCopyTest()
         {
             var schema = new SimpleGenericSchema<SimpleGenericSchema<SimpleBondSchema>>

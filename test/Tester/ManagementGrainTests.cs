@@ -41,7 +41,7 @@ namespace UnitTests.Management
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("BVT"), TestCategory("Management")]
         public async Task GetHosts()
         {
             if (HostedCluster.SecondarySilos.Count == 0)
@@ -56,7 +56,7 @@ namespace UnitTests.Management
             Assert.Equal(numberOfActiveSilos, siloStatuses.Count);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("BVT"), TestCategory("Management")]
         public async Task GetDetailedHosts()
         {
             if (HostedCluster.SecondarySilos.Count == 0)
@@ -72,7 +72,7 @@ namespace UnitTests.Management
         }
 
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("BVT"), TestCategory("Management")]
         public void GetSimpleGrainStatistics()
         {
             SimpleGrainStatistic[] stats = this.GetSimpleGrainStatisticsRunner("Initial");
@@ -83,13 +83,13 @@ namespace UnitTests.Management
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("BVT"), TestCategory("Management")]
         public void GetSimpleGrainStatistics_ActivationCounts()
         {
             RunGetStatisticsTest<ISimpleGrain, SimpleGrain>(g => g.GetA().Wait());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Management")]
+        [Fact, TestCategory("BVT"), TestCategory("Management")]
         public void GetTestGrainStatistics_ActivationCounts()
         {
             RunGetStatisticsTest<ITestGrain, TestGrain>(g => g.GetKey().Wait());

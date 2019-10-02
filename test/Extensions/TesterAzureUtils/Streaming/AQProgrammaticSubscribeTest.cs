@@ -15,7 +15,7 @@ using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Streaming
 {
-    [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Functional"), TestCategory("AQStreaming")]
+    [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("AQStreaming")]
     public class AQProgrammaticSubscribeTest : ProgrammaticSubcribeTestsRunner, IClassFixture<AQProgrammaticSubscribeTest.Fixture>
     {
         private const int queueCount = 8;

@@ -208,7 +208,7 @@ namespace UnitTests
             await Do_FanOut_Task_Join(0, false, true);
         }
 
-        // TODO: [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
+        // TODO: [Fact, TestCategory("BVT"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         [Fact(Skip ="Ignore"), TestCategory("Failures"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task FanOut_Task_NonReentrant_Chain()
         {

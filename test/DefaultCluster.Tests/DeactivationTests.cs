@@ -13,7 +13,7 @@ namespace DefaultCluster.Tests.General
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task DeactivateReactivateTiming()
         {
             var x = GetRandomGrainId();

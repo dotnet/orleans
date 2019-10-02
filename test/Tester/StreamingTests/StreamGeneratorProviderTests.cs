@@ -65,7 +65,7 @@ namespace UnitTests.StreamingTests
 
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ValidateGeneratedStreamsTest()
         {
             this.fixture.Logger.Info("************************ ValidateGeneratedStreamsTest *********************************");
