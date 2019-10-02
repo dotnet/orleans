@@ -211,7 +211,7 @@ namespace Orleans.CodeGenerator
                                 logContext = $"known assembly {assembly.GetName().Name} where 'TreatTypesAsSerializable' = true";
                             else if (type.IsSerializable)
                                 logContext = $"known assembly {assembly.GetName().Name} where type is [Serializable]";
-                            else if (type.IsSerializable)
+                            else if (TypeHasKnownBase(type))
                                 logContext = $"known assembly {assembly.GetName().Name} where type has known base type.";
                         }
 
