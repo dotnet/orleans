@@ -1,7 +1,7 @@
 using System;
 
 
-namespace Orleans.Runtime
+namespace Orleans.Internal
 {
     /// <summary>
     /// The Utils class contains a variety of utility methods for use in application and grain code.

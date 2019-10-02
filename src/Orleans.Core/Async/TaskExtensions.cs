@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-namespace Orleans
+namespace Orleans.Internal
 {
     public static class OrleansTaskExtentions
     {

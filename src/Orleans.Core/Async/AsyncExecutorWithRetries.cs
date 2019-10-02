@@ -3,7 +3,7 @@ using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-namespace Orleans
+namespace Orleans.Internal
 {
     /// <summary>
     /// This class is a convenient utility class to execute a certain asynchronous function with retries,

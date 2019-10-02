@@ -2,7 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 
-namespace Orleans.Runtime
+namespace Orleans.Internal
 {
     /// <summary>
     /// Thread-safe random number generator.
