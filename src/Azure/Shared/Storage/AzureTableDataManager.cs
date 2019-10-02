@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
+using Orleans.Internal;
 using Orleans.Runtime;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
@@ -52,10 +53,6 @@ namespace Orleans.Transactions.AzureStorage
         private CloudTable tableReference;
 
         public CloudTable Table => tableReference;
-
-#if !ORLEANS_TRANSACTIONS
-        private readonly CounterStatistic numServerBusy = CounterStatistic.FindOrCreate(StatisticNames.AZURE_SERVER_BUSY, true);
-#endif
 
         /// <summary>
         /// Constructor

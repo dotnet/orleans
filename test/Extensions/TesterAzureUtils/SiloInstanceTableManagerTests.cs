@@ -4,17 +4,15 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Clustering.AzureStorage;
 using Orleans.Configuration;
+using Orleans.Internal;
 
 namespace Tester.AzureUtils
 {

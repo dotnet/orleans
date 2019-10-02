@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
+using Orleans.Internal;
 using Orleans.Runtime.Messaging;
 using Orleans.Streams;
 

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.Placement
 {

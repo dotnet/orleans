@@ -1,8 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Orleans.Runtime;
+using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;

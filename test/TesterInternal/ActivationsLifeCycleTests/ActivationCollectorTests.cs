@@ -9,7 +9,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
-using Orleans.Utilities;
+using Orleans.Internal;
 using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;

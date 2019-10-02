@@ -5,12 +5,12 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Tests.AzureUtils;
+using Orleans.Internal;
 
 namespace Tester.AzureUtils
 {

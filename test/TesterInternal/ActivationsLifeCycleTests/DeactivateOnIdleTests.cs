@@ -11,7 +11,7 @@ using UnitTests.TestHelper;
 using Xunit;
 using Xunit.Abstractions;
 using System.Linq;
-using Orleans.Runtime.Configuration;
+using Orleans.Internal;
 using Orleans.Hosting;
 using Orleans.Configuration;
 using Microsoft.Extensions.Configuration;

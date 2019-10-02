@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 

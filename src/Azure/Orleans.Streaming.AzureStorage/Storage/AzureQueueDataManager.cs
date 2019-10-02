@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using Orleans.AzureUtils.Utilities;
 using System.Linq;
 using Orleans.Streaming.AzureStorage;
+using Orleans.Internal;
 
 namespace Orleans.AzureUtils
 {

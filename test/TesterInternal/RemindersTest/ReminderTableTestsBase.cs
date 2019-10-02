@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.TestingHost.Utils;
+using Orleans.Internal;
 
 namespace UnitTests.RemindersTest
 {

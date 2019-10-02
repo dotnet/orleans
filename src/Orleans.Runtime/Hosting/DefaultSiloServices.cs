@@ -41,6 +41,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
 using Microsoft.AspNetCore.Connections;
 using Orleans.Networking.Shared;
+using Orleans.Configuration.Internal;
 
 namespace Orleans.Hosting
 {

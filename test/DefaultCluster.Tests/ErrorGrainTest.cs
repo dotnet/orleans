@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;

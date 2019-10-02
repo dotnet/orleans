@@ -355,7 +355,7 @@ namespace Orleans
             return string.Format("SiloAddress={0} SiloName={1} Status={2}", SiloAddress.ToLongString(), SiloName, Status);
         }
 
-        internal string ToFullString(bool full = false)
+        public string ToFullString(bool full = false)
         {
             if (!full)
                 return ToString();

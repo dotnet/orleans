@@ -11,6 +11,7 @@ using Orleans.Configuration;
 using Orleans.Timers;
 using System.Diagnostics;
 using System.Reflection.Metadata;
+using Orleans.Internal;
 
 namespace Orleans.Streams
 {

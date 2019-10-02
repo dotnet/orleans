@@ -9,6 +9,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils.Utilities;
 using Orleans.AzureUtils;
 using Orleans.Reminders.AzureStorage;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.ReminderService
 {

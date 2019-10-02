@@ -4,8 +4,7 @@ using Orleans;
 using Orleans.Runtime;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Runtime.Configuration;
-using Tester;
+using Orleans.Internal;
 
 namespace Tests.GeoClusterTests
 {

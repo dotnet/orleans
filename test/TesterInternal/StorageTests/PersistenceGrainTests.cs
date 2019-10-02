@@ -13,10 +13,10 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Runtime.Configuration;
 using TesterInternal;
 using TestExtensions;
 using Orleans.Hosting;
+using Orleans.Internal;
 using Microsoft.Extensions.DependencyInjection;
 
 // ReSharper disable RedundantAssignment

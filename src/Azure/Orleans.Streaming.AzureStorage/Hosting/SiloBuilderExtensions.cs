@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.LeaseProviders;
 using Orleans.Streams;
 

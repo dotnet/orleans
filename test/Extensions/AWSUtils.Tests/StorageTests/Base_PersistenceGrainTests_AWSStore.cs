@@ -1,6 +1,3 @@
-using Orleans;
-using Orleans.Runtime;
-using Orleans.Runtime.TestHooks;
 using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
@@ -8,10 +5,9 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
 using Tester;
 using TestExtensions;
-using UnitTests;
+using Orleans.Internal;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;

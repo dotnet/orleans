@@ -17,6 +17,7 @@ using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Serialization;
 
 namespace Tester.AzureUtils.Streaming

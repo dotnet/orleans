@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.TestHooks;

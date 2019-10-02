@@ -2,8 +2,8 @@ using System;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Table;
-using Orleans;
 using Orleans.Tests.AzureUtils;
+using Orleans.Internal;
 
 namespace Tester.AzureUtils
 {

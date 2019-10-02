@@ -8,6 +8,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Configuration;
 using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
+using Orleans.Internal;
 
 namespace Orleans.Streams
 {

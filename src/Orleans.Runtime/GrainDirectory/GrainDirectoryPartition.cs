@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.GrainDirectory
 {

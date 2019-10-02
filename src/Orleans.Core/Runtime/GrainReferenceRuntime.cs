@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
+using Orleans.Internal;
 using Orleans.Serialization;
 using System;
 using System.Collections.Concurrent;

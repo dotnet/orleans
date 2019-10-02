@@ -9,13 +9,12 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Tester;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable

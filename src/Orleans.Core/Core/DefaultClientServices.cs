@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
 using Orleans.Hosting;
 using Orleans.Messaging;

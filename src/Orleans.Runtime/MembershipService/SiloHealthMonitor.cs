@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 using static Orleans.Runtime.MembershipService.SiloHealthMonitor;
 
 namespace Orleans.Runtime.MembershipService

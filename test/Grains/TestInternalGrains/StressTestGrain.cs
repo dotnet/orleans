@@ -8,6 +8,7 @@ using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 
 namespace UnitTests.Grains
 {

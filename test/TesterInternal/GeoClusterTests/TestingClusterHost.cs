@@ -1,12 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
 using TestExtensions;
@@ -14,6 +12,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.MultiCluster;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 

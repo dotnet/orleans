@@ -2,15 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using System.Linq;
 using UnitTests.TimerTests;
 using Orleans.Hosting;
+using Orleans.Internal;
 using TestExtensions;
 
 // ReSharper disable InconsistentNaming

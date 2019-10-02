@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -12,6 +12,7 @@ using Orleans.Serialization;
 using TestExtensions;
 using Xunit;
 using Tester;
+using Orleans.Internal;
 
 namespace UnitTests.General
 {

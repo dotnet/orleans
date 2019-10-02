@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration.Internal;
 using System.Linq;
 
 namespace Orleans.Configuration
