@@ -1,9 +1,10 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 
 namespace UnitTests.GrainInterfaces
 {
+    using System;
     using Orleans;
 
     [TypeCodeOverride(6548972)]
@@ -47,5 +48,36 @@ namespace UnitTests.GrainInterfaces
     { 
         Task<string> CallWithBadInterceptors(bool early, bool mid, bool late);
         Task<string> GetRequestContext();
+    }
+
+    public interface IHungryGrain<T> : IGrainWithIntegerKey
+    {
+        [TestMethodTag("hungry-eat")]
+        Task Eat(T food);
+
+        [TestMethodTag("hungry-eatwith")]
+        Task EatWith<U>(T food, U condiment);
+    }
+
+    public interface IOmnivoreGrain : IGrainWithIntegerKey
+    {
+        [TestMethodTag("omnivore-eat")]
+        Task Eat<T>(T food);
+    }
+
+    [Serializable]
+    public class Apple { }
+
+    public interface ICaterpillarGrain : IHungryGrain<Apple>, IOmnivoreGrain
+    {
+        [TestMethodTag("caterpillar-eat")]
+        new Task Eat<T>(T food);
+    }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public class TestMethodTagAttribute : Attribute
+    {
+        public TestMethodTagAttribute(string tag) => this.Tag = tag;
+        public string Tag { get; }
     }
 }
