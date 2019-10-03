@@ -174,7 +174,8 @@ namespace Orleans.Statistics
             if (string.IsNullOrWhiteSpace(memAvailableLine))
             {
                 memAvailableLine = await ReadLineStartingWithAsync(MEMINFO_FILEPATH, "MemFree");
-                if (string.IsNullOrWhiteSpace(memAvailableLine)) {
+                if (string.IsNullOrWhiteSpace(memAvailableLine))
+                {
                     _logger.LogWarning($"Couldn't read 'MemAvailable' or 'MemFree' line from '{MEMINFO_FILEPATH}'");
                     return;
                 }
