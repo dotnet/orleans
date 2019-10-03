@@ -45,23 +45,27 @@ namespace Orleans.CodeGenerator.Generators
             foreach (var type in interfaces)
             {
                 var interfaceId = types.GetTypeId(type);
-                var allMethods = new[] {type}.Concat(type.AllInterfaces).SelectMany(i => i.GetDeclaredInstanceMembers<IMethodSymbol>());
+                var typeInterfaces = new[] { type }.Concat(type.AllInterfaces);
+
+                var allMethods = new Dictionary<int, IMethodSymbol>();
+                foreach (var typeInterface in typeInterfaces)
+                {
+                    foreach (var method in typeInterface.GetDeclaredInstanceMembers<IMethodSymbol>())
+                    {
+                        allMethods[types.GetMethodId(method)] = method;
+                    }
+                }
 
                 var methodCases = new List<SwitchSectionSyntax>();
 
                 // Switch on method id.
                 foreach (var method in allMethods)
                 {
-                    // Generate switch case.
-                    var methodId = types.GetMethodId(method);
-
-                    var methodType = method;
-
-                    // Generate the switch label for this interface id.
-                    var methodIdSwitchLabel = CaseSwitchLabel(methodId.ToHexLiteral());
+                    // Generate the switch label for this method id.
+                    var methodIdSwitchLabel = CaseSwitchLabel(method.Key.ToHexLiteral());
 
                     // Generate the switch body.
-                    var methodInvokeStatement = generateMethodHandler(methodType);
+                    var methodInvokeStatement = generateMethodHandler(method.Value);
 
                     methodCases.Add(
                         SwitchSection().AddLabels(methodIdSwitchLabel).AddStatements(methodInvokeStatement));
