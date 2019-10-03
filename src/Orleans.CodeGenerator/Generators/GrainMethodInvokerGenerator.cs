@@ -317,7 +317,7 @@ namespace Orleans.CodeGenerator.Generators
             return new GenericInvokerField(fieldName, declaration);
         }
 
-        private struct GenericInvokerField
+        private readonly struct GenericInvokerField
         {
             public GenericInvokerField(string fieldName, MemberDeclarationSyntax declaration)
             {
