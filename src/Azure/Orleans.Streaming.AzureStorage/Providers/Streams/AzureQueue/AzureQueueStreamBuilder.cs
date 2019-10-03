@@ -1,13 +1,13 @@
 using System;
+using Microsoft.Azure.Storage.Queue;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orleans.Providers.Streams.AzureQueue;
-using Orleans.Streams;
-using Orleans.Providers.Streams.Common;
-using Orleans.ApplicationParts;
-using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+using Orleans.ApplicationParts;
+using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Providers.Streams.Common;
 using Orleans.Configuration;
+using Orleans.Streams;
 
 namespace Orleans.Hosting
 {

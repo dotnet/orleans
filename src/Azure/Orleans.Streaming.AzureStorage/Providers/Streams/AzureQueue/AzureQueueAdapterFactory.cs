@@ -1,16 +1,16 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Azure.Storage.Queue;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Serialization;
-using Orleans.Streams;
-using Orleans.Providers.Streams.Common;
 using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
-using Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Microsoft.WindowsAzure.Storage.Queue;
+using Orleans.Serialization;
+using Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue;
+using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
@@ -37,12 +37,12 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public AzureQueueAdapterFactory(
             string name,
-            AzureQueueOptions options, 
+            AzureQueueOptions options,
             SimpleQueueCacheOptions cacheOptions,
             IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter,
-            IServiceProvider serviceProvider, 
-            IOptions<ClusterOptions> clusterOptions, 
-            SerializationManager serializationManager, 
+            IServiceProvider serviceProvider,
+            IOptions<ClusterOptions> clusterOptions,
+            SerializationManager serializationManager,
             ILoggerFactory loggerFactory)
         {
             this.providerName = name;
@@ -58,7 +58,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary> Init the factory.</summary>
         public virtual void Init()
         {
-            this.StreamFailureHandlerFactory = this.StreamFailureHandlerFactory ?? 
+            this.StreamFailureHandlerFactory = this.StreamFailureHandlerFactory ??
                     ((qid) => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler()));
         }
 
@@ -67,11 +67,11 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             var adapter = new AzureQueueAdapter(
                 this.dataAdapter,
-                this.SerializationManager, 
-                this.streamQueueMapper, 
-                this.loggerFactory, 
+                this.SerializationManager,
+                this.streamQueueMapper,
+                this.loggerFactory,
                 this.options,
-                this.clusterOptions.ServiceId, 
+                this.clusterOptions.ServiceId,
                 this.providerName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }

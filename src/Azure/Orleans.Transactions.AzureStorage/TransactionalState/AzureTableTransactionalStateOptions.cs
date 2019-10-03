@@ -1,5 +1,3 @@
-﻿
-
 namespace Orleans.Configuration
 {
     public class AzureTableTransactionalStateOptions

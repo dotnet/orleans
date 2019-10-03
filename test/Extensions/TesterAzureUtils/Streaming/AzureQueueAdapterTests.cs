@@ -5,20 +5,20 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Queue;
+using Microsoft.Azure.Storage.Queue;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Configuration;
 using Orleans.Internal;
-using Orleans.Serialization;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -42,7 +42,7 @@ namespace Tester.AzureUtils.Streaming
             this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
             BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
         }
-        
+
         public void Dispose()
         {
             if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))

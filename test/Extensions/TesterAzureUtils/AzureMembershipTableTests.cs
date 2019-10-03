@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -6,8 +5,6 @@ using Orleans;
 using Orleans.AzureUtils;
 using Orleans.Configuration;
 using Orleans.Messaging;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.MembershipService;
 using TestExtensions;
 using UnitTests;

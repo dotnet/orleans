@@ -1,5 +1,5 @@
-﻿using System;
-using Microsoft.WindowsAzure.Storage.Table;
+using System;
+using Microsoft.Azure.Cosmos.Table;
 using Newtonsoft.Json;
 using Orleans.Transactions.Abstractions;
 

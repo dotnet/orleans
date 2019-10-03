@@ -13,7 +13,7 @@ using Xunit;
 
 namespace Tester.AzureUtils
 {
-    public class AzureGossipTableTests : AzureStorageBasicTests , IDisposable
+    public class AzureGossipTableTests : AzureStorageBasicTests, IDisposable
     {
         private readonly ILogger logger;
 
@@ -151,7 +151,7 @@ namespace Tester.AzureUtils
             // push G1
             await this.gossipTable.Publish(new MultiClusterData(G1));
 
-            // push H1, retrieve G1 
+            // push H1, retrieve G1
             var answer = await this.gossipTable.Synchronize(new MultiClusterData(H1));
             Assert.Equal(1, answer.Gateways.Count);
             Assert.True(answer.Gateways.ContainsKey(this.siloAddress1));
@@ -173,7 +173,7 @@ namespace Tester.AzureUtils
             answer = await this.gossipTable.Synchronize(new MultiClusterData(new GatewayEntry[] { H1, G2 }));
             Assert.True(answer.IsEmpty);
 
-            // push H2 
+            // push H2
             await this.gossipTable.Publish(new MultiClusterData(H2));
 
             // retrieve all
@@ -184,6 +184,6 @@ namespace Tester.AzureUtils
             Assert.Equal(G2, answer.Gateways[this.siloAddress1]);
             Assert.Equal(H2, answer.Gateways[this.siloAddress2]);
         }
-         
+
     }
 }

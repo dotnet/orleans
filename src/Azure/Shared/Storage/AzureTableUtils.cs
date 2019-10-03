@@ -1,12 +1,8 @@
 using System;
-using System.Linq;
 using System.Net;
+using Microsoft.Azure.Cosmos.Table;
+using Microsoft.Azure.Cosmos.Tables.SharedFiles;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Queue;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Microsoft.WindowsAzure.Storage.Shared.Protocol;
-using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.Runtime;
 using Orleans.Storage;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
@@ -34,7 +30,7 @@ namespace Orleans.Transactions.AzureStorage
 #endif
 {
     /// <summary>
-    /// Constants related to Azure table storage.
+    /// Constants related to Azure Table storage (also applies to Table endpoints in Cosmos DB).
     /// </summary>
     internal static class AzureTableConstants
     {
@@ -47,15 +43,12 @@ namespace Orleans.Transactions.AzureStorage
     }
 
     /// <summary>
-    /// General utility functions related to Azure storage.
+    /// General utility functions related to Azure Table storage (also applies to Table endpoints in Cosmos DB).
     /// </summary>
-    /// <remarks>
-    /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constraints this class needs to have public visibility.
-    /// </remarks>
-    public static class AzureStorageUtils
+    internal static class AzureTableUtils
     {
         /// <summary>
-        /// ETag of value "*" to match any etag for conditional table operations (update, nerge, delete).
+        /// ETag of value "*" to match any etag for conditional table operations (update, merge, delete).
         /// </summary>
         public const string ANY_ETAG = AzureTableConstants.ANY_ETAG;
 
@@ -68,9 +61,9 @@ namespace Orleans.Transactions.AzureStorage
         {
             HttpStatusCode httpStatusCode;
             string restStatus;
-            if (AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true))
+            if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus, true))
             {
-                if (AzureStorageUtils.IsNotFoundError(httpStatusCode)
+                if (AzureTableUtils.IsNotFoundError(httpStatusCode)
                     /* New table: Azure table schema not yet initialized, so need to do first create */)
                 {
                     return true;
@@ -210,16 +203,6 @@ namespace Orleans.Transactions.AzureStorage
         internal static void ValidateTableName(string tableName)
         {
             NameValidator.ValidateTableName(tableName);
-        }
-
-        internal static void ValidateContainerName(string containerName)
-        {
-            NameValidator.ValidateContainerName(containerName);
-        }
-
-        internal static void ValidateBlobName(string blobName)
-        {
-            NameValidator.ValidateBlobName(blobName);
         }
 
         /// <summary>

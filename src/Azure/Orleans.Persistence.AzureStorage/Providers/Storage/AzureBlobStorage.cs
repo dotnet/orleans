@@ -4,11 +4,11 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Azure.Storage;
+using Microsoft.Azure.Storage.Blob;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Providers.Azure;
@@ -38,10 +38,10 @@ namespace Orleans.Storage
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(
             string name,
-            AzureBlobStorageOptions options, 
-            SerializationManager serializationManager, 
-            IGrainFactory grainFactory, 
-            ITypeResolver typeResolver, 
+            AzureBlobStorageOptions options,
+            SerializationManager serializationManager,
+            IGrainFactory grainFactory,
+            ITypeResolver typeResolver,
             ILoggerFactory loggerFactory)
         {
             this.name = name;
@@ -119,7 +119,7 @@ namespace Orleans.Storage
             {
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Writing, "Writing: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
 
-                var (contents, mimeType) = ConvertToStorageFormat(grainState.State);;
+                var (contents, mimeType) = ConvertToStorageFormat(grainState.State); ;
 
                 var blob = container.GetBlockBlobReference(blobName);
                 blob.Properties.ContentType = mimeType;

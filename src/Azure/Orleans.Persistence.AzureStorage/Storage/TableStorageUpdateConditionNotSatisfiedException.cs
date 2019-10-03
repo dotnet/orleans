@@ -1,4 +1,3 @@
-﻿
 using System;
 using System.Runtime.Serialization;
 using Orleans.Runtime;
@@ -19,7 +18,7 @@ namespace Orleans.Storage
         public TableStorageUpdateConditionNotSatisfiedException(
             string errorMsg,
             string grainType,
-            GrainReference grainId, 
+            GrainReference grainId,
             string tableName,
             string storedEtag,
             string currentEtag,
@@ -44,7 +43,7 @@ namespace Orleans.Storage
             : this(CreateDefaultMessage(grainType, grainId, tableName, storedEtag, currentEtag), grainType, grainId, tableName, storedEtag, currentEtag, storageException)
         {
         }
-        
+
         /// <summary>
         /// Id of grain
         /// </summary>

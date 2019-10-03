@@ -59,7 +59,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
                     var configInStorage = await tableManager.ReadConfigurationEntryAsync();
                     await DiffAndWriteBackConfigAsync(data.Configuration, configInStorage);
                 };
-                tasks.Add(publishconfig());    
+                tasks.Add(publishconfig());
             }
             foreach (var gateway in data.Gateways.Values)
             {

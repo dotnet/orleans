@@ -8,21 +8,21 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Tester;
+using Tester.AzureUtils.Streaming;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
-using Tester;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Tester.AzureUtils.Streaming;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -40,7 +40,7 @@ namespace UnitTests.Streaming.Reliability
         private string _streamProviderName;
         private int numExpectedSilos;
 #if DELETE_AFTER_TEST
-        private HashSet<IStreamReliabilityTestGrain> _usedGrains; 
+        private HashSet<IStreamReliabilityTestGrain> _usedGrains;
 #endif
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -116,7 +116,7 @@ namespace UnitTests.Streaming.Reliability
             this.output = output;
             CheckSilosRunning("Initially", numExpectedSilos);
 #if DELETE_AFTER_TEST
-            _usedGrains = new HashSet<IStreamReliabilityTestGrain>(); 
+            _usedGrains = new HashSet<IStreamReliabilityTestGrain>();
 #endif
         }
 
@@ -164,7 +164,7 @@ namespace UnitTests.Streaming.Reliability
             await RestartAllSilos();
 
             CheckSilosRunning("After Restart", numExpectedSilos);
-            
+
             Assert.NotEqual(silos, this.HostedCluster.Silos); // Should be different silos after restart
 
             StreamTestUtils.LogEndTest(testName, logger);
@@ -631,7 +631,7 @@ namespace UnitTests.Streaming.Reliability
             CheckSilosRunning(when, numExpectedSilos);
 
             // Since we restart all silos, the client might not haave had enough
-            // time to reconnect to the new gateways. Let's retry the call if it 
+            // time to reconnect to the new gateways. Let's retry the call if it
             // is the case
             for (int i = 0; i < 3; i++)
             {
@@ -688,7 +688,7 @@ namespace UnitTests.Streaming.Reliability
             long producerGrainId = random.Next();
 
 #if USE_GENERICS
-            IStreamReliabilityTestGrain<int> producerGrain = 
+            IStreamReliabilityTestGrain<int> producerGrain =
 #else
             IStreamReliabilityTestGrain producerGrain =
 #endif
@@ -703,7 +703,7 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After restart all silos";
             CheckSilosRunning(when, numExpectedSilos);
-            // Note: It is not guaranteed that the list of producers will not get modified / cleaned up during silo shutdown, so can't assume count will be 1 here. 
+            // Note: It is not guaranteed that the list of producers will not get modified / cleaned up during silo shutdown, so can't assume count will be 1 here.
             // Expected == -1 means don't care.
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, output, when, -1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
 

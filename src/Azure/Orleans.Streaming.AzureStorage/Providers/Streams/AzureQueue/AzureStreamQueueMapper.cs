@@ -1,10 +1,9 @@
-﻿using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text;
 using Orleans.Configuration;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue
 {
