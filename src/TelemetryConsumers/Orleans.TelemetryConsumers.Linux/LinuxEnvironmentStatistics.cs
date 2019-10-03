@@ -173,8 +173,11 @@ namespace Orleans.Statistics
 
             if (string.IsNullOrWhiteSpace(memAvailableLine))
             {
-                _logger.LogWarning($"Couldn't read 'MemAvailable' line from '{MEMINFO_FILEPATH}'");
-                return;
+                memAvailableLine = await ReadLineStartingWithAsync(MEMINFO_FILEPATH, "MemFree");
+                if (string.IsNullOrWhiteSpace(memAvailableLine)) {
+                    _logger.LogWarning($"Couldn't read 'MemAvailable' or 'MemFree' line from '{MEMINFO_FILEPATH}'");
+                    return;
+                }
             }
 
             if (!long.TryParse(new string(memAvailableLine.Where(char.IsDigit).ToArray()), out var availableMemInKb))
