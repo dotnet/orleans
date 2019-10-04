@@ -154,7 +154,8 @@ namespace Orleans.Runtime.MembershipService
                 while (await this.monitorClusterHealthTimer.NextTick(onceOffDelay))
                 {
                     if (onceOffDelay != default) onceOffDelay = default;
-                    _ = this.ProbeMonitoredSilos(CancellationToken.None);
+
+                    _ = this.ProbeMonitoredSilos();
                 }
             }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
@@ -167,15 +168,16 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task ProbeMonitoredSilos(CancellationToken cancellation)
+        private async Task ProbeMonitoredSilos()
         {
             try
             {
+                using var cancellation = new CancellationTokenSource(this.clusterMembershipOptions.ProbeTimeout);
                 var tasks = new List<Task>(this.monitoredSilos.Count);
                 foreach (var pair in this.monitoredSilos)
                 {
                     var monitor = pair.Value;
-                    tasks.Add(PingSilo(monitor, cancellation));
+                    tasks.Add(PingSilo(monitor, cancellation.Token));
                 }
 
                 await Task.WhenAll(tasks);
