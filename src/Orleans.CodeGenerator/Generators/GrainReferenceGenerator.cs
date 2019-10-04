@@ -111,11 +111,11 @@ namespace Orleans.CodeGenerator.Generators
                 var methodIdArgument = Argument(methodDescription.MethodId.ToHexLiteral());
 
                 // Construct a new object array from all method arguments.
-                var parameters = method.Parameters;
+                var parameters = method.Parameters.Select((p, i) => (p, GetSanitizedName(p, i))).ToList<(IParameterSymbol Symbol, string Name)>();
                 var body = new List<StatementSyntax>();
                 foreach (var parameter in parameters)
                 {
-                    if (parameter.Type.HasInterface(wellKnownTypes.IGrainObserver))
+                    if (parameter.Symbol.Type.HasInterface(wellKnownTypes.IGrainObserver))
                     {
                         body.Add(
                             ExpressionStatement(
@@ -136,7 +136,7 @@ namespace Orleans.CodeGenerator.Generators
                         allParameters.Add(TypeOfExpression(typeParameter.ToTypeSyntax()));
                     }
 
-                    allParameters.AddRange(parameters.Select(GetParameterForInvocation));
+                    allParameters.AddRange(parameters.Select(p => GetParameterForInvocation(p.Symbol, p.Name)));
 
                     args =
                         ArrayCreationExpression(objectArrayType)
@@ -144,7 +144,7 @@ namespace Orleans.CodeGenerator.Generators
                             InitializerExpression(SyntaxKind.ArrayInitializerExpression)
                               .AddExpressions(allParameters.ToArray()));
                 }
-                else if (parameters.Length == 0)
+                else if (parameters.Count == 0)
                 {
                     args = LiteralExpression(SyntaxKind.NullLiteralExpression);
                 }
@@ -154,7 +154,7 @@ namespace Orleans.CodeGenerator.Generators
                         ArrayCreationExpression(objectArrayType)
                             .WithInitializer(
                                 InitializerExpression(SyntaxKind.ArrayInitializerExpression)
-                                    .AddExpressions(parameters.Select(GetParameterForInvocation).ToArray()));
+                                    .AddExpressions(parameters.Select((p => GetParameterForInvocation(p.Symbol, p.Name))).ToArray()));
                 }
 
                 var options = GetInvokeOptions(wellKnownTypes, method);
@@ -219,7 +219,9 @@ namespace Orleans.CodeGenerator.Generators
                 }
                 else throw new NotSupportedException($"Method {method} has unsupported return type, {method.ReturnType}.");
 
+                var paramDeclaration = method.Parameters.Select((p, i) => Parameter(GetSanitizedName(p, i).ToIdentifier()).WithType(p.Type.ToTypeSyntax()));
                 var methodDeclaration = method.GetDeclarationSyntax()
+                    .WithParameterList(ParameterList().AddParameters(paramDeclaration.ToArray()))
                     .WithModifiers(TokenList())
                     .WithExplicitInterfaceSpecifier(ExplicitInterfaceSpecifier(method.ContainingType.ToNameSyntax()))
                     .AddBodyStatements(body.ToArray())
@@ -233,9 +235,9 @@ namespace Orleans.CodeGenerator.Generators
 
             return members.ToArray();
 
-            ExpressionSyntax GetParameterForInvocation(IParameterSymbol arg, int argIndex)
+            ExpressionSyntax GetParameterForInvocation(IParameterSymbol arg, string name)
             {
-                var argIdentifier = GetParameterName(arg, argIndex).ToIdentifierName();
+                var identifier = name.ToIdentifierName();
 
                 // Addressable arguments must be converted to references before passing.
                 if (arg.Type.HasInterface(wellKnownTypes.IAddressable)
@@ -243,23 +245,18 @@ namespace Orleans.CodeGenerator.Generators
                 {
                     return
                         ConditionalExpression(
-                            BinaryExpression(SyntaxKind.IsExpression, argIdentifier, wellKnownTypes.Grain.ToTypeSyntax()),
-                            InvocationExpression(argIdentifier.Member("AsReference".ToGenericName().AddTypeArgumentListArguments(arg.Type.ToTypeSyntax()))),
-                            argIdentifier);
+                            BinaryExpression(SyntaxKind.IsExpression, identifier, wellKnownTypes.Grain.ToTypeSyntax()),
+                            InvocationExpression(identifier.Member("AsReference".ToGenericName().AddTypeArgumentListArguments(arg.Type.ToTypeSyntax()))),
+                            identifier);
                 }
 
-                return argIdentifier;
+                return identifier;
+            }
 
-                string GetParameterName(IParameterSymbol parameter, int index)
-                {
-                    var argName = parameter.Name;
-                    if (string.IsNullOrWhiteSpace(argName))
-                    {
-                        argName = string.Format(CultureInfo.InvariantCulture, "arg{0:G}", index);
-                    }
-
-                    return argName;
-                }
+            static string GetSanitizedName(IParameterSymbol parameter, int index)
+            {
+                var parameterName = string.IsNullOrWhiteSpace(parameter.Name) ? "arg" : parameter.Name;
+                return string.Format(CultureInfo.InvariantCulture, "{0}{1:G}", parameterName, index);
             }
         }
 
