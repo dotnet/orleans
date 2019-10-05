@@ -81,21 +81,11 @@ namespace Orleans.Runtime.Messaging
         private async Task RunAsync()
         {
             var runCancellation = this.cancellation.Token;
-            var runCancellationTask = runCancellation.WhenCancelled();
             while (!runCancellation.IsCancellationRequested)
             {
                 try
                 {
-                    var acceptTask = this.listener.AcceptAsync(runCancellation);
-
-                    if (!acceptTask.IsCompletedSuccessfully)
-                    {
-                        // Allow the call to be gracefully cancelled.
-                        var completed = await Task.WhenAny(acceptTask.AsTask(), runCancellationTask);
-                        if (ReferenceEquals(completed, runCancellationTask)) break;
-                    }
-
-                    var context = acceptTask.Result;
+                    var context = await this.listener.AcceptAsync(runCancellation);
                     if (context == null) break;
 
                     var connection = this.CreateConnection(context);
