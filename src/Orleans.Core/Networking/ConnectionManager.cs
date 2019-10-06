@@ -249,24 +249,7 @@ namespace Orleans.Runtime.Messaging
                         address);
                 }
 
-                _ = Task.Run(async () =>
-                {
-                    Exception error = default;
-                    try
-                    {
-                        using (this.BeginConnectionScope(connection))
-                        {
-                            await connection.Run();
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        error = exception;
-                    }
-
-                    this.OnConnectionTerminated(address, connection, error);
-                });
-
+                this.StartConnection(address, connection);
                 this.OnConnected(address, connection);
                 return connection;
             }
@@ -364,6 +347,37 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 this.closedTaskCompletionSource.TrySetResult(0);
+            }
+        }
+
+        private void StartConnection(SiloAddress address, Connection connection)
+        {
+            ThreadPool.UnsafeQueueUserWorkItem(this.StartConnectionCore, (address, connection));
+        }
+
+        private void StartConnectionCore(object state)
+        {
+            var (address, connection) = ((SiloAddress, Connection))state;
+            _ = this.RunConnectionAsync(address, connection);
+        }
+
+        private async Task RunConnectionAsync(SiloAddress address, Connection connection)
+        {
+            Exception error = default;
+            try
+            {
+                using (this.BeginConnectionScope(connection))
+                {
+                    await connection.Run();
+                }
+            }
+            catch (Exception exception)
+            {
+                error = exception;
+            }
+            finally
+            {
+                this.OnConnectionTerminated(address, connection, error);
             }
         }
 

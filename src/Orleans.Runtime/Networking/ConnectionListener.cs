@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -16,12 +15,11 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly IConnectionListenerFactory listenerFactory;
         private readonly ConnectionManager connectionManager;
-        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly ConcurrentDictionary<Connection, Task> connections = new ConcurrentDictionary<Connection, Task>(ReferenceEqualsComparer.Instance);
         private readonly INetworkingTrace trace;
+        private TaskCompletionSource<object> acceptLoopTcs;
         private IConnectionListener listener;
         private ConnectionDelegate connectionDelegate;
-        private Task runTask;
 
         protected ConnectionListener(
             IServiceProvider serviceProvider,
@@ -73,87 +71,52 @@ namespace Orleans.Runtime.Messaging
 
         public void Start()
         {
-            if (this.runTask != null) throw new InvalidOperationException("Start has already been called");
             if (this.listener is null) throw new InvalidOperationException("Listener is not bound");
-            this.runTask = Task.Run(() => this.RunAsync());
+            this.acceptLoopTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            ThreadPool.UnsafeQueueUserWorkItem(this.StartAcceptingConnections, this.acceptLoopTcs);
         }
 
-        private async Task RunAsync()
+        private void StartAcceptingConnections(object completionObj)
         {
-            var runCancellation = this.cancellation.Token;
-            while (true)
+            _ = RunAcceptLoop((TaskCompletionSource<object>)completionObj);
+
+            async Task RunAcceptLoop(TaskCompletionSource<object> completion)
             {
                 try
                 {
-                    var context = await this.listener.AcceptAsync(runCancellation);
-                    if (context == null) break;
+                    while (true)
+                    {
+                        var context = await this.listener.AcceptAsync();
+                        if (context == null) break;
 
-                    var connection = this.CreateConnection(context);
-                    _ = RunConnection(connection);
-                }
-                catch (ObjectDisposedException)
-                {
-                    break;
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
+                        var connection = this.CreateConnection(context);
+                        this.StartConnection(connection);
+                    }
                 }
                 catch (Exception exception)
                 {
-                    this.trace.LogWarning("Exception in AcceptAsync: {Exception}", exception);
+                    this.trace.LogCritical("Exception in AcceptAsync: {Exception}", exception);
                 }
-            }
-
-            async Task RunConnection(Connection connection)
-            {
-                await Task.Yield();
-
-                using (this.BeginConnectionScope(connection))
+                finally
                 {
-                    try
-                    {
-                        var connectionTask = connection.Run();
-                        this.connections.TryAdd(connection, connectionTask);
-                        await connectionTask;
-                        this.trace.LogInformation("Connection {@Connection} terminated", connection);
-                    }
-                    catch (Exception exception)
-                    {
-                        this.trace.LogInformation(exception, "Connection {@Connection} terminated with an exception", connection);
-                    }
-                    finally
-                    {
-                        this.connections.TryRemove(connection, out _);
-                    }
+                    completion.TrySetResult(null);
                 }
             }
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            this.cancellation.Cancel(throwOnFirstException: false);
-            if (this.runTask != null)
-            {
-                try
-                {
-                    await this.runTask;
-                }
-                catch (Exception exception)
-                {
-                    this.trace.LogWarning(
-                        exception,
-                        "Exception while waiting for accept loop to terminate: {Exception}",
-                        exception);
-                }
-            }
-            
             try
             {
-                ValueTask listenerStop = default;
-                if (this.listener != null)
+                if (this.acceptLoopTcs is object)
                 {
-                    listenerStop = this.listener.UnbindAsync(CancellationToken.None);
+                    await Task.WhenAll(
+                        this.listener.UnbindAsync(cancellationToken).AsTask(),
+                        this.acceptLoopTcs.Task);
+                }
+                else
+                {
+                    await this.listener.UnbindAsync(cancellationToken);
                 }
 
                 var cycles = 0;
@@ -183,7 +146,6 @@ namespace Orleans.Runtime.Messaging
 
                 await this.connectionManager.Closed;
 
-                await listenerStop;
                 if (this.listener != null)
                 {
                     await this.listener.DisposeAsync();
@@ -192,6 +154,41 @@ namespace Orleans.Runtime.Messaging
             catch (Exception exception)
             {
                 this.trace?.LogWarning("Exception during shutdown: {Exception}", exception);
+            }
+        }
+
+        private void StartConnection(Connection connection)
+        {
+            ThreadPool.UnsafeQueueUserWorkItem(this.StartConnectionCore, connection);
+        }
+
+        private void StartConnectionCore(object state)
+        {
+            var connection = (Connection)state;
+            _ = this.RunConnectionAsync(connection);
+        }
+
+        private async Task RunConnectionAsync(Connection connection)
+        {
+            await Task.Yield();
+
+            using (this.BeginConnectionScope(connection))
+            {
+                try
+                {
+                    var connectionTask = connection.Run();
+                    this.connections.TryAdd(connection, connectionTask);
+                    await connectionTask;
+                    this.trace.LogInformation("Connection {@Connection} terminated", connection);
+                }
+                catch (Exception exception)
+                {
+                    this.trace.LogInformation(exception, "Connection {@Connection} terminated with an exception", connection);
+                }
+                finally
+                {
+                    this.connections.TryRemove(connection, out _);
+                }
             }
         }
 
