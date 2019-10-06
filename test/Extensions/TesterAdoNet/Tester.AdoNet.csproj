@@ -57,52 +57,52 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="$(SourceRoot)src\AdoNet\Shared\MySQL-Main.sql" Link="MySQL-Main.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Main\MySQL-Main.sql" Link="MySQL-Main.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Shared\Oracle-Main.sql" Link="Oracle-Main.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Main\Oracle-Main.sql" Link="Oracle-Main.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Shared\PostgreSQL-Main.sql" Link="PostgreSQL-Main.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Main\PostgreSQL-Main.sql" Link="PostgreSQL-Main.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Shared\SQLServer-Main.sql" Link="SQLServer-Main.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Main\SQLServer-Main.sql" Link="SQLServer-Main.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\MySQL-Clustering.sql" Link="MySQL-Clustering.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Clustering\MySQL-Clustering.sql" Link="MySQL-Clustering.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\Oracle-Clustering.sql" Link="Oracle-Clustering.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Clustering\Oracle-Clustering.sql" Link="Oracle-Clustering.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\PostgreSQL-Clustering.sql" Link="PostgreSQL-Clustering.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Clustering\PostgreSQL-Clustering.sql" Link="PostgreSQL-Clustering.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\SQLServer-Clustering.sql" Link="SQLServer-Clustering.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Clustering\SQLServer-Clustering.sql" Link="SQLServer-Clustering.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\MySQL-Persistence.sql" Link="MySQL-Persistence.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Persistence\MySQL-Persistence.sql" Link="MySQL-Persistence.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\Oracle-Persistence.sql" Link="Oracle-Persistence.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Persistence\Oracle-Persistence.sql" Link="Oracle-Persistence.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\PostgreSQL-Persistence.sql" Link="PostgreSQL-Persistence.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Persistence\PostgreSQL-Persistence.sql" Link="PostgreSQL-Persistence.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\SQLServer-Persistence.sql" Link="SQLServer-Persistence.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Persistence\SQLServer-Persistence.sql" Link="SQLServer-Persistence.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\MySQL-Reminders.sql" Link="MySQL-Reminders.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Reminders\MySQL-Reminders.sql" Link="MySQL-Reminders.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\Oracle-Reminders.sql" Link="Oracle-Reminders.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Reminders\Oracle-Reminders.sql" Link="Oracle-Reminders.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\PostgreSQL-Reminders.sql" Link="PostgreSQL-Reminders.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Reminders\PostgreSQL-Reminders.sql" Link="PostgreSQL-Reminders.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\SQLServer-Reminders.sql" Link="SQLServer-Reminders.sql">
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Extensions.AdoNet.Scripts\Scripts\Reminders\SQLServer-Reminders.sql" Link="SQLServer-Reminders.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

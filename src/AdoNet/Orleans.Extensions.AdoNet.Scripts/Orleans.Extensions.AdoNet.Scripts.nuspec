@@ -1,0 +1,29 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Microsoft.Orleans.Extensions.AdoNet.Scripts</id>
+    <version>$version$</version>
+    <title>Microsoft Orleans ADO.NET scripts</title>
+    <authors>Microsoft</authors>
+    <owners>Microsoft,Orleans</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectUrl>https://github.com/dotnet/orleans</projectUrl>
+    <license type="expression">MIT</license>
+    <icon>logo_128.png</icon>
+    <summary>
+      SQL scripts for initializing databaes for Microsoft Orleans ADO.NET extensions
+    </summary>
+    <description>
+      SQL scripts for initializing databaes for Microsoft Orleans ADO.NET extensions
+    </description>
+    <copyright>© Microsoft Corporation. All rights reserved.</copyright>
+    <tags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET SQL MySQL PostgreSQL Oracle</tags>
+  </metadata>
+
+  <files>
+    <file src="Scripts\**\*.sql" target="Scripts" />
+  
+    <file src="..\..\..\assets\logo_128.png" />
+  </files>
+
+</package>
