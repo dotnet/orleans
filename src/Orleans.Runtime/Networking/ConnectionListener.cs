@@ -81,7 +81,7 @@ namespace Orleans.Runtime.Messaging
         private async Task RunAsync()
         {
             var runCancellation = this.cancellation.Token;
-            while (!runCancellation.IsCancellationRequested)
+            while (true)
             {
                 try
                 {
