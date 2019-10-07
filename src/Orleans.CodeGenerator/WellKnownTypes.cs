@@ -20,6 +20,7 @@ namespace Orleans.CodeGenerator
                 CopierMethodAttribute = Type("Orleans.CodeGeneration.CopierMethodAttribute"),
                 DeserializerMethodAttribute = Type("Orleans.CodeGeneration.DeserializerMethodAttribute"),
                 Delegate = compilation.GetSpecialType(SpecialType.System_Delegate),
+                DebuggerStepThroughAttribute = Type("System.Diagnostics.DebuggerStepThroughAttribute"),
                 Exception = Type("System.Exception"),
                 ExcludeFromCodeCoverageAttribute = Type("System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute"),
                 FormatterServices = Type("System.Runtime.Serialization.FormatterServices"),
@@ -167,6 +168,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol CopierMethodAttribute { get; private set; }
         public INamedTypeSymbol Delegate { get; private set; }
         public INamedTypeSymbol DeserializerMethodAttribute { get; private set; }
+        public INamedTypeSymbol DebuggerStepThroughAttribute { get; private set; }
         public INamedTypeSymbol Exception { get; private set; }
         public INamedTypeSymbol ExcludeFromCodeCoverageAttribute { get; private set; }
         public INamedTypeSymbol FormatterServices { get; private set; }

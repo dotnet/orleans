@@ -16,8 +16,17 @@ namespace Orleans.CodeGenerator.Generators
     /// <summary>
     /// Generates GrainReference implementations for grains.
     /// </summary>
-    internal static class GrainReferenceGenerator
+    internal class GrainReferenceGenerator
     {
+        private readonly CodeGeneratorOptions options;
+        private readonly WellKnownTypes wellKnownTypes;
+
+        public GrainReferenceGenerator(CodeGeneratorOptions options, WellKnownTypes wellKnownTypes)
+        {
+            this.options = options;
+            this.wellKnownTypes = wellKnownTypes;
+        }
+
         /// <summary>
         /// Returns the name of the generated class for the provided type.
         /// </summary>
@@ -29,7 +38,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Generates the class for the provided grain types.
         /// </summary>
-        internal static TypeDeclarationSyntax GenerateClass(WellKnownTypes wellKnownTypes, GrainInterfaceDescription description)
+        internal TypeDeclarationSyntax GenerateClass(GrainInterfaceDescription description)
         {
             var generatedTypeName = description.ReferenceTypeName;
             var grainType = description.Type;
@@ -55,27 +64,33 @@ namespace Orleans.CodeGenerator.Generators
                         SimpleBaseType(wellKnownTypes.GrainReference.ToTypeSyntax()),
                         SimpleBaseType(grainType.ToTypeSyntax()))
                     .AddConstraintClauses(grainType.GetTypeConstraintSyntax())
-                    .AddMembers(GenerateConstructors(wellKnownTypes, generatedTypeName))
+                    .AddMembers(GenerateConstructors(generatedTypeName))
                     .AddMembers(
-                        GrainInterfaceCommon.GenerateInterfaceIdProperty(wellKnownTypes, description).AddModifiers(Token(SyntaxKind.OverrideKeyword)),
-                        GrainInterfaceCommon.GenerateInterfaceVersionProperty(wellKnownTypes, description).AddModifiers(Token(SyntaxKind.OverrideKeyword)),
-                        GenerateInterfaceNameProperty(wellKnownTypes, description),
-                        GenerateIsCompatibleMethod(wellKnownTypes, description),
-                        GenerateGetMethodNameMethod(wellKnownTypes, description))
-                    .AddMembers(GenerateInvokeMethods(wellKnownTypes, description))
+                        GrainInterfaceCommon.GenerateInterfaceIdProperty(this.wellKnownTypes, description).AddModifiers(Token(SyntaxKind.OverrideKeyword)),
+                        GrainInterfaceCommon.GenerateInterfaceVersionProperty(this.wellKnownTypes, description).AddModifiers(Token(SyntaxKind.OverrideKeyword)),
+                        GenerateInterfaceNameProperty(description),
+                        GenerateIsCompatibleMethod(description),
+                        GenerateGetMethodNameMethod(description))
+                    .AddMembers(GenerateInvokeMethods(description))
                     .AddAttributeLists(attributes);
             if (genericTypes.Length > 0)
             {
                 classDeclaration = classDeclaration.AddTypeParameterListParameters(genericTypes);
             }
-            
+
+            if (this.options.DebuggerStepThrough)
+            {
+                var debuggerStepThroughAttribute = Attribute(this.wellKnownTypes.DebuggerStepThroughAttribute.ToNameSyntax());
+                classDeclaration = classDeclaration.AddAttributeLists(AttributeList().AddAttributes(debuggerStepThroughAttribute));
+            }
+
             return classDeclaration;
         }
 
         /// <summary>
         /// Generates constructors.
         /// </summary>
-        private static MemberDeclarationSyntax[] GenerateConstructors(WellKnownTypes wellKnownTypes, string className)
+        private MemberDeclarationSyntax[] GenerateConstructors(string className)
         {
             var baseConstructors =
                 wellKnownTypes.GrainReference.Constructors.Where(c => c.DeclaredAccessibility != Accessibility.Private);
@@ -100,7 +115,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Generates invoker methods.
         /// </summary>
-        private static MemberDeclarationSyntax[] GenerateInvokeMethods(WellKnownTypes wellKnownTypes, GrainInterfaceDescription description)
+        private MemberDeclarationSyntax[] GenerateInvokeMethods(GrainInterfaceDescription description)
         {
             var baseReference = BaseExpression();
             var methods = description.Methods;
@@ -157,7 +172,7 @@ namespace Orleans.CodeGenerator.Generators
                                     .AddExpressions(parameters.Select(GetParameterForInvocation).ToArray()));
                 }
 
-                var options = GetInvokeOptions(wellKnownTypes, method);
+                var options = GetInvokeOptions(method);
 
                 // Construct the invocation call.
                 bool asyncMethod;
@@ -266,7 +281,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns syntax for the options argument to GrainReference.InvokeMethodAsync{T} and GrainReference.InvokeOneWayMethod.
         /// </summary>
-        private static ArgumentSyntax GetInvokeOptions(WellKnownTypes wellKnownTypes, IMethodSymbol method)
+        private ArgumentSyntax GetInvokeOptions(IMethodSymbol method)
         {
             var options = new List<ExpressionSyntax>();
             var imo = wellKnownTypes.InvokeMethodOptions.ToNameSyntax();
@@ -342,7 +357,7 @@ namespace Orleans.CodeGenerator.Generators
             return Argument(NameColon("options"), Token(SyntaxKind.None), allOptions);
         }
 
-        private static MemberDeclarationSyntax GenerateIsCompatibleMethod(WellKnownTypes wellKnownTypes, GrainInterfaceDescription description)
+        private MemberDeclarationSyntax GenerateIsCompatibleMethod(GrainInterfaceDescription description)
         {
             var method = wellKnownTypes.GrainReference.Method("IsCompatible");
             var interfaceIdParameter = method.Parameters[0].Name.ToIdentifierName();
@@ -373,7 +388,7 @@ namespace Orleans.CodeGenerator.Generators
                     .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
         }
 
-        private static MemberDeclarationSyntax GenerateInterfaceNameProperty(WellKnownTypes wellKnownTypes, GrainInterfaceDescription description)
+        private MemberDeclarationSyntax GenerateInterfaceNameProperty(GrainInterfaceDescription description)
         {
             var returnValue = description.Type.Name.ToLiteralExpression();
             return
@@ -383,7 +398,7 @@ namespace Orleans.CodeGenerator.Generators
                     .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
         }
 
-        private static MethodDeclarationSyntax GenerateGetMethodNameMethod(WellKnownTypes wellKnownTypes, GrainInterfaceDescription description)
+        private MethodDeclarationSyntax GenerateGetMethodNameMethod(GrainInterfaceDescription description)
         {
             var method = wellKnownTypes.GrainReference.Method("GetMethodName");
             var methodDeclaration = method.GetDeclarationSyntax().AddModifiers(Token(SyntaxKind.OverrideKeyword));

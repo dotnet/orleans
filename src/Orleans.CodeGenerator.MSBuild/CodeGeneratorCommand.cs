@@ -76,6 +76,11 @@ namespace Orleans.CodeGenerator.MSBuild
         /// </summary>
         public string AssemblyName { get; set; }
 
+        /// <summary>
+        /// Whether or not to add <see cref="DebuggerStepThroughAttribute"/> to generated code.
+        /// </summary>
+        public bool DebuggerStepThrough { get; set; }
+
         public async Task<bool> Execute(CancellationToken cancellationToken)
         {
             var stopwatch = Stopwatch.StartNew();
@@ -135,7 +140,11 @@ namespace Orleans.CodeGenerator.MSBuild
                 return false;
             }
 
-            var generator = new CodeGenerator(compilation, this.Log);
+            var options = new CodeGeneratorOptions
+            {
+                DebuggerStepThrough = this.DebuggerStepThrough
+            };
+            var generator = new CodeGenerator(compilation, options, this.Log);
             var syntax = generator.GenerateCode(cancellationToken);
             this.Log.LogDebug($"GenerateCode completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();

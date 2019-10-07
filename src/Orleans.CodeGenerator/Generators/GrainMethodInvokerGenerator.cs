@@ -13,9 +13,21 @@ namespace Orleans.CodeGenerator.Generators
     /// <summary>
     /// Generates IGrainMethodInvoker implementations for grains.
     /// </summary>
-    internal static class GrainMethodInvokerGenerator
+    internal class GrainMethodInvokerGenerator
     {
-        private static int nextId;
+        private readonly CodeGeneratorOptions options;
+        private readonly WellKnownTypes wellKnownTypes;
+
+        /// <summary>
+        /// The next id used for generated code disambiguation purposes.
+        /// </summary>
+        private int nextId;
+
+        public GrainMethodInvokerGenerator(CodeGeneratorOptions options, WellKnownTypes wellKnownTypes)
+        {
+            this.options = options;
+            this.wellKnownTypes = wellKnownTypes;
+        }
 
         /// <summary>
         /// Returns the name of the generated class for the provided type.
@@ -25,7 +37,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Generates the class for the provided grain types.
         /// </summary>
-        internal static TypeDeclarationSyntax GenerateClass(WellKnownTypes wellKnownTypes, GrainInterfaceDescription description)
+        internal TypeDeclarationSyntax GenerateClass(GrainInterfaceDescription description)
         {
             var generatedTypeName = description.InvokerTypeName;
             var grainType = description.Type;
@@ -76,13 +88,19 @@ namespace Orleans.CodeGenerator.Generators
                 classDeclaration = classDeclaration.AddTypeParameterListParameters(genericTypes);
             }
 
+            if (this.options.DebuggerStepThrough)
+            {
+                var debuggerStepThroughAttribute = Attribute(this.wellKnownTypes.DebuggerStepThroughAttribute.ToNameSyntax());
+                classDeclaration = classDeclaration.AddAttributeLists(AttributeList().AddAttributes(debuggerStepThroughAttribute));
+            }
+
             return classDeclaration;
         }
 
         /// <summary>
         /// Generates syntax for the IGrainMethodInvoker.Invoke method.
         /// </summary>
-        private static MethodDeclarationSyntax GenerateInvokeMethod(
+        private MethodDeclarationSyntax GenerateInvokeMethod(
             WellKnownTypes wellKnownTypes,
             INamedTypeSymbol grainType,
             Dictionary<IMethodSymbol, GenericInvokerField> genericInvokerFields)
@@ -96,7 +114,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Generates syntax for the IGrainExtensionMethodInvoker.Invoke method.
         /// </summary>
-        private static MethodDeclarationSyntax GenerateExtensionInvokeMethod(
+        private MethodDeclarationSyntax GenerateExtensionInvokeMethod(
             WellKnownTypes wellKnownTypes,
             INamedTypeSymbol grainType,
             Dictionary<IMethodSymbol, GenericInvokerField> genericInvokerFields)
@@ -110,7 +128,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Generates syntax for an invoke method.
         /// </summary>
-        private static MethodDeclarationSyntax GenerateInvokeMethod(
+        private MethodDeclarationSyntax GenerateInvokeMethod(
             WellKnownTypes wellKnownTypes,
             INamedTypeSymbol grainType,
             IMethodSymbol invokeMethod,
@@ -206,7 +224,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Generates syntax to invoke a method on a grain.
         /// </summary>
-        private static StatementSyntax[] GenerateInvokeForMethod(
+        private StatementSyntax[] GenerateInvokeForMethod(
             WellKnownTypes wellKnownTypes,
             ExpressionSyntax castGrain,
             IMethodSymbol method,
@@ -272,7 +290,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Generates GenericMethodInvoker fields for the generic methods in <paramref name="methodDescriptions"/>.
         /// </summary>
-        private static Dictionary<IMethodSymbol, GenericInvokerField> GenerateGenericInvokerFields(WellKnownTypes wellKnownTypes, List<GrainMethodDescription> methodDescriptions)
+        private Dictionary<IMethodSymbol, GenericInvokerField> GenerateGenericInvokerFields(WellKnownTypes wellKnownTypes, List<GrainMethodDescription> methodDescriptions)
         {
             if (!(wellKnownTypes.GenericMethodInvoker is WellKnownTypes.Some genericMethodInvoker)) return new Dictionary<IMethodSymbol, GenericInvokerField>();
 
@@ -290,7 +308,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Generates a GenericMethodInvoker field for the provided generic method.
         /// </summary>
-        private static GenericInvokerField GenerateGenericInvokerField(IMethodSymbol method, INamedTypeSymbol genericMethodInvoker)
+        private GenericInvokerField GenerateGenericInvokerField(IMethodSymbol method, INamedTypeSymbol genericMethodInvoker)
         {
             var fieldName = $"GenericInvoker_{method.Name}_{Interlocked.Increment(ref nextId):X}";
             var fieldInfoVariable =

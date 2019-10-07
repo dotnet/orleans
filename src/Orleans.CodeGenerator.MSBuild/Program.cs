@@ -105,6 +105,9 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
                         case nameof(cmd.CodeGenOutputFile):
                             cmd.CodeGenOutputFile = value;
                             break;
+                        case nameof(cmd.DebuggerStepThrough):
+                            cmd.DebuggerStepThrough = bool.Parse(value);
+                            break;
                         case nameof(LogLevel):
                             if (!Enum.TryParse(ignoreCase: true, value: value, result: out logLevel))
                             {
