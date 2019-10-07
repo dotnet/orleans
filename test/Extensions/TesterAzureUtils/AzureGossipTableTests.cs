@@ -1,4 +1,5 @@
 using System;
+using System.Configuration;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -69,9 +70,9 @@ namespace Tester.AzureUtils
             var answer = await this.gossipTable.Synchronize(new MultiClusterData());
             Assert.True(answer.IsEmpty);
 
-            var ts1 = new DateTime(year: 2011, month: 1, day: 1);
-            var ts2 = new DateTime(year: 2012, month: 2, day: 2);
-            var ts3 = new DateTime(year: 2013, month: 3, day: 3);
+            var ts1 = new DateTime(year: 2011, month: 1, day: 1, hour: 0, minute: 0, second: 0, kind: DateTimeKind.Utc);
+            var ts2 = new DateTime(year: 2012, month: 2, day: 2, hour: 0, minute: 0, second: 0, kind: DateTimeKind.Utc);
+            var ts3 = new DateTime(year: 2013, month: 3, day: 3, hour: 0, minute: 0, second: 0, kind: DateTimeKind.Utc);
 
             var conf1 = new MultiClusterConfiguration(ts1, new string[] { "A" }.ToList(), "comment");
             var conf2 = new MultiClusterConfiguration(ts2, new string[] { "A", "B", "C" }.ToList());
