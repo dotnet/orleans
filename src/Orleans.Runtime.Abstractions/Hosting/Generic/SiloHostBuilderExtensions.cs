@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Orleans.ApplicationParts;
-using Orleans.Configuration;
+using Orleans.Configuration.Internal;
+using Orleans.Serialization;
 
 namespace Orleans.Hosting
 {
@@ -151,6 +153,20 @@ namespace Orleans.Hosting
 
             configure(builder.GetApplicationPartManager());
             return builder;
+        }
+
+        /// <summary>
+        /// Enabled legacy <see cref="ILBasedSerializer"/> support.
+        /// </summary>
+        public static ISiloHostBuilder EnableLegacyILBasedSerializer(this ISiloHostBuilder builder)
+        {
+            return builder.ConfigureServices(services =>
+            {
+#pragma warning disable CS0618 // Type or member is obsolete
+                services.TryAddSingleton<ILBasedSerializer>();
+                services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
+#pragma warning restore CS0618 // Type or member is obsolete
+            });
         }
     }
 }
