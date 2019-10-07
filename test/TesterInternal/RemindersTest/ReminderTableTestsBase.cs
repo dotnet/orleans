@@ -153,7 +153,7 @@ namespace UnitTests.RemindersTest
         private static ReminderEntry CreateReminder(GrainReference grainRef, string reminderName)
         {
             var now = DateTime.UtcNow;
-            now = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, DateTimeKind.Utc);
+            now = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
             return new ReminderEntry
             {
                 GrainRef = grainRef,
