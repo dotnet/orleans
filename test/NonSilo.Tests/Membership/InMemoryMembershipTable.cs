@@ -65,7 +65,7 @@ namespace NonSilo.Tests.Membership
                 foreach (var (entry, etag) in this.entries)
                 {
                     if (entry.Status == SiloStatus.Dead
-                        && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks)) < beforeDate)
+                        && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
                     {
                         continue;
                     }
