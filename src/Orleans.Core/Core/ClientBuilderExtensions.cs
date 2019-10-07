@@ -12,6 +12,9 @@ using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Serialization;
+using Orleans.Configuration.Internal;
 
 namespace Orleans
 {
@@ -290,6 +293,20 @@ namespace Orleans
 
             configure(builder.GetApplicationPartManager());
             return builder;
+        }
+
+        /// <summary>
+        /// Enabled legacy <see cref="ILBasedSerializer"/> support.
+        /// </summary>
+        public static IClientBuilder EnableLegacyILBasedSerializer(this IClientBuilder builder)
+        {
+            return builder.ConfigureServices(services =>
+            {
+#pragma warning disable CS0618 // Type or member is obsolete
+                services.TryAddSingleton<ILBasedSerializer>();
+                services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
+#pragma warning restore CS0618 // Type or member is obsolete
+            });
         }
     }
 }
