@@ -98,6 +98,7 @@
     <ItemGroup>
       <Orleans_CodeGenArgs Include="WaitForDebugger" Condition="'$(OrleansCodeGenWaitForDebugger)' != ''" />
       <Orleans_CodeGenArgs Include="LogLevel:$(OrleansCodeGenLogLevel)" />
+      <Orleans_CodeGenArgs Include="DebuggerStepThrough:true" Condition="'$(OrleansCodeGenDebuggerStepThrough)' == 'true'" />
       <Orleans_CodeGenArgs Include="ProjectPath:$(MSBuildProjectFullPath)"/>
       <Orleans_CodeGenArgs Include="ProjectGuid:$(ProjectGuid)"/>
       <Orleans_CodeGenArgs Include="AssemblyName:$(AssemblyName)"/>

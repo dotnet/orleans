@@ -46,21 +46,29 @@ namespace Orleans.CodeGenerator.Generators
     ///    }
     ///}
     /// </summary>
-    internal static class SerializerGenerator
+    internal class SerializerGenerator
     {
         /// <summary>
         /// The suffix appended to the name of generated classes.
         /// </summary>
         private const string ClassSuffix = "Serializer";
+        private readonly CodeGeneratorOptions options;
+        private readonly WellKnownTypes wellKnownTypes;
 
-        private static readonly ConcurrentDictionary<ITypeSymbol, bool> ShallowCopyableTypes = new ConcurrentDictionary<ITypeSymbol, bool>();
+        public SerializerGenerator(CodeGeneratorOptions options, WellKnownTypes wellKnownTypes)
+        {
+            this.options = options;
+            this.wellKnownTypes = wellKnownTypes;
+        }
+
+        private readonly ConcurrentDictionary<ITypeSymbol, bool> ShallowCopyableTypes = new ConcurrentDictionary<ITypeSymbol, bool>();
 
         /// <summary>
         /// Returns the name of the generated class for the provided type.
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>The name of the generated class for the provided type.</returns>
-        internal static string GetGeneratedClassName(INamedTypeSymbol type)
+        internal string GetGeneratedClassName(INamedTypeSymbol type)
         {
             var parts = type.ToDisplayParts(SymbolDisplayFormat.FullyQualifiedFormat
                 .WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Omitted)
@@ -95,9 +103,9 @@ namespace Orleans.CodeGenerator.Generators
         }
 
         /// <summary>
-        /// Generates the non static serializer class for the provided grain types.
+        /// Generates the non serializer class for the provided grain types.
         /// </summary>
-        internal static (TypeDeclarationSyntax, TypeSyntax) GenerateClass(WellKnownTypes wellKnownTypes, SemanticModel model, SerializerTypeDescription description, ILogger logger)
+        internal (TypeDeclarationSyntax, TypeSyntax) GenerateClass(SemanticModel model, SerializerTypeDescription description, ILogger logger)
         {
             var className = GetGeneratedClassName(description.Target);
             var type = description.Target;
@@ -112,14 +120,14 @@ namespace Orleans.CodeGenerator.Generators
                         AttributeArgument(TypeOfExpression(type.WithoutTypeParameters().ToTypeSyntax())))
             };
 
-            var fields = GetFields(wellKnownTypes, model, type, logger);
+            var fields = GetFields(model, type, logger);
             
-            var members = new List<MemberDeclarationSyntax>(GenerateFields(wellKnownTypes, fields))
+            var members = new List<MemberDeclarationSyntax>(GenerateFields(fields))
             {
-                GenerateConstructor(wellKnownTypes, className, fields),
-                GenerateDeepCopierMethod(wellKnownTypes, type, fields, model),
-                GenerateSerializerMethod(wellKnownTypes, type, fields, model),
-                GenerateDeserializerMethod(wellKnownTypes, type, fields, model),
+                GenerateConstructor(className, fields),
+                GenerateDeepCopierMethod(type, fields, model),
+                GenerateSerializerMethod(type, fields, model),
+                GenerateDeserializerMethod(type, fields, model),
             };
 
             var classDeclaration =
@@ -129,15 +137,22 @@ namespace Orleans.CodeGenerator.Generators
                     .AddAttributeLists(AttributeList().AddAttributes(attributes.ToArray()))
                     .AddMembers(members.ToArray())
                     .AddConstraintClauses(type.GetTypeConstraintSyntax());
+
             if (genericTypes.Length > 0)
             {
                 classDeclaration = classDeclaration.AddTypeParameterListParameters(genericTypes);
             }
-            
+
+            if (this.options.DebuggerStepThrough)
+            {
+                var debuggerStepThroughAttribute = Attribute(this.wellKnownTypes.DebuggerStepThroughAttribute.ToNameSyntax());
+                classDeclaration = classDeclaration.AddAttributeLists(AttributeList().AddAttributes(debuggerStepThroughAttribute));
+            }
+
             return (classDeclaration, ParseTypeName(type.GetParsableReplacementName(className)));
         }
 
-        private static MemberDeclarationSyntax GenerateConstructor(WellKnownTypes wellKnownTypes, string className, List<FieldInfoMember> fields)
+        private MemberDeclarationSyntax GenerateConstructor(string className, List<FieldInfoMember> fields)
         {
             var body = new List<StatementSyntax>();
 
@@ -222,7 +237,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns syntax for the deserializer method.
         /// </summary>
-        private static MemberDeclarationSyntax GenerateDeserializerMethod(WellKnownTypes wellKnownTypes, INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
+        private MemberDeclarationSyntax GenerateDeserializerMethod(INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
         {
             var contextParameter = IdentifierName("context");
 
@@ -231,7 +246,7 @@ namespace Orleans.CodeGenerator.Generators
                     VariableDeclaration(type.ToTypeSyntax())
                         .AddVariables(
                             VariableDeclarator("result")
-                                .WithInitializer(EqualsValueClause(GetObjectCreationExpressionSyntax(wellKnownTypes, type, model)))));
+                                .WithInitializer(EqualsValueClause(GetObjectCreationExpressionSyntax(type, model)))));
             var resultVariable = IdentifierName("result");
 
             var body = new List<StatementSyntax> {resultDeclaration};
@@ -284,7 +299,7 @@ namespace Orleans.CodeGenerator.Generators
                             .AddAttributes(Attribute(wellKnownTypes.DeserializerMethodAttribute.ToNameSyntax())));
         }
 
-        private static MemberDeclarationSyntax GenerateSerializerMethod(WellKnownTypes wellKnownTypes, INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
+        private MemberDeclarationSyntax GenerateSerializerMethod(INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
         {
             var contextParameter = IdentifierName("context");
 
@@ -328,7 +343,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns syntax for the deep copy method.
         /// </summary>
-        private static MemberDeclarationSyntax GenerateDeepCopierMethod(WellKnownTypes wellKnownTypes, INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
+        private MemberDeclarationSyntax GenerateDeepCopierMethod(INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
         {
             var originalVariable = IdentifierName("original");
             var inputVariable = IdentifierName("input");
@@ -358,7 +373,7 @@ namespace Orleans.CodeGenerator.Generators
                         VariableDeclaration(type.ToTypeSyntax())
                             .AddVariables(
                                 VariableDeclarator("result")
-                                    .WithInitializer(EqualsValueClause(GetObjectCreationExpressionSyntax(wellKnownTypes, type, model))))));
+                                    .WithInitializer(EqualsValueClause(GetObjectCreationExpressionSyntax(type, model))))));
 
                 // Record this serialization.
                 var context = IdentifierName("context");
@@ -388,9 +403,9 @@ namespace Orleans.CodeGenerator.Generators
         }
 
         /// <summary>
-        /// Returns syntax for the static fields of the serializer class.
+        /// Returns syntax for the fields of the serializer class.
         /// </summary>
-        private static MemberDeclarationSyntax[] GenerateFields(WellKnownTypes wellKnownTypes, List<FieldInfoMember> fields)
+        private MemberDeclarationSyntax[] GenerateFields(List<FieldInfoMember> fields)
         {
             var result = new List<MemberDeclarationSyntax>();
 
@@ -444,7 +459,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns syntax for initializing a new instance of the provided type.
         /// </summary>
-        private static ExpressionSyntax GetObjectCreationExpressionSyntax(WellKnownTypes wellKnownTypes, INamedTypeSymbol type, SemanticModel model)
+        private ExpressionSyntax GetObjectCreationExpressionSyntax(INamedTypeSymbol type, SemanticModel model)
         {
             ExpressionSyntax result;
 
@@ -474,7 +489,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Return the default constructor on <paramref name="type"/> if found or null if not found.
         /// </summary>
-        private static IMethodSymbol GetEmptyConstructor(INamedTypeSymbol type, SemanticModel model)
+        private IMethodSymbol GetEmptyConstructor(INamedTypeSymbol type, SemanticModel model)
         {
             return type.GetDeclaredInstanceMembers<IMethodSymbol>()
                 .FirstOrDefault(method => method.MethodKind == MethodKind.Constructor && method.Parameters.Length == 0 && model.IsAccessible(0, method));
@@ -483,14 +498,14 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns a sorted list of the fields of the provided type.
         /// </summary>
-        private static List<FieldInfoMember> GetFields(WellKnownTypes wellKnownTypes, SemanticModel model, INamedTypeSymbol type, ILogger logger)
+        private List<FieldInfoMember> GetFields(SemanticModel model, INamedTypeSymbol type, ILogger logger)
         {
             var result = new List<FieldInfoMember>();
             foreach (var field in type.GetDeclaredInstanceMembers<IFieldSymbol>())
             {
-                if (ShouldSerializeField(wellKnownTypes, field))
+                if (ShouldSerializeField(field))
                 {
-                    result.Add(new FieldInfoMember(wellKnownTypes, model, type, field, result.Count));
+                    result.Add(new FieldInfoMember(this, model, type, field, result.Count));
                 }
             }
 
@@ -516,9 +531,9 @@ namespace Orleans.CodeGenerator.Generators
                     foreach (var field in baseType.GetDeclaredInstanceMembers<IFieldSymbol>())
                     {
                         if (hasUnsupportedRefAsmBase) referenceAssemblyHasFields = true;
-                        if (ShouldSerializeField(wellKnownTypes, field))
+                        if (ShouldSerializeField(field))
                         {
-                            result.Add(new FieldInfoMember(wellKnownTypes, model, type, field, result.Count));
+                            result.Add(new FieldInfoMember(this, model, type, field, result.Count));
                         }
                     }
 
@@ -578,7 +593,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns <see langowrd="true"/> if the provided field should be serialized, <see langword="false"/> otherwise.
         /// </summary>
-        public static bool ShouldSerializeField(WellKnownTypes wellKnownTypes, IFieldSymbol symbol)
+        public bool ShouldSerializeField(IFieldSymbol symbol)
         {
             if (symbol.IsStatic) return false;
             if (symbol.HasAttribute(wellKnownTypes.NonSerializedAttribute)) return false;
@@ -596,13 +611,13 @@ namespace Orleans.CodeGenerator.Generators
             return true;
         }
         
-        internal static bool IsOrleansShallowCopyable(WellKnownTypes wellKnownTypes, ITypeSymbol type)
+        internal bool IsOrleansShallowCopyable(ITypeSymbol type)
         {
             var root = new HashSet<ITypeSymbol>();
-            return IsOrleansShallowCopyable(wellKnownTypes, type, root);
+            return IsOrleansShallowCopyable(type, root);
         }
 
-        internal static bool IsOrleansShallowCopyable(WellKnownTypes wellKnownTypes, ITypeSymbol type, HashSet<ITypeSymbol> examining)
+        internal bool IsOrleansShallowCopyable(ITypeSymbol type, HashSet<ITypeSymbol> examining)
         {
             switch (type.SpecialType)
             {
@@ -658,13 +673,13 @@ namespace Orleans.CodeGenerator.Generators
             
             if (type.TypeKind == TypeKind.Struct && !namedType.IsGenericType && !namedType.IsUnboundGenericType)
             {
-                return ShallowCopyableTypes[type] =  IsValueTypeFieldsShallowCopyable(wellKnownTypes, type, examining);
+                return ShallowCopyableTypes[type] =  IsValueTypeFieldsShallowCopyable(type, examining);
             }
 
             return ShallowCopyableTypes[type] = false;
         }
 
-        private static bool IsValueTypeFieldsShallowCopyable(WellKnownTypes wellKnownTypes, ITypeSymbol type, HashSet<ITypeSymbol> examining)
+        private bool IsValueTypeFieldsShallowCopyable(ITypeSymbol type, HashSet<ITypeSymbol> examining)
         {
             foreach (var field in type.GetInstanceMembers<IFieldSymbol>())
             {
@@ -677,7 +692,7 @@ namespace Orleans.CodeGenerator.Generators
 
                 if (type.Equals(fieldType)) return false;
 
-                if (!IsOrleansShallowCopyable(wellKnownTypes, fieldType, examining)) return false;
+                if (!IsOrleansShallowCopyable(fieldType, examining)) return false;
             }
 
             return true;
@@ -688,6 +703,7 @@ namespace Orleans.CodeGenerator.Generators
         /// </summary>
         private class FieldInfoMember
         {
+            private readonly SerializerGenerator generator;
             private readonly SemanticModel model;
             private readonly WellKnownTypes wellKnownTypes;
             private readonly INamedTypeSymbol targetType;
@@ -698,9 +714,10 @@ namespace Orleans.CodeGenerator.Generators
             /// </summary>
             private readonly int ordinal;
 
-            public FieldInfoMember(WellKnownTypes wellKnownTypes, SemanticModel model, INamedTypeSymbol targetType, IFieldSymbol field, int ordinal)
+            public FieldInfoMember(SerializerGenerator generator, SemanticModel model, INamedTypeSymbol targetType, IFieldSymbol field, int ordinal)
             {
-                this.wellKnownTypes = wellKnownTypes;
+                this.generator = generator;
+                this.wellKnownTypes = generator.wellKnownTypes;
                 this.model = model;
                 this.targetType = targetType;
                 this.Field = field;
@@ -800,7 +817,7 @@ namespace Orleans.CodeGenerator.Generators
                 var getValueExpression = this.GetValueExpression(instance);
 
                 // Avoid deep-copying the field if possible.
-                if (forceAvoidCopy || IsOrleansShallowCopyable(this.wellKnownTypes, this.SafeType))
+                if (forceAvoidCopy || generator.IsOrleansShallowCopyable(this.SafeType))
                 {
                     // Return the value without deep-copying it.
                     return getValueExpression;
