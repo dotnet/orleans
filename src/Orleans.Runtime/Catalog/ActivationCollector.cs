@@ -352,10 +352,10 @@ namespace Orleans.Runtime
         private DateTime MakeTicketFromDateTime(DateTime timestamp)
         {
             // round the timestamp to the next quantum. e.g. if the quantum is 1 minute and the timestamp is 3:45:22, then the ticket will be 3:46. note that TimeStamp.Ticks and DateTime.Ticks both return a long.
-            DateTime ticket = new DateTime(((timestamp.Ticks - 1) / quantum.Ticks + 1) * quantum.Ticks);
+            DateTime ticket = new DateTime(((timestamp.Ticks - 1) / quantum.Ticks + 1) * quantum.Ticks, DateTimeKind.Utc);
             if (ticket < nextTicket)
             {
-                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - quantum.Ticks + 1)));
+                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - quantum.Ticks + 1, DateTimeKind.Utc)));
             }
             return ticket;
         }

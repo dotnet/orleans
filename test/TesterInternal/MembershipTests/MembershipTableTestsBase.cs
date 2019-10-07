@@ -429,7 +429,7 @@ namespace UnitTests.MembershipTests
         private static DateTime GetUtcNowWithSecondsResolution()
         {
             var now = DateTime.UtcNow;
-            return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
+            return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, DateTimeKind.Utc);
         }
 
         private static SiloAddress CreateSiloAddressForTest()

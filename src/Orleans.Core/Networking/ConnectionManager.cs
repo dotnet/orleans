@@ -137,7 +137,7 @@ namespace Orleans.Runtime.Messaging
                 if (entry.LastFailure.HasValue)
                 {
                     var ticks = Math.Max(lastFailure.Ticks, entry.LastFailure.Value.Ticks);
-                    lastFailure = new DateTime(ticks);
+                    lastFailure = new DateTime(ticks, DateTimeKind.Utc);
                 }
 
                 // Remove defunct connections.
