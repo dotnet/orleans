@@ -13,6 +13,7 @@ using UnitTests.StreamingTests;
 
 namespace UnitTests.Grains
 {
+    [Serializable]
     public class StreamReliabilityTestGrainState
     {
         // For producer and consumer 
