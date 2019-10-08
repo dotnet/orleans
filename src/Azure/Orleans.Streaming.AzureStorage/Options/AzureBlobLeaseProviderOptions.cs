@@ -1,8 +1,8 @@
 using System;
+using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Options;
-using Microsoft.WindowsAzure.Storage;
+using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
-using Orleans.Streaming.AzureStorage;
 
 namespace Orleans.Configuration
 {
@@ -70,7 +70,7 @@ namespace Orleans.Configuration
             }
             try
             {
-                AzureStorageUtils.ValidateContainerName(this.options.BlobContainerName);
+                AzureBlobUtils.ValidateContainerName(this.options.BlobContainerName);
             }
             catch (ArgumentException e)
             {

@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.MembershipService;
-using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {

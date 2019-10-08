@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using Orleans.Transactions.Abstractions;
 
@@ -233,7 +233,7 @@ namespace Orleans.Transactions.AzureStorage
         private async Task<KeyEntity> ReadKey()
         {
             var query = new TableQuery<KeyEntity>()
-                .Where(AzureStorageUtils.PointQuery(this.partition, KeyEntity.RK));
+                .Where(AzureTableUtils.PointQuery(this.partition, KeyEntity.RK));
             TableQuerySegment<KeyEntity> queryResult = await table.ExecuteQuerySegmentedAsync(query, null).ConfigureAwait(false);
             return queryResult.Results.Count == 0
                 ? new KeyEntity() { PartitionKey = this.partition }
@@ -243,7 +243,7 @@ namespace Orleans.Transactions.AzureStorage
         private async Task<List<KeyValuePair<long, StateEntity>>> ReadStates()
         {
             var query = new TableQuery<StateEntity>()
-                .Where(AzureStorageUtils.RangeQuery(this.partition, StateEntity.RK_MIN, StateEntity.RK_MAX));
+                .Where(AzureTableUtils.RangeQuery(this.partition, StateEntity.RK_MIN, StateEntity.RK_MAX));
             TableContinuationToken continuationToken = null;
             var results = new List<KeyValuePair<long, StateEntity>>();
             do
@@ -287,7 +287,7 @@ namespace Orleans.Transactions.AzureStorage
                 if (batchOperation.Count == AzureTableConstants.MaxBatchSize - (batchContainsKey ? 0 : 1))
                 {
                     // the key serves as a synchronizer, to prevent modification by multiple grains under edge conditions,
-                    // like duplicate activations or deployments.Every batch write needs to include the key, 
+                    // like duplicate activations or deployments.Every batch write needs to include the key,
                     // even if the key values don't change.
 
                     if (!batchContainsKey)

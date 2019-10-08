@@ -94,7 +94,7 @@ namespace Tester.AzureUtils.Streaming
         public async Task DelayedQueueRebalancingTests_2()
         {
             await ValidateAgentsState(2, 2, "1");
-            
+
             await this.HostedCluster.StartAdditionalSilosAsync(2, true);
             await ValidateAgentsState(4, 2, "2");
 
@@ -111,7 +111,7 @@ namespace Tester.AzureUtils.Streaming
             Assert.Equal(numExpectedSilos, results.Length);
 
             // Convert.ToInt32 is used because of different behavior of the fallback serializers: binary formatter and Json.Net.
-            // The binary one deserializes object[] into array of ints when the latter one - into longs. http://stackoverflow.com/a/17918824 
+            // The binary one deserializes object[] into array of ints when the latter one - into longs. http://stackoverflow.com/a/17918824
             var numAgents = results.Select(Convert.ToInt32).ToArray();
             logger.Info($"Got back NumberRunningAgents: {Utils.EnumerableToString(numAgents)}");
             int i = 0;

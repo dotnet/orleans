@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Azure.Storage.Queue;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -68,7 +68,7 @@ namespace Tester.AzureUtils
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
             CloudQueueMessage outMessage4 = await manager.GetQueueMessage();
-           Assert.Null(outMessage4);
+            Assert.Null(outMessage4);
 
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
@@ -115,7 +115,7 @@ namespace Tester.AzureUtils
             const int NumThreads = 100;
             Task<bool>[] promises = new Task<bool>[NumThreads];
 
-            for (int i = 0; i < NumThreads; i++) 
+            for (int i = 0; i < NumThreads; i++)
             {
                 promises[i] = Task.Run<bool>(async () =>
                 {
@@ -138,7 +138,7 @@ namespace Tester.AzureUtils
             CloudQueueMessage inMessage = new CloudQueueMessage("Hello, World");
             await manager.AddQueueMessage(inMessage);
             Assert.Equal(1, await manager.GetApproximateMessageCount());
-            
+
             CloudQueueMessage outMessage = await manager.GetQueueMessage();
             logger.Info("GetQueueMessage: {0}", PrintCloudQueueMessage(outMessage));
             Assert.Equal(inMessage.AsString, outMessage.AsString);

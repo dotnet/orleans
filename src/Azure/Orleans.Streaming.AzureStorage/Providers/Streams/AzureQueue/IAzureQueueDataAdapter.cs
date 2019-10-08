@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.WindowsAzure.Storage.Queue;
+using Microsoft.Azure.Storage.Queue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -34,7 +34,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
             //new CloudQueueMessage(byte[]) not supported in netstandard, taking a detour to set it
             var cloudQueueMessage = new CloudQueueMessage(null as string);
-            cloudQueueMessage.SetMessageContent(rawBytes);
+            cloudQueueMessage.SetMessageContent2(rawBytes);
             return cloudQueueMessage;
         }
 
@@ -60,7 +60,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     public class AzureQueueDataAdapterV2 : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>, IOnDeserialized
     {
         private SerializationManager serializationManager;
-        
+
         /// <summary>
         /// Initializes a new instance of the <see cref="AzureQueueDataAdapterV2"/> class.
         /// </summary>
@@ -80,7 +80,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
             //new CloudQueueMessage(byte[]) not supported in netstandard, taking a detour to set it
             var cloudQueueMessage = new CloudQueueMessage(null as string);
-            cloudQueueMessage.SetMessageContent(rawBytes);
+            cloudQueueMessage.SetMessageContent2(rawBytes);
             return cloudQueueMessage;
         }
 

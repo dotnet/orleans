@@ -2,20 +2,20 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Azure.Storage.Queue;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
+using Orleans.AzureUtils.Utilities;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Orleans.AzureUtils.Utilities;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
     /// <summary>
-    /// Receives batches of messages from a single partition of a message queue.  
+    /// Receives batches of messages from a single partition of a message queue.
     /// </summary>
-    internal class AzureQueueAdapterReceiver: IQueueAdapterReceiver
+    internal class AzureQueueAdapterReceiver : IQueueAdapterReceiver
     {
         private readonly SerializationManager serializationManager;
         private AzureQueueDataManager queue;
@@ -76,8 +76,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             try
             {
-                var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.    
-                if (queueRef == null) return new List<IBatchContainer>();  
+                var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
+                if (queueRef == null) return new List<IBatchContainer>();
 
                 int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ?
                     CloudQueueMessage.MaxNumberOfMessagesToPeek : Math.Min(maxCount, CloudQueueMessage.MaxNumberOfMessagesToPeek);

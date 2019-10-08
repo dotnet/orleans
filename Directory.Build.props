@@ -85,7 +85,10 @@
     <MicrosoftExtensionsHostingVersion>3.0.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
+    <MicrosoftAzureCosmosTableVersion>1.0.5</MicrosoftAzureCosmosTableVersion>
     <MicrosoftAzureEventHubsVersion>2.2.1</MicrosoftAzureEventHubsVersion>
+    <MicrosoftAzureStorageBlobVersion>10.0.3</MicrosoftAzureStorageBlobVersion>
+    <MicrosoftAzureStorageQueueVersion>10.0.3</MicrosoftAzureStorageQueueVersion>
     <MicrosoftDataSQLiteVersion>2.0.0</MicrosoftDataSQLiteVersion>
     <MicrosoftPowerShell5ReferenceAssembliesVersion>1.1.0</MicrosoftPowerShell5ReferenceAssembliesVersion>
     <MicrosoftServiceFabricServicesVersion>3.4.664</MicrosoftServiceFabricServicesVersion>

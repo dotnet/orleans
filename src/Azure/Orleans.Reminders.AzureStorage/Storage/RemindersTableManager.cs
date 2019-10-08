@@ -4,10 +4,9 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Table;
 using Orleans.AzureUtils.Utilities;
-using Orleans.AzureUtils;
 using Orleans.Reminders.AzureStorage;
 using Orleans.Internal;
 
@@ -18,16 +17,16 @@ namespace Orleans.Runtime.ReminderService
         public string GrainReference        { get; set; }    // Part of RowKey
         public string ReminderName          { get; set; }    // Part of RowKey
         public string ServiceId             { get; set; }    // Part of PartitionKey
-        public string DeploymentId          { get; set; }    
-        public string StartAt               { get; set; }    
-        public string Period                { get; set; }    
+        public string DeploymentId          { get; set; }
+        public string StartAt               { get; set; }
+        public string Period                { get; set; }
         public string GrainRefConsistentHash { get; set; }    // Part of PartitionKey
 
 
         public static string ConstructRowKey(GrainReference grainRef, string reminderName)
         {
             var key = String.Format("{0}-{1}", grainRef.ToKeyString(), reminderName); //grainRef.ToString(), reminderName);
-            return AzureStorageUtils.SanitizeTableProperty(key);
+            return AzureTableUtils.SanitizeTableProperty(key);
         }
 
         public static string ConstructPartitionKey(string serviceId, GrainReference grainRef)
@@ -37,7 +36,7 @@ namespace Orleans.Runtime.ReminderService
 
         public static string ConstructPartitionKey(string serviceId, uint number)
         {
-            // IMPORTANT NOTE: Other code using this return data is very sensitive to format changes, 
+            // IMPORTANT NOTE: Other code using this return data is very sensitive to format changes,
             //       so take great care when making any changes here!!!
 
             // this format of partition key makes sure that the comparisons in FindReminderEntries(begin, end) work correctly
@@ -45,7 +44,7 @@ namespace Orleans.Runtime.ReminderService
             // when comparisons will be done on strings, this will ensure that positive numbers are always greater than negative
             // string grainHash = number < 0 ? string.Format("0{0}", number.ToString("X")) : string.Format("1{0:d16}", number);
 
-            return AzureStorageUtils.SanitizeTableProperty($"{serviceId}_{number:X8}");
+            return AzureTableUtils.SanitizeTableProperty($"{serviceId}_{number:X8}");
         }
 
 
@@ -64,11 +63,11 @@ namespace Orleans.Runtime.ReminderService
             sb.Append(" Period=").Append(Period);
             sb.Append(" GrainRefConsistentHash=").Append(GrainRefConsistentHash);
             sb.Append("]");
-            
+
             return sb.ToString();
         }
     }
-    
+
     internal class RemindersTableManager : AzureTableDataManager<ReminderTableEntry>
     {
         public string ServiceId { get; private set; }
@@ -135,7 +134,7 @@ namespace Orleans.Runtime.ReminderService
                 var queryResults = await ReadTableEntriesAndEtagsAsync(filterOnServiceIdStr);
                 return queryResults.ToList();
             }
-            
+
             // (begin > end)
             string queryOnSBegin = TableQuery.CombineFilters(
                 filterOnServiceIdStr, TableOperators.And, TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.GreaterThan, sBegin));
@@ -189,13 +188,13 @@ namespace Orleans.Runtime.ReminderService
             {
                 HttpStatusCode httpStatusCode;
                 string restStatus;
-                if (AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
+                if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
                 {
                     if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("UpsertRow failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
-                    if (AzureStorageUtils.IsContentionError(httpStatusCode)) return null; // false;
+                    if (AzureTableUtils.IsContentionError(httpStatusCode)) return null; // false;
                 }
                 throw;
-            }              
+            }
         }
 
 
@@ -209,10 +208,10 @@ namespace Orleans.Runtime.ReminderService
             {
                 HttpStatusCode httpStatusCode;
                 string restStatus;
-                if (AzureStorageUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
+                if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
                 {
                     if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("DeleteReminderEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
-                    if (AzureStorageUtils.IsContentionError(httpStatusCode)) return false;
+                    if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
                 }
                 throw;
             }

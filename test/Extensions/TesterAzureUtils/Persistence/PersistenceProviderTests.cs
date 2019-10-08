@@ -1,25 +1,25 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Microsoft.WindowsAzure.Storage.Table;
-using Xunit;
-using Xunit.Abstractions;
+using Newtonsoft.Json;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.Providers;
 using Orleans.Storage;
-using TestExtensions;
-using UnitTests.StorageTests;
-using UnitTests.Persistence;
 using Samples.StorageProviders;
-using Newtonsoft.Json;
-using System.Globalization;
+using TestExtensions;
+using UnitTests.Persistence;
+using UnitTests.StorageTests;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Persistence
 {

@@ -7,7 +7,7 @@ namespace Orleans.Hosting
     public static class ClientBuilderExtensions
     {
         /// <summary>
-        /// Configure cluster client to use azure queue persistent streams. 
+        /// Configure cluster client to use azure queue persistent streams.
         /// </summary>
         public static IClientBuilder AddAzureQueueStreams(this IClientBuilder builder,
             string name,

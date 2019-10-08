@@ -1,11 +1,8 @@
 using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Options;
-using Microsoft.WindowsAzure.Storage;
+using Microsoft.Azure.Storage;
 using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Configuration
 {
@@ -62,8 +59,8 @@ namespace Orleans.Configuration
                     $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ConnectionString)} is not valid.");
             try
             {
-                AzureStorageUtils.ValidateContainerName(options.ContainerName);
-                AzureStorageUtils.ValidateBlobName(this.name);
+                AzureBlobUtils.ValidateContainerName(options.ContainerName);
+                AzureBlobUtils.ValidateBlobName(this.name);
             }
             catch(ArgumentException e)
             {

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Transactions.TestKit.Base</PackageId>
@@ -12,7 +12,7 @@
     <AssemblyName>Orleans.Transactions.TestKit.Base</AssemblyName>
     <RootNamespace>Orleans.Transactions.TestKit.Base</RootNamespace>
   </PropertyGroup>
-  
+
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>

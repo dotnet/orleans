@@ -4,21 +4,20 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Tester;
+using Tester.AzureUtils.Streaming;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
-using Tester;
-using Orleans.Hosting;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Providers.Streams.AzureQueue;
-using Tester.AzureUtils.Streaming;
 
 namespace UnitTests.StreamingTests
 {
@@ -172,7 +171,7 @@ namespace UnitTests.StreamingTests
         {
             // 1 Stream, 1 Producer, 128 Consumers
             await Test_Stream_Limits(
-                SmsStreamProviderName, 
+                SmsStreamProviderName,
                 1, 1, 128);
         }
 
@@ -181,7 +180,7 @@ namespace UnitTests.StreamingTests
         {
             // 1 Stream, 128 Producers, 1 Consumer
             await Test_Stream_Limits(
-                SmsStreamProviderName, 
+                SmsStreamProviderName,
                 1, 128, 1);
         }
 
@@ -190,7 +189,7 @@ namespace UnitTests.StreamingTests
         {
             // 1 Stream, 128 Producers, 128 Consumers
             await Test_Stream_Limits(
-                SmsStreamProviderName, 
+                SmsStreamProviderName,
                 1, 128, 128);
         }
 
@@ -200,7 +199,7 @@ namespace UnitTests.StreamingTests
             // 1 Stream, 1 Producer, 400 Consumers
             int numConsumers = 400;
             await Test_Stream_Limits(
-                SmsStreamProviderName, 
+                SmsStreamProviderName,
                 1, 1, numConsumers);
         }
 
@@ -239,7 +238,7 @@ namespace UnitTests.StreamingTests
 
             // 1 Stream, Max Producers, 1 Consumer
             await Test_Stream_Limits(
-                SmsStreamProviderName, 
+                SmsStreamProviderName,
                 1, 1, MaxConsumersPerStream, useFanOut: true);
         }
         [SkippableFact]
@@ -251,7 +250,7 @@ namespace UnitTests.StreamingTests
 
             // 1 Stream, Max Producers, 1 Consumer
             await Test_Stream_Limits(
-                SmsStreamProviderName, 
+                SmsStreamProviderName,
                 1, 1, MaxConsumersPerStream, useFanOut: false);
         }
 
@@ -275,7 +274,7 @@ namespace UnitTests.StreamingTests
             // 152 Streams, x9 Producers, x9 Consumers
             int numStreams = 152;
             await Test_Stream_Limits(
-                SmsStreamProviderName, 
+                SmsStreamProviderName,
                 numStreams, 9, 9, useFanOut: false);
         }
 
@@ -500,7 +499,7 @@ namespace UnitTests.StreamingTests
                 int activePubSubGrains = ActiveGrainCount(typeof(PubSubRendezvousGrain).FullName);
                 Assert.Equal(streamIds.Length,  activePubSubGrains);  //  "Initial PubSub count -- should all be warmed up"
             }
-            
+
             int activeConsumerGrains = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain).FullName);
             Assert.Equal(0,  activeConsumerGrains);  //  "Initial Consumer count should be zero"
 
@@ -646,7 +645,7 @@ namespace UnitTests.StreamingTests
                 var grain = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
                 consumers.Add(grain);
 
-                Task promise; 
+                Task promise;
                 if (normalSubscribeCalls)
                 {
                     promise = grain.BecomeConsumer(streamId, streamNamespace, streamProviderName);
@@ -669,16 +668,16 @@ namespace UnitTests.StreamingTests
         }
 
         private async Task Test_Stream_Limits(
-            string streamProviderName, 
-            int numStreams, 
-            int numProducers, 
-            int numConsumers, 
-            int numMessages = 1, 
+            string streamProviderName,
+            int numStreams,
+            int numProducers,
+            int numConsumers,
+            int numMessages = 1,
             bool useFanOut = true)
         {
             output.WriteLine("Testing {0} Streams x Producers={1} Consumers={2} per stream with {3} messages each",
                 1, numProducers, numConsumers, numMessages);
-            
+
             Stopwatch sw = Stopwatch.StartNew();
 
             var promises = new List<Task<double>>();
@@ -700,14 +699,14 @@ namespace UnitTests.StreamingTests
             }
             double rps = (await Task.WhenAll(promises)).Sum();
             promises.Clear();
-            output.WriteLine("Got total {0} RPS on {1} streams, or {2} RPS per streams", 
+            output.WriteLine("Got total {0} RPS on {1} streams, or {2} RPS per streams",
                 rps, numStreams, rps/numStreams);
 
             sw.Stop();
 
             int totalMessages = numMessages * numStreams * numProducers;
             output.WriteLine("Sent {0} messages total on {1} Streams from {2} Producers to {3} Consumers in {4} at {5} RPS",
-                totalMessages, numStreams, numStreams * numProducers, numStreams * numConsumers, 
+                totalMessages, numStreams, numStreams * numProducers, numStreams * numConsumers,
                 sw.Elapsed, totalMessages / sw.Elapsed.TotalSeconds);
         }
 

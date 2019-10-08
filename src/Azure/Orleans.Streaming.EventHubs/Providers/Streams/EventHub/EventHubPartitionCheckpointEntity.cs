@@ -1,4 +1,4 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using Orleans.Streaming.EventHubs;
 
 namespace Orleans.ServiceBus.Providers
@@ -24,13 +24,13 @@ namespace Orleans.ServiceBus.Providers
         public static string MakePartitionKey(string streamProviderName, string checkpointNamespace)
         {
             string key = $"EventHubCheckpoints_{streamProviderName}_{checkpointNamespace}";
-            return AzureStorageUtils.SanitizeTableProperty(key);
+            return AzureTableUtils.SanitizeTableProperty(key);
         }
 
         public static string MakeRowKey(string partition)
         {
             string key = $"partition_{partition}";
-            return AzureStorageUtils.SanitizeTableProperty(key);
+            return AzureTableUtils.SanitizeTableProperty(key);
         }
     }
 }

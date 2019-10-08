@@ -2,8 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Azure.Storage.Queue;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
 using Orleans.Configuration;
 using Orleans.Serialization;
@@ -22,7 +22,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         protected readonly ConcurrentDictionary<QueueId, AzureQueueDataManager> Queues = new ConcurrentDictionary<QueueId, AzureQueueDataManager>();
         protected readonly IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter;
 
-        public string Name { get ; }
+        public string Name { get; }
         public bool IsRewindable => false;
 
         public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
@@ -47,7 +47,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return AzureQueueAdapterReceiver.Create(this.serializationManager, this.loggerFactory, this.streamQueueMapper.PartitionToAzureQueue(queueId), 
+            return AzureQueueAdapterReceiver.Create(this.serializationManager, this.loggerFactory, this.streamQueueMapper.PartitionToAzureQueue(queueId),
                 queueOptions.ConnectionString, this.dataAdapter, queueOptions.MessageVisibilityTimeout);
         }
 

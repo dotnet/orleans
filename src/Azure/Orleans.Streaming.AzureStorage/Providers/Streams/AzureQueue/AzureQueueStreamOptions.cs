@@ -1,8 +1,6 @@
-
-using Orleans.Runtime;
-using Orleans.Streams;
 using System;
 using System.Collections.Generic;
+using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {

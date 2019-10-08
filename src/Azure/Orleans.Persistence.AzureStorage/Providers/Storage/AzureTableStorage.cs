@@ -6,20 +6,19 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging;
+using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.DependencyInjection;
-using LogLevel = Microsoft.Extensions.Logging.LogLevel;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Configuration;
+using Orleans.Configuration.Overrides;
+using Orleans.Persistence.AzureStorage;
+using Orleans.Providers.Azure;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
-using Orleans.Providers.Azure;
-using Orleans.Persistence.AzureStorage;
-using Orleans.Configuration.Overrides;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Storage
 {
@@ -383,7 +382,7 @@ namespace Orleans.Storage
         private string GetKeyString(GrainReference grainReference)
         {
             var key = String.Format("{0}_{1}", this.clusterOptions.ServiceId, grainReference.ToKeyString());
-            return AzureStorageUtils.SanitizeTableProperty(key);
+            return AzureTableUtils.SanitizeTableProperty(key);
         }
 
         internal class GrainStateRecord
@@ -428,7 +427,7 @@ namespace Orleans.Storage
                 }
                 catch (Exception exc)
                 {
-                    if (AzureStorageUtils.TableStorageDataNotFound(exc))
+                    if (AzureTableUtils.TableStorageDataNotFound(exc))
                     {
                         if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading (exception): PartitionKey={0} RowKey={1} from Table={2} Exception={3}", partitionKey, rowKey, TableName, LogFormatter.PrintException(exc));
                         return null;  // No data
@@ -466,7 +465,7 @@ namespace Orleans.Storage
         /// <summary> Decodes Storage exceptions.</summary>
         public bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false)
         {
-            return AzureStorageUtils.EvaluateException(e, out httpStatusCode, out restStatus, getRESTErrors);
+            return AzureTableUtils.EvaluateException(e, out httpStatusCode, out restStatus, getRESTErrors);
         }
 
         private async Task Init(CancellationToken ct)

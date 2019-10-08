@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Azure.Storage;
+using Microsoft.Azure.Storage.Blob;
 using Microsoft.Extensions.Options;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
 using Orleans.Configuration;
 
 namespace Orleans.LeaseProviders
@@ -71,7 +71,7 @@ namespace Orleans.LeaseProviders
                 switch (e.RequestInformation.HttpStatusCode)
                 {
                     case 404:
-                    case 409: 
+                    case 409:
                     case 412: statusCode = ResponseCode.LeaseNotAvailable; break;
                     default: statusCode = ResponseCode.TransientFailure; break;
                 }
