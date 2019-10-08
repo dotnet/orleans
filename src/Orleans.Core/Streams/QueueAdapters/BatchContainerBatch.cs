@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Orleans.Concurrency;
 
 namespace Orleans.Streams
 {
@@ -9,9 +8,7 @@ namespace Orleans.Streams
     /// A batch of batch containers, that if configured (see StreamPullingAgentOptions), will be the data pulled by the
     /// PersistenStreamPullingAgent from it's underlying cache
     /// </summary>
-    [Serializable]
-    [Immutable]
-    internal class BatchContainerBatch : IBatchContainerBatch
+    class BatchContainerBatch : IBatchContainerBatch
     {
         /// <summary>
         /// Stream identifier for the stream this batch is part of.

@@ -121,7 +121,6 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         }
     }
 
-    [Serializable]
     public class Apple : IFruit
     {
         int number;
