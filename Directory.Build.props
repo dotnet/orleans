@@ -86,17 +86,13 @@
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
     <MicrosoftAzureCosmosTableVersion>1.0.5</MicrosoftAzureCosmosTableVersion>
-    <MicrosoftAzureEventHubsVersion>2.2.1</MicrosoftAzureEventHubsVersion>
-    <MicrosoftAzureStorageBlobVersion>10.0.3</MicrosoftAzureStorageBlobVersion>
-    <MicrosoftAzureStorageQueueVersion>10.0.3</MicrosoftAzureStorageQueueVersion>
-    <MicrosoftDataSQLiteVersion>2.0.0</MicrosoftDataSQLiteVersion>
-    <MicrosoftPowerShell5ReferenceAssembliesVersion>1.1.0</MicrosoftPowerShell5ReferenceAssembliesVersion>
+    <MicrosoftAzureEventHubsVersion>4.1.0</MicrosoftAzureEventHubsVersion>
+    <MicrosoftAzureStorageBlobVersion>11.1.0</MicrosoftAzureStorageBlobVersion>
+    <MicrosoftAzureStorageQueueVersion>11.1.0</MicrosoftAzureStorageQueueVersion>
+    <MicrosoftDataSQLiteVersion>3.0.0</MicrosoftDataSQLiteVersion>
     <MicrosoftServiceFabricServicesVersion>3.4.664</MicrosoftServiceFabricServicesVersion>
-    <WindowsAzureStorageVersion>8.2.1</WindowsAzureStorageVersion>
 
-    <FSharpCoreVersion>4.5.2</FSharpCoreVersion>
-
-    <SystemManagementAutomationdllVersion>10.0.10586</SystemManagementAutomationdllVersion>
+    <FSharpCoreVersion>4.7.0</FSharpCoreVersion>
 
     <!-- 3rd party packages -->
     <AWSSDKDynamoDBv2Version>3.3.4.17</AWSSDKDynamoDBv2Version>
@@ -117,11 +113,11 @@
     <!-- Test related packages -->
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
     <MicrosoftTestSdkVersion>16.3.0</MicrosoftTestSdkVersion>
-    <BenchmarkDotNetVersion>0.11.4</BenchmarkDotNetVersion>
+    <BenchmarkDotNetVersion>0.11.5</BenchmarkDotNetVersion>
     <XunitSkippableFactVersion>1.3.12</XunitSkippableFactVersion>
     <DotNetxUnitVersion>2.3.1</DotNetxUnitVersion>
     <xUnitVersion>2.4.1</xUnitVersion>
-    <NodaTimeVersion>2.2.2</NodaTimeVersion>
+    <NodaTimeVersion>2.4.7</NodaTimeVersion>
 
     <!-- Tooling related packages -->
     <SourceLinkVersion>2.8.3</SourceLinkVersion>
