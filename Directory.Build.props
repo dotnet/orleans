@@ -113,11 +113,11 @@
     <!-- Test related packages -->
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
     <MicrosoftTestSdkVersion>16.3.0</MicrosoftTestSdkVersion>
-    <BenchmarkDotNetVersion>0.11.4</BenchmarkDotNetVersion>
+    <BenchmarkDotNetVersion>0.11.5</BenchmarkDotNetVersion>
     <XunitSkippableFactVersion>1.3.12</XunitSkippableFactVersion>
     <DotNetxUnitVersion>2.3.1</DotNetxUnitVersion>
     <xUnitVersion>2.4.1</xUnitVersion>
-    <NodaTimeVersion>2.2.2</NodaTimeVersion>
+    <NodaTimeVersion>2.4.7</NodaTimeVersion>
 
     <!-- Tooling related packages -->
     <SourceLinkVersion>2.8.3</SourceLinkVersion>
