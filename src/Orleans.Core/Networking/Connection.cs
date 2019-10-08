@@ -164,7 +164,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void Send(Message message)
+        public virtual void Send(Message message)
         {
             if (!this.outgoingMessageWriter.TryWrite(message))
             {

@@ -45,6 +45,8 @@ namespace Orleans.Runtime.Messaging
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
 
+        public NetworkProtocolVersion RemoteProtocolVersion { get; private set; }
+
         protected override void OnReceivedMessage(Message msg)
         {
             // See it's a Ping message, and if so, short-circuit it
@@ -244,11 +246,13 @@ namespace Orleans.Runtime.Messaging
                     throw new InvalidOperationException("Unexpected non-proxied connection on silo endpoint.");
                 }
 
-                if (siloAddress != null)
+                if (siloAddress is object)
                 {
                     this.RemoteSiloAddress = siloAddress;
                     this.connectionManager.OnConnected(siloAddress, this);
                 }
+
+                this.RemoteProtocolVersion = protocolVersion;
 
                 return protocolVersion;
             }
@@ -308,6 +312,19 @@ namespace Orleans.Runtime.Messaging
             {
                 this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {SiloAddress} is dropping message: {Message}. Reason = {Reason}", this.LocalSiloAddress, msg, reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+            }
+        }
+
+        public override void Send(Message message)
+        {
+            if (this.RemoteProtocolVersion == NetworkProtocolVersion.Version1 && this.RemoteSiloAddress is null)
+            {
+                // Incoming Version1 connections are half-duplex (read-only)
+                this.messageCenter.SendMessage(message);
+            }
+            else
+            {
+                base.Send(message);
             }
         }
 
