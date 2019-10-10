@@ -276,12 +276,12 @@ namespace Orleans.Runtime.Messaging
             if (msg.SendingSilo == null)
                 msg.SendingSilo = this.LocalSiloAddress;
 
-            if (msg.IsPing())
+            if (this.Log.IsEnabled(LogLevel.Debug) && msg.IsPing())
             {
-                this.Log.LogInformation("Sending ping message {Message}", msg);
+                this.Log.LogDebug("Sending ping message {Message}", msg);
             }
 
-            if (this.RemoteSiloAddress is object && msg.TargetSilo is object && !this.RemoteSiloAddress.Equals(msg.TargetSilo))
+            if (this.RemoteSiloAddress is object && msg.TargetSilo is object && !this.RemoteSiloAddress.Matches(msg.TargetSilo))
             {
                 this.Log.LogWarning(
                     "Attempting to send message addressed to {TargetSilo} to connection with {RemoteSiloAddress}. Message {Message}",
