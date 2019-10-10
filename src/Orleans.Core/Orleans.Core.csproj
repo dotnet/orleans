@@ -38,6 +38,7 @@
     <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
     <PackageReference Include="System.Reflection.Emit" Version="$(SystemReflectionEmitVersion)" />
     <PackageReference Include="System.Reflection.Emit.Lightweight" Version="$(SystemReflectionEmitVersion)" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="1.0.0" />
   </ItemGroup>
 
 </Project>
