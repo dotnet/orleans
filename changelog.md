@@ -7,6 +7,11 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [1.5.10] (changes since 1.5.9)
+
+- Non-breaking bug fixes
+  - Remove activation from message target list if constructor threw an exception (#5960)
+
 ### [2.4.3] (changes since 2.4.2)
 
 - Non-breaking improvements
