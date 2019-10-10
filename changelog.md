@@ -7,6 +7,20 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.4.3] (changes since 2.4.2)
+
+- Non-breaking improvements
+  - Add "UseSiloUnobservedExceptionsHandler" extensions to the ISiloBuilder (#59120)
+
+- Non-breaking bug fixes
+  - Remove activation from message target list if constructor threw an exception (#5958)
+  - Fix Connect blocked when ConnectAsync completed synchronously (#5963)
+  - Stateless worker local compatibility check (#5917)
+  - Fixed wrong condition for getting logContext (#5999)
+  - Fix UTF8 encoding settings that appear to break execution of tests. (#6001)
+  - Use MemFree when MemAvailable is not present (#6005)
+  - Specify DateTimeKind.Utc when constructing DateTime instances (#6020)
+
 ### [3.0.0-rc1] (changes since 3.0.0-beta1)
 
 - Non-breaking improvements
