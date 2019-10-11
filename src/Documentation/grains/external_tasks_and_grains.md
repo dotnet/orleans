@@ -11,13 +11,21 @@ In some cases grain code might need to “break out” of the Orleans task sched
 
 ### Task based APIs:
 
-1) `await`, `Task.Factory.StartNew`, `Task.ContinuewWith`, `Task.WhenAny`, `Task.WhenAll`, `Task.Delay` all respect the current Task Scheduler. That means that using them in the default way, without passing a different TaskScheduler, will cause them to execute in the grain context.
+1) `await`, `Task.Factory.StartNew` (see below), `Task.ContinuewWith`, `Task.WhenAny`, `Task.WhenAll`, `Task.Delay` all respect the current Task Scheduler. That means that using them in the default way, without passing a different TaskScheduler, will cause them to execute in the grain context.
 
 2) Both `Task.Run` and the `endMethod` delegate of `Task.Factory.FromAsync` do NOT respect the current task Scheduler. They both use the `TaskScheduler.Default` scheduler, which is the .NET thread pool task Scheduler. Therefore, the code inside `Task.Run` and the `endMethod` will ALWAYS run on the .NET thread pool outside of the single-threaded execution model for Orleans grains, [as detailed here](http://blogs.msdn.com/b/pfxteam/archive/2011/10/24/10229468.aspx). However, any code after the `await Task.Run` or `await Task.Factory.FromAsync` will run back under the scheduler at the point the task was created, which is the grain scheduler.
 
-3) `configureAwait(false)` is an explicit API to escape the current task Scheduler. It will cause the code after an awaited Task to be executed on the `TaskScheduler.Default` scheduler, which is the .NET thread pool, and will thus break the single-threaded execution of the Orleans grain. You should in general **never ever use `configureAwait(false)` directly in grain code.**
+3) `configureAwait(false)` is an explicit API to escape the current task Scheduler. It will cause the code after an awaited Task to be executed on the `TaskScheduler.Default` scheduler, which is the .NET thread pool, and will thus break the single-threaded execution of the Orleans grain. You should in general **never ever use `ConfigureAwait(false)` directly in grain code.**
 
 4) Methods with signature `async void` should not be used with grains. They are intended for graphical user interface event handlers.
+
+#### Task.Factory.StartNew and async delegates
+The usual recommendation for scheduling tasks in any C# program is to use `Task.Run` in favor of `Task.Factory.StartNew`.
+In fact, a quick google search on the use of `Task.Factory.StartNew()` will suggest [that it is Dangerous](https://blog.stephencleary.com/2013/08/startnew-is-dangerous.html) and [that one should always favor `Task.Run`](https://devblogs.microsoft.com/pfxteam/task-run-vs-task-factory-startnew/). But if we want to stay in the Orleans single threaded execution model for our grain then we need to use it, so how do we do it correctly then?
+The "danger" when using `Task.Factory.StartNew()` is that it does not natively support async delegates.
+This means that this is likely a bug: `var notIntendedTask = Task.Factory.StartNew(SomeDelegateAsync)`.
+`notIntendedTask` is _not_ a task that completes when `SomeDelegateAsync` does.
+Instead, one should _always_ unwrap the returned task: `var task = Task.Factory.StartNew(SomeDelegateAsync).Unwrap()`.
 
 ### Example:
 
@@ -105,7 +113,8 @@ What are you trying to do?   | How to do it
 ------------- | -------------
 Run background work on .NET thread-pool threads. No grain code or grain calls allowed.  |  `Task.Run`
 Grain interface call | Method return types = `Task` or `Task<T>`
-Run worker task from grain code with Orleans turn-based concurrency guarantees. | `Task.Factory.StartNew`  
+Run asynchronous worker task from grain code with Orleans turn-based concurrency guarantees ([see above](#taskfactorystartnew-and-async-delegates)). | `Task.Factory.StartNew(WorkerAsync).Unwrap()`
+Run synchronous worker task from grain code with Orleans turn-based concurrency guarantees. | `Task.Factory.StartNew(WorkerSync)`
 Timeouts for executing work items  | `Task.Delay` + `Task.WhenAny`
 Use with `async`/`await` | The normal .NET Task-Async programming model. Supported & recommended  
 `ConfigureAwait(false)` | Do not use inside grain code. Allowed only inside libraries.
