@@ -99,7 +99,11 @@ namespace Orleans
             // Networking
             services.TryAddSingleton<ConnectionManager>();
             services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ConnectionManagerLifecycleAdapter<IClusterClientLifecycle>>();
-            services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
+
+            services.AddSingletonKeyedService<object, IConnectionFactory>(
+                ClientOutboundConnectionFactory.ServicesKey,
+                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
+
             services.TryAddTransient<IMessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(sp,
                 sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.MaxMessageHeaderSize,
                 sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.MaxMessageBodySize));
