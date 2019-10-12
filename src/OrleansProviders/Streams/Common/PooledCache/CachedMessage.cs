@@ -1,31 +1,31 @@
 
 using System;
-using Orleans.Streams;
+using Orleans.Providers.Abstractions;
 
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
     /// This is a tightly packed cached structure containing a queue message.
-    /// It should only contain value types.
+    /// Other than a pooled byte array, it should only contain value types.
     /// </summary>
     public struct CachedMessage
     {
         /// <summary>
-        /// Guid of streamId this event is part of
+        /// location of sequence token in segment
         /// </summary>
-        public Guid StreamGuid;
+        public (int Offset, int Count) SequenceTokenWindow;
         /// <summary>
-        /// Interned Namespace string of streamId this event is part of
+        /// location of streamId in segment
         /// </summary>
-        public string StreamNamespace;
+        public (int Offset, int Count) StreamIdTokenWindow;
         /// <summary>
-        /// Sequence number.  Position of event in queue
+        /// location of payload in segment
         /// </summary>
-        public long SequenceNumber;
+        public (int Offset, int Count) OffsetTokenWindow;
         /// <summary>
-        /// Event index.  Index in batch
+        /// location of payload in segment
         /// </summary>
-        public int EventIndex;
+        public (int Offset, int Count) PayloadWindow;
         /// <summary>
         /// Time event was written to EventHub
         /// </summary>
@@ -37,24 +37,112 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Segment containing the serialized event data
         /// </summary>
-        public ArraySegment<byte> Segment;
+        private ArraySegment<byte> Segment;
+        public object Id => Segment.Array;
+
+        public static CachedMessage Create(IQueueMessageCacheAdapter adapter, in DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
+        {
+            byte[] streamIdentityToken = StreamIdentityToken.Create(adapter.StreamPosition.StreamIdentity);
+            var cachedMessage = new CachedMessage
+            {
+                DequeueTimeUtc = dequeueTime,
+                EnqueueTimeUtc = adapter.EnqueueTimeUtc
+            };
+
+            cachedMessage.SequenceTokenWindow = (0, adapter.StreamPosition.SequenceToken.SequenceToken.Length);
+            cachedMessage.StreamIdTokenWindow = (cachedMessage.SequenceTokenWindow.Offset + cachedMessage.SequenceTokenWindow.Count, streamIdentityToken.Length);
+            cachedMessage.OffsetTokenWindow = (cachedMessage.StreamIdTokenWindow.Offset + cachedMessage.StreamIdTokenWindow.Count, adapter.OffsetToken.Length);
+            cachedMessage.PayloadWindow = (cachedMessage.OffsetTokenWindow.Offset + cachedMessage.OffsetTokenWindow.Count, adapter.PayloadSize);
+
+            // get size of namespace, offset, partitionkey, properties, and payload
+            int size =
+                cachedMessage.SequenceTokenWindow.Count +
+                cachedMessage.StreamIdTokenWindow.Count +
+                cachedMessage.OffsetTokenWindow.Count +
+                cachedMessage.PayloadWindow.Count;
+
+            // get segment
+            cachedMessage.Segment = getSegment(size);
+
+            // encode sequence token
+            Buffer.BlockCopy(adapter.StreamPosition.SequenceToken.SequenceToken, 0, cachedMessage.Segment.Array, cachedMessage.Segment.Offset + cachedMessage.SequenceTokenWindow.Offset, cachedMessage.SequenceTokenWindow.Count);
+
+            // encode streamIdentityToken
+            Buffer.BlockCopy(streamIdentityToken, 0, cachedMessage.Segment.Array, cachedMessage.Segment.Offset + cachedMessage.StreamIdTokenWindow.Offset, cachedMessage.StreamIdTokenWindow.Count);
+
+            // encode offsetToken
+            Buffer.BlockCopy(adapter.OffsetToken, 0, cachedMessage.Segment.Array, cachedMessage.Segment.Offset + cachedMessage.OffsetTokenWindow.Offset, cachedMessage.OffsetTokenWindow.Count);
+
+            // encode payload
+            adapter.AppendPayload(cachedMessage.Payload());
+
+            return cachedMessage;
+        }
+
+        public static CachedMessage Create(byte[] sequenceToken, byte[] streamIdentityToken, byte[] offsetToken, byte[] body, in DateTime enqueueTimeUtc, in DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
+        {
+            var cachedMessage = new CachedMessage
+            {
+                DequeueTimeUtc = dequeueTime,
+                EnqueueTimeUtc = enqueueTimeUtc
+            };
+
+            cachedMessage.SequenceTokenWindow = (0, sequenceToken.Length);
+            cachedMessage.StreamIdTokenWindow = (cachedMessage.SequenceTokenWindow.Offset + cachedMessage.SequenceTokenWindow.Count, streamIdentityToken.Length);
+            cachedMessage.OffsetTokenWindow = (cachedMessage.StreamIdTokenWindow.Offset + cachedMessage.StreamIdTokenWindow.Count, offsetToken.Length);
+            cachedMessage.PayloadWindow = (cachedMessage.OffsetTokenWindow.Offset + cachedMessage.OffsetTokenWindow.Count, body.Length);
+
+            // get size of namespace, offset, partitionkey, properties, and payload
+            int size =
+                cachedMessage.SequenceTokenWindow.Count +
+                cachedMessage.StreamIdTokenWindow.Count +
+                cachedMessage.OffsetTokenWindow.Count +
+                cachedMessage.PayloadWindow.Count;
+
+            // get segment
+            cachedMessage.Segment = getSegment(size);
+
+            // encode sequence token
+            Buffer.BlockCopy(sequenceToken, 0, cachedMessage.Segment.Array, cachedMessage.Segment.Offset + cachedMessage.SequenceTokenWindow.Offset, cachedMessage.SequenceTokenWindow.Count);
+
+            // encode streamIdentityToken
+            Buffer.BlockCopy(streamIdentityToken, 0, cachedMessage.Segment.Array, cachedMessage.Segment.Offset + cachedMessage.StreamIdTokenWindow.Offset, cachedMessage.StreamIdTokenWindow.Count);
+
+            // encode offsetToken
+            Buffer.BlockCopy(offsetToken, 0, cachedMessage.Segment.Array, cachedMessage.Segment.Offset + cachedMessage.OffsetTokenWindow.Offset, cachedMessage.OffsetTokenWindow.Count);
+
+            // encode payload
+            Buffer.BlockCopy(body, 0, cachedMessage.Segment.Array, cachedMessage.Segment.Offset + cachedMessage.PayloadWindow.Offset, cachedMessage.PayloadWindow.Count);
+
+            return cachedMessage;
+        }
+
+        public ArraySegment<byte> SequenceToken()
+            => this.Segment.Spit(this.SequenceTokenWindow.Offset, this.SequenceTokenWindow.Count);
+
+        public ArraySegment<byte> StreamIdToken()
+            => this.Segment.Spit(this.StreamIdTokenWindow.Offset, this.StreamIdTokenWindow.Count);
+
+        public ArraySegment<byte> OffsetToken()
+            => this.Segment.Spit(this.OffsetTokenWindow.Offset, this.OffsetTokenWindow.Count);
+
+        public ArraySegment<byte> Payload()
+            => this.Segment.Spit(this.PayloadWindow.Offset, this.PayloadWindow.Count);
+
+        public int Compare(ReadOnlySpan<byte> sequenceToken)
+            => this.SequenceToken().AsSpan().SequenceCompareTo(sequenceToken);
+
+        public bool CompareStreamId(byte[] streamIdentity)
+            => this.StreamIdToken().AsSpan().SequenceEqual(streamIdentity);
     }
 
     public static class CachedMessageExtensions
     {
-        public static int Compare(this ref CachedMessage cachedMessage, StreamSequenceToken token)
+        internal static ArraySegment<byte> Spit(this in ArraySegment<byte> source, int offset, int count)
         {
-            return cachedMessage.SequenceNumber != token.SequenceNumber
-                ? (int)(cachedMessage.SequenceNumber - token.SequenceNumber)
-                : cachedMessage.EventIndex - token.EventIndex;
-        }
-
-        public static bool CompareStreamId(this ref CachedMessage cachedMessage, IStreamIdentity streamIdentity)
-        {
-            int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-            if (result != 0) return false;
-
-            return string.Compare(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal) == 0;
+            if (source.Offset + offset + count > source.Offset + source.Count)
+                throw new ArgumentOutOfRangeException(nameof(source));
+            return new ArraySegment<byte>(source.Array, source.Offset + offset, count);
         }
     }
 }

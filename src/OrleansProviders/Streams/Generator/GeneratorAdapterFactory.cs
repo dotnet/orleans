@@ -205,7 +205,7 @@ namespace Orleans.Providers.Streams.Generator
             {
                 throw new ArgumentNullException("arg");
             }
-            generatorConfig = arg as IStreamGeneratorConfig;
+            this.generatorConfig = arg as IStreamGeneratorConfig;
             if (generatorConfig == null)
             {
                 throw new ArgumentOutOfRangeException("arg", "Arg must by of type IStreamGeneratorConfig");
@@ -273,17 +273,17 @@ namespace Orleans.Providers.Streams.Generator
         private void SetGeneratorOnReciever(Receiver receiver)
         {
             // if we don't have generator configuration, don't set generator
-            if (generatorConfig == null)
+            if (this.generatorConfig == null)
             {
                 return;
             }
 
-            var generator = (IStreamGenerator)(serviceProvider?.GetService(generatorConfig.StreamGeneratorType) ?? Activator.CreateInstance(generatorConfig.StreamGeneratorType));
+            var generator = (IStreamGenerator)(this.serviceProvider?.GetService(this.generatorConfig.StreamGeneratorType) ?? Activator.CreateInstance(this.generatorConfig.StreamGeneratorType));
             if (generator == null)
             {
-                throw new OrleansException($"StreamGenerator type not supported: {generatorConfig.StreamGeneratorType}");
+                throw new OrleansException($"StreamGenerator type not supported: {this.generatorConfig.StreamGeneratorType}");
             }
-            generator.Configure(serviceProvider, generatorConfig);
+            generator.Configure(this.serviceProvider, generatorConfig);
             receiver.QueueGenerator = generator;
         }
 
@@ -297,7 +297,7 @@ namespace Orleans.Providers.Streams.Generator
             CreateBufferPoolIfNotCreatedYet();
             var dimensions = new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId);
             var cacheMonitor = this.CacheMonitorFactory(dimensions, this.telemetryProducer);
-            return new GeneratorPooledCache(bufferPool, this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.Name}.{queueId}"), serializationManager, 
+            return new GeneratorPooledCache(bufferPool, serializationManager, 
                 cacheMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
         }
 

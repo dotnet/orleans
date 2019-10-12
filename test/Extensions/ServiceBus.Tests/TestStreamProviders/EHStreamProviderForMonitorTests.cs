@@ -28,7 +28,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 
         public EHStreamProviderForMonitorTestsAdapterFactory(string name, EventDataGeneratorStreamOptions options, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions,
             EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions streamCacheEvictionOptions, StreamStatisticOptions statisticOptions,
-            IEventHubDataAdapter dataAdapter, IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+            EventHubDataAdapter dataAdapter, IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
             : base(name, options, ehOptions, receiverOptions, cacheOptions, streamCacheEvictionOptions, statisticOptions, dataAdapter, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
         {
             this.serializationManager = serializationManager;
@@ -46,8 +46,8 @@ namespace ServiceBus.Tests.TestStreamProviders
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
-            IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
-                ?? services.GetService<IEventHubDataAdapter>()
+            EventHubDataAdapter dataAdapter = services.GetServiceByName<EventHubDataAdapter>(name)
+                ?? services.GetService<EventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
             var factory = ActivatorUtilities.CreateInstance<EHStreamProviderForMonitorTestsAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions, 
                 evictionOptions, statisticOptions, dataAdapter);
@@ -86,7 +86,7 @@ namespace ServiceBus.Tests.TestStreamProviders
                 EventHubStreamCachePressureOptions cacheOptions,
                 StreamCacheEvictionOptions streamCacheEviction,
                 StreamStatisticOptions statisticOptions,
-                IEventHubDataAdapter dataAdater,
+                EventHubDataAdapter dataAdater,
                 SerializationManager serializationManager,
                 EventHubMonitorAggregationDimensions sharedDimensions,
                 ILoggerFactory loggerFactory,

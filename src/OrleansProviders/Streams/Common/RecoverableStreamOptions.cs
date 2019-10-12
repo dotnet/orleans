@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -16,6 +16,10 @@ namespace Orleans.Configuration
         /// Default DataMinTimeInCache
         /// </summary>
         public static readonly TimeSpan DefaultDataMinTimeInCache = TimeSpan.FromMinutes(5);
+        /// <summary>
+        /// Cannot set DataMinTimeInCache below this value
+        /// </summary>
+        public static readonly TimeSpan MinDataMinTimeInCache = TimeSpan.FromSeconds(30);
 
         /// <summary>
         /// Difference in time between the newest and oldest messages in the cache.  Any messages older than this will be purged from the cache.

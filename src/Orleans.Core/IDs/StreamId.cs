@@ -2,6 +2,7 @@ using System;
 using System.Runtime.Serialization;
 using System.Text;
 using Orleans.Concurrency;
+using Orleans.Configuration;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -22,57 +23,42 @@ namespace Orleans.Streams
         private readonly StreamIdInternerKey key;
 
         // Keep public, similar to GrainId.GetPrimaryKey. Some app scenarios might need that.
-        public Guid Guid { get { return key.Guid; } }
+        public Guid Guid => this.key.Guid;
 
         // I think it might be more clear if we called this the ActivationNamespace.
-        public string Namespace { get { return key.Namespace; } }
+        public string Namespace => this.key.Namespace;
 
-        public string ProviderName { get { return key.ProviderName; } }
+        public string ProviderName => this.key.ProviderName;
 
         // TODO: need to integrate with Orleans serializer to really use Interner.
         private StreamId(StreamIdInternerKey key)
         {
             this.key = key;
+            
         }
 
         internal static StreamId GetStreamId(Guid guid, string providerName, string streamNamespace)
-        {
-            return FindOrCreateStreamId(new StreamIdInternerKey(guid, providerName, streamNamespace));
-        }
+            => FindOrCreateStreamId(new StreamIdInternerKey(guid, providerName, streamNamespace));
 
         private static StreamId FindOrCreateStreamId(StreamIdInternerKey key)
-        {
-            return streamIdInternCache.Value.FindOrCreate(key, k => new StreamId(k));
-        }
+            => streamIdInternCache.Value.FindOrCreate(key, k => new StreamId(k));
 
-        public int CompareTo(StreamId other)
-        {
-            return key.CompareTo(other.key);
-        }
+        public int CompareTo(StreamId other) => this.key.CompareTo(other.key);
 
-        public bool Equals(StreamId other)
-        {
-            return other != null && key.Equals(other.key);
-        }
+        public bool Equals(StreamId other) => other != null && this.key.Equals(other.key);
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as StreamId);
-        }
+        public override bool Equals(object obj) => this.Equals(obj as StreamId);
 
-        public override int GetHashCode()
-        {
-            return key.GetHashCode();
-        }
+        public override int GetHashCode() => this.key.GetHashCode();
 
         public uint GetUniformHashCode()
         {
-            if (uniformHashCache == 0)
+            if (this.uniformHashCache == 0)
             {
-                byte[] guidBytes = Guid.ToByteArray();
-                byte[] providerBytes = Encoding.UTF8.GetBytes(ProviderName);
+                byte[] guidBytes = this.Guid.ToByteArray();
+                byte[] providerBytes = Encoding.UTF8.GetBytes(this.ProviderName);
                 byte[] allBytes;
-                if (Namespace == null)
+                if (this.Namespace == null)
                 {
                     allBytes = new byte[guidBytes.Length + providerBytes.Length];
                     Array.Copy(guidBytes, allBytes, guidBytes.Length);
@@ -80,30 +66,30 @@ namespace Orleans.Streams
                 }
                 else
                 {
-                    byte[] namespaceBytes = Encoding.UTF8.GetBytes(Namespace);
+                    byte[] namespaceBytes = Encoding.UTF8.GetBytes(this.Namespace);
                     allBytes = new byte[guidBytes.Length + providerBytes.Length + namespaceBytes.Length];
                     Array.Copy(guidBytes, allBytes, guidBytes.Length);
                     Array.Copy(providerBytes, 0, allBytes, guidBytes.Length, providerBytes.Length);
                     Array.Copy(namespaceBytes, 0, allBytes, guidBytes.Length + providerBytes.Length, namespaceBytes.Length);
                 }
-                uniformHashCache = JenkinsHash.ComputeHash(allBytes);
+                this.uniformHashCache = JenkinsHash.ComputeHash(allBytes);
             }
-            return uniformHashCache;
+            return this.uniformHashCache;
         }
 
         public override string ToString()
         {
-            return Namespace == null ? 
-                Guid.ToString() : 
-                String.Format("{0}{1}-{2}", Namespace != null ? (String.Format("{0}-", Namespace)) : "", Guid, ProviderName);
+            return this.Namespace == null ?
+                this.Guid.ToString() : 
+                string.Format("{0}{1}-{2}", this.Namespace != null ? (string.Format("{0}-", this.Namespace)) : "", this.Guid, this.ProviderName);
         }
 
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             // Use the AddValue method to specify serialized values.
-            info.AddValue("Guid", Guid, typeof(Guid));
-            info.AddValue("ProviderName", ProviderName, typeof(string));
-            info.AddValue("Namespace", Namespace, typeof(string));
+            info.AddValue("Guid", this.Guid, typeof(Guid));
+            info.AddValue("ProviderName", this.ProviderName, typeof(string));
+            info.AddValue("Namespace", this.Namespace, typeof(string));
         }
 
         // The special constructor is used to deserialize values. 
@@ -113,7 +99,7 @@ namespace Orleans.Streams
             var guid = (Guid) info.GetValue("Guid", typeof(Guid));
             var providerName = (string) info.GetValue("ProviderName", typeof(string));
             var nameSpace = (string) info.GetValue("Namespace", typeof(string));
-            key = new StreamIdInternerKey(guid, providerName, nameSpace);
+            this.key = new StreamIdInternerKey(guid, providerName, nameSpace);
         }
     }
 

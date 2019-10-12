@@ -12,6 +12,7 @@ using Orleans.Streams;
 using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Configuration;
 using Orleans;
+using Orleans.Providers.Abstractions;
 
 namespace ServiceBus.Tests.TestStreamProviders
 {
@@ -30,7 +31,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             EventHubStreamCachePressureOptions cacheOptions,
             StreamCacheEvictionOptions evictionOptions,
             StreamStatisticOptions statisticOptions,
-            IEventHubDataAdapter dataAdatper,
+            EventHubDataAdapter dataAdatper,
             IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
             : base(name, options, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdatper, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
 
@@ -55,7 +56,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             private readonly string name;
 
             public CacheFactoryForTesting(string name, EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions,
-                IEventHubDataAdapter dataAdapter, SerializationManager serializationManager, ConcurrentBag<QueueCacheForTesting> caches, EventHubMonitorAggregationDimensions sharedDimensions,
+                EventHubDataAdapter dataAdapter, SerializationManager serializationManager, ConcurrentBag<QueueCacheForTesting> caches, EventHubMonitorAggregationDimensions sharedDimensions,
                 ILoggerFactory loggerFactory,
                 Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = null,
                 Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = null)
@@ -66,14 +67,14 @@ namespace ServiceBus.Tests.TestStreamProviders
             }
 
             private const int DefaultMaxAddCount = 10;
-            protected override IEventHubQueueCache CreateCache(string partition, IEventHubDataAdapter dataAdatper, StreamStatisticOptions options, IStreamQueueCheckpointer<string> checkpointer,
+            protected override IEventHubQueueCache CreateCache(string partition, EventHubDataAdapter dataAdatper, StreamStatisticOptions options, IStreamQueueCheckpointer<string> checkpointer,
                 ILoggerFactory loggerFactory, IObjectPool<FixedSizeBuffer> bufferPool, string blockPoolId,  TimePurgePredicate timePurge,
                 SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions, ITelemetryProducer telemetryProducer)
             {
                 var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
                 var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory, telemetryProducer);
                 var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{this.name}.{partition}");
-                var evictionStrategy = new ChronologicalEvictionStrategy(cacheLogger, timePurge, cacheMonitor, options.StatisticMonitorWriteInterval);
+                var evictionStrategy = new ChronologicalEvictionStrategy(timePurge, cacheMonitor, options.StatisticMonitorWriteInterval);
                 //set defaultMaxAddCount to 10 so TryCalculateCachePressureContribution will start to calculate real contribution shortly
                 var cache = new QueueCacheForTesting(DefaultMaxAddCount, bufferPool, dataAdatper, evictionStrategy, checkpointer,
                     cacheLogger, cacheMonitor, options.StatisticMonitorWriteInterval);
@@ -86,7 +87,7 @@ namespace ServiceBus.Tests.TestStreamProviders
         {
             public bool IsUnderPressure { get; private set; }
 
-            public QueueCacheForTesting(int defaultMaxAddCount, IObjectPool<FixedSizeBuffer> bufferPool, IEventHubDataAdapter dataAdapter, IEvictionStrategy evictionStrategy, IStreamQueueCheckpointer<string> checkpointer, ILogger logger,
+            public QueueCacheForTesting(int defaultMaxAddCount, IObjectPool<FixedSizeBuffer> bufferPool, EventHubDataAdapter dataAdapter, IFiFoEvictionStrategy<CachedMessage> evictionStrategy, IStreamQueueCheckpointer<string> checkpointer, ILogger logger,
                 ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
                 : base("test", defaultMaxAddCount, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, cacheMonitor, cacheMonitorWriteInterval)
             {
@@ -127,8 +128,8 @@ namespace ServiceBus.Tests.TestStreamProviders
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
-            IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
-                ?? services.GetService<IEventHubDataAdapter>()
+            EventHubDataAdapter dataAdapter = services.GetServiceByName<EventHubDataAdapter>(name)
+                ?? services.GetService<EventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
             var factory = ActivatorUtilities.CreateInstance<EHStreamProviderWithCreatedCacheListAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, 
                 cacheOptions, evictionOptions, statisticOptions, dataAdapter);

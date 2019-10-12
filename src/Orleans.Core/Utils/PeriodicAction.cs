@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Orleans
 {
@@ -15,7 +15,7 @@ namespace Orleans
             this.action = action;
         }
 
-        public bool TryAction(DateTime nowUtc)
+        public bool TryAction(in DateTime nowUtc)
         {
             if (nowUtc < this.nextUtc) return false;
             this.nextUtc = nowUtc + this.period;

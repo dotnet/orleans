@@ -39,20 +39,26 @@ namespace Orleans.ServiceBus.Providers
 
         /// <summary>
         /// Duplicate of EventHub's EventData class.
+        /// NOTE: Tightly coupled with default EventDataCacheAdapter
+        /// TODO: Depricate, can't remove without breaking backwards compatability, but should depricate. - jbragg
         /// </summary>
         /// <param name="cachedMessage"></param>
         /// <param name="serializationManager"></param>
         public EventHubMessage(CachedMessage cachedMessage, SerializationManager serializationManager)
         {
+            StreamIdentityToken streamIdentityToken = new StreamIdentityToken(cachedMessage.StreamIdToken().ToArray());
+            EventSequenceToken.Parse(cachedMessage.SequenceToken().ToArray(), out long sequenceNumber, out int ignore);
+            ArraySegment<byte> payload = cachedMessage.Payload();
             int readOffset = 0;
-            StreamIdentity = new StreamIdentity(cachedMessage.StreamGuid, cachedMessage.StreamNamespace);
-            Offset = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
-            PartitionKey = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
-            SequenceNumber = cachedMessage.SequenceNumber;
-            EnqueueTimeUtc = cachedMessage.EnqueueTimeUtc;
-            DequeueTimeUtc = cachedMessage.DequeueTimeUtc;
-            Properties = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).DeserializeProperties(serializationManager);
-            Payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).ToArray();
+
+            this.StreamIdentity = new StreamIdentity(streamIdentityToken.Guid, streamIdentityToken.Namespace);
+            this.Offset = EventHubDataAdapter.TokenToOffset(cachedMessage.OffsetToken().ToArray());
+            this.PartitionKey = streamIdentityToken.Guid.ToString();
+            this.SequenceNumber = sequenceNumber;
+            this.EnqueueTimeUtc = cachedMessage.EnqueueTimeUtc;
+            this.DequeueTimeUtc = cachedMessage.DequeueTimeUtc;
+            this.Properties = SegmentBuilder.ReadNextBytes(payload, ref readOffset).DeserializeProperties(serializationManager);
+            this.Payload = SegmentBuilder.ReadNextBytes(payload, ref readOffset).ToArray();
         }
 
         /// <summary>

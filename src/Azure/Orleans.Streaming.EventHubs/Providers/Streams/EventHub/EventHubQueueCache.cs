@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System.Collections.Generic;
-using Microsoft.Extensions.Logging;
+using Orleans.Providers.Abstractions;
+using Orleans.Configuration;
+using System.Linq;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -25,8 +28,8 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         protected readonly PooledQueueCache cache;
         private readonly IObjectPool<FixedSizeBuffer> bufferPool;
-        private readonly IEventHubDataAdapter dataAdapter;
-        private readonly IEvictionStrategy evictionStrategy;
+        private readonly EventHubDataAdapter dataAdapter;
+        private readonly IFiFoEvictionStrategy<CachedMessage> evictionStrategy;
         private readonly IStreamQueueCheckpointer<string> checkpointer;
         private readonly ILogger logger;
         private readonly AggregatedCachePressureMonitor cachePressureMonitor;
@@ -50,8 +53,8 @@ namespace Orleans.ServiceBus.Providers
             string partition,
             int defaultMaxAddCount,
             IObjectPool<FixedSizeBuffer> bufferPool,
-            IEventHubDataAdapter dataAdapter,
-            IEvictionStrategy evictionStrategy,
+            EventHubDataAdapter dataAdapter,
+            IFiFoEvictionStrategy<CachedMessage> evictionStrategy,
             IStreamQueueCheckpointer<string> checkpointer,
             ILogger logger,
             ICacheMonitor cacheMonitor,
@@ -62,11 +65,9 @@ namespace Orleans.ServiceBus.Providers
             this.bufferPool = bufferPool;
             this.dataAdapter = dataAdapter;
             this.checkpointer = checkpointer;
-            this.cache = new PooledQueueCache(dataAdapter, logger, cacheMonitor, cacheMonitorWriteInterval);
+            this.cache = new PooledQueueCache(cacheMonitor, cacheMonitorWriteInterval);
             this.cacheMonitor = cacheMonitor;
             this.evictionStrategy = evictionStrategy;
-            this.evictionStrategy.OnPurged = this.OnPurge;
-            this.evictionStrategy.PurgeObservable = this.cache;
             this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger, cacheMonitor);
             this.logger = logger;
         }
@@ -74,7 +75,22 @@ namespace Orleans.ServiceBus.Providers
         /// <inheritdoc />
         public void SignalPurge()
         {
-            this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+            DateTime nowUtc = DateTime.UtcNow;
+            if(this.evictionStrategy.TryEvict(this.cache, nowUtc))
+            {
+                if (this.logger.IsEnabled(LogLevel.Debug) && this.cache.Oldest.HasValue && this.cache.Newest.HasValue)
+                {
+                    this.logger.Debug("CachePeriod: EnqueueTimeUtc: {OldestEnqueueTimeUtc} to {NewestEnqueueTimeUtc}, DequeueTimeUtc: {OldestDequeueTimeUtc} to {NewestDequeueTimeUtc}",
+                        LogFormatter.PrintDate(this.cache.Oldest.Value.EnqueueTimeUtc),
+                        LogFormatter.PrintDate(this.cache.Newest.Value.EnqueueTimeUtc),
+                        LogFormatter.PrintDate(this.cache.Oldest.Value.DequeueTimeUtc),
+                        LogFormatter.PrintDate(this.cache.Newest.Value.DequeueTimeUtc));
+                }
+                if (this.cache.Oldest.HasValue)
+                {
+                    this.checkpointer.Update(EventHubDataAdapter.TokenToOffset(this.cache.Oldest.Value.OffsetToken().ToArray()), nowUtc);
+                }
+            }
         }
 
         /// <summary>
@@ -88,21 +104,11 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
-        /// </summary>
-        /// <filterpriority>2</filterpriority>
-        public void Dispose()
-        {
-            this.evictionStrategy.OnPurged = null;
-        }
-
-        /// <summary>
         /// The limit of the maximum number of items that can be added
         /// </summary>
-        public int GetMaxAddCount()
-        {
-            return cachePressureMonitor.IsUnderPressure(DateTime.UtcNow) ? 0 : defaultMaxAddCount;
-        }
+        public int GetMaxAddCount() => this.cachePressureMonitor.IsUnderPressure(DateTime.UtcNow)
+            ? 0
+            : this.defaultMaxAddCount;
 
         /// <summary>
         /// Add a list of EventHub EventData to the cache.
@@ -110,17 +116,18 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="messages"></param>
         /// <param name="dequeueTimeUtc"></param>
         /// <returns></returns>
-        public List<StreamPosition> Add(List<EventData> messages, DateTime dequeueTimeUtc)
+        public List<StreamPosition> Add(List<EventData> messages, in DateTime dequeueTimeUtc)
         {
             List<StreamPosition> positions = new List<StreamPosition>();
             List<CachedMessage> cachedMessages = new List<CachedMessage>();
             foreach (EventData message in messages)
             {
-                StreamPosition position = this.dataAdapter.GetStreamPosition(this.Partition, message);
-                cachedMessages.Add(this.dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, this.GetSegment));
+                IQueueMessageCacheAdapter messageAdapter = this.dataAdapter.Create(this.Partition, message);
+                StreamPosition position = messageAdapter.StreamPosition;
+                cachedMessages.Add(CachedMessage.Create(messageAdapter, dequeueTimeUtc, this.GetSegment));
                 positions.Add(position);
             }
-            cache.Add(cachedMessages, dequeueTimeUtc);
+            this.cache.Add(cachedMessages, dequeueTimeUtc);
             return positions;
         }
 
@@ -132,7 +139,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public object GetCursor(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)
         {
-            return cache.GetCursor(streamIdentity, sequenceToken);
+            return this.cache.GetCursor(StreamIdentityToken.Create(streamIdentity), sequenceToken?.SequenceToken);
         }
 
         /// <summary>
@@ -143,31 +150,13 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
         {
-            if (!cache.TryGetNextMessage(cursorObj, out message))
+            message = default;
+            if (!cache.TryGetNextMessage(cursorObj, out CachedMessage cachedMessage))
                 return false;
-            double cachePressureContribution;
-            cachePressureMonitor.RecordCachePressureContribution(
-                TryCalculateCachePressureContribution(message.SequenceToken, out cachePressureContribution)
-                    ? cachePressureContribution
-                    : 0.0);
+            message = this.dataAdapter.GetBatchContainer(cachedMessage);
+            _ = this.TryCalculateCachePressureContribution(cachedMessage, out double cachePressureContribution);
+            this.cachePressureMonitor.RecordCachePressureContribution(cachePressureContribution);
             return true;
-        }
-
-        /// <summary>
-        /// Handles cache purge signals
-        /// </summary>
-        /// <param name="lastItemPurged"></param>
-        /// <param name="newestItem"></param>
-        private void OnPurge(CachedMessage? lastItemPurged, CachedMessage? newestItem)
-        {
-            if (logger.IsEnabled(LogLevel.Debug) && lastItemPurged.HasValue && newestItem.HasValue)
-            {
-                logger.Debug($"CachePeriod: EnqueueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.EnqueueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.EnqueueTimeUtc)}, DequeueTimeUtc: {LogFormatter.PrintDate(lastItemPurged.Value.DequeueTimeUtc)} to {LogFormatter.PrintDate(newestItem.Value.DequeueTimeUtc)}");
-            }
-            if (lastItemPurged.HasValue)
-            {
-                checkpointer.Update(this.dataAdapter.GetOffset(lastItemPurged.Value), DateTime.UtcNow);
-            }
         }
 
         /// <summary>
@@ -175,23 +164,21 @@ namespace Orleans.ServiceBus.Providers
         ///   0 indicating  no danger,
         ///   1 indicating removal is imminent.
         /// </summary>
-        private bool TryCalculateCachePressureContribution(StreamSequenceToken token, out double cachePressureContribution)
+        private bool TryCalculateCachePressureContribution(in CachedMessage cachedMessage, out double cachePressureContribution)
         {
             cachePressureContribution = 0;
             // if cache is empty or has few items, don't calculate pressure
-            if (cache.IsEmpty ||
-                !cache.Newest.HasValue ||
-                !cache.Oldest.HasValue ||
-                cache.Newest.Value.SequenceNumber - cache.Oldest.Value.SequenceNumber < 10 * defaultMaxAddCount) // not enough items in cache.
+            if (!this.cache.Newest.HasValue ||
+                !this.cache.Oldest.HasValue ||
+                (this.cache.Newest.Value.DequeueTimeUtc - this.cache.Oldest.Value.DequeueTimeUtc).TotalSeconds < StreamCacheEvictionOptions.MinDataMinTimeInCache.TotalSeconds) // not enough items in cache.
             {
                 return false;
             }
 
-            IEventHubPartitionLocation location = (IEventHubPartitionLocation)token;
-            double cacheSize = cache.Newest.Value.SequenceNumber - cache.Oldest.Value.SequenceNumber;
-            long distanceFromNewestMessage = cache.Newest.Value.SequenceNumber - location.SequenceNumber;
+            var cacheRealTimeAgeDelta = this.cache.Newest.Value.DequeueTimeUtc - this.cache.Oldest.Value.DequeueTimeUtc;
+            var distanceFromNewestMessage = this.cache.Newest.Value.DequeueTimeUtc - cachedMessage.DequeueTimeUtc;
             // pressure is the ratio of the distance from the front of the cache to the
-            cachePressureContribution = distanceFromNewestMessage / cacheSize;
+            cachePressureContribution = distanceFromNewestMessage.Ticks / Math.Max(1, cacheRealTimeAgeDelta.Ticks);
 
             return true;
         }
@@ -200,14 +187,14 @@ namespace Orleans.ServiceBus.Providers
         {
             // get segment from current block
             ArraySegment<byte> segment;
-            if (currentBuffer == null || !currentBuffer.TryGetSegment(size, out segment))
+            if (this.currentBuffer == null || !this.currentBuffer.TryGetSegment(size, out segment))
             {
                 // no block or block full, get new block and try again
-                currentBuffer = bufferPool.Allocate();
+                this.currentBuffer = this.bufferPool.Allocate();
                 //call EvictionStrategy's OnBlockAllocated method
-                this.evictionStrategy.OnBlockAllocated(currentBuffer);
+                this.evictionStrategy.OnBlockAllocated(this.currentBuffer);
                 // if this fails with clean block, then requested size is too big
-                if (!currentBuffer.TryGetSegment(size, out segment))
+                if (!this.currentBuffer.TryGetSegment(size, out segment))
                 {
                     throw new ArgumentOutOfRangeException(nameof(size), $"Message size is to big. MessageSize: {size}");
                 }

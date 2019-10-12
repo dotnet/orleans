@@ -15,7 +15,8 @@ namespace Orleans.Providers.Streams.Generator
     {
         private SimpleGeneratorOptions options;
         private Guid streamGuid;
-        private int sequenceId;
+        private long sequenceId;
+        private int generated;
 
         public void Configure(IServiceProvider serviceProvider, IStreamGeneratorConfig generatorConfig)
         {
@@ -24,9 +25,10 @@ namespace Orleans.Providers.Streams.Generator
             {
                 throw new ArgumentOutOfRangeException(nameof(generatorConfig));
             }
-            options = cfg;
-            sequenceId = 0;
-            streamGuid = Guid.NewGuid();
+            this.options = cfg;
+            this.sequenceId = DateTime.UtcNow.Ticks;
+            this.generated = 0;
+            this.streamGuid = Guid.NewGuid();
         }
 
         /// <summary>
@@ -35,7 +37,7 @@ namespace Orleans.Providers.Streams.Generator
         public bool TryReadEvents(DateTime utcNow, int maxCount, out List<IBatchContainer> events)
         {
             events = new List<IBatchContainer>();
-            if (sequenceId >= this.options.EventsInStream)
+            if (generated >= this.options.EventsInStream)
             {
                 return false;
             }
@@ -53,19 +55,19 @@ namespace Orleans.Providers.Streams.Generator
         private bool TryGenerateBatch(out GeneratedBatchContainer batch)
         {
             batch = null;
-            if (sequenceId >= this.options.EventsInStream)
+            if (generated >= this.options.EventsInStream)
             {
                 return false;
             }
-            sequenceId++;
+            generated++;
             var evt = new GeneratedEvent
             {
                 // If this is the last event generated, mark it as such, so test grains know to report results.
-                EventType = (sequenceId != this.options.EventsInStream)
+                EventType = (generated != this.options.EventsInStream)
                         ? GeneratedEvent.GeneratedEventType.Fill
                         : GeneratedEvent.GeneratedEventType.Report
             };
-            batch = new GeneratedBatchContainer(streamGuid, this.options.StreamNamespace, evt, new EventSequenceTokenV2(sequenceId));
+            batch = new GeneratedBatchContainer(streamGuid, this.options.StreamNamespace, evt, new EventSequenceTokenV2(this.generated));
             return true;
         }
     }

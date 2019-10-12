@@ -8,9 +8,7 @@ using Benchmarks.Serialization;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
-using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Jobs;
-using BenchmarkDotNet.Toolchains.CsProj;
+using Benchmarks.PooledQueueCacheBenchmark;
 
 namespace Benchmarks
 {
@@ -196,6 +194,19 @@ namespace Benchmarks
                     return benchmark;
                 },
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["PooledQueueCache"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new PooledQueueCacheBenchmarks();
+                    benchmark.BenchmarkSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.Run(),
                 benchmark => benchmark.Teardown());
             },
         };

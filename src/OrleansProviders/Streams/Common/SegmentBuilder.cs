@@ -23,7 +23,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Calculates how much space will be needed to append the provided bytes into the segment.
         /// </summary>
-        public static int CalculateAppendSize(ArraySegment<byte> segment)
+        public static int CalculateAppendSize(in ArraySegment<byte> segment)
         {
             return (segment.Count == 0)
                 ? sizeof(int)
@@ -71,7 +71,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Appends an array of bytes to the end of the segment
         /// </summary>
-        public static void Append(ArraySegment<byte> segment, ref int writerOffset, ArraySegment<byte> append)
+        public static void Append(ArraySegment<byte> segment, ref int writerOffset, in ArraySegment<byte> append)
         {
             if (segment.Array == null)
             {
@@ -121,7 +121,7 @@ namespace Orleans.Providers.Streams.Common
         /// Reads the next item in the segment as a byte array.  For performance, this is returned as a sub-segment of the original segment.
         /// </summary>
         /// <returns></returns>
-        public static ArraySegment<byte> ReadNextBytes(ArraySegment<byte> segment, ref int readerOffset)
+        public static ArraySegment<byte> ReadNextBytes(in ArraySegment<byte> segment, ref int readerOffset)
         {
             if (segment.Array == null)
             {
@@ -138,7 +138,7 @@ namespace Orleans.Providers.Streams.Common
         /// Reads the next item in the segment as a string.
         /// </summary>
         /// <returns></returns>
-        public static string ReadNextString(ArraySegment<byte> segment, ref int readerOffset)
+        public static string ReadNextString(in ArraySegment<byte> segment, ref int readerOffset)
         {
             if (segment.Array == null)
             {

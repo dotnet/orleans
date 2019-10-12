@@ -14,7 +14,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
     public class TestEventHubStreamAdapterFactory : EventHubAdapterFactory
     {
         public TestEventHubStreamAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCachePressureOptions cacheOptions, 
-            StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions, IEventHubDataAdapter dataAdapter,
+            StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions, EventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
             : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
         {
@@ -28,8 +28,8 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
-            IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
-                ?? services.GetService<IEventHubDataAdapter>()
+            EventHubDataAdapter dataAdapter = services.GetServiceByName<EventHubDataAdapter>(name)
+                ?? services.GetService<EventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
             var factory = ActivatorUtilities.CreateInstance<TestEventHubStreamAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter);
             factory.Init();

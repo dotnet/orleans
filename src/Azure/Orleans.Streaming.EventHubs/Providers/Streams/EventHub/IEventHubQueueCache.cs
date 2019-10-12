@@ -1,6 +1,5 @@
 using System;
 using Microsoft.Azure.EventHubs;
-using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using System.Collections.Generic;
 
@@ -9,7 +8,7 @@ namespace Orleans.ServiceBus.Providers
     /// <summary>
     /// Interface for a stream message cache that stores EventHub EventData
     /// </summary>
-    public interface IEventHubQueueCache : IQueueFlowController, IDisposable
+    public interface IEventHubQueueCache : IQueueFlowController
     {
         /// <summary>
         /// Add a list of EventHub EventData to the cache.
@@ -17,7 +16,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="message"></param>
         /// <param name="dequeueTimeUtc"></param>
         /// <returns></returns>
-        List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc);
+        List<StreamPosition> Add(List<EventData> message, in DateTime dequeueTimeUtc);
 
         /// <summary>
         /// Get a cursor into the cache to read events from a stream.

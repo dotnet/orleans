@@ -6,12 +6,13 @@ using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Orleans.Providers.Abstractions;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
     public class EventHubQueueCacheForTesting : EventHubQueueCache
     {
-        public EventHubQueueCacheForTesting(IObjectPool<FixedSizeBuffer> bufferPool, IEventHubDataAdapter dataAdapter, IEvictionStrategy evictionStrategy, IStreamQueueCheckpointer<string> checkpointer,
+        public EventHubQueueCacheForTesting(IObjectPool<FixedSizeBuffer> bufferPool, EventHubDataAdapter dataAdapter, IFiFoEvictionStrategy<CachedMessage> evictionStrategy, IStreamQueueCheckpointer<string> checkpointer,
             ILogger logger)
             :base("test", EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, null, null)
             { }
@@ -20,8 +21,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     }
     public class EHEvictionStrategyForTesting : ChronologicalEvictionStrategy
     {
-        public EHEvictionStrategyForTesting(ILogger logger, ICacheMonitor cacheMonitor = null, TimeSpan? monitorWriteInterval = null, TimePurgePredicate timePurage = null)
-            :base(logger, timePurage, cacheMonitor, monitorWriteInterval)
+        public EHEvictionStrategyForTesting(ICacheMonitor cacheMonitor = null, TimeSpan? monitorWriteInterval = null, TimePurgePredicate timePurage = null)
+            :base(timePurage, cacheMonitor, monitorWriteInterval)
         { }
 
         public Queue<FixedSizeBuffer> InUseBuffers => this.inUseBuffers;
@@ -29,19 +30,9 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
     public class MockEventHubCacheAdaptor : EventHubDataAdapter
     {
-        private long sequenceNumberCounter = 0;
-        private int eventIndex = 1;
-        private string eventHubOffset = "OffSet";
         public MockEventHubCacheAdaptor(SerializationManager serializationManager)
             : base(serializationManager)
         { }
-
-        public override StreamPosition GetStreamPosition(string partition, EventData queueMessage)
-        {
-            var steamIdentity = new StreamIdentity(Guid.NewGuid(), "EmptySpace");
-            var sequenceToken = new EventHubSequenceTokenV2(this.eventHubOffset, this.sequenceNumberCounter++, this.eventIndex);
-            return new StreamPosition(steamIdentity, sequenceToken);
-        }
     }
 
     internal class CachePressureInjectionMonitor : ICachePressureMonitor
