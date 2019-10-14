@@ -169,9 +169,9 @@ namespace Orleans.Providers.Streams.Common
             var itemCountBeforePurge = itemCountAfterPurge + itemsPurged;
             if (itemCountAfterPurge == 0)
             {
-                logger.Debug("BlockPurged: cache empty");
+                logger.LogDebug("BlockPurged: cache empty");
             }
-            logger.Debug($"BlockPurged: PurgeCount: {itemCountBeforePurge - itemCountAfterPurge}, CacheSize: {itemCountAfterPurge}");
+            logger.LogDebug("BlockPurged: PurgeCount: {PurgeCount}, CacheSize: {ItemCountAfterPurge}", itemCountBeforePurge - itemCountAfterPurge, itemCountAfterPurge);
         }
     }
 }
