@@ -34,6 +34,7 @@ namespace Orleans.Runtime
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private readonly SharedCallbackData sharedCallbackData;
+        private readonly SharedCallbackData systemSharedCallbackData;
         private SafeTimer callbackTimer;
 
         private ILocalGrainDirectory directory;
@@ -88,7 +89,15 @@ namespace Orleans.Runtime
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.messagingOptions,
-                this.appRequestStatistics);
+                this.appRequestStatistics,
+                this.messagingOptions.ResponseTimeout);
+
+            this.systemSharedCallbackData = new SharedCallbackData(
+                msg => this.UnregisterCallback(msg.Id),
+                this.loggerFactory.CreateLogger<CallbackData>(),
+                this.messagingOptions,
+                this.appRequestStatistics,
+                this.messagingOptions.SystemResponseTimeout);
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -181,6 +190,7 @@ namespace Orleans.Runtime
             // fill in destination
             var targetGrainId = target.GrainId;
             message.TargetGrain = targetGrainId;
+            SharedCallbackData sharedData;
             if (targetGrainId.IsSystemTarget)
             {
                 SiloAddress targetSilo = (target.SystemTargetSilo ?? MySilo);
@@ -188,25 +198,37 @@ namespace Orleans.Runtime
                 message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, targetSilo);
                 message.Category = targetGrainId.Equals(Constants.MembershipOracleId) ?
                     Message.Categories.Ping : Message.Categories.System;
+                sharedData = this.systemSharedCallbackData;
             }
+            else
+            {
+                sharedData = this.sharedCallbackData;
+            }
+
             if (target.IsObserverReference)
             {
                 message.TargetObserverId = target.ObserverId;
             }
 
             if (debugContext != null)
+            {
                 message.DebugContext = debugContext;
+            }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             if (context == null && !oneWay)
+            {
                 logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
+            }
 
             if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
-                message.TimeToLive = this.messagingOptions.ResponseTimeout;
+            {
+                message.TimeToLive = sharedData.ResponseTimeout;
+            }
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context, message);
+                var callbackData = new CallbackData(sharedData, context, message);
                 callbacks.TryAdd(message.Id, callbackData);
             }
 
