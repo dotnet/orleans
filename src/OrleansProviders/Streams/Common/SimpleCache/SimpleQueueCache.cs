@@ -317,8 +317,8 @@ namespace Orleans.Providers.Streams.Common
 
         internal static void Log(ILogger logger, string format, params object[] args)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(format, args);
-            //if(logger.IsInfo) logger.Info(format, args);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(format, args);
+            //if(logger.IsInfo) logger.LogInformation(format, args);
         }
     }
 }
