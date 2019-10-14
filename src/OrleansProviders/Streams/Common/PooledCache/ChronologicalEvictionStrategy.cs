@@ -171,7 +171,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 logger.Debug("BlockPurged: cache empty");
             }
-            logger.Debug($"BlockPurged: PurgeCount: {itemCountBeforePurge - itemCountAfterPurge}, CacheSize: {itemCountAfterPurge}");
+            logger.Debug("BlockPurged: PurgeCount: {PurgeCount}, CacheSize: {ItemCountAfterPurge}", itemCountBeforePurge - itemCountAfterPurge, itemCountAfterPurge);
         }
     }
 }

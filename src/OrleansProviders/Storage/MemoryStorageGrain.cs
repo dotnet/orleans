@@ -36,7 +36,7 @@ namespace Orleans.Storage
 
         public Task<IGrainState> ReadStateAsync(string stateStore, string grainStoreKey)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("ReadStateAsync for {0} grain: {1}", stateStore, grainStoreKey);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("ReadStateAsync for {StateStore} grain: {GrainStoreKey}", stateStore, grainStoreKey);
             GrainStateStore storage = GetStoreForGrain(stateStore);
             var grainState = storage.GetGrainState(grainStoreKey);
             return Task.FromResult(grainState);
@@ -44,10 +44,10 @@ namespace Orleans.Storage
 
         public Task<string> WriteStateAsync(string stateStore, string grainStoreKey, IGrainState grainState)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("WriteStateAsync for {0} grain: {1} eTag: {2}", stateStore, grainStoreKey, grainState.ETag);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("WriteStateAsync for {StateStore} grain: {GrainStoreKey} eTag: {ETag}", stateStore, grainStoreKey, grainState.ETag);
             GrainStateStore storage = GetStoreForGrain(stateStore);
             storage.UpdateGrainState(grainStoreKey, grainState);
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Done WriteStateAsync for {0} grain: {1} eTag: {2}", stateStore, grainStoreKey, grainState.ETag);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Done WriteStateAsync for {StateStore} grain: {GrainStoreKey} eTag: {ETag}", stateStore, grainStoreKey, grainState.ETag);
             return Task.FromResult(grainState.ETag);
         }
 
@@ -136,7 +136,7 @@ namespace Orleans.Storage
                 // else we have an etag mismatch
                 if (logger.IsEnabled(LogLevel.Warning))
                 {
-                    logger.Warn(0, $"Etag mismatch during {operation} for grain {grainStoreKey}: Expected = {currentETag ?? "null"} Received = {receivedEtag}");
+                    logger.Warn(0, "Etag mismatch during {Operation} for grain {GrainStoreKey}: Expected = {Expected} Received = {Received}", operation, grainStoreKey, currentETag ?? "null", receivedEtag);
                 }
                 throw new MemoryStorageEtagMismatchException(currentETag, receivedEtag);
             }

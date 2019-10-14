@@ -56,7 +56,7 @@ namespace Orleans.Storage
             this.grainFactory = grainFactory;
 
             //Init
-            logger.Info("Init: Name={0} NumStorageGrains={1}", name, this.options.NumStorageGrains);
+            logger.Info("Init: Name={Name} NumStorageGrains={NumStorageGrains}", name, this.options.NumStorageGrains);
 
             storageGrains = new Lazy<IMemoryStorageGrain>[this.options.NumStorageGrains];
             for (int i = 0; i < this.options.NumStorageGrains; i++)
@@ -72,7 +72,7 @@ namespace Orleans.Storage
         {
             IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Read Keys={0}", StorageProviderUtils.PrintKeys(keys));
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Read Keys={Keys}", StorageProviderUtils.PrintKeys(keys));
             
             string id = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(id);
@@ -90,7 +90,7 @@ namespace Orleans.Storage
         {
             IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Write {0} ", StorageProviderUtils.PrintOneWrite(keys, grainState.State, grainState.ETag));
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Write {Write} ", StorageProviderUtils.PrintOneWrite(keys, grainState.State, grainState.ETag));
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
@@ -107,7 +107,7 @@ namespace Orleans.Storage
         public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Delete Keys={0} Etag={1}", StorageProviderUtils.PrintKeys(keys), grainState.ETag);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Delete Keys={Keys} Etag={Etag}", StorageProviderUtils.PrintKeys(keys), grainState.ETag);
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try

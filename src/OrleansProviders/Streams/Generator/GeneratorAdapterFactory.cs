@@ -111,7 +111,7 @@ namespace Orleans.Providers.Streams.Generator
             generatorConfig = this.serviceProvider.GetServiceByName<IStreamGeneratorConfig>(this.Name);
             if(generatorConfig == null)
             {
-                this.logger.LogInformation("No generator configuration found for stream provider {0}.  Inactive until provided with configuration by command.", this.Name);
+                this.logger.LogInformation("No generator configuration found for stream provider {StreamProvider}.  Inactive until provided with configuration by command.", this.Name);
             }
         }
 
