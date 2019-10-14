@@ -11,29 +11,31 @@ namespace Orleans.Runtime
         public readonly Action<Message> Unregister;
         public readonly ILogger Logger;
         public readonly MessagingOptions MessagingOptions;
+        private TimeSpan responseTimeout;
         public long ResponseTimeoutStopwatchTicks;
 
         public SharedCallbackData(
             Action<Message> unregister,
             ILogger logger,
             MessagingOptions messagingOptions,
-            ApplicationRequestsStatisticsGroup requestStatistics)
+            ApplicationRequestsStatisticsGroup requestStatistics,
+            TimeSpan responseTimeout)
         {
             RequestStatistics = requestStatistics;
             this.Unregister = unregister;
             this.Logger = logger;
             this.MessagingOptions = messagingOptions;
-            this.ResponseTimeout = messagingOptions.ResponseTimeout;
+            this.ResponseTimeout = responseTimeout;
         }
 
         public ApplicationRequestsStatisticsGroup RequestStatistics { get; }
 
         public TimeSpan ResponseTimeout
         {
-            get => this.MessagingOptions.ResponseTimeout;
+            get => this.responseTimeout;
             set
             {
-                this.MessagingOptions.ResponseTimeout = value;
+                this.responseTimeout = value;
                 this.ResponseTimeoutStopwatchTicks = (long)(value.TotalSeconds * Stopwatch.Frequency);
             }
         }

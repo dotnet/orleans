@@ -1,6 +1,5 @@
 using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Options;
+using System.Diagnostics;
 using Orleans.Runtime;
 
 namespace Orleans.Configuration
@@ -10,6 +9,11 @@ namespace Orleans.Configuration
     /// </summary>
     public class SiloMessagingOptions : MessagingOptions
     {
+        /// <summary>
+        /// <see cref="SystemResponseTimeout"/>.
+        /// </summary>
+        private TimeSpan systemResponseTimeout = DEFAULT_RESPONSE_TIMEOUT;
+
         /// <summary>
         /// The SiloSenderQueues attribute specifies the number of parallel queues and attendant threads used by the silo to send outbound
         /// messages (requests, responses, and notifications) to other silos.
@@ -84,5 +88,15 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan ShutdownRerouteTimeout { get; set; } =
             DEFAULT_SHUTDOWN_REROUTE_TIMEOUT;
+
+        /// <summary>
+        /// The SystemResponseTimeout attribute specifies the default timeout before an internal system request is assumed to have failed.
+        /// <seealso cref="MessagingOptions.ResponseTimeoutWithDebugger"/>
+        /// </summary>
+        public TimeSpan SystemResponseTimeout
+        {
+            get { return Debugger.IsAttached ? ResponseTimeoutWithDebugger : this.systemResponseTimeout; }
+            set { this.systemResponseTimeout = value; }
+        }
     }
 }

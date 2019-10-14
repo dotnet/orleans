@@ -106,7 +106,8 @@ namespace Orleans
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions,
-                this.appRequestStatistics);
+                this.appRequestStatistics,
+                this.clientMessagingOptions.ResponseTimeout);
         }
 
         internal void ConsumeServices(IServiceProvider services)
