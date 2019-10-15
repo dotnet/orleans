@@ -158,7 +158,13 @@ namespace Orleans.Runtime
                 logger.Warn(ErrorCode.SiloGcWarning, "Note: ServerGC only kicks in on multi-core systems (settings enabling ServerGC have no effect on single-core machines).");
             }
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Warn(ErrorCode.SiloGcWarning, "Debug level logging set : This will impact performance of ServerGC.  Recommended to set log level to Info for production");
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                var highestLogLevel = logger.IsEnabled(LogLevel.Trace) ? nameof(LogLevel.Trace) : nameof(LogLevel.Debug);
+                logger.LogWarning(
+                    ErrorCode.SiloGcWarning,
+                    $"A verbose logging level ({highestLogLevel}) is configured. This will impact performance. The recommended log level is {nameof(LogLevel.Information)}.");
+            }
 
             logger.Info(ErrorCode.SiloInitializing, "-------------- Initializing silo on host {0} MachineName {1} at {2}, gen {3} --------------",
                 this.siloDetails.DnsHostName, Environment.MachineName, localEndpoint, this.siloDetails.SiloAddress.Generation);
