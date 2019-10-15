@@ -73,11 +73,11 @@ or
 
 ### Building from source
 
-Clone the sources from the GitHub [repo](https://github.com/dotnet/orleans) 
+Clone the sources from the GitHub [repo](https://github.com/dotnet/orleans).
 
 Run the `Build.cmd` script to build the nuget packages locally,
 then reference the required NuGet packages from `/Artifacts/Release/*`.
-You can run `Test.cmd` to run all BVT tests, and `TestAll.cmd` to also run Functional tests (which take much longer)
+You can run `Test.cmd` to run all BVT tests, and `TestAll.cmd` to also run Functional tests (which take much longer).
 
 ### Building and running tests in Visual Studio 2017
 .NET Core 2.0 SDK is a pre-requisite to build Orleans.sln.
@@ -92,7 +92,7 @@ Then either restart VS, or go to the task manager and kill the processes that st
 Documentation
 =============
 
-Documentation is located [here](https://dotnet.github.io/orleans/Documentation/)
+Documentation is located [here](https://dotnet.github.io/orleans/Documentation/).
 
 Code Examples
 =============
@@ -133,9 +133,9 @@ So, welcome to Orleans Blog, both as a reader and as a blogger!
 Community
 =========
 
-* Ask questions by [opening an issue on GitHub](https://github.com/dotnet/orleans/issues) or on [Stack Overflow](https://stackoverflow.com/questions/ask?tags=orleans)
+* Ask questions by [opening an issue on GitHub](https://github.com/dotnet/orleans/issues) or on [Stack Overflow](https://stackoverflow.com/questions/ask?tags=orleans).
 
-* [Chat on Gitter](https://gitter.im/dotnet/orleans)
+* [Chat on Gitter](https://gitter.im/dotnet/orleans).
 
 * Follow the [@MSFTOrleans](https://twitter.com/MSFTOrleans) Twitter account for Orleans announcements.
 
