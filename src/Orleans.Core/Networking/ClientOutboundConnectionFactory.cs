@@ -9,6 +9,7 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class ClientOutboundConnectionFactory : ConnectionFactory, IConnectionDirectionFeature
     {
+        internal static readonly object ServicesKey = new object();
         private readonly IServiceProvider serviceProvider;
         private readonly ClientConnectionOptions clientConnectionOptions;
         private readonly MessageFactory messageFactory;
@@ -22,10 +23,9 @@ namespace Orleans.Runtime.Messaging
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<ClientConnectionOptions> clientConnectionOptions,
-            IConnectionFactory connectionFactory,
             MessageFactory messageFactory,
             INetworkingTrace trace)
-            : base(connectionFactory, serviceProvider, connectionOptions)
+            : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionFactory>(ServicesKey), serviceProvider, connectionOptions)
         {
             this.serviceProvider = serviceProvider;
             this.clientConnectionOptions = clientConnectionOptions.Value;

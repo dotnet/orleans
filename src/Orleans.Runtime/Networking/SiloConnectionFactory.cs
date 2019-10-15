@@ -10,6 +10,7 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class SiloConnectionFactory : ConnectionFactory
     {
+        internal static readonly object ServicesKey = new object();
         private readonly INetworkingTrace trace;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IServiceProvider serviceProvider;
@@ -25,11 +26,10 @@ namespace Orleans.Runtime.Messaging
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<SiloConnectionOptions> siloConnectionOptions,
-            IConnectionFactory connectionFactory,
             MessageFactory messageFactory,
             INetworkingTrace trace,
             ILocalSiloDetails localSiloDetails)
-            : base(connectionFactory, serviceProvider, connectionOptions)
+            : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionFactory>(ServicesKey), serviceProvider, connectionOptions)
         {
             this.serviceProvider = serviceProvider;
             this.siloConnectionOptions = siloConnectionOptions.Value;
