@@ -162,7 +162,7 @@ namespace Orleans.Runtime
             {
                 var highestLogLevel = logger.IsEnabled(LogLevel.Trace) ? nameof(LogLevel.Trace) : nameof(LogLevel.Debug);
                 logger.LogWarning(
-                    ErrorCode.SiloGcWarning,
+                    new EventId((int)ErrorCode.SiloGcWarning),
                     $"A verbose logging level ({highestLogLevel}) is configured. This will impact performance. The recommended log level is {nameof(LogLevel.Information)}.");
             }
 
