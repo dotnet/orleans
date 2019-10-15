@@ -57,12 +57,13 @@ namespace Orleans.Runtime.Messaging
 
                     // Configure the connection builder using the user-defined options.
                     var connectionBuilder = new ConnectionBuilder(this.ServiceProvider);
-                    this.ConnectionOptions.ConfigureConnectionBuilder(connectionBuilder);
+                    this.ConfigureConnectionBuilder(connectionBuilder);
                     Connection.ConfigureBuilder(connectionBuilder);
                     return this.connectionDelegate = connectionBuilder.Build();
                 }
             }
         }
+        protected virtual void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder) { }
 
         public async Task BindAsync(CancellationToken cancellationToken)
         {

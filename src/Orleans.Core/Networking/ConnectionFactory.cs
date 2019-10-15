@@ -37,12 +37,14 @@ namespace Orleans.Runtime.Messaging
 
                     // Configure the connection builder using the user-defined options.
                     var connectionBuilder = new ConnectionBuilder(this.serviceProvider);
-                    this.ConnectionOptions.ConfigureConnectionBuilder(connectionBuilder);
+                    this.ConfigureConnectionBuilder(connectionBuilder);
                     Connection.ConfigureBuilder(connectionBuilder);
                     return this.connectionDelegate = connectionBuilder.Build();
                 }
             }
         }
+
+        protected virtual void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder) { }
 
         protected abstract Connection CreateConnection(SiloAddress address, ConnectionContext context);
 

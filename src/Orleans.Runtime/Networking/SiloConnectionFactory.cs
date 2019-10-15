@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Messaging
         private readonly INetworkingTrace trace;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IServiceProvider serviceProvider;
+        private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly MessageFactory messageFactory;
         private readonly object initializationLock = new object();
         private bool isInitialized;
@@ -23,6 +24,7 @@ namespace Orleans.Runtime.Messaging
         public SiloConnectionFactory(
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
+            IOptions<SiloConnectionOptions> siloConnectionOptions,
             IConnectionFactory connectionFactory,
             MessageFactory messageFactory,
             INetworkingTrace trace,
@@ -30,6 +32,7 @@ namespace Orleans.Runtime.Messaging
             : base(connectionFactory, serviceProvider, connectionOptions)
         {
             this.serviceProvider = serviceProvider;
+            this.siloConnectionOptions = siloConnectionOptions.Value;
             this.messageFactory = messageFactory;
             this.trace = trace;
             this.localSiloDetails = localSiloDetails;
@@ -62,6 +65,13 @@ namespace Orleans.Runtime.Messaging
                 this.localSiloDetails,
                 this.connectionManager,
                 this.ConnectionOptions);
+        }
+
+        protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
+        {
+            var configureDelegate = (SiloConnectionOptions.ISiloConnectionBuilderOptions)this.siloConnectionOptions;
+            configureDelegate.ConfigureSiloOutboundBuilder(connectionBuilder);
+            base.ConfigureConnectionBuilder(connectionBuilder);
         }
 
         private void EnsureInitialized()

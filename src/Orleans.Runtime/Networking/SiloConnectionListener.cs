@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly INetworkingTrace trace;
         private readonly ILocalSiloDetails localSiloDetails;
+        private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly MessageCenter messageCenter;
         private readonly MessageFactory messageFactory;
         private readonly EndpointOptions endpointOptions;
@@ -21,6 +22,7 @@ namespace Orleans.Runtime.Messaging
         public SiloConnectionListener(
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
+            IOptions<SiloConnectionOptions> siloConnectionOptions,
             IConnectionListenerFactory listenerFactory,
             MessageCenter messageCenter,
             MessageFactory messageFactory,
@@ -30,6 +32,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionManager connectionManager)
             : base(serviceProvider, listenerFactory, connectionOptions, connectionManager, trace)
         {
+            this.siloConnectionOptions = siloConnectionOptions.Value;
             this.messageCenter = messageCenter;
             this.messageFactory = messageFactory;
             this.trace = trace;
@@ -53,6 +56,13 @@ namespace Orleans.Runtime.Messaging
                 this.localSiloDetails,
                 this.connectionManager,
                 this.ConnectionOptions);
+        }
+
+        protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
+        {
+            var configureDelegate = (SiloConnectionOptions.ISiloConnectionBuilderOptions)this.siloConnectionOptions;
+            configureDelegate.ConfigureSiloInboundBuilder(connectionBuilder);
+            base.ConfigureConnectionBuilder(connectionBuilder);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
