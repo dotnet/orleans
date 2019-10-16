@@ -7,6 +7,23 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.0.0-rc2] (changes since 3.0.0-rc1)
+
+- Non-breaking improvements
+  - Default to cleaning up dead silo entries in the cluster membership table after 7 days. (#6032)
+  - Reduce log noise in SiloConnection (#6037)
+  - Add separate SiloMessagingOptions.SystemResponseTimeout option for SystemTarget calls (#6046)
+  - Added structured logging (#6045)
+  - Transactions: support larger state sizes in Azure Table Storage (#6047)
+  - Add warning message at startup (#6041)
+  - Add TLS middleware with sample (#6035)
+  - Prevent Orleans + Kestrel from interfering with each other's networking services (#6042)
+  - Remove SQL scripts from AdoNet NuGet packages. (#6049)
+
+- Non-breaking bug fixes
+  - Add an explicit reference to Microsoft.Bcl.AsyncInterfaces pack… (#6031)
+  - Fix potential rare NullReferenceException in GrainTimer (#6043)
+
 ### [1.5.10] (changes since 1.5.9)
 
 - Non-breaking bug fixes
