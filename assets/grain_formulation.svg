@@ -1,0 +1,77 @@
+<svg width="1280" height="720" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" overflow="hidden">
+	<defs>
+		<clipPath id="clip0">
+			<path d="M150 160 1150 160 1150 550 150 550Z" fill-rule="evenodd" clip-rule="evenodd" />
+		</clipPath>
+	</defs>
+	<g clip-path="url(#clip0)">
+		<rect x="0" y="0" width="1280" height="720" fill="#1F0D2D" />
+		<text fill="#FFFFFF" font-family="Calibri,Calibri_MSFontService,sans-serif" font-weight="400" font-size="59" transform="translate(218.97 386)">
+			Grain =
+			<tspan fill="#FFC000" x="184.633" y="0">
+				identity
+			</tspan>
+			<tspan x="381.087" y="0">
+				+
+			</tspan>
+			<tspan fill="#00B050" x="423.587" y="0">
+				behavior
+			</tspan>
+			<tspan x="646.447" y="0">
+				[+
+			</tspan>
+			<tspan fill="#FF0000" x="706.947" y="0">
+				state
+			</tspan>
+			]
+		</text>
+		<path d="M396 341C396 326.641 397.94 315 400.333 315L486.667 315C489.06 315 491 303.359 491 289 491 303.359 492.94 315 495.333 315L581.667 315C584.06 315 586 326.641 586 341" stroke="#FFC000" stroke-width="2.33333" stroke-miterlimit="8" fill="none" fill-rule="evenodd" />
+		<text fill="#4EC9B0" font-family="Consolas,Consolas_MSFontService,sans-serif" font-weight="400" font-size="24" transform="translate(365.697 263)">
+			User
+			<tspan fill="#FFFFFF" x="52.6667" y="0">
+				/
+			</tspan>
+			<tspan fill="#00B0F0" x="65.8333" y="0">
+				jack@email.com
+			</tspan>
+		</text>
+		<path d="M847 400C847 414.36 845.06 426 842.667 426L745.833 426C743.44 426 741.5 437.641 741.5 452 741.5 437.641 739.56 426 737.167 426L640.333 426C637.94 426 636 414.359 636 400" stroke="#00B050" stroke-width="2.33333" stroke-miterlimit="8" fill="none" fill-rule="evenodd" />
+		<text fill="#FFFFFF" font-family="Calibri,Calibri_MSFontService,sans-serif" font-weight="400" font-size="24" transform="translate(925.151 233)">
+			In
+			<tspan x="18.6667" y="0">
+				-
+			</tspan>
+			<tspan x="26" y="0">
+				memory
+			</tspan>
+			<tspan x="-3.55334" y="29">
+				o
+			</tspan>
+			<tspan x="9.11334" y="29">
+				r
+			</tspan>
+			<tspan x="22.9467" y="29">
+				persisted
+			</tspan>
+		</text>
+		<path d="M922 344C922 329.641 923.94 318 926.333 318L975.167 318C977.56 318 979.5 306.359 979.5 292 979.5 306.359 981.44 318 983.833 318L1032.67 318C1035.06 318 1037 329.641 1037 344" stroke="#FF0000" stroke-width="2.33333" stroke-miterlimit="8" fill="none" fill-rule="evenodd" />
+		<text fill="#569CD6" font-family="Consolas,Consolas_MSFontService,sans-serif" font-weight="400" font-size="24" transform="translate(575.102 493)">
+			class
+			<tspan fill="#4EC9B0" x="79" y="0">
+				User
+			</tspan>
+			<tspan fill="#D4D4D4" x="144.833" y="0">
+				:
+			</tspan>
+			<tspan fill="#4EC9B0" x="171.167" y="0">
+				Grain
+			</tspan>
+			<tspan fill="#D4D4D4" x="237" y="0">
+				,
+			</tspan>
+			<tspan fill="#4EC9B0" x="263.333" y="0">
+				IUser
+			</tspan>
+		</text>
+	</g>
+</svg>
