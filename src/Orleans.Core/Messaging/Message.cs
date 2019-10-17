@@ -551,7 +551,7 @@ namespace Orleans.Runtime
 
         internal void DropExpiredMessage(ILogger logger, MessagingStatisticsGroup.Phase phase)
         {
-            logger.LogWarning((int)ErrorCode.Messaging_DroppingExpiredMessage, "Dropped expired message during {Phase} phase.  Message: {Message}", Enum.GetName(typeof(MessagingStatisticsGroup.Phase), phase), logger.IsEnabled(LogLevel.Trace) ? this.ToLongString() : this.ToString());
+            logger.LogWarning((int)ErrorCode.Messaging_DroppingExpiredMessage, "Dropped expired message during {Phase} phase.  Message: {Message}", phase.ToString(), logger.IsEnabled(LogLevel.Trace) ? this.ToLongString() : this.ToString());
             MessagingStatisticsGroup.OnMessageExpired(phase);
         }
 
