@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using Orleans.Transactions;
@@ -548,8 +549,9 @@ namespace Orleans.Runtime
             };
         }
 
-        internal void DropExpiredMessage(MessagingStatisticsGroup.Phase phase)
+        internal void DropExpiredMessage(ILogger logger, MessagingStatisticsGroup.Phase phase)
         {
+            logger.LogWarning((int)ErrorCode.Messaging_DroppingExpiredMessage, "Dropped expired message during {Phase} phase.  Message: {Message}", Enum.GetName(typeof(MessagingStatisticsGroup.Phase), phase), logger.IsEnabled(LogLevel.Trace) ? this.ToLongString() : this.ToString());
             MessagingStatisticsGroup.OnMessageExpired(phase);
         }
 

@@ -141,7 +141,7 @@ namespace Orleans
                         message = objectData.Messages.Dequeue();
                     }
 
-                    if (ExpireMessageIfExpired(message, MessagingStatisticsGroup.Phase.Invoke))
+                    if (ExpireMessageIfExpired(this.logger, message, MessagingStatisticsGroup.Phase.Invoke))
                         continue;
 
                     RequestContextExtensions.Import(message.RequestContextData);
@@ -201,11 +201,11 @@ namespace Orleans
             }
         }
 
-        private static bool ExpireMessageIfExpired(Message message, MessagingStatisticsGroup.Phase phase)
+        private static bool ExpireMessageIfExpired(ILogger logger, Message message, MessagingStatisticsGroup.Phase phase)
         {
             if (message.IsExpired)
             {
-                message.DropExpiredMessage(phase);
+                message.DropExpiredMessage(logger, phase);
                 return true;
             }
 
@@ -215,7 +215,7 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private void SendResponseAsync(Message message, object resultObject)
         {
-            if (ExpireMessageIfExpired(message, MessagingStatisticsGroup.Phase.Respond))
+            if (ExpireMessageIfExpired(this.logger, message, MessagingStatisticsGroup.Phase.Respond))
             {
                 return;
             }

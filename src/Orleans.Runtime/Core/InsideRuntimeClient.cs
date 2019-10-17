@@ -249,7 +249,7 @@ namespace Orleans.Runtime
             // Don't process messages that have already timed out
             if (request.IsExpired)
             {
-                request.DropExpiredMessage(MessagingStatisticsGroup.Phase.Respond);
+                request.DropExpiredMessage(this.logger, MessagingStatisticsGroup.Phase.Respond);
                 return;
             }
 
@@ -314,7 +314,7 @@ namespace Orleans.Runtime
                 // Don't process messages that have already timed out
                 if (message.IsExpired)
                 {
-                    message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Invoke);
+                    message.DropExpiredMessage(this.logger, MessagingStatisticsGroup.Phase.Invoke);
                     return;
                 }
 
