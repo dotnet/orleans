@@ -79,7 +79,7 @@ namespace Orleans.Runtime
             {
                 logger.Warn(ErrorCode.Dispatcher_DroppingExpiredMessage, "Dropping an expired message: {0}", message);
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Expired");
-                message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Dispatch);
+                message.DropExpiredMessage(this.logger, MessagingStatisticsGroup.Phase.Dispatch);
                 return;
             }
 

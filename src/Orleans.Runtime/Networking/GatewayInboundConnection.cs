@@ -56,7 +56,7 @@ namespace Orleans.Runtime.Messaging
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {
-                msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
+                msg.DropExpiredMessage(this.Log, MessagingStatisticsGroup.Phase.Receive);
                 return;
             }
 
@@ -159,7 +159,7 @@ namespace Orleans.Runtime.Messaging
             // Don't send messages that have already timed out
             if (msg.IsExpired)
             {
-                msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Send);
+                msg.DropExpiredMessage(this.Log, MessagingStatisticsGroup.Phase.Send);
                 return false;
             }
 

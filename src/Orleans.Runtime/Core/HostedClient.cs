@@ -138,7 +138,7 @@ namespace Orleans.Runtime
             if (!this.ClientId.Equals(message.TargetGrain)) return false;
             if (message.IsExpired)
             {
-                message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
+                message.DropExpiredMessage(this.logger, MessagingStatisticsGroup.Phase.Receive);
                 return true;
             }
 

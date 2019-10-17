@@ -633,6 +633,7 @@ namespace Orleans
         Messaging_Dispatcher_ReturnToOriginCluster    = MessagingBase + 35,
         MessagingAcceptAsyncSocketException     = MessagingBase + 36,
         Messaging_ExceptionReceiveAsync         = MessagingBase + 37,
+        Messaging_DroppingExpiredMessage = MessagingBase + 38,
 
         DirectoryBase                           = Runtime + 1100,
         DirectoryBothPrimaryAndBackupForGrain   = DirectoryBase + 1,
