@@ -387,6 +387,17 @@ namespace Orleans.Runtime
         /// </summary>
         private List<Message> waiting;
 
+        private enum LoadState
+        {
+            Low,
+            Hot,
+            Overload
+        }
+
+        private LoadState loadState = LoadState.Low;
+        int lifetimeHighLoad = 0;
+        int spikeHighestLoad = 0;
+
         public int WaitingCount 
         { 
             get
@@ -478,21 +489,39 @@ namespace Orleans.Runtime
             if (maxRequestsHardLimit <= 0 && maxRequestsSoftLimit <= 0) return null; // No limits are set
 
             int count = GetRequestCount();
+            this.lifetimeHighLoad = Math.Max(this.lifetimeHighLoad, count);
 
             if (maxRequestsHardLimit > 0 && count > maxRequestsHardLimit) // Hard limit
             {
-                log.Warn(ErrorCode.Catalog_Reject_ActivationTooManyRequests, 
-                    String.Format("Overload - {0} enqueued requests for activation {1}, exceeding hard limit rejection threshold of {2}",
-                        count, this, maxRequestsHardLimit));
-
+                this.spikeHighestLoad = Math.Max(this.spikeHighestLoad, count);
+                this.loadState = LoadState.Overload;
+                log.LogWarning((int)ErrorCode.Catalog_Reject_ActivationTooManyRequests,
+                    "Overload - {Count} enqueued requests for activation {Activation}, exceeding hard limit rejection threshold of {Threshold}",
+                        count, this, maxRequestsHardLimit);
                 return new LimitExceededException(limitName, count, maxRequestsHardLimit, this.ToString());
             }
             if (maxRequestsSoftLimit > 0 && count > maxRequestsSoftLimit) // Soft limit
             {
-                log.Warn(ErrorCode.Catalog_Warn_ActivationTooManyRequests,
-                    String.Format("Hot - {0} enqueued requests for activation {1}, exceeding soft limit warning threshold of {2}",
-                        count, this, maxRequestsSoftLimit));
+                this.spikeHighestLoad = Math.Max(this.spikeHighestLoad, count);
+                // only log warning on state changes.
+                if (this.loadState != LoadState.Hot)
+                {
+                    this.loadState = LoadState.Hot;
+                    log.LogWarning((int)ErrorCode.Catalog_Warn_ActivationTooManyRequests,
+                        "Hot - {Count} enqueued requests for activation {Activation}, exceeding soft limit warning threshold of {Threshold}",
+                            count, this, maxRequestsSoftLimit);
+                }
                 return null;
+            }
+
+            // log on state changes.
+            if (this.loadState != LoadState.Low)
+            {
+                this.loadState = LoadState.Low;
+                log.LogInformation((int)ErrorCode.Catalog_ActivationRequestsLow,
+                    "Low - {Count} enqueued requests for activation {Activation}, has returned below threshold {Threshold}.  Load spike reached {SpikeHigh}, with lifetime high of {LifetimeHigh}",
+                        count, this, maxRequestsSoftLimit, spikeHighestLoad, lifetimeHighLoad);
+                this.spikeHighestLoad = 0;
             }
 
             return null;
