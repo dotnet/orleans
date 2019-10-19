@@ -2,7 +2,7 @@
   <!-- Begin Orleans: Without these lines the project won't build properly -->
   <!-- Set path to code generator -->
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)/src/BootstrapBuild/Orleans.CodeGeneration.Build/Orleans.CodeGeneration.Build.Bootstrap.csproj" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
+    <ProjectReference Include="$(SourceRoot)/src/BootstrapBuild/Orleans.CodeGeneration.Build/Orleans.CodeGeneration.Build.Bootstrap.csproj" Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and '$(OrleansCodeGenPrecompile)' != 'true'">
       <Project>{F7D70028-7E3B-48E3-92B9-DB889AE5ABD1}</Project>
       <Name>Orleans.CodeGeneration.Build.Bootstrap</Name>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
