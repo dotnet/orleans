@@ -19,9 +19,10 @@ Therefore, the complete identity of a grain is formed from the grain's type and 
 
 The caller of the grain decides which scheme should be used. 
 The options are:
+
 * long
-* GUID 
-* string 
+* GUID
+* string
 * GUID + string
 * long + string
 
