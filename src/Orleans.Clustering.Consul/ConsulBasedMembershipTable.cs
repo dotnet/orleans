@@ -173,9 +173,35 @@ namespace Orleans.Runtime.Membership
             return new MembershipTableData(membershipEntries, _tableVersion);
         }
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            throw new NotImplementedException();
+            var allKVs = await _consulClient.KV.List(ConsulSiloRegistrationAssembler.ParseDeploymentKVPrefix(this.clusterId, this.kvRootFolder));
+            if (allKVs.Response == null)
+            {
+                _logger.Debug("Could not find any silo registrations for deployment {0}.", this.clusterId);
+                return;
+            }
+
+            var allRegistrations =
+                allKVs.Response
+                .Where(siloKV => !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.SiloIAmAliveSuffix, StringComparison.OrdinalIgnoreCase))
+                .Select(siloKV =>
+                {
+                    var iAmAliveKV = allKVs.Response.Where(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.ParseSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase)).SingleOrDefault();
+                    return new
+                    {
+                        RegistrationKey = siloKV.Key,
+                        Registration = ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, iAmAliveKV)
+                    };
+                }).ToArray();
+
+            foreach (var entry in allRegistrations)
+            {
+                if (entry.Registration.IAmAliveTime < beforeDate)
+                {
+                    await _consulClient.KV.DeleteTree(entry.RegistrationKey);
+                }
+            }
         }
     }
 }
