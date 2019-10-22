@@ -100,7 +100,7 @@ public class AzureTableStorageOptions
 }
 ```
 
-> __Note:__ State size should not exceed 64KB, a limit imposed by Azure Table Storage.
+> __Note:__ The maxium column size is 32kb (chars) or 64kb (bytes) in Azure Table Storage. When saving state larger than these limits, Orleans automatically splits longer values, over multiple Columns.  The maximum allowed size (per row over all columns) is 1Mb, a limit imposed by Azure Table Storage. 
 
 ### AzureBlobGrainStorage Provider
 
