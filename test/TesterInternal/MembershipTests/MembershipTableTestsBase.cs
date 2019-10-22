@@ -412,6 +412,42 @@ namespace UnitTests.MembershipTests
             Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromMilliseconds(50), (amAliveTime - member.Item1.IAmAliveTime).Duration().ToString());
         }
 
+        protected async Task MembershipTable_CleanupDefunctSiloEntries(bool extendedProtocol = true)
+        {
+            MembershipTableData data = await membershipTable.ReadAll();
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+
+            Assert.Equal(0, data.Members.Count);
+
+            TableVersion newTableVersion = data.Version.Next();
+
+            MembershipEntry oldEntry = CreateMembershipEntryForTest();
+            oldEntry.IAmAliveTime = oldEntry.IAmAliveTime.AddDays(-10);
+            oldEntry.StartTime = oldEntry.StartTime.AddDays(-10);
+            bool ok = await membershipTable.InsertRow(oldEntry, newTableVersion);
+
+            Assert.True(ok, "InsertRow failed");
+
+            newTableVersion = newTableVersion.Next();
+            MembershipEntry newEntry = CreateMembershipEntryForTest();
+            ok = await membershipTable.InsertRow(newEntry, newTableVersion);
+
+            Assert.True(ok, "InsertRow failed");
+
+            data = await membershipTable.ReadAll();
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+
+            Assert.Equal(2, data.Members.Count);
+
+
+            await membershipTable.CleanupDefunctSiloEntries(oldEntry.IAmAliveTime.AddDays(3));
+
+            data = await membershipTable.ReadAll();
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+
+            Assert.Equal(1, data.Members.Count);
+        }
+
         private static int generation;
 
 
