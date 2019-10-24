@@ -6,10 +6,6 @@
     href: Benefits.md
   - name: Frequently Asked Questions
     href: frequently_asked_questions.md
-  - name: Orleans 2.0
-    href: Orleans-2.0.md
-  - name: What's new in Orleans
-    href: whats_new_in_orleans.md
 - name: Core Concepts
   href: core_concepts/toc.yml
 - name: Grains
