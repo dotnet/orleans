@@ -136,7 +136,7 @@ Grain interfaces in Orleans can be optionally versioned.
 The cluster maintains a mapping of which grain implementations are available on which silos in the cluster and the versions of those implementations.
 This version information is used by the runtime in conjunction with placement strategies to make placement decisions when routing calls to grains.
 In addition to safe update of versioned grains, this also enables heterogeneous clusters, where different silos have different sets of grain implementations available.
-For more information, see the [Grain Versioning](deployment/grain_versioning/grain_versioning.md) documentation.
+For more information, see the [Grain Versioning](grains/grain_versioning/grain_versioning.md) documentation.
 
 ### Elastic Scalability &amp; Fault Tolerance
 
