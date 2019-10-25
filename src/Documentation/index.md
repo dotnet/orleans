@@ -182,10 +182,7 @@ The latest stable, production-quality release is located [here](https://github.c
 Nightly builds are published to https://dotnet.myget.org/gallery/orleans-ci.
 These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds published to NuGet.
 
-<details>
-<summary>
-Using the nightly build packages in your project
-</summary>
+### Using the nightly build packages in your project
 
 To use nightly builds in your project, add the MyGet feed using either of the following methods:
 
@@ -212,7 +209,6 @@ or
  </packageSources>
 </configuration>
 ```
-</details>
 
 ## Community
 
