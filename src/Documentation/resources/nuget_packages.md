@@ -281,66 +281,6 @@ PM> Install-Package Microsoft.Orleans.TestingHost
 
 Includes the library for hosting silos and clients in a testing project.
 
-## Legacy Packages
-
-The below packages are for backward compatibility and easier migration from Orleans 1.x to 2.0
-
-### [Microsoft Orleans Core Legacy Library](https://www.nuget.org/packages/Microsoft.Orleans.Core.Legacy/)
-
-``` powershell
-PM> Install-Package Microsoft.Orleans.Core.Legacy
-```
-
-Contains 1.x style client configuration objects and logging APIs. Makes migration easier by not requiring to change client code to the new client builder API and logging.
-
-### [Microsoft Orleans Runtime Legacy Library](https://www.nuget.org/packages/Microsoft.Orleans.Runtime.Legacy/)
-
-``` powershell
-PM> Install-Package Microsoft.Orleans.Runtime.Legacy
-```
-
-Contains 1.x style silo configuration objects and hosting APIs. Makes migration easier by not requiring to change silo configuration and hosting code to the new silo host builder API.
-
-### [Microsoft Orleans Azure Utilities](https://www.nuget.org/packages/Microsoft.Orleans.OrleansAzureUtils/)
-
-``` powershell
-PM> Install-Package Microsoft.Orleans.OrleansAzureUtils
-```
-
-A meta-package that includes all packages with Azure providers to simplify upgrading of 1.x projects.
-
-### [Microsoft Orleans Sql Utilities](https://www.nuget.org/packages/Microsoft.Orleans.OrleansSqlUtils/)
-
-``` powershell
-PM> Install-Package Microsoft.Orleans.OrleansSqlUtils 
-```
-
-A meta-package that includes all packages with ADO.NET providers to simplify upgrading of 1.x projects.
-
-### [Microsoft Orleans AWS Utilities](https://www.nuget.org/packages/Microsoft.Orleans.OrleansAWSUtils/)
-
-``` powershell
-PM> Install-Package Microsoft.Orleans.OrleansAWSUtils
-```
-
-A meta-package that includes all packages with AWS providers to simplify upgrading of 1.x projects.
-
-### [Microsoft Orleans Service Fabric Support](https://www.nuget.org/packages/Microsoft.Orleans.ServiceFabric/)
-
-``` powershell
-PM> Install-Package Microsoft.Orleans.ServiceFabric
-```
-
-A meta-package that includes all packages with Service Fabric providers to simplify upgrading of 1.x projects.
-
-### [Microsoft Orleans Management Tool](https://www.nuget.org/packages/Microsoft.Orleans.OrleansManager/)
-
-``` powershell
-PM> Install-Package Microsoft.Orleans.OrleansManager
-```
-
-Includes Orleans management tool - OrleansManager.exe.
-
 ## Serializers
 
 ### [Microsoft Orleans Bond Serializer](https://www.nuget.org/packages/Microsoft.Orleans.Serialization.Bond/)
