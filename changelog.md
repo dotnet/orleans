@@ -7,6 +7,13 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.0.0] (changes since 3.0.0-rc2)
+
+- Non-breaking improvements
+  - Added consistent logging for all messages dropped due to expiry (#6053)
+  - Implement CleanupDefunctSiloEntries for Consul membership provider (#6056)
+  - Add remark about SQL scripts to client/silo builder documentation (#6062)
+
 ### [3.0.0-rc2] (changes since 3.0.0-rc1)
 
 - Non-breaking improvements
