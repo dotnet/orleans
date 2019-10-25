@@ -63,7 +63,7 @@ hostBuilder
 );
 ```
 
-The above code configures the GeneratorAdapter to use a queue mapper with 8 queues, and balences the queues across the cluster using the DynamicClusterConfigDeploymentBalancer.
+The above code configures the GeneratorAdapter to use a queue mapper with 8 queues, and balances the queues across the cluster using the `DynamicClusterConfigDeploymentBalancer`.
 
 ### Pulling Protocol<a name="Pulling-Protocol"></a>
 
@@ -84,12 +84,12 @@ This handshake between the agent and the pub-sub guarantees **strong streaming s
 It also allows to decoupling delivery to different streams and to different consumers.
 
 Imagine a situation where one stream has 3 stream consumers and one of them is slow.
-If care not taken, it is possible that this slow consumer will impact agent's progress, slowing the consumption of other consumers of that stream, and even slowing the dequeuing and delivery of events for other streams.
+If care is not taken, it is possible that this slow consumer will impact the agent's progress, slowing the consumption of other consumers of that stream, and even slowing the dequeuing and delivery of events for other streams.
 To prevent that and allow maximum parallelism in the agent, we use `IQueueCache`.
 
-`IQueueCache` buffers stream events and provides a way to the agent to deliver events to each consumer at its own pace.
+`IQueueCache` buffers stream events and provides a way for the agent to deliver events to each consumer at its own pace.
 The per-consumer delivery is implemented by the internal component called `IQueueCacheCursor`, which tracks per-consumer progress.
-That way each consumer receives events at its own pace: fast consumers receive events as quickly as they are dequeued from the queue, while slow consumers receive them later on.
+That way, each consumer receives events at its own pace: fast consumers receive events as quickly as they are dequeued from the queue, while slow consumers receive them later on.
 Once the message is delivered to all consumers, it can be deleted from the cache.
 
 ### Backpressure<a name="Backpressure"></a>
