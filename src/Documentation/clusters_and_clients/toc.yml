@@ -3,8 +3,6 @@
   homepage: index.md
 - name: Silo Lifecycle
   href: silo_lifecycle.md
-- name: PowerShell Client Module
-  href: powershell_client.md
 - name: Heterogeneous Silos
   href: heterogeneous_silos.md
 - name: Configuration Guide
