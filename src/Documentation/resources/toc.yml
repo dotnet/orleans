@@ -1,13 +1,11 @@
 - name: Resources Overview
   href: index.md
-- name: Student Projects
-  href: student_projects.md
+- name: Frequently Asked Questions
+  href: frequently_asked_questions.md
 - name: Documentation Guidelines
   href: documentation_guidelines.md
 - name: Links
   href: links.md
-- name: Migration
-  href: migration/toc.yml
 - name: Presentations
   href: presentations/index.md
 - name: Blog

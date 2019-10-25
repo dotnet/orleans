@@ -148,4 +148,4 @@ Assemblies added by the above methods can be supplemented using the following ex
 Type discovery requires that the provided Application Parts include specific attributes.
 Adding the build-time code generation package (`Microsoft.Orleans.CodeGenerator.MSBuild` or `Microsoft.Orleans.OrleansCodeGenerator.Build`) to each project containing Grains, Grain Interfaces, or Serializers is the recommended approach for ensuring that these attributes are present.
 Build-time code generation only supports C#.
-For F#, Visual Basic, and other .NET languages, code can be generated during configuration time via the `WithCodeGeneration()` method described above. More info regarding code generation could be found in [the corresponding section](../../core_concepts/code_generation.md).
+For F#, Visual Basic, and other .NET languages, code can be generated during configuration time via the `WithCodeGeneration()` method described above. More info regarding code generation could be found in [the corresponding section](../../grains/code_generation.md).

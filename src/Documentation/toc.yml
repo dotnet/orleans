@@ -1,36 +1,22 @@
 - name: Overview
   href: index.md
   homepage: index.md
-  items:
-  - name: Benefits
-    href: Benefits.md
-  - name: Frequently Asked Questions
-    href: frequently_asked_questions.md
-  - name: Orleans 2.0
-    href: Orleans-2.0.md
-  - name: What's new in Orleans
-    href: whats_new_in_orleans.md
-- name: Core Concepts
-  href: core_concepts/toc.yml
 - name: Grains
   href: grains/toc.yml
-  items:
-- name: Clusters and Clients
+- name: Streaming
+  href: streaming/toc.yml
+- name: Hosting
   href: clusters_and_clients/toc.yml
   items:
   - name: Configuration Guide
     href: index.md
   - name: Monitoring
     href: index.md
-- name: Deployment
-  href: deployment/toc.yml
+  - name: Deployment
+    href: deployment/toc.yml
   items:
-  - name: Grain Versioning
-    href: index.md
   - name: Multi-Cluster Support
     href: index.md
-- name: Streaming
-  href: streaming/toc.yml
 - name: Tutorials and Samples
   href: tutorials_and_samples/toc.yml
 - name: Implementation Details

@@ -2,8 +2,6 @@
   href: index.md
 - name: Handling Failures
   href: handling_failures.md
-- name: Grain Versioning
-  href: grain_versioning/toc.yml
 - name: Using Azure Web Apps with Azure Cloud Services
   href: azure_web_apps_with_azure_cloud_services.md
 - name: Troubleshooting Azure Cloud Services Deployments

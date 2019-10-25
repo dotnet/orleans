@@ -3,7 +3,7 @@ layout: page
 title: Orleans NuGet Packages
 ---
 
-# Orleans NuGet packages as of [v2.0.0-rc2](https://github.com/dotnet/orleans/releases/tag/v2.0.0-rc2)
+# Orleans NuGet packages
 
 ## Key Packages
 

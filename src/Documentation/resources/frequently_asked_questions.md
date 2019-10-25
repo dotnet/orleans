@@ -46,14 +46,6 @@ Orleans is very flexible, and has a number of optional providers that help host 
 
 While based on the same base principles of the Actor Model, Orleans took a step forward, and introduced a notion of Virtual Actors that greatly simplifies developer's experience and is much more suitable for cloud services and high-scale systems.
 
-### Microsoft has another actor model implementation - Azure Service Fabric Reliable Actors. How do I choose between the two?
-
-Reliable Actors are tightly integrated with Service Fabric to leverage its core features, such as replicated in-cluster storage.
-Orleans has a richer feature set, is not tied to any particular hosting platform, and can run in almost any environment.
-Orleans provides an [optional integration package](https://www.nuget.org/packages/Microsoft.Orleans.Hosting.ServiceFabric/) for hosting Orleans applications in Service Fabric.
-
-In the end, it's the application developer's decision of how much they would benefit from the tight integration of Reliable Actors with the underlying platform of Service Fabric versus the flexibility to run anywhere and the feature set of Orleans.
-
 ## Design
 
 ### How big or how small should a grain be in my application?
@@ -77,22 +69,6 @@ Therefore, it is advisable to avoid designs where a single grain receives a disp
 There are various patterns that help prevent overloading of a single grain even when logically it is a central point of communication.
 
 For example, if a grain is an aggregator of some counters or statistics that are reported by a large number of grains on a regular basis, one proven approach is to add a controlled number of intermediate aggregator grains and assign each of the reporting grains (using a modulo on a key or a hash) to an intermediate aggregator, so that the load is more or less evenly distributed across all intermediate aggregator grains that in their turn periodically report partial aggregates to the central aggregator grain.
-
-### Can a single Orleans cluster run across multiple datacenters?
-
-Orleans clusters are currently limited to a single data center per cluster.
-Instead, since 1.3.0, you can consider a multi-cluster deployment where clusters deployed to different datacenters form a single multi-cluster. 
-
-### In what cases can a split brain (same grain activated in multiple silos at the same time) happen?
-
-During normal operations the Orleans runtime guarantees that each grain will have at most one instance in the cluster.
-The only time this guarantee can be violated is when a silo crashes or gets killed without a proper shutdown.
-In that case, there is a ~30 second (based on configuration) window where a grain can potentially get temporarily instantiated in more than one silo.
-Convergence to a single instance per grain is guaranteed, and duplicate activations will be deactivated when this window closes.
-
-Also you can take a look at Orleans' [paper](http://research.microsoft.com/pubs/210931/Orleans-MSR-TR-2014-41.pdf) for a more detailed information, however you don't need to understand it fully to be able to write your application code.
-You just need to consider the rare possibility of having two instances of an actor while writing your application.
-The persistence model guarantees that no writes to storage are blindly overwritten in such a case.
 
 ## How To
 

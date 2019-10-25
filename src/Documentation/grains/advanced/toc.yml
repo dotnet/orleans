@@ -10,3 +10,8 @@
   href: ../cancellation_tokens.md
 - name: Transactions
   href: ../transactions.md
+- name: Grain Lifecycle
+  href: ../grain_lifecycle.md
+- name: Interface Versioning
+  href: ../grain_versioning/toc.yml
+
