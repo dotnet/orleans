@@ -16,6 +16,11 @@ namespace Orleans.Storage
             return storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.Conflict;
         }
 
+        public static bool IsNotFound(this Microsoft.Azure.Cosmos.Table.StorageException storageException)
+        {
+            return storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.NotFound;
+        }
+
         public static bool IsPreconditionFailed(this StorageException storageException)
         {
             return storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.PreconditionFailed;
