@@ -29,7 +29,6 @@ namespace Orleans.Streams
         private static readonly CounterStatistic counterConsumersAdded;
         private static readonly CounterStatistic counterConsumersRemoved;
         private static readonly CounterStatistic counterConsumersTotal;
-        private readonly ISiloStatusOracle siloStatusOracle;
 
         static PubSubRendezvousGrain()
         {
@@ -41,9 +40,8 @@ namespace Orleans.Streams
             counterConsumersTotal   = CounterStatistic.FindOrCreate(StatisticNames.STREAMS_PUBSUB_CONSUMERS_TOTAL);
         }
 
-        public PubSubRendezvousGrain(ISiloStatusOracle siloStatusOracle)
+        public PubSubRendezvousGrain()
         {
-            this.siloStatusOracle = siloStatusOracle;
         }
 
         public override Task OnActivateAsync()
@@ -413,7 +411,7 @@ namespace Orleans.Streams
             {
                 var grainRef = producer.Producer as GrainReference;
                 // if producer is a system target on and unavailable silo, remove it.
-                if (grainRef == null || grainRef.GrainId.IsSystemTarget && siloStatusOracle.GetApproximateSiloStatus(grainRef.SystemTargetSilo).IsUnavailable())
+                if (grainRef == null || grainRef.GrainId.IsSystemTarget)
                 {
                     RemoveProducer(producer);
                 }
