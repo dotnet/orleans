@@ -7,7 +7,7 @@ title: Persistence
 
 Grains can have multiple named persistent data objects associated with them. This state is loaded from storage during grain activation so that they are available during requests. Grain persistence uses an extensible plugin model so that storage providers for any database can be used. This persistence model is designed for simplicity and is not intended to cover all data access patterns. Grains can also access databases directly, without using the grain persistence model.
 
-![A grain can have multiple persisted data objects each stored in a different storage system](/images/grain_state_1.png)
+![A grain can have multiple persisted data objects each stored in a different storage system](../../images/grain_state_1.png)
 
 In the above diagram, UserGrain has a *Profile* state and a *Cart* state, each of which is stored in a separate storage system.
 
