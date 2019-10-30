@@ -98,7 +98,7 @@ namespace Tests
         public async Task SaysHelloCorrectly()
         {
             var hello = _cluster.GrainFactory.GetGrain<IHelloGrain>(Guid.NewGuid());
-            var greeting = await hello.SayHell();
+            var greeting = await hello.SayHello();
 
             Assert.Equal("Hello, World", greeting);
         }
