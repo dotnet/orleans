@@ -48,7 +48,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async Task<List<ActivationAddress>> Lookup(GrainId grainId)
         {
-            if (grainId.IsClient)
+            if (grainId.IsClient())
                 return await this.inClusterGrainLocator.Lookup(grainId);
 
             List<ActivationAddress> results;
@@ -61,7 +61,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             results = new List<ActivationAddress>();
 
-            var entry = await this.grainDirectory.Lookup(grainId.ToParsableString());
+            var entry = await this.grainDirectory.Lookup(((LegacyGrainId)grainId).ToParsableString());
 
             // Nothing found
             if (entry == null)
@@ -87,7 +87,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async Task<ActivationAddress> Register(ActivationAddress address)
         {
-            if (address.Grain.IsClient)
+            if (address.Grain.IsClient())
                 return await this.inClusterGrainLocator.Register(address);
 
             var grainAddress = address.ToGrainAddress();
@@ -115,7 +115,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses)
         {
-            if (grainId.IsClient)
+            if (grainId.IsClient())
                 return this.inClusterGrainLocator.TryLocalLookup(grainId, out addresses);
 
             if (this.cache.LookUp(grainId, out var results))
@@ -225,7 +225,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             return ActivationAddress.GetAddress(
                     SiloAddress.FromParsableString(addr.SiloAddress),
-                    GrainId.FromParsableString(addr.GrainId),
+                    LegacyGrainId.FromParsableString(addr.GrainId),
                     ActivationId.GetActivationId(UniqueKey.Parse(addr.ActivationId.AsSpan())));
         }
 
@@ -234,7 +234,7 @@ namespace Orleans.Runtime.GrainDirectory
             return new GrainAddress
             {
                 SiloAddress = addr.Silo.ToParsableString(),
-                GrainId = addr.Grain.ToParsableString(),
+                GrainId = ((LegacyGrainId)addr.Grain).ToParsableString(),
                 ActivationId = (addr.Activation.Key.ToHexString())
             };
         }

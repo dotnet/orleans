@@ -268,8 +268,8 @@ namespace UnitTests.Serialization
         public void Serialize_ActivationAddress(SerializerToUse serializerToUse)
         {
             var environment = InitializeSerializer(serializerToUse);
-            var grain = GrainId.NewId();
-            var addr = ActivationAddress.GetAddress(null, grain, null);
+            GrainId grain = LegacyGrainId.NewId();
+            var addr = ActivationAddress.GetAddress(null, grain, default);
             object deserialized = OrleansSerializationLoop(environment.SerializationManager, addr, false);
             Assert.IsAssignableFrom<ActivationAddress>(deserialized);
             Assert.Null(((ActivationAddress)deserialized).Activation); //Activation no longer null after copy
@@ -546,12 +546,12 @@ namespace UnitTests.Serialization
             source4[0] = new GrainReference[2];
             source4[1] = new GrainReference[3];
             source4[2] = new GrainReference[1];
-            source4[0][0] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
-            source4[0][1] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
-            source4[1][0] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
-            source4[1][1] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
-            source4[1][2] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
-            source4[2][0] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
+            source4[0][0] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[0][1] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[1][0] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[1][1] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[1][2] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[2][0] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             deserialized = OrleansSerializationLoop(environment.SerializationManager, source4);
             ValidateArrayOfArrays(source4, deserialized, "grain reference");
 
@@ -561,7 +561,7 @@ namespace UnitTests.Serialization
                 source5[i] = new GrainReference[64];
                 for (int j = 0; j < source5[i].Length; j++)
                 {
-                    source5[i][j] = environment.InternalGrainFactory.GetGrain(GrainId.NewId());
+                    source5[i][j] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
                 }
             }
             deserialized = OrleansSerializationLoop(environment.SerializationManager, source5);
@@ -737,7 +737,7 @@ namespace UnitTests.Serialization
         //public void Serialize_RequestInvocationHistory()
         //{
         //    //Message inMsg = new Message();
-        //    //inMsg.TargetGrain = GrainId.NewId();
+        //    //inMsg.TargetGrain = LegacyGrainId.NewId();
         //    //inMsg.TargetActivation = ActivationId.NewId();
         //    //inMsg.InterfaceId = 12;
         //    //inMsg.MethodId = 13;
@@ -777,14 +777,14 @@ namespace UnitTests.Serialization
         public void Serialize_GrainReference(SerializerToUse serializerToUse)
         {
             var environment = InitializeSerializer(serializerToUse);
-            GrainId grainId = GrainId.NewId();
+            GrainId grainId = LegacyGrainId.NewId();
             GrainReference input = environment.InternalGrainFactory.GetGrain(grainId);
 
             object deserialized = OrleansSerializationLoop(environment.SerializationManager, input);
 
             var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
             Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
-            Assert.Equal(grainId.GetPrimaryKey(), grainRef.GrainId.GetPrimaryKey()); //PK different after copy
+            Assert.Equal(((LegacyGrainId)grainId).GetPrimaryKey(), ((LegacyGrainId)grainRef.GrainId).GetPrimaryKey()); //PK different after copy
             Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
         }
 
@@ -793,7 +793,7 @@ namespace UnitTests.Serialization
         public void Serialize_GrainReference_ViaStandardSerializer(SerializerToUse serializerToUse)
         {
             var environment = InitializeSerializer(serializerToUse);
-            GrainId grainId = GrainId.NewId();
+            GrainId grainId = LegacyGrainId.NewId();
             GrainReference input = environment.InternalGrainFactory.GetGrain(grainId);
             Assert.True(input.IsBound);
 
@@ -801,7 +801,7 @@ namespace UnitTests.Serialization
             var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
             Assert.True(grainRef.IsBound);
             Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
-            Assert.Equal(grainId.GetPrimaryKey(), grainRef.GrainId.GetPrimaryKey()); //PK different after copy
+            Assert.Equal(((LegacyGrainId)grainId).GetPrimaryKey(), ((LegacyGrainId)grainRef.GrainId).GetPrimaryKey()); //PK different after copy
             Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
         }
         

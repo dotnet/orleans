@@ -233,7 +233,7 @@ namespace Orleans.Messaging
             }
 
             // For untargeted messages to system targets, and for unordered messages, pick a next connection in round robin fashion.
-            if (msg.TargetGrain.IsSystemTarget || msg.IsUnordered)
+            if (msg.TargetGrain.IsSystemTarget() || msg.IsUnordered)
             {
                 // Get the cached list of live gateways.
                 // Pick a next gateway name in a round robin fashion.

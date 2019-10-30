@@ -8,28 +8,6 @@ using Orleans.Serialization;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Indicates that a <see cref="GrainReference"/> was not bound to the runtime before being used.
-    /// </summary>
-    [Serializable]
-    public class GrainReferenceNotBoundException : OrleansException
-    {
-        internal GrainReferenceNotBoundException(GrainReference grainReference) : base(CreateMessage(grainReference)) { }
-
-        private static string CreateMessage(GrainReference grainReference)
-        {
-            return $"Attempted to use a GrainReference which has not been bound to the runtime: {grainReference.ToDetailedString()}." +
-                   $" Use the {nameof(IGrainFactory)}.{nameof(IGrainFactory.BindGrainReference)} method to bind this reference to the runtime.";
-        }
-
-        internal GrainReferenceNotBoundException(string msg) : base(msg) { }
-        internal GrainReferenceNotBoundException(string message, Exception innerException) : base(message, innerException) { }
-
-        protected GrainReferenceNotBoundException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        { }
-    }
-
-    /// <summary>
     /// This is the base class for all typed grain references.
     /// </summary>
     [Serializable]
@@ -44,11 +22,11 @@ namespace Orleans.Runtime
         [NonSerialized]
         private readonly InvokeMethodOptions invokeMethodOptions;
 
-        internal bool IsSystemTarget { get { return GrainId.IsSystemTarget; } }
+        internal bool IsSystemTarget { get { return GrainId.IsSystemTarget(); } }
 
         public bool IsGrainService => this.IsSystemTarget;  // TODO make this distinct
 
-        internal bool IsObserverReference { get { return GrainId.IsClient; } }
+        internal bool IsObserverReference { get { return GrainId.IsClient(); } }
 
         internal GuidId ObserverId { get { return observerId; } }
         
@@ -68,9 +46,7 @@ namespace Orleans.Runtime
         /// </summary>
         internal bool IsBound => this.runtime != null;
 
-        internal GrainId GrainId { get; private set; }
-
-        public IGrainIdentity GrainIdentity => this.GrainId;
+        public GrainId GrainId { get; private set; }
 
         /// <summary>
         /// Called from generated code.
@@ -103,43 +79,55 @@ namespace Orleans.Runtime
             this.SystemTargetSilo = systemTargetSilo;
             this.observerId = observerId;
             this.runtime = runtime;
-            if (String.IsNullOrEmpty(genericArgument))
+            if (string.IsNullOrEmpty(genericArgument))
             {
                 genericArguments = null; // always keep it null instead of empty.
             }
 
             // SystemTarget checks
-            if (grainId.IsSystemTarget && systemTargetSilo==null)
+            var isSystemTarget = grainId.IsSystemTarget();
+            if (isSystemTarget)
             {
-                throw new ArgumentNullException("systemTargetSilo", String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, but passing null systemTargetSilo.", grainId));
+                if (systemTargetSilo == null)
+                {
+                    throw new ArgumentNullException("systemTargetSilo", String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, but passing null systemTargetSilo.", grainId));
+                }
+
+                if (genericArguments != null)
+                {
+                    throw new ArgumentException(String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments), "genericArgument");
+                }
+
+                if (observerId != null)
+                {
+                    throw new ArgumentException(String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null observerId {1}.", grainId, observerId), "genericArgument");
+                }
             }
-            if (grainId.IsSystemTarget && genericArguments != null)
-            {
-                throw new ArgumentException(String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments), "genericArgument");
-            }
-            if (grainId.IsSystemTarget && observerId != null)
-            {
-                throw new ArgumentException(String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null observerId {1}.", grainId, observerId), "genericArgument");
-            }
-            if (!grainId.IsSystemTarget && systemTargetSilo != null)
+            else if (systemTargetSilo != null)
             {
                 throw new ArgumentException(String.Format("Trying to create a GrainReference for non-SystemTarget grain id {0}, but passing a non-null systemTargetSilo {1}.", grainId, systemTargetSilo), "systemTargetSilo");
             }
 
             // ObserverId checks
-            if (grainId.IsClient && observerId == null)
+            var isClient = grainId.IsClient();
+            if (isClient)
             {
-                throw new ArgumentNullException("observerId", String.Format("Trying to create a GrainReference for Observer with Client grain id {0}, but passing null observerId.", grainId));
+                if (observerId == null)
+                {
+                    throw new ArgumentNullException("observerId", String.Format("Trying to create a GrainReference for Observer with Client grain id {0}, but passing null observerId.", grainId));
+                }
+
+                if (genericArguments != null)
+                {
+                    throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments), "genericArgument");
+                }
+
+                if (systemTargetSilo != null)
+                {
+                    throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null systemTargetSilo {1}.", grainId, systemTargetSilo), "genericArgument");
+                }
             }
-            if (grainId.IsClient && genericArguments != null)
-            {
-                throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments), "genericArgument");
-            }
-            if (grainId.IsClient && systemTargetSilo != null)
-            {
-                throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null systemTargetSilo {1}.", grainId, systemTargetSilo), "genericArgument");
-            }
-            if (!grainId.IsClient && observerId != null)
+            else if (observerId != null)
             {
                 throw new ArgumentException(String.Format("Trying to create a GrainReference with non null Observer {0}, but non Client grain id {1}.", observerId, grainId), "observerId");
             }
@@ -237,7 +225,7 @@ namespace Orleans.Runtime
         public uint GetUniformHashCode()
         {
             // GrainId already includes the hashed type code for generic arguments.
-            return GrainId.GetUniformHashCode();
+            return (uint)GrainId.GetHashCode();
         }
 
         /// <summary>
@@ -367,13 +355,13 @@ namespace Orleans.Runtime
         {
             if (IsSystemTarget)
             {
-                return String.Format("{0}:{1}/{2}", SYSTEM_TARGET_STR, GrainId.ToDetailedString(), SystemTargetSilo);
+                return String.Format("{0}:{1}/{2}", SYSTEM_TARGET_STR, GrainId.ToString(), SystemTargetSilo);
             }
             if (IsObserverReference)
             {
-                return String.Format("{0}:{1}/{2}", OBSERVER_ID_STR, GrainId.ToDetailedString(), observerId.ToDetailedString());
+                return String.Format("{0}:{1}/{2}", OBSERVER_ID_STR, GrainId.ToString(), observerId.ToString());
             }
-            return String.Format("{0}:{1}{2}", GRAIN_REFERENCE_STR, GrainId.ToDetailedString(),
+            return String.Format("{0}:{1}{2}", GRAIN_REFERENCE_STR, GrainId.ToString(),
                    !HasGenericArgument ? String.Empty : String.Format("<{0}>", genericArguments)); 
         }
 
@@ -383,34 +371,17 @@ namespace Orleans.Runtime
         {
             if (IsObserverReference)
             {
-                return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, GrainId.ToParsableString(), OBSERVER_ID_STR, observerId.ToParsableString());
+                return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, ((LegacyGrainId)GrainId).ToParsableString(), OBSERVER_ID_STR, observerId.ToParsableString());
             }
             if (IsSystemTarget)
             {
-                return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, GrainId.ToParsableString(), SYSTEM_TARGET_STR, SystemTargetSilo.ToParsableString());
+                return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, ((LegacyGrainId)GrainId).ToParsableString(), SYSTEM_TARGET_STR, SystemTargetSilo.ToParsableString());
             }
             if (HasGenericArgument)
             {
-                return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, GrainId.ToParsableString(), GENERIC_ARGUMENTS_STR, genericArguments);
+                return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, ((LegacyGrainId)GrainId).ToParsableString(), GENERIC_ARGUMENTS_STR, genericArguments);
             }
-            return String.Format("{0}={1}", GRAIN_REFERENCE_STR, GrainId.ToParsableString());
-        }
-
-        public GrainReferenceKeyInfo ToKeyInfo()
-        {
-            if (IsObserverReference)
-            {
-                return new GrainReferenceKeyInfo(GrainId.ToKeyInfo(), observerId.Guid);
-            }
-            if (IsSystemTarget)
-            {
-                return new GrainReferenceKeyInfo(GrainId.ToKeyInfo(), (SystemTargetSilo.Endpoint, SystemTargetSilo.Generation));
-            }
-            if (HasGenericArgument)
-            {
-                return new GrainReferenceKeyInfo(GrainId.ToKeyInfo(), genericArguments);
-            }
-            return new GrainReferenceKeyInfo(GrainId.ToKeyInfo());
+            return String.Format("{0}={1}", GRAIN_REFERENCE_STR, ((LegacyGrainId)GrainId).ToParsableString());
         }
         
         internal static GrainReference FromKeyString(string key, IGrainReferenceRuntime runtime)
@@ -429,26 +400,26 @@ namespace Orleans.Runtime
             {
                 grainIdStr = trimmed.Slice(grainIdIndex, genericIndex - grainIdIndex).Trim();
                 ReadOnlySpan<char> genericStr = trimmed.Slice(genericIndex + GENERIC_ARGUMENTS_STR_WITH_EQUAL_SIGN.Length);
-                return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime, genericStr.ToString());
+                return FromGrainId(LegacyGrainId.FromParsableString(grainIdStr), runtime, genericStr.ToString());
             }
             else if (observerIndex >= 0)
             {
                 grainIdStr = trimmed.Slice(grainIdIndex, observerIndex - grainIdIndex).Trim();
                 ReadOnlySpan<char> observerIdStr = trimmed.Slice(observerIndex + OBSERVER_ID_STR_WITH_EQUAL_SIGN.Length);
                 GuidId observerId = GuidId.FromParsableString(observerIdStr.ToString());
-                return NewObserverGrainReference(GrainId.FromParsableString(grainIdStr), observerId, runtime);
+                return NewObserverGrainReference(LegacyGrainId.FromParsableString(grainIdStr), observerId, runtime);
             }
             else if (systemTargetIndex >= 0)
             {
                 grainIdStr = trimmed.Slice(grainIdIndex, systemTargetIndex - grainIdIndex).Trim();
                 ReadOnlySpan<char> systemTargetStr = trimmed.Slice(systemTargetIndex + SYSTEM_TARGET_STR_WITH_EQUAL_SIGN.Length);
                 SiloAddress siloAddress = SiloAddress.FromParsableString(systemTargetStr.ToString());
-                return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime, null, siloAddress);
+                return FromGrainId(LegacyGrainId.FromParsableString(grainIdStr), runtime, null, siloAddress);
             }
             else
             {
                 grainIdStr = trimmed.Slice(grainIdIndex);
-                return FromGrainId(GrainId.FromParsableString(grainIdStr), runtime);
+                return FromGrainId(LegacyGrainId.FromParsableString(grainIdStr), runtime);
             }
         }
 
@@ -456,19 +427,19 @@ namespace Orleans.Runtime
         {
             if (keyInfo.HasGenericArgument)
             {
-                return FromGrainId(GrainId.FromKeyInfo(keyInfo.Key), runtime, keyInfo.GenericArgument);
+                return FromGrainId(LegacyGrainId.FromKeyInfo(keyInfo.Key), runtime, keyInfo.GenericArgument);
             }
             else if (keyInfo.HasObserverId)
             {
-                return NewObserverGrainReference(GrainId.FromKeyInfo(keyInfo.Key), GuidId.GetGuidId(keyInfo.ObserverId), runtime);
+                return NewObserverGrainReference(LegacyGrainId.FromKeyInfo(keyInfo.Key), GuidId.GetGuidId(keyInfo.ObserverId), runtime);
             }
             else if (keyInfo.HasTargetSilo)
             {
-                return FromGrainId(GrainId.FromKeyInfo(keyInfo.Key), runtime, null, SiloAddress.New(keyInfo.TargetSilo.endpoint, keyInfo.TargetSilo.generation));
+                return FromGrainId(LegacyGrainId.FromKeyInfo(keyInfo.Key), runtime, null, SiloAddress.New(keyInfo.TargetSilo.endpoint, keyInfo.TargetSilo.generation));
             }
             else
             {
-                return FromGrainId(GrainId.FromKeyInfo(keyInfo.Key), runtime);
+                return FromGrainId(LegacyGrainId.FromKeyInfo(keyInfo.Key), runtime);
             }
         }
 
@@ -476,7 +447,7 @@ namespace Orleans.Runtime
         public virtual void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             // Use the AddValue method to specify serialized values.
-            info.AddValue("GrainId", GrainId.ToParsableString(), typeof(string));
+            info.AddValue("GrainId", GrainId, typeof(GrainId));
             if (IsSystemTarget)
             {
                 info.AddValue("SystemTargetSilo", SystemTargetSilo.ToParsableString(), typeof(string));
@@ -495,8 +466,7 @@ namespace Orleans.Runtime
         protected GrainReference(SerializationInfo info, StreamingContext context)
         {
             // Reset the property value using the GetValue method.
-            var grainIdStr = info.GetString("GrainId");
-            GrainId = GrainId.FromParsableString(grainIdStr);
+            GrainId = (GrainId)info.GetValue("GrainId", typeof(GrainId));
             if (IsSystemTarget)
             {
                 var siloAddressStr = info.GetString("SystemTargetSilo");

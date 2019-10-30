@@ -142,7 +142,7 @@ namespace DefaultCluster.Tests.General
         [Fact(Skip = "GrainReference interning is not currently implemented."), TestCategory("Serialization"), TestCategory("Interner")]
         public void GrainReference_Interning()
         {
-            var grainId = GrainId.GetGrainIdForTesting(new Guid());
+            var grainId = LegacyGrainId.GetGrainIdForTesting(new Guid());
             var g1 = GrainReference.FromGrainId(grainId, null);
             var g2 = GrainReference.FromGrainId(grainId, null);
             Assert.Equal(g1, g2); // Should be equal GrainReferences

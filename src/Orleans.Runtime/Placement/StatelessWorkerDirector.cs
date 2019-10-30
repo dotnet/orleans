@@ -45,7 +45,7 @@ namespace Orleans.Runtime.Placement
 
         private PlacementResult SelectActivationCore(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
-            if (target.IsClient)
+            if (target.IsClient())
                 throw new InvalidOperationException("Cannot use StatelessWorkerStrategy to route messages to client grains.");
 
             // If there are available (not busy with a request) activations, it returns the first one.

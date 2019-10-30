@@ -479,7 +479,7 @@ namespace Orleans.Runtime.ReminderService
         private static GrainId GetGrainId()
         {
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService));
-            return GrainId.GetGrainServiceGrainId(0, typeCode);
+            return LegacyGrainId.GetGrainServiceGrainId(0, typeCode);
         }
 
         private class LocalReminderData

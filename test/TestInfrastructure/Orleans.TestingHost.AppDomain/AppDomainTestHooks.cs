@@ -50,7 +50,7 @@ namespace Orleans.TestingHost
             var catalog = this.host.Services.GetRequiredService<Catalog>();
             foreach (var kvp in localGrainDirectory.DirectoryPartition.GetItems())
             {
-                if (kvp.Key.IsSystemTarget || kvp.Key.IsClient || !kvp.Key.IsGrain)
+                if (kvp.Key.IsSystemTarget() || kvp.Key.IsClient() || !kvp.Key.IsLegacyGrain())
                     continue;// Skip system grains, system targets and clients
                 if (catalog.GetGrainTypeName(kvp.Key).Contains(expr))
                     x.Add(kvp.Key, kvp.Value);

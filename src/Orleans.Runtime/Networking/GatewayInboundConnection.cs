@@ -71,13 +71,13 @@ namespace Orleans.Runtime.Messaging
             {
                 // reroute via Dispatcher
                 msg.TargetSilo = null;
-                msg.TargetActivation = null;
+                msg.TargetActivation = default;
                 msg.ClearTargetAddress();
 
-                if (msg.TargetGrain.IsSystemTarget)
+                if (msg.TargetGrain.IsSystemTarget())
                 {
                     msg.TargetSilo = this.myAddress;
-                    msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, this.myAddress);
+                    msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 
                 MessagingStatisticsGroup.OnMessageReRoute(msg);

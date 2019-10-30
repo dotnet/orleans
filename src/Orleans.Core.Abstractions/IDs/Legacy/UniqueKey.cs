@@ -8,7 +8,7 @@ using System.Text;
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal class UniqueKey : IComparable<UniqueKey>, IEquatable<UniqueKey>
+    public class UniqueKey : IComparable<UniqueKey>, IEquatable<UniqueKey>
     {
         private const ulong TYPE_CODE_DATA_MASK = 0xFFFFFFFF; // Lowest 4 bytes
         private static readonly char[] KeyExtSeparationChar = {'+'};

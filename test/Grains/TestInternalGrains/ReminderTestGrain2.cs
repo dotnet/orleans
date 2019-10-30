@@ -47,7 +47,7 @@ namespace UnitTests.Grains
             this.sequence = new Dictionary<string, long>();
             this.period = GetDefaultPeriod(this.logger);
             this.logger.Info("OnActivateAsync.");
-            this.filePrefix = "g" + this.Identity.PrimaryKey + "_";
+            this.filePrefix = "g" + this.Identity.ToString().Replace('/', '_') + "_";
             return GetMissingReminders();
         }
 
@@ -240,7 +240,7 @@ namespace UnitTests.Grains
             this.sequence = new Dictionary<string, long>();
             this.period = ReminderTestGrain2.GetDefaultPeriod(this.logger);
             this.logger.Info("OnActivateAsync.");
-            this.filePrefix = "gc" + this.Identity.PrimaryKey + "_";
+            this.filePrefix = "gc" + ((LegacyGrainId)this.Identity).PrimaryKey + "_";
             await GetMissingReminders();
         }
 

@@ -1,343 +1,115 @@
 using System;
-using System.Globalization;
-using Orleans.Core;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
+using System.Text;
+using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
+    [Immutable]
     [Serializable]
-    internal class GrainId : UniqueIdentifier, IEquatable<GrainId>, IGrainIdentity
+    [StructLayout(LayoutKind.Auto)]
+    public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
     {
-        private static readonly object lockable = new object();
-        private const int INTERN_CACHE_INITIAL_SIZE = InternerConstants.SIZE_LARGE;
-        private static readonly TimeSpan internCacheCleanupInterval = InternerConstants.DefaultCacheCleanupFreq;
+        private readonly GrainType _type;
+        private readonly SpanId _key;
 
-        private static Interner<UniqueKey, GrainId> grainIdInternCache;
+        public GrainId(GrainType type, SpanId key)
+        {
+            _type = type;
+            _key = key;
+        }
 
-        public UniqueKey.Category Category => Key.IdCategory;
-
-        public bool IsSystemTarget => Key.IsSystemTargetKey; 
-
-        public bool IsGrain => Category == UniqueKey.Category.Grain || Category == UniqueKey.Category.KeyExtGrain; 
-
-        public bool IsClient => Category == UniqueKey.Category.Client; 
-
-        internal GrainId(UniqueKey key)
-            : base(key)
+        public GrainId(byte[] type, byte[] key) : this(new GrainType(type), new SpanId(key))
         {
         }
 
-        public static GrainId NewId()
+        public GrainId(GrainType type, byte[] key, int keyHashCode) : this(type, new SpanId(key, keyHashCode)) { }
+
+
+        public GrainId(GrainType type, byte[] key) : this(type, new SpanId(key))
         {
-            return FindOrCreateGrainId(UniqueKey.NewKey(Guid.NewGuid(), UniqueKey.Category.Grain));
         }
 
-        public static GrainId NewClientId()
+        public GrainId(SerializationInfo info, StreamingContext context)
         {
-            return NewClientId(Guid.NewGuid());
+            _type = new GrainType((byte[])info.GetValue("tv", typeof(byte[])), info.GetInt32("th"));
+            _key = new SpanId((byte[])info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
         }
 
-        internal static GrainId NewClientId(Guid id)
+        // TODO: remove implicit conversion (potentially make explicit to start with)
+        public static implicit operator LegacyGrainId(GrainId id) => LegacyGrainId.FromGrainId(id);
+
+        public static GrainId Create(string type, string key) => Create(GrainType.Create(type), key);
+
+        public static GrainId Create(string type, Guid key) => Create(GrainType.Create(type), key.ToString("N"));
+
+        public static GrainId Create(GrainType type, string key) => new GrainId(type, Encoding.UTF8.GetBytes(key));
+
+        public static GrainId Create(GrainType type, SpanId key) => new GrainId(type, key);
+
+        public readonly GrainType Type => _type;
+
+        public readonly SpanId Key => _key;
+
+        public readonly bool IsDefault => _type.IsDefault && _key.IsDefault;
+
+        public override bool Equals(object obj) => obj is GrainId id && this.Equals(id);
+
+        public bool Equals(GrainId other) => this.Type.Equals(other.Type) && this._key.Equals(other._key);
+
+        public override readonly int GetHashCode() => HashCode.Combine(_type, _key);
+
+        public readonly uint GetUniformHashCode() => unchecked((uint)this.GetHashCode());
+
+        public uint GetHashCode_Modulo(uint umod)
         {
-            return FindOrCreateGrainId(UniqueKey.NewKey(id, UniqueKey.Category.Client, 0));
+            int key = GetHashCode();
+            int mod = (int)umod;
+            key = ((key % mod) + mod) % mod; // key should be positive now. So assert with checked.
+            return checked((uint)key);
         }
 
-        internal static GrainId GetGrainId(UniqueKey key)
+        public readonly void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            return FindOrCreateGrainId(key);
+            info.AddValue("tv", GrainType.UnsafeGetArray(_type));
+            info.AddValue("th", _type.GetHashCode());
+            info.AddValue("kv", SpanId.UnsafeGetArray(_key));
+            info.AddValue("kh", _key.GetHashCode());
         }
 
-        internal static GrainId GetSystemGrainId(Guid guid)
+        public int CompareTo(GrainId other)
         {
-            return FindOrCreateGrainId(UniqueKey.NewKey(guid, UniqueKey.Category.SystemGrain));
+            var typeComparison = _type.CompareTo(other._type);
+            if (typeComparison != 0) return typeComparison;
+
+            return _key.CompareTo(other._key);
         }
 
-        // For testing only.
-        internal static GrainId GetGrainIdForTesting(Guid guid)
+        public static bool operator ==(GrainId a, GrainId b) => a.Equals(b);
+
+        public static bool operator !=(GrainId a, GrainId b) => !a.Equals(b);
+
+        public static bool operator >(GrainId a, GrainId b) => a.CompareTo(b) > 0;
+
+        public static bool operator <(GrainId a, GrainId b) => a.CompareTo(b) < 0;
+
+        public override readonly string ToString() => $"{_type.ToStringUtf8()}/{_key.ToStringUtf8()}";
+
+        public static (byte[] Key, int KeyHashCode) UnsafeGetKey(GrainId id) => (SpanId.UnsafeGetArray(id._key), id._key.GetHashCode());
+
+        public static SpanId KeyAsSpanId(GrainId id) => id._key;
+
+        public sealed class Comparer : IEqualityComparer<GrainId>, IComparer<GrainId>
         {
-            return FindOrCreateGrainId(UniqueKey.NewKey(guid, UniqueKey.Category.None));
-        }
+            public static Comparer Instance { get; } = new Comparer();
 
-        internal static GrainId NewSystemTargetGrainIdByTypeCode(int typeData)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewSystemTargetKey(Guid.NewGuid(), typeData));
-        }
+            public int Compare(GrainId x, GrainId y) => x.CompareTo(y);
 
-        internal static GrainId GetSystemTargetGrainId(short systemGrainId)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewSystemTargetKey(systemGrainId));
-        }
+            public bool Equals(GrainId x, GrainId y) => x.Equals(y);
 
-        internal static GrainId GetGrainId(long typeCode, long primaryKey, string keyExt=null)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewKey(primaryKey, 
-                keyExt == null ? UniqueKey.Category.Grain : UniqueKey.Category.KeyExtGrain, 
-                typeCode, keyExt));
-        }
-
-        internal static GrainId GetGrainId(long typeCode, Guid primaryKey, string keyExt=null)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewKey(primaryKey, 
-                keyExt == null ? UniqueKey.Category.Grain : UniqueKey.Category.KeyExtGrain, 
-                typeCode, keyExt));
-        }
-
-        internal static GrainId GetGrainId(long typeCode, string primaryKey)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewKey(0L,
-                UniqueKey.Category.KeyExtGrain,
-                typeCode, primaryKey));
-        }
-
-        internal static GrainId GetGrainServiceGrainId(short id, int typeData)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(id, typeData));
-        }
-
-        internal static GrainId GetGrainServiceGrainId(int typeData, string systemGrainId)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(systemGrainId, typeData));
-        }
-
-        public Guid PrimaryKey
-        {
-            get { return GetPrimaryKey(); }
-        }
-
-        public long PrimaryKeyLong
-        {
-            get { return GetPrimaryKeyLong(); }
-        }
-
-        public string PrimaryKeyString
-        {
-            get { return GetPrimaryKeyString(); }
-        }
-
-        public string IdentityString
-        {
-            get { return ToDetailedString(); }
-        }
-
-        public bool IsLongKey
-        {
-            get { return Key.IsLongKey; }
-        }
-
-        public long GetPrimaryKeyLong(out string keyExt)
-        {
-            return Key.PrimaryKeyToLong(out keyExt);
-        }
-
-        internal long GetPrimaryKeyLong()
-        {
-            return Key.PrimaryKeyToLong();
-        }
-
-        public Guid GetPrimaryKey(out string keyExt)
-        {
-            return Key.PrimaryKeyToGuid(out keyExt);
-        }
-
-        internal Guid GetPrimaryKey()
-        {
-            return Key.PrimaryKeyToGuid();
-        }
-
-        internal string GetPrimaryKeyString()
-        {
-            string key;
-            var tmp = GetPrimaryKey(out key);
-            return key;
-        }
-
-        public int TypeCode => Key.BaseTypeCode;
-
-        private static GrainId FindOrCreateGrainId(UniqueKey key)
-        {
-            // Note: This is done here to avoid a wierd cyclic dependency / static initialization ordering problem involving the GrainId, Constants & Interner classes
-            if (grainIdInternCache != null) return grainIdInternCache.FindOrCreate(key, k => new GrainId(k));
-
-            lock (lockable)
-            {
-                if (grainIdInternCache == null)
-                {
-                    grainIdInternCache = new Interner<UniqueKey, GrainId>(INTERN_CACHE_INITIAL_SIZE, internCacheCleanupInterval);
-                }
-            }
-            return grainIdInternCache.FindOrCreate(key, k => new GrainId(k));
-        }
-
-        public bool Equals(GrainId other)
-        {
-            return other != null && Key.Equals(other.Key);
-        }
-
-        public override bool Equals(UniqueIdentifier obj)
-        {
-            var o = obj as GrainId;
-            return o != null && Key.Equals(o.Key);
-        }
-
-        public override bool Equals(object obj)
-        {
-            var o = obj as GrainId;
-            return o != null && Key.Equals(o.Key);
-        }
-
-        // Keep compiler happy -- it does not like classes to have Equals(...) without GetHashCode() methods
-        public override int GetHashCode()
-        {
-            return Key.GetHashCode();
-        }
-
-        /// <summary>
-        /// Get a uniformly distributed hash code value for this grain, based on Jenkins Hash function.
-        /// NOTE: Hash code value may be positive or NEGATIVE.
-        /// </summary>
-        /// <returns>Hash code for this GrainId</returns>
-        public uint GetUniformHashCode()
-        {
-            return Key.GetUniformHashCode();
-        }
-
-        public override string ToString()
-        {
-            return ToStringImpl(false);
-        }
-
-        // same as ToString, just full primary key and type code
-        internal string ToDetailedString()
-        {
-            return ToStringImpl(true);
-        }
-
-        // same as ToString, just full primary key and type code
-        private string ToStringImpl(bool detailed)
-        {
-            // TODO Get name of system/target grain + name of the grain type
-
-            var keyString = Key.ToString();
-            // this should grab the least-significant half of n1, suffixing it with the key extension.
-            string idString = keyString;
-            if (!detailed)
-            {
-                if (keyString.Length >= 48)
-                    idString = keyString.Substring(24, 8) + keyString.Substring(48);
-                else
-                    idString = keyString.Substring(24, 8);
-            }
-
-            string fullString = null;
-            switch (Category)
-            {
-                case UniqueKey.Category.Grain:
-                case UniqueKey.Category.KeyExtGrain:
-                    var typeString = TypeCode.ToString("X");
-                    if (!detailed) typeString = typeString.Substring(Math.Max(0, typeString.Length - 8));
-                    fullString = $"*grn/{typeString}/{idString}";
-                    break;
-                case UniqueKey.Category.Client:
-                    fullString = $"*cli/{idString}";
-                    break;
-                case UniqueKey.Category.SystemTarget:
-                case UniqueKey.Category.KeyExtSystemTarget:
-                    fullString = $"*stg/{Key.N1}/{idString}";
-                    break;
-                case UniqueKey.Category.SystemGrain:
-                    fullString = $"*sgn/{Key.PrimaryKeyToGuid()}/{idString}";
-                    break;
-                default:
-                    fullString = "???/" + idString;
-                    break;
-            }
-            return detailed ? String.Format("{0}-0x{1, 8:X8}", fullString, GetUniformHashCode()) : fullString;
-        }
-
-        internal string ToFullString()
-        {
-            string kx;
-            string pks =
-                Key.IsLongKey ?
-                    GetPrimaryKeyLong(out kx).ToString(CultureInfo.InvariantCulture) :
-                    GetPrimaryKey(out kx).ToString();
-            string pksHex =
-                Key.IsLongKey ?
-                    GetPrimaryKeyLong(out kx).ToString("X") :
-                    GetPrimaryKey(out kx).ToString("X");
-            return
-                String.Format(
-                    "[GrainId: {0}, IdCategory: {1}, BaseTypeCode: {2} (x{3}), PrimaryKey: {4} (x{5}), UniformHashCode: {6} (0x{7, 8:X8}){8}]",
-                    ToDetailedString(),                // 0
-                    Category,                          // 1
-                    TypeCode,                          // 2
-                    TypeCode.ToString("X"),            // 3
-                    pks,                               // 4
-                    pksHex,                            // 5
-                    GetUniformHashCode(),              // 6
-                    GetUniformHashCode(),              // 7
-                    Key.HasKeyExt ?  String.Format(", KeyExtension: {0}", kx) : "");   // 8
-        }
-
-        internal string ToStringWithHashCode()
-        {
-            return String.Format("{0}-0x{1, 8:X8}", this.ToString(), this.GetUniformHashCode()); 
-        }
-
-        /// <summary>
-        /// Return this GrainId in a standard string form, suitable for later use with the <c>FromParsableString</c> method.
-        /// </summary>
-        /// <returns>GrainId in a standard string format.</returns>
-        internal string ToParsableString()
-        {
-            // NOTE: This function must be the "inverse" of FromParsableString, and data must round-trip reliably.
-
-            return Key.ToHexString();
-        }
-
-        /// <summary>
-        /// Return this GrainId in a standard components form, suitable for later use with the <see cref="FromKeyInfo"/> method.
-        /// </summary>
-        /// <returns>GrainId in a standard components form.</returns>
-        internal (ulong, ulong, ulong, string) ToKeyInfo()
-        {
-            return (Key.N0, Key.N1, Key.TypeCodeData, Key.KeyExt);
-        }
-
-        /// <summary>
-        /// Create a new GrainId object by parsing string in a standard form returned from <c>ToParsableString</c> method.
-        /// </summary>
-        /// <param name="grainId">String containing the GrainId info to be parsed.</param>
-        /// <returns>New GrainId object created from the input data.</returns>
-        internal static GrainId FromParsableString(string grainId)
-        {
-            return FromParsableString(grainId.AsSpan());
-        }
-
-        /// <summary>
-        /// Create a new GrainId object by parsing string in a standard form returned from <c>ToParsableString</c> method.
-        /// </summary>
-        /// <param name="grainId">String containing the GrainId info to be parsed.</param>
-        /// <returns>New GrainId object created from the input data.</returns>
-        internal static GrainId FromParsableString(ReadOnlySpan<char> grainId)
-        {
-            // NOTE: This function must be the "inverse" of ToParsableString, and data must round-trip reliably.
-
-            var key = UniqueKey.Parse(grainId);
-            return FindOrCreateGrainId(key);
-        }
-
-        /// <summary>
-        /// Create a new GrainId object by parsing components returned form <see cref="ToKeyInfo"/>.
-        /// </summary>
-        /// <param name="grainId">Components containing the GrainId to be parsed.</param>
-        /// <returns>New GrainId object created from the input data.</returns>
-        internal static GrainId FromKeyInfo((ulong, ulong, ulong, string) grainId)
-        {
-            // NOTE: This function must be the "inverse" of ToKeyInfo, and data must round-trip reliably.
-
-            var (n0, n1, typeCodeData, keyExt) = grainId;
-            var key = UniqueKey.NewKey(n0, n1, typeCodeData, keyExt);
-            return FindOrCreateGrainId(key);
+            public int GetHashCode(GrainId obj) => obj.GetHashCode();
         }
     }
 }

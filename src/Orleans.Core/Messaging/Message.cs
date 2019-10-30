@@ -290,7 +290,7 @@ namespace Orleans.Runtime
             if (id == null) return false;
 
             // don't set expiration for one way, system target and system grain messages.
-            return Direction != Directions.OneWay && !id.IsSystemTarget;
+            return Direction != Directions.OneWay && !id.IsSystemTarget();
         }
 
         public ITransactionInfo TransactionInfo
@@ -480,7 +480,7 @@ namespace Orleans.Runtime
             {
                 history.Append(TargetGrain).Append(":");
             }
-            if (TargetActivation != null)
+            if (TargetActivation is object)
             {
                 history.Append(TargetActivation);
             }
@@ -908,12 +908,12 @@ namespace Orleans.Runtime
                     headers = headers | Headers.FORWARD_COUNT;
 
                 headers = _targetSilo == null ? headers & ~Headers.TARGET_SILO : headers | Headers.TARGET_SILO;
-                headers = _targetGrain == null ? headers & ~Headers.TARGET_GRAIN : headers | Headers.TARGET_GRAIN;
-                headers = _targetActivation == null ? headers & ~Headers.TARGET_ACTIVATION : headers | Headers.TARGET_ACTIVATION;
-                headers = _targetObserverId == null ? headers & ~Headers.TARGET_OBSERVER : headers | Headers.TARGET_OBSERVER;
-                headers = _sendingSilo == null ? headers & ~Headers.SENDING_SILO : headers | Headers.SENDING_SILO;
-                headers = _sendingGrain == null ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
-                headers = _sendingActivation == null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
+                headers = _targetGrain.IsDefault ? headers & ~Headers.TARGET_GRAIN : headers | Headers.TARGET_GRAIN;
+                headers = _targetActivation is null ? headers & ~Headers.TARGET_ACTIVATION : headers | Headers.TARGET_ACTIVATION;
+                headers = _targetObserverId is null ? headers & ~Headers.TARGET_OBSERVER : headers | Headers.TARGET_OBSERVER;
+                headers = _sendingSilo is null ? headers & ~Headers.SENDING_SILO : headers | Headers.SENDING_SILO;
+                headers = _sendingGrain.IsDefault ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
+                headers = _sendingActivation is null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
                 headers = _isNewPlacement == default(bool) ? headers & ~Headers.IS_NEW_PLACEMENT : headers | Headers.IS_NEW_PLACEMENT;
                 headers = _isReturnedFromRemoteCluster == default(bool) ? headers & ~Headers.IS_RETURNED_FROM_REMOTE_CLUSTER : headers | Headers.IS_RETURNED_FROM_REMOTE_CLUSTER;
                 headers = _isUsingIfaceVersion == default(bool) ? headers & ~Headers.IS_USING_INTERFACE_VERSION : headers | Headers.IS_USING_INTERFACE_VERSION;

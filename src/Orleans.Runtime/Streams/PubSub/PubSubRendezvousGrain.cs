@@ -410,7 +410,7 @@ namespace Orleans.Streams
             {
                 var grainRef = producer.Producer as GrainReference;
                 // if producer is a system target on and unavailable silo, remove it.
-                if (grainRef == null || grainRef.GrainId.IsSystemTarget)
+                if (grainRef == null || grainRef.GrainId.IsSystemTarget())
                 {
                     RemoveProducer(producer);
                 }

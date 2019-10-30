@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -43,7 +43,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             TestStoreGrainState state = new TestStoreGrainState();
             var stateProperties = AsDictionary(state);
             var keys = GetKeys(name, reference);
@@ -65,7 +65,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
+            GrainReference reference = fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -89,7 +89,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             var data = TestStoreGrainState.NewRandomState();
 
             output.WriteLine("Using store = {0}", store.GetType().FullName);
@@ -175,7 +175,7 @@ namespace UnitTests.StorageTests
 
             ILocalDataStore store = new HierarchicalKeyStore(2);
 
-            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
+            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             var grainState = TestStoreGrainState.NewRandomState();
             var state = grainState.State;
             Stopwatch sw = new Stopwatch();
@@ -183,7 +183,7 @@ namespace UnitTests.StorageTests
             IList<Tuple<string, string>> keys = new[]
             {
                 Tuple.Create("GrainType", name),
-                Tuple.Create("GrainId", reference.GrainId.GetPrimaryKey().ToString("N"))
+                Tuple.Create("GrainId", ((LegacyGrainId)reference.GrainId).GetPrimaryKey().ToString("N"))
             }.ToList();
             store.WriteRow(keys, AsDictionary(state), grainState.ETag);
             TimeSpan writeTime = sw.Elapsed;
@@ -203,7 +203,7 @@ namespace UnitTests.StorageTests
             var keys = new[]
             {
                 Tuple.Create("GrainType", grainTypeName),
-                Tuple.Create("GrainId", grain.GrainId.GetPrimaryKey().ToString("N"))
+                Tuple.Create("GrainId", ((LegacyGrainId)grain.GrainId).GetPrimaryKey().ToString("N"))
             };
             return keys.ToList();
         }

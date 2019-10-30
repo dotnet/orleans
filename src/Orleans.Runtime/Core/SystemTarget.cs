@@ -65,18 +65,18 @@ namespace Orleans.Runtime
         {
         }
 
-        internal SystemTarget(GrainId grainId, SiloAddress silo, ILoggerFactory loggerFactory) 
+        internal SystemTarget(LegacyGrainId grainId, SiloAddress silo, ILoggerFactory loggerFactory)
             : this(grainId, silo, false, loggerFactory)
         {
         }
 
-        internal SystemTarget(GrainId grainId, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
+        internal SystemTarget(LegacyGrainId grainId, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
         {
             this.grainId = grainId;
-            this.Silo = silo;
+            Silo = silo;
             this.ActivationAddress = ActivationAddress.GetAddress(this.Silo, this.grainId, this.ActivationId);
-            this.ActivationId = ActivationId.GetSystemActivation(grainId, silo);
             this.IsLowPriority = lowPriority;
+            ActivationId = ActivationId.GetDeterministic(grainId);
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
         }
 

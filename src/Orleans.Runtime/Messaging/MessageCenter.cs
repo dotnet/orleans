@@ -31,7 +31,7 @@ namespace Orleans.Runtime.Messaging
 
         public bool TryDeliverToProxy(Message msg)
         {
-            if (msg.TargetGrain is null || !msg.TargetGrain.IsClient) return false;
+            if (!msg.TargetGrain.IsClient()) return false;
             if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)) return true;
             return this.hostedClient is IHostedClient client && client.TryDispatchToClient(msg);
         }

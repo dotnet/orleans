@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -119,6 +120,61 @@ namespace Orleans.Runtime
             var host = IPAddress.Parse(hostString);
             int port = Int32.Parse(portString);
             return New(new IPEndPoint(host, port), Int32.Parse(genString));
+        }
+
+        /// <summary>
+        /// Create a new SiloAddress object by parsing string in a standard form returned from <c>ToParsableString</c> method.
+        /// </summary>
+        /// <param name="addr">String containing the SiloAddress info to be parsed.</param>
+        /// <returns>New SiloAddress object created from the input data.</returns>
+        public static unsafe SiloAddress FromUtf8String(ReadOnlySpan<byte> addr)
+        {
+            // This must be the "inverse" of ToParsableString, and must be the same across all silos in a deployment.
+            // Basically, this should never change unless the data content of SiloAddress changes
+
+            // First is the IPEndpoint; then '@'; then the generation
+            var atSign = addr.IndexOf((byte)SEPARATOR);
+            if (atSign < 0) ThrowInvalidUtf8SiloAddress(addr);
+
+            // IPEndpoint is the host, then ':', then the port
+            var endpointSlice = addr.Slice(0, atSign);
+            int lastColon = endpointSlice.LastIndexOf((byte)':');
+            if (lastColon < 0) ThrowInvalidUtf8SiloAddress(addr);
+
+            IPAddress host;
+            var hostSlice = endpointSlice.Slice(0, lastColon);
+            fixed (byte* hostBytes = hostSlice)
+            {
+                host = IPAddress.Parse(Encoding.UTF8.GetString(hostBytes, hostSlice.Length));
+            }
+
+            int port;
+            var portSlice = endpointSlice.Slice(lastColon + 1);
+            fixed (byte* portBytes = portSlice)
+            {
+                port = int.Parse(Encoding.UTF8.GetString(portBytes, portSlice.Length));
+            }
+
+            int generation;
+            var genSlice = addr.Slice(atSign + 1);
+            fixed (byte* genBytes = genSlice)
+            {
+                generation = int.Parse(Encoding.UTF8.GetString(genBytes, genSlice.Length));
+            }
+
+            return New(new IPEndPoint(host, port), generation);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static unsafe void ThrowInvalidUtf8SiloAddress(ReadOnlySpan<byte> addr)
+        {
+            string addrString;
+            fixed (byte* addrBytes = addr)
+            {
+                addrString = Encoding.UTF8.GetString(addrBytes, addr.Length);
+            }
+
+            throw new FormatException("Invalid string SiloAddress: " + addrString);
         }
 
         /// <summary> Object.ToString method override. </summary>
