@@ -29,7 +29,7 @@ namespace OrleansSiloHost
                             })
                             .UseTls(StoreName.My, "fakedomain.faketld", allowInvalid: isDevelopment, StoreLocation.LocalMachine, options =>
                             {
-                                // In this sample there is only one silo, however if tehre are multiple silos then the TargetHost must be set
+                                // In this sample there is only one silo, however if there are multiple silos then the TargetHost must be set
                                 // for each connection which is initiated.
                                 options.OnAuthenticateAsClient = (connection, sslOptions) =>
                                 {
