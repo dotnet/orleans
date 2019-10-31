@@ -144,7 +144,7 @@ Logic which is common to many grains can be expressed as [Grain Call Filters](ht
 
 ### Request Context
 
-Metadata and other information can be passed along a series of requests using [request context](https://dotnet.github.io/orleans/Documentation/grains/request_context.html). Request context can be used for holing distributed tracing information or any other user-defined values.
+Metadata and other information can be passed along a series of requests using [request context](https://dotnet.github.io/orleans/Documentation/grains/request_context.html). Request context can be used for holding distributed tracing information or any other user-defined values.
 
 ## Documentation
 
