@@ -41,10 +41,12 @@ builder.AddLogStorageBasedLogConsistencyProvider("LogStorage")
 
 Each journaled grain class must have a `LogConsistencyProvider` attribute to specify the log-consistency provider. Some providers additionally require a `StorageProvider` attribute.
 Eg:
+```csharp
 [StorageProvider(ProviderName = "OrleansLocalStorage")]
 [LogConsistencyProvider(ProviderName = "LogStorage")]
-    public class EventSourcedBankAccountGrain : JournaledGrain<BankAccountState>, IEventSourcedBankAccountGrain
-  {}
+public class EventSourcedBankAccountGrain : JournaledGrain<BankAccountState>, IEventSourcedBankAccountGrain
+{ ... }
+```
 
 So here "OrleansLocalStorage" is being used for storing the grain state, where was "LogStorage" is the in-memory storage provider for EventSourcing events.
 
