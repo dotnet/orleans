@@ -90,7 +90,7 @@ The grain class above does not persist its state. More thorough example demonstr
 
 ## Orleans Runtime
 
-The Orleans runtime is what implements the programming model for applications.The main component of the runtime is the *silo*, which is responsible for hosting grains. Typically, a group of silos run as a cluster for scalability and fault-tolerance. When run as a cluster, silos coordinate with each other to distribute work, detect and recover from failures. The runtime enables grains hosted in the cluster to communicate with each other as if they are within a single process.
+The Orleans runtime is what implements the programming model for applications. The main component of the runtime is the *silo*, which is responsible for hosting grains. Typically, a group of silos run as a cluster for scalability and fault-tolerance. When run as a cluster, silos coordinate with each other to distribute work, detect and recover from failures. The runtime enables grains hosted in the cluster to communicate with each other as if they are within a single process.
 
 In addition to the core programming model, the silo provides grains with a set of runtime services, such as timers, reminders (persistent timers), persistence, transactions, streams, and more. See the [features section](#features) below for more detail.
 
