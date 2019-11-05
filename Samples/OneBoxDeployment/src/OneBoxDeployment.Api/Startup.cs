@@ -1,20 +1,19 @@
+using Hellang.Middleware.ProblemDetails;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.Mvc.Formatters;
-using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.PlatformAbstractions;
+using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
-using OneBoxDeployment.Api.Extensions;
 using OneBoxDeployment.Api.Filters;
 using OneBoxDeployment.Api.Logging;
 using OneBoxDeployment.Common;
@@ -25,12 +24,12 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Statistics;
 using Serilog;
-using Swashbuckle.AspNetCore.Swagger;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using System.Security.Principal;
 using System.Threading.Tasks;
@@ -67,7 +66,7 @@ namespace OneBoxDeployment.Api
         /// <summary>
         /// The hosting environment.
         /// </summary>
-        public Microsoft.AspNetCore.Hosting.IHostingEnvironment Environment { get; set; }
+        public IWebHostEnvironment Environment { get; set; }
 
 
         /// <summary>
@@ -76,7 +75,7 @@ namespace OneBoxDeployment.Api
         /// <param name="logger">The environment specific logger.</param>
         /// <param name="configuration">The environment specific configuration object.</param>
         /// <param name="env">The environment information to use in checking per deployment type configuration value validity.</param>
-        public Startup(ILogger<Startup> logger, IConfiguration configuration, Microsoft.AspNetCore.Hosting.IHostingEnvironment env)
+        public Startup(ILogger<Startup> logger, IConfiguration configuration, IWebHostEnvironment env)
         {
             Logger = logger ?? throw new ArgumentNullException(nameof(logger));
             Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -137,29 +136,45 @@ namespace OneBoxDeployment.Api
 
             //See more about formatters at https://docs.microsoft.com/en-us/aspnet/core/mvc/models/formatting.
             services
-                .AddMvcCore(o =>
+                .AddProblemDetails(ConfigureProblemDetails)
+                .AddMvcCore(options =>
                 {
                     if(!Environment.IsDevelopment())
                     {
-                        o.Filters.Add(new AuthorizeFilter(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build()));
+                        options.Filters.Add(new AuthorizeFilter(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build()));
                     }
 
-                    o.Conventions.Add(new NotFoundResultFilterConvention());
+                    options.Conventions.Add(new NotFoundResultFilterConvention());
+
+                    //The Content-Security-Policy (CSP) is JSON, so it's added here to the known JSON serialized types.
+                    const string MimeTypeCspReport = "application/csp-report";
+                    var jsonOutputFormatter = options.OutputFormatters.OfType<SystemTextJsonOutputFormatter>().FirstOrDefault();
+                    if(jsonOutputFormatter != null)
+                    {
+                        jsonOutputFormatter.SupportedMediaTypes.Add(MimeTypeCspReport);
+                    }
+
+                    var jsonInputFormatter = options.InputFormatters.OfType<SystemTextJsonInputFormatter>().FirstOrDefault();
+                    if(jsonInputFormatter != null)
+                    {
+                        jsonInputFormatter.SupportedMediaTypes.Add(MimeTypeCspReport);
+                    }
                 })
+                .AddApiExplorer()
+                //.AddAuthorization()
                 .AddDataAnnotations()
-                .AddJsonFormatters()
-                .AddApiExplorer();
+                .AddFormatterMappings();
 
             //For further Swagger registration information:
             //https://docs.microsoft.com/en-us/aspnet/core/tutorials/web-api-help-pages-using-swagger.
-            services.AddSwaggerGen(swagger =>
+            services.AddSwaggerGen(openApiConfig =>
             {
-                swagger.DescribeAllEnumsAsStrings();
-                swagger.DescribeAllParametersInCamelCase();
+                openApiConfig.DescribeAllParametersInCamelCase();
+                openApiConfig.OperationFilter<BadRequestProblemDetailOpenApiFilterAttribute>();
 
                 //In the Swagger document this corresponds as follows:
                 //http://localhost:4003/{SwaggerRoot}/{SwaggerDocumentationBasePath}/swagger.json
-                swagger.SwaggerDoc(SwaggerDocumentationBasePath, new Info
+                openApiConfig.SwaggerDoc(SwaggerDocumentationBasePath, new OpenApiInfo
                 {
                     Title = "OneBoxDeployment APIs",
 
@@ -169,19 +184,19 @@ namespace OneBoxDeployment.Api
                     //Also, for choosing licenses:
                     //- https://go.developer.ebay.com/api-license-agreement
                     //- https://www.zendesk.com/company/customers-partners/application-developer-api-license-agreement/
-                    Contact = new Contact
+                    Contact = new OpenApiContact
                     {
-                        Email = "contact@...",
+                        Email = "contact@contact.com",
                         Name = "OneBoxDeployment",
-                        Url = "https://..."
+                        Url = new Uri("https://contactinformationtobedefined.com")
                     },
                     Description = "OneBoxDeployment application programming interface (API) descriptions.",
-                    License = new License
+                    License = new OpenApiLicense
                     {
-                        Name = "License to be defined",
-                        Url = "https://choosealicense.com/licenses/"
+                        Name = "The license name to be defined.",
+                        Url = new Uri("https://contactinformationtobedefined.com")
                     },
-                    TermsOfService = "Terms of Service to be defined."
+                    TermsOfService = new Uri("https://choosealicense.com/licenses/")
                 });
 
 
@@ -190,22 +205,8 @@ namespace OneBoxDeployment.Api
                 string commentsFilename = $"{Assembly.GetAssembly(typeof(Startup)).GetName().Name}.xml";
                 string fullCommentsFilePath = Path.Combine(PlatformServices.Default.Application.ApplicationBasePath,
                     commentsFilename);
-                swagger.IncludeXmlComments(fullCommentsFilePath);
+                openApiConfig.IncludeXmlComments(fullCommentsFilePath);
             });
-
-            services.Configure<MvcOptions>(options =>
-            {
-                //The Content-Security-Policy (CSP) is JSON, so it's added here to the known JSON serialized types.
-                foreach(var jsonFormatters in options.InputFormatters.OfType<JsonInputFormatter>())
-                {
-                    if(jsonFormatters.SupportedMediaTypes.All(m => m != "application/csp-report"))
-                    {
-                        jsonFormatters.SupportedMediaTypes.Add("application/csp-report");
-                    }
-                }
-            })
-            .Configure<ApiBehaviorOptions>(options => options.InvalidModelStateResponseFactory = _ => new ProblemDetails.ValidationProblemDetailsResult());
-
 
             services.AddHttpContextAccessor();
             services.AddTransient<IPrincipal>(provider => provider.GetService<IHttpContextAccessor>()?.HttpContext?.User);
@@ -240,12 +241,7 @@ namespace OneBoxDeployment.Api
                    options.Invariant = clusterConfig.ConnectionConfig.AdoNetConstant;
                    options.ConnectionString = clusterConfig.ConnectionConfig.ConnectionString;
                })
-               .Configure<ClientMessagingOptions>(options =>
-               {
-                   options.ResponseTimeout = TimeSpan.FromSeconds(30);
-                   options.ResendOnTimeout = true;
-                   options.MaxResendCount = 60;
-               })
+               .Configure<ClientMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromSeconds(30))
                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ITestStateGrain).Assembly).WithReferences());
 
             var client = clientBuilder.Build();
@@ -271,7 +267,7 @@ namespace OneBoxDeployment.Api
         /// <param name="app">The application to configure.</param>
         /// <param name="env">The environment information to use in configuration phase.</param>
         /// <param name="applicationLifetime"></param>
-        public void Configure(IApplicationBuilder app, Microsoft.AspNetCore.Hosting.IHostingEnvironment env, Microsoft.AspNetCore.Hosting.IApplicationLifetime applicationLifetime)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IHostApplicationLifetime applicationLifetime)
         {
             if(!env.IsProduction())
             {
@@ -287,40 +283,6 @@ namespace OneBoxDeployment.Api
             //It appears there isn't other way (e.g. in Program) than taking a reference to the global
             //static Serilog instance.
             applicationLifetime.ApplicationStopped.Register(Log.CloseAndFlush);
-
-            app.UseExceptionHandler(errorApp =>
-            {
-                errorApp.Run(async context =>
-                {
-                    var errorFeature = context.Features.Get<IExceptionHandlerFeature>();
-                    var exception = errorFeature.Error;
-
-                    var problemDetails = new ValidationProblemDetails
-                    {
-                        Instance = $"urn:oneboxdeployment:error:{Guid.NewGuid()}"
-                    };
-
-                    if(exception is BadHttpRequestException badHttpRequestException)
-                    {
-                        problemDetails.Title = "Invalid request";
-                        problemDetails.Status = (int)typeof(BadHttpRequestException).GetProperty("StatusCode", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(badHttpRequestException);
-                        problemDetails.Detail = badHttpRequestException.Message;
-                    }
-                    else
-                    {
-                        problemDetails.Title = "An unexpected error";
-                        problemDetails.Status = 500;
-                        problemDetails.Detail = Environment.IsDevelopment() ? exception.Demystify().ToString() : string.Empty;
-                    }
-
-                    Logger.LogInformation(Events.GlobalExceptionHandler.Id, Events.GlobalExceptionHandler.FormatString, problemDetails);
-
-                    context.Response.StatusCode = problemDetails.Status.Value;
-                    context.Response.WriteJson(problemDetails, "application/problem+json");
-
-                    await Task.CompletedTask.ConfigureAwait(false);
-                });
-            });
 
             //Security headers will always be added and by default the disallow everything.
             //The trimming is a robustness measure to make sure the URL has one trailing slash.
@@ -410,9 +372,40 @@ namespace OneBoxDeployment.Api
             }
 
             app.UseCors("CorsPolicy");
-
+            app.UseProblemDetails();
             app.UseStaticFiles();
-            app.UseMvc();
+            app.UseRouting();
+            //app.UseAuthorization();
+            app.UseEndpoints(endpoints => endpoints.MapControllers());
+        }
+
+
+        private void ConfigureProblemDetails(ProblemDetailsOptions options)
+        {
+            // This is the default behavior; only include exception details in a development environment.
+            options.IncludeExceptionDetails = ctx => Environment.IsDevelopment();
+
+            options.OnBeforeWriteDetails = (ctx, details) =>
+            {
+                var identifier = Guid.NewGuid().ToString();
+                ctx.TraceIdentifier = identifier;
+                details.Instance = $"urn:oneboxdeployment:error:{identifier}";
+            };
+
+            // This will map NotImplementedException to the 501 Not Implemented status code.
+            options.Map<NotImplementedException>(ex => new ExceptionProblemDetails(ex, StatusCodes.Status501NotImplemented));
+
+            // This will map HttpRequestException to the 503 Service Unavailable status code.
+            options.Map<HttpRequestException>(ex => new ExceptionProblemDetails(ex, StatusCodes.Status503ServiceUnavailable));
+
+            options.Map<ValidationException>(ex => new ExceptionProblemDetails(ex, StatusCodes.Status400BadRequest)
+            {
+                Title = "Hep!"
+            });
+
+            // Because exceptions are handled polymorphically, this will act as a "catch all" mapping, which is why it's added last.
+            // If an exception other than NotImplementedException and HttpRequestException is thrown, this will handle it.
+            options.Map<Exception>(ex => new ExceptionProblemDetails(ex, StatusCodes.Status500InternalServerError));
         }
     }
 }

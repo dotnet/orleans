@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using System.Collections.Generic;
@@ -52,13 +53,12 @@ namespace OneBoxDeployment.Api
 
             //TODO: https://github.com/aspnet/Extensions/blob/master/src/Hosting/Hosting/src/Host.cs.
             return new WebHostBuilder()
-                .UseApplicationInsights()
                 .UseConfiguration(commandLineConfig)
                 .UseKestrel(options => options.AddServerHeader = false)
                 .UseContentRoot(Directory.GetCurrentDirectory())
                 .ConfigureAppConfiguration((builderContext, config) =>
                 {
-                    IHostingEnvironment env = builderContext.HostingEnvironment;
+                    var env = builderContext.HostingEnvironment;
                     config
                         .AddJsonFile("appsettings.api.json", optional: false, reloadOnChange: true)
                         .AddJsonFile($"appsettings.api.{env.EnvironmentName}.json", optional: false, reloadOnChange: true);
@@ -84,7 +84,7 @@ namespace OneBoxDeployment.Api
                 .ConfigureLogging((hostingContext, loggingBuilder) =>
                 {
                     var section = hostingContext.Configuration.GetSection("Serilog");
-                    var loggerConfiguration = new LoggerConfiguration().ReadFrom.ConfigurationSection(section);
+                    var loggerConfiguration = new LoggerConfiguration().ReadFrom.Configuration(section);
                     var logger = loggerConfiguration.CreateLogger();
                     loggingBuilder.AddSerilog(logger);
 

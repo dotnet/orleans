@@ -12,12 +12,10 @@
   </PropertyGroup>
   <ItemGroup>
     <SqlCmdVariable Include="Configuration">
-      <Value>
-      </Value>
+      <Value>Debug</Value>
     </SqlCmdVariable>
     <SqlCmdVariable Include="ProjectDir">
-      <Value>
-      </Value>
+      <Value>C:\projektit\testit\orleans\Samples\OneBoxDeployment\src\OneBoxDeployment.Database</Value>
     </SqlCmdVariable>
   </ItemGroup>
 </Project>

@@ -1,4 +1,3 @@
-using OneBoxDeployment.Api.Extensions;
 using OneBoxDeployment.Api.Logging;
 using OneBoxDeployment.IntegrationTests.HttpClients;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +7,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Extensions.Ordering;
+using OneBoxDeployment.Common;
 
 namespace OneBoxDeployment.IntegrationTests.Tests
 {

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <Configurations>Debug;Release;Production</Configurations>
     <AssemblyName>OneBoxDeployment.Utilities</AssemblyName>
     <RootNamespace>OneBoxDeployment.Utilities</RootNamespace>
@@ -13,7 +13,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
-    <PackageReference Include="System.Reactive.Linq" Version="4.1.6" />
+    <PackageReference Include="System.Reactive.Linq" Version="4.2.0" />
   </ItemGroup>
 
   <!--
