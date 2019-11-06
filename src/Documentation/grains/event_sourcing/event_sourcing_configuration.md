@@ -41,6 +41,7 @@ builder.AddLogStorageBasedLogConsistencyProvider("LogStorage")
 
 Each journaled grain class must have a `LogConsistencyProvider` attribute to specify the log-consistency provider. Some providers additionally require a `StorageProvider` attribute.
 Eg:
+
 ```csharp
 [StorageProvider(ProviderName = "OrleansLocalStorage")]
 [LogConsistencyProvider(ProviderName = "LogStorage")]
@@ -72,6 +73,7 @@ public class ChatGrain : JournaledGrain<XDocument, IChatEvent>, IChatGrain { ...
 ## Default Providers
 
 It is possible to omit the `LogConsistencyProvider` and/or the `StorageProvider` attributes, if a default is specified in the configuration. This is done by using the special name `Default` for the respective provider. For example:
+
 ```xml
 <LogConsistencyProviders>
   <Provider Type="Orleans.EventSourcing.LogStorage.LogConsistencyProvider" Name="Default" />
