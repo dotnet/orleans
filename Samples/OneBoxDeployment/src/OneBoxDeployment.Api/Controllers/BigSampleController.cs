@@ -14,9 +14,10 @@ namespace OneBoxDeployment.Api.Controllers
     /// A sample OneBoxDeployment controller calling Orleans.
     /// </summary>
     [Route("api/[controller]")]
-    [Produces("application/json")]
     [Consumes("application/json")]
+    //[Produces("application/json", "application/problem+json")]
     [ApiController]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status500InternalServerError)]
     public class OneBoxDeploymentController: ControllerBase

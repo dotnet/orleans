@@ -1,11 +1,11 @@
 using OneBoxDeployment.Common;
-using OneBoxDeployment.Api.ProblemDetails;
 using OneBoxDeployment.IntegrationTests.HttpClients;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Extensions.Ordering;
+using Microsoft.AspNetCore.Mvc;
 
 namespace OneBoxDeployment.IntegrationTests.Tests
 {
@@ -46,7 +46,7 @@ namespace OneBoxDeployment.IntegrationTests.Tests
 
             var response = await supposedlyFaultyRouteValue.Content.DeserializeAsync<ValidationProblemDetails>().ConfigureAwait(false);
             Assert.Equal((int)HttpStatusCode.InternalServerError, response.Status);
-            Assert.Equal("An unexpected error", response.Title);
+            Assert.Equal("Internal server error", response.Title);
             Assert.StartsWith("urn:oneboxdeployment:error", response.Instance);
         }
     }

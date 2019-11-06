@@ -7,7 +7,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OneBoxDeployment.Api.Extensions
+namespace OneBoxDeployment.Common
 {
     /// <summary>
     /// Extends Newtonsoft.JSON and HTTP types.
@@ -17,7 +17,7 @@ namespace OneBoxDeployment.Api.Extensions
         /// <summary>
         /// The serializer used in all operations.
         /// </summary>
-        private static JsonSerializer Serializer { get; } = new JsonSerializer();
+        private static JsonSerializer Serializer => new JsonSerializer();
 
         /// <summary>
         /// The default content type.

@@ -40,6 +40,7 @@ namespace OneBoxDeployment.OrleansHost
             await siloHost.StartAsync().ConfigureAwait(false);
             Console.WriteLine("Application started. Press Ctrl+C to shut down.");
             ProceedWithClosing.WaitOne();
+
             await siloHost.StopAsync().ConfigureAwait(false);
         }
 
@@ -97,8 +98,6 @@ namespace OneBoxDeployment.OrleansHost
                 .Configure<SiloMessagingOptions>(options =>
                 {
                     options.ResponseTimeout = TimeSpan.FromSeconds(5);
-                    options.ResendOnTimeout = true;
-                    options.MaxResendCount = 5;
                 })
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(TestStateGrain).Assembly).WithReferences())
                 .UseAdoNetReminderService(options =>
