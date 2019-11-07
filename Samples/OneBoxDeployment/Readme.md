@@ -16,7 +16,7 @@ The sample shows a way to test the API together with storage on a developer mach
 
 The development idea is that the developer can reset the development databases in case of relational database by either running the database project or publishing to it. Otherwise the tests make a differential backup in the beginning and restore it in the end. This way the developer can arrange data as per development and check using tests if they still pass, this allows for developing with data and even do exploratory testing as part of the development cycle. On the continuous integration server this is likely the opposite, one may want to restore the test database from a backup or a snapshot. Then when changes to other developers, continuous integration or even production are desired, they can be done on the `.sqlproj` and reviewed as per normal development flow, e.g. _reviewed in pull requets_.
 
-At any time the databas can be reset or snapshots deleted. There shouldn't be any snapshots visible unless the tests have been cancelled abruptly so that the test dispose haven't had the time to clean them off. In this case the tests do will fail unless the snapshots are deleted.
+At any time the database can be reset or snapshots deleted. There shouldn't be any snapshots visible unless the tests have been cancelled abruptly so that the test dispose haven't had the time to clean them off. In this case the tests do will fail unless the snapshots are deleted.
 
 ## Setting up the SQL Server Database
 
