@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -39,7 +39,7 @@ namespace Orleans.Runtime.Membership
             get { return this.maxStaleness; }
         }
 
-        public Boolean IsUpdatable
+        public bool IsUpdatable
         {
             get { return true; }
         }
@@ -57,7 +57,7 @@ namespace Orleans.Runtime.Membership
 
         public async Task<IList<Uri>> GetGateways()
         {
-            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.kvRootFolder, this.logger);
+            var membershipTableData = await ConsulBasedMembershipTable.ReadAll(this.consulClient, this.clusterId, this.kvRootFolder, this.logger, null);
             if (membershipTableData == null) return new List<Uri>();
 
             return membershipTableData.Members.Select(e => e.Item1).
