@@ -43,7 +43,7 @@ namespace OrleansAWSUtils.Streams
         {
             if (token != null)
             {
-                throw new ArgumentException("SQSStream stream provider currebtly does not support non-null StreamSequenceToken.", "token");
+                throw new ArgumentException("SQSStream stream provider currently does not support non-null StreamSequenceToken.", "token");
             }
             var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
             SQSStorage queue;
