@@ -20,6 +20,8 @@ At any time the database can be reset or snapshots deleted. There shouldn't be a
 
 ## Setting up the SQL Server Database
 
+0. (_optional_) If you are using Visual Studio 2019 Community Edition, you need to edit the `OneBoxDeployment.Database.sqlproj` file, and set the `ArtifactReference` and `HintPath` to point to `Community`, instead of `Enterprise`.
+
 1. This needs to be done only the first time
 Open the _OneBoxDeployment.Database_ project and open _Debug_ tab. If the target connection string isn't set, put _Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=OneBoxDeployment.Database;Integrated Security=True;Persist Security Info=False;Pooling=True;MultipleActiveResultSets=True;Connect Timeout=60;Encrypt=False;TrustServerCertificate=True_ to it. This deploys the database to LocalDb with the current user rights.
 
