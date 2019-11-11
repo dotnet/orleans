@@ -5,7 +5,7 @@ title: JournaledGrain API
 
 # JournaledGrain Basics
 
-Journaled grains derive from `<JournaledGrain<StateType,EventType>`, with the following type parameters:
+Journaled grains derive from `JournaledGrain<StateType,EventType>`, with the following type parameters:
 
 * The `StateType` represents the state of the grain. It must be a class with a public default constructor.  
 * `EventType` is a common supertype for all the events that can be raised for this grain, and can be any class or interface. 
