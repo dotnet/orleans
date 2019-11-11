@@ -50,8 +50,8 @@ public class UserGrain : Grain, IUserGrain
   private readonly IPersistentState<CartState> _cart;
 
   public UserGrain(
-    [PersistentState("profile", "myGrainStorage")] IPersistentState<ProfileState> profile,
-    [PersistentState("cart", "cartStorage")] IPersistentState<CartState> cart,
+    [PersistentState("profile", "profileStore")] IPersistentState<ProfileState> profile,
+    [PersistentState("cart", "cartStore")] IPersistentState<CartState> cart,
     )
   {
     _profile = profile;
@@ -103,7 +103,7 @@ The `ClearStateAsync()` method clears the grain's state in storage. Depending on
 
 Before a grain can use persistence, a storage provider must be configured on the silo.
 
-First, configure a storage provider:
+First, configure storage providers, one for profile state and one for cart state:
 
 ``` csharp
 var host = new HostBuilder()
@@ -119,7 +119,19 @@ var host = new HostBuilder()
 
         // Configure the storage connection key
         options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1";
-      });
+      })
+
+      // Configure Azure Blob storage using the name "cartStore"
+      .AddAzureBlobGrainStorage(
+        name: "cartStore",
+        configureOptions: options =>
+        {
+            // Use JSON for serializing the state in storage
+            options.UseJson = true;
+
+            // Configure the storage connection key
+            options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data2;AccountKey=SOMETHING2";
+        });
     // -- other options
   })
   .Build();
