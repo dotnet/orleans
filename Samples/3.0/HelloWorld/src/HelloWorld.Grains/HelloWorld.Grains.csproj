@@ -7,7 +7,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="3.0.0" />
     <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="3.0.0" />
     <PackageReference Include="Microsoft.Orleans.Runtime.Abstractions" Version="3.0.0" />
-    <PackageReference Include="Microsoft.Orleans.OrleansCodeGenerator.Build" Version="3.0.0" PrivateAssets="all">
+    <PackageReference Include="Microsoft.Orleans.CodeGenerator.MSBuild" Version="3.0.0" PrivateAssets="all">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
   </ItemGroup>
