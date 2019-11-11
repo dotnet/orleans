@@ -49,7 +49,7 @@ public class EventSourcedBankAccountGrain : JournaledGrain<BankAccountState>, IE
 { ... }
 ```
 
-So here "OrleansLocalStorage" is being used for storing the grain state, where was "LogStorage" is the in-memory storage provider for EventSourcing events.
+So here "`OrleansLocalStorage`" is being used for storing the grain state, where was "`LogStorage`" is the in-memory storage provider for EventSourcing events.
 
 ### LogConsistencyProvider Attributes
 
