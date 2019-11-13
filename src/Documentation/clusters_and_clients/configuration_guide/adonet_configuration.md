@@ -1,6 +1,18 @@
 # ADO.NET Database Configuration
 
-The following sections contain links to SQL scripts to configure your database as well as the corresponding ADO.NET invariant used to configure ADO.NET providers in Orleans. These scripts are intended to be customized if needed for your deployment.
+The following sections contain links to SQL scripts to configure your database as well as the corresponding ADO.NET invariant used to configure ADO.NET providers in Orleans.
+These scripts are intended to be customized if needed for your deployment.
+Before executing scripts for Clustering, Persiatence, or Reminders, one needs to create main tables with the Main scripts.
+
+## Mian scripts
+
+| Database        | Script                                                                                                                                       | NuGet Package                                                                  | ADO.NET Invariant             |
+|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|--------------------------|
+| SQL Server      | [SQLServer-Main.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/SQLServer-Main.sql)   | [System.Data.SqlClient](https://www.nuget.org/packages/System.Data.SqlClient/) | System.Data.SqlClient    |
+| MySQL / MariaDB | [MySQL-Main.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/MySQL-Main.sql)           | [MySql.Data](https://www.nuget.org/packages/MySql.Data/)                       | MySql.Data.MySqlClient   |
+| PostgreSQL      | [PostgreSQL-Main.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/PostgreSQL-Main.sql) | [Npgsql](https://www.nuget.org/packages/Npgsql/)                               | Npgsql                   |
+| Oracle          | [Oracle-Main.sql](https://github.com/dotnet/orleans/blob/master/src/AdoNet/Shared/Oracle-Main.sql)         | [ODP.net](https://www.nuget.org/packages/Oracle.ManagedDataAccess/)            | Oracle.DataAccess.Client |
+
 
 ## Clustering
 
