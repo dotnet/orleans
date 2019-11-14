@@ -4,7 +4,7 @@ The following sections contain links to SQL scripts to configure your database a
 These scripts are intended to be customized if needed for your deployment.
 Before executing scripts for Clustering, Persiatence, or Reminders, one needs to create main tables with the Main scripts.
 
-## Mian scripts
+## Main scripts
 
 | Database        | Script                                                                                                                                       | NuGet Package                                                                  | ADO.NET Invariant             |
 |-----------------|----------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|--------------------------|
