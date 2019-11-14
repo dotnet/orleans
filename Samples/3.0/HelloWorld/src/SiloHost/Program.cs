@@ -26,7 +26,17 @@ namespace OrleansSiloHost
                         })
                         .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                         .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(HelloGrain).Assembly).WithReferences())
-                        .AddMemoryGrainStorage(name: "ArchiveStorage");
+                        .AddMemoryGrainStorage(name: "ArchiveStorage")
+                        .AddAzureBlobGrainStorage(
+                            name: "profileStore",
+                            configureOptions: options =>
+                            {
+                                // Use JSON for serializing the state in storage
+                                options.UseJson = true;
+
+                                // Configure the storage connection key
+                                options.ConnectionString = "DefaultEndpointsProtocol=https;AccountName=data1;AccountKey=SOMETHING1";
+                            });
                 })
                 .ConfigureServices(services =>
                 {
