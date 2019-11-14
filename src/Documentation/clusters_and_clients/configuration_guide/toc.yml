@@ -17,6 +17,8 @@
   href: configuring_.NET_garbage_collection.md
 - name: Configuring ADO.NET Providers
   href: configuring_ADO.NET_providers.md
+- name: ADO.NET Database Configuration
+  href: adonet_configuration.md
 - name: Serialization
   href: serialization.md  
 - name: Startup Tasks
