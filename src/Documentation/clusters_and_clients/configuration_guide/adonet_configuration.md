@@ -2,7 +2,7 @@
 
 The following sections contain links to SQL scripts to configure your database as well as the corresponding ADO.NET invariant used to configure ADO.NET providers in Orleans.
 These scripts are intended to be customized if needed for your deployment.
-Before executing scripts for Clustering, Persiatence, or Reminders, one needs to create main tables with the Main scripts.
+Before executing scripts for Clustering, Persistence, or Reminders, one needs to create main tables with the Main scripts.
 
 ## Main scripts
 
