@@ -124,6 +124,12 @@ namespace Orleans
                     this.ClusterConnectionLost += handler;
                 }
 
+                var gatewayCountChangedHandlers = this.ServiceProvider.GetServices<GatewayCountChangedHandler>();
+                foreach (var handler in gatewayCountChangedHandlers)
+                {
+                    this.GatewayCountChanged += handler;
+                }
+
                 var clientInvokeCallbacks = this.ServiceProvider.GetServices<ClientInvokeCallback>();
                 foreach (var handler in clientInvokeCallbacks)
                 {
@@ -594,6 +600,11 @@ namespace Orleans
             }
 
             Utils.SafeExecute(() => (this.ServiceProvider as IDisposable)?.Dispose());
+
+            Utils.SafeExecute(() => this.ClusterConnectionLost = null);
+            Utils.SafeExecute(() => this.GatewayCountChanged = null);
+            Utils.SafeExecute(() => this.ClientInvokeCallback = null);
+
             this.ServiceProvider = null;
             GC.SuppressFinalize(this);
         }
