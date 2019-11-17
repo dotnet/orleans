@@ -51,7 +51,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="readCapacityUnits"></param>
         /// <param name="writeCapacityUnits"></param>
         public DynamoDBStorage(ILoggerFactory loggerFactory, string service,
-            string accessKey = "", string secretKey = "",  
+            string accessKey = "", string secretKey = "",
             int readCapacityUnits = DefaultReadCapacityUnits,
             int writeCapacityUnits = DefaultWriteCapacityUnits)
         {
@@ -242,47 +242,14 @@ namespace Orleans.Transactions.DynamoDB
                 {
                     TableName = tableName,
                     Key = keys,
-                    ExpressionAttributeValues = new Dictionary<string, AttributeValue>(),
                     ReturnValues = ReturnValue.UPDATED_NEW
                 };
 
-                var updateExpression = new StringBuilder();
-                foreach (var field in fields.Keys)
-                {
-                    var valueKey = ":" + field;
-                    request.ExpressionAttributeValues.Add(valueKey, fields[field]);
-                    updateExpression.Append($" {field} = {valueKey},");
-                }
-                updateExpression.Insert(0, "SET");
-
-                if (string.IsNullOrWhiteSpace(extraExpression))
-                {
-                    updateExpression.Remove(updateExpression.Length - 1, 1);
-                }
-                else
-                {
-                    updateExpression.Append($" {extraExpression}");
-                    if (extraExpressionValues != null && extraExpressionValues.Count > 0)
-                    {
-                        foreach (var key in extraExpressionValues.Keys)
-                        {
-                            request.ExpressionAttributeValues.Add(key, extraExpressionValues[key]);
-                        }
-                    }
-                }
-
-                request.UpdateExpression = updateExpression.ToString();
+                (request.UpdateExpression, request.ExpressionAttributeValues) = ConvertUpdate(fields, conditionValues,
+                    extraExpression, extraExpressionValues);
 
                 if (!string.IsNullOrWhiteSpace(conditionExpression))
                     request.ConditionExpression = conditionExpression;
-
-                if (conditionValues != null && conditionValues.Keys.Count > 0)
-                {
-                    foreach (var item in conditionValues)
-                    {
-                        request.ExpressionAttributeValues.Add(item.Key, item.Value);
-                    }
-                }
 
                 var result = await ddbClient.UpdateItemAsync(request);
 
@@ -304,6 +271,49 @@ namespace Orleans.Transactions.DynamoDB
                     $"Intermediate error upserting to the table {tableName}", exc);
                 throw;
             }
+        }
+
+        public (string updateExpression, Dictionary<string, AttributeValue> expressionAttributeValues)
+            ConvertUpdate(Dictionary<string, AttributeValue> fields,
+                Dictionary<string, AttributeValue> conditionValues = null,
+                string extraExpression = "", Dictionary<string, AttributeValue> extraExpressionValues = null)
+        {
+            var expressionAttributeValues = new Dictionary<string, AttributeValue>();
+
+            var updateExpression = new StringBuilder();
+            foreach (var field in fields.Keys)
+            {
+                var valueKey = ":" + field;
+                expressionAttributeValues.Add(valueKey, fields[field]);
+                updateExpression.Append($" {field} = {valueKey},");
+            }
+            updateExpression.Insert(0, "SET");
+
+            if (string.IsNullOrWhiteSpace(extraExpression))
+            {
+                updateExpression.Remove(updateExpression.Length - 1, 1);
+            }
+            else
+            {
+                updateExpression.Append($" {extraExpression}");
+                if (extraExpressionValues != null && extraExpressionValues.Count > 0)
+                {
+                    foreach (var key in extraExpressionValues.Keys)
+                    {
+                        expressionAttributeValues.Add(key, extraExpressionValues[key]);
+                    }
+                }
+            }
+
+            if (conditionValues != null && conditionValues.Keys.Count > 0)
+            {
+                foreach (var item in conditionValues)
+                {
+                    expressionAttributeValues.Add(item.Key, item.Value);
+                }
+            }
+
+            return (updateExpression.ToString(), expressionAttributeValues);
         }
 
         /// <summary>
@@ -563,6 +573,85 @@ namespace Orleans.Transactions.DynamoDB
             {
                 Logger.Warn(ErrorCode.StorageProviderBase,
                     $"Intermediate error bulk inserting entries to table {tableName}.", exc);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Transactionally reads entries from a DynamoDB table
+        /// </summary>
+        /// <typeparam name="TResult">The result type</typeparam>
+        /// <param name="tableName">The name of the table to search for the entry</param>
+        /// <param name="keys">The table entry keys to search for</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null</param>
+        /// <returns>The object translated by the resolver function</returns>
+        public async Task<IEnumerable<TResult>> GetEntriesTxAsync<TResult>(string tableName, IEnumerable<Dictionary<string, AttributeValue>> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
+        {
+            try
+            {
+                var request = new TransactGetItemsRequest
+                {
+                    TransactItems = keys.Select(key => new TransactGetItem
+                    {
+                        Get = new Get
+                        {
+                            TableName = tableName,
+                            Key = key
+                        }
+                    }).ToList()
+                };
+
+                var response = await ddbClient.TransactGetItemsAsync(request);
+
+                return response.Responses.Select(r => resolver(r.Item));
+            }
+            catch (Exception)
+            {
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to find table entry for Keys = {0}", Utils.EnumerableToString(keys, d => Utils.DictionaryToString(d)));
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Transactionally performs write requests
+        /// </summary>
+        /// <param name="puts">Any puts to be performed</param>
+        /// <param name="updates">Any updated to be performed</param>
+        /// <param name="deletes">Any deletes to be performed</param>
+        /// <param name="conditionChecks">Any condition checks to be performed</param>
+        /// <returns></returns>
+        public Task WriteTxAsync(IEnumerable<Put> puts = null, IEnumerable<Update> updates = null, IEnumerable<Delete> deletes = null, IEnumerable<ConditionCheck> conditionChecks = null)
+        {
+            try
+            {
+                var transactItems = new List<TransactWriteItem>();
+                if (puts != null)
+                {
+                    transactItems.AddRange(puts.Select(p => new TransactWriteItem{Put = p}));
+                }
+                if (updates != null)
+                {
+                    transactItems.AddRange(updates.Select(u => new TransactWriteItem{Update = u}));
+                }
+                if (deletes != null)
+                {
+                    transactItems.AddRange(deletes.Select(d => new TransactWriteItem{Delete = d}));
+                }
+                if (conditionChecks != null)
+                {
+                    transactItems.AddRange(conditionChecks.Select(c => new TransactWriteItem{ConditionCheck = c}));
+                }
+
+                var request = new TransactWriteItemsRequest
+                {
+                    TransactItems = transactItems
+                };
+
+                return ddbClient.TransactWriteItemsAsync(request);
+            }
+            catch (Exception)
+            {
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to write tx");
                 throw;
             }
         }

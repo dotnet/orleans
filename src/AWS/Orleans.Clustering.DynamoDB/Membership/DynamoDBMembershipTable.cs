@@ -7,6 +7,8 @@ using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,8 +17,7 @@ namespace Orleans.Clustering.DynamoDB
 {
     internal class DynamoDBMembershipTable : IMembershipTable
     {
-        //DynamoDB does not support the extended Membership Protocol and will always return the same table version information
-        private readonly TableVersion tableVersion = new TableVersion(0, "0");
+        private static readonly TableVersion NotFoundTableVersion = new TableVersion(0, "0");
 
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
         private const int MAX_BATCH_SIZE = 25;
@@ -28,8 +29,8 @@ namespace Orleans.Clustering.DynamoDB
         private readonly string clusterId;
 
         public DynamoDBMembershipTable(
-            ILoggerFactory loggerFactory, 
-            IOptions<DynamoDBClusteringOptions> clusteringOptions, 
+            ILoggerFactory loggerFactory,
+            IOptions<DynamoDBClusteringOptions> clusteringOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
             this.loggerFactory = loggerFactory;
@@ -38,13 +39,13 @@ namespace Orleans.Clustering.DynamoDB
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
-        public Task InitializeMembershipTable(bool tryInitTableVersion)
+        public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
             this.storage = new DynamoDBStorage(this.loggerFactory, this.options.Service, this.options.AccessKey, this.options.SecretKey,
                   this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
 
             logger.Info(ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
-            return storage.InitializeTable(this.options.TableName,
+            await storage.InitializeTable(this.options.TableName,
                 new List<KeySchemaElement>
                 {
                     new KeySchemaElement { AttributeName = SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME, KeyType = KeyType.HASH },
@@ -55,6 +56,76 @@ namespace Orleans.Clustering.DynamoDB
                     new AttributeDefinition { AttributeName = SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                     new AttributeDefinition { AttributeName = SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
                 });
+
+            // even if I am not the one who created the table,
+            // try to insert an initial table version if it is not already there,
+            // so we always have a first table version row, before this silo starts working.
+            if (tryInitTableVersion)
+            {
+                // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
+                bool created = await TryCreateTableVersionEntryAsync();
+                if(created) logger.Info("Created new table version row.");
+            }
+        }
+
+        private async Task<bool> TryCreateTableVersionEntryAsync()
+        {
+            var keys = new Dictionary<string, AttributeValue>
+            {
+                { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
+                { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.TABLE_VERSION_ROW) }
+            };
+
+            var versionRow = await storage.ReadSingleEntryAsync(this.options.TableName, keys, fields => new SiloInstanceRecord(fields));
+            if (versionRow != null)
+            {
+                return false;
+            }
+
+            if (!TryCreateTableVersionRecord(0, null, out var entry))
+            {
+                return false;
+            }
+
+            var notExistConditionExpression =
+                $"attribute_not_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_not_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";
+            try
+            {
+                await storage.PutEntryAsync(this.options.TableName, entry.GetFields(true), notExistConditionExpression);
+            }
+            catch (ConditionalCheckFailedException)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool TryCreateTableVersionRecord(int version, string etag, out SiloInstanceRecord entry)
+        {
+            int etagInt;
+            if (etag is null)
+            {
+                etagInt = 0;
+            }
+            else
+            {
+                if (!int.TryParse(etag, out etagInt))
+                {
+                    entry = default;
+                    return false;
+                }
+            }
+
+            entry = new SiloInstanceRecord
+            {
+                DeploymentId = clusterId,
+                SiloIdentity = SiloInstanceRecord.TABLE_VERSION_ROW,
+                MembershipVersion = version.ToString(CultureInfo.InvariantCulture),
+                ETag = etagInt
+            };
+
+            return true;
         }
 
         public async Task DeleteMembershipTableEntries(string clusterId)
@@ -89,13 +160,22 @@ namespace Orleans.Clustering.DynamoDB
         {
             try
             {
-                var keys = new Dictionary<string, AttributeValue>
+                var siloEntryKeys = new Dictionary<string, AttributeValue>
                 {
                     { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
                     { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.ConstructSiloIdentity(siloAddress)) }
                 };
-                var entry = await storage.ReadSingleEntryAsync(this.options.TableName, keys, fields => new SiloInstanceRecord(fields));
-                MembershipTableData data = entry != null ? Convert(new List<SiloInstanceRecord> { entry }) : new MembershipTableData(this.tableVersion);
+
+                var versionEntryKeys = new Dictionary<string, AttributeValue>
+                {
+                    { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
+                    { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.TABLE_VERSION_ROW) }
+                };
+
+                var entries = await storage.GetEntriesTxAsync(this.options.TableName,
+                    new[] {siloEntryKeys, versionEntryKeys}, fields => new SiloInstanceRecord(fields));
+
+                MembershipTableData data = Convert(entries.ToList());
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Read my entry {0} Table=" + Environment.NewLine + "{1}", siloAddress.ToLongString(), data.ToString());
                 return data;
             }
@@ -134,13 +214,41 @@ namespace Orleans.Clustering.DynamoDB
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("InsertRow entry = {0}", entry.ToFullString());
                 var tableEntry = Convert(entry);
 
+                if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
+                {
+                    this.logger.Warn(ErrorCode.MembershipBase,
+                        $"Insert failed. Invalid ETag value. Will retry. Entry {entry.ToFullString()}, eTag {tableVersion.VersionEtag}");
+                    return false;
+                }
+
+                versionEntry.ETag++;
+
                 bool result;
 
                 try
                 {
-                    var expression = $"attribute_not_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_not_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";
+                    var notExistConditionExpression =
+                        $"attribute_not_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_not_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";
+                    var tableEntryInsert = new Put
+                    {
+                        Item = tableEntry.GetFields(true),
+                        ConditionExpression = notExistConditionExpression,
+                        TableName = this.options.TableName
+                    };
 
-                    await this.storage.PutEntryAsync(this.options.TableName, tableEntry.GetFields(true), expression);
+                    var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = tableVersion.VersionEtag } } };
+                    var etagConditionalExpression = $"{SiloInstanceRecord.ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
+                    var versionEntryUpdate = new Update
+                    {
+                        TableName = this.options.TableName,
+                        Key = versionEntry.GetKeys(),
+                        ConditionExpression = etagConditionalExpression
+                    };
+                    (versionEntryUpdate.UpdateExpression, versionEntryUpdate.ExpressionAttributeValues) =
+                        this.storage.ConvertUpdate(versionEntry.GetFields(), conditionalValues);
+
+                    await this.storage.WriteTxAsync(new[] {tableEntryInsert}, new[] {versionEntryUpdate});
+
                     result = true;
                 }
                 catch (ConditionalCheckFailedException)
@@ -149,7 +257,7 @@ namespace Orleans.Clustering.DynamoDB
                     this.logger.Warn(ErrorCode.MembershipBase,
                         $"Insert failed due to contention on the table. Will retry. Entry {entry.ToFullString()}");
                 }
-                    
+
                 return result;
             }
             catch (Exception exc)
@@ -166,8 +274,7 @@ namespace Orleans.Clustering.DynamoDB
             {
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("UpdateRow entry = {0}, etag = {1}", entry.ToFullString(), etag);
                 var siloEntry = Convert(entry);
-                int currentEtag = 0;
-                if (!int.TryParse(etag, out currentEtag))
+                if (!int.TryParse(etag, out var currentEtag))
                 {
                     this.logger.Warn(ErrorCode.MembershipBase,
                         $"Update failed. Invalid ETag value. Will retry. Entry {entry.ToFullString()}, eTag {etag}");
@@ -176,15 +283,43 @@ namespace Orleans.Clustering.DynamoDB
 
                 siloEntry.ETag = currentEtag + 1;
 
+                if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
+                {
+                    this.logger.Warn(ErrorCode.MembershipBase,
+                        $"Update failed. Invalid ETag value. Will retry. Entry {entry.ToFullString()}, eTag {tableVersion.VersionEtag}");
+                    return false;
+                }
+
+                versionEntry.ETag++;
+
                 bool result;
 
                 try
                 {
-                    var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = etag } } };
                     var etagConditionalExpression = $"{SiloInstanceRecord.ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
-                    await this.storage.UpsertEntryAsync(this.options.TableName, siloEntry.GetKeys(),
-                        siloEntry.GetFields(), etagConditionalExpression, conditionalValues);
 
+                    var siloConditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = etag } } };
+                    var siloEntryUpdate = new Update
+                    {
+                        TableName = this.options.TableName,
+                        Key = siloEntry.GetKeys(),
+                        ConditionExpression = etagConditionalExpression
+                    };
+                    (siloEntryUpdate.UpdateExpression, siloEntryUpdate.ExpressionAttributeValues) =
+                        this.storage.ConvertUpdate(siloEntry.GetFields(), siloConditionalValues);
+
+
+                    var versionConditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = tableVersion.VersionEtag } } };
+                    var versionEntryUpdate = new Update
+                    {
+                        TableName = this.options.TableName,
+                        Key = versionEntry.GetKeys(),
+                        ConditionExpression = etagConditionalExpression
+                    };
+                    (versionEntryUpdate.UpdateExpression, versionEntryUpdate.ExpressionAttributeValues) =
+                        this.storage.ConvertUpdate(versionEntry.GetFields(), versionConditionalValues);
+
+                    await this.storage.WriteTxAsync(updates: new[] {siloEntryUpdate, versionEntryUpdate});
                     result = true;
                 }
                 catch (ConditionalCheckFailedException)
@@ -193,7 +328,7 @@ namespace Orleans.Clustering.DynamoDB
                     this.logger.Warn(ErrorCode.MembershipBase,
                         $"Update failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, eTag {etag}");
                 }
-                    
+
                 return result;
             }
             catch (Exception exc)
@@ -227,21 +362,30 @@ namespace Orleans.Clustering.DynamoDB
             try
             {
                 var memEntries = new List<Tuple<MembershipEntry, string>>();
-
+                var tableVersion = NotFoundTableVersion;
                 foreach (var tableEntry in entries)
                 {
-                    try
+                    if (tableEntry.SiloIdentity == SiloInstanceRecord.TABLE_VERSION_ROW)
                     {
-                        MembershipEntry membershipEntry = Parse(tableEntry);
-                        memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, tableEntry.ETag.ToString()));
+                        tableVersion = new TableVersion(int.Parse(tableEntry.MembershipVersion), tableEntry.ETag.ToString(CultureInfo.InvariantCulture));
                     }
-                    catch (Exception exc)
+                    else
                     {
-                        this.logger.Error(ErrorCode.MembershipBase,
-                            $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {tableEntry}. Ignoring this entry.", exc);
+                        try
+                        {
+                            MembershipEntry membershipEntry = Parse(tableEntry);
+                            memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry,
+                                tableEntry.ETag.ToString(CultureInfo.InvariantCulture)));
+                        }
+                        catch (Exception exc)
+                        {
+                            this.logger.Error(ErrorCode.MembershipBase,
+                                $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {tableEntry}. Ignoring this entry.",
+                                exc);
+                        }
                     }
                 }
-                var data = new MembershipTableData(memEntries, this.tableVersion);
+                var data = new MembershipTableData(memEntries, tableVersion);
                 return data;
             }
             catch (Exception exc)
