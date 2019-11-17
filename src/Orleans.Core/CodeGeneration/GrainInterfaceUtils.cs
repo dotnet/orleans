@@ -421,10 +421,7 @@ namespace Orleans.CodeGeneration
         private static int GetTypeCode(Type grainInterfaceOrClass)
         {
             var attr = grainInterfaceOrClass.GetCustomAttributes<TypeCodeOverrideAttribute>(false).FirstOrDefault();
-            if (attr != null && attr.TypeCode > 0)
-            {
-                return attr.TypeCode;
-            }
+            if (attr != null) return attr.TypeCode;
 
             var fullName = TypeUtils.GetTemplatedName(
                 TypeUtils.GetFullName(grainInterfaceOrClass), 

@@ -11,13 +11,15 @@ namespace UnitTests.GrainInterfaces
     {
         [MethodId(14142)]
         Task<string> One();
+        [MethodId(-14142)]
         Task<string> Echo(string someArg);
         Task<string> NotIntercepted();
         Task<string> Throw();
         Task<string> IncorrectResultType();
         Task FilterThrows();
     }
-    
+
+    [TypeCodeOverride(-6548972)]
     public interface IOutgoingMethodInterceptionGrain : IGrainWithIntegerKey
     {
         Task<Dictionary<string, object>> EchoViaOtherGrain(IMethodInterceptionGrain otherGrain, string message);
