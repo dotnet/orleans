@@ -477,6 +477,41 @@ namespace Orleans.Transactions.DynamoDB
         }
 
         /// <summary>
+        /// Query for multiple entries in a DynamoDB table by filtering its keys
+        /// </summary>
+        /// <typeparam name="TResult">The result type</typeparam>
+        /// <param name="tableName">The name of the table to search for the entries</param>
+        /// <param name="keys">The table entry keys to search for</param>
+        /// <param name="keyConditionExpression">the expression that will filter the keys</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
+        /// <param name="indexName">In case a secondary index is used in the keyConditionExpression</param>
+        /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
+        /// <returns>The collection containing a list of objects translated by the resolver function</returns>
+        public async Task<List<TResult>> QueryAllAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys,
+                string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver,
+                string indexName = "", bool scanIndexForward = true) where TResult : class
+        {
+            List<TResult> resultList = null;
+            Dictionary<string, AttributeValue> lastEvaluatedKey = null;
+            do
+            {
+                List<TResult> results;
+                (results, lastEvaluatedKey) = await QueryAsync(tableName, keys, keyConditionExpression, resolver,
+                    indexName, scanIndexForward, lastEvaluatedKey);
+                if (resultList == null)
+                {
+                    resultList = results;
+                }
+                else
+                {
+                    resultList.AddRange(results);
+                }
+            } while (lastEvaluatedKey.Count != 0);
+
+            return resultList;
+        }
+
+        /// <summary>
         /// Scan a DynamoDB table by querying the entry fields.
         /// </summary>
         /// <typeparam name="TResult">The result type</typeparam>

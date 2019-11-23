@@ -121,7 +121,7 @@ namespace Orleans.Clustering.DynamoDB
             {
                 DeploymentId = clusterId,
                 SiloIdentity = SiloInstanceRecord.TABLE_VERSION_ROW,
-                MembershipVersion = version.ToString(CultureInfo.InvariantCulture),
+                MembershipVersion = version,
                 ETag = etagInt
             };
 
@@ -191,10 +191,30 @@ namespace Orleans.Clustering.DynamoDB
         {
             try
             {
-                var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) } };
-                var records = await this.storage.QueryAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item));
+                //first read just the version row so that we can check for version consistency
+                var versionEntryKeys = new Dictionary<string, AttributeValue>
+                {
+                    { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
+                    { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.TABLE_VERSION_ROW) }
+                };
+                var versionRow = await this.storage.ReadSingleEntryAsync(this.options.TableName, versionEntryKeys,
+                    fields => new SiloInstanceRecord(fields));
+                if (versionRow == null)
+                {
+                    throw new KeyNotFoundException("No version row found for membership table");
+                }
 
-                MembershipTableData data = Convert(records.results);
+                var keys = new Dictionary<string, AttributeValue> { { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) } };
+                var records = await this.storage.QueryAllAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item));
+
+                if (records.Any(record => record.MembershipVersion > versionRow.MembershipVersion))
+                {
+                    this.logger.Warn(ErrorCode.MembershipBase, "Found an inconsistency while reading all silo entries");
+                    //not expecting this to hit often, but if it does, should put in a limit
+                    return await this.ReadAll();
+                }
+
+                MembershipTableData data = Convert(records);
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
 
                 return data;
@@ -212,7 +232,7 @@ namespace Orleans.Clustering.DynamoDB
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("InsertRow entry = {0}", entry.ToFullString());
-                var tableEntry = Convert(entry);
+                var tableEntry = Convert(entry, tableVersion);
 
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
                 {
@@ -273,7 +293,7 @@ namespace Orleans.Clustering.DynamoDB
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("UpdateRow entry = {0}, etag = {1}", entry.ToFullString(), etag);
-                var siloEntry = Convert(entry);
+                var siloEntry = Convert(entry, tableVersion);
                 if (!int.TryParse(etag, out var currentEtag))
                 {
                     this.logger.Warn(ErrorCode.MembershipBase,
@@ -367,7 +387,7 @@ namespace Orleans.Clustering.DynamoDB
                 {
                     if (tableEntry.SiloIdentity == SiloInstanceRecord.TABLE_VERSION_ROW)
                     {
-                        tableVersion = new TableVersion(int.Parse(tableEntry.MembershipVersion), tableEntry.ETag.ToString(CultureInfo.InvariantCulture));
+                        tableVersion = new TableVersion(tableEntry.MembershipVersion, tableEntry.ETag.ToString(CultureInfo.InvariantCulture));
                     }
                     else
                     {
@@ -447,7 +467,7 @@ namespace Orleans.Clustering.DynamoDB
             return parse;
         }
 
-        private SiloInstanceRecord Convert(MembershipEntry memEntry)
+        private SiloInstanceRecord Convert(MembershipEntry memEntry, TableVersion tableVersion)
         {
             var tableEntry = new SiloInstanceRecord
             {
@@ -461,7 +481,8 @@ namespace Orleans.Clustering.DynamoDB
                 SiloName = memEntry.SiloName,
                 StartTime = LogFormatter.PrintDate(memEntry.StartTime),
                 IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
-                SiloIdentity = SiloInstanceRecord.ConstructSiloIdentity(memEntry.SiloAddress)
+                SiloIdentity = SiloInstanceRecord.ConstructSiloIdentity(memEntry.SiloAddress),
+                MembershipVersion = tableVersion.Version
             };
 
             if (memEntry.SuspectTimes != null)

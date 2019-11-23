@@ -42,7 +42,7 @@ namespace Orleans.Runtime.MembershipService
         public string IAmAliveTime { get; set; }
         public int ETag { get; set; }
 
-        public string MembershipVersion      { get; set; }               // Special version row (for serializing table updates). // We'll have a designated row with only MembershipVersion column.
+        public int MembershipVersion { get; set; }
 
         public SiloInstanceRecord() { }
 
@@ -100,8 +100,9 @@ namespace Orleans.Runtime.MembershipService
                 int.TryParse(fields[ETAG_PROPERTY_NAME].N, out etag))
                 ETag = etag;
 
-            if (fields.ContainsKey(MEMBERSHIP_VERSION_PROPERTY_NAME))
-                MembershipVersion = fields[MEMBERSHIP_VERSION_PROPERTY_NAME].S;
+            if (fields.ContainsKey(MEMBERSHIP_VERSION_PROPERTY_NAME) &&
+                int.TryParse(fields[MEMBERSHIP_VERSION_PROPERTY_NAME].N, out int version))
+                MembershipVersion = version;
         }
 
         internal static SiloAddress UnpackRowKey(string rowKey)
@@ -197,8 +198,7 @@ namespace Orleans.Runtime.MembershipService
             if (!string.IsNullOrWhiteSpace(IAmAliveTime))
                 fields.Add(I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(IAmAliveTime));
 
-            if (!string.IsNullOrWhiteSpace(MembershipVersion))
-                fields.Add(MEMBERSHIP_VERSION_PROPERTY_NAME, new AttributeValue(MembershipVersion));
+            fields.Add(MEMBERSHIP_VERSION_PROPERTY_NAME, new AttributeValue { N = MembershipVersion.ToString() });
 
             fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = ETag.ToString() });
             return fields;
