@@ -271,11 +271,18 @@ namespace Orleans.Clustering.DynamoDB
 
                     result = true;
                 }
-                catch (ConditionalCheckFailedException)
+                catch (TransactionCanceledException canceledException)
                 {
-                    result = false;
-                    this.logger.Warn(ErrorCode.MembershipBase,
-                        $"Insert failed due to contention on the table. Will retry. Entry {entry.ToFullString()}");
+                    if (canceledException.Message.Contains("ConditionalCheckFailed")) //not a good way to check for this currently
+                    {
+                        result = false;
+                        this.logger.Warn(ErrorCode.MembershipBase,
+                            $"Insert failed due to contention on the table. Will retry. Entry {entry.ToFullString()}");
+                    }
+                    else
+                    {
+                        throw;
+                    }
                 }
 
                 return result;
@@ -342,11 +349,18 @@ namespace Orleans.Clustering.DynamoDB
                     await this.storage.WriteTxAsync(updates: new[] {siloEntryUpdate, versionEntryUpdate});
                     result = true;
                 }
-                catch (ConditionalCheckFailedException)
+                catch (TransactionCanceledException canceledException)
                 {
-                    result = false;
-                    this.logger.Warn(ErrorCode.MembershipBase,
-                        $"Update failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, eTag {etag}");
+                    if (canceledException.Message.Contains("ConditionalCheckFailed")) //not a good way to check for this currently
+                    {
+                        result = false;
+                        this.logger.Warn(ErrorCode.MembershipBase,
+                            $"Update failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, eTag {etag}");
+                    }
+                    else
+                    {
+                        throw;
+                    }
                 }
 
                 return result;
