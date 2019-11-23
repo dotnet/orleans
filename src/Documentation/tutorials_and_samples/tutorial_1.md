@@ -62,7 +62,7 @@ You will also probably need to add `using` statements.
 
 `Microsoft.Orleans.Core.Abstractions` is needed everywhere. It included in both `Microsoft.Orleans.Server` and `Microsoft.Orleans.Client`.
 
-`Microsoft.Orleans.CodeGenerator.MSBuild` automatically generates code that is needed to make calls to grains pass machine boundaries. So it needed in both `GrainInterfaces` and `Grains` projects.
+`Microsoft.Orleans.CodeGenerator.MSBuild` automatically generates code that is needed to make calls to grains across machine boundaries. So it needed in both `GrainInterfaces` and `Grains` projects.
 
 ## Define a Grain Interface
 
@@ -99,7 +99,7 @@ namespace OrleansBasics
             this.logger = logger;
         }
 
-        Task<string> IHello.SayHello(string greeting)
+        public Task<string> IHello.SayHello(string greeting)
         {
             logger.LogInformation($"\n SayHello message received: greeting = '{greeting}'");
             return Task.FromResult($"\n Client said: '{greeting}', so HelloGrain says: Hello!");
