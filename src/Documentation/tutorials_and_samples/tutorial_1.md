@@ -99,7 +99,7 @@ namespace OrleansBasics
             this.logger = logger;
         }
 
-        public Task<string> IHello.SayHello(string greeting)
+        Task<string> IHello.SayHello(string greeting)
         {
             logger.LogInformation($"\n SayHello message received: greeting = '{greeting}'");
             return Task.FromResult($"\n Client said: '{greeting}', so HelloGrain says: Hello!");
