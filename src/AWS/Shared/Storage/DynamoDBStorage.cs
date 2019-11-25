@@ -638,7 +638,7 @@ namespace Orleans.Transactions.DynamoDB
 
                 var response = await ddbClient.TransactGetItemsAsync(request);
 
-                return response.Responses.Select(r => resolver(r.Item));
+                return response.Responses.Where(r => r?.Item?.Count > 0).Select(r => resolver(r.Item));
             }
             catch (Exception)
             {
