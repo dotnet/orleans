@@ -7,6 +7,21 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.0.1] (changes since 3.0.0)
+
+- Non-breaking improvements
+  - Azure table grain storage inconsistent state on not found (#6071)
+  - Removed silo status check before cleaing up system targets from… (#6072)
+  - Do not include grain identifier in the ILogger category name (#6122)
+ 
+- Non-breaking bug fixes
+  - Consul: support extended membership protocol (#6095)
+  - Fix routing of gateway count changed events to registered servi… (#6102)
+  - Allow negative values in TypeCodeAttribute. Fixes #6114 (#6127)
+  - DynamoDB: support extended membership protocol (#6126)
+  - Redact logged connection string in ADO storage provider during init (#6139)
+  - Fixed CodeGenerator.MSBuild cannot ResolveAssembly in .NetCore 3.0 (#6143)
+
 ### [2.4.4] (changes since 2.4.3)
 
 - Non-breaking improvements
