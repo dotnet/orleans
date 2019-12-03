@@ -14,17 +14,7 @@ namespace Orleans.Connections.Security
     /// </summary>
     public class TlsOptions
     {
-        private TimeSpan _handshakeTimeout;
-
-        /// <summary>
-        /// Initializes a new instance of <see cref="TlsOptions"/>.
-        /// </summary>
-        public TlsOptions()
-        {
-            RemoteCertificateMode = RemoteCertificateMode.RequireCertificate;
-            SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls11;
-            HandshakeTimeout = TimeSpan.FromSeconds(10);
-        }
+        private TimeSpan _handshakeTimeout = TimeSpan.FromSeconds(10);
 
         /// <summary>
         /// <para>
@@ -61,7 +51,7 @@ namespace Orleans.Connections.Security
         /// <summary>
         /// Specifies allowable SSL protocols. Defaults to <see cref="SslProtocols.Tls12" /> and <see cref="SslProtocols.Tls11"/>.
         /// </summary>
-        public SslProtocols SslProtocols { get; set; }
+        public SslProtocols SslProtocols { get; set; } = SslProtocols.Tls12 | SslProtocols.Tls11;
 
         /// <summary>
         /// Specifies whether the certificate revocation list is checked during authentication.
@@ -77,16 +67,16 @@ namespace Orleans.Connections.Security
         }
 
         /// <summary>
-        /// Provides direct configuration of the <see cref="SslServerAuthenticationOptions"/> on a per-connection basis.
+        /// Provides direct configuration of the <see cref="TlsServerAuthenticationOptions"/> on a per-connection basis.
         /// This is called after all of the other settings have already been applied.
         /// </summary>
-        public Action<ConnectionContext, SslServerAuthenticationOptions> OnAuthenticateAsServer { get; set; }
+        public Action<ConnectionContext, TlsServerAuthenticationOptions> OnAuthenticateAsServer { get; set; }
 
         /// <summary>
-        /// Provides direct configuration of the <see cref="SslClientAuthenticationOptions"/> on a per-connection basis.
+        /// Provides direct configuration of the <see cref="TlsClientAuthenticationOptions"/> on a per-connection basis.
         /// This is called after all of the other settings have already been applied.
         /// </summary>
-        public Action<ConnectionContext, SslClientAuthenticationOptions> OnAuthenticateAsClient { get; set; }
+        public Action<ConnectionContext, TlsClientAuthenticationOptions> OnAuthenticateAsClient { get; set; }
 
         /// <summary>
         /// Specifies the maximum amount of time allowed for the TLS/SSL handshake. This must be positive and finite.
@@ -100,6 +90,7 @@ namespace Orleans.Connections.Security
                 {
                     throw new ArgumentOutOfRangeException(nameof(value), nameof(HandshakeTimeout) + " must be positive");
                 }
+
                 _handshakeTimeout = value != Timeout.InfiniteTimeSpan ? value : TimeSpan.MaxValue;
             }
         }
