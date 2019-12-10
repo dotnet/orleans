@@ -134,7 +134,7 @@ namespace Orleans.CodeGenerator.Generators
                     {
                         body.Add(
                             ExpressionStatement(
-                                InvocationExpression(wellKnownTypes.GrainFactoryBase.ToDisplayString().ToIdentifierName().Member("CheckGrainObserverParamInternal"))
+                                InvocationExpression(wellKnownTypes.GrainFactoryBase.ToNameSyntax().Member("CheckGrainObserverParamInternal"))
                                     .AddArgumentListArguments(Argument(parameter.Name.ToIdentifierName()))));
                     }
                 }
