@@ -28,7 +28,7 @@ namespace Orleans.Networking.Shared
 
         public async ValueTask<ConnectionContext> ConnectAsync(EndPoint endpoint, CancellationToken cancellationToken)
         {
-            var socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
+            var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
             {
                 LingerState = new LingerOption(true, 0),
                 NoDelay = true
