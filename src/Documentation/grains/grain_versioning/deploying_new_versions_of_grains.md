@@ -54,9 +54,9 @@ Suggested deployment steps:
 1. "V1" silos and clients are deployed and are running in the Production slot.
 2. "V2" silos and clients begin to start in the Staging slot. They will join the
 same cluster as the Production slot. No "V2" activations will be created so far.
-3. Once the deployment in the Staging slot is finished, the developper can redirect
-some traffic on the V2 clients (smoke tests, targeted beta users, ect.). This will
-create V2 activations, but since Grains are backward compatibles and that all silos
+3. Once the deployment in the Staging slot is finished, the developer can redirect
+some traffic to the V2 clients (smoke tests, targeted beta users, etc.). This will
+create V2 activations, but since Grains are backward compatible and all silos
 are in the same cluster, no duplicate activations will be created.
 4. If the validation is successful, proceed to VIP swap.
   If not, you can safely shutdown the Staging cluster: existing V2 activations will be
