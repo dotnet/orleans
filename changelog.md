@@ -7,6 +7,15 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.0.2] (changes since 3.0.1)
+
+- Non-breaking improvements
+  - Specify endpoint AddressFamily in Socket constructor (#6168)
+  - Make IFatalErrorHandler public so that it can be replaced by users (#6170)
+ 
+- Non-breaking bug fixes
+  - CodeGen: fix ambiguous reference to Orleans namespace (#6171)
+
 ### [3.0.1] (changes since 3.0.0)
 
 - Non-breaking improvements
