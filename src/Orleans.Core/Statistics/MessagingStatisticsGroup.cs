@@ -85,7 +85,7 @@ namespace Orleans.Runtime
             ConnectedClientCount = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_CONNECTED_CLIENTS, false);
 
             MessagesSentTotal = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_SENT_MESSAGES_TOTAL);
-            MessagesSentPerDirection = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            MessagesSentPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
                 MessagesSentPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
@@ -93,7 +93,7 @@ namespace Orleans.Runtime
             }
 
             MessagesReceived = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_RECEIVED_MESSAGES_TOTAL);
-            MessagesReceivedPerDirection = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            MessagesReceivedPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
                 MessagesReceivedPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
@@ -104,11 +104,11 @@ namespace Orleans.Runtime
             totalBytesReceived = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_RECEIVED_BYTES_TOTAL);
             HeaderBytesSent = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_SENT_BYTES_HEADER);
             headerBytesReceived = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_RECEIVED_BYTES_HEADER);
-            FailedSentMessages = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
-            DroppedSentMessages = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
-            RejectedMessages = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            FailedSentMessages ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            DroppedSentMessages ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            RejectedMessages ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
 
-            ReroutedMessages = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            ReroutedMessages ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
                 ReroutedMessages[(int)direction] = CounterStatistic.FindOrCreate(
@@ -124,8 +124,8 @@ namespace Orleans.Runtime
             expiredAtInvokeCounter = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_EXPIRED_ATINVOKE);
             expiredAtRespondCounter = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_EXPIRED_ATRESPOND);
 
-            perSocketDirectionStatsSend = new PerSocketDirectionStats[Enum.GetValues(typeof(ConnectionDirection)).Length];
-            perSocketDirectionStatsReceive = new PerSocketDirectionStats[Enum.GetValues(typeof(ConnectionDirection)).Length];
+            perSocketDirectionStatsSend ??= new PerSocketDirectionStats[Enum.GetValues(typeof(ConnectionDirection)).Length];
+            perSocketDirectionStatsReceive ??= new PerSocketDirectionStats[Enum.GetValues(typeof(ConnectionDirection)).Length];
 
             perSocketDirectionStatsSend[(int)ConnectionDirection.SiloToSilo] = new PerSocketDirectionStats(true, ConnectionDirection.SiloToSilo);
             perSocketDirectionStatsReceive[(int)ConnectionDirection.SiloToSilo] = new PerSocketDirectionStats(false, ConnectionDirection.SiloToSilo);

@@ -36,7 +36,7 @@ namespace Orleans
 
         private ClientProviderRuntime clientProviderRuntime;
 
-        internal ClientStatisticsManager ClientStatistics;
+        internal readonly ClientStatisticsManager ClientStatistics;
         private GrainId clientId;
         private readonly GrainId handshakeClientId;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
@@ -137,7 +137,6 @@ namespace Orleans
                 }
 
                 this.InternalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
-                this.ClientStatistics = this.ServiceProvider.GetRequiredService<ClientStatisticsManager>();
                 this.messageFactory = this.ServiceProvider.GetService<MessageFactory>();
 
                 var serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
@@ -596,7 +595,6 @@ namespace Orleans
             if (ClientStatistics != null)
             {
                 Utils.SafeExecute(() => ClientStatistics.Dispose());
-                ClientStatistics = null;
             }
 
             Utils.SafeExecute(() => (this.ServiceProvider as IDisposable)?.Dispose());
