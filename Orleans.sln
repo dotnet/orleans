@@ -192,9 +192,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.CodeGenerator.MSBui
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Transactions", "Transactions", "{3189037B-208D-40A1-A561-169D77D9BB5A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.TestKit.Base", "src\Orleans.Transactions.TestkitBase\Orleans.Transactions.TestKit.Base.csproj", "{531A89F5-DD05-4D14-A330-6548359A231A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.TestKit.Base", "src\Orleans.Transactions.TestKitBase\Orleans.Transactions.TestKit.Base.csproj", "{531A89F5-DD05-4D14-A330-6548359A231A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.TestKit.xUnit", "src\Orleans.Transactions.Testkit.Xunit\Orleans.Transactions.TestKit.xUnit.csproj", "{B8ABE746-C76F-4E0E-86A5-744E85A55CE8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Transactions.TestKit.xUnit", "src\Orleans.Transactions.TestKit.xUnit\Orleans.Transactions.TestKit.xUnit.csproj", "{B8ABE746-C76F-4E0E-86A5-744E85A55CE8}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.TelemetryConsumers.Linux", "src\TelemetryConsumers\Orleans.TelemetryConsumers.Linux\Orleans.TelemetryConsumers.Linux.csproj", "{49E24301-040C-4C23-A985-AF30005A413C}"
 EndProject

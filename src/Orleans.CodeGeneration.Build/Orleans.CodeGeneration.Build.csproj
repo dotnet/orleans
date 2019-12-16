@@ -9,7 +9,6 @@
   <PropertyGroup>
     <TargetFramework />
     <TargetFrameworks>netcoreapp3.0;net461</TargetFrameworks>
-    <TargetFrameworks Condition="'$(OS)' != 'Windows_NT'">netcoreapp3.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
@@ -46,6 +45,7 @@
     <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildVersion)" />
     <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildVersion)" />
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="$(MicrosoftBclAsyncInterfacesVersion)" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="All" Version="$(MicrosoftNETFrameworkReferenceAssembliesVersion)" />
   </ItemGroup>
 
   <!-- Packages included explicitly to prevent build warnings about inconsistent versions -->
