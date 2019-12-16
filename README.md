@@ -159,7 +159,7 @@ Please see the [getting started tutorial](https://dotnet.github.io/orleans/Docum
 On Windows, run the `build.cmd` script to build the NuGet packages locally, then reference the required NuGet packages from `/Artifacts/Release/*`.
 You can run `Test.cmd` to run all BVT tests, and `TestAll.cmd` to also run Functional tests.
 
-On Linux and macOS, run the `build.sh` script or `dotnet build ./OrleansCrossPlatform.sln` to build Orleans.
+On Linux and macOS, run the `build.sh` script or `dotnet build` to build Orleans.
 
 ## Official Builds
 
