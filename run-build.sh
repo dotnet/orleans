@@ -58,5 +58,5 @@ then
     ulimit -n 1024
 fi
 
-dotnet build OrleansCrossPlatform.sln /p:Configuration=$CONFIGURATION ${args[@]}
-dotnet pack OrleansCrossPlatform.sln /p:Configuration=$CONFIGURATION ${args[@]}
+dotnet build Orleans.sln /p:Configuration=$CONFIGURATION ${args[@]}
+dotnet pack Orleans.sln /p:Configuration=$CONFIGURATION ${args[@]}

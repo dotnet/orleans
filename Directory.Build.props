@@ -71,6 +71,7 @@
     <MicrosoftCodeAnalysisVersion>3.3.1</MicrosoftCodeAnalysisVersion>
     <MicrosoftWin32RegistryVersion>4.6.0</MicrosoftWin32RegistryVersion>
     <MicrosoftBclAsyncInterfacesVersion>1.0.0</MicrosoftBclAsyncInterfacesVersion>
+    <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.0</MicrosoftNETFrameworkReferenceAssembliesVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
     <MicrosoftExtensionsConfigurationBinderVersion>3.0.0</MicrosoftExtensionsConfigurationBinderVersion>

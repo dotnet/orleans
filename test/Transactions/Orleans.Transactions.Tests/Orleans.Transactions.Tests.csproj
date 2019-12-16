@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.AzureStorage\Orleans.Clustering.AzureStorage.csproj" />
-    <ProjectReference Include="..\..\..\src\Orleans.Transactions.Testkit.Xunit\Orleans.Transactions.TestKit.xUnit.csproj" />
+    <ProjectReference Include="..\..\..\src\Orleans.Transactions.TestKit.xUnit\Orleans.Transactions.TestKit.xUnit.csproj" />
     <ProjectReference Include="..\..\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
     <ProjectReference Include="..\..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
