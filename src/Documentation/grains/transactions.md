@@ -89,13 +89,17 @@ public interface IAccountGrain : IGrainWithGuidKey
 
 ```
 
+#### Important Considerations
+
+Please be aware that at the moment OnActivateAsync could NOT be marked as transactional as any such call requires a proper setup before the call. It does exist only for the grain application API. This means that an attempt to read transactional state as part of these methods will raise an exception in the runtime.
+
 ### Grain Implementations
 
 A grain implementation needs to use an `ITransactionalState` facet (see Facet System) to manage grain state via ACID transactions.
 
 ```csharp
 
-    public interface ITransactionalState<TState>  
+    public interface ITransactionalState<TState>
         where TState : class, new()
     {
         Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction);
