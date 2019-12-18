@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Persistence Azure Storage</Title>
     <Description>Microsoft Orleans persistence providers for Azure Storage</Description>
     <PackageTags>$(PackageTags) Azure Table Blob Storage</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

@@ -1,3 +1,4 @@
+#if !NETCOREAPP
 using System;
 using System.Collections.Generic;
 using Orleans;
@@ -68,3 +69,4 @@ namespace Tests.GeoClusterTests
         }
     }
 }
+#endif

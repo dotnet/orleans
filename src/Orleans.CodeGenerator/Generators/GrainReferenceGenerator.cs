@@ -195,7 +195,7 @@ namespace Orleans.CodeGenerator.Generators
 
                     if (isOneWayTask)
                     {
-                        if (!wellKnownTypes.Task.Equals(method.ReturnType))
+                        if (!SymbolEqualityComparer.Default.Equals(wellKnownTypes.Task, method.ReturnType))
                         {
                             throw new CodeGenerationException(
                                 $"Method {method} is marked with [{wellKnownTypes.OneWayAttribute.Name}], " +
@@ -209,8 +209,8 @@ namespace Orleans.CodeGenerator.Generators
                 else if (method.ReturnType is INamedTypeSymbol methodReturnType)
                 {
                     // If the method doesn't return a Task type (eg, it returns ValueTask<T>), then we must make an async method and await the invocation result.
-                    var isTaskMethod = wellKnownTypes.Task.Equals(methodReturnType)
-                                       || methodReturnType.IsGenericType && wellKnownTypes.Task_1.Equals(methodReturnType.ConstructedFrom);
+                    var isTaskMethod = SymbolEqualityComparer.Default.Equals(wellKnownTypes.Task, methodReturnType)
+                                       || methodReturnType.IsGenericType && SymbolEqualityComparer.Default.Equals(wellKnownTypes.Task_1, methodReturnType.ConstructedFrom);
                     asyncMethod = !isTaskMethod;
 
                     var returnType = methodReturnType.IsGenericType

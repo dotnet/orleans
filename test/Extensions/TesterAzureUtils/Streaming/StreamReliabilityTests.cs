@@ -1,3 +1,4 @@
+#if !NETCOREAPP
 //#define USE_GENERICS
 //#define DELETE_AFTER_TEST
 
@@ -1137,3 +1138,4 @@ namespace UnitTests.Streaming.Reliability
 }
 
 // ReSharper restore ConvertToConstant.Local
+#endif

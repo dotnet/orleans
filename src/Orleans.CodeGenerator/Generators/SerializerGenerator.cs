@@ -519,8 +519,8 @@ namespace Orleans.CodeGenerator.Generators
                 var referenceAssemblyHasFields = false;
                 var baseType = type.BaseType;
                 while (baseType != null &&
-                       !baseType.Equals(wellKnownTypes.Object) &&
-                       !baseType.Equals(wellKnownTypes.Attribute))
+                       !SymbolEqualityComparer.Default.Equals(baseType, wellKnownTypes.Object) &&
+                       !SymbolEqualityComparer.Default.Equals(baseType, wellKnownTypes.Attribute))
                 {
                     if (!hasUnsupportedRefAsmBase
                         && baseType.ContainingAssembly.HasAttribute("ReferenceAssemblyAttribute")
@@ -579,7 +579,7 @@ namespace Orleans.CodeGenerator.Generators
 
                     foreach (var refAsmType in wellKnownTypes.SupportedRefAsmBaseTypes)
                     {
-                        if (baseDefinition.Equals(refAsmType)) return true;
+                        if (SymbolEqualityComparer.Default.Equals(baseDefinition, refAsmType)) return true;
                     }
 
                     return false;
@@ -603,8 +603,8 @@ namespace Orleans.CodeGenerator.Generators
             if (fieldType.TypeKind == TypeKind.Pointer) return false;
             if (fieldType.TypeKind == TypeKind.Delegate) return false;
 
-            if (wellKnownTypes.IntPtr.Equals(fieldType)) return false;
-            if (wellKnownTypes.UIntPtr.Equals(fieldType)) return false;
+            if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.IntPtr, fieldType)) return false;
+            if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.UIntPtr, fieldType)) return false;
 
             if (symbol.ContainingType.HasBaseType(wellKnownTypes.MarshalByRefObject)) return false;
 
@@ -639,15 +639,15 @@ namespace Orleans.CodeGenerator.Generators
                     return true;
             }
 
-            if (wellKnownTypes.TimeSpan.Equals(type)
-                || wellKnownTypes.IPAddress.Equals(type)
-                || wellKnownTypes.IPEndPoint.Equals(type)
-                || wellKnownTypes.SiloAddress.Equals(type)
-                || wellKnownTypes.GrainId.Equals(type)
-                || wellKnownTypes.ActivationId.Equals(type)
-                || wellKnownTypes.ActivationAddress.Equals(type)
-                || wellKnownTypes.CorrelationId is WellKnownTypes.Some correlationIdType && correlationIdType.Value.Equals(type)
-                || wellKnownTypes.CancellationToken.Equals(type)) return true;
+            if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.TimeSpan, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.IPAddress, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.IPEndPoint, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.SiloAddress, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.GrainId, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.ActivationId, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.ActivationAddress, type)
+                || wellKnownTypes.CorrelationId is WellKnownTypes.Some correlationIdType && SymbolEqualityComparer.Default.Equals(correlationIdType.Value, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.CancellationToken, type)) return true;
 
             if (ShallowCopyableTypes.TryGetValue(type, out var result)) return result;
 
@@ -666,7 +666,7 @@ namespace Orleans.CodeGenerator.Generators
                 return ShallowCopyableTypes[type] = false;
             }
 
-            if (namedType.IsGenericType && wellKnownTypes.Immutable_1.Equals(namedType.ConstructedFrom))
+            if (namedType.IsGenericType && SymbolEqualityComparer.Default.Equals(wellKnownTypes.Immutable_1, namedType.ConstructedFrom))
             {
                 return ShallowCopyableTypes[type] = true;
             }
@@ -690,7 +690,7 @@ namespace Orleans.CodeGenerator.Generators
                     return false;
                 }
 
-                if (type.Equals(fieldType)) return false;
+                if (SymbolEqualityComparer.Default.Equals(type, fieldType)) return false;
 
                 if (!IsOrleansShallowCopyable(fieldType, examining)) return false;
             }
@@ -792,7 +792,7 @@ namespace Orleans.CodeGenerator.Generators
                         .ToArray();
 
                     if (candidates.Length > 1) return null;
-                    if (!this.SafeType.Equals(candidates[0].Type)) return null;
+                    if (!SymbolEqualityComparer.Default.Equals(this.SafeType, candidates[0].Type)) return null;
 
                     return this.property = candidates[0];
                 }

@@ -1,3 +1,4 @@
+#if !NETCOREAPP
 using System;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
@@ -173,3 +174,4 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         }
     }
 }
+#endif

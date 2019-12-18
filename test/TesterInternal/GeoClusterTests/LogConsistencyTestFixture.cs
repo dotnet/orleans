@@ -1,3 +1,4 @@
+#if !NETCOREAPP
 using Orleans;
 using Orleans.Runtime;
 using Orleans.LogConsistency;
@@ -521,3 +522,4 @@ namespace Tests.GeoClusterTests
         }
     }
 }
+#endif

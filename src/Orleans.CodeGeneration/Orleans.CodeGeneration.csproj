@@ -3,6 +3,7 @@
     <AssemblyName>Orleans.CodeGeneration</AssemblyName>
     <RootNamespace>OrleansCodeGenerator</RootNamespace>
     <PackageId>Microsoft.Orleans.OrleansCodeGenerator</PackageId>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>

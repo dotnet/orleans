@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+#if !NETCOREAPP
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -60,3 +61,4 @@ namespace Tests.GeoClusterTests
         }
     }
 }
+#endif

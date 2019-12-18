@@ -422,7 +422,7 @@ namespace Orleans.CodeGenerator.Analysis
             if (named.IsGenericType && !named.IsUnboundGenericType)
             {
                 var unbound = named.ConstructUnboundGenericType();
-                if (unbound.Equals(this.wellKnownTypes.Task_1))
+                if (SymbolEqualityComparer.Default.Equals(unbound, this.wellKnownTypes.Task_1))
                 {
                     return;
                 }

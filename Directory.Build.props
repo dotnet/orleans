@@ -40,37 +40,35 @@
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <TestProjectTargetFramework>net461</TestProjectTargetFramework>
-  </PropertyGroup>
-
   <!-- Shared Package Versions -->
   <PropertyGroup>
     <!-- System packages -->
     <SystemRuntimeVersion>4.3.1</SystemRuntimeVersion>
-    <SystemDataSqlClientVersion>4.7.0</SystemDataSqlClientVersion>
+    <SystemDataSqlClientVersion>4.8.0</SystemDataSqlClientVersion>
     <SystemDataCommonVersion>4.3.0</SystemDataCommonVersion>
-
-    <SystemCollectionsImmutableVersion>1.6.0</SystemCollectionsImmutableVersion>
-    <SystemRuntimeCompilerServicesUnsafeVersion>4.6.0</SystemRuntimeCompilerServicesUnsafeVersion>
+    <SystemDiagnosticsEventLogVersion>4.7.0</SystemDiagnosticsEventLogVersion>
+    <SystemConfigurationConfigurationManagerVersion>4.7.0</SystemConfigurationConfigurationManagerVersion>
+    <SystemCollectionsImmutableVersion>1.7.0</SystemCollectionsImmutableVersion>
+    <SystemRuntimeCompilerServicesUnsafeVersion>4.7.0</SystemRuntimeCompilerServicesUnsafeVersion>
     <SystemNetHttpVersion>4.3.4</SystemNetHttpVersion>
-    <SystemReflectionMetadataVersion>1.7.0</SystemReflectionMetadataVersion>
-    <SystemReflectionTypeExtensionsVersion>4.6.0</SystemReflectionTypeExtensionsVersion>
+    <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
+    <SystemReflectionMetadataVersion>1.8.0</SystemReflectionMetadataVersion>
+    <SystemReflectionTypeExtensionsVersion>4.7.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.5.0</SystemValueTupleVersion>
-    <SystemReflectionEmitVersion>4.6.0</SystemReflectionEmitVersion>
+    <SystemReflectionEmitVersion>4.7.0</SystemReflectionEmitVersion>
     <SystemThreadingTasksExtensionsVersion>4.5.3</SystemThreadingTasksExtensionsVersion>
-    <SystemThreadingChannelsVersion>4.6.0</SystemThreadingChannelsVersion>
+    <SystemThreadingChannelsVersion>4.7.0</SystemThreadingChannelsVersion>
     <SystemBuffersVersion>4.5.0</SystemBuffersVersion>
     <SystemMemoryVersion>4.5.3</SystemMemoryVersion>
-    <SystemIOPipelinesVersion>4.6.0</SystemIOPipelinesVersion>
-    <SystemCodeDomVersion>4.6.0</SystemCodeDomVersion>
+    <SystemIOPipelinesVersion>4.7.0</SystemIOPipelinesVersion>
+    <SystemCodeDomVersion>4.7.0</SystemCodeDomVersion>
+    <SystemSecurityPermissionsVersion>4.7.0</SystemSecurityPermissionsVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>16.3.0</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>3.3.1</MicrosoftCodeAnalysisVersion>
-    <MicrosoftWin32RegistryVersion>4.6.0</MicrosoftWin32RegistryVersion>
-    <MicrosoftBclAsyncInterfacesVersion>1.0.0</MicrosoftBclAsyncInterfacesVersion>
+    <MicrosoftBuildVersion>16.4.0</MicrosoftBuildVersion>
+    <MicrosoftCodeAnalysisVersion>3.4.0</MicrosoftCodeAnalysisVersion>
+    <MicrosoftWin32RegistryVersion>4.7.0</MicrosoftWin32RegistryVersion>
+    <MicrosoftBclAsyncInterfacesVersion>1.1.0</MicrosoftBclAsyncInterfacesVersion>
     <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.0</MicrosoftNETFrameworkReferenceAssembliesVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
@@ -91,7 +89,7 @@
     <MicrosoftAzureEventHubsVersion>4.1.0</MicrosoftAzureEventHubsVersion>
     <MicrosoftAzureStorageBlobVersion>11.1.0</MicrosoftAzureStorageBlobVersion>
     <MicrosoftAzureStorageQueueVersion>11.1.0</MicrosoftAzureStorageQueueVersion>
-    <MicrosoftDataSQLiteVersion>3.0.0</MicrosoftDataSQLiteVersion>
+    <MicrosoftDataSQLiteVersion>3.1.0</MicrosoftDataSQLiteVersion>
     <MicrosoftServiceFabricServicesVersion>3.4.664</MicrosoftServiceFabricServicesVersion>
 
     <FSharpCoreVersion>4.7.0</FSharpCoreVersion>
@@ -104,7 +102,7 @@
     <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
     <GoogleProtobufVersion>3.4.0</GoogleProtobufVersion>
     <ProtobufNetVersion>2.3.7</ProtobufNetVersion>
-    <MySqlDataVersion>6.9.9</MySqlDataVersion>
+    <MySqlDataVersion>8.0.18</MySqlDataVersion>
     <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
     <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
     <NpgsqlVersion>3.1.9</NpgsqlVersion>
@@ -114,8 +112,8 @@
 
     <!-- Test related packages -->
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
-    <MicrosoftTestSdkVersion>16.3.0</MicrosoftTestSdkVersion>
-    <BenchmarkDotNetVersion>0.11.5</BenchmarkDotNetVersion>
+    <MicrosoftTestSdkVersion>16.4.0</MicrosoftTestSdkVersion>
+    <BenchmarkDotNetVersion>0.12.0</BenchmarkDotNetVersion>
     <XunitSkippableFactVersion>1.3.12</XunitSkippableFactVersion>
     <DotNetxUnitVersion>2.3.1</DotNetxUnitVersion>
     <xUnitVersion>2.4.1</xUnitVersion>

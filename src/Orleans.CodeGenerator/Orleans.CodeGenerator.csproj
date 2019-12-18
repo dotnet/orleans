@@ -3,6 +3,7 @@
     <AssemblyName>Orleans.CodeGenerator</AssemblyName>
     <RootNamespace>Orleans.CodeGenerator</RootNamespace>
     <PackageId>Microsoft.Orleans.CodeGenerator</PackageId>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" />

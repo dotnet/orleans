@@ -1,3 +1,4 @@
+#if !NETCOREAPP
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -603,3 +604,4 @@ namespace UnitTests.GeoClusterTests
         }
     }
 }
+#endif

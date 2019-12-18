@@ -16,9 +16,8 @@
 
 using System;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
+using Newtonsoft.Json;
 using Orleans;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage;
 
@@ -116,8 +115,7 @@ namespace Samples.StorageProviders
         /// </remarks>
         protected static string ConvertToStorageFormat(IGrainState grainState)
         {
-            JavaScriptSerializer serializer = new JavaScriptSerializer();
-            return serializer.Serialize(grainState.State);
+            return JsonConvert.SerializeObject(grainState.State);
         }
 
         /// <summary>
@@ -127,8 +125,7 @@ namespace Samples.StorageProviders
         /// <param name="entityData">JSON storage format representation of the grain state.</param>
         protected static void ConvertFromStorageFormat(IGrainState grainState, string entityData)
         {
-            JavaScriptSerializer deserializer = new JavaScriptSerializer();
-            object data = deserializer.Deserialize(entityData, grainState.State.GetType());
+            object data = JsonConvert.DeserializeObject(entityData, grainState.State.GetType());
             grainState.State = data;
         }
     }

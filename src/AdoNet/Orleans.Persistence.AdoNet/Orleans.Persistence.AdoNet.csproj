@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Persistence ADO.NET Providers</Title>
     <Description>Microsoft Orleans persistence providers for ADO.NET Providers</Description>
     <PackageTags>$(PackageTags) ADO.NET SQL MySQL PostgreSQL Oracle</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

@@ -131,7 +131,7 @@ namespace Orleans.CodeGenerator
             // Check that all types which the developer marked as requiring code generation have had code generation.
             foreach (var required in this.compilationAnalyzer.CodeGenerationRequiredTypes)
             {
-                if (!model.Serializers.SerializerTypes.Any(t => t.Target.Equals(required)))
+                if (!model.Serializers.SerializerTypes.Any(t => SymbolEqualityComparer.Default.Equals(t.Target, required)))
                 {
                     throw new CodeGenerationException(
                         $"Found {this.wellKnownTypes.ConsiderForCodeGenerationAttribute} with ThrowOnFailure set for type {required}, but a serializer" +
@@ -349,7 +349,7 @@ namespace Orleans.CodeGenerator
                         this.log.LogTrace($"{nameof(ProcessSerializableType)} type {type} is a serializer for {target}");
                     }
 
-                    if (target.Equals(type))
+                    if (SymbolEqualityComparer.Default.Equals(target, type))
                     {
                         selfSerializing = true;
                         typeSyntax = type.WithoutTypeParameters().ToTypeSyntax();
@@ -390,7 +390,7 @@ namespace Orleans.CodeGenerator
                 return;
             }
 
-            if (type.TypeParameters.Any(p => p.ConstraintTypes.Any(c => c.Equals(this.wellKnownTypes.Delegate))))
+            if (type.TypeParameters.Any(p => p.ConstraintTypes.Any(c => SymbolEqualityComparer.Default.Equals(c, this.wellKnownTypes.Delegate))))
             {
                 if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ProcessSerializableType)} skipping type with Delegate parameter constraint, {type}");
                 return;

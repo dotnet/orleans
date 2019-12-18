@@ -9,6 +9,7 @@
     <RootNamespace>Orleans.Runtime</RootNamespace>
     <AssemblyName>Orleans.Runtime.Abstractions</AssemblyName>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>

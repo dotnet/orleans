@@ -4,12 +4,12 @@
     <PackageId>Microsoft.Orleans.Core.Abstractions</PackageId>
     <Title>Microsoft Orleans Core Abstractions</Title>
     <Description>Core abstractions library of Microsoft Orleans</Description>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
     <AssemblyName>Orleans.Core.Abstractions</AssemblyName>
     <RootNamespace>Orleans</RootNamespace>
-    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>

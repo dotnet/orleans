@@ -1,4 +1,4 @@
-<Project>  
+<Project>
   <PropertyGroup>
     <_ParentDirectoryBuildTargetsPath Condition="'$(_DirectoryBuildTargetsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildTargetsFile)'))</_ParentDirectoryBuildTargetsPath>
   </PropertyGroup>

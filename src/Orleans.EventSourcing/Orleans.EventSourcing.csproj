@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Event-Sourcing</Title>
     <Description>Base types for creating Microsoft Orleans grains with event-sourced state.</Description>
     <PackageTags>$(PackageTags) EventSourcing</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

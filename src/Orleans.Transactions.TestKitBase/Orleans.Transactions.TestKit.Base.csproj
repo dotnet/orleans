@@ -6,15 +6,12 @@
     <Description>Testkit base library for transactions</Description>
     <PackageTags>$(PackageTags) TransactionTestkKit</PackageTags>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
     <AssemblyName>Orleans.Transactions.TestKit.Base</AssemblyName>
     <RootNamespace>Orleans.Transactions.TestKit.Base</RootNamespace>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>

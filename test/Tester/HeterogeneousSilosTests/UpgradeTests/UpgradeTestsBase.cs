@@ -1,3 +1,4 @@
+#if !NETCOREAPP
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -278,3 +279,4 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         }
     }
 }
+#endif

@@ -124,8 +124,8 @@ namespace Orleans.CodeGenerator.Utilities
 
         public static bool HasBaseType(this ITypeSymbol typeSymbol, INamedTypeSymbol baseType)
         {
-            if (baseType.Equals(typeSymbol.BaseType)) return true;
-            if (typeSymbol.BaseType == null) return false;
+            if (SymbolEqualityComparer.Default.Equals(baseType, typeSymbol.BaseType)) return true;
+            if (typeSymbol.BaseType is null) return false;
             return typeSymbol.BaseType.HasBaseType(baseType);
         }
 
@@ -134,7 +134,7 @@ namespace Orleans.CodeGenerator.Utilities
             var attributes = symbol.GetAttributes();
             foreach (var attr in attributes)
             {
-                if (attr.AttributeClass.Equals(attributeType)) return true;
+                if (SymbolEqualityComparer.Default.Equals(attr.AttributeClass, attributeType)) return true;
             }
 
             return false;
@@ -173,7 +173,7 @@ namespace Orleans.CodeGenerator.Utilities
             var temp = default(List<AttributeData>);
             foreach (var attr in symbol.GetAttributes())
             {
-                if (!attr.AttributeClass.Equals(attributeType) && !attr.AttributeClass.HasBaseType(attributeType)) continue;
+                if (!SymbolEqualityComparer.Default.Equals(attr.AttributeClass, attributeType) && !attr.AttributeClass.HasBaseType(attributeType)) continue;
 
                 if (temp == null) temp = new List<AttributeData>();
                 temp.Add(attr);

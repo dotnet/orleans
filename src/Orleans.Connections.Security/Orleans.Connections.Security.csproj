@@ -19,6 +19,7 @@
     <PackageReference Include="System.Buffers" Version="$(SystemBuffersVersion)" />
     <PackageReference Include="System.Memory" Version="$(SystemMemoryVersion)" />
     <PackageReference Include="System.IO.Pipelines" Version="$(SystemIOPipelinesVersion)" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="$(SystemDiagnosticsEventLogVersion)" />
   </ItemGroup>
 
 </Project>

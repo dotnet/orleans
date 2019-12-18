@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>NonSilo.Tests</RootNamespace>
     <AssemblyName>NonSilo.Tests</AssemblyName>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -10,6 +11,11 @@
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrains\TestInternalGrains.csproj" />
     <ProjectReference Include="..\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="$(SystemDiagnosticsEventLogVersion)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -78,7 +84,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
-    <DotNetCliToolReference Include="dotnet-xunit" Version="$(DotNetxUnitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
     <PackageReference Include="NSubstitute" Version="$(NSubstituteVersion)" />
     <PackageReference Include="NSubstitute.Analyzers.CSharp" Version="$(NSubstituteAnalyzersCSharpVersion)" />
   </ItemGroup>
