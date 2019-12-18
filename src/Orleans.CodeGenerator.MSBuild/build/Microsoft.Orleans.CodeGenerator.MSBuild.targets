@@ -37,7 +37,6 @@
     <Orleans_OutputFileName>$(Orleans_CodeGenDirectory)$(TargetName).orleans.g.cs</Orleans_OutputFileName>
     <Orleans_CodeGeneratorEnabled Condition=" '$(DesignTimeBuild)' != 'true'">true</Orleans_CodeGeneratorEnabled>
     <Orleans_ArgsFile>$(Orleans_CodeGenDirectory)$(TargetName).orleans.g.args.txt</Orleans_ArgsFile>
-    <OrleansGenerateCodeDependsOn>$(OrleansGenerateCodeDependsOn);ResolveReferences;OrleansGenerateInputCache</OrleansGenerateCodeDependsOn>
   </PropertyGroup>
 
   <UsingTask
@@ -68,8 +67,27 @@
     This is based on the _GenerateCompileDependencyCache target from the .NET project system.
   -->
   <Target Name="OrleansGenerateInputCache"
-          DependsOnTargets="ResolveAssemblyReferences"
+          AfterTargets="ResolveAssemblyReferences"
           BeforeTargets="OrleansGenerateCode">
+
+    <ItemGroup>
+      <Orleans_CodeGenArgs Include="WaitForDebugger" Condition="'$(OrleansCodeGenWaitForDebugger)' != ''" />
+      <Orleans_CodeGenArgs Include="LogLevel:$(OrleansCodeGenLogLevel)" />
+      <Orleans_CodeGenArgs Include="DebuggerStepThrough:true" Condition="'$(OrleansCodeGenDebuggerStepThrough)' == 'true'" />
+      <Orleans_CodeGenArgs Include="ProjectPath:$(MSBuildProjectFullPath)"/>
+      <Orleans_CodeGenArgs Include="ProjectGuid:$(ProjectGuid)"/>
+      <Orleans_CodeGenArgs Include="AssemblyName:$(AssemblyName)"/>
+      <Orleans_CodeGenArgs Include="OutputType:$(OutputType)"/>
+      <Orleans_CodeGenArgs Include="TargetPath:$(TargetPath)"/>
+      <Orleans_CodeGenArgs Include="CodeGenOutputFile:$(Orleans_OutputFileName)"/>
+      <Orleans_CodeGenArgs Include="@(Compile -> 'Compile:%(FullPath)')"/>
+      <Orleans_CodeGenArgs Include="@(ReferencePath -> 'Reference:%(FullPath)')"/>
+      <Orleans_CodeGenArgs Include="DefineConstants:$(DefineConstants.Replace(';',','))"/>
+    </ItemGroup>
+
+    <Message Text="[Orleans.CodeGenerator] - CodeGen arguments=@(Orleans_CodeGenArgs -> '%(Identity)')" Importance="Low"/>
+    <Message Text="[Orleans.CodeGenerator] - CodeGen arguments file=$(Orleans_ArgsFile)" Importance="Low"/>
+    <WriteLinesToFile Overwrite="true" File="$(Orleans_ArgsFile)" Lines="@(Orleans_CodeGenArgs)"/>
 
     <Hash ItemsToHash="@(Orleans_CodeGenInputs)">
       <Output TaskParameter="HashResult" PropertyName="Orleans_UpdatedInputCacheContents" />
@@ -88,32 +106,13 @@
   </Target>
 
   <Target Name="OrleansGenerateCode"
-          DependsOnTargets="$(OrleansGenerateCodeDependsOn)"
           AfterTargets="OrleansGenerateInputCache"
           BeforeTargets="AssignTargetPaths"
           Condition="'$(Orleans_CodeGeneratorEnabled)' == 'true'"
-          Inputs="@(Orleans_CodeGenInputs);$(Orleans_CodeGenInputCache)"
+          Inputs="$(Orleans_CodeGenInputCache)"
           Outputs="$(Orleans_OutputFileName)">
 
-    <ItemGroup>
-      <Orleans_CodeGenArgs Include="WaitForDebugger" Condition="'$(OrleansCodeGenWaitForDebugger)' != ''" />
-      <Orleans_CodeGenArgs Include="LogLevel:$(OrleansCodeGenLogLevel)" />
-      <Orleans_CodeGenArgs Include="DebuggerStepThrough:true" Condition="'$(OrleansCodeGenDebuggerStepThrough)' == 'true'" />
-      <Orleans_CodeGenArgs Include="ProjectPath:$(MSBuildProjectFullPath)"/>
-      <Orleans_CodeGenArgs Include="ProjectGuid:$(ProjectGuid)"/>
-      <Orleans_CodeGenArgs Include="AssemblyName:$(AssemblyName)"/>
-      <Orleans_CodeGenArgs Include="OutputType:$(OutputType)"/>
-      <Orleans_CodeGenArgs Include="TargetPath:$(TargetPath)"/>
-      <Orleans_CodeGenArgs Include="CodeGenOutputFile:$(Orleans_OutputFileName)"/>
-      <Orleans_CodeGenArgs Include="@(Compile -> 'Compile:%(FullPath)')"/>
-      <Orleans_CodeGenArgs Include="@(ReferencePath -> 'Reference:%(FullPath)')"/>
-      <Orleans_CodeGenArgs Include="DefineConstants:$(DefineConstants.Replace(';',','))"/>
-    </ItemGroup>
-
     <Message Text="[Orleans.CodeGenerator] - CodeGen executable=$(Orleans_GeneratorAssembly)" Importance="Low" />
-    <Message Text="[Orleans.CodeGenerator] - CodeGen arguments=@(Orleans_CodeGenArgs -> '%(Identity)')" Importance="Low"/>
-    <Message Text="[Orleans.CodeGenerator] - CodeGen arguments file=$(Orleans_ArgsFile)" Importance="Low"/>
-    <WriteLinesToFile Overwrite="true" File="$(Orleans_ArgsFile)" Lines="@(Orleans_CodeGenArgs)"/>
 
     <Orleans.CodeGenerator.MSBuild.Tasks.GetDotNetHost Condition="'$(Orleans_DotNetHost)' == '' and '$(Orleans_MSBuildIsCore)' == 'true' ">
       <Output TaskParameter="DotNetHost" PropertyName="Orleans_DotNetHost" />
