@@ -74,10 +74,10 @@ namespace Orleans.Runtime
                 turnsExecutedStartTotal = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_TURNSEXECUTED_TOTAL_START);
                 turnsExecutedEndTotal = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_TURNSEXECUTED_TOTAL_END);
 
-                turnsExecutedPerWorkerThreadApplicationTurns = new CounterStatistic[1];
-                turnsExecutedPerWorkerThreadSystemTurns = new CounterStatistic[1];
-                turnsExecutedPerWorkerThreadNull = new CounterStatistic[1];
-                turnsExecutedPerWorkItemGroup = new CounterStatistic[1];
+                turnsExecutedPerWorkerThreadApplicationTurns ??= new CounterStatistic[1];
+                turnsExecutedPerWorkerThreadSystemTurns ??= new CounterStatistic[1];
+                turnsExecutedPerWorkerThreadNull ??= new CounterStatistic[1];
+                turnsExecutedPerWorkItemGroup ??= new CounterStatistic[1];
             }
 
             NumLongRunningTurns = CounterStatistic.FindOrCreate(StatisticNames.SCHEDULER_NUM_LONG_RUNNING_TURNS);

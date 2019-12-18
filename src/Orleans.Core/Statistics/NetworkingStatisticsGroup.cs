@@ -10,8 +10,8 @@ namespace Orleans.Runtime
 
         internal static void Init()
         {
-            closedSockets = new CounterStatistic[Enum.GetValues(typeof(ConnectionDirection)).Length];
-            openedSockets = new CounterStatistic[Enum.GetValues(typeof(ConnectionDirection)).Length];
+            closedSockets ??= new CounterStatistic[Enum.GetValues(typeof(ConnectionDirection)).Length];
+            openedSockets ??= new CounterStatistic[Enum.GetValues(typeof(ConnectionDirection)).Length];
 
             openedSockets[(int)ConnectionDirection.SiloToSilo] = CounterStatistic.FindOrCreate(StatisticNames.NETWORKING_SOCKETS_SILO_OPENED);
             closedSockets[(int)ConnectionDirection.SiloToSilo] = CounterStatistic.FindOrCreate(StatisticNames.NETWORKING_SOCKETS_SILO_CLOSED);
