@@ -23,26 +23,26 @@ namespace Orleans.Runtime
 
         internal static void Init()
         {
-            dispatcherMessagesProcessedOkPerDirection = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            dispatcherMessagesProcessedOkPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
                 dispatcherMessagesProcessedOkPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
                     new StatisticName(StatisticNames.MESSAGING_DISPATCHER_PROCESSED_OK_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
             }
-            dispatcherMessagesProcessedErrorsPerDirection = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            dispatcherMessagesProcessedErrorsPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
                 dispatcherMessagesProcessedErrorsPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
                     new StatisticName(StatisticNames.MESSAGING_DISPATCHER_PROCESSED_ERRORS_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
             }
-            dispatcherMessagesProcessedReRoutePerDirection = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            dispatcherMessagesProcessedReRoutePerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
                 dispatcherMessagesProcessedReRoutePerDirection[(int)direction] = CounterStatistic.FindOrCreate(
                     new StatisticName(StatisticNames.MESSAGING_DISPATCHER_PROCESSED_REROUTE_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
             }
 
-            dispatcherMessagesProcessingReceivedPerDirection = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            dispatcherMessagesProcessingReceivedPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
                 dispatcherMessagesProcessingReceivedPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
@@ -56,12 +56,12 @@ namespace Orleans.Runtime
             igcMessagesReRoute = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_IGC_REROUTE);
 
             imaReceived = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_IMA_RECEIVED);
-            imaEnqueuedByContext = new CounterStatistic[3];
+            imaEnqueuedByContext ??= new CounterStatistic[3];
             imaEnqueuedByContext[0] = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_IMA_ENQUEUED_TO_NULL);
             imaEnqueuedByContext[1] = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_IMA_ENQUEUED_TO_SYSTEM_TARGET);
             imaEnqueuedByContext[2] = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_IMA_ENQUEUED_TO_ACTIVATION);
 
-            dispatcherReceivedByContext = new CounterStatistic[2];
+            dispatcherReceivedByContext ??= new CounterStatistic[2];
             dispatcherReceivedByContext[0] = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_DISPATCHER_RECEIVED_ON_NULL);
             dispatcherReceivedByContext[1] = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_DISPATCHER_RECEIVED_ON_ACTIVATION);
         }
