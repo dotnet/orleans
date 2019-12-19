@@ -115,7 +115,7 @@ namespace Orleans.Runtime
                     $"Class {grainType.FullName} is already marked with Reentrant attribute");
 
             var callbackMethodName = grainType.GetCustomAttribute<MayInterleaveAttribute>().CallbackMethodName;
-            var method = grainType.GetMethod(callbackMethodName, BindingFlags.Public | BindingFlags.Static);
+            var method = grainType.GetMethod(callbackMethodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
             if (method == null)
                 throw new InvalidOperationException(
                     $"Class {grainType.FullName} doesn't declare public static method " +
