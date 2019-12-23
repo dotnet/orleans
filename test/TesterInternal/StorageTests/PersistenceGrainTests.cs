@@ -1019,7 +1019,7 @@ namespace UnitTests.StorageTests
             Assert.NotNull(exc.InnerException); // BaseException.InnerException should not be null
             Assert.IsAssignableFrom<BadProviderConfigException>(exc.InnerException);
 
-            Assert.Equal(msg3,  ae.Message);  //  "AggregateException.Message should be '{0}'", msg3
+            Assert.StartsWith(msg3,  ae.Message);  //  "AggregateException.Message should be '{0}'", msg3
             Assert.Equal(msg2,  exc.Message);  //  "OrleansException.Message should be '{0}'", msg2
             Assert.Equal(msg1,  exc.InnerException.Message);  //  "InnerException.Message should be '{0}'", msg1
         }
