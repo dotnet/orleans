@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Reflection;
 using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
@@ -20,7 +21,10 @@ namespace Orleans.Serialization
         /// <inheritdoc />
         public bool IsSupportedType(Type itemType)
         {
-            return itemType.IsSerializable && SerializableType.IsAssignableFrom(itemType) && DotNetSerializableUtilities.HasSerializationConstructor(itemType);
+            return itemType.IsSerializable
+                && SerializableType.IsAssignableFrom(itemType)
+                && DotNetSerializableUtilities.HasSerializationConstructor(itemType)
+                && itemType.GetCustomAttribute<SerializableAttribute>() is object;
         }
 
         /// <inheritdoc />
