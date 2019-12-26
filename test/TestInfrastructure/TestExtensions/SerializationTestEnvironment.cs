@@ -31,11 +31,6 @@ namespace TestExtensions
             return result;
         }
 
-        public static SerializationTestEnvironment Initialize(List<TypeInfo> serializationProviders = null, TypeInfo fallbackProvider = null)
-        {
-            return Initialize(serializationProviders?.Select(t => t.AsType()).ToList(), fallbackProvider?.AsType());
-        }
-
         public static SerializationTestEnvironment Initialize(List<Type> serializationProviders = null, Type fallbackProvider = null)
         {
             return InitializeWithDefaults(clientBuilder => clientBuilder.Configure<SerializationProviderOptions>(options =>

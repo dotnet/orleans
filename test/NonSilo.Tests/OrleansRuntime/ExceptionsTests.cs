@@ -22,27 +22,19 @@ namespace UnitTests.OrleansRuntime
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_Exception_DotNet()
         {
-            var activationAddress = ActivationAddress.NewActivationAddress(SiloAddressUtils.NewLocalSiloAddress(12345), GrainId.NewId());
-           
-            var original = new Catalog.NonExistentActivationException("Some message", activationAddress, false);
+            var original = new SiloUnavailableException("Some message");
             var output = TestingUtils.RoundTripDotNetSerializer(original, this.fixture.GrainFactory, this.fixture.SerializationManager);
 
             Assert.Equal(original.Message, output.Message);
-            Assert.Equal(original.NonExistentActivation, output.NonExistentActivation);
-            Assert.Equal(original.IsStatelessWorker, output.IsStatelessWorker);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_Exception_Orleans()
         {
-            var activationAddress = ActivationAddress.NewActivationAddress(SiloAddressUtils.NewLocalSiloAddress(12345), GrainId.NewId());
-
-            var original = new Catalog.NonExistentActivationException("Some message", activationAddress, false);
+            var original = new SiloUnavailableException("Some message");
             var output = this.fixture.SerializationManager.RoundTripSerializationForTesting(original);
 
             Assert.Equal(original.Message, output.Message);
-            Assert.Equal(original.NonExistentActivation, output.NonExistentActivation);
-            Assert.Equal(original.IsStatelessWorker, output.IsStatelessWorker);
         }
     }
 }
