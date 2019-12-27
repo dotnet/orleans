@@ -12,7 +12,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(OrleansCodeGeneratorAssembly)' == ''">
-    <CoreAssembly>$(MSBuildThisFileDirectory)..\tasks\netcoreapp3.0\Orleans.CodeGeneration.Build.dll</CoreAssembly>
+    <CoreAssembly>$(MSBuildThisFileDirectory)..\tasks\netcoreapp3.1\Orleans.CodeGeneration.Build.dll</CoreAssembly>
     <FullAssembly>$(MSBuildThisFileDirectory)..\tasks\net461\Orleans.CodeGeneration.Build.exe</FullAssembly>
 
     <!-- Specify the assembly containing the MSBuild tasks. -->

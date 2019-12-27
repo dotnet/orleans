@@ -242,37 +242,6 @@ namespace Tester.AzureUtils.Persistence
             Assert.True(readTime >= expectedLatency, $"Read: Expected minimum latency = {expectedLatency} Actual = {readTime}");
         }
 
-        [Fact, TestCategory("Performance"), TestCategory("JSON")]
-        public void Json_Perf_Newtonsoft_vs_Net()
-        {
-            const int numIterations = 10000;
-
-            Dictionary<string, object> dataValues = new Dictionary<string, object>();
-            var dotnetJsonSerializer = new System.Web.Script.Serialization.JavaScriptSerializer();
-            string jsonData = null;
-            int[] idx = { 0 };
-            TimeSpan baseline = TestUtils.TimeRun(numIterations, TimeSpan.Zero, ".Net JavaScriptSerializer",
-            () =>
-            {
-                dataValues.Clear();
-                dataValues.Add("A", idx[0]++);
-                dataValues.Add("B", idx[0]++);
-                dataValues.Add("C", idx[0]++);
-                jsonData = dotnetJsonSerializer.Serialize(dataValues);
-            });
-            idx[0] = 0;
-            TimeSpan elapsed = TestUtils.TimeRun(numIterations, baseline, "Newtonsoft Json JavaScriptSerializer",
-            () =>
-            {
-                dataValues.Clear();
-                dataValues.Add("A", idx[0]++);
-                dataValues.Add("B", idx[0]++);
-                dataValues.Add("C", idx[0]++);
-                jsonData = Newtonsoft.Json.JsonConvert.SerializeObject(dataValues);
-            });
-            this.output.WriteLine("Elapsed: {0} Date: {1}", elapsed, jsonData);
-        }
-
         [Fact, TestCategory("Functional")]
         public void LoadClassByName()
         {

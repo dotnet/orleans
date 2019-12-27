@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Streaming AWS SQS</Title>
     <Description>Microsoft Orleans streaming provider for AWS SQS</Description>
     <PackageTags>$(PackageTags) AWS SQS</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

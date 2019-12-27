@@ -1,9 +1,9 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Analyzers</PackageId>
     <Title>Microsoft Orleans Analyzers</Title>
     <Description>C# Analyzers for Microsoft Orleans.</Description>
-    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <DevelopmentDependency>true</DevelopmentDependency>

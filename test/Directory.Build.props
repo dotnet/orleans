@@ -14,7 +14,7 @@
 
   <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->
   <PropertyGroup>
-    <TargetFramework>$(TestProjectTargetFramework)</TargetFramework>
+    <TestTargetFrameworks>netcoreapp3.1;net461</TestTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -23,12 +23,11 @@
 
   <!-- Needed for to not to have failed tests because wrong binding redirects were generated for older packages -->
   <ItemGroup>
-    <PackageReference Include="System.Net.Http" Version="$(SystemNetHttpVersion)" />    
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="All" Version="$(MicrosoftNETFrameworkReferenceAssembliesVersion)" />
+    <PackageReference Include="System.Net.Http" Version="$(SystemNetHttpVersion)" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(BuildingInsideVisualStudio)' == 'true' and '$(TargetFramework)' == '$(TestProjectTargetFramework)' ">
-    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
+  <!-- All .NET Framework projects should link to the reference assemblies package so that .NET Targeting Packs are not needed -->
+  <ItemGroup Condition="$(TargetFramework.StartsWith('net')) and !$(TargetFramework.StartsWith('netcore')) and !$(TargetFramework.StartsWith('netstandard'))" >
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="All" Version="$(MicrosoftNETFrameworkReferenceAssembliesVersion)" />
   </ItemGroup>
 </Project>

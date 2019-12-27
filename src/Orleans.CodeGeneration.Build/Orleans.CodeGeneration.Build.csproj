@@ -7,8 +7,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework />
-    <TargetFrameworks>netcoreapp3.0;net461</TargetFrameworks>
+    <TargetFrameworks>netcoreapp3.1;net461</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>

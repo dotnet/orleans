@@ -2,6 +2,7 @@
   <PropertyGroup>
     <RootNamespace>TestServiceFabric</RootNamespace>
     <AssemblyName>TestServiceFabric</AssemblyName>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -10,11 +11,12 @@
 
   <ItemGroup>
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
     <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
     <PackageReference Include="Microsoft.ServiceFabric.Services" Version="$(MicrosoftServiceFabricServicesVersion)" />
     <PackageReference Include="NSubstitute" Version="$(NSubstituteVersion)" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsOptionsVersion)" />
-    <DotNetCliToolReference Include="dotnet-xunit" Version="$(DotNetxUnitVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>
 
   <ItemGroup>

@@ -201,7 +201,7 @@ namespace Benchmarks
         };
 
         // requires benchmark name or 'All' word as first parameter
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
             if (args.Length > 0 && args[0].Equals("all", StringComparison.InvariantCultureIgnoreCase))
             {

@@ -3,13 +3,15 @@
     <RootNamespace>Orleans.Transactions.Azure.Tests</RootNamespace>
     <AssemblyName>Orleans.Transactions.Azure.Tests</AssemblyName>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
     <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
-    <DotNetCliToolReference Include="dotnet-xunit" Version="$(DotNetxUnitVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>
 
   <ItemGroup>

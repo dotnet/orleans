@@ -1,3 +1,4 @@
+#if !NETCOREAPP
 using System;
 using System.Linq;
 using System.Net;
@@ -75,3 +76,4 @@ namespace UnitTests.MembershipTests
         }
     }
 }
+#endif

@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Telemetry Consumer - NewRelic</Title>
     <Description>NewRelic implementation of Orleans Telemetry API.</Description>
     <PackageTags>$(PackageTags) NewRelic</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

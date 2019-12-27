@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
@@ -15,8 +15,8 @@
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="$(SystemRuntimeCompilerServicesUnsafeVersion)" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsHostingVersion)" />
-    <DotNetCliToolReference Include="dotnet-xunit" Version="$(DotNetxUnitVersion)" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(BuildingInsideVisualStudio)' == 'true'">

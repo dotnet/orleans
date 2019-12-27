@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Streaming Azure Storage</Title>
     <Description>Microsoft Orleans streaming provider for Azure Queue Storage</Description>
     <PackageTags>$(PackageTags) Azure Table Blob Storage</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

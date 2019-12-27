@@ -3,10 +3,10 @@
     <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.Linux</PackageId>
     <Title>Microsoft Orleans Telemetry Consumer - Linux</Title>
     <Description>Microsoft Linux implementation of Orleans Telemetry API.</Description>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <OutputType>library</OutputType>
     <AssemblyName>Orleans.TelemetryConsumers.Linux</AssemblyName>
     <RootNamespace>OrleansTelemetryConsumers.Linux</RootNamespace>

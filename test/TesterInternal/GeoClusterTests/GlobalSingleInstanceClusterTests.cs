@@ -1,3 +1,4 @@
+#if !NETCOREAPP
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -662,3 +663,4 @@ namespace Tests.GeoClusterTests
 
     }
 }
+#endif

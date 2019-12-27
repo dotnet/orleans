@@ -1,3 +1,4 @@
+#if !NETCOREAPP
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -127,3 +128,4 @@ namespace UnitTests.Management
 }
 
 // ReSharper restore ConvertToConstant.Local
+#endif

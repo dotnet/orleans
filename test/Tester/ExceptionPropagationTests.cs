@@ -190,7 +190,7 @@ namespace UnitTests.General
             // assert that the faulted task has an inner exception of type AggregateException, which should be our original exception
             var exception = await Assert.ThrowsAsync<AggregateException>(() => grainCallTask);
 
-            Assert.Equal("Test AggregateException message", exception.Message);
+            Assert.StartsWith("Test AggregateException message", exception.Message);
 
             // make sure that all exceptions in the task are present, and not just the first one.
             Assert.Equal(2, exception.InnerExceptions.Count);

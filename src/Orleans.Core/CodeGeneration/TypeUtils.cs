@@ -481,6 +481,9 @@ namespace Orleans.Runtime
 
         private static readonly Lazy<bool> canUseReflectionOnly = new Lazy<bool>(() =>
         {
+#if NETCOREAPP
+            return false;
+#else
             try
             {
                 ReflectionOnlyTypeResolver.TryResolveType(typeof(TypeUtils).AssemblyQualifiedName, out _);
@@ -495,6 +498,7 @@ namespace Orleans.Runtime
                 // if other exceptions not related to platform ocurr, assume that ReflectionOnly is supported
                 return true;
             }
+#endif
         });
 
         public static bool CanUseReflectionOnly => canUseReflectionOnly.Value;
