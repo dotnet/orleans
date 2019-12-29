@@ -7,6 +7,17 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.4.5] (changes since 2.4.4)
+
+- Non-breaking improvements
+  - Make IFatalErrorHandler public so that it can be replaced by users (#6170)
+  - Allow MayInterleaveAttribute on base grains. Fix for issue #6189 (#6192)
+
+- Non-breaking bug fixes
+  - Azure table grain storage inconsistent state on not found (#6071)
+  - Removed silo status check before cleaning up system targets from… (#6072)
+  - CodeGen: fix ambiguous reference to Orleans namespace (#6171)
+
 ### [3.0.2] (changes since 3.0.1)
 
 - Non-breaking improvements
