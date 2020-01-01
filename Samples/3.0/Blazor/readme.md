@@ -2,30 +2,26 @@
 
 Orleans ASP.NET Core Blazor Sample targetting:
 
-* .NET Core 3.0 Preview 7
-* Blazor 3.0 Preview 7
-* Orleans 2.3.6
+* .NET Core 3.1
+* Orleans 3.0
 
-This sample demonstrates how to integrate [ASP.NET Core Blazor](https://docs.microsoft.com/en-us/aspnet/core/blazor/?view=aspnetcore-3.0)
+This sample demonstrates how to integrate [ASP.NET Core Blazor](https://docs.microsoft.com/en-us/aspnet/core/blazor/?view=aspnetcore-3.1)
 with [Microsoft Orleans](https://dotnet.github.io/orleans/). This demonstrates both client-side and server-side Blazor hosting models.
 
 The server-side sample application leverages Orleans Streams to provide real-time synchronization between browser sessions.
 
 The client-side sample application leverages ASP.NET Web API running alongside Orleans for standard web communication.
 
-Both applications are based on the [official tutorial](https://docs.microsoft.com/en-us/aspnet/core/tutorials/build-your-first-blazor-app?view=aspnetcore-3.0), adapted to showcase integration with Orleans.
-
-Note that at the time of building this sample, Blazor is still in preview, so expect things to change and break.
+Both applications are based on the [official tutorial](https://docs.microsoft.com/en-us/aspnet/core/tutorials/build-your-first-blazor-app?view=aspnetcore-3.1), adapted to showcase integration with Orleans.
 
 ### Prerequisites
 
-* Visual Studio 2019 Preview
-* .NET Core 3.0 Preview 7 SDK
-* Blazor 3.0 Preview Extensions
+* Visual Studio 2019 v.16.4+
+* .NET Core 3.1
 
 ### How To Run
 
-To run this sample, open the solution in Visual Studio 2019 Preview with the prerequisites above installed, and set solution startup to run the projects below:
+To run this sample, open the solution in Visual Studio 2019 with the prerequisites above installed, and set solution startup to run the projects below:
 
 * `Sample.Silo`
 * `Sample.ServerSide`
