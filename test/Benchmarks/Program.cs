@@ -131,7 +131,7 @@ namespace Benchmarks
                     // All calls are cross-silo because the calling silo doesn't have any grain classes.
                     Console.WriteLine("## Silo to Silo ##");
                     var test = new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true);
-                    test.PingConcurrentHostedClient().GetAwaiter().GetResult();
+                    test.PingConcurrentHostedClient(blocksPerWorker: 10).GetAwaiter().GetResult();
                     test.Shutdown().GetAwaiter().GetResult();
                 }
             },
@@ -149,7 +149,11 @@ namespace Benchmarks
             },
             ["ConcurrentPing_SiloToSilo"] = () =>
             {
-                new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient().GetAwaiter().GetResult();                
+                new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 10).GetAwaiter().GetResult();                
+            },
+            ["ConcurrentPing_SiloToSilo_Long"] = () =>
+            {
+                new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 1000).GetAwaiter().GetResult();
             },
             ["PingForever"] = () =>
             {
