@@ -98,10 +98,10 @@ namespace Benchmarks.Ping
             grainFactory: this.client,
             blocksPerWorker: 10);
 
-        public Task PingConcurrentHostedClient() => this.Run(
+        public Task PingConcurrentHostedClient(int blocksPerWorker = 30) => this.Run(
             runs: 3,
             grainFactory: (IGrainFactory)this.hosts[0].Services.GetService(typeof(IGrainFactory)),
-            blocksPerWorker: 30);
+            blocksPerWorker: blocksPerWorker);
 
         private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
         {
