@@ -1,8 +1,9 @@
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.OpenApi.Models;
 using Orleans;
 using Orleans.Hosting;
 using Sample.Grains;
@@ -14,12 +15,56 @@ namespace Sample.Silo
 {
     public class Program
     {
-        public static Task Main(string[] args)
+        public static void Main(string[] args)
         {
-            return new HostBuilder()
-                .ConfigureAppConfiguration(builder =>
+            CreateHostBuilder(args).Build().Run();
+        }
+
+        public static IHostBuilder CreateHostBuilder(string[] args) =>
+            Host.CreateDefaultBuilder(args)
+                .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    builder.AddCommandLine(args);
+                    webBuilder
+                        .ConfigureServices(services =>
+                        {
+                            services.AddControllers()
+                                .AddApplicationPart(typeof(WeatherController).Assembly);
+
+                            services.AddSwaggerGen(options =>
+                            {
+                                options.SwaggerDoc("v1", new OpenApiInfo { Title = nameof(Sample), Version = "v1" });
+                            });
+
+                            services.AddCors(options =>
+                            {
+                                options.AddPolicy("ApiService",
+                                    builder =>
+                                    {
+                                        builder
+                                            .WithOrigins(
+                                                "http://localhost:62653",
+                                                "http://localhost:62654")
+                                            .AllowAnyMethod()
+                                            .AllowAnyHeader();
+                                    });
+                            });
+                        })
+                        .Configure(app =>
+                       {
+                           app.UseCors("ApiService");
+                           app.UseSwagger();
+                           app.UseSwaggerUI(options =>
+                           {
+                               options.SwaggerEndpoint("/swagger/v1/swagger.json", nameof(Sample));
+                           });
+
+                           app.UseRouting();
+                           app.UseEndpoints(endpoints =>
+                           {
+                               endpoints.MapDefaultControllerRoute();
+                           });
+                       })
+                        .UseUrls("http://localhost:8081");
                 })
                 .ConfigureLogging(builder =>
                 {
@@ -37,8 +82,6 @@ namespace Sample.Silo
                     {
                         options.SuppressStatusMessages = true;
                     });
-
-                    services.AddHostedService<ApiService>();
                 })
                 .UseOrleans(builder =>
                 {
@@ -54,8 +97,6 @@ namespace Sample.Silo
                     {
                         options.HideTrace = true;
                     });
-                })
-                .RunConsoleAsync();
-        }
+                });
     }
 }
