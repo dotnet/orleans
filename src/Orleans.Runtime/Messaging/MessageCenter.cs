@@ -21,6 +21,7 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageFactory messageFactory;
         private readonly ILoggerFactory loggerFactory;
         private readonly ConnectionManager senderManager;
+        private readonly MessagingTrace messagingTrace;
         private readonly Action<Message>[] messageHandlers;
         private SiloMessagingOptions messagingOptions;
         internal bool IsBlockingApplicationMessages { get; private set; }
@@ -47,19 +48,21 @@ namespace Orleans.Runtime.Messaging
             ILoggerFactory loggerFactory,
             IOptions<StatisticsOptions> statisticsOptions,
             ISiloStatusOracle siloStatusOracle,
-            ConnectionManager senderManager)
+            ConnectionManager senderManager,
+            MessagingTrace messagingTrace)
         {
             this.messagingOptions = messagingOptions.Value;
             this.loggerFactory = loggerFactory;
             this.senderManager = senderManager;
+            this.messagingTrace = messagingTrace;
             this.log = loggerFactory.CreateLogger<MessageCenter>();
             this.messageFactory = messageFactory;
             this.MyAddress = siloDetails.SiloAddress;
 
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
 
-            inboundQueue = new InboundMessageQueue(this.loggerFactory.CreateLogger<InboundMessageQueue>(), statisticsOptions);
-            OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager, siloStatusOracle);
+            inboundQueue = new InboundMessageQueue(this.loggerFactory.CreateLogger<InboundMessageQueue>(), statisticsOptions, this.messagingTrace);
+            OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager, siloStatusOracle, this.messagingTrace);
 
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Completed initialization.");
 
@@ -177,15 +180,15 @@ namespace Orleans.Runtime.Messaging
                 && !Constants.SystemMembershipTableId.Equals(msg.TargetGrain))
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
-                if (this.log.IsEnabled(LogLevel.Warning))
-                {
-                    this.log.LogWarning("Dropping message {Message} since this silo is blocking application messages", msg);
-                }
+                this.messagingTrace.OnDropBlockedApplicationMessage(msg);
             }
             else
             {
                 if (msg.SendingSilo == null)
+                {
                     msg.SendingSilo = MyAddress;
+                }
+
                 OutboundQueue.SendMessage(msg);
             }
         }

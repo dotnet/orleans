@@ -24,8 +24,8 @@ namespace Orleans.Runtime.Messaging
             AllowSynchronousContinuations = false
         };
 
+        private readonly ConnectionCommon shared;
         private readonly ConnectionDelegate middleware;
-        private readonly IServiceProvider serviceProvider;
         private readonly Channel<Message> outgoingMessages;
         private readonly ChannelWriter<Message> outgoingMessageWriter;
         private readonly object lockObj = new object();
@@ -34,15 +34,11 @@ namespace Orleans.Runtime.Messaging
         protected Connection(
             ConnectionContext connection,
             ConnectionDelegate middleware,
-            MessageFactory messageFactory,
-            IServiceProvider serviceProvider,
-            INetworkingTrace trace)
+            ConnectionCommon shared)
         {
             this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
             this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
-            this.MessageFactory = messageFactory ?? throw new ArgumentNullException(nameof(messageFactory));
-            this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            this.Log = trace ?? throw new ArgumentNullException(nameof(trace));
+            this.shared = shared;
             this.outgoingMessages = Channel.CreateUnbounded<Message>(OutgoingMessageChannelOptions);
             this.outgoingMessageWriter = this.outgoingMessages.Writer;
 
@@ -60,9 +56,10 @@ namespace Orleans.Runtime.Messaging
         protected CounterStatistic MessageReceivedCounter { get; set; }
         protected CounterStatistic MessageSentCounter { get; set; }
         protected ConnectionContext Context { get; }
-        protected INetworkingTrace Log { get; }
+        protected NetworkingTrace Log => this.shared.NetworkingTrace;
+        protected MessagingTrace MessagingTrace => this.shared.MessagingTrace;
         protected abstract ConnectionDirection ConnectionDirection { get; }
-        protected MessageFactory MessageFactory { get; }
+        protected MessageFactory MessageFactory => this.shared.MessageFactory;
         protected abstract IMessageCenter MessageCenter { get; }
 
         public bool IsValid { get; private set; }
@@ -184,7 +181,7 @@ namespace Orleans.Runtime.Messaging
 
             Exception error = default;
             PipeReader input = default;
-            var serializer = this.serviceProvider.GetRequiredService<IMessageSerializer>();
+            var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
             try
             {
                 if (this.Log.IsEnabled(LogLevel.Information))
@@ -258,7 +255,7 @@ namespace Orleans.Runtime.Messaging
 
             Exception error = default;   
             PipeWriter output = default;
-            var serializer = this.serviceProvider.GetRequiredService<IMessageSerializer>();
+            var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
             try
             {
                 output = this.Context.Transport.Output;

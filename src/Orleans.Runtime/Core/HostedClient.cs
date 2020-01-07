@@ -28,6 +28,7 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ISiloMessageCenter siloMessageCenter;
+        private readonly MessagingTrace messagingTrace;
         private bool disposing;
         private Task messagePump;
 
@@ -39,7 +40,8 @@ namespace Orleans.Runtime
             IGrainReferenceRuntime grainReferenceRuntime,
             IInternalGrainFactory grainFactory,
             InvokableObjectManager invokableObjectManager,
-            ISiloMessageCenter messageCenter)
+            ISiloMessageCenter messageCenter,
+            MessagingTrace messagingTrace)
         {
             this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
             {
@@ -54,6 +56,7 @@ namespace Orleans.Runtime
             this.grainFactory = grainFactory;
             this.invokableObjects = invokableObjectManager;
             this.siloMessageCenter = messageCenter;
+            this.messagingTrace = messagingTrace;
             this.logger = logger;
 
             this.ClientAddress = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, GrainId.NewClientId());
@@ -138,7 +141,7 @@ namespace Orleans.Runtime
             if (!this.ClientId.Equals(message.TargetGrain)) return false;
             if (message.IsExpired)
             {
-                message.DropExpiredMessage(this.logger, MessagingStatisticsGroup.Phase.Receive);
+                this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Receive);
                 return true;
             }
 

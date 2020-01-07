@@ -12,6 +12,7 @@ namespace Orleans.Runtime.Messaging
         private readonly OrleansTaskScheduler scheduler;
         private readonly Dispatcher dispatcher;
         private readonly MessageFactory messageFactory;
+        private readonly MessagingTrace messagingTrace;
         private readonly Message.Categories category;
 
         internal IncomingMessageAgent(
@@ -21,7 +22,8 @@ namespace Orleans.Runtime.Messaging
             OrleansTaskScheduler sched, 
             Dispatcher dispatcher, 
             MessageFactory messageFactory,
-            ILoggerFactory loggerFactory) :
+            ILoggerFactory loggerFactory,
+            MessagingTrace messagingTrace) :
             base(cat.ToString(), loggerFactory)
         {
             category = cat;
@@ -30,6 +32,7 @@ namespace Orleans.Runtime.Messaging
             scheduler = sched;
             this.dispatcher = dispatcher;
             this.messageFactory = messageFactory;
+            this.messagingTrace = messagingTrace;
             OnFault = FaultBehavior.RestartOnFault;
             messageCenter.RegisterLocalMessageHandler(cat, ReceiveMessage);
         }
@@ -52,6 +55,7 @@ namespace Orleans.Runtime.Messaging
                 // Get an application message
                 while (reader.TryRead(out var msg))
                 {
+                    this.messagingTrace.OnDequeueInboundMessage(msg);
                     if (msg == null)
                     {
                         if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Dequeued a null message, exiting");
@@ -68,8 +72,7 @@ namespace Orleans.Runtime.Messaging
 
         private void ReceiveMessage(Message msg)
         {
-            EventSourceUtils.EmitEvent(msg, OrleansIncomingMessageAgentEvent.ReceiverMessageAction);
-            MessagingProcessingStatisticsGroup.OnImaMessageReceived(msg);
+            this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
 
             ISchedulingContext context;
             // Find the activation it targets; first check for a system activation, then an app activation
@@ -89,12 +92,12 @@ namespace Orleans.Runtime.Messaging
                 switch (msg.Direction)
                 {
                     case Message.Directions.Request:
-                        MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
+                        this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
                         scheduler.QueueWorkItem(new RequestWorkItem(target, msg), context);
                         break;
 
                     case Message.Directions.Response:
-                        MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
+                        this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
                         scheduler.QueueWorkItem(new ResponseWorkItem(target, msg), context);
                         break;
 
@@ -149,10 +152,8 @@ namespace Orleans.Runtime.Messaging
 
         private void EnqueueReceiveMessage(Message msg, ActivationData targetActivation, ISchedulingContext context)
         {
-            MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
-
-            if (targetActivation != null) targetActivation.IncrementEnqueuedOnDispatcherCount();
-
+            this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
+            targetActivation?.IncrementEnqueuedOnDispatcherCount();
             scheduler.QueueWorkItem(new ClosureWorkItem(() =>
             {
                 try
@@ -161,7 +162,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 finally
                 {
-                    if (targetActivation != null) targetActivation.DecrementEnqueuedOnDispatcherCount();
+                    targetActivation?.DecrementEnqueuedOnDispatcherCount();
                 }
             },
             "Dispatcher.ReceiveMessage"), context);

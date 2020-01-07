@@ -16,28 +16,28 @@ namespace Orleans.Runtime.Messaging
         private readonly IConnectionListenerFactory listenerFactory;
         private readonly ConnectionManager connectionManager;
         private readonly ConcurrentDictionary<Connection, Task> connections = new ConcurrentDictionary<Connection, Task>(ReferenceEqualsComparer.Instance);
-        private readonly INetworkingTrace trace;
+        private readonly ConnectionCommon connectionShared;
         private TaskCompletionSource<object> acceptLoopTcs;
         private IConnectionListener listener;
         private ConnectionDelegate connectionDelegate;
 
         protected ConnectionListener(
-            IServiceProvider serviceProvider,
             IConnectionListenerFactory listenerFactory,
             IOptions<ConnectionOptions> connectionOptions,
             ConnectionManager connectionManager,
-            INetworkingTrace trace)
+            ConnectionCommon connectionShared)
         {
-            this.ServiceProvider = serviceProvider;
             this.listenerFactory = listenerFactory;
             this.connectionManager = connectionManager;
             this.ConnectionOptions = connectionOptions.Value;
-            this.trace = trace;
+            this.connectionShared = connectionShared;
         }
 
         public abstract EndPoint Endpoint { get; }
 
-        protected IServiceProvider ServiceProvider { get; }
+        protected IServiceProvider ServiceProvider => this.connectionShared.ServiceProvider;
+
+        protected NetworkingTrace NetworkingTrace => this.connectionShared.NetworkingTrace;
 
         public int ConnectionCount => this.connections.Count;
 
@@ -96,7 +96,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 catch (Exception exception)
                 {
-                    this.trace.LogCritical("Exception in AcceptAsync: {Exception}", exception);
+                    this.NetworkingTrace.LogCritical("Exception in AcceptAsync: {Exception}", exception);
                 }
                 finally
                 {
@@ -141,7 +141,7 @@ namespace Orleans.Runtime.Messaging
 
                     if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount > 0)
                     {
-                        this.trace?.LogWarning("Waiting for {NumRemaining} connections to terminate", this.ConnectionCount);
+                        this.NetworkingTrace.LogWarning("Waiting for {NumRemaining} connections to terminate", this.ConnectionCount);
                     }
                 }
 
@@ -154,7 +154,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                this.trace?.LogWarning("Exception during shutdown: {Exception}", exception);
+                this.NetworkingTrace.LogWarning("Exception during shutdown: {Exception}", exception);
             }
         }
 
@@ -180,11 +180,11 @@ namespace Orleans.Runtime.Messaging
                     var connectionTask = connection.Run();
                     this.connections.TryAdd(connection, connectionTask);
                     await connectionTask;
-                    this.trace.LogInformation("Connection {@Connection} terminated", connection);
+                    this.NetworkingTrace.LogInformation("Connection {@Connection} terminated", connection);
                 }
                 catch (Exception exception)
                 {
-                    this.trace.LogInformation(exception, "Connection {@Connection} terminated with an exception", connection);
+                    this.NetworkingTrace.LogInformation(exception, "Connection {@Connection} terminated with an exception", connection);
                 }
                 finally
                 {
@@ -195,9 +195,9 @@ namespace Orleans.Runtime.Messaging
 
         private IDisposable BeginConnectionScope(Connection connection)
         {
-            if (this.trace.IsEnabled(LogLevel.Critical))
+            if (this.NetworkingTrace.IsEnabled(LogLevel.Critical))
             {
-                return this.trace.BeginScope(new ConnectionLogScope(connection));
+                return this.NetworkingTrace.BeginScope(new ConnectionLogScope(connection));
             }
 
             return null;

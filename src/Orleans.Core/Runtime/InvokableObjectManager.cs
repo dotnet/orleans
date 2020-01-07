@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -17,12 +18,18 @@ namespace Orleans
         private readonly IRuntimeClient runtimeClient;
         private readonly ILogger logger;
         private readonly SerializationManager serializationManager;
+        private readonly MessagingTrace messagingTrace;
         private readonly Func<object, Task> dispatchFunc;
 
-        public InvokableObjectManager(IRuntimeClient runtimeClient, SerializationManager serializationManager, ILogger<InvokableObjectManager> logger)
+        public InvokableObjectManager(
+            IRuntimeClient runtimeClient,
+            SerializationManager serializationManager,
+            MessagingTrace messagingTrace,
+            ILogger<InvokableObjectManager> logger)
         {
             this.runtimeClient = runtimeClient;
             this.serializationManager = serializationManager;
+            this.messagingTrace = messagingTrace;
             this.logger = logger;
 
             this.dispatchFunc = o =>
@@ -141,8 +148,11 @@ namespace Orleans
                         message = objectData.Messages.Dequeue();
                     }
 
-                    if (ExpireMessageIfExpired(this.logger, message, MessagingStatisticsGroup.Phase.Invoke))
+                    if (message.IsExpired)
+                    {
+                        this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Invoke);
                         continue;
+                    }
 
                     RequestContextExtensions.Import(message.RequestContextData);
                     InvokeMethodRequest request = null;
@@ -201,22 +211,12 @@ namespace Orleans
             }
         }
 
-        private static bool ExpireMessageIfExpired(ILogger logger, Message message, MessagingStatisticsGroup.Phase phase)
-        {
-            if (message.IsExpired)
-            {
-                message.DropExpiredMessage(logger, phase);
-                return true;
-            }
-
-            return false;
-        }
-
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private void SendResponseAsync(Message message, object resultObject)
         {
-            if (ExpireMessageIfExpired(this.logger, message, MessagingStatisticsGroup.Phase.Respond))
+            if (message.IsExpired)
             {
+                this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Respond);
                 return;
             }
 

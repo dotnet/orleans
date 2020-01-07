@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using Orleans.Transactions;
 
 namespace Orleans.Runtime
 {
-    internal class Message : IOutgoingMessage
+    internal class Message
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
@@ -28,7 +27,6 @@ namespace Orleans.Runtime
             set { _targetHistory = value; }
         }
 
-        
         public DateTime? QueuedTime
         {
             get { return _queuedTime; }
@@ -508,12 +506,6 @@ namespace Orleans.Runtime
             return history.ToString();
         }
 
-        public bool IsSameDestination(IOutgoingMessage other)
-        {
-            var msg = (Message)other;
-            return msg != null && Object.Equals(TargetSilo, msg.TargetSilo);
-        }
-
         // For statistical measuring of time spent in queues.
         private ITimeInterval timeInterval;
 
@@ -547,12 +539,6 @@ namespace Orleans.Runtime
                 Result = Message.ResponseTypes.Error,
                 BodyObject = Response.ExceptionResponse(exception)
             };
-        }
-
-        internal void DropExpiredMessage(ILogger logger, MessagingStatisticsGroup.Phase phase)
-        {
-            logger.LogWarning((int)ErrorCode.Messaging_DroppingExpiredMessage, "Dropped expired message during {Phase} phase.  Message: {Message}", phase.ToString(), logger.IsEnabled(LogLevel.Trace) ? this.ToLongString() : this.ToString());
-            MessagingStatisticsGroup.OnMessageExpired(phase);
         }
 
         private static int BufferLength(List<ArraySegment<byte>> buffer)

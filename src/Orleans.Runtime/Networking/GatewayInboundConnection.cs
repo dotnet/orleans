@@ -23,17 +23,14 @@ namespace Orleans.Runtime.Messaging
         public GatewayInboundConnection(
             ConnectionContext connection,
             ConnectionDelegate middleware,
-            IServiceProvider serviceProvider,
             Gateway gateway,
             OverloadDetector overloadDetector,
-            MessageFactory messageFactory,
-            INetworkingTrace trace,
             ILocalSiloDetails siloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
             ConnectionOptions connectionOptions,
             MessageCenter messageCenter,
-            ILocalSiloDetails localSiloDetails)
-            : base(connection, middleware, messageFactory, serviceProvider, trace)
+            ConnectionCommon connectionShared)
+            : base(connection, middleware, connectionShared)
         {
             this.connectionOptions = connectionOptions;
             this.gateway = gateway;
@@ -42,7 +39,7 @@ namespace Orleans.Runtime.Messaging
             this.messageCenter = messageCenter;
             this.multiClusterOptions = multiClusterOptions.Value;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
-            this.myAddress = localSiloDetails.SiloAddress;
+            this.myAddress = siloDetails.SiloAddress;
             this.MessageReceivedCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
             this.MessageSentCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
         }
@@ -56,7 +53,7 @@ namespace Orleans.Runtime.Messaging
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {
-                msg.DropExpiredMessage(this.Log, MessagingStatisticsGroup.Phase.Receive);
+                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Receive);
                 return;
             }
 
@@ -159,13 +156,15 @@ namespace Orleans.Runtime.Messaging
             // Don't send messages that have already timed out
             if (msg.IsExpired)
             {
-                msg.DropExpiredMessage(this.Log, MessagingStatisticsGroup.Phase.Send);
+                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Send);
                 return false;
             }
 
             // Fill in the outbound message with our silo address, if it's not already set
             if (msg.SendingSilo == null)
+            {
                 msg.SendingSilo = this.myAddress;
+            }
 
             return true;
         }

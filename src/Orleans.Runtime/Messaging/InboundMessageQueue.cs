@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Messaging
         private readonly Channel<Message>[] messageQueues;
 
         private readonly ILogger log;
-
+        private readonly MessagingTrace messagingTrace;
         private readonly QueueTrackingStatistic[] queueTracking;
 
         private readonly StatisticsLevel statisticsLevel;
@@ -35,9 +35,10 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal InboundMessageQueue(ILogger<InboundMessageQueue> log, IOptions<StatisticsOptions> statisticsOptions)
+        internal InboundMessageQueue(ILogger<InboundMessageQueue> log, IOptions<StatisticsOptions> statisticsOptions, MessagingTrace messagingTrace)
         {
             this.log = log;
+            this.messagingTrace = messagingTrace;
             int n = Enum.GetValues(typeof(Message.Categories)).Length;
             this.messageQueues = new Channel<Message>[n];
             this.queueTracking = new QueueTrackingStatistic[n];
@@ -51,6 +52,7 @@ namespace Orleans.Runtime.Messaging
                     SingleWriter = false,
                     AllowSynchronousContinuations = false
                 });
+
                 if (this.statisticsLevel.CollectQueueStats())
                 {
                     var queueName = "IncomingMessageAgent." + category;
@@ -89,12 +91,12 @@ namespace Orleans.Runtime.Messaging
             // Should always return true
             if (writer.TryWrite(msg))
             {
-                if (this.log.IsEnabled(LogLevel.Trace))
-                {
-                    this.log.Trace("Queued incoming {0} message", msg.Category.ToString());
-                }
+                this.messagingTrace.OnEnqueueInboundMessage(msg);
             }
-            else ThrowPostMessage(msg);
+            else
+            {
+                ThrowPostMessage(msg);
+            }
 
             void ThrowPostMessage(Message m) => throw new InvalidOperationException("Attempted to post message " + m + " to closed message queue.");
         }

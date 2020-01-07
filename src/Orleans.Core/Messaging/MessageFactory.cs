@@ -1,6 +1,5 @@
 
 using System;
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
@@ -12,11 +11,13 @@ namespace Orleans.Runtime
     {
         private readonly SerializationManager serializationManager;
         private readonly ILogger logger;
+        private readonly MessagingTrace messagingTrace;
 
-        public MessageFactory(SerializationManager serializationManager, ILogger<MessageFactory> logger)
+        public MessageFactory(SerializationManager serializationManager, ILogger<MessageFactory> logger, MessagingTrace messagingTrace)
         {
             this.serializationManager = serializationManager;
             this.logger = logger;
+            this.messagingTrace = messagingTrace;
         }
 
         public Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
@@ -26,7 +27,6 @@ namespace Orleans.Runtime
                 Category = Message.Categories.Application,
                 Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
                 Id = CorrelationId.GetNext(),
-                TraceContext = new TraceContext() { ActivityId = Trace.CorrelationManager.ActivityId },
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
@@ -38,15 +38,15 @@ namespace Orleans.Runtime
             if (options.IsTransactional())
             {
                 SetTransaction(message, options);
-            } else
+            }
+            else
             {
                 // clear transaction info if not in transaction
                 message.RequestContextData?.Remove(TransactionContext.Orleans_TransactionContext_Key);
             }
 
-
+            messagingTrace.OnCreateMessage(message);
             return message;
-
         }
 
         private void SetTransaction(Message message, InvokeMethodOptions options)
@@ -137,6 +137,7 @@ namespace Orleans.Runtime
                 response.RequestContextData = contextData;
             }
 
+            messagingTrace.OnCreateMessage(response);
             return response;
         }
 

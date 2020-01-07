@@ -1,13 +1,14 @@
-﻿using System;
+using System;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class NetworkingTrace : INetworkingTrace
+    internal sealed class NetworkingTrace : DiagnosticListener, ILogger
     {
         private readonly ILogger log;
 
-        public NetworkingTrace(ILoggerFactory loggerFactory)
+        public NetworkingTrace(ILoggerFactory loggerFactory) : base("Microsoft.Orleans.Networking")
         {
             this.log = loggerFactory.CreateLogger("Microsoft.Orleans.Networking");
         }

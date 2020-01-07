@@ -11,11 +11,10 @@ namespace Orleans.Runtime.Messaging
     internal sealed class SiloConnectionFactory : ConnectionFactory
     {
         internal static readonly object ServicesKey = new object();
-        private readonly INetworkingTrace trace;
         private readonly ILocalSiloDetails localSiloDetails;
+        private readonly ConnectionCommon connectionShared;
         private readonly IServiceProvider serviceProvider;
         private readonly SiloConnectionOptions siloConnectionOptions;
-        private readonly MessageFactory messageFactory;
         private readonly object initializationLock = new object();
         private bool isInitialized;
         private ConnectionManager connectionManager;
@@ -26,16 +25,14 @@ namespace Orleans.Runtime.Messaging
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<SiloConnectionOptions> siloConnectionOptions,
-            MessageFactory messageFactory,
-            INetworkingTrace trace,
-            ILocalSiloDetails localSiloDetails)
+            ILocalSiloDetails localSiloDetails,
+            ConnectionCommon connectionShared)
             : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionFactory>(ServicesKey), serviceProvider, connectionOptions)
         {
             this.serviceProvider = serviceProvider;
             this.siloConnectionOptions = siloConnectionOptions.Value;
-            this.messageFactory = messageFactory;
-            this.trace = trace;
             this.localSiloDetails = localSiloDetails;
+            this.connectionShared = connectionShared;
         }
 
         public override ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
@@ -58,13 +55,11 @@ namespace Orleans.Runtime.Messaging
                 address,
                 context,
                 this.ConnectionDelegate,
-                this.serviceProvider,
-                this.trace,
                 this.messageCenter,
-                this.messageFactory,
                 this.localSiloDetails,
                 this.connectionManager,
-                this.ConnectionOptions);
+                this.ConnectionOptions,
+                this.connectionShared);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)

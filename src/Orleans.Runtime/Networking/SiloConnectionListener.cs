@@ -12,32 +12,29 @@ namespace Orleans.Runtime.Messaging
     internal sealed class SiloConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>
     {
         internal static readonly object ServicesKey = new object();
-        private readonly INetworkingTrace trace;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly MessageCenter messageCenter;
-        private readonly MessageFactory messageFactory;
         private readonly EndpointOptions endpointOptions;
         private readonly ConnectionManager connectionManager;
+        private readonly ConnectionCommon connectionShared;
 
         public SiloConnectionListener(
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<SiloConnectionOptions> siloConnectionOptions,
             MessageCenter messageCenter,
-            MessageFactory messageFactory,
-            INetworkingTrace trace,
             IOptions<EndpointOptions> endpointOptions,
             ILocalSiloDetails localSiloDetails,
-            ConnectionManager connectionManager)
-            : base(serviceProvider, serviceProvider.GetRequiredServiceByKey<object, IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, trace)
+            ConnectionManager connectionManager,
+            ConnectionCommon connectionShared)
+            : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
             this.messageCenter = messageCenter;
-            this.messageFactory = messageFactory;
-            this.trace = trace;
             this.localSiloDetails = localSiloDetails;
             this.connectionManager = connectionManager;
+            this.connectionShared = connectionShared;
             this.endpointOptions = endpointOptions.Value;
         }
 
@@ -49,13 +46,11 @@ namespace Orleans.Runtime.Messaging
                 default(SiloAddress),
                 context,
                 this.ConnectionDelegate,
-                this.ServiceProvider,
-                this.trace,
                 this.messageCenter,
-                this.messageFactory,
                 this.localSiloDetails,
                 this.connectionManager,
-                this.ConnectionOptions);
+                this.ConnectionOptions,
+                this.connectionShared);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)

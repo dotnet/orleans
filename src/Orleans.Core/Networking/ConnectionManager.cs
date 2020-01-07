@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConcurrentDictionary<SiloAddress, ConnectionEntry> connections = new ConcurrentDictionary<SiloAddress, ConnectionEntry>();
         private readonly ConnectionOptions connectionOptions;
         private readonly ConnectionFactory connectionFactory;
-        private readonly INetworkingTrace trace;
+        private readonly NetworkingTrace trace;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly object lockObj = new object();
         private readonly TaskCompletionSource<int> closedTaskCompletionSource = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -27,7 +27,7 @@ namespace Orleans.Runtime.Messaging
         public ConnectionManager(
             IOptions<ConnectionOptions> connectionOptions,
             ConnectionFactory connectionFactory,
-            INetworkingTrace trace)
+            NetworkingTrace trace)
         {
             this.connectionOptions = connectionOptions.Value;
             this.connectionFactory = connectionFactory;

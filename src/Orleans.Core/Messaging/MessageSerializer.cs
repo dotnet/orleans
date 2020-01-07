@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
 using Orleans.Configuration;
 using Orleans.Networking.Shared;
 using Orleans.Serialization;
@@ -111,12 +112,18 @@ namespace Orleans.Runtime.Messaging
             return (headerLength, bodyLength);
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private void ThrowIfLengthsInvalid(int headerLength, int bodyLength)
         {
             if (headerLength <= 0 || headerLength > this.maxHeaderLength)
+            {
                 throw new OrleansException($"Invalid header size: {headerLength} (max configured value is {this.maxHeaderLength}, see {nameof(MessagingOptions.MaxMessageHeaderSize)})");
+            }
+
             if (bodyLength < 0 || bodyLength > this.maxBodyLength)
+            {
                 throw new OrleansException($"Invalid body size: {bodyLength} (max configured value is {this.maxBodyLength}, see {nameof(MessagingOptions.MaxMessageBodySize)})");
+            }
         }
 
         private sealed class OrleansSerializer<T>
