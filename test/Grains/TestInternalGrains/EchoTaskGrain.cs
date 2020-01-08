@@ -8,7 +8,9 @@ using Orleans;
 using Orleans.Concurrency;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Utilities;
 using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace UnitTests.Grains
 {
@@ -58,7 +60,7 @@ namespace UnitTests.Grains
     }
 
     [StorageProvider(ProviderName = "MemoryStore")]
-    internal class EchoTaskGrain : Grain<EchoTaskGrainState>, IEchoTaskGrain
+    internal class EchoTaskGrain : Grain<EchoTaskGrainState>, IEchoTaskGrain, IDebuggerHelperTestGrain
     {
         private readonly IInternalGrainFactory internalGrainFactory;
         private ILogger logger;
@@ -182,6 +184,23 @@ namespace UnitTests.Grains
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
             return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
+        }
+
+        public Task OrleansDebuggerHelper_GetGrainInstance_Test()
+        {
+            var result = OrleansDebuggerHelper.GetGrainInstance(null);
+            Assert.Null(result);
+
+            result = OrleansDebuggerHelper.GetGrainInstance(this);
+            Assert.Same(this, result);
+
+            result = OrleansDebuggerHelper.GetGrainInstance(this.AsReference<IDebuggerHelperTestGrain>());
+            Assert.Same(this, result);
+
+            result = OrleansDebuggerHelper.GetGrainInstance(this.GrainFactory.GetGrain<IEchoGrain>(Guid.NewGuid()));
+            Assert.Null(result);
+
+            return Task.CompletedTask;
         }
     }
 
