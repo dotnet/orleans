@@ -1,15 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26124.0
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29613.14
 MinimumVisualStudioVersion = 15.0.26124.0
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "API", "API\API.csproj", "{57485C87-B23C-4407-8A6E-08B63881800E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "API", "API\API.csproj", "{57485C87-B23C-4407-8A6E-08B63881800E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grains", "Grains\Grains.csproj", "{72903237-9BC2-424C-B5D2-8CA8D4AF5CE1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Grains", "Grains\Grains.csproj", "{72903237-9BC2-424C-B5D2-8CA8D4AF5CE1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Interfaces", "Interfaces\Interfaces.csproj", "{7D077D31-0929-4157-BD82-C1B71BED7830}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silo", "Silo\Silo.csproj", "{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Interfaces", "Interfaces\Interfaces.csproj", "{7D077D31-0929-4157-BD82-C1B71BED7830}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,9 +17,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{57485C87-B23C-4407-8A6E-08B63881800E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -60,17 +55,11 @@ Global
 		{7D077D31-0929-4157-BD82-C1B71BED7830}.Release|x64.Build.0 = Release|Any CPU
 		{7D077D31-0929-4157-BD82-C1B71BED7830}.Release|x86.ActiveCfg = Release|Any CPU
 		{7D077D31-0929-4157-BD82-C1B71BED7830}.Release|x86.Build.0 = Release|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Debug|x64.Build.0 = Debug|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Debug|x86.Build.0 = Debug|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Release|x64.ActiveCfg = Release|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Release|x64.Build.0 = Release|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Release|x86.ActiveCfg = Release|Any CPU
-		{F3C48E67-9F34-4C3D-86B1-BD74756A1C0C}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4F92E200-0A5E-4340-9512-C12423449F97}
 	EndGlobalSection
 EndGlobal

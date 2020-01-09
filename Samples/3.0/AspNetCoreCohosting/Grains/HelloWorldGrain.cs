@@ -1,14 +1,15 @@
-﻿using System.Threading.Tasks;
-using AspNetCoreHostedServices.Interfaces;
+using System.Threading.Tasks;
+using AspNetCoreCohosting.Interfaces;
 using Microsoft.Extensions.Logging;
 
-namespace AspNetCoreHostedServices.Grains
+namespace AspNetCoreCohosting.Grains
 {
     public class HelloWorldGrain : Orleans.Grain, IHelloWorld
     {
         private readonly ILogger<HelloWorldGrain> _logger;
 
-        public HelloWorldGrain(ILogger<HelloWorldGrain> logger) {
+        public HelloWorldGrain(ILogger<HelloWorldGrain> logger)
+        {
             this._logger = logger;
         }
 

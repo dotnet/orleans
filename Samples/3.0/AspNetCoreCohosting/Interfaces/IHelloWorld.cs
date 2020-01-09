@@ -1,6 +1,6 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 
-namespace AspNetCoreHostedServices.Interfaces
+namespace AspNetCoreCohosting.Interfaces
 {
     public interface IHelloWorld : Orleans.IGrainWithIntegerKey
     {
