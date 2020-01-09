@@ -60,4 +60,9 @@ namespace UnitTests.GrainInterfaces
         Task<string> CallMethodTask_Block(string data);
         Task<string> CallMethodAV_Block(string data);
     }
+
+    public interface IDebuggerHelperTestGrain : IGrain
+    {
+        Task OrleansDebuggerHelper_GetGrainInstance_Test();
+    }
 }
