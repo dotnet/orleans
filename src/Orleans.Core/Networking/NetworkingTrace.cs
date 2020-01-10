@@ -1,13 +1,15 @@
-﻿using System;
+using System;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class NetworkingTrace : INetworkingTrace
+    internal sealed class NetworkingTrace : DiagnosticListener, ILogger
     {
         private readonly ILogger log;
 
-        public NetworkingTrace(ILoggerFactory loggerFactory)
+        public NetworkingTrace(ILoggerFactory loggerFactory) : base("Microsoft.Orleans.Networking")
         {
             this.log = loggerFactory.CreateLogger("Microsoft.Orleans.Networking");
         }
@@ -17,6 +19,7 @@ namespace Orleans.Runtime.Messaging
             return this.log.BeginScope(state);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsEnabled(LogLevel logLevel)
         {
             return this.log.IsEnabled(logLevel);

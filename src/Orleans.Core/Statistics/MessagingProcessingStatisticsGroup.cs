@@ -7,15 +7,12 @@ namespace Orleans.Runtime
     {
         private static CounterStatistic[] dispatcherMessagesProcessedOkPerDirection;
         private static CounterStatistic[] dispatcherMessagesProcessedErrorsPerDirection;
-        private static CounterStatistic[] dispatcherMessagesProcessedReRoutePerDirection;
         private static CounterStatistic[] dispatcherMessagesProcessingReceivedPerDirection;
         private static CounterStatistic dispatcherMessagesProcessedTotal;
         private static CounterStatistic dispatcherMessagesReceivedTotal;
         private static CounterStatistic[] dispatcherReceivedByContext;
       
-        private static CounterStatistic igcMessagesForwarded;
-        private static CounterStatistic igcMessagesResent;
-        private static CounterStatistic igcMessagesReRoute;
+        private static CounterStatistic dispatcherMessagesForwarded;
 
         private static CounterStatistic imaReceived;
         private static CounterStatistic[] imaEnqueuedByContext;
@@ -35,13 +32,6 @@ namespace Orleans.Runtime
                 dispatcherMessagesProcessedErrorsPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
                     new StatisticName(StatisticNames.MESSAGING_DISPATCHER_PROCESSED_ERRORS_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
             }
-            dispatcherMessagesProcessedReRoutePerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
-            foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
-            {
-                dispatcherMessagesProcessedReRoutePerDirection[(int)direction] = CounterStatistic.FindOrCreate(
-                    new StatisticName(StatisticNames.MESSAGING_DISPATCHER_PROCESSED_REROUTE_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
-            }
-
             dispatcherMessagesProcessingReceivedPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
@@ -51,9 +41,7 @@ namespace Orleans.Runtime
             dispatcherMessagesProcessedTotal = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_DISPATCHER_PROCESSED_TOTAL);
             dispatcherMessagesReceivedTotal = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_DISPATCHER_RECEIVED_TOTAL);
 
-            igcMessagesForwarded = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_IGC_FORWARDED);
-            igcMessagesResent = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_IGC_RESENT);
-            igcMessagesReRoute = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_IGC_REROUTE);
+            dispatcherMessagesForwarded = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_DISPATCHER_FORWARDED);
 
             imaReceived = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_IMA_RECEIVED);
             imaEnqueuedByContext ??= new CounterStatistic[3];
@@ -87,31 +75,15 @@ namespace Orleans.Runtime
             dispatcherMessagesProcessedTotal.Increment();
         }
 
-        internal static void OnDispatcherMessageProcessedError(Message msg, string reason)
+        internal static void OnDispatcherMessageProcessedError(Message msg)
         {
             dispatcherMessagesProcessedErrorsPerDirection[(int)msg.Direction].Increment();
             dispatcherMessagesProcessedTotal.Increment();
         }
 
-        internal static void OnDispatcherMessageReRouted(Message msg)
+        internal static void OnDispatcherMessageForwared(Message msg)
         {
-            dispatcherMessagesProcessedReRoutePerDirection[(int)msg.Direction].Increment();
-            dispatcherMessagesProcessedTotal.Increment();
-        }
-
-        internal static void OnIgcMessageForwared(Message msg)
-        {
-            igcMessagesForwarded.Increment();
-        }
-
-        internal static void OnIgcMessageResend(Message msg)
-        {
-            igcMessagesResent.Increment();
-        }
-
-        internal static void OnIgcMessageReRoute(Message msg)
-        {
-            igcMessagesReRoute.Increment();
+            dispatcherMessagesForwarded.Increment();
         }
 
         internal static void OnImaMessageReceived(Message msg)

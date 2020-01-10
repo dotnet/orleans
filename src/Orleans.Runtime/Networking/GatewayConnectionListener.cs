@@ -12,13 +12,12 @@ namespace Orleans.Runtime.Messaging
     internal sealed class GatewayConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>
     {
         internal static readonly object ServicesKey = new object();
-        private readonly INetworkingTrace trace;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IOptions<MultiClusterOptions> multiClusterOptions;
         private readonly MessageCenter messageCenter;
+        private readonly ConnectionCommon connectionShared;
         private readonly EndpointOptions endpointOptions;
         private readonly SiloConnectionOptions siloConnectionOptions;
-        private readonly MessageFactory messageFactory;
         private readonly OverloadDetector overloadDetector;
         private readonly Gateway gateway;
 
@@ -26,25 +25,23 @@ namespace Orleans.Runtime.Messaging
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<SiloConnectionOptions> siloConnectionOptions,
-            MessageFactory messageFactory,
             OverloadDetector overloadDetector,
             Gateway gateway,
-            INetworkingTrace trace,
             ILocalSiloDetails localSiloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
             IOptions<EndpointOptions> endpointOptions,
             MessageCenter messageCenter,
-            ConnectionManager connectionManager)
-            : base(serviceProvider, serviceProvider.GetRequiredServiceByKey<object, IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, trace)
+            ConnectionManager connectionManager,
+            ConnectionCommon connectionShared)
+            : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
-            this.messageFactory = messageFactory;
             this.overloadDetector = overloadDetector;
             this.gateway = gateway;
-            this.trace = trace;
             this.localSiloDetails = localSiloDetails;
             this.multiClusterOptions = multiClusterOptions;
             this.messageCenter = messageCenter;
+            this.connectionShared = connectionShared;
             this.endpointOptions = endpointOptions.Value;
         }
 
@@ -55,16 +52,13 @@ namespace Orleans.Runtime.Messaging
             return new GatewayInboundConnection(
                 context,
                 this.ConnectionDelegate,
-                this.ServiceProvider,
                 this.gateway,
                 this.overloadDetector,
-                this.messageFactory,
-                this.trace,
                 this.localSiloDetails,
                 this.multiClusterOptions,
                 this.ConnectionOptions,
                 this.messageCenter,
-                this.localSiloDetails);
+                this.connectionShared);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)

@@ -75,9 +75,7 @@ namespace Orleans.Runtime
         public static readonly StatisticName MESSAGING_IMA_ENQUEUED_TO_SYSTEM_TARGET                = new StatisticName("Messaging.Processing.IMA.Enqueued.ToSystemTargetContex");
         public static readonly StatisticName MESSAGING_IMA_ENQUEUED_TO_ACTIVATION                   = new StatisticName("Messaging.Processing.IMA.Enqueued.ToActivationContex");
 
-        public static readonly StatisticName MESSAGING_IGC_FORWARDED                                = new StatisticName("Messaging.Processing.IGC.Forwarded");
-        public static readonly StatisticName MESSAGING_IGC_RESENT                                   = new StatisticName("Messaging.Processing.IGC.Resent");
-        public static readonly StatisticName MESSAGING_IGC_REROUTE                                  = new StatisticName("Messaging.Processing.IGC.ReRoute");
+        public static readonly StatisticName MESSAGING_DISPATCHER_FORWARDED                         = new StatisticName("Messaging.Processing.Dispatcher.Forwarded");
         public static readonly StatisticName MESSAGING_PROCESSING_ACTIVATION_DATA_ALL               = new StatisticName("Messaging.Processing.ActivationData.All");
 
         public static readonly StatisticNameFormat MESSAGING_PINGS_SENT_PER_SILO               = new StatisticNameFormat("Messaging.Pings.Sent.{0}");

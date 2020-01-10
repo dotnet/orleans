@@ -100,6 +100,7 @@ namespace Orleans.Runtime
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly IOptions<SiloMessagingOptions> messagingOptions;
+        private readonly RuntimeMessagingTrace messagingTrace;
 
         public Catalog(
             ILocalSiloDetails localSiloDetails,
@@ -119,7 +120,8 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             IOptions<SchedulingOptions> schedulingOptions,
             IOptions<GrainCollectionOptions> collectionOptions,
-            IOptions<SiloMessagingOptions> messagingOptions)
+            IOptions<SiloMessagingOptions> messagingOptions,
+            RuntimeMessagingTrace messagingTrace)
             : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
@@ -138,6 +140,7 @@ namespace Orleans.Runtime
             this.serviceProvider = serviceProvider;
             this.collectionOptions = collectionOptions;
             this.messagingOptions = messagingOptions;
+            this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
             this.Dispatcher = new Dispatcher(
@@ -149,10 +152,10 @@ namespace Orleans.Runtime
                 grainDirectory,
                 this.activationCollector,
                 messageFactory,
-                serializationManager,
                 versionSelectorManager.CompatibilityDirectorManager,
                 loggerFactory,
-                schedulingOptions);
+                schedulingOptions,
+                messagingTrace);
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
 // TODO: figure out how to read config change notification from options. - jbragg
@@ -517,7 +520,7 @@ namespace Orleans.Runtime
                 UnregisterMessageTarget(result);
                 throw;
             }
-            activatedPromise = InitActivation(result, grainType, genericArguments, requestContextData);
+            activatedPromise = InitActivation(result, requestContextData);
             return result;
         }
 
@@ -541,8 +544,7 @@ namespace Orleans.Runtime
             Completed
         }
 
-        private async Task InitActivation(ActivationData activation, string grainType, string genericArguments,
-            Dictionary<string, object> requestContextData)
+        private async Task InitActivation(ActivationData activation, Dictionary<string, object> requestContextData)
         {
             // We've created a dummy activation, which we'll eventually return, but in the meantime we'll queue up (or perform promptly)
             // the operations required to turn the "dummy" activation into a real activation

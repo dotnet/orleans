@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,6 @@ using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions.Compatibility;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -28,8 +28,8 @@ namespace Orleans.Runtime
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly ActivationCollector activationCollector;
         private readonly MessageFactory messageFactory;
-        private readonly SerializationManager serializationManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
+        private readonly RuntimeMessagingTrace messagingTrace;
         private readonly SchedulingOptions schedulingOptions;
         private readonly ILogger invokeWorkItemLogger;
         internal Dispatcher(
@@ -41,10 +41,10 @@ namespace Orleans.Runtime
             ILocalGrainDirectory localGrainDirectory,
             ActivationCollector activationCollector,
             MessageFactory messageFactory,
-            SerializationManager serializationManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             ILoggerFactory loggerFactory,
-            IOptions<SchedulingOptions> schedulerOptions)
+            IOptions<SchedulingOptions> schedulerOptions,
+            RuntimeMessagingTrace messagingTrace)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
@@ -55,8 +55,8 @@ namespace Orleans.Runtime
             this.localGrainDirectory = localGrainDirectory;
             this.activationCollector = activationCollector;
             this.messageFactory = messageFactory;
-            this.serializationManager = serializationManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
+            this.messagingTrace = messagingTrace;
             this.schedulingOptions = schedulerOptions.Value;
             logger = loggerFactory.CreateLogger<Dispatcher>();
         }
@@ -72,21 +72,20 @@ namespace Orleans.Runtime
         /// <param name="message"></param>
         public void ReceiveMessage(Message message)
         {
-            EventSourceUtils.EmitEvent(message, OrleansDispatcherEvent.ReceiveMessageAction);
-            MessagingProcessingStatisticsGroup.OnDispatcherMessageReceive(message);
+            this.messagingTrace.OnDispatcherReceiveMessage(message);
+
             // Don't process messages that have already timed out
             if (message.IsExpired)
             {
-                logger.Warn(ErrorCode.Dispatcher_DroppingExpiredMessage, "Dropping an expired message: {0}", message);
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Expired");
-                message.DropExpiredMessage(this.logger, MessagingStatisticsGroup.Phase.Dispatch);
+                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
+                this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Dispatch);
                 return;
             }
 
             // check if its targeted at a new activation
             if (message.TargetGrain.IsSystemTarget)
             {
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "ReceiveMessage on system target.");
+                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
                 throw new InvalidOperationException("Dispatcher was called ReceiveMessage on system target for " + message);
             }
 
@@ -125,7 +124,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Non-existent activation");
+                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
               
                     var nea = ex as Catalog.NonExistentActivationException;
                     if (nea == null)
@@ -201,23 +200,22 @@ namespace Orleans.Runtime
 
         public void RejectMessage(
             Message message, 
-            Message.RejectionTypes rejectType, 
+            Message.RejectionTypes rejectionType, 
             Exception exc, 
             string rejectInfo = null)
         {
             if (message.Direction == Message.Directions.Request
                 || (message.Direction == Message.Directions.OneWay && message.HasCacheInvalidationHeader))
             {
-                var str = String.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
-                MessagingStatisticsGroup.OnRejectedMessage(message);
-                Message rejection = this.messageFactory.CreateRejectionResponse(message, rejectType, str, exc);
+                this.messagingTrace.OnDispatcherRejectMessage(message, rejectionType, rejectInfo, exc);
+
+                var str = string.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
+                Message rejection = this.messageFactory.CreateRejectionResponse(message, rejectionType, str, exc);
                 SendRejectionMessage(rejection);
             }
             else
             {
-                logger.Warn(ErrorCode.Messaging_Dispatcher_DiscardRejection,
-                    "Discarding {0} rejection for message {1}. Exc = {2}",
-                    Enum.GetName(typeof(Message.Directions), message.Direction), message, exc == null ? "" : exc.Message);
+                this.messagingTrace.OnDispatcherDiscardedRejection(message, rejectionType, rejectInfo, exc);
             }
         }
 
@@ -240,11 +238,10 @@ namespace Orleans.Runtime
             {
                 if (targetActivation.State == ActivationState.Invalid || targetActivation.State == ActivationState.FailedToActivate)
                 {
-                    logger.Warn((int)ErrorCode.Dispatcher_Receive_InvalidActivation,
-                        "Response received for {State} activation {Message}", targetActivation.State, message);
-                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Invalid");
+                    this.messagingTrace.OnDispatcherReceiveInvalidActivation(message, targetActivation.State);
                     return;
                 }
+
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
                 if (Transport.TryDeliverToProxy(message)) return;
 
@@ -274,14 +271,14 @@ namespace Orleans.Runtime
                         catch (DeadlockException exc)
                         {
                             // Record that this message is no longer flowing through the system
-                            MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Deadlock");
-                            logger.Warn(ErrorCode.Dispatcher_DetectedDeadlock, 
-                                "Detected Application Deadlock: {0}", exc.Message);
+                            this.messagingTrace.OnDispatcherDetectedDeadlock(message, targetActivation, exc);
+
                             // We want to send DeadlockException back as an application exception, rather than as a system rejection.
                             SendResponse(message, Response.ExceptionResponse(exc));
                             return;
                         }
                     }
+
                     EnqueueRequest(message, targetActivation);
                 }
                 else
@@ -373,11 +370,11 @@ namespace Orleans.Runtime
                 newChain.Add(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
 
                 throw new DeadlockException(
-                    String.Format(
+                    string.Format(
                         "Deadlock Exception for grain call chain {0}.",
                         Utils.EnumerableToString(
                             newChain,
-                            elem => String.Format("{0}.{1}", elem.GrainId, elem.DebugContext))),
+                            elem => string.Format("{0}.{1}", elem.GrainId, elem.DebugContext))),
                     newChain.Select(req => new Tuple<GrainId, string>(req.GrainId, req.DebugContext)).ToList());
             }
         }
@@ -423,6 +420,7 @@ namespace Orleans.Runtime
                 targetActivation.RecordRunning(message, message.IsAlwaysInterleave);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
+                this.messagingTrace.OnScheduleMessage(message);
                 scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
             }
         }
@@ -437,7 +435,7 @@ namespace Orleans.Runtime
             var overloadException = targetActivation.CheckOverloaded(logger);
             if (overloadException != null)
             {
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Overload2");
+                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
                 RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + targetActivation);
                 return;
             }
@@ -514,11 +512,7 @@ namespace Orleans.Runtime
                 this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
             }
 
-            if (logger.IsEnabled(LogLevel.Information))
-            {
-                logger.Info(ErrorCode.Messaging_Dispatcher_ForwardingRequests,
-                    $"Forwarding {messages.Count} requests destined for address {oldAddress} to address {forwardingAddress} after {failedOperation}.");
-            }
+            this.messagingTrace.OnDispatcherForwardingMultiple(messages.Count, oldAddress, forwardingAddress, failedOperation, exc);
 
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
             scheduler.QueueWorkItem(new ClosureWorkItem(
@@ -534,7 +528,6 @@ namespace Orleans.Runtime
                         {
                             TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
                         }
-                        
                     }
                 }
                 ), catalog.SchedulingContext);
@@ -545,18 +538,7 @@ namespace Orleans.Runtime
             bool forwardingSucceded = true;
             try
             {
-                if (logger.IsEnabled(LogLevel.Information))
-                {
-                    logger.LogInformation(
-                        (int)ErrorCode.Messaging_Dispatcher_TryForward,
-                        "Trying to forward after {FailedOperation}, ForwardCount = {ForwardCount}. OldAddress = {OldAddress}, ForwardingAddress = {ForwardingAddress}, Message {Message}, Exception: {Exception}.",
-                        failedOperation,
-                        message.ForwardCount,
-                        oldAddress,
-                        forwardingAddress,
-                        message,
-                        exc);
-                }
+                this.messagingTrace.OnDispatcherForwarding(message, oldAddress, forwardingAddress, failedOperation, exc);
 
                 // if this message is from a different cluster and hit a non-existing activation
                 // in this cluster (which can happen due to stale cache or directory states)
@@ -572,7 +554,6 @@ namespace Orleans.Runtime
                     logger.Info(ErrorCode.Messaging_Dispatcher_ReturnToOriginCluster, $"Forwarding back to origin cluster, to fictional activation {message}");
                 }
 
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageReRouted(message);
                 if (oldAddress != null)
                 {
                     message.AddToCacheInvalidationHeader(oldAddress);
@@ -602,10 +583,12 @@ namespace Orleans.Runtime
 
                 if (!forwardingSucceded)
                 {
-                    var str = $"Forwarding failed: tried to forward message {message} for {message.ForwardCount} times after {failedOperation} to invalid activation. Rejecting now.";
-                    logger.Warn(ErrorCode.Messaging_Dispatcher_TryForwardFailed, str, exc);
-
-                    if (!sentRejection) RejectMessage(message, Message.RejectionTypes.Transient, exc, str);
+                    this.messagingTrace.OnDispatcherForwardingFailed(message, oldAddress, forwardingAddress, failedOperation, exc);
+                    if (!sentRejection)
+                    {
+                        var str = $"Forwarding failed: tried to forward message {message} for {message.ForwardCount} times after {failedOperation} to invalid activation. Rejecting now.";
+                        RejectMessage(message, Message.RejectionTypes.Transient, exc, str);
+                    }
                 }
             }
         }
@@ -624,7 +607,7 @@ namespace Orleans.Runtime
             if (!MayForward(message, this.messagingOptions)) return false;
 
             message.ForwardCount = message.ForwardCount + 1;
-            MessagingProcessingStatisticsGroup.OnIgcMessageForwared(message);
+            MessagingProcessingStatisticsGroup.OnDispatcherMessageForwared(message);
             ResendMessageImpl(message, forwardingAddress);
             return true;
         }
@@ -659,8 +642,7 @@ namespace Orleans.Runtime
         {
             return message.ForwardCount < messagingOptions.MaxForwardCount
                 // allow one more forward hop for multi-cluster case
-                + (message.IsReturnedFromRemoteCluster ? 1 : 0)
-                ;
+                + (message.IsReturnedFromRemoteCluster ? 1 : 0);
         }
 
         /// <summary>
@@ -688,7 +670,7 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                OnAddressingFailure(ex, message);
+                OnAddressingFailure(message, sendingActivation, ex);
             }
 
             return Task.CompletedTask;
@@ -701,29 +683,18 @@ namespace Orleans.Runtime
                 }
                 catch (Exception ex)
                 {
-                    OnAddressingFailure(ex, message);
+                    OnAddressingFailure(message, activation, ex);
                     return;
                 }
 
                 TransportMessage(m, activation);
             }
 
-            void OnAddressingFailure(Exception ex, Message m)
+            void OnAddressingFailure(Message m, ActivationData activation, Exception ex)
             {
-                if (ShouldLogError(ex))
-                {
-                    logger.Error(ErrorCode.Dispatcher_SelectTarget_Failed, $"SelectTarget failed with {ex.Message}", ex);
-                }
-
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "SelectTarget failed");
+                this.messagingTrace.OnDispatcherSelectTargetFailed(m, activation, ex);
                 RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
             }
-        }
-
-        private bool ShouldLogError(Exception ex)
-        {
-            return !(ex.GetBaseException() is KeyNotFoundException) &&
-                   !(ex.GetBaseException() is ClientNotAvailableException);
         }
 
         // this is a compatibility method for portions of the code base that don't use
@@ -778,7 +749,6 @@ namespace Orleans.Runtime
                 message.SendingAddress, target, this.catalog, strategy);
             SetMessageTargetPlacement(message, placementResult, targetAddress);
         }
-
 
         private void SetMessageTargetPlacement(Message message, PlacementResult placementResult, ActivationAddress targetAddress)
         {
