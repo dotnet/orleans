@@ -9,10 +9,10 @@ namespace AspNetCoreCohosting.Controllers
     [Route("api/hello")]
     public class HelloWorldController : ControllerBase
     {
-        private readonly IClusterClient _client;
+        private readonly IGrainFactory _client;
         private readonly IHelloWorld _grain;
 
-        public HelloWorldController(IClusterClient client)
+        public HelloWorldController(IGrainFactory client)
         {
             _client = client;
             _grain = _client.GetGrain<IHelloWorld>(0);
