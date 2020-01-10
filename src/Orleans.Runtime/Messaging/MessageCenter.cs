@@ -184,11 +184,7 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
-                if (msg.SendingSilo == null)
-                {
-                    msg.SendingSilo = MyAddress;
-                }
-
+                msg.SendingSilo ??= this.MyAddress;
                 OutboundQueue.SendMessage(msg);
             }
         }

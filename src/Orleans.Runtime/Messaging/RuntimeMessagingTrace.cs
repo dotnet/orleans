@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
@@ -12,12 +13,13 @@ namespace Orleans.Runtime
         public const string DispatcherForwardingEventName = Category + ".Dispatcher.Forwarding";
         public const string DispatcherForwardingMultipleEventName = Category + ".Dispatcher.ForwardingMultiple";
         public const string DispatcherForwardingFailedEventName = Category + ".Dispatcher.ForwardingFailed";
+        public const string DispatcherSelectTargetFailedEventName = Category + ".Dispatcher.SelectTargetFailed";
 
         private static readonly Action<ILogger, ActivationState, Message, Exception> LogDispatcherReceiveInvalidActivation =
             LoggerMessage.Define<ActivationState, Message>(
                 LogLevel.Warning,
                 new EventId((int)ErrorCode.Dispatcher_Receive_InvalidActivation, DispatcherReceiveInvalidActivationEventName),
-                "Response received for {State} activation {Message}");
+                "Invalid activation in state {State} for message {Message}");
 
         private static readonly Action<ILogger, Message, ActivationData, Exception> LogDispatcherDetectedDeadlock =
             LoggerMessage.Define<Message, ActivationData>(
@@ -25,14 +27,14 @@ namespace Orleans.Runtime
                 new EventId((int)ErrorCode.Dispatcher_DetectedDeadlock, DispatcherDetectedDeadlockEventName),
                 "Detected application deadlock on message {Message} and activation {Activation}");
 
-        private static readonly Action<ILogger, string, Message.RejectionTypes, Message, Exception> LogDispatcherDiscardedRejection =
-            LoggerMessage.Define<string, Message.RejectionTypes, Message>(
+        private static readonly Action<ILogger, Message, string, Message.RejectionTypes, Exception> LogDispatcherDiscardedRejection =
+            LoggerMessage.Define<Message, string, Message.RejectionTypes>(
                 LogLevel.Warning,
                 new EventId((int)ErrorCode.Messaging_Dispatcher_DiscardRejection, DispatcherDiscardedRejectionEventName),
-                "Discarding rejection {Reason} of type {RejectionType} for message {Message}");
+                "Discarding rejection of message {Message} with reason '{Reason}' ({RejectionType})");
 
-        private static readonly Action<ILogger, string, Message.RejectionTypes, Message, Exception> LogDispatcherRejectedMessage =
-            LoggerMessage.Define<string, Message.RejectionTypes, Message>(
+        private static readonly Action<ILogger, Message, string, Message.RejectionTypes, Exception> LogDispatcherRejectedMessage =
+            LoggerMessage.Define<Message, string, Message.RejectionTypes>(
                 LogLevel.Debug,
                 new EventId((int)ErrorCode.Messaging_Dispatcher_Rejected, DispatcherRejectedMessageEventName),
                 "Rejected message {Message} with reason '{Reason}' ({RejectionType})");
@@ -54,6 +56,12 @@ namespace Orleans.Runtime
                 LogLevel.Information,
                 new EventId((int)ErrorCode.Messaging_Dispatcher_ForwardingRequests, DispatcherForwardingMultipleEventName),
                 "Forwarding {MessageCount} requests destined for address {OldAddress} to address {ForwardingAddress} after {FailedOperation}");
+
+        private static readonly Action<ILogger, Message, ActivationData, Exception> LogDispatcherSelectTargetFailed =
+            LoggerMessage.Define<Message, ActivationData>(
+                LogLevel.Error,
+                new EventId((int)ErrorCode.Dispatcher_SelectTarget_Failed, DispatcherSelectTargetFailedEventName),
+                "Failed to address message {Message} from activation {Activation}");
 
         public RuntimeMessagingTrace(ILoggerFactory loggerFactory) : base(loggerFactory)
         {
@@ -88,7 +96,7 @@ namespace Orleans.Runtime
                 this.Write(DispatcherDiscardedRejectionEventName, new { Message = message, RejectionType = rejectionType, Reason = reason, Exception = exception });
             }
 
-            LogDispatcherDiscardedRejection(this, reason, rejectionType, message, exception);
+            LogDispatcherDiscardedRejection(this, message, reason, rejectionType, exception);
         }
 
         internal void OnDispatcherRejectMessage(Message message, Message.RejectionTypes rejectionType, string reason, Exception exception)
@@ -102,7 +110,7 @@ namespace Orleans.Runtime
 
             if (this.IsEnabled(LogLevel.Debug))
             {
-                LogDispatcherRejectedMessage(this, reason, rejectionType, message, exception);
+                LogDispatcherRejectedMessage(this, message, reason, rejectionType, exception);
             }
         }
 
@@ -117,6 +125,8 @@ namespace Orleans.Runtime
             {
                 LogDispatcherForwarding(this, message, oldAddress, forwardingAddress, failedOperation, message.ForwardCount, exception);
             }
+
+            MessagingProcessingStatisticsGroup.OnDispatcherMessageForwared(message);
         }
 
         internal void OnDispatcherForwardingFailed(Message message, ActivationAddress oldAddress, ActivationAddress forwardingAddress, string failedOperation, Exception exception)
@@ -139,6 +149,27 @@ namespace Orleans.Runtime
             if (this.IsEnabled(LogLevel.Information))
             {
                 LogDispatcherForwardingMultiple(this, messageCount, oldAddress, forwardingAddress, failedOperation, exception);
+            }
+        }
+
+        internal void OnDispatcherSelectTargetFailed(Message message, ActivationData sendingActivation, Exception exception)
+        {
+            if (this.IsEnabled(DispatcherSelectTargetFailedEventName))
+            {
+                this.Write(DispatcherSelectTargetFailedEventName, new { Message = message, SendingActivation = sendingActivation, Exception = exception });
+            }
+
+            if (ShouldLogError(exception))
+            {
+                LogDispatcherSelectTargetFailed(this, message, sendingActivation, exception);
+            }
+
+            MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
+
+            static bool ShouldLogError(Exception ex)
+            {
+                return !(ex.GetBaseException() is KeyNotFoundException) &&
+                       !(ex.GetBaseException() is ClientNotAvailableException);
             }
         }
     }

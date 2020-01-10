@@ -276,10 +276,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // Fill in the outbound message with our silo address, if it's not already set
-            if (msg.SendingSilo == null)
-            {
-                msg.SendingSilo = this.LocalSiloAddress;
-            }
+            msg.SendingSilo ??= this.LocalSiloAddress;
 
             if (this.Log.IsEnabled(LogLevel.Debug) && msg.IsPing())
             {

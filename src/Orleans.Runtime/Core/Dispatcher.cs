@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -553,7 +554,6 @@ namespace Orleans.Runtime
                     logger.Info(ErrorCode.Messaging_Dispatcher_ReturnToOriginCluster, $"Forwarding back to origin cluster, to fictional activation {message}");
                 }
 
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageReRouted(message);
                 if (oldAddress != null)
                 {
                     message.AddToCacheInvalidationHeader(oldAddress);
@@ -670,7 +670,7 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                OnAddressingFailure(ex, message);
+                OnAddressingFailure(message, sendingActivation, ex);
             }
 
             return Task.CompletedTask;
@@ -683,28 +683,17 @@ namespace Orleans.Runtime
                 }
                 catch (Exception ex)
                 {
-                    OnAddressingFailure(ex, message);
+                    OnAddressingFailure(message, activation, ex);
                     return;
                 }
 
                 TransportMessage(m, activation);
             }
 
-            void OnAddressingFailure(Exception ex, Message m)
+            void OnAddressingFailure(Message m, ActivationData activation, Exception ex)
             {
-                if (ShouldLogError(ex))
-                {
-                    logger.Error(ErrorCode.Dispatcher_SelectTarget_Failed, $"SelectTarget failed with {ex.Message}", ex);
-                }
-
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
+                this.messagingTrace.OnDispatcherSelectTargetFailed(m, activation, ex);
                 RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
-            }
-
-            static bool ShouldLogError(Exception ex)
-            {
-                return !(ex.GetBaseException() is KeyNotFoundException) &&
-                       !(ex.GetBaseException() is ClientNotAvailableException);
             }
         }
 
@@ -760,7 +749,6 @@ namespace Orleans.Runtime
                 message.SendingAddress, target, this.catalog, strategy);
             SetMessageTargetPlacement(message, placementResult, targetAddress);
         }
-
 
         private void SetMessageTargetPlacement(Message message, PlacementResult placementResult, ActivationAddress targetAddress)
         {

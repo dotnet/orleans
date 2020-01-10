@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
@@ -18,6 +19,7 @@ namespace Orleans.Runtime.Messaging
             return this.log.BeginScope(state);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsEnabled(LogLevel logLevel)
         {
             return this.log.IsEnabled(logLevel);

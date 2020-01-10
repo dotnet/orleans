@@ -76,8 +76,7 @@ namespace Orleans.Runtime.Messaging
 
             SiloAddress targetAddress = this.gateway.TryToReroute(msg);
             msg.SendingSilo = this.myAddress;
-
-            if (targetAddress == null)
+            if (targetAddress is null)
             {
                 // reroute via Dispatcher
                 msg.TargetSilo = null;
@@ -161,10 +160,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // Fill in the outbound message with our silo address, if it's not already set
-            if (msg.SendingSilo == null)
-            {
-                msg.SendingSilo = this.myAddress;
-            }
+            msg.SendingSilo ??= this.myAddress;
 
             return true;
         }
@@ -192,7 +188,7 @@ namespace Orleans.Runtime.Messaging
 
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
-                msg.RetryCount = msg.RetryCount + 1;
+                msg.RetryCount++;
                 this.messageCenter.SendMessage(msg);
             }
             else
@@ -202,6 +198,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     reason.Append("Original exception is: ").Append(ex.ToString());
                 }
+
                 reason.Append("Msg is: ").Append(msg);
                 FailMessage(msg, reason.ToString());
             }

@@ -91,14 +91,17 @@ namespace Orleans.Runtime.Messaging
             // Should always return true
             if (writer.TryWrite(msg))
             {
-                this.messagingTrace.OnEnqueueInboundMessage(msg);
+                if (this.messagingTrace.IsEnabled(LogLevel.Trace))
+                {
+                    this.messagingTrace.OnEnqueueInboundMessage(msg);
+                }
             }
             else
             {
                 ThrowPostMessage(msg);
             }
 
-            void ThrowPostMessage(Message m) => throw new InvalidOperationException("Attempted to post message " + m + " to closed message queue.");
+            static void ThrowPostMessage(Message m) => throw new InvalidOperationException("Attempted to post message " + m + " to closed message queue.");
         }
 
         public ChannelReader<Message> GetReader(Message.Categories type) => this.messageQueues[(int)type].Reader;

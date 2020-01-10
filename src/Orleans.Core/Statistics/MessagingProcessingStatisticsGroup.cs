@@ -7,7 +7,6 @@ namespace Orleans.Runtime
     {
         private static CounterStatistic[] dispatcherMessagesProcessedOkPerDirection;
         private static CounterStatistic[] dispatcherMessagesProcessedErrorsPerDirection;
-        private static CounterStatistic[] dispatcherMessagesProcessedReRoutePerDirection;
         private static CounterStatistic[] dispatcherMessagesProcessingReceivedPerDirection;
         private static CounterStatistic dispatcherMessagesProcessedTotal;
         private static CounterStatistic dispatcherMessagesReceivedTotal;
@@ -33,13 +32,6 @@ namespace Orleans.Runtime
                 dispatcherMessagesProcessedErrorsPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
                     new StatisticName(StatisticNames.MESSAGING_DISPATCHER_PROCESSED_ERRORS_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
             }
-            dispatcherMessagesProcessedReRoutePerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
-            foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
-            {
-                dispatcherMessagesProcessedReRoutePerDirection[(int)direction] = CounterStatistic.FindOrCreate(
-                    new StatisticName(StatisticNames.MESSAGING_DISPATCHER_PROCESSED_REROUTE_PER_DIRECTION, Enum.GetName(typeof(Message.Directions), direction)));
-            }
-
             dispatcherMessagesProcessingReceivedPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
@@ -86,12 +78,6 @@ namespace Orleans.Runtime
         internal static void OnDispatcherMessageProcessedError(Message msg)
         {
             dispatcherMessagesProcessedErrorsPerDirection[(int)msg.Direction].Increment();
-            dispatcherMessagesProcessedTotal.Increment();
-        }
-
-        internal static void OnDispatcherMessageReRouted(Message msg)
-        {
-            dispatcherMessagesProcessedReRoutePerDirection[(int)msg.Direction].Increment();
             dispatcherMessagesProcessedTotal.Increment();
         }
 
