@@ -25,9 +25,9 @@ namespace Orleans.Messaging
         TimeSpan MaxStaleness { get; }
 
         /// <summary>
-        /// Specifies whether this IGatewayListProvider ever refreshes its returned information, or always returns the same gw list.
-        /// (currently only the static config based StaticGatewayListProvider is not updatable. All others are.)
+        /// Specifies whether this IGatewayListProvider ever refreshes its returned information, or always returns the same gateway list.
         /// </summary>
+        [Obsolete("This attribute is no longer used and all providers are considered updatable")]
         bool IsUpdatable { get; }
     }
 
