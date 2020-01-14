@@ -2,7 +2,7 @@
   href: index.md
 - name: Frequently Asked Questions
   href: frequently_asked_questions.md
-- name: Nuget Packages
+- name: NuGet Packages
   href: nuget_packages.md
 - name: Documentation Guidelines
   href: documentation_guidelines.md
