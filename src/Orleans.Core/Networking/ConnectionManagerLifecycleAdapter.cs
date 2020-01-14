@@ -24,7 +24,7 @@ namespace Orleans.Runtime.Messaging
         {
             lifecycle.Subscribe(
                 nameof(ConnectionManager),
-                ServiceLifecycleStage.RuntimeInitialize,
+                ServiceLifecycleStage.RuntimeInitialize-1, // Components from RuntimeInitialize need network
                 this);
         }
     }
