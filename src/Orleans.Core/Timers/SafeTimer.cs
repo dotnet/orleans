@@ -12,51 +12,10 @@ namespace Orleans.Runtime
     /// 
     /// Log levels used: Recovered faults => Warning, Per-Timer operations => Verbose, Per-tick operations => Verbose3
     /// </summary>
-    internal class SafeTimer : IDisposable
+    internal class SafeTimer : SafeTimerBase
     {
-        private readonly SafeTimerBase safeTimerBase;
-        private readonly TimerCallback callbackFunc;
-
-        public SafeTimer(ILogger logger, TimerCallback callback, object state)
+        public SafeTimer(ILogger logger, TimerCallback callback, object state, TimeSpan dueTime, TimeSpan period) : base(logger, callback, state, dueTime, period)
         {
-            callbackFunc = callback;
-            safeTimerBase = new SafeTimerBase(logger, callbackFunc, state);
-        }
-
-        public SafeTimer(ILogger logger, TimerCallback callback, object state, TimeSpan dueTime, TimeSpan period)
-        {
-            callbackFunc = callback;
-            safeTimerBase = new SafeTimerBase(logger, callbackFunc, state, dueTime, period);
-        }
-
-        public void Start(TimeSpan dueTime, TimeSpan period)
-        {
-            safeTimerBase.Start(dueTime, period);
-        }
-
-        public void Dispose()
-        {
-            safeTimerBase.Dispose();
-        }
-
-        // May be called by finalizer thread with disposing=false. As per guidelines, in such a case do not touch other objects.
-        // Dispose() may be called multiple times
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                safeTimerBase.DisposeTimer();
-            }
-        }
-
-        internal string GetFullName()
-        {
-            return String.Format("SafeTimer: {0}. ", callbackFunc != null ? callbackFunc.GetType().FullName : "");
-        }
-
-        public bool CheckTimerFreeze(DateTime lastCheckTime, Func<string> callerName)
-        {
-            return safeTimerBase.CheckTimerFreeze(lastCheckTime, callerName);
         }
     }
 }
