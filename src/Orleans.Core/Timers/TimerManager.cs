@@ -2,6 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 using Orleans.Threading;
 
 namespace Orleans.Timers.Internal
@@ -92,7 +93,7 @@ namespace Orleans.Timers.Internal
         static TimerManager()
         {
             var timerPeriod = TimeSpan.FromMilliseconds(TIMER_TICK_MILLISECONDS);
-            QueueChecker = new Timer(_ => CheckQueues(), null, timerPeriod, timerPeriod);
+            QueueChecker = NonCapturingTimer.Create(_ => CheckQueues(), null, timerPeriod, timerPeriod);
         }
 
         /// <summary>
