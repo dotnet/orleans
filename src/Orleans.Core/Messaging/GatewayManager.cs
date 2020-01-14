@@ -21,7 +21,7 @@ namespace Orleans.Messaging
     internal class GatewayManager : IGatewayListListener, IDisposable
     {
         internal readonly IGatewayListProvider ListProvider;
-        private SafeTimer gatewayRefreshTimer;
+        private AsyncTaskSafeTimer gatewayRefreshTimer;
         private readonly Dictionary<SiloAddress, DateTime> knownDead;
         private List<SiloAddress> cachedLiveGateways;
         private DateTime lastRefreshTime;
@@ -53,7 +53,7 @@ namespace Orleans.Messaging
 
             ListProvider = gatewayListProvider;
 
-            var knownGateways = ListProvider.GetGateways().GetResult();
+            var knownGateways = ListProvider.GetGateways().GetAwaiter().GetResult();
 
             if (knownGateways.Count == 0)
             {
@@ -75,10 +75,12 @@ namespace Orleans.Messaging
             this.knownGateways = cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
 
             lastRefreshTime = DateTime.UtcNow;
-            if (ListProvider.IsUpdatable)
-            {
-                gatewayRefreshTimer = new SafeTimer(this.loggerFactory.CreateLogger<SafeTimer>(), RefreshSnapshotLiveGateways_TimerCallback, null, this.gatewayOptions.GatewayListRefreshPeriod, this.gatewayOptions.GatewayListRefreshPeriod);
-            }
+            gatewayRefreshTimer = new AsyncTaskSafeTimer(
+                this.loggerFactory.CreateLogger<SafeTimer>(),
+                RefreshSnapshotLiveGateways_TimerCallback,
+                null,
+                this.gatewayOptions.GatewayListRefreshPeriod,
+                this.gatewayOptions.GatewayListRefreshPeriod);
         }
 
         public void Stop()
@@ -185,18 +187,24 @@ namespace Orleans.Messaging
         {
             // If there is already an expedited refresh call in place, don't call again, until the previous one is finished.
             // We don't want to issue too many Gateway refresh calls.
-            if (ListProvider == null || !ListProvider.IsUpdatable || gatewayRefreshCallInitiated) return;
+            if (ListProvider == null || gatewayRefreshCallInitiated) return;
 
             // Initiate gateway list refresh asynchronously. The Refresh timer will keep ticking regardless.
             // We don't want to block the client with synchronously Refresh call.
             // Client's call will fail with "No Gateways found" but we will try to refresh the list quickly.
             gatewayRefreshCallInitiated = true;
-            var task = Task.Factory.StartNew(() =>
+            _ = Task.Run(async () =>
             {
-                RefreshSnapshotLiveGateways_TimerCallback(null);
-                gatewayRefreshCallInitiated = false;
+                try
+                {
+                    await RefreshSnapshotLiveGateways_TimerCallback(null);
+                    gatewayRefreshCallInitiated = false;
+                }
+                catch
+                {
+                    // Intentionally ignore any exceptions here.
+                }
             });
-            task.Ignore();
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -213,14 +221,15 @@ namespace Orleans.Messaging
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        internal void RefreshSnapshotLiveGateways_TimerCallback(object context)
+        internal async Task RefreshSnapshotLiveGateways_TimerCallback(object context)
         {
             try
             {
-                if (ListProvider == null || !ListProvider.IsUpdatable) return;
+                if (ListProvider is null) return;
 
                 // the listProvider.GetGateways() is not under lock.
-                var refreshedGateways = ListProvider.GetGateways().GetResult().Select(gw => gw.ToGatewayAddress()).ToList();
+                var allGateways = await ListProvider.GetGateways();
+                var refreshedGateways = allGateways.Select(gw => gw.ToGatewayAddress()).ToList();
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
                     logger.LogDebug("Discovered {GatewayCount} gateways: {Gateways}", refreshedGateways.Count, Utils.EnumerableToString(refreshedGateways));
