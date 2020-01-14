@@ -52,16 +52,10 @@ You will also probably need to add `using` statements.
 
 ## Add Orleans NuGet Packages
 
-1. To the Silo project, install `Microsoft.Orleans.Server` from NuGet:
-
-``` cmd
-dotnet 
-```
-
-2. To the Client project, add the `Microsoft.Orleans.Client` NuGet package.
+1. To the Silo project, add the `Microsoft.Orleans.Server` and `Microsoft.Extensions.Logging.Console` NuGet packages.
+2. To the Client project, add the `Microsoft.Orleans.Client` and `Microsoft.Extensions.Logging.Console` NuGet packages.
 3. To the GrainInterfaces, add the `Microsoft.Orleans.Core.Abstractions` and `Microsoft.Orleans.CodeGenerator.MSBuild` packages.
 4. To the Grains project, add the `Microsoft.Orleans.Core.Abstractions` and `Microsoft.Orleans.CodeGenerator.MSBuild` NuGet pacakges, as well as the `Microsoft.Extensions.Logging.Abstractions` package for logging.
-5. To the Client and Silo projects, add the `Microsoft.Extensions.Logging.Console` Nuget package, so that they can print logs in their console windows.
 
 `Microsoft.Orleans.Server` and `Microsoft.Orleans.Client` are meta-packages that bring dependency that you will most likely need on the Silo and Client side.
 
