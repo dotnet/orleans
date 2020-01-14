@@ -54,8 +54,8 @@ You will also probably need to add `using` statements.
 
 1. To the Silo project, add `Microsoft.Orleans.Server` NuGet package.
 2. To the Client project, add `Microsoft.Orleans.Client` NuGet package.
-3. To the GrainInterfaces and Grains projects, add `Microsoft.Orleans.Core.Abstractions` and `Microsoft.Orleans.CodeGenerator.MSBuild` packages.
-4. To the Grains project, add `Microsoft.Orleans.CodeGenerator.MSBuild` as well as `Microsoft.Extensions.Logging.Abstractions` package for logging.
+3. To the GrainInterfaces, add `Microsoft.Orleans.Core.Abstractions` and `Microsoft.Orleans.CodeGenerator.MSBuild` packages.
+4. To the Grains project, add `Microsoft.Orleans.Core.Abstractions`, `Microsoft.Orleans.CodeGenerator.MSBuild`, as well as the `Microsoft.Extensions.Logging.Abstractions` package for logging.
 5. To the Client and Silo projects, add `Microsoft.Extensions.Logging.Console`, so that they can print logs in their console windows.
 
 `Microsoft.Orleans.Server` and `Microsoft.Orleans.Client` are meta-packages that bring dependency that you will most likely need on the Silo and Client side.
