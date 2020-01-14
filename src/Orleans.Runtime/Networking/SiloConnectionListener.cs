@@ -64,7 +64,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (this.Endpoint is null) return;
 
-            lifecycle.Subscribe(nameof(SiloConnectionListener), ServiceLifecycleStage.RuntimeInitialize, this.OnRuntimeInitializeStart, this.OnRuntimeInitializeStop);
+            lifecycle.Subscribe(nameof(SiloConnectionListener), ServiceLifecycleStage.RuntimeInitialize-1, this.OnRuntimeInitializeStart, this.OnRuntimeInitializeStop);
         }
 
         private async Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
