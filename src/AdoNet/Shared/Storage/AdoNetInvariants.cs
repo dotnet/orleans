@@ -54,5 +54,10 @@ namespace Orleans.Tests.SqlUtils
         /// PostgreSQL invariant name string.
         /// </summary>
         public const string InvariantNamePostgreSql = "Npgsql";
+
+        /// <summary>
+        /// Dotnet core Microsoft SQL Server invariant name string.
+        /// </summary>
+        public const string InvariantNameSqlServerDotnetCore = "Microsoft.Data.SqlClient";
     }
 }
