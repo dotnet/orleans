@@ -23,14 +23,25 @@ namespace Orleans.Tests.SqlUtils
         private static readonly ConcurrentDictionary<string, CachedFactory> factoryCache =
             new ConcurrentDictionary<string, CachedFactory>();
 
-        private static readonly Dictionary<string, Tuple<string, string>> providerFactoryTypeMap =
-            new Dictionary<string, Tuple<string, string>>
+        private static readonly Dictionary<string, Tuple<List<string>, string>> providerFactoryTypeMap =
+            new Dictionary<string, Tuple<List<string>, string>>
             {
-                { AdoNetInvariants.InvariantNameSqlServer, new Tuple<string, string>("System.Data.SqlClient", "System.Data.SqlClient.SqlClientFactory") },
-                { AdoNetInvariants.InvariantNameMySql, new Tuple<string, string>("MySql.Data", "MySql.Data.MySqlClient.MySqlClientFactory") },
-                { AdoNetInvariants.InvariantNameOracleDatabase, new Tuple<string, string>("Oracle.ManagedDataAccess", "Oracle.ManagedDataAccess.Client.OracleClientFactory") },
-                { AdoNetInvariants.InvariantNamePostgreSql, new Tuple<string, string>("Npgsql", "Npgsql.NpgsqlFactory") },
-                { AdoNetInvariants.InvariantNameSqlLite, new Tuple<string, string>("Microsoft.Data.SQLite", "Microsoft.Data.SQLite.SqliteFactory") },
+                {
+                    AdoNetInvariants.InvariantNameSqlServer,
+                    new Tuple<List<string>, string>(new List<string>(new[] { "Microsoft.Data.SqlClient", "System.Data.SqlClient" }), "System.Data.SqlClient.SqlClientFactory")
+                },
+                {
+                    AdoNetInvariants.InvariantNameMySql,
+                    new Tuple<List<string>, string>(new List<string>(new[] { "MySql.Data", "MySqlConnector" }), "MySql.Data.MySqlClient.MySqlClientFactory") },
+                {
+                    AdoNetInvariants.InvariantNameOracleDatabase,
+                    new Tuple<List<string>, string>(new List<string>(new[] { "Oracle.ManagedDataAccess" }), "Oracle.ManagedDataAccess.Client.OracleClientFactory") },
+                {
+                    AdoNetInvariants.InvariantNamePostgreSql,
+                    new Tuple<List<string>, string>(new List<string>(new[] { "Npgsql" }), "Npgsql.NpgsqlFactory") },
+                {
+                    AdoNetInvariants.InvariantNameSqlLite,
+                    new Tuple<List<string>, string>(new List<string>(new[] { "Microsoft.Data.SQLite" }), "Microsoft.Data.SQLite.SqliteFactory") },
             };
 
         private static CachedFactory GetFactory(string invariantName)
@@ -40,21 +51,25 @@ namespace Orleans.Tests.SqlUtils
                 throw new ArgumentNullException(nameof(invariantName));
             }
 
-            Tuple<string, string> providerFactoryDefinition;
+            Tuple<List<string>, string> providerFactoryDefinition;
             if (!providerFactoryTypeMap.TryGetValue(invariantName, out providerFactoryDefinition))
                 throw new InvalidOperationException($"Database provider factory with '{invariantName}' invariant name not supported.");
 
-            Assembly asm;
-            try
+            Assembly asm = null;
+            for (int asmIndex = 0; asmIndex < providerFactoryDefinition.Item1.Count; ++asmIndex)
             {
-                var asmName = new AssemblyName(providerFactoryDefinition.Item1);
-                asm = Assembly.Load(asmName);
+                try
+                {
+
+                    var asmName = new AssemblyName(providerFactoryDefinition.Item1[asmIndex]);
+                    asm = Assembly.Load(asmName);
+                }
+                catch (Exception exc)
+                {
+                    Console.WriteLine($"Unable to find and/or load a candidate assembly for '{invariantName}' invariant name.", exc);
+                }
             }
-            catch (Exception exc)
-            {
-                throw new InvalidOperationException($"Unable to find and/or load a candidate assembly for '{invariantName}' invariant name.", exc);
-            }
-            
+
             if (asm == null)
                 throw new InvalidOperationException($"Can't find database provider factory with '{invariantName}' invariant name. Please make sure that your ADO.Net provider package library is deployed with your application.");
 
