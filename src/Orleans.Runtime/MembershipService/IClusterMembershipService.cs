@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
-    internal interface IClusterMembershipService
+    public interface IClusterMembershipService
     {
         ClusterMembershipSnapshot CurrentSnapshot { get; }
 
