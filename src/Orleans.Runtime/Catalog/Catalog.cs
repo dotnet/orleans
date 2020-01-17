@@ -605,7 +605,7 @@ namespace Orleans.Runtime
                             .FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS)
                             .Increment();
                         var primary = directory.GetPrimaryForGrain(activation.ForwardingAddress.Grain);
-                        if (logger.IsEnabled(LogLevel.Information))
+                        if (logger.IsEnabled(LogLevel.Debug))
                         {
                             // If this was a duplicate, it's not an error, just a race.
                             // Forward on all of the pending messages, and then forget about this activation.
@@ -614,14 +614,7 @@ namespace Orleans.Runtime
                                 $"GrainInstanceType is {activation.GrainInstanceType}. " +
                                 $"{(primary != null ? "Primary Directory partition for this grain is " + primary + ". " : string.Empty)}" +
                                 $"Full activation address is {address.ToFullString()}. We have {activation.WaitingCount} messages to forward.";
-                            if (activation.IsUsingGrainDirectory)
-                            {
-                                logger.Info(ErrorCode.Catalog_DuplicateActivation, logMsg);
-                            }
-                            else
-                            {
-                                logger.Debug(ErrorCode.Catalog_DuplicateActivation, logMsg);
-                            }
+                            logger.Debug(ErrorCode.Catalog_DuplicateActivation, logMsg);
                         }
 
                         UnregisterMessageTarget(activation);
