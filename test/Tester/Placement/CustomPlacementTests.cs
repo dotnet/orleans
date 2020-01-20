@@ -32,9 +32,9 @@ namespace Tester.CustomPlacementTests
                 builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
             }
 
-            private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class TestSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = true);
                     hostBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100));

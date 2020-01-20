@@ -29,7 +29,7 @@ namespace NetCore.Tests
             Assert.Equal(original, decoded);
         }
 
-        private class TlsConfigurator : ISiloBuilderConfigurator, IClientBuilderConfigurator
+        private class TlsConfigurator : ISiloConfigurator, IClientBuilderConfigurator
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
@@ -52,7 +52,7 @@ namespace NetCore.Tests
                 });
             }
 
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IPingGrain).Assembly));
 

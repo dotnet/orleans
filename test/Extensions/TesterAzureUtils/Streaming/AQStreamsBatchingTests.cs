@@ -27,9 +27,9 @@ namespace Tester.AzureUtils.Streaming
                 builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
             }
 
-            private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class SiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b =>

@@ -56,9 +56,9 @@ namespace Tester
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
         }
 
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.UseLocalhostClustering();
                 hostBuilder.ConfigureServices((context, services) =>

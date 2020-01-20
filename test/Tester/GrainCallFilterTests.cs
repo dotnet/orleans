@@ -30,9 +30,9 @@ namespace UnitTests.General
                 builder.AddClientBuilderConfigurator<ClientConfigurator>();
             }
 
-            private class SiloInvokerTestSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class SiloInvokerTestSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddIncomingGrainCallFilter(context =>

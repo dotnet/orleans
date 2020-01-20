@@ -32,9 +32,9 @@ namespace UnitTests.General
             builder.AddClientBuilderConfigurator<Configurator>();
         }
 
-        private class Configurator : ISiloBuilderConfigurator, IClientBuilderConfigurator
+        private class Configurator : ISiloConfigurator, IClientBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddMemoryGrainStorage("MemoryStore")
                     .AddMemoryGrainStorageAsDefault()

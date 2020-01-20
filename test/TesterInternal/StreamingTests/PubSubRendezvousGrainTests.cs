@@ -23,9 +23,9 @@ namespace UnitTests.StreamingTests
                builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
             }
 
-            public class SiloHostConfigurator : ISiloBuilderConfigurator
+            public class SiloHostConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddFaultInjectionMemoryStorage("PubSubStore");
                 }

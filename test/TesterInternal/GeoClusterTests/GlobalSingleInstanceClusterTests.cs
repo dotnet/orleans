@@ -91,9 +91,9 @@ namespace Tests.GeoClusterTests
         private string cluster1;
         private ClientWrapper[] clients;
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.Configure<MultiClusterOptions>(options => options.GlobalSingleInstanceRetryInterval = TimeSpan.FromSeconds(5));
             }

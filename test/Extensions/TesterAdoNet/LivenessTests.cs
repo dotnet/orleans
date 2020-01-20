@@ -22,9 +22,9 @@ namespace UnitTests.MembershipTests
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var connectionString = cfg["RelationalStorageConnectionString"];
@@ -80,9 +80,9 @@ namespace UnitTests.MembershipTests
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var connectionString = cfg["RelationalStorageConnectionString"];
@@ -139,9 +139,9 @@ namespace UnitTests.MembershipTests
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var connectionString = cfg["RelationalStorageConnectionString"];

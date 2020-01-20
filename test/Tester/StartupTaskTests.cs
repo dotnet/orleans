@@ -28,9 +28,9 @@ namespace DefaultCluster.Tests
                 builder.AddSiloBuilderConfigurator<StartupTaskSiloConfigurator>();
             }
 
-            private class StartupTaskSiloConfigurator : ISiloBuilderConfigurator
+            private class StartupTaskSiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddStartupTask<CallGrainStartupTask>();
                     hostBuilder.AddStartupTask(

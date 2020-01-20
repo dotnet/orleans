@@ -45,9 +45,9 @@ namespace UnitTests.StreamingTests
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
-        private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        private class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .AddSimpleMessageStreamProvider(SmsStreamProviderName)

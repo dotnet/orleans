@@ -5,12 +5,12 @@ using Orleans.TestingHost;
 
 namespace Orleans.Transactions.TestKit
 {
-    public class SkewedClockConfigurator : ISiloBuilderConfigurator
+    public class SkewedClockConfigurator : ISiloConfigurator
     {
         private static readonly TimeSpan MinSkew = TimeSpan.FromSeconds(3);
         private static readonly TimeSpan MaxSkew = TimeSpan.FromSeconds(5);
 
-        public void Configure(ISiloHostBuilder hostBuilder)
+        public void Configure(ISiloBuilder hostBuilder)
         {
             hostBuilder
                 .ConfigureServices(services => services.AddSingleton<IClock>(sp => new SkewedClock(MinSkew, MaxSkew)));

@@ -150,9 +150,9 @@ namespace Tests.GeoClusterTests
             }
         }
 
-        public class TwoClusterSiloConfigurator : ISiloBuilderConfigurator
+        public class TwoClusterSiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.Configure<MultiClusterOptions>(options =>
                 {

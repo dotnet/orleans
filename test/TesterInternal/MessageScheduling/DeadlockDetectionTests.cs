@@ -20,9 +20,9 @@ namespace UnitTests
             }
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.Configure<SchedulingOptions>(options =>
                 {
