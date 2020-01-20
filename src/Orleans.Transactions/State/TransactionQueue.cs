@@ -9,6 +9,7 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Storage;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
+using Orleans.Transactions.DeadlockDetection;
 
 namespace Orleans.Transactions.State
 {
@@ -29,6 +30,9 @@ namespace Orleans.Transactions.State
         protected StorageBatch<TState> storageBatch;
 
         private int failCounter;
+
+        // We have to expose this to the deadlock detection system.
+        internal ParticipantId Resource => this.resource;
 
         // collection tasks
         private Dictionary<DateTime, PreparedMessages> unprocessedPreparedMessages;
@@ -55,7 +59,8 @@ namespace Orleans.Transactions.State
             IClock clock,
             ILogger logger,
             ITimerManager timerManager,
-            IActivationLifetime activationLifetime)
+            IActivationLifetime activationLifetime,
+            ITransactionalLockObserver transactionalLockObserver)
         {
             this.options = options.Value;
             this.resource = resource;
@@ -65,7 +70,7 @@ namespace Orleans.Transactions.State
             this.logger = logger;
             this.activationLifetime = activationLifetime;
             this.storageWorker = new BatchWorkerFromDelegate(StorageWork, this.activationLifetime.OnDeactivating);
-            this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, activationLifetime);
+            this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, activationLifetime, transactionalLockObserver);
             this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager, activationLifetime);
             this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
             this.commitQueue = new CommitQueue<TState>();
@@ -657,8 +662,8 @@ namespace Orleans.Transactions.State
                                 // send PreparedMessage to remote TM
                                 bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
                                       .Prepared(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource, TransactionalStatus.Ok)
-                                      .Ignore();                                
-                                    
+                                      .Ignore();
+
                                 bottom.LastSent = now;
 
                                 if (logger.IsEnabled(LogLevel.Trace))
