@@ -8,6 +8,9 @@ namespace Orleans.Configuration
         public TimeSpan LockTimeout { get; set; } = DefaultLockTimeout;
         public static TimeSpan DefaultLockTimeout = TimeSpan.FromSeconds(8);
 
+        public TimeSpan DeadlockDetectionThreshold { get; set; } = DefaultDeadlockDetectionThreshold;
+        public static TimeSpan DefaultDeadlockDetectionThreshold = TimeSpan.FromSeconds(3);
+
         // max time the TM will wait for prepare phase to complete
         public TimeSpan PrepareTimeout { get; set; } = DefaultPrepareTimeout;
         public static TimeSpan DefaultPrepareTimeout => TimeSpan.FromSeconds(20);
