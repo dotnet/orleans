@@ -6,11 +6,7 @@ using Orleans.Concurrency;
 namespace Orleans.Transactions.DeadlockDetection
 {
 
-    internal class CollectLocksRequest
-    {
-        public ParticipantId ResourceId;
-        public IList<Guid> TransactionIds;
-    }
+
 
     public interface IDeadlockDetector : IGrainWithIntegerKey
     {
