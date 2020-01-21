@@ -190,7 +190,7 @@ namespace Orleans.Providers.Streams.Generator
             var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
             var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
             Receiver receiver = receivers.GetOrAdd(queueId, qid => new Receiver(receiverMonitor));
-            SetGeneratorOnReciever(receiver);
+            SetGeneratorOnReceiver(receiver);
             return receiver;
         }
 
@@ -211,10 +211,10 @@ namespace Orleans.Providers.Streams.Generator
                 throw new ArgumentOutOfRangeException("arg", "Arg must by of type IStreamGeneratorConfig");
             }
 
-            // update generator on recievers
+            // update generator on receivers
             foreach (Receiver receiver in receivers.Values)
             {
-                SetGeneratorOnReciever(receiver);
+                SetGeneratorOnReceiver(receiver);
             }
 
             return Task.FromResult<object>(true);
@@ -270,7 +270,7 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
-        private void SetGeneratorOnReciever(Receiver receiver)
+        private void SetGeneratorOnReceiver(Receiver receiver)
         {
             // if we don't have generator configuration, don't set generator
             if (generatorConfig == null)
