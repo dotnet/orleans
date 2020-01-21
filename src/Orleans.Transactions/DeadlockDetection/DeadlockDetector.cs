@@ -15,9 +15,12 @@ namespace Orleans.Transactions.DeadlockDetection
     public class DeadlockDetector : Grain, IDeadlockDetector
     {
         private readonly ILogger<DeadlockDetector> logger;
-        public DeadlockDetector(ILogger<DeadlockDetector> logger)
+        private readonly ITransactionalLockObserver localObserver;
+
+        public DeadlockDetector(ILogger<DeadlockDetector> logger, ITransactionalLockObserver localObserver)
         {
             this.logger = logger;
+            this.localObserver = localObserver;
         }
 
         public async Task CheckForDeadlocks(ParticipantId resourceId, IList<Guid> transactionIds)
@@ -46,8 +49,7 @@ namespace Orleans.Transactions.DeadlockDetection
         private async Task<WaitForGraph> CollectGraph(ParticipantId resource, IList<Guid> lockedBy)
         {
 
-            LockSnapshot localSnapshot =
-                ServiceProvider.GetRequiredService<ITransactionalLockObserver>().CreateSnapshot(resource, lockedBy);
+            LockSnapshot localSnapshot = localObserver.CreateSnapshot(resource, lockedBy);
 
             if (localSnapshot.IsLocallyDeadlocked)
             {
