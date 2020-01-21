@@ -137,7 +137,7 @@ namespace Orleans.Transactions.State
                     group.Deadline = now + this.options.LockTimeout;
                     if (transactionalLockObserver != null)
                     {
-                        group.DeadlockDeadline = now + TimeSpan.FromSeconds(2);
+                        group.DeadlockDeadline = now + this.options.DeadlockDetectionThreshold;
                     }
 
                     if (logger.IsEnabled(LogLevel.Trace))
