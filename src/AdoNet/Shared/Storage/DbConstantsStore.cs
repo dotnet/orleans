@@ -55,7 +55,17 @@ namespace Orleans.Tests.SqlUtils
                                     supportsCommandCancellation: false, // Is supported but the remarks sound scary: https://docs.oracle.com/cd/E11882_01/win.112/e23174/OracleCommandClass.htm#DAFIEHHG.
                                     commandInterceptor: OracleCommandInterceptor.Instance) 
                     
-                }, 
+                },
+                {
+                    AdoNetInvariants.InvariantNameSqlServerDotnetCore,
+                    new DbConstants(startEscapeIndicator: '[',
+                                    endEscapeIndicator: ']',
+                                    unionAllSelectTemplate: " UNION ALL SELECT ",
+                                    isSynchronousAdoNetImplementation: false,
+                                    supportsStreamNatively: true,
+                                    supportsCommandCancellation: true,
+                                    commandInterceptor: NoOpCommandInterceptor.Instance)
+                },
             };
 
         public static DbConstants GetDbConstants(string invariantName)

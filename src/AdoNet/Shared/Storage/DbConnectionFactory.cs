@@ -31,6 +31,7 @@ namespace Orleans.Tests.SqlUtils
                 { AdoNetInvariants.InvariantNameOracleDatabase, new Tuple<string, string>("Oracle.ManagedDataAccess", "Oracle.ManagedDataAccess.Client.OracleClientFactory") },
                 { AdoNetInvariants.InvariantNamePostgreSql, new Tuple<string, string>("Npgsql", "Npgsql.NpgsqlFactory") },
                 { AdoNetInvariants.InvariantNameSqlLite, new Tuple<string, string>("Microsoft.Data.SQLite", "Microsoft.Data.SQLite.SqliteFactory") },
+                { AdoNetInvariants.InvariantNameSqlServerDotnetCore, new Tuple<string, string>("Microsoft.Data.SqlClient", "Microsoft.Data.SqlClient.SqlClientFactory") },
             };
 
         private static CachedFactory GetFactory(string invariantName)
