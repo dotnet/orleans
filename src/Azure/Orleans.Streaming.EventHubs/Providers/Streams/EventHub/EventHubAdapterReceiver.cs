@@ -56,7 +56,7 @@ namespace Orleans.ServiceBus.Providers
         private AggregatedQueueFlowController flowController;
 
         // Receiver life cycle
-        private int recieverState = ReceiverShutdown;
+        private int receiverState = ReceiverShutdown;
 
         private const int ReceiverShutdown = 0;
         private const int ReceiverRunning = 1;
@@ -91,7 +91,7 @@ namespace Orleans.ServiceBus.Providers
         {
             this.logger.Info("Initializing EventHub partition {0}-{1}.", this.settings.Hub.Path, this.settings.Partition);
             // if receiver was already running, do nothing
-            return ReceiverRunning == Interlocked.Exchange(ref this.recieverState, ReceiverRunning)
+            return ReceiverRunning == Interlocked.Exchange(ref this.receiverState, ReceiverRunning)
                 ? Task.CompletedTask
                 : Initialize();
         }
@@ -128,7 +128,7 @@ namespace Orleans.ServiceBus.Providers
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
-            if (this.recieverState == ReceiverShutdown || maxCount <= 0)
+            if (this.receiverState == ReceiverShutdown || maxCount <= 0)
             {
                 return new List<IBatchContainer>();
             }
@@ -231,7 +231,7 @@ namespace Orleans.ServiceBus.Providers
             try
             {
                 // if receiver was already shutdown, do nothing
-                if (ReceiverShutdown == Interlocked.Exchange(ref this.recieverState, ReceiverShutdown))
+                if (ReceiverShutdown == Interlocked.Exchange(ref this.receiverState, ReceiverShutdown))
                 {
                     return;
                 }
