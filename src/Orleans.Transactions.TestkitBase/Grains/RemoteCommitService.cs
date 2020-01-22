@@ -13,7 +13,7 @@ namespace Orleans.Transactions.TestKit
     }
 
     // TODO : Replace with more complete service implementation which:
-    // - can be called to verify that commit service recieve Callme with proper args.
+    // - can be called to verify that commit service receive Callme with proper args.
     // - can produce errors for fault senarios.
     public class RemoteCommitService : IRemoteCommitService
     {

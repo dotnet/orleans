@@ -1284,7 +1284,7 @@ Two fixes backported from v2.x
   - Make PreferLocalPlacement activate in other silos when shutting down #2276
   - Reset GrainClient.ClientInvokeCallback when uninitializing GrainClient #2299
   - Fix ObjectDisposedException in networking layer #2302
-  - Reset client gateway reciever buffer on socket reset. #2316
+  - Reset client gateway receiver buffer on socket reset. #2316
   - Removed calling Trace.Close() from TelemetryConsumer.Close() #2396
   - Removes deadlocking and corrupted hashing in SQL storage provider #2395
   - Fix #2358: Invoke interceptor broken for generic grains #2502
@@ -1320,7 +1320,7 @@ Two fixes backported from v2.x
   - Release BinaryTokenStreamWriter buffers after use in more cases. #2326
   - Provide better handling in Grain when the GrainRuntime or GrainIdentity is null #2338
 - Bug fixes
-  - Reset client gateway reciever buffer on socket reset. #2316
+  - Reset client gateway receiver buffer on socket reset. #2316
   - Removes potential deadlocking and corrupted hashing in ADO.NET storage provider #2395
   - LoadShedQueueFlowControl cast fix #2405
 

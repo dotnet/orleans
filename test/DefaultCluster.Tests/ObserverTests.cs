@@ -18,7 +18,7 @@ namespace DefaultCluster.Tests.General
     {
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
         private int callbackCounter;
-        private readonly bool[] callbacksRecieved = new bool[2];
+        private readonly bool[] callbacksReceived = new bool[2];
 
         // we keep the observer objects as instance variables to prevent them from
         // being garbage collected permaturely (the runtime stores them as weak references).
@@ -32,8 +32,8 @@ namespace DefaultCluster.Tests.General
         private void TestInitialize()
         {
             callbackCounter = 0;
-            callbacksRecieved[0] = false;
-            callbacksRecieved[1] = false;
+            callbacksReceived[0] = false;
+            callbacksReceived[1] = false;
 
             observer1 = null;
             observer2 = null;
@@ -86,20 +86,20 @@ namespace DefaultCluster.Tests.General
             this.Logger.Info("Invoking ObserverTest_SimpleNotification_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
 
             if (a == 3 && b == 0)
-                callbacksRecieved[0] = true;
+                callbacksReceived[0] = true;
             else if (a == 3 && b == 2)
-                callbacksRecieved[1] = true;
+                callbacksReceived[1] = true;
             else
                 throw new ArgumentOutOfRangeException("Unexpected callback with values: a=" + a + ",b=" + b);
 
             if (callbackCounter == 1)
             {
                 // Allow for callbacks occurring in any order
-                Assert.True(callbacksRecieved[0] || callbacksRecieved[1]);
+                Assert.True(callbacksReceived[0] || callbacksReceived[1]);
             }
             else if (callbackCounter == 2)
             {
-                Assert.True(callbacksRecieved[0] && callbacksRecieved[1]);
+                Assert.True(callbacksReceived[0] && callbacksReceived[1]);
                 result.Done = true;
             }
             else

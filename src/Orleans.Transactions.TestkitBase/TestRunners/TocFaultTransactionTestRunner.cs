@@ -38,7 +38,7 @@ namespace Orleans.Transactions.TestKit
                 }
             }
 
-            // TODO : Add verification that commit service recieve call with proper args.
+            // TODO : Add verification that commit service receive call with proper args.
         }
 
         public virtual async Task MultiGrainWriteTransactionWithCommitException(string grainStates, int grainCount)
@@ -67,7 +67,7 @@ namespace Orleans.Transactions.TestKit
                 }
             }
 
-            // TODO : Add verification that commit service recieve call with proper args.
+            // TODO : Add verification that commit service receive call with proper args.
         }
     }
 }
