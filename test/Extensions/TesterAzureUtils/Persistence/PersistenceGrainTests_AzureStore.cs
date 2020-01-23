@@ -40,9 +40,9 @@ namespace Tester.AzureUtils.Persistence
         private GrainPersistenceTestsRunner basicPersistenceTestsRunner;
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.UseAzureStorageClustering(options =>
                 {

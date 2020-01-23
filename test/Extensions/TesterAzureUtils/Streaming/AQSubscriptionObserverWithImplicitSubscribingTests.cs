@@ -39,9 +39,9 @@ namespace Tester.AzureUtils.Streaming
             }
         }
 
-        private class SiloConfigurator : ISiloBuilderConfigurator
+        private class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .AddAzureQueueStreams(StreamProviderName, sb=>

@@ -26,9 +26,9 @@ namespace Consul.Tests
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
         }
 
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.UseConsulClustering(options => { options.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT); });
             }

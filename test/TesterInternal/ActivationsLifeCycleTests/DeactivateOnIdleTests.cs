@@ -196,9 +196,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var maxForwardCount = int.Parse(cfg["MaxForwardCount"]);
@@ -285,9 +285,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        public class NoForwardingSiloConfigurator : ISiloBuilderConfigurator
+        public class NoForwardingSiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 // Disable retries in this case, to make test more predictable.
                 hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = 0);
@@ -310,9 +310,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        public class LazyDeregistrationDelaySiloConfigurator : ISiloBuilderConfigurator
+        public class LazyDeregistrationDelaySiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.Configure<GrainDirectoryOptions>(options => options.LazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000));
             }

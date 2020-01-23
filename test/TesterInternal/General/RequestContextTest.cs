@@ -36,9 +36,9 @@ namespace UnitTests.General
             }
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.Configure<SiloMessagingOptions>(options => options.PropagateActivityId = true);
             }

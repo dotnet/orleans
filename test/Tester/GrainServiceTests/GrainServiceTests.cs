@@ -18,9 +18,9 @@ namespace Tester
                 builder.AddSiloBuilderConfigurator<GrainServiceSiloBuilderConfigurator>();
             }
 
-            private class GrainServiceSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class GrainServiceSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddTestGrainService("abc").AddGrainExtension<IEchoExtension, EchoExtension>();
                 }

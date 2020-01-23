@@ -28,9 +28,9 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
                 builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
             }
 
-            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore")

@@ -33,9 +33,9 @@ namespace UnitTests.Streaming
                 builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
             }
 
-            public class SiloHostConfigurator : ISiloBuilderConfigurator
+            public class SiloHostConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("MemoryStore")
@@ -126,9 +126,9 @@ namespace UnitTests.Streaming
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
 
-            public class SiloConfigurator : ISiloBuilderConfigurator
+            public class SiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
                         .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)

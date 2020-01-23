@@ -22,9 +22,9 @@ namespace UnitTests.CatalogTests
             }
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.Configure<SiloMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromMinutes(1));
                 hostBuilder.Configure<SchedulingOptions>(options => options.MaxActiveThreads = 1);

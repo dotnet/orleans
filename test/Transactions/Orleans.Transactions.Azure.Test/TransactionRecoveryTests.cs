@@ -52,9 +52,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
             return this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
 
-        private class SiloBuilderConfiguratorUsingAzureClustering : ISiloBuilderConfigurator
+        private class SiloBuilderConfiguratorUsingAzureClustering : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.UseAzureStorageClustering(options =>
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString);

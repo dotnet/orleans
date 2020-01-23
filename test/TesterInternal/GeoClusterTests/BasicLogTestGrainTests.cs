@@ -27,9 +27,9 @@ namespace Tests.GeoClusterTests
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }
 
-            private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class SiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddStateStorageBasedLogConsistencyProvider()

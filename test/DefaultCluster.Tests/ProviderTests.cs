@@ -27,9 +27,9 @@ namespace DefaultCluster.Tests
                 builder.AddSiloBuilderConfigurator<Configurator>();
             }
 
-            private class Configurator : ISiloBuilderConfigurator
+            private class Configurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddGrainExtension<IAutoExtension, AutoExtension>();
                 }

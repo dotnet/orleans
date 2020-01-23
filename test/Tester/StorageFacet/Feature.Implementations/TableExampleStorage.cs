@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -62,7 +62,7 @@ namespace Tester.StorageFacet.Implementations
 
     public static class TableExampleStorageExtensions
     {
-        public static void UseTableExampleStorage(this ISiloHostBuilder builder, string name)
+        public static void UseTableExampleStorage(this ISiloBuilder builder, string name)
         {
             builder.ConfigureServices(services =>
             {

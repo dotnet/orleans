@@ -39,9 +39,9 @@ namespace UnitTests.StorageTests
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
 
-            private class SiloConfigurator : ISiloBuilderConfigurator
+            private class SiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddMemoryGrainStorage("MemoryStore");
                     hostBuilder.AddTestStorageProvider(MockStorageProviderName1, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));

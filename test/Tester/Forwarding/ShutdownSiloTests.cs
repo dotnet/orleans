@@ -20,9 +20,9 @@ namespace Tester.Forwarding
         public const int NumberOfSilos = 2;
 
         public static readonly TimeSpan DeactivationTimeout = TimeSpan.FromSeconds(10);
-        internal class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        internal class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .Configure<GrainCollectionOptions>(options =>

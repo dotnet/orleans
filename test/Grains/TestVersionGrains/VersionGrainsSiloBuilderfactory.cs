@@ -12,9 +12,9 @@ using Microsoft.Extensions.Configuration;
 
 namespace TestVersionGrains
 {
-    public class VersionGrainsSiloBuilderConfigurator : ISiloBuilderConfigurator
+    public class VersionGrainsSiloBuilderConfigurator : ISiloConfigurator
     {
-        public void Configure(ISiloHostBuilder hostBuilder)
+        public void Configure(ISiloBuilder hostBuilder)
         {
             var cfg = hostBuilder.GetConfiguration();
             var siloCount = int.Parse(cfg["SiloCount"]);

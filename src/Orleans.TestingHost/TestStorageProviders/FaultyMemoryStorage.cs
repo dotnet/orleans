@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +13,26 @@ namespace Orleans.TestingHost
 {
     public static class SiloHostBuilderExtensions
     {
+        /// <summary>
+        /// Configure silo to use FaultInjectionMemoryStorage
+        /// </summary>
+        public static ISiloBuilder AddFaultInjectionMemoryStorage(this ISiloBuilder builder, string name, Action<MemoryGrainStorageOptions> configureOptions,
+            Action<FaultInjectionGrainStorageOptions> configureFaultInjecitonOptions)
+        {
+            return builder.ConfigureServices(services => services.AddFaultInjectionMemoryStorage(name,
+                ob => ob.Configure(configureOptions), faultOb => faultOb.Configure(configureFaultInjecitonOptions)));
+        }
+
+        /// <summary>
+        /// Configure silo to use FaultInjectionMemoryStorage
+        /// </summary>
+        public static ISiloBuilder AddFaultInjectionMemoryStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null,
+            Action<OptionsBuilder<FaultInjectionGrainStorageOptions>> configureFaultInjecitonOptions = null)
+        {
+            return builder.ConfigureServices(services => services.AddFaultInjectionMemoryStorage(name,
+               configureOptions, configureFaultInjecitonOptions));
+        }
+
         /// <summary>
         /// Configure silo to use FaultInjectionMemoryStorage
         /// </summary>
