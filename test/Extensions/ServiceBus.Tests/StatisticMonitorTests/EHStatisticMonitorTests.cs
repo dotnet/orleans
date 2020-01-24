@@ -72,7 +72,7 @@ namespace ServiceBus.Tests.MonitorTests
             seed = new Random();
         }
 
-        [Fact, TestCategory("Functional")]
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/4594"), TestCategory("Functional")]
         public async Task EHStatistics_MonitorCalledAccordingly()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), StreamNamespace, StreamProviderName);
