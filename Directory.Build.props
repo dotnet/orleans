@@ -80,6 +80,7 @@
     <MicrosoftExtensionsDependencyInjectionVersion>3.0.0</MicrosoftExtensionsDependencyInjectionVersion>
     <MicrosoftExtensionsDependencyModelVersion>3.0.0</MicrosoftExtensionsDependencyModelVersion>
     <MicrosoftExtensionsLoggingVersion>3.0.0</MicrosoftExtensionsLoggingVersion>
+    <MicrosoftExtensionsObjectPoolVersion>3.0.0</MicrosoftExtensionsObjectPoolVersion>
     <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>3.0.0</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
     <MicrosoftExtensionsOptionsVersion>3.0.0</MicrosoftExtensionsOptionsVersion>
     <MicrosoftExtensionsHostingAbstractionsVersion>3.0.0</MicrosoftExtensionsHostingAbstractionsVersion>

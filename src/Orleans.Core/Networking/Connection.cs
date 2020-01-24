@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 using Orleans.Configuration;
 using Orleans.Messaging;
 
@@ -24,6 +25,11 @@ namespace Orleans.Runtime.Messaging
             AllowSynchronousContinuations = false
         };
 
+#if NETCOREAPP
+        private static readonly ObjectPool<MessageHandler> MessageHandlerPool = ObjectPool.Create(new MessageHandlerPoolPolicy());
+#else
+        private readonly WaitCallback handleMessageCallback;
+#endif
         private readonly ConnectionCommon shared;
         private readonly ConnectionDelegate middleware;
         private readonly Channel<Message> outgoingMessages;
@@ -36,6 +42,9 @@ namespace Orleans.Runtime.Messaging
             ConnectionDelegate middleware,
             ConnectionCommon shared)
         {
+#if !NETCOREAPP
+            this.handleMessageCallback = obj => this.OnReceivedMessage((Message)obj);
+#endif
             this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
             this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
             this.shared = shared;
@@ -211,7 +220,13 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     MessagingStatisticsGroup.OnMessageReceive(this.MessageReceivedCounter, message, bodyLength + headerLength, headerLength, this.ConnectionDirection);
-                                    this.OnReceivedMessage(message);
+#if NETCOREAPP
+                                    var handler = MessageHandlerPool.Get();
+                                    handler.Set(message, this);
+                                    ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
+#else
+                                    ThreadPool.UnsafeQueueUserWorkItem(this.handleMessageCallback, message);
+#endif
                                     message = null;
                                 }
                             }
@@ -480,5 +495,41 @@ namespace Orleans.Runtime.Messaging
                 MessagingStatisticsGroup.OnDroppedSentMessage(message);
             }
         }
+
+#if NETCOREAPP
+        private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>
+        {
+            public override MessageHandler Create() => new MessageHandler();
+
+            public override bool Return(MessageHandler obj)
+            {
+                obj.Reset();
+                return true;
+            }
+        }
+
+        private sealed class MessageHandler : IThreadPoolWorkItem
+        {
+            private Message message;
+            private Connection connection;
+
+            public void Set(Message m, Connection c)
+            {
+                this.message = m;
+                this.connection = c;
+            }
+
+            public void Execute()
+            {
+                this.connection.OnReceivedMessage(this.message);
+                MessageHandlerPool.Return(this);
+            }
+            public void Reset()
+            {
+                this.message = null;
+                this.connection = null;
+            }
+        }
+#endif
     }
 }
