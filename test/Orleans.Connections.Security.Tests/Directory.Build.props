@@ -8,7 +8,7 @@
   <Choose>
     <When Condition="$(OrleansRuntimeVersion) == $(VersionPrefix)">
       <ItemGroup>
-        <ProjectReference Include="..\..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
+        <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
@@ -21,7 +21,7 @@
   <Choose>
     <When Condition="$(OrleansExtensionsVersion) == $(VersionPrefix)">
       <ItemGroup>
-        <ProjectReference Include="..\..\src\Orleans.Connections.Security\Orleans.Connections.Security.csproj" />
+        <ProjectReference Include="$(SourceRoot)src\Orleans.Connections.Security\Orleans.Connections.Security.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
