@@ -68,7 +68,10 @@
   -->
   <Target Name="OrleansGenerateInputCache"
           AfterTargets="ResolveAssemblyReferences"
-          BeforeTargets="OrleansGenerateCode">
+          BeforeTargets="OrleansGenerateCode"
+          Condition="'$(Orleans_CodeGeneratorEnabled)' == 'true'"
+          Inputs="@(Orleans_CodeGenInputs)"
+          Outputs="$(Orleans_CodeGenInputCache);$(Orleans_ArgsFile)">
 
     <ItemGroup>
       <Orleans_CodeGenArgs Include="WaitForDebugger" Condition="'$(OrleansCodeGenWaitForDebugger)' != ''" />
@@ -87,9 +90,14 @@
 
     <Message Text="[Orleans.CodeGenerator] - CodeGen arguments=@(Orleans_CodeGenArgs -> '%(Identity)')" Importance="Low"/>
     <Message Text="[Orleans.CodeGenerator] - CodeGen arguments file=$(Orleans_ArgsFile)" Importance="Low"/>
-    <WriteLinesToFile Overwrite="true" File="$(Orleans_ArgsFile)" Lines="@(Orleans_CodeGenArgs)"/>
+    
+    <WriteLinesToFile
+      Overwrite="true"
+      File="$(Orleans_ArgsFile)"
+      Lines="@(Orleans_CodeGenArgs)"
+      WriteOnlyWhenDifferent="True"/>
 
-    <Hash ItemsToHash="@(Orleans_CodeGenInputs)">
+    <Hash ItemsToHash="@(Orleans_CodeGenInputs);@(Orleans_CodeGenArgs)">
       <Output TaskParameter="HashResult" PropertyName="Orleans_UpdatedInputCacheContents" />
     </Hash>
 
@@ -100,7 +108,8 @@
       WriteOnlyWhenDifferent="True" />
 
     <ItemGroup>
-      <FileWrites Include="$(Orleans_CodeGenInputCache)" />
+      <FileWrites Include="$(Orleans_ArgsFile)" Condition="Exists('$(Orleans_ArgsFile)')" />
+      <FileWrites Include="$(Orleans_CodeGenInputCache)"  Condition="Exists('$(Orleans_CodeGenInputCache)')" />
     </ItemGroup>
     
   </Target>
@@ -109,7 +118,7 @@
           AfterTargets="OrleansGenerateInputCache"
           BeforeTargets="AssignTargetPaths"
           Condition="'$(Orleans_CodeGeneratorEnabled)' == 'true'"
-          Inputs="$(Orleans_CodeGenInputCache)"
+          Inputs="@(Orleans_CodeGenInputs);$(Orleans_CodeGenInputCache)"
           Outputs="$(Orleans_OutputFileName)">
 
     <Message Text="[Orleans.CodeGenerator] - CodeGen executable=$(Orleans_GeneratorAssembly)" Importance="Low" />
@@ -131,8 +140,8 @@
           BeforeTargets="AssignTargetPaths"
           Condition="'$(Orleans_CodeGeneratorEnabled)' != 'true' and Exists('$(Orleans_OutputFileName)')">
     <ItemGroup>
-      <Compile Include="$(Orleans_OutputFileName)"/>
-      <FileWrites Include="$(Orleans_OutputFileName)"/>
+      <Compile Include="$(Orleans_OutputFileName)" Condition="Exists('$(Orleans_OutputFileName)')" />
+      <FileWrites Include="$(Orleans_OutputFileName)" Condition="Exists('$(Orleans_OutputFileName)')" />
     </ItemGroup>
   </Target>
 </Project>
