@@ -248,8 +248,6 @@ namespace Orleans.Runtime
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            StartTaskWithPerfAnalysis("Start Scheduler", scheduler.Start, new Stopwatch());
-
             // SystemTarget for provider init calls
             this.lifecycleSchedulingSystemTarget = Services.GetRequiredService<LifecycleSchedulingSystemTarget>();
             this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
