@@ -196,14 +196,14 @@ namespace Orleans.Serialization
         private static void ThrowInsufficientData() => throw new InvalidOperationException("Insufficient data present in buffer.");
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#if NETSTANDARD2_1
+#if NETCOREAPP
         public float ReadFloat() => BitConverter.Int32BitsToSingle(ReadInt32());
 #else
         public float ReadFloat() => BitConverter.ToSingle(BitConverter.GetBytes(this.ReadInt32()), 0);
 #endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#if NETSTANDARD2_1
+#if NETCOREAPP
         public double ReadDouble() => BitConverter.Int64BitsToDouble(ReadInt64());
 #else
         public double ReadDouble() => BitConverter.ToDouble(BitConverter.GetBytes(this.ReadInt64()), 0);
@@ -370,7 +370,7 @@ namespace Orleans.Serialization
 
             if (v4)
             {
-#if NETSTANDARD2_1
+#if NETCOREAPP
                 return new IPAddress(buff.Slice(12));
 #else
                 var v4Bytes = new byte[4];
@@ -383,7 +383,7 @@ namespace Orleans.Serialization
             }
             else
             {
-#if NETSTANDARD2_1
+#if NETCOREAPP
                 return new IPAddress(buff);
 #else
                 var v6Bytes = new byte[16];
@@ -398,7 +398,7 @@ namespace Orleans.Serialization
 
         public Guid ReadGuid()
         {
-#if NETSTANDARD2_1
+#if NETCOREAPP
             Span<byte> bytes = stackalloc byte[16];
             this.ReadBytes(in bytes);
             return new Guid(bytes);

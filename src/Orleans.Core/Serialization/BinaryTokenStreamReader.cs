@@ -143,22 +143,16 @@ namespace Orleans.Serialization
                     result = @this.ReadChar();
                     break;
                 case SerializationTokenType.Guid:
-#if NETSTANDARD2_1
                     if (@this is BinaryTokenStreamReader2 reader)
                     {
-                        Span<byte> bytes = stackalloc byte[16];
-                        reader.ReadBytes(in bytes);
-                        result = new Guid(bytes);
+                        result = reader.ReadGuid();
                     }
                     else
                     {
                         var bytes = @this.ReadBytes(16);
                         result = new Guid(bytes);
                     }
-#else
-                    var bytes = @this.ReadBytes(16);
-                    result = new Guid(bytes);
-#endif
+
                     break;
                 case SerializationTokenType.Date:
                     result = DateTime.FromBinary(@this.ReadLong());
