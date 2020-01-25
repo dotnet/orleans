@@ -18,7 +18,7 @@ namespace Orleans.Runtime
 {
     internal class Dispatcher
     {
-        internal ISiloMessageCenter Transport { get; }
+        internal MessageCenter Transport { get; }
 
         private readonly OrleansTaskScheduler scheduler;
         private readonly Catalog catalog;
@@ -34,8 +34,8 @@ namespace Orleans.Runtime
         private readonly ILogger invokeWorkItemLogger;
 
         internal Dispatcher(
-            OrleansTaskScheduler scheduler, 
-            ISiloMessageCenter transport, 
+            OrleansTaskScheduler scheduler,
+            MessageCenter transport, 
             Catalog catalog,
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementDirectorsManager placementDirectorsManager,

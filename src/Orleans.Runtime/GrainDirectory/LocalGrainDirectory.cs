@@ -18,7 +18,7 @@ namespace Orleans.Runtime.GrainDirectory
     internal class LocalGrainDirectory :
         ILocalGrainDirectory, ISiloStatusListener
     {
-        private readonly DedicatedAsynchAgent maintainer;
+        private readonly AdaptiveDirectoryCacheMaintainer maintainer;
         private readonly ILogger log;
         private readonly SiloAddress seed;
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -87,7 +87,6 @@ namespace Orleans.Runtime.GrainDirectory
             ISiloStatusOracle siloStatusOracle,
             IInternalGrainFactory grainFactory,
             Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
-            ExecutorService executorService,
             IOptions<DevelopmentClusterMembershipOptions> developmentClusterMembershipOptions,
             IOptions<GrainDirectoryOptions> grainDirectoryOptions,
             ILoggerFactory loggerFactory)
@@ -116,8 +115,7 @@ namespace Orleans.Runtime.GrainDirectory
                 GrainDirectoryCacheFactory.CreateGrainDirectoryCacheMaintainer(
                     this,
                     this.DirectoryCache,
-                    grainFactory, 
-                    executorService,
+                    grainFactory,
                     loggerFactory);
 
             var primarySiloEndPoint = developmentClusterMembershipOptions.Value.PrimarySiloEndpoint;

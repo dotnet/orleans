@@ -158,7 +158,14 @@ namespace Orleans.Runtime.Scheduler
 
         protected override IEnumerable<Task> GetScheduledTasks()
         {
-            return Array.Empty<Task>();
+            foreach (var item in this.workgroupDirectory)
+            {
+                var workGroup = item.Value;
+                foreach (var task in workGroup.GetScheduledTasks())
+                {
+                    yield return task;
+                }
+            }
         }
 
         protected override void QueueTask(Task task)

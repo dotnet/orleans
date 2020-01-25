@@ -19,7 +19,6 @@ namespace UnitTests.TesterInternal
             var services = new ServiceCollection();
             services.AddOptions();
             services.AddLogging();
-            services.AddSingleton<ExecutorService>();
             services.AddSingleton<SchedulerStatisticsGroup>();
             services.AddSingleton<StageAnalysisStatisticsGroup>();
             services.AddSingleton(loggerFactory);

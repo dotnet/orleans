@@ -32,6 +32,8 @@ namespace Orleans.Runtime
         public AgentState State { get; private set; }
         internal string Name { get; private set; }
 
+        protected TaskSchedulerAgent(ILoggerFactory loggerFactory) : this(null, loggerFactory) { }
+
         protected TaskSchedulerAgent(string nameSuffix, ILoggerFactory loggerFactory)
         {
             Cts = new CancellationTokenSource();
