@@ -109,15 +109,12 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task ProcessMembershipUpdates()
         {
-            IAsyncEnumerator<MembershipTableSnapshot> enumerator = default;
             try
             {
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
-                enumerator = this.tableManager.MembershipTableUpdates.GetAsyncEnumerator(this.shutdownCancellation.Token);
-                while (await enumerator.MoveNextAsync())
+                await foreach (var tableSnapshot in this.tableManager.MembershipTableUpdates.WithCancellation(this.shutdownCancellation.Token))
                 {
-                    var current = enumerator.Current;
-                    var newMonitoredSilos = this.UpdateMonitoredSilos(current, this.monitoredSilos, DateTime.UtcNow);
+                    var newMonitoredSilos = this.UpdateMonitoredSilos(tableSnapshot, this.monitoredSilos, DateTime.UtcNow);
 
                     foreach (var pair in this.monitoredSilos)
                     {
@@ -128,7 +125,7 @@ namespace Orleans.Runtime.MembershipService
                     }
 
                     this.monitoredSilos = newMonitoredSilos;
-                    this.observedMembershipVersion = current.Version;
+                    this.observedMembershipVersion = tableSnapshot.Version;
                 }
             }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
@@ -137,7 +134,6 @@ namespace Orleans.Runtime.MembershipService
             }
             finally
             {
-                if (enumerator is object) await enumerator.DisposeAsync();
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopped processing membership updates");
             }
         }
@@ -346,8 +342,9 @@ namespace Orleans.Runtime.MembershipService
 
                 this.monitoredSilos = this.monitoredSilos.Clear();
 
-                // Stop waiting for graceful shutdown when the provided cancellation token is cancelled
-                return Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
+                // Allow some minimum time for graceful shutdown.
+                var shutdownGracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), ct.WhenCancelled());
+                return Task.WhenAny(shutdownGracePeriod, Task.WhenAll(tasks));
             }
         }
 

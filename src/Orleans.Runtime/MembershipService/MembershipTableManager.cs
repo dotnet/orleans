@@ -799,7 +799,10 @@ namespace Orleans.Runtime.MembershipService
             async Task OnRuntimeGrainServicesStop(CancellationToken ct)
             {
                 this.membershipUpdateTimer.Dispose();
-                await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
+
+                // Allow some minimum time for graceful shutdown.
+                var gracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), ct.WhenCancelled());
+                await Task.WhenAny(gracePeriod, Task.WhenAll(tasks));
             }
         }
 
