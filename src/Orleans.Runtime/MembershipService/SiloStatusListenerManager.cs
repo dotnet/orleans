@@ -75,14 +75,12 @@ namespace Orleans.Runtime.MembershipService
         private async Task ProcessMembershipUpdates()
         {
             ClusterMembershipSnapshot previous = default;
-            IAsyncEnumerator<MembershipTableSnapshot> enumerator = default;
             try
             {
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
-                enumerator = this.membershipTableManager.MembershipTableUpdates.GetAsyncEnumerator(this.cancellation.Token);
-                while (await enumerator.MoveNextAsync())
+                await foreach (var tableSnapshot in this.membershipTableManager.MembershipTableUpdates.WithCancellation(this.cancellation.Token))
                 {
-                    var snapshot = enumerator.Current.CreateClusterMembershipSnapshot();
+                    var snapshot = tableSnapshot.CreateClusterMembershipSnapshot();
 
                     var update = (previous is null || snapshot.Version == MembershipVersion.MinValue) ? snapshot.AsUpdate() : snapshot.CreateUpdate(previous);
                     this.NotifyObservers(update);
@@ -96,7 +94,6 @@ namespace Orleans.Runtime.MembershipService
             }
             finally
             {
-                if (enumerator is object) await enumerator.DisposeAsync();
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping membership update processor");
             }
         }

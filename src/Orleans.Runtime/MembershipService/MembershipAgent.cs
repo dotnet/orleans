@@ -322,15 +322,17 @@ namespace Orleans.Runtime.MembershipService
                     }
                     else
                     {
-                        var task = await Task.WhenAny(cancellationTask, this.BecomeShuttingDown());
-                        if (ReferenceEquals(task, cancellationTask))
+                        // Allow some minimum time for graceful shutdown.
+                        var gracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), cancellationTask);
+                        var task = await Task.WhenAny(gracePeriod, this.BecomeShuttingDown());
+                        if (ReferenceEquals(task, gracePeriod))
                         {
                             this.log.LogWarning("Graceful shutdown aborted: starting ungraceful shutdown");
                             await Task.Run(() => this.BecomeStopping());
                         }
                         else
                         {
-                            await Task.WhenAny(cancellationTask, Task.WhenAll(tasks));
+                            await Task.WhenAny(gracePeriod, Task.WhenAll(tasks));
                         }
                     }
                 }

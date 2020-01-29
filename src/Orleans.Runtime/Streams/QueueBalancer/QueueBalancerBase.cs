@@ -105,11 +105,10 @@ namespace Orleans.Streams
         private async Task ListenForClusterChanges()
         {
             var current = new HashSet<SiloAddress>();
-            IAsyncEnumerator<ClusterMembershipSnapshot> enumerator = this.clusterMembershipUpdates.GetAsyncEnumerator(this.Cancellation);
-            while(!this.Cancellation.IsCancellationRequested && await enumerator.MoveNextAsync())
+            await foreach (var membershipSnapshot in this.clusterMembershipUpdates.WithCancellation(this.Cancellation))
             {
                 // get active members
-                var update = new HashSet<SiloAddress>(enumerator.Current.Members.Values
+                var update = new HashSet<SiloAddress>(membershipSnapshot.Members.Values
                     .Where(member => member.Status == SiloStatus.Active)
                     .Select(member => member.SiloAddress));
 

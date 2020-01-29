@@ -107,5 +107,6 @@ namespace Orleans.Configuration
         public bool IsRunningAsUnitTest { get; set; } = false;
 
         internal TimeSpan AllowedIAmAliveMissPeriod => this.IAmAliveTablePublishTimeout.Multiply(this.NumMissedTableIAmAliveLimit);
+        internal static TimeSpan ClusteringShutdownGracePeriod => TimeSpan.FromSeconds(5);
     }
 }
