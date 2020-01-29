@@ -89,23 +89,23 @@ namespace Orleans.Transactions.DynamoDB
 
         private void CreateClient()
         {
-            if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            if (this.service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                this.service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 // Local DynamoDB instance (for testing)
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
-                ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = service });
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this.service });
             }
-            else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
+            else if (!string.IsNullOrEmpty(this.accessKey) && !string.IsNullOrEmpty(this.secretKey))
             {
                 // AWS DynamoDB instance (auth via explicit credentials)
-                var credentials = new BasicAWSCredentials(accessKey, secretKey);
-                ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                var credentials = new BasicAWSCredentials(this.accessKey, this.secretKey);
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
             }
             else
             {
                 // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
             }
         }
 
