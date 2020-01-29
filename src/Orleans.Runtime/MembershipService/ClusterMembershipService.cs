@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Utilities;
@@ -63,14 +64,12 @@ namespace Orleans.Runtime
 
         private async Task ProcessMembershipUpdates(CancellationToken ct)
         {
-            IAsyncEnumerator<MembershipTableSnapshot> enumerator = default;
             try
             {
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
-                enumerator = this.membershipTableManager.MembershipTableUpdates.GetAsyncEnumerator(ct);
-                while (await enumerator.MoveNextAsync())
+                await foreach (var tableSnapshot in this.membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
                 {
-                    this.updates.TryPublish(enumerator.Current.CreateClusterMembershipSnapshot());
+                    this.updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
                 }
             }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
@@ -80,7 +79,6 @@ namespace Orleans.Runtime
             }
             finally
             {
-                if (enumerator is object) await enumerator.DisposeAsync();
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping membership update processor");
             }
         }
@@ -95,10 +93,11 @@ namespace Orleans.Runtime
                 return Task.CompletedTask;
             }
 
-            async Task OnRuntimeInitializeStop(CancellationToken ungracefulCancellation)
+            async Task OnRuntimeInitializeStop(CancellationToken ct)
             {
                 cancellation.Cancel(throwOnFirstException: false);
-                await Task.WhenAny(ungracefulCancellation.WhenCancelled(), Task.WhenAll(tasks));
+                var shutdownGracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), ct.WhenCancelled());
+                await Task.WhenAny(shutdownGracePeriod, Task.WhenAll(tasks));
             }
 
             lifecycle.Subscribe(
