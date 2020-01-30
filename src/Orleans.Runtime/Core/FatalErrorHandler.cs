@@ -58,7 +58,7 @@ namespace Orleans.Runtime
 
                 if (Debugger.IsAttached) Debugger.Break();
 
-                Environment.FailFast(msg);
+                Environment.FailFast(msg, exception);
             }
             else
             {
