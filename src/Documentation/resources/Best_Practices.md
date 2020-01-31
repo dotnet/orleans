@@ -1,15 +1,14 @@
 # Best Practices
 
-Orleans was designed in 2014 with the intention of removing low-level
-abstractions from actor model frameworks. Grains (actors stored in memory) are
-used to maintain the lifecycle among other features. Orleans is based on the
-actor model and fits some projects better that others.
+Orleans was built with the goal to greatly simplify building of distributed scalable applications, especially for the cloud. Orleans invented the Virtual Actor Model as an evolution of the Actor Model optimized for the cloud scenarios.
+
+Grains (virtual actors) are the base building blocks of an Orleans-based application. They encapsulate state and behavior of application entities and maintain their lifecycle, The programming model of Orleans and the characteristics of its runtime fit some types of applications better than others. This document is intended to capture some of the tried and proven application patterns that work well in Orleans.
 
 ## Orleans should be considered when:
 
--   Significant number (hundreds to millions) of loosely coupled entities
+-   Significant number (hundreds, millions, billions, and even trillions) of loosely coupled entities. To put the number in perspective, Orleans can easily create a grain for every person on Earth in a small cluster, so long as a subset of that total number is active at any point in time. 
 
-    -   Example: Internet of Things (IoT) – individual devices turning on/off
+    -   Example: Additonal examples are: user profiles, purchase orders, application/game sessions, stocks
 
 -   Entities are small enough to be single-threaded
 
@@ -19,7 +18,7 @@ actor model and fits some projects better that others.
 
     -   Example: request-response, start/monitor/complete
 
--   More than one server is expected or may be required\\
+-   More than one server is expected or may be required
 
     -   Orleans runs on a cluster which is expanded by adding servers to expand
         the cluster
@@ -27,12 +26,8 @@ actor model and fits some projects better that others.
 -   Global coordination is not needed or on a smaller scale between a few
     entities at a time
 
-    -   Orleans maintains its clusters and talks to other clusters. Each cluster
-        is able to communicate through tcp/ip
+    -   Scalability and performance of execution is achieved by parallelizing and distributed a large number of mostly independent tasks with no single point of synchronization.
 
--   *Various entities are used at different times*
-
-    -   This depends on the entities that are being used
 
 ## Orleans is not the best fit when:
 
@@ -47,7 +42,7 @@ actor model and fits some projects better that others.
 
 -   Global coordination and/or consistency is needed
 
-    -   Orleans maintains the silos within its own framework
+    -   Such global coordination would severely limit performance of an Orleans-based application. Orleans was built to easily scale to a global scale without the need of in-depth manual coordination. 
 
 -   *Operations that run for a long time*
 
@@ -59,7 +54,7 @@ actor model and fits some projects better that others.
 
 **Overview**:
 
--   Actors are not objects, however they are similar
+-   Grains resemble objects. However, they are distributed, virtual, and asynchronous.
 
 -   They are loosely coupled, isolated, and primarily independent
 
@@ -119,6 +114,10 @@ actor model and fits some projects better that others.
 
 **Implementation of Grains**:
 
+-   Never perform a thread-blocking operation within a grain. All operations other than local computations must be explicitly asynchronous.
+    
+    -   Examples: Synchronously waiting for an IO operation or a web service call, locking, running an excessive loop that is waiting for a condition, etc. 
+    
 -   When to use a [StatelessWorker]
 
     -   Functional operations such as: decryption, decompression, and before
