@@ -105,17 +105,17 @@ actor model and fits some projects better that others.
 
     -   Await a Task and continue execution:
 
-        -   var x = await bar.Foo();  
+        -   `var x = await bar.Foo();  
             var y = DoSomething(x);  
-            return y;
+            return y;`
 
     -   Fan-out:
 
-        -   var tasks = new List\<Task\>();  
+        -   `var tasks = new List\<Task\>();  
             foreach(var grain in grains)  
             { tasks.Add(grain.Foo()) }  
             await Task.WhenAll(tasks);  
-            DoMoreWork();
+            DoMoreWork();`
 
 **Implementation of Grains**:
 
@@ -365,11 +365,11 @@ Scaling out and in
     -   Default tracing levels can be overridden for grains and runtime
         components
 
-        -   Example: \<TraceLevelOverrideLogPrefix="Application"
-            TraceLevel=“Verbose" /\>
+        -   Example: `<TraceLevelOverrideLogPrefix="Application"
+            TraceLevel=“Verbose">`
 
-        -   Example: \<TraceLevelOverrideLogPrefix=“Runtime"
-            TraceLevel=“Warning" /\>
+        -   Example: `<TraceLevelOverrideLogPrefix=“Runtime"
+            TraceLevel=“Warning">`
 
 Testing
 
