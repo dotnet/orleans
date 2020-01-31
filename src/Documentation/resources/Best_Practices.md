@@ -315,7 +315,7 @@ Writing Custom Providers
 
     -   Orleans provides it best effort for grain delivery
 
-    -   Any network message can be lost and should be retired by the application
+    -   All of the network messages can be lost and should be retried by the application
         if it is crucial
 
         -   Common practice is to retry from end-to-end from the client/front
