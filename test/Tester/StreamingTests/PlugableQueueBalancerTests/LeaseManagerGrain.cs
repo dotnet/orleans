@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -29,18 +29,16 @@ namespace Tester.StreamingTests
         private static readonly DateTime UnAssignedLeaseTime = DateTime.MinValue;
         private Dictionary<QueueId, DateTime> queueLeaseToRenewTimeMap;
         private ISiloStatusOracle siloStatusOracle;
-        private ClusterConfiguration clusterConfiguration;
         public override Task OnActivateAsync()
         {
             this.siloStatusOracle = base.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
-            this.clusterConfiguration = base.ServiceProvider.GetRequiredService<ClusterConfiguration>();
             this.queueLeaseToRenewTimeMap = new Dictionary<QueueId, DateTime>();
             this.responsibilityMap = new Dictionary<string, int>();
             return Task.CompletedTask;
         }
         public Task<int> GetLeaseResposibility()
         {
-            var siloCount = this.clusterConfiguration.Overrides.Count;
+            var siloCount = this.siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Count;
             var resposibity = this.queueLeaseToRenewTimeMap.Count / siloCount;
             return Task.FromResult(resposibity);
         }

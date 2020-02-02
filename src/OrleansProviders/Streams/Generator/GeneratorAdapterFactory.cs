@@ -111,7 +111,7 @@ namespace Orleans.Providers.Streams.Generator
             generatorConfig = this.serviceProvider.GetServiceByName<IStreamGeneratorConfig>(this.Name);
             if(generatorConfig == null)
             {
-                this.logger.LogInformation("No generator configuration found for stream provider {0}.  Inactive until provided with configuration by command.", this.Name);
+                this.logger.LogInformation("No generator configuration found for stream provider {StreamProvider}.  Inactive until provided with configuration by command.", this.Name);
             }
         }
 
@@ -190,7 +190,7 @@ namespace Orleans.Providers.Streams.Generator
             var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
             var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
             Receiver receiver = receivers.GetOrAdd(queueId, qid => new Receiver(receiverMonitor));
-            SetGeneratorOnReciever(receiver);
+            SetGeneratorOnReceiver(receiver);
             return receiver;
         }
 
@@ -211,10 +211,10 @@ namespace Orleans.Providers.Streams.Generator
                 throw new ArgumentOutOfRangeException("arg", "Arg must by of type IStreamGeneratorConfig");
             }
 
-            // update generator on recievers
+            // update generator on receivers
             foreach (Receiver receiver in receivers.Values)
             {
-                SetGeneratorOnReciever(receiver);
+                SetGeneratorOnReceiver(receiver);
             }
 
             return Task.FromResult<object>(true);
@@ -243,7 +243,7 @@ namespace Orleans.Providers.Streams.Generator
                 var watch = Stopwatch.StartNew();
                 await Task.Delay(random.Next(1,MaxDelayMs));
                 List<IBatchContainer> batches;
-                if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, out batches))
+                if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, maxCount, out batches))
                 {
                     return new List<IBatchContainer>();
                 }
@@ -270,7 +270,7 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
-        private void SetGeneratorOnReciever(Receiver receiver)
+        private void SetGeneratorOnReceiver(Receiver receiver)
         {
             // if we don't have generator configuration, don't set generator
             if (generatorConfig == null)

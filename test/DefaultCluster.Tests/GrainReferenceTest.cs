@@ -19,7 +19,7 @@ namespace DefaultCluster.Tests.General
     /// <summary>
     /// Summary description for GrainReferenceTest
     /// </summary>
-    [TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainReference")]
+    [TestCategory("BVT"), TestCategory("GrainReference")]
     public class GrainReferenceTest : HostedTestClusterEnsureDefaultStarted
     {
         public GrainReferenceTest(DefaultClusterFixture fixture) : base(fixture)
@@ -39,7 +39,7 @@ namespace DefaultCluster.Tests.General
             Assert.False(ref2.Equals(ref1));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
+        [Fact, TestCategory("BVT"), TestCategory("AsynchronyPrimitives")]
         public void TaskCompletionSource_Resolve()
         {
             string str = "Hello TaskCompletionSource";

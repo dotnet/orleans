@@ -5,12 +5,12 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Tests.AzureUtils;
+using Orleans.Internal;
+using AzureTableDefaultPolicies = Orleans.Clustering.AzureStorage.AzureTableDefaultPolicies;
 
 namespace Tester.AzureUtils
 {
@@ -20,7 +20,7 @@ namespace Tester.AzureUtils
         private readonly ITestOutputHelper output;
         private string PartitionKey;
         private UnitTestAzureTableDataManager manager;
-        
+
         public AzureTableDataManagerStressTests(ITestOutputHelper output)
         {
             this.output = output;
@@ -113,7 +113,7 @@ namespace Tester.AzureUtils
                 string partitionKey = PartitionKey;
                 if (numPartitions > 1) partitionKey += (i % numPartitions);
                 string rowKey = i.ToString(CultureInfo.InvariantCulture);
-                
+
                 UnitTestAzureTableData dataObject = new UnitTestAzureTableData();
                 dataObject.PartitionKey = partitionKey;
                 dataObject.RowKey = rowKey;

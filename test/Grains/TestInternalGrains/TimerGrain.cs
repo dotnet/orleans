@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
@@ -21,12 +22,16 @@ namespace UnitTestGrains
         string DefaultTimerName = "DEFAULT TIMER";
         ISchedulingContext context;
 
-        private Logger logger;
+        private ILogger logger;
+
+        public TimerGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
             ThrowIfDeactivating();
-            logger = this.GetLogger("TimerGrain_" + base.Data.Address.ToString());
             context = RuntimeContext.Current.ActivationContext;
             defaultTimer = this.RegisterTimer(Tick, DefaultTimerName, period, period);
             allTimers = new Dictionary<string, IDisposable>();
@@ -133,14 +138,18 @@ namespace UnitTestGrains
         private ISchedulingContext context;
         private TaskScheduler activationTaskScheduler;
 
-        private Logger logger;
+        private ILogger logger;
+
+        public TimerCallGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public Task<int> GetTickCount() { return Task.FromResult(tickCount); }
         public Task<Exception> GetException() { return Task.FromResult(tickException); }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger("TimerCallGrain_" + base.Data.Address);
             context = RuntimeContext.Current.ActivationContext;
             activationTaskScheduler = TaskScheduler.Current;
             return Task.CompletedTask;

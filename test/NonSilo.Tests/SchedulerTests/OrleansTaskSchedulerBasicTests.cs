@@ -1,24 +1,15 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using TestExtensions;
 using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans;
 using Orleans.TestingHost.Utils;
-using Orleans.Statistics;
-using Orleans.Hosting;
-using Microsoft.Extensions.Options;
-
-using Orleans.Runtime.TestHooks;
+using Orleans.Internal;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -45,7 +36,6 @@ namespace UnitTests.SchedulerTests
     {
         private readonly ITestOutputHelper output;
         private static readonly object Lockable = new object();
-        private readonly IHostEnvironmentStatistics performanceMetrics;
         private readonly UnitTestSchedulingContext rootContext;
         private readonly OrleansTaskScheduler scheduler;
         private readonly ILoggerFactory loggerFactory;
@@ -54,9 +44,8 @@ namespace UnitTests.SchedulerTests
             this.output = output;
             SynchronizationContext.SetSynchronizationContext(null);
             this.loggerFactory = InitSchedulerLogging();
-            this.performanceMetrics = new TestHooksHostEnvironmentStatistics();
             this.rootContext = new UnitTestSchedulingContext();
-            this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(this.rootContext, this.performanceMetrics, this.loggerFactory);
+            this.scheduler = TestInternalHelper.InitializeSchedulerForTesting(this.rootContext, this.loggerFactory);
         }
         
         public void Dispose()
@@ -83,7 +72,7 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("AsynchronyPrimitives")]
         public void Async_Task_Start_ActivationTaskScheduler()
         {
-            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskRunner;
+            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskScheduler;
 
             int expected = 2;
             bool done = false;
@@ -102,7 +91,7 @@ namespace UnitTests.SchedulerTests
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
-            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskRunner;
+            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskScheduler;
 
             int n = 0;
             // ReSharper disable AccessToModifiedClosure
@@ -126,7 +115,7 @@ namespace UnitTests.SchedulerTests
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
             // is completely and thoroughly broken and both closures are executed "simultaneously"
-            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskRunner;
+            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskScheduler;
 
             int n = 0;
 
@@ -328,7 +317,7 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public async Task Sched_Task_TaskWorkItem_CurrentScheduler()
         {
-            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskRunner;
+            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskScheduler;
 
             var result0 = new TaskCompletionSource<bool>();
             var result1 = new TaskCompletionSource<bool>();
@@ -376,7 +365,7 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public async Task Sched_Task_ClosureWorkItem_SpecificScheduler()
         {
-            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskRunner;
+            ActivationTaskScheduler activationScheduler = this.scheduler.GetWorkItemGroup(this.rootContext).TaskScheduler;
 
             var result0 = new TaskCompletionSource<bool>();
             var result1 = new TaskCompletionSource<bool>();
@@ -712,10 +701,7 @@ namespace UnitTests.SchedulerTests
             var filters = new LoggerFilterOptions();
             filters.AddFilter("Scheduler", LogLevel.Trace);
             filters.AddFilter("Scheduler.WorkerPoolThread", LogLevel.Trace);
-            var orleansConfig = new ClusterConfiguration();
-            orleansConfig.StandardLoad();
-            NodeConfiguration config = orleansConfig.CreateNodeConfigurationForSilo("Primary");
-            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(config.SiloName, orleansConfig.Globals.ClusterId), filters);
+            var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("Silo", DateTime.Now.ToString("yyyyMMdd_hhmmss")), filters);
             return loggerFactory;
         }
     }

@@ -31,23 +31,13 @@ namespace AWSUtils.Tests.Streaming
                 throw new SkipException("Empty connection string");
             }
 
-            var clusterId = Guid.NewGuid().ToString();
-
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-
-                legacy.ClusterConfiguration.Globals.ClusterId = clusterId;
-                legacy.ClientConfiguration.ClusterId = clusterId;
-                legacy.ClientConfiguration.DataConnectionString = StreamConnectionString;
-                legacy.ClusterConfiguration.Globals.DataConnectionString = StreamConnectionString;
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
 
-        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        private class MySiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .AddMemoryGrainStorage("PubSubStore")
@@ -69,8 +59,6 @@ namespace AWSUtils.Tests.Streaming
                     });
             }
         }
-
-
 
         public SQSSubscriptionMultiplicityTests()
         {

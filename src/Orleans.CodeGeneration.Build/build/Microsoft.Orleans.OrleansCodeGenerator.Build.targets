@@ -12,14 +12,8 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(OrleansCodeGeneratorAssembly)' == ''">
-    <CoreAssembly20>$(MSBuildThisFileDirectory)..\tasks\netcoreapp2.0\Orleans.CodeGeneration.Build.dll</CoreAssembly20>
-    <CoreAssembly21>$(MSBuildThisFileDirectory)..\tasks\netcoreapp2.1\Orleans.CodeGeneration.Build.dll</CoreAssembly21>
+    <CoreAssembly>$(MSBuildThisFileDirectory)..\tasks\netcoreapp3.1\Orleans.CodeGeneration.Build.dll</CoreAssembly>
     <FullAssembly>$(MSBuildThisFileDirectory)..\tasks\net461\Orleans.CodeGeneration.Build.exe</FullAssembly>
-
-    <CoreAssembly Condition="$(TargetFramework.Equals('netcoreapp2.0')) or $(TargetFramework.Equals('netstandard2.0'))">$(CoreAssembly20)</CoreAssembly>
-    <CoreAssembly Condition="$(TargetFramework.Equals('netcoreapp2.1')) or $(TargetFramework.Equals('netstandard2.1'))">$(CoreAssembly21)</CoreAssembly>
-    <!-- Fallback to 2.0 assembly if needed -->
-    <CoreAssembly Condition="$(CoreAssembly) == ''">$(CoreAssembly20)</CoreAssembly>
 
     <!-- Specify the assembly containing the MSBuild tasks. -->
     <MSBuildIsCore Condition="'$(MSBuildRuntimeType)' == 'Core' or '$(OS)' != 'Windows_NT'">true</MSBuildIsCore>

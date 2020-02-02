@@ -4,16 +4,11 @@
     <Title>Microsoft Orleans Event-Sourcing</Title>
     <Description>Base types for creating Microsoft Orleans grains with event-sourced state.</Description>
     <PackageTags>$(PackageTags) EventSourcing</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
     <AssemblyName>Orleans.EventSourcing</AssemblyName>
     <RootNamespace>OrleansEventSourcing</RootNamespace>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CSharp" Version="$(SystemRuntimeVersion)" />
-    <PackageReference Include="System.Dynamic.Runtime" Version="$(SystemRuntimeVersion)" />
-  </ItemGroup>
-
 </Project>

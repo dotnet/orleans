@@ -29,17 +29,6 @@ namespace Orleans.Configuration
         public static readonly TimeSpan RESPONSE_TIMEOUT_WITH_DEBUGGER = TimeSpan.FromMinutes(30);
 
         /// <summary>
-        /// The MaxResendCount attribute specifies the maximal number of resends of the same message.
-        /// </summary>
-        public int MaxResendCount { get; set; }
-
-        /// <summary>
-        /// The ResendOnTimeout attribute specifies whether the message should be automatically resend by the runtime when it times out on the sender.
-        /// Default is false.
-        /// </summary>
-        public bool ResendOnTimeout { get; set; }
-
-        /// <summary>
         /// The DropExpiredMessages attribute specifies whether the message should be dropped if it has expired, that is if it was not delivered 
         /// to the destination before it has timed out on the sender.
         /// Default is true.
@@ -76,5 +65,24 @@ namespace Orleans.Configuration
         /// </summary>
         public int LargeMessageWarningThreshold { get; set; } = DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD;
         public const int DEFAULT_LARGE_MESSAGE_WARNING_THRESHOLD = Constants.LARGE_OBJECT_HEAP_THRESHOLD;
+
+        /// <summary>
+        /// The maximum number of times a message send attempt will be retried.
+        /// </summary>
+        internal const int DEFAULT_MAX_MESSAGE_SEND_RETRIES = 1;
+
+        /// <summary>
+        /// The maximum size, in bytes, of the header for a message. The runtime will forcibly close the connection
+        /// if the header size is greater than this value.
+        /// </summary>
+        public int MaxMessageHeaderSize { get; set; } = DEFAULT_MAX_MESSAGE_HEADER_SIZE;
+        public const int DEFAULT_MAX_MESSAGE_HEADER_SIZE = 10485760; // 10MB
+
+        /// <summary>
+        /// The maximum size, in bytes, of the body for a message. The runtime will forcibly close the connection
+        /// if the body size is greater than this value.
+        /// </summary>
+        public int MaxMessageBodySize { get; set; } = DEFAULT_MAX_MESSAGE_BODY_SIZE;
+        public const int DEFAULT_MAX_MESSAGE_BODY_SIZE = 104857600; // 100MB
     }
 }

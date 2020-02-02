@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit.Abstractions;
@@ -25,6 +25,10 @@ public class TestCategoryAttribute : Attribute, ITraitAttribute
 
 public class CategoryDiscoverer : ITraitDiscoverer
 {
+    public CategoryDiscoverer(IMessageSink diagnosticMessageSink)
+    {
+    }
+
     public IEnumerable<KeyValuePair<string, string>> GetTraits(IAttributeInfo traitAttribute)
     {
         var ctorArgs = traitAttribute.GetConstructorArguments().ToList();

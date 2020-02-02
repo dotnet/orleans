@@ -45,8 +45,7 @@ namespace UnitTests.General
                     "MySQL-Main.sql",
                     "MySQL-Clustering.sql",
                     "MySQL-Persistence.sql",
-                    "MySQL-Reminders.sql",
-                    "MySQL-Statistics.sql"
+                    "MySQL-Reminders.sql"
                 };
             }
         }

@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Orleans.Runtime;
+using Microsoft.Azure.Cosmos.Table;
 
 //
 // Number of #ifs can be reduced (or removed), once we separate test projects by feature/area, otherwise we are ending up with ambigous types and build errors.

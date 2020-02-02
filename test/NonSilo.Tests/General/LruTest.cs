@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using Orleans.Runtime;
 using Xunit;
@@ -11,7 +11,7 @@ namespace UnitTests
     ///</summary>
     public class LruTest
     {
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("LRU")]
+        [Fact, TestCategory("BVT"), TestCategory("LRU")]
         public void LruCountTest()
         {
             const int maxSize = 10;
@@ -28,7 +28,7 @@ namespace UnitTests
             Assert.Equal(2, target.Count);  // "Count wrong after adding two items"
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("LRU")]
+        [Fact, TestCategory("BVT"), TestCategory("LRU")]
         public void LruMaximumSizeTest()
         {
             const int maxSize = 10;
@@ -51,7 +51,7 @@ namespace UnitTests
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("LRU")]
+        [Fact, TestCategory("BVT"), TestCategory("LRU")]
         public void LruUsageTest()
         {
             const int maxSize = 10;

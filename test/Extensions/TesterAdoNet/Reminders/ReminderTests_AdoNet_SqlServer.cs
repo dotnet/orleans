@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Orleans;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -12,6 +11,7 @@ using UnitTests.General;
 using UnitTests.GrainInterfaces;
 using UnitTests.TimerTests;
 using Orleans.Tests.SqlUtils;
+using Orleans.Internal;
 using Xunit;
 
 // ReSharper disable InconsistentNaming
@@ -40,9 +40,9 @@ namespace Tester.AdoNet.Reminders
             }
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.UseAdoNetReminderService(options =>
                 {

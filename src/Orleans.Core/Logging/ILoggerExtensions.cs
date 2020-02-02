@@ -95,7 +95,7 @@ namespace Orleans.Runtime
             logger.LogDebug(logCode, format, args);
         }
 
-        internal static void Debug(this ILogger logger, ErrorCode logCode, string format, params object[] args)
+        public static void Debug(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
             logger.LogDebug(LoggingUtils.CreateEventId(logCode), format, args);
         }
@@ -111,7 +111,7 @@ namespace Orleans.Runtime
             logger.LogDebug(logCode, message);
         }
 
-        internal static void Debug(this ILogger logger, ErrorCode logCode, string message)
+        public static void Debug(this ILogger logger, ErrorCode logCode, string message)
         {
             logger.LogDebug(LoggingUtils.CreateEventId(logCode), message);
         }
@@ -130,7 +130,7 @@ namespace Orleans.Runtime
             logger.LogTrace(logCode, format, args);
         }
 
-        internal static void Trace(this ILogger logger, ErrorCode logCode, string format, params object[] args)
+        public static void Trace(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
             logger.LogTrace(LoggingUtils.CreateEventId(logCode), format, args);
         }
@@ -146,7 +146,7 @@ namespace Orleans.Runtime
             logger.LogTrace(logCode, message);
         }
 
-        internal static void Trace(this ILogger logger, ErrorCode logCode, string message)
+        public static void Trace(this ILogger logger, ErrorCode logCode, string message)
         {
             logger.LogTrace(LoggingUtils.CreateEventId(logCode), message);
         }
@@ -165,7 +165,7 @@ namespace Orleans.Runtime
             logger.LogInformation(logCode, format, args);
         }
 
-        internal static void Info(this ILogger logger, ErrorCode logCode, string format, params object[] args)
+        public static void Info(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
             logger.LogInformation(LoggingUtils.CreateEventId(logCode), format, args);
         }
@@ -181,7 +181,7 @@ namespace Orleans.Runtime
             logger.LogInformation(logCode, message);
         }
 
-        internal static void Info(this ILogger logger, ErrorCode logCode, string message)
+        public static void Info(this ILogger logger, ErrorCode logCode, string message)
         {
             logger.LogInformation(LoggingUtils.CreateEventId(logCode), message);
         }
@@ -200,7 +200,7 @@ namespace Orleans.Runtime
             logger.LogWarning(logCode, format, args);
         }
 
-        internal static void Warn(this ILogger logger, ErrorCode logCode, string format, params object[] args)
+        public static void Warn(this ILogger logger, ErrorCode logCode, string format, params object[] args)
         {
             logger.LogWarning(LoggingUtils.CreateEventId(logCode), format, args);
         }
@@ -217,7 +217,7 @@ namespace Orleans.Runtime
             logger.LogWarning(logCode, exception, message);
         }
 
-        internal static void Warn(this ILogger logger, ErrorCode logCode, string message, Exception exception = null)
+        public static void Warn(this ILogger logger, ErrorCode logCode, string message, Exception exception = null)
         {
             logger.LogWarning(LoggingUtils.CreateEventId(logCode), exception, message);
         }
@@ -234,13 +234,13 @@ namespace Orleans.Runtime
             logger.LogError(logCode, exception, message);
         }
 
-        internal static void Error(this ILogger logger, ErrorCode logCode, string message, Exception exception = null)
+        public static void Error(this ILogger logger, ErrorCode logCode, string message, Exception exception = null)
         {
             logger.LogError(LoggingUtils.CreateEventId(logCode), exception, message);
         }
 
 
-        internal static void Assert(this ILogger logger, ErrorCode errorCode, bool condition, string message = null)
+        public static void Assert(this ILogger logger, ErrorCode errorCode, bool condition, string message = null)
         {
             if (condition) return;
 
@@ -252,7 +252,7 @@ namespace Orleans.Runtime
             logger.Fail(errorCode, "Assert failed with message = " + message);
         }
 
-        internal static void Fail(this ILogger logger, ErrorCode errorCode, string message)
+        public static void Fail(this ILogger logger, ErrorCode errorCode, string message)
         {
             if (message == null)
             {
@@ -275,7 +275,8 @@ namespace Orleans.Runtime
             {
                 logger.Error(ErrorCode.Logger_ProcessCrashing, "INTERNAL FAILURE! Process crashing!");
 
-                Environment.FailFast("Unrecoverable failure: " + message);
+                // Environment.FailFast triggers a popup on some machine "xxx has stopped working"
+                Environment.Exit(128);
             }
         }
     }

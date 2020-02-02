@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -78,5 +78,134 @@ namespace Orleans
         /// </summary>
         /// <param name="grain">The grain reference.</param>
         void BindGrainReference(IAddressable grain);
+
+        /// <summary>
+        /// A GetGrain overload that returns the runtime type of the grain interface and returns the grain cast to
+        /// TGrainInterface.
+        /// 
+        /// The main use-case is when you want to get a grain whose type is unknown at compile time (e.g. generic type parameters).
+        /// </summary>
+        /// <typeparam name="TGrainInterface">The output type of the grain</typeparam>
+        /// <param name="grainPrimaryKey">the primary key of the grain</param>
+        /// <param name="grainInterfaceType">the runtime type of the grain interface</param>
+        /// <returns>the requested grain with the given grainID and grainInterfaceType</returns>
+        TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, Guid grainPrimaryKey)
+            where TGrainInterface : IGrain;
+
+        /// <summary>
+        /// A GetGrain overload that returns the runtime type of the grain interface and returns the grain cast to
+        /// TGrainInterface.
+        /// 
+        /// The main use-case is when you want to get a grain whose type is unknown at compile time (e.g. generic type parameters).
+        /// </summary>
+        /// <typeparam name="TGrainInterface">The output type of the grain</typeparam>
+        /// <param name="grainPrimaryKey">the primary key of the grain</param>
+        /// <param name="grainInterfaceType">the runtime type of the grain interface</param>
+        /// <returns>the requested grain with the given grainID and grainInterfaceType</returns>
+        TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, long grainPrimaryKey)
+            where TGrainInterface : IGrain;
+
+        /// <summary>
+        /// A GetGrain overload that returns the runtime type of the grain interface and returns the grain cast to
+        /// TGrainInterface.
+        /// 
+        /// The main use-case is when you want to get a grain whose type is unknown at compile time (e.g. generic type parameters).
+        /// </summary>
+        /// <typeparam name="TGrainInterface">The output type of the grain</typeparam>
+        /// <param name="grainPrimaryKey">the primary key of the grain</param>
+        /// <param name="grainInterfaceType">the runtime type of the grain interface</param>
+        /// <returns>the requested grain with the given grainID and grainInterfaceType</returns>
+        TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, string grainPrimaryKey)
+            where TGrainInterface : IGrain;
+
+        /// <summary>
+        /// A GetGrain overload that returns the runtime type of the grain interface and returns the grain cast to
+        /// TGrainInterface.
+        /// 
+        /// The main use-case is when you want to get a grain whose type is unknown at compile time (e.g. generic type parameters).
+        /// </summary>
+        /// <typeparam name="TGrainInterface">The output type of the grain</typeparam>
+        /// <param name="grainPrimaryKey">the primary key of the grain</param>
+        /// <param name="keyExtension">The key extension of the grain.</param>
+        /// <param name="grainInterfaceType">the runtime type of the grain interface</param>
+        /// <returns>the requested grain with the given grainID and grainInterfaceType</returns>
+        TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, Guid grainPrimaryKey, string keyExtension)
+            where TGrainInterface : IGrain;
+
+        /// <summary>
+        /// A GetGrain overload that returns the runtime type of the grain interface and returns the grain cast to
+        /// TGrainInterface.
+        /// 
+        /// The main use-case is when you want to get a grain whose type is unknown at compile time (e.g. generic type parameters).
+        /// </summary>
+        /// <typeparam name="TGrainInterface">The output type of the grain</typeparam>
+        /// <param name="grainPrimaryKey">the primary key of the grain</param>
+        /// <param name="keyExtension">The key extension of the grain.</param>
+        /// <param name="grainInterfaceType">the runtime type of the grain interface</param>
+        /// <returns>the requested grain with the given grainID and grainInterfaceType</returns>
+        TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, long grainPrimaryKey, string keyExtension)
+            where TGrainInterface : IGrain;
+
+        /// <summary>
+        /// A GetGrain overload that returns the runtime type of the grain interface and returns the grain cast to
+        /// <see paramref="TGrainInterface"/>. It is the caller's responsibility to ensure <see paramref="TGrainInterface"/>
+        /// extends IGrain, as there is no compile-time checking for this overload.
+        /// 
+        /// The main use-case is when you want to get a grain whose type is unknown at compile time.
+        /// </summary>
+        /// <param name="grainPrimaryKey">the primary key of the grain</param>
+        /// <param name="grainInterfaceType">the runtime type of the grain interface</param>
+        /// <returns></returns>
+        IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey);
+
+        /// <summary>
+        /// A GetGrain overload that returns the runtime type of the grain interface and returns the grain cast to
+        /// <see paramref="TGrainInterface"/>. It is the caller's responsibility to ensure <see paramref="TGrainInterface"/>
+        /// extends IGrain, as there is no compile-time checking for this overload.
+        /// 
+        /// The main use-case is when you want to get a grain whose type is unknown at compile time.
+        /// </summary>
+        /// <param name="grainPrimaryKey">the primary key of the grain</param>
+        /// <param name="grainInterfaceType">the runtime type of the grain interface</param>
+        /// <returns></returns>
+        IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey);
+
+        /// <summary>
+        /// A GetGrain overload that returns the runtime type of the grain interface and returns the grain cast to
+        /// <see paramref="TGrainInterface"/>. It is the caller's responsibility to ensure <see paramref="TGrainInterface"/>
+        /// extends IGrain, as there is no compile-time checking for this overload.
+        /// 
+        /// The main use-case is when you want to get a grain whose type is unknown at compile time.
+        /// </summary>
+        /// <param name="grainPrimaryKey">the primary key of the grain</param>
+        /// <param name="grainInterfaceType">the runtime type of the grain interface</param>
+        /// <returns></returns>
+        IGrain GetGrain(Type grainInterfaceType, string grainPrimaryKey);
+
+        /// <summary>
+        /// A GetGrain overload that returns the runtime type of the grain interface and returns the grain cast to
+        /// <see paramref="TGrainInterface"/>. It is the caller's responsibility to ensure <see paramref="TGrainInterface"/>
+        /// extends IGrain, as there is no compile-time checking for this overload.
+        /// 
+        /// The main use-case is when you want to get a grain whose type is unknown at compile time.
+        /// </summary>
+        /// <param name="grainPrimaryKey">the primary key of the grain</param>
+        /// <param name="keyExtension">The key extension of the grain.</param>
+        /// <param name="grainInterfaceType">the runtime type of the grain interface</param>
+        /// <returns></returns>
+        IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey, string keyExtension);
+
+        /// <summary>
+        /// A GetGrain overload that returns the runtime type of the grain interface and returns the grain cast to
+        /// <see paramref="TGrainInterface"/>. It is the caller's responsibility to ensure <see paramref="TGrainInterface"/>
+        /// extends IGrain, as there is no compile-time checking for this overload.
+        /// 
+        /// The main use-case is when you want to get a grain whose type is unknown at compile time.
+        /// </summary>
+        /// <param name="grainPrimaryKey">the primary key of the grain</param>
+        /// <param name="keyExtension">The key extension of the grain.</param>
+        /// <param name="grainInterfaceType">the runtime type of the grain interface</param>
+        /// <returns></returns>
+        IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey, string keyExtension);
     }
 }

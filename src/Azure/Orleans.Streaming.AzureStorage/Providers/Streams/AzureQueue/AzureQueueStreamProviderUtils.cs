@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
 using Orleans.Configuration;
-using Orleans.Streaming.AzureStorage.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue
@@ -15,7 +14,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     public class AzureQueueStreamProviderUtils
     {
         /// <summary>
-        /// Generate default azure queue names 
+        /// Generate default azure queue names
         /// </summary>
         /// <param name="serviceId"></param>
         /// <param name="providerName"></param>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Net;
 using Orleans.MultiCluster;
@@ -13,11 +13,11 @@ namespace Tester.GeoClusterTests
     /// </summary>
     public class MultiClusterDataTests
     {
-        [Fact, TestCategory("GeoCluster"), TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("GeoCluster"), TestCategory("BVT")]
         public void MultiClusterData_Configuration()
         {
-            var ts1 = new DateTime(year: 2011, month: 1, day: 1);
-            var ts2 = new DateTime(year: 2012, month: 2, day: 2);
+            var ts1 = new DateTime(year: 2011, month: 1, day: 1, hour: 0, minute: 0, second: 0, kind: DateTimeKind.Utc);
+            var ts2 = new DateTime(year: 2012, month: 2, day: 2, hour: 0, minute: 0, second: 0, kind: DateTimeKind.Utc);
 
             var conf1 = new MultiClusterConfiguration(ts1, new string[] { "A" }.ToList());
             var conf2 = new MultiClusterConfiguration(ts2, new string[] { "A", "B", "C" }.ToList());
@@ -34,7 +34,7 @@ namespace Tester.GeoClusterTests
             TestAlgebraicProperties(gd3, gd2);
         }
 
-        [Fact, TestCategory("GeoCluster"), TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("GeoCluster"), TestCategory("BVT")]
         public void MultiClusterData_Gateways()
         {
             var ts1 = DateTime.UtcNow;

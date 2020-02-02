@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Reminders ADO.NET Providers</Title>
     <Description>Microsoft Orleans reminders provider for ADO.NET Providers</Description>
     <PackageTags>$(PackageTags) ADO.NET SQL MySQL PostgreSQL Oracle</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -30,58 +31,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Data.Common" Version="$(SystemRuntimeVersion)" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Storage\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="MySQL-Reminders.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\MySQL\</PackagePath>
-    </None>
-    <None Include="Oracle-Reminders.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\Oracle\</PackagePath>
-    </None>
-    <None Include="PostgreSQL-Reminders.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\PostgreSQL\</PackagePath>
-    </None>
-    <None Include="SQLServer-Reminders.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
-    </None>
-    <None Include="..\Shared\MySQL-Main.sql" Link="MySQL-Main.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\MySQL\</PackagePath>
-    </None>
-    <None Include="..\Shared\Oracle-Main.sql" Link="Oracle-Main.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\Oracle\</PackagePath>
-    </None>
-    <None Include="..\Shared\PostgreSQL-Main.sql" Link="PostgreSQL-Main.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\PostgreSQL\</PackagePath>
-    </None>
-    <None Include="..\Shared\SQLServer-Main.sql" Link="SQLServer-Main.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
-    </None>
-    <Content Include="Microsoft.Orleans.Reminders.AdoNet.targets">
-      <PackagePath>build/$(TargetFramework)/</PackagePath>
-      <Pack>true</Pack>
-    </Content>
+    <PackageReference Include="System.Data.Common" Version="$(SystemDataCommonVersion)" />
+    <PackageReference Include="System.Memory" Version="$(SystemMemoryVersion)" />
   </ItemGroup>
 
 </Project>

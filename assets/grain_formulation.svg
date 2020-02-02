@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="1000"
+   height="390"
+   overflow="hidden"
+   version="1.1"
+   id="svg3841"
+   sodipodi:docname="grain_formulation.svg"
+   style="overflow:hidden"
+   inkscape:version="0.92.4 (5da689c313, 2019-01-14)">
+  <metadata
+     id="metadata3845">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="3840"
+     inkscape:window-height="2080"
+     id="namedview3843"
+     showgrid="false"
+     inkscape:zoom="1.1286039"
+     inkscape:cx="698.58642"
+     inkscape:cy="-89.548541"
+     inkscape:window-x="-11"
+     inkscape:window-y="734"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg3841"
+     showborder="false" />
+  <defs
+     id="defs3787">
+    <clipPath
+       id="clip0">
+      <path
+         d="M 150,160 H 1150 V 550 H 150 Z"
+         id="path3784"
+         inkscape:connector-curvature="0"
+         style="clip-rule:evenodd;fill-rule:evenodd" />
+    </clipPath>
+  </defs>
+  <g
+     clip-path="url(#clip0)"
+     id="g3839"
+     transform="translate(-150,-160)">
+    <rect
+       x="0"
+       y="0"
+       width="1150"
+       height="550"
+       id="rect3789"
+       style="fill:#1f0d2d" />
+    <text
+       font-weight="400"
+       font-size="59"
+       transform="translate(218.97,386)"
+       id="text3801"
+       style="font-weight:400;font-size:59px;font-family:Calibri, Calibri_MSFontService, sans-serif;fill:#ffffff">Grain = <tspan
+   x="184.633"
+   y="0"
+   id="tspan3791"
+   style="fill:#ffc000">identity</tspan>
+<tspan
+   x="381.08701"
+   y="0"
+   id="tspan3793">+</tspan>
+<tspan
+   x="423.58701"
+   y="0"
+   id="tspan3795"
+   style="fill:#00b050">behavior</tspan>
+<tspan
+   x="646.44702"
+   y="0"
+   id="tspan3797">[+</tspan>
+<tspan
+   x="706.94702"
+   y="0"
+   id="tspan3799"
+   style="fill:#ff0000">state</tspan>
+ ]</text>
+    <path
+       d="m 396,341 c 0,-14.359 1.94,-26 4.333,-26 h 86.334 c 2.393,0 4.333,-11.641 4.333,-26 0,14.359 1.94,26 4.333,26 h 86.334 c 2.393,0 4.333,11.641 4.333,26"
+       stroke-miterlimit="8"
+       id="path3803"
+       inkscape:connector-curvature="0"
+       style="fill:none;fill-rule:evenodd;stroke:#ffc000;stroke-width:2.33332992;stroke-miterlimit:8" />
+    <text
+       font-weight="400"
+       font-size="24"
+       transform="translate(365.697,263)"
+       id="text3809"
+       style="font-weight:400;font-size:24px;font-family:Consolas, Consolas_MSFontService, sans-serif;fill:#4ec9b0">User <tspan
+   x="52.666698"
+   y="0"
+   id="tspan3805"
+   style="fill:#ffffff">/</tspan>
+<tspan
+   x="65.833298"
+   y="0"
+   id="tspan3807"
+   style="fill:#00b0f0">jack@email.com</tspan>
+</text>
+    <path
+       d="m 847,400 c 0,14.36 -1.94,26 -4.333,26 h -96.834 c -2.393,0 -4.333,11.641 -4.333,26 0,-14.359 -1.94,-26 -4.333,-26 H 640.333 C 637.94,426 636,414.359 636,400"
+       stroke-miterlimit="8"
+       id="path3811"
+       inkscape:connector-curvature="0"
+       style="fill:none;fill-rule:evenodd;stroke:#00b050;stroke-width:2.33332992;stroke-miterlimit:8" />
+    <text
+       font-weight="400"
+       font-size="24"
+       transform="translate(925.151,233)"
+       id="text3823"
+       style="font-weight:400;font-size:24px;font-family:Calibri, Calibri_MSFontService, sans-serif;fill:#ffffff">In <tspan
+   x="18.6667"
+   y="0"
+   id="tspan3813">-</tspan>
+<tspan
+   x="26"
+   y="0"
+   id="tspan3815">memory</tspan>
+<tspan
+   x="-3.55334"
+   y="29"
+   id="tspan3817">o</tspan>
+<tspan
+   x="9.1133404"
+   y="29"
+   id="tspan3819">r</tspan>
+<tspan
+   x="22.946699"
+   y="29"
+   id="tspan3821">persisted</tspan>
+</text>
+    <path
+       d="m 922,344 c 0,-14.359 1.94,-26 4.333,-26 h 48.834 c 2.393,0 4.333,-11.641 4.333,-26 0,14.359 1.94,26 4.333,26 h 48.837 c 2.39,0 4.33,11.641 4.33,26"
+       stroke-miterlimit="8"
+       id="path3825"
+       inkscape:connector-curvature="0"
+       style="fill:none;fill-rule:evenodd;stroke:#ff0000;stroke-width:2.33332992;stroke-miterlimit:8" />
+    <text
+       font-weight="400"
+       font-size="24"
+       transform="translate(575.102,493)"
+       id="text3837"
+       style="font-weight:400;font-size:24px;font-family:Consolas, Consolas_MSFontService, sans-serif;fill:#569cd6">class <tspan
+   x="79"
+   y="0"
+   id="tspan3827"
+   style="fill:#4ec9b0">User</tspan>
+<tspan
+   x="144.83299"
+   y="0"
+   id="tspan3829"
+   style="fill:#d4d4d4">:</tspan>
+<tspan
+   x="171.16701"
+   y="0"
+   id="tspan3831"
+   style="fill:#4ec9b0">Grain</tspan>
+<tspan
+   x="237"
+   y="0"
+   id="tspan3833"
+   style="fill:#d4d4d4">,</tspan>
+<tspan
+   x="263.33301"
+   y="0"
+   id="tspan3835"
+   style="fill:#4ec9b0">IUser</tspan>
+</text>
+  </g>
+</svg>

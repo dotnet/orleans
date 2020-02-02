@@ -1,11 +1,11 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
-using Orleans.Storage;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
+using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Hosting
 {
@@ -79,7 +79,7 @@ namespace Orleans.Hosting
             Action<OptionsBuilder<AzureTableStorageOptions>> configureOptions = null)
         {
             configureOptions?.Invoke(services.AddOptions<AzureTableStorageOptions>(name));
-            services.AddTransient<IConfigurationValidator>(sp => new AzureTableGrainStorageOptionsValidator(sp.GetService<IOptionsSnapshot<AzureTableStorageOptions>>().Get(name), name));
+            services.AddTransient<IConfigurationValidator>(sp => new AzureTableGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>().Get(name), name));
             services.ConfigureNamedOptionForLogging<AzureTableStorageOptions>(name);
             services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             return services.AddSingletonNamedService<IGrainStorage>(name, AzureTableGrainStorageFactory.Create)

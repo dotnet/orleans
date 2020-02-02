@@ -1,14 +1,17 @@
 using System;
+using Orleans.Internal;
+using Orleans.Runtime;
 
 namespace TestExtensions
 {
     public abstract class OrleansTestingBase
     {
+        private static readonly SafeRandom safeRandom = new SafeRandom();
         protected static readonly Random random = new Random();
 
-        protected static long GetRandomGrainId()
+        public static long GetRandomGrainId()
         {
-            return random.Next();
+            return safeRandom.Next();
         }
     }
 }

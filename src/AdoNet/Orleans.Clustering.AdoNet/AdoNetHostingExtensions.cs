@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
@@ -13,7 +14,7 @@ namespace Orleans.Hosting
     public static class AdoNetHostingExtensions
     {
         /// <summary>
-        /// Configures this silo to use ADO.NET for clustering.
+        /// Configures this silo to use ADO.NET for clustering. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </summary>
         /// <param name="builder">
         /// The builder.
@@ -24,6 +25,9 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloHostBuilder"/>.
         /// </returns>
+        /// <remarks>
+        /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
+        /// </remarks>
         public static ISiloHostBuilder UseAdoNetClustering(
             this ISiloHostBuilder builder,
             Action<AdoNetClusteringSiloOptions> configureOptions)
@@ -42,7 +46,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configures this silo to use ADO.NET for clustering.
+        /// Configures this silo to use ADO.NET for clustering. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </summary>
         /// <param name="builder">
         /// The builder.
@@ -53,6 +57,9 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloHostBuilder"/>.
         /// </returns>
+        /// <remarks>
+        /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
+        /// </remarks>
         public static ISiloHostBuilder UseAdoNetClustering(
             this ISiloHostBuilder builder,
             Action<OptionsBuilder<AdoNetClusteringSiloOptions>> configureOptions)
@@ -67,7 +74,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configures this silo to use ADO.NET for clustering.
+        /// Configures this silo to use ADO.NET for clustering. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </summary>
         /// <param name="builder">
         /// The builder.
@@ -78,6 +85,9 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloBuilder"/>.
         /// </returns>
+        /// <remarks>
+        /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
+        /// </remarks>
         public static ISiloBuilder UseAdoNetClustering(
             this ISiloBuilder builder,
             Action<AdoNetClusteringSiloOptions> configureOptions)
@@ -96,7 +106,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configures this silo to use ADO.NET for clustering.
+        /// Configures this silo to use ADO.NET for clustering. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </summary>
         /// <param name="builder">
         /// The builder.
@@ -107,6 +117,9 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloBuilder"/>.
         /// </returns>
+        /// <remarks>
+        /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
+        /// </remarks>
         public static ISiloBuilder UseAdoNetClustering(
             this ISiloBuilder builder,
             Action<OptionsBuilder<AdoNetClusteringSiloOptions>> configureOptions)
@@ -121,7 +134,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configures this client to use ADO.NET for clustering.
+        /// Configures this client to use ADO.NET for clustering. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </summary>
         /// <param name="builder">
         /// The builder.
@@ -132,6 +145,9 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="IClientBuilder"/>.
         /// </returns>
+        /// <remarks>
+        /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
+        /// </remarks>
         public static IClientBuilder UseAdoNetClustering(
             this IClientBuilder builder,
             Action<AdoNetClusteringClientOptions> configureOptions)
@@ -150,7 +166,7 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Configures this client to use ADO.NET for clustering.
+        /// Configures this client to use ADO.NET for clustering. Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
         /// </summary>
         /// <param name="builder">
         /// The builder.
@@ -161,6 +177,9 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="IClientBuilder"/>.
         /// </returns>
+        /// <remarks>
+        /// Instructions on configuring your database are available at <see href="http://aka.ms/orleans-sql-scripts"/>.
+        /// </remarks>
         public static IClientBuilder UseAdoNetClustering(
             this IClientBuilder builder,
             Action<OptionsBuilder<AdoNetClusteringClientOptions>> configureOptions)

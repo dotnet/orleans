@@ -18,9 +18,9 @@ namespace Orleans.Runtime.ReminderService
         private RemindersTableManager remTableManager;
 
         public AzureBasedReminderTable(
-            IGrainReferenceConverter grainReferenceConverter, 
-            ILoggerFactory loggerFactory, 
-            IOptions<ClusterOptions> clusterOptions, 
+            IGrainReferenceConverter grainReferenceConverter,
+            ILoggerFactory loggerFactory,
+            IOptions<ClusterOptions> clusterOptions,
             IOptions<AzureTableReminderStorageOptions> storageOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;

@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -29,11 +31,24 @@ namespace UnitTests.General
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.ApplyToAllNodes(n => n.PropagateActivityId = true);
-                    legacy.ClientConfiguration.PropagateActivityId = true;
-                });
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+                builder.AddClientBuilderConfigurator<ClientConfigurator>();
+            }
+        }
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.Configure<SiloMessagingOptions>(options => options.PropagateActivityId = true);
+            }
+        }
+
+        public class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<SiloMessagingOptions>(options => options.PropagateActivityId = true);
             }
         }
 
@@ -65,7 +80,7 @@ namespace UnitTests.General
             Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("BVT"), TestCategory("RequestContext")]
         public async Task RequestContext_LegacyActivityId_Simple()
         {
             Guid activityId = Guid.NewGuid();
@@ -461,6 +476,8 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
 
+        private AsyncLocal<int> threadId = new AsyncLocal<int>();
+
         public Halo_CallContextTests(ITestOutputHelper output)
         {
             this.output = output;
@@ -484,8 +501,8 @@ namespace UnitTests.General
 
         private async Task ContextTester(int i)
         {
-            CallContext.LogicalSetData("threadId", i);
-            int contextId = (int)(CallContext.LogicalGetData("threadId") ?? -1);
+            threadId.Value = i;
+            int contextId = threadId.Value;
             output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
             await FrameworkContextVerification(i).ConfigureAwait(false);
         }
@@ -495,7 +512,7 @@ namespace UnitTests.General
             for (int i = 0; i < 10; i++)
             {
                 await Task.Delay(10);
-                int contextId = (int)(CallContext.LogicalGetData("threadId") ?? -1);
+                int contextId = threadId.Value;
                 output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
                 Assert.Equal(id, contextId);
             }

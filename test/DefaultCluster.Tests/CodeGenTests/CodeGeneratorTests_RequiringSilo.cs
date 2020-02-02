@@ -1,4 +1,4 @@
-﻿
+
 using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
@@ -19,7 +19,7 @@ namespace DefaultCluster.Tests.CodeGeneration
             this.output = output;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("UniqueKey")]
+        [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("UniqueKey")]
         public void CodeGen_GrainId_TypeCode()
         {
             var g1Key = GetRandomGrainId();
@@ -32,7 +32,7 @@ namespace DefaultCluster.Tests.CodeGeneration
             Assert.Equal(1146670029, k1.BaseTypeCode);  // "Encoded type code data should match"
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("UniqueKey"), TestCategory("ActivationCollector")]
+        [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("UniqueKey"), TestCategory("ActivationCollector")]
         public void CollectionTest_GrainId_TypeCode()
         {
             var g1Key = GetRandomGrainId();

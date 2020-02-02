@@ -19,7 +19,7 @@ namespace Orleans.Serialization
     {
         /// <summary> Read an <c>GrainId</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal static GrainId ReadGrainId(this IBinaryTokenStreamReader @this)
+        internal static GrainId ReadGrainId<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
             UniqueKey key = @this.ReadUniqueKey();
             return GrainId.GetGrainId(key);
@@ -27,13 +27,13 @@ namespace Orleans.Serialization
 
         /// <summary> Read an <c>ActivationId</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal static ActivationId ReadActivationId(this IBinaryTokenStreamReader @this)
+        internal static ActivationId ReadActivationId<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
             UniqueKey key = @this.ReadUniqueKey();
             return ActivationId.GetActivationId(key);
         }
 
-        internal static UniqueKey ReadUniqueKey(this IBinaryTokenStreamReader @this)
+        internal static UniqueKey ReadUniqueKey<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
             ulong n0 = @this.ReadULong();
             ulong n1 = @this.ReadULong();
@@ -42,12 +42,12 @@ namespace Orleans.Serialization
             return UniqueKey.NewKey(n0, n1, typeCodeData, keyExt);
         }
 
-        internal static CorrelationId ReadCorrelationId(this IBinaryTokenStreamReader @this)
+        internal static CorrelationId ReadCorrelationId<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
-            return new CorrelationId(@this.ReadBytes(CorrelationId.SIZE_BYTES));
+            return new CorrelationId(@this.ReadLong());
         }
 
-        internal static GrainDirectoryEntryStatus ReadMultiClusterStatus(this IBinaryTokenStreamReader @this)
+        internal static GrainDirectoryEntryStatus ReadMultiClusterStatus<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
             byte val = @this.ReadByte();
             return (GrainDirectoryEntryStatus)val;
@@ -55,7 +55,7 @@ namespace Orleans.Serialization
 
         /// <summary> Read an <c>ActivationAddress</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal static ActivationAddress ReadActivationAddress(this IBinaryTokenStreamReader @this)
+        internal static ActivationAddress ReadActivationAddress<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
             var silo = @this.ReadSiloAddress();
             var grain = @this.ReadGrainId();
@@ -74,24 +74,21 @@ namespace Orleans.Serialization
         /// Peek at the next token in this input stream.
         /// </summary>
         /// <returns>Next token that will be read from the stream.</returns>
-        internal static SerializationTokenType PeekToken(this IBinaryTokenStreamReader @this)
+        internal static SerializationTokenType PeekToken<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
-            // TODO try to avoid that
-            return ((BinaryTokenStreamReader) @this).PeekToken();
+            return (SerializationTokenType)@this.PeekByte();
         }
 
         /// <summary> Read a <c>SerializationTokenType</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal static SerializationTokenType ReadToken(this IBinaryTokenStreamReader @this)
+        internal static SerializationTokenType ReadToken<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
-            // TODO try to avoid that
-            return ((BinaryTokenStreamReader) @this).ReadToken();
+            return (SerializationTokenType)@this.ReadByte();
         }
 
-        internal static bool TryReadSimpleType(this IBinaryTokenStreamReader @this, out object result, out SerializationTokenType token)
+        internal static bool TryReadSimpleType<TReader>(this TReader @this, out object result, out SerializationTokenType token) where TReader : IBinaryTokenStreamReader
         {
             token = @this.ReadToken();
-            byte[] bytes;
             switch (token)
             {
                 case SerializationTokenType.True:
@@ -146,8 +143,16 @@ namespace Orleans.Serialization
                     result = @this.ReadChar();
                     break;
                 case SerializationTokenType.Guid:
-                    bytes = @this.ReadBytes(16);
-                    result = new Guid(bytes);
+                    if (@this is BinaryTokenStreamReader2 reader)
+                    {
+                        result = reader.ReadGuid();
+                    }
+                    else
+                    {
+                        var bytes = @this.ReadBytes(16);
+                        result = new Guid(bytes);
+                    }
+
                     break;
                 case SerializationTokenType.Date:
                     result = DateTime.FromBinary(@this.ReadLong());
@@ -174,7 +179,7 @@ namespace Orleans.Serialization
                     result = @this.ReadIPEndPoint();
                     break;
                 case SerializationTokenType.CorrelationId:
-                    result = new CorrelationId(@this.ReadBytes(CorrelationId.SIZE_BYTES));
+                    result = new CorrelationId(@this.ReadLong());
                     break;
                 default:
                     result = null;
@@ -269,7 +274,7 @@ namespace Orleans.Serialization
         }
 
         /// <summary> Read a <c>Type</c> value from the stream. </summary>
-        internal static Type ReadSpecifiedTypeHeader(this IBinaryTokenStreamReader @this, SerializationManager serializationManager)
+        internal static Type ReadSpecifiedTypeHeader<TReader>(this TReader @this, SerializationManager serializationManager) where TReader : IBinaryTokenStreamReader
         {
             // Assumes that the SpecifiedType token has already been read
 
@@ -418,7 +423,8 @@ namespace Orleans.Serialization
                     var typeName = @this.ReadString();
                     try
                     {
-                        return serializationManager.ResolveTypeName(typeName);
+                        var type = serializationManager.ResolveTypeName(typeName);
+                        return type;
                     }
                     catch (TypeAccessException ex)
                     {
@@ -435,7 +441,7 @@ namespace Orleans.Serialization
         /// <param name="serializationManager">The serialization manager used to resolve type names.</param>
         /// <param name="expected">Expected Type, if known.</param>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        private static Type ReadFullTypeHeader(this IBinaryTokenStreamReader @this, SerializationManager serializationManager, Type expected = null)
+        private static Type ReadFullTypeHeader<TReader>(this TReader @this, SerializationManager serializationManager, Type expected = null) where TReader: IBinaryTokenStreamReader
         {
             var token = @this.ReadToken();
 
@@ -553,7 +559,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Gets the total length.
         /// </summary>
-        public int Length => this.totalLength;
+        public long Length => this.totalLength;
 
         /// <summary>
         /// Creates a copy of the current stream reader.
@@ -664,7 +670,7 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public bool ReadBoolean()
         {
-            return ReadToken() == SerializationTokenType.True;
+            return this.ReadToken() == SerializationTokenType.True;
         }
 
         /// <summary> Read an <c>Int32</c> value from the stream. </summary>
@@ -867,6 +873,14 @@ namespace Orleans.Serialization
             return buff[offset];
         }
 
+        public byte PeekByte()
+        {
+            if (currentOffset == currentSegment.Count + currentSegment.Offset)
+                StartNextSegment();
+
+            return currentBuffer[currentOffset];
+        }
+
         /// <summary> Read an <c>sbyte</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public sbyte ReadSByte()
@@ -969,27 +983,6 @@ namespace Orleans.Serialization
             trace.Write(format, args);
             trace.WriteLine(" at offset {0}", CurrentPosition);
             trace.Flush();
-        }
-
-        /// <summary>
-        /// Peek at the next token in this input stream.
-        /// </summary>
-        /// <returns>Next token that will be read from the stream.</returns>
-        internal SerializationTokenType PeekToken()
-        {
-            if (currentOffset == currentSegment.Count + currentSegment.Offset)
-                StartNextSegment();
-
-            return (SerializationTokenType)currentBuffer[currentOffset];
-        }
-
-        /// <summary> Read a <c>SerializationTokenType</c> value from the stream. </summary>
-        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal SerializationTokenType ReadToken()
-        {
-            int offset;
-            var buff = CheckLength(1, out offset);
-            return (SerializationTokenType)buff[offset];
         }
     }
 }

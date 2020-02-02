@@ -5,6 +5,7 @@ using Orleans.Runtime.Scheduler;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
+using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
@@ -14,6 +15,15 @@ namespace Orleans.Runtime
         {
             //resolve handler from DI to initialize it
             var ignore = services.GetService<SiloUnobservedExceptionsHandler>();
+        }
+
+        /// <summary>
+        /// Configure silo with unobserved exception handler
+        /// </summary>
+        public static ISiloBuilder UseSiloUnobservedExceptionsHandler(this ISiloBuilder siloBuilder)
+        {
+            siloBuilder.ConfigureServices(services => services.TryAddSingleton<SiloUnobservedExceptionsHandler>());
+            return siloBuilder;
         }
 
         /// <summary>
@@ -29,7 +39,7 @@ namespace Orleans.Runtime
     internal class SiloUnobservedExceptionsHandler : IDisposable
     {
         private readonly ILogger logger;
-        
+
         public SiloUnobservedExceptionsHandler(ILogger<SiloUnobservedExceptionsHandler> logger)
         {
             this.logger = logger;

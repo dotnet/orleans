@@ -56,11 +56,11 @@ VALUES
 	SELECT @DeploymentId
 	WHERE NOT EXISTS
 	(
-	SELECT 1
-	FROM
-		OrleansMembershipVersionTable
-	WHERE
-		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
+		SELECT 1
+		FROM
+			OrleansMembershipVersionTable WITH(HOLDLOCK, XLOCK, ROWLOCK)
+		WHERE
+			DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
 	);
 
 	SELECT @@ROWCOUNT;
@@ -99,14 +99,14 @@ VALUES
 		@IAmAliveTime
 	WHERE NOT EXISTS
 	(
-	SELECT 1
-	FROM
-		OrleansMembershipTable
-	WHERE
-		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-		AND Address = @Address AND @Address IS NOT NULL
-		AND Port = @Port AND @Port IS NOT NULL
-		AND Generation = @Generation AND @Generation IS NOT NULL
+		SELECT 1
+		FROM
+			OrleansMembershipTable WITH(HOLDLOCK, XLOCK, ROWLOCK)
+		WHERE
+			DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
+			AND Address = @Address AND @Address IS NOT NULL
+			AND Port = @Port AND @Port IS NOT NULL
+			AND Generation = @Generation AND @Generation IS NOT NULL
 	);
 
 	UPDATE OrleansMembershipVersionTable

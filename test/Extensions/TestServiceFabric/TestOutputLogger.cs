@@ -1,7 +1,6 @@
 using System;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions.Internal;
 namespace TestServiceFabric
 {
     public class TestOutputLogger<TCategoryName> : TestOutputLogger, ILogger<TCategoryName>
@@ -42,6 +41,18 @@ namespace TestServiceFabric
             this.Output.WriteLine($"{logLevel} {eventId} [{this.Name}] {formatter(state, exception)}");
         }
 
+        private class NullScope : IDisposable
+        {
+            public static NullScope Instance { get; } = new NullScope();
+
+            private NullScope()
+            {
+            }
+
+            public void Dispose()
+            {
+            }
+        }
     }
 
     public class TestOutputLoggerProvider : ILoggerProvider

@@ -1,6 +1,6 @@
+#if !NETCOREAPP
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.LogConsistency;
 using Orleans.TestingHost;
 using System;
@@ -9,9 +9,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
-using TestExtensions;
 using Orleans.EventSourcing.Common;
+using Orleans.Internal;
 using Tester;
+using Orleans.Hosting;
 
 namespace Tests.GeoClusterTests
 {
@@ -36,11 +37,11 @@ namespace Tests.GeoClusterTests
 
         public class ClientWrapper : Tests.GeoClusterTests.TestingClusterHost.ClientWrapperBase
         {
-            public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
-                (name, gwPort, clusterId, configUpdater, clientConfigurator) => new ClientWrapper(name, gwPort, clusterId, configUpdater, clientConfigurator);
+            public static readonly Func<string, int, string, Action<IClientBuilder>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, clientConfigurator) => new ClientWrapper(name, gwPort, clusterId, clientConfigurator);
 
-            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer, Action<IClientBuilder> clientConfigurator)
-               : base(name, gatewayport, clusterId, customizer, clientConfigurator)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<IClientBuilder> clientConfigurator)
+               : base(name, gatewayport, clusterId, clientConfigurator)
             {
                 systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
@@ -167,8 +168,7 @@ namespace Tests.GeoClusterTests
                 for (int i = 0; i < numclusters; i++)
                 {
                     var clustername = Cluster[i] = ((char)('A' + i)).ToString();
-                    MultiCluster.NewGeoCluster(globalserviceid, clustername, 1,
-                        cfg => LogConsistencyProviderConfiguration.ConfigureLogConsistencyProvidersForTesting(TestDefaultConfiguration.DataConnectionString, cfg));
+                    MultiCluster.NewGeoCluster<LogConsistencyProviderSiloConfigurator>(globalserviceid, clustername, 1);
                     Client[i] = this.MultiCluster.NewClient(clustername, 0, ClientWrapper.Factory);
                 }
 
@@ -510,4 +510,16 @@ namespace Tests.GeoClusterTests
             await Task.WhenAll(tasks);
         }
     }
+
+    internal class LogConsistencyProviderSiloConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder hostBuilder)
+        {
+            hostBuilder.AddCustomStorageBasedLogConsistencyProvider("StateStorage");
+            hostBuilder.AddCustomStorageBasedLogConsistencyProvider("LogStorage");
+            hostBuilder.AddCustomStorageBasedLogConsistencyProvider("CustomStorage");
+            hostBuilder.AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
+        }
+    }
 }
+#endif

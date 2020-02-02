@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Runtime.GrainDirectory;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -11,15 +14,19 @@ namespace UnitTests.Grains
     public class TestGrain : Grain, ITestGrain
     {
         private string label;
-        private Logger logger;
+        private ILogger logger;
         private IDisposable timer;
+
+        public TestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
             if (this.GetPrimaryKeyLong() == -2)
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
-            logger = this.GetLogger("TestGrain " + Data.Address);
             label = this.GetPrimaryKeyLong().ToString();
             logger.Info("OnActivateAsync");
 
@@ -130,7 +137,12 @@ namespace UnitTests.Grains
     internal class GuidTestGrain : Grain, IGuidTestGrain
     {
         private string label;
-        private Logger logger;
+        private ILogger logger;
+
+        public GuidTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
@@ -138,7 +150,6 @@ namespace UnitTests.Grains
             //    throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             label = this.GetPrimaryKey().ToString();
-            logger = this.GetLogger("GuidTestGrain " + Data.Address);
             logger.Info("OnActivateAsync");
 
             return Task.CompletedTask;
@@ -171,9 +182,20 @@ namespace UnitTests.Grains
         }
     }
 
-    public class OneWayGrain : Grain, IOneWayGrain
+    internal class OneWayGrain : Grain, IOneWayGrain, ISimpleGrainObserver
     {
         private int count;
+        private TaskCompletionSource<int> tcs = new TaskCompletionSource<int>();
+        private IOneWayGrain other;
+        private Catalog catalog;
+
+        public OneWayGrain(Catalog catalog)
+        {
+            this.catalog = catalog;
+        }
+
+        private ILocalGrainDirectory LocalGrainDirectory => this.ServiceProvider.GetRequiredService<ILocalGrainDirectory>();
+        private ILocalSiloDetails LocalSiloDetails => this.ServiceProvider.GetRequiredService<ILocalSiloDetails>();
 
         public Task Notify()
         {
@@ -196,11 +218,69 @@ namespace UnitTests.Grains
             return completedSynchronously;
         }
 
+        public async Task<IOneWayGrain> GetOtherGrain()
+        {
+            return this.other ?? (this.other = await GetGrainOnOtherSilo());
+
+            async Task<IOneWayGrain> GetGrainOnOtherSilo()
+            {
+                while (true)
+                {
+                    var candidate = this.GrainFactory.GetGrain<IOneWayGrain>(Guid.NewGuid());
+                    var directorySilo = await candidate.GetPrimaryForGrain();
+                    var thisSilo = await this.GetSiloAddress();
+                    var candidateSilo = await candidate.GetSiloAddress();
+                    if (!directorySilo.Equals(candidateSilo)
+                        && !directorySilo.Equals(thisSilo)
+                        && !candidateSilo.Equals(thisSilo))
+                    {
+                        return candidate;
+                    }
+                }
+            }
+        }
+
+        public Task<string> GetActivationAddress(IGrain grain)
+        {
+            var grainId = ((GrainReference)grain).GrainId;
+            if (this.catalog.FastLookup(grainId, out var addresses))
+            {
+                return Task.FromResult(addresses.Addresses.Single().ToString());
+            }
+
+            return Task.FromResult<string>(null);
+        }
+
+        public Task NotifyOtherGrain() => this.other.Notify(this.AsReference<ISimpleGrainObserver>());
+
         public Task<int> GetCount() => Task.FromResult(this.count);
+
+        public Task Deactivate()
+        {
+            this.DeactivateOnIdle();
+            return Task.CompletedTask;
+        }
 
         public Task ThrowsOneWay()
         {
             throw new Exception("GET OUT!");
+        }
+
+        public Task<SiloAddress> GetSiloAddress()
+        {
+            return Task.FromResult(this.LocalSiloDetails.SiloAddress);
+        }
+
+        public Task<SiloAddress> GetPrimaryForGrain()
+        {
+            var grainId = (GrainId)this.Identity;
+            var primaryForGrain = this.LocalGrainDirectory.GetPrimaryForGrain(grainId);
+            return Task.FromResult(primaryForGrain);
+        }
+
+        public void StateChanged(int a, int b)
+        {
+            this.tcs.TrySetResult(0);
         }
     }
 

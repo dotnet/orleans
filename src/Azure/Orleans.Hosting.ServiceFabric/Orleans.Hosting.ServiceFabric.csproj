@@ -4,10 +4,10 @@
     <Title>Microsoft Orleans Service Fabric Hosting Support</Title>
     <Description>Support for hosting Microsoft Orleans on Service Fabric.</Description>
     <PackageTags>$(PackageTags) Azure ServiceFabric</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyName>Orleans.Hosting.ServiceFabric</AssemblyName>
     <RootNamespace>Orleans.Hosting.ServiceFabric</RootNamespace>
     <PlatformTarget>x64</PlatformTarget>
@@ -17,5 +17,4 @@
     <PackageReference Include="Microsoft.ServiceFabric.Services" Version="$(MicrosoftServiceFabricServicesVersion)" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsOptionsVersion)" />
   </ItemGroup>
-
 </Project>

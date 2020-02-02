@@ -26,19 +26,15 @@ namespace GoogleUtils.Tests.Streaming
             {
                 throw new SkipException("Google PubSub Simulator not available");
             }
-            
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.ClusterId = GoogleTestUtils.ProjectId;
-                legacy.ClientConfiguration.ClusterId = GoogleTestUtils.ProjectId;
-            });
+
+            builder.Options.ClusterId = GoogleTestUtils.ProjectId;
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
 
-        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        private class MySiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .AddMemoryGrainStorage("PubSubStore")

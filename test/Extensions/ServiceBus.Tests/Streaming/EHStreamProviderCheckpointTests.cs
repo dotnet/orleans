@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
@@ -38,32 +36,35 @@ namespace ServiceBus.Tests.StreamingTests
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
 
-        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        private class MySiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .AddAzureBlobGrainStorage(
-                    ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
-                    (AzureBlobStorageOptions options) =>
+                        ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
+                        (AzureBlobStorageOptions options) =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        })
+                    .AddEventHubStreams(StreamProviderName, b=>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    })
-                    .AddEventHubStreams(StreamProviderName, b=>b
-                    .ConfigureEventHub(ob=>ob.Configure(
-                    options =>
-                    {
-                        options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                        options.ConsumerGroup = EHConsumerGroup;
-                        options.Path = EHPath;
-                     
-                    }))
-                    .UseEventHubCheckpointer(ob=>ob.Configure(options => {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        options.PersistInterval = TimeSpan.FromSeconds(1);
-                    }))
-                    .UseDynamicClusterConfigDeploymentBalancer()
-                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                        b.UseDynamicClusterConfigDeploymentBalancer();
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                        b.ConfigureEventHub(ob => ob.Configure(
+                            options =>
+                            {
+                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConsumerGroup = EHConsumerGroup;
+                                options.Path = EHPath;
+
+                            }));
+                        b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.PersistInterval = TimeSpan.FromSeconds(1);
+                        }));
+                    });
             }
         }
 
@@ -72,15 +73,16 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddEventHubStreams(StreamProviderName, b=>b
-                    .ConfigureEventHub(ob => ob.Configure(
-                    options =>
+                    .AddEventHubStreams(StreamProviderName, b=>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                        options.ConsumerGroup = EHConsumerGroup;
-                        options.Path = EHPath;
-                    }))
-                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                        b.ConfigureEventHub(ob => ob.Configure(options =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConsumerGroup = EHConsumerGroup;
+                            options.Path = EHPath;
+                        }));
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    });
             }
         }
 

@@ -63,7 +63,7 @@ namespace Orleans.Providers.Streams.Common
         public void TrackMessagesReceived(long count, DateTime? oldestMessageEnqueueTimeUtc, DateTime? newestMessageEnqueueTimeUtc)
         {
             var now = DateTime.UtcNow;
-            this.TelemetryProducer.TrackMetric("MessagesRecieved", count, this.LogProperties);
+            this.TelemetryProducer.TrackMetric("MessagesReceived", count, this.LogProperties);
             if (oldestMessageEnqueueTimeUtc.HasValue)
                 this.TelemetryProducer.TrackMetric("OldestMessageReadEnqueueTimeToNow", now - oldestMessageEnqueueTimeUtc.Value, this.LogProperties);
             if (newestMessageEnqueueTimeUtc.HasValue)

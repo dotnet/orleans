@@ -7,7 +7,7 @@ set CMDHOME=%CMDHOME:~0,-1%
 
 @REM Due to more of Windows .cmd script parameter passing quirks, we can't pass this value as cmdline argument, 
 @REM  so we need to pass it in through the back door as environment variable, scoped by setlocal
-set TEST_FILTERS=-trait Category=BVT -trait Category=SlowBVT -trait Category=Functional
+set TEST_FILTERS=Category=BVT^|Category=SlowBVT^|Category=Functional
 
 @REM Note: We transfer _complete_ control to the Test.cmd script here because we don't use CALL.
 

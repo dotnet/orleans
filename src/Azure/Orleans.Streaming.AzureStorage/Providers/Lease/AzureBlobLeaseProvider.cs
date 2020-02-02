@@ -1,33 +1,35 @@
-﻿using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Azure.Storage;
+using Microsoft.Azure.Storage.Blob;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.LeaseProviders
 {
-    public class AzureBlobLeaseProviderConfig
-    {
-        public string DataConnectionString { get; set; }
-        public string BlobContainerName { get; set; }
-    }
     public class AzureBlobLeaseProvider : ILeaseProvider
     {
         private CloudBlobContainer container;
-        private AzureBlobLeaseProviderConfig providerConfig;
+        private AzureBlobLeaseProviderOptions options;
         private CloudBlobClient blobClient;
-        public AzureBlobLeaseProvider(AzureBlobLeaseProviderConfig config)
+        public AzureBlobLeaseProvider(IOptions<AzureBlobLeaseProviderOptions> options)
+            : this(options.Value)
         {
-            var account = CloudStorageAccount.Parse(config.DataConnectionString);
+        }
+
+        private AzureBlobLeaseProvider(AzureBlobLeaseProviderOptions options)
+        {
+            var account = CloudStorageAccount.Parse(options.DataConnectionString);
             this.blobClient = account.CreateCloudBlobClient();
-            this.providerConfig = config;
+            this.options = options;
         }
 
         private async Task InitContainerIfNotExistsAsync()
         {
             if (this.container == null)
             {
-                var tmpContainer = blobClient.GetContainerReference(this.providerConfig.BlobContainerName);
+                var tmpContainer = blobClient.GetContainerReference(this.options.BlobContainerName);
                 await tmpContainer.CreateIfNotExistsAsync().ConfigureAwait(false);
                 this.container = tmpContainer;
             }
@@ -69,7 +71,7 @@ namespace Orleans.LeaseProviders
                 switch (e.RequestInformation.HttpStatusCode)
                 {
                     case 404:
-                    case 409: 
+                    case 409:
                     case 412: statusCode = ResponseCode.LeaseNotAvailable; break;
                     default: statusCode = ResponseCode.TransientFailure; break;
                 }
@@ -130,6 +132,12 @@ namespace Orleans.LeaseProviders
                 }
                 return new AcquireLeaseResult(new AcquiredLease(acquiredLease.ResourceKey), statusCode, e);
             }
+        }
+
+        public static ILeaseProvider Create(IServiceProvider services, string name)
+        {
+            AzureBlobLeaseProviderOptions options = services.GetOptionsByName<AzureBlobLeaseProviderOptions>(name);
+            return new AzureBlobLeaseProvider(options);
         }
     }
 }

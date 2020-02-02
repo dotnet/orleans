@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using Orleans;
@@ -195,13 +196,17 @@ namespace UnitTests.Grains
     [PreferLocalPlacement]
     public class LocalContentGrain : Grain, ILocalContentGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private object cachedContent;
         internal static ILocalContentGrain InstanceIdForThisSilo;
-        
+
+        public LocalContentGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            this.logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             DelayDeactivation(TimeSpan.MaxValue);   // make sure this activation is not collected.
             cachedContent = RuntimeIdentity;        // store your silo identity as a local cached content in this grain.
@@ -223,11 +228,15 @@ namespace UnitTests.Grains
 
     public class TestContentGrain : Grain, ITestContentGrain
     {
-        private Logger logger;
+        private ILogger logger;
+
+        public TestContentGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            this.logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             return base.OnActivateAsync();
         }

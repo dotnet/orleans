@@ -12,7 +12,7 @@ namespace UnitTDefaultCluster.Tests.General
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("RequestContext"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("RequestContext")]
         public async Task RequestContextCallerToCalleeFlow()
         {
             var grain = this.GrainFactory.GetGrain<ISimplePersistentGrain>(random.Next());

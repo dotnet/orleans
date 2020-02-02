@@ -46,21 +46,29 @@ namespace Orleans.CodeGenerator.Generators
     ///    }
     ///}
     /// </summary>
-    internal static class SerializerGenerator
+    internal class SerializerGenerator
     {
         /// <summary>
         /// The suffix appended to the name of generated classes.
         /// </summary>
         private const string ClassSuffix = "Serializer";
+        private readonly CodeGeneratorOptions options;
+        private readonly WellKnownTypes wellKnownTypes;
 
-        private static readonly ConcurrentDictionary<ITypeSymbol, bool> ShallowCopyableTypes = new ConcurrentDictionary<ITypeSymbol, bool>();
+        public SerializerGenerator(CodeGeneratorOptions options, WellKnownTypes wellKnownTypes)
+        {
+            this.options = options;
+            this.wellKnownTypes = wellKnownTypes;
+        }
+
+        private readonly ConcurrentDictionary<ITypeSymbol, bool> ShallowCopyableTypes = new ConcurrentDictionary<ITypeSymbol, bool>();
 
         /// <summary>
         /// Returns the name of the generated class for the provided type.
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>The name of the generated class for the provided type.</returns>
-        internal static string GetGeneratedClassName(INamedTypeSymbol type)
+        internal string GetGeneratedClassName(INamedTypeSymbol type)
         {
             var parts = type.ToDisplayParts(SymbolDisplayFormat.FullyQualifiedFormat
                 .WithGlobalNamespaceStyle(SymbolDisplayGlobalNamespaceStyle.Omitted)
@@ -95,9 +103,9 @@ namespace Orleans.CodeGenerator.Generators
         }
 
         /// <summary>
-        /// Generates the non static serializer class for the provided grain types.
+        /// Generates the non serializer class for the provided grain types.
         /// </summary>
-        internal static (TypeDeclarationSyntax, TypeSyntax) GenerateClass(WellKnownTypes wellKnownTypes, SemanticModel model, SerializerTypeDescription description, ILogger logger)
+        internal (TypeDeclarationSyntax, TypeSyntax) GenerateClass(SemanticModel model, SerializerTypeDescription description, ILogger logger)
         {
             var className = GetGeneratedClassName(description.Target);
             var type = description.Target;
@@ -112,14 +120,14 @@ namespace Orleans.CodeGenerator.Generators
                         AttributeArgument(TypeOfExpression(type.WithoutTypeParameters().ToTypeSyntax())))
             };
 
-            var fields = GetFields(wellKnownTypes, model, type, logger);
+            var fields = GetFields(model, type, logger);
             
-            var members = new List<MemberDeclarationSyntax>(GenerateFields(wellKnownTypes, fields))
+            var members = new List<MemberDeclarationSyntax>(GenerateFields(fields))
             {
-                GenerateConstructor(wellKnownTypes, className, fields),
-                GenerateDeepCopierMethod(wellKnownTypes, type, fields, model),
-                GenerateSerializerMethod(wellKnownTypes, type, fields, model),
-                GenerateDeserializerMethod(wellKnownTypes, type, fields, model),
+                GenerateConstructor(className, fields),
+                GenerateDeepCopierMethod(type, fields, model),
+                GenerateSerializerMethod(type, fields, model),
+                GenerateDeserializerMethod(type, fields, model),
             };
 
             var classDeclaration =
@@ -129,15 +137,22 @@ namespace Orleans.CodeGenerator.Generators
                     .AddAttributeLists(AttributeList().AddAttributes(attributes.ToArray()))
                     .AddMembers(members.ToArray())
                     .AddConstraintClauses(type.GetTypeConstraintSyntax());
+
             if (genericTypes.Length > 0)
             {
                 classDeclaration = classDeclaration.AddTypeParameterListParameters(genericTypes);
             }
-            
+
+            if (this.options.DebuggerStepThrough)
+            {
+                var debuggerStepThroughAttribute = Attribute(this.wellKnownTypes.DebuggerStepThroughAttribute.ToNameSyntax());
+                classDeclaration = classDeclaration.AddAttributeLists(AttributeList().AddAttributes(debuggerStepThroughAttribute));
+            }
+
             return (classDeclaration, ParseTypeName(type.GetParsableReplacementName(className)));
         }
 
-        private static MemberDeclarationSyntax GenerateConstructor(WellKnownTypes wellKnownTypes, string className, List<FieldInfoMember> fields)
+        private MemberDeclarationSyntax GenerateConstructor(string className, List<FieldInfoMember> fields)
         {
             var body = new List<StatementSyntax>();
 
@@ -222,7 +237,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns syntax for the deserializer method.
         /// </summary>
-        private static MemberDeclarationSyntax GenerateDeserializerMethod(WellKnownTypes wellKnownTypes, INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
+        private MemberDeclarationSyntax GenerateDeserializerMethod(INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
         {
             var contextParameter = IdentifierName("context");
 
@@ -231,7 +246,7 @@ namespace Orleans.CodeGenerator.Generators
                     VariableDeclaration(type.ToTypeSyntax())
                         .AddVariables(
                             VariableDeclarator("result")
-                                .WithInitializer(EqualsValueClause(GetObjectCreationExpressionSyntax(wellKnownTypes, type, model)))));
+                                .WithInitializer(EqualsValueClause(GetObjectCreationExpressionSyntax(type, model)))));
             var resultVariable = IdentifierName("result");
 
             var body = new List<StatementSyntax> {resultDeclaration};
@@ -284,7 +299,7 @@ namespace Orleans.CodeGenerator.Generators
                             .AddAttributes(Attribute(wellKnownTypes.DeserializerMethodAttribute.ToNameSyntax())));
         }
 
-        private static MemberDeclarationSyntax GenerateSerializerMethod(WellKnownTypes wellKnownTypes, INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
+        private MemberDeclarationSyntax GenerateSerializerMethod(INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
         {
             var contextParameter = IdentifierName("context");
 
@@ -328,7 +343,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns syntax for the deep copy method.
         /// </summary>
-        private static MemberDeclarationSyntax GenerateDeepCopierMethod(WellKnownTypes wellKnownTypes, INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
+        private MemberDeclarationSyntax GenerateDeepCopierMethod(INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
         {
             var originalVariable = IdentifierName("original");
             var inputVariable = IdentifierName("input");
@@ -358,7 +373,7 @@ namespace Orleans.CodeGenerator.Generators
                         VariableDeclaration(type.ToTypeSyntax())
                             .AddVariables(
                                 VariableDeclarator("result")
-                                    .WithInitializer(EqualsValueClause(GetObjectCreationExpressionSyntax(wellKnownTypes, type, model))))));
+                                    .WithInitializer(EqualsValueClause(GetObjectCreationExpressionSyntax(type, model))))));
 
                 // Record this serialization.
                 var context = IdentifierName("context");
@@ -388,9 +403,9 @@ namespace Orleans.CodeGenerator.Generators
         }
 
         /// <summary>
-        /// Returns syntax for the static fields of the serializer class.
+        /// Returns syntax for the fields of the serializer class.
         /// </summary>
-        private static MemberDeclarationSyntax[] GenerateFields(WellKnownTypes wellKnownTypes, List<FieldInfoMember> fields)
+        private MemberDeclarationSyntax[] GenerateFields(List<FieldInfoMember> fields)
         {
             var result = new List<MemberDeclarationSyntax>();
 
@@ -444,7 +459,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns syntax for initializing a new instance of the provided type.
         /// </summary>
-        private static ExpressionSyntax GetObjectCreationExpressionSyntax(WellKnownTypes wellKnownTypes, INamedTypeSymbol type, SemanticModel model)
+        private ExpressionSyntax GetObjectCreationExpressionSyntax(INamedTypeSymbol type, SemanticModel model)
         {
             ExpressionSyntax result;
 
@@ -474,67 +489,101 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Return the default constructor on <paramref name="type"/> if found or null if not found.
         /// </summary>
-        private static IMethodSymbol GetEmptyConstructor(INamedTypeSymbol type, SemanticModel model)
+        private IMethodSymbol GetEmptyConstructor(INamedTypeSymbol type, SemanticModel model)
         {
-            return type.GetMembers()
-                .OfType<IMethodSymbol>()
+            return type.GetDeclaredInstanceMembers<IMethodSymbol>()
                 .FirstOrDefault(method => method.MethodKind == MethodKind.Constructor && method.Parameters.Length == 0 && model.IsAccessible(0, method));
         }
 
         /// <summary>
         /// Returns a sorted list of the fields of the provided type.
         /// </summary>
-        private static List<FieldInfoMember> GetFields(WellKnownTypes wellKnownTypes, SemanticModel model, INamedTypeSymbol type, ILogger logger)
+        private List<FieldInfoMember> GetFields(SemanticModel model, INamedTypeSymbol type, ILogger logger)
         {
             var result = new List<FieldInfoMember>();
-            foreach (var field in type.GetDeclaredMembers<IFieldSymbol>())
+            foreach (var field in type.GetDeclaredInstanceMembers<IFieldSymbol>())
             {
-                if (ShouldSerializeField(wellKnownTypes, field))
+                if (ShouldSerializeField(field))
                 {
-                    result.Add(new FieldInfoMember(wellKnownTypes, model, type, field, result.Count));
+                    result.Add(new FieldInfoMember(this, model, type, field, result.Count));
                 }
             }
 
-            // Some reference assemblies are compiled without private fields.
-            // Warn the user if they are inheriting from a type in one of these assemblies using a heuristic:
-            // If the type inherits from a type in a reference assembly and there are no fields declared on those
-            // base types, emit a warning.
-            var hasReferenceAssemblyBase = false;
-            var referenceAssemblyHasFields = false;
-            var baseType = type.BaseType;
-            while (baseType != null &&
-                   !baseType.Equals(wellKnownTypes.Object) &&
-                   !baseType.Equals(wellKnownTypes.Attribute))
+            if (type.TypeKind == TypeKind.Class)
             {
-                if (!hasReferenceAssemblyBase && baseType.ContainingAssembly.HasAttribute("ReferenceAssemblyAttribute")) hasReferenceAssemblyBase = true;
-                foreach (var field in baseType.GetDeclaredMembers<IFieldSymbol>())
+                // Some reference assemblies are compiled without private fields.
+                // Warn the user if they are inheriting from a type in one of these assemblies using a heuristic:
+                // If the type inherits from a type in a reference assembly and there are no fields declared on those
+                // base types, emit a warning.
+                var hasUnsupportedRefAsmBase = false;
+                var referenceAssemblyHasFields = false;
+                var baseType = type.BaseType;
+                while (baseType != null &&
+                       !SymbolEqualityComparer.Default.Equals(baseType, wellKnownTypes.Object) &&
+                       !SymbolEqualityComparer.Default.Equals(baseType, wellKnownTypes.Attribute))
                 {
-                    if (hasReferenceAssemblyBase) referenceAssemblyHasFields = true;
-                    if (ShouldSerializeField(wellKnownTypes, field))
+                    if (!hasUnsupportedRefAsmBase
+                        && baseType.ContainingAssembly.HasAttribute("ReferenceAssemblyAttribute")
+                        && !IsSupportedRefAsmType(baseType))
                     {
-                        result.Add(new FieldInfoMember(wellKnownTypes, model, type, field, result.Count));
+                        hasUnsupportedRefAsmBase = true;
                     }
+                    foreach (var field in baseType.GetDeclaredInstanceMembers<IFieldSymbol>())
+                    {
+                        if (hasUnsupportedRefAsmBase) referenceAssemblyHasFields = true;
+                        if (ShouldSerializeField(field))
+                        {
+                            result.Add(new FieldInfoMember(this, model, type, field, result.Count));
+                        }
+                    }
+
+                    baseType = baseType.BaseType;
                 }
 
-                baseType = baseType.BaseType;
-            }
-
-            if (type.TypeKind == TypeKind.Class && hasReferenceAssemblyBase && !referenceAssemblyHasFields)
-            {
-                var fileLocation = string.Empty;
-                var declaration = type.DeclaringSyntaxReferences.FirstOrDefault();
-                if (declaration != null)
+                if (hasUnsupportedRefAsmBase && !referenceAssemblyHasFields)
                 {
-                    var location = declaration.SyntaxTree.GetLocation(declaration.Span);
-                    if (location.IsInSource)
+                    var fileLocation = string.Empty;
+                    var declaration = type.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as ClassDeclarationSyntax;
+                    if (declaration != null)
                     {
-                        var pos = location.GetMappedLineSpan();
-                        fileLocation = $"{pos.Path}({pos.Span.Start.Line},{pos.Span.Start.Character}): ";
+                        var location = declaration.Identifier.GetLocation();
+                        if (location.IsInSource)
+                        {
+                            var pos = location.GetLineSpan();
+                            fileLocation = string.Format(
+                                "{0}({1},{2},{3},{4}): ",
+                                pos.Path,
+                                pos.StartLinePosition.Line + 1,
+                                pos.StartLinePosition.Character + 1,
+                                pos.EndLinePosition.Line + 1,
+                                pos.EndLinePosition.Character + 1);
+                        }
                     }
+
+                    logger.LogWarning(
+                        $"{fileLocation}warning ORL1001: Type {type} has a base type which belongs to a reference assembly."
+                        + " Serializer generation for this type may not include important base type fields.");
                 }
 
-                logger.LogWarning(
-                    $"{fileLocation}Warning: Type {type} has a base type which belongs to a reference assembly. Serializer generation for this type may not include important base type fields.");
+                bool IsSupportedRefAsmType(INamedTypeSymbol t)
+                {
+                    INamedTypeSymbol baseDefinition;
+                    if (t.IsGenericType && !t.IsUnboundGenericType)
+                    {
+                        baseDefinition = t.ConstructUnboundGenericType().OriginalDefinition;
+                    }
+                    else
+                    {
+                        baseDefinition = t.OriginalDefinition;
+                    }
+
+                    foreach (var refAsmType in wellKnownTypes.SupportedRefAsmBaseTypes)
+                    {
+                        if (SymbolEqualityComparer.Default.Equals(baseDefinition, refAsmType)) return true;
+                    }
+
+                    return false;
+                }
             }
 
             result.Sort(FieldInfoMember.Comparer.Instance);
@@ -544,7 +593,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns <see langowrd="true"/> if the provided field should be serialized, <see langword="false"/> otherwise.
         /// </summary>
-        public static bool ShouldSerializeField(WellKnownTypes wellKnownTypes, IFieldSymbol symbol)
+        public bool ShouldSerializeField(IFieldSymbol symbol)
         {
             if (symbol.IsStatic) return false;
             if (symbol.HasAttribute(wellKnownTypes.NonSerializedAttribute)) return false;
@@ -554,21 +603,21 @@ namespace Orleans.CodeGenerator.Generators
             if (fieldType.TypeKind == TypeKind.Pointer) return false;
             if (fieldType.TypeKind == TypeKind.Delegate) return false;
 
-            if (wellKnownTypes.IntPtr.Equals(fieldType)) return false;
-            if (wellKnownTypes.UIntPtr.Equals(fieldType)) return false;
+            if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.IntPtr, fieldType)) return false;
+            if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.UIntPtr, fieldType)) return false;
 
             if (symbol.ContainingType.HasBaseType(wellKnownTypes.MarshalByRefObject)) return false;
 
             return true;
         }
         
-        internal static bool IsOrleansShallowCopyable(WellKnownTypes wellKnownTypes, ITypeSymbol type)
+        internal bool IsOrleansShallowCopyable(ITypeSymbol type)
         {
             var root = new HashSet<ITypeSymbol>();
-            return IsOrleansShallowCopyable(wellKnownTypes, type, root);
+            return IsOrleansShallowCopyable(type, root);
         }
 
-        internal static bool IsOrleansShallowCopyable(WellKnownTypes wellKnownTypes, ITypeSymbol type, HashSet<ITypeSymbol> examining)
+        internal bool IsOrleansShallowCopyable(ITypeSymbol type, HashSet<ITypeSymbol> examining)
         {
             switch (type.SpecialType)
             {
@@ -590,15 +639,15 @@ namespace Orleans.CodeGenerator.Generators
                     return true;
             }
 
-            if (wellKnownTypes.TimeSpan.Equals(type)
-                || wellKnownTypes.IPAddress.Equals(type)
-                || wellKnownTypes.IPEndPoint.Equals(type)
-                || wellKnownTypes.SiloAddress.Equals(type)
-                || wellKnownTypes.GrainId.Equals(type)
-                || wellKnownTypes.ActivationId.Equals(type)
-                || wellKnownTypes.ActivationAddress.Equals(type)
-                || wellKnownTypes.CorrelationId is WellKnownTypes.Some correlationIdType && correlationIdType.Value.Equals(type)
-                || wellKnownTypes.CancellationToken.Equals(type)) return true;
+            if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.TimeSpan, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.IPAddress, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.IPEndPoint, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.SiloAddress, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.GrainId, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.ActivationId, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.ActivationAddress, type)
+                || wellKnownTypes.CorrelationId is WellKnownTypes.Some correlationIdType && SymbolEqualityComparer.Default.Equals(correlationIdType.Value, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.CancellationToken, type)) return true;
 
             if (ShallowCopyableTypes.TryGetValue(type, out var result)) return result;
 
@@ -617,32 +666,33 @@ namespace Orleans.CodeGenerator.Generators
                 return ShallowCopyableTypes[type] = false;
             }
 
-            if (namedType.IsGenericType && wellKnownTypes.Immutable_1.Equals(namedType.ConstructedFrom))
+            if (namedType.IsGenericType && SymbolEqualityComparer.Default.Equals(wellKnownTypes.Immutable_1, namedType.ConstructedFrom))
             {
                 return ShallowCopyableTypes[type] = true;
             }
             
             if (type.TypeKind == TypeKind.Struct && !namedType.IsGenericType && !namedType.IsUnboundGenericType)
             {
-                return ShallowCopyableTypes[type] =  IsValueTypeFieldsShallowCopyable(wellKnownTypes, type, examining);
+                return ShallowCopyableTypes[type] =  IsValueTypeFieldsShallowCopyable(type, examining);
             }
 
             return ShallowCopyableTypes[type] = false;
         }
 
-        private static bool IsValueTypeFieldsShallowCopyable(WellKnownTypes wellKnownTypes, ITypeSymbol type, HashSet<ITypeSymbol> examining)
+        private bool IsValueTypeFieldsShallowCopyable(ITypeSymbol type, HashSet<ITypeSymbol> examining)
         {
-            foreach (var field in type.GetAllMembers<IFieldSymbol>())
+            foreach (var field in type.GetInstanceMembers<IFieldSymbol>())
             {
+                if (field.IsStatic) continue;
+
                 if (!(field.Type is INamedTypeSymbol fieldType))
                 {
-                    throw new NotSupportedException(
-                        $"Field {field} in type {type} is not an {nameof(INamedTypeSymbol)} and therefore is not supported. Type is {field.Type.GetType()}");
+                    return false;
                 }
 
-                if (type.Equals(fieldType)) return false;
+                if (SymbolEqualityComparer.Default.Equals(type, fieldType)) return false;
 
-                if (!IsOrleansShallowCopyable(wellKnownTypes, fieldType, examining)) return false;
+                if (!IsOrleansShallowCopyable(fieldType, examining)) return false;
             }
 
             return true;
@@ -653,6 +703,7 @@ namespace Orleans.CodeGenerator.Generators
         /// </summary>
         private class FieldInfoMember
         {
+            private readonly SerializerGenerator generator;
             private readonly SemanticModel model;
             private readonly WellKnownTypes wellKnownTypes;
             private readonly INamedTypeSymbol targetType;
@@ -663,9 +714,10 @@ namespace Orleans.CodeGenerator.Generators
             /// </summary>
             private readonly int ordinal;
 
-            public FieldInfoMember(WellKnownTypes wellKnownTypes, SemanticModel model, INamedTypeSymbol targetType, IFieldSymbol field, int ordinal)
+            public FieldInfoMember(SerializerGenerator generator, SemanticModel model, INamedTypeSymbol targetType, IFieldSymbol field, int ordinal)
             {
-                this.wellKnownTypes = wellKnownTypes;
+                this.generator = generator;
+                this.wellKnownTypes = generator.wellKnownTypes;
                 this.model = model;
                 this.targetType = targetType;
                 this.Field = field;
@@ -735,12 +787,12 @@ namespace Orleans.CodeGenerator.Generators
 
                     var name = propertyName.Groups[1].Value;
                     var candidates = this.targetType
-                        .GetAllMembers<IPropertySymbol>()
+                        .GetInstanceMembers<IPropertySymbol>()
                         .Where(p => string.Equals(name, p.Name, StringComparison.Ordinal) && !p.IsAbstract)
                         .ToArray();
 
                     if (candidates.Length > 1) return null;
-                    if (!this.SafeType.Equals(candidates[0].Type)) return null;
+                    if (!SymbolEqualityComparer.Default.Equals(this.SafeType, candidates[0].Type)) return null;
 
                     return this.property = candidates[0];
                 }
@@ -765,7 +817,7 @@ namespace Orleans.CodeGenerator.Generators
                 var getValueExpression = this.GetValueExpression(instance);
 
                 // Avoid deep-copying the field if possible.
-                if (forceAvoidCopy || IsOrleansShallowCopyable(this.wellKnownTypes, this.SafeType))
+                if (forceAvoidCopy || generator.IsOrleansShallowCopyable(this.SafeType))
                 {
                     // Return the value without deep-copying it.
                     return getValueExpression;

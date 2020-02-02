@@ -24,7 +24,8 @@ namespace Tester.ClientConnectionTests
         [Fact]
         public async Task ConnectIsRetryableTest()
         {
-            var gwEndpoint = this.HostedCluster.Client.Configuration().Gateways.First();
+            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var gwEndpoint = gateways.First();
 
             // Create a client with no gateway endpoint and then add a gateway endpoint when the client fails to connect.
             var gatewayProvider = new MockGatewayListProvider();
@@ -43,7 +44,7 @@ namespace Tester.ClientConnectionTests
             {
                 Assert.IsType<SiloUnavailableException>(exception);
                 exceptions.Add(exception);
-                gatewayProvider.Gateways = new List<Uri> {gwEndpoint.ToGatewayUri()}.AsReadOnly();
+                gatewayProvider.Gateways = new List<Uri> { gwEndpoint }.AsReadOnly();
                 return Task.FromResult(true);
             }
 

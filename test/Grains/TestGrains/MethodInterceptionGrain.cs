@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -193,5 +193,42 @@ namespace UnitTests.Grains
 
             this.context = null;
         }
+    }
+
+    public class CaterpillarGrain : Grain, ICaterpillarGrain, IIncomingGrainCallFilter
+    {
+        Task IIncomingGrainCallFilter.Invoke(IIncomingGrainCallContext ctx)
+        {
+            if (ctx.InterfaceMethod is null) throw new Exception("InterfaceMethod is null");
+            if (!ctx.InterfaceMethod.DeclaringType.IsInterface) throw new Exception("InterfaceMethod is not an interface method");
+
+            if (ctx.ImplementationMethod is null) throw new Exception("ImplementationMethod is null");
+            if (ctx.ImplementationMethod.DeclaringType.IsInterface) throw new Exception("ImplementationMethod is an interface method");
+
+            if (RequestContext.Get("tag") is string tag)
+            {
+                var ifaceTag = ctx.InterfaceMethod.GetCustomAttribute<TestMethodTagAttribute>()?.Tag;
+                var implTag = ctx.ImplementationMethod.GetCustomAttribute<TestMethodTagAttribute>()?.Tag;
+                if (!string.Equals(tag, ifaceTag, StringComparison.Ordinal)
+                    || !string.Equals(tag, implTag, StringComparison.Ordinal))
+                {
+                    throw new Exception($"Expected method tags to be equal to request context tag: RequestContext: {tag} Interface: {ifaceTag} Implementation: {implTag}");
+                }
+            }
+
+            return ctx.Invoke();
+        }
+
+        [TestMethodTag("hungry-eat")]
+        public Task Eat(Apple food) => Task.CompletedTask;
+
+        [TestMethodTag("omnivore-eat")]
+        Task IOmnivoreGrain.Eat<T>(T food) => Task.CompletedTask;
+
+        [TestMethodTag("caterpillar-eat")]
+        public Task Eat<T>(T food) => Task.CompletedTask;
+
+        [TestMethodTag("hungry-eatwith")]
+        public Task EatWith<U>(Apple food, U condiment) => Task.CompletedTask;
     }
 }

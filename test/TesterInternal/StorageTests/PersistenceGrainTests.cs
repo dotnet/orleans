@@ -13,10 +13,11 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Runtime.Configuration;
 using TesterInternal;
 using TestExtensions;
 using Orleans.Hosting;
+using Orleans.Internal;
+using Microsoft.Extensions.DependencyInjection;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -35,22 +36,18 @@ namespace UnitTests.StorageTests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderName1);
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderName2,
-                        new Dictionary<string, string> {{"Config1", "1"}, {"Config2", "2"}});
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<ErrorInjectionStorageProvider>(ErrorInjectorProviderName);
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<MockStorageProvider>(MockStorageProviderNameLowerCase);
-                });
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
 
-            private class SiloConfigurator : ISiloBuilderConfigurator
+            private class SiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddMemoryGrainStorage("MemoryStore");
+                    hostBuilder.AddTestStorageProvider(MockStorageProviderName1, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
+                    hostBuilder.AddTestStorageProvider(MockStorageProviderName2, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
+                    hostBuilder.AddTestStorageProvider(MockStorageProviderNameLowerCase, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
+                    hostBuilder.AddTestStorageProvider(ErrorInjectorProviderName, (sp, name) => ActivatorUtilities.CreateInstance<ErrorInjectionStorageProvider>(sp));
                 }
             }
         }
@@ -1022,7 +1019,7 @@ namespace UnitTests.StorageTests
             Assert.NotNull(exc.InnerException); // BaseException.InnerException should not be null
             Assert.IsAssignableFrom<BadProviderConfigException>(exc.InnerException);
 
-            Assert.Equal(msg3,  ae.Message);  //  "AggregateException.Message should be '{0}'", msg3
+            Assert.StartsWith(msg3,  ae.Message);  //  "AggregateException.Message should be '{0}'", msg3
             Assert.Equal(msg2,  exc.Message);  //  "OrleansException.Message should be '{0}'", msg2
             Assert.Equal(msg1,  exc.InnerException.Message);  //  "InnerException.Message should be '{0}'", msg1
         }

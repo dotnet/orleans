@@ -38,22 +38,30 @@ namespace UnitTests.GrainInterfaces
 
     public interface IMessageSerializationGrain : IGrainWithIntegerKey
     {
-        Task Send(UndeserializableType input);
-        Task<UnserializableType> Get();
+        Task SendUnserializable(UnserializableType input);
+        Task SendUndeserializable(UndeserializableType input);
+        Task<UnserializableType> GetUnserializable();
+        Task<UndeserializableType> GetUndeserializable();
 
-        Task SendToOtherSilo();
-        Task GetFromOtheSilo();
+        Task SendUnserializableToOtherSilo();
+        Task SendUndeserializableToOtherSilo();
+        Task GetUnserializableFromOtherSilo();
+        Task GetUndeserializableFromOtherSilo();
 
-        Task SendToClient(IMessageSerializationClientObject obj);
-        Task GetFromClient(IMessageSerializationClientObject obj);
+        Task SendUnserializableToClient(IMessageSerializationClientObject obj);
+        Task SendUndeserializableToClient(IMessageSerializationClientObject obj);
+        Task GetUnserializableFromClient(IMessageSerializationClientObject obj);
+        Task GetUndeserializableFromClient(IMessageSerializationClientObject obj);
 
         Task<string> GetSiloIdentity();
     }
 
     public interface IMessageSerializationClientObject : IAddressable
     {
-        Task Send(UndeserializableType input);
-        Task<UnserializableType> Get();
+        Task SendUnserializable(UnserializableType input);
+        Task SendUndeserializable(UndeserializableType input);
+        Task<UnserializableType> GetUnserializable();
+        Task<UndeserializableType> GetUndeserializable();
     }
 
     [Serializable]

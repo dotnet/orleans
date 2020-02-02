@@ -41,7 +41,6 @@ namespace DefaultCluster.Tests.General
                     })
                     .AddMemoryGrainStorage("PubSubStore")
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemStream")
-                    .EnableDirectClient()
                     .Build();
                 this.Silo.StartAsync().GetAwaiter().GetResult();
             }
@@ -102,7 +101,7 @@ namespace DefaultCluster.Tests.General
             var handle = new AsyncResultHandle();
 
             var callbackCounter = new int[1];
-            var callbacksRecieved = new bool[2];
+            var callbacksReceived = new bool[2];
 
             var grain = client.GetGrain<ISimpleObserverableGrain>(0);
             var observer = new ObserverTests.SimpleGrainObserver(
@@ -112,20 +111,20 @@ namespace DefaultCluster.Tests.General
                     callbackCounter[0]++;
 
                     if (a == 3 && b == 0)
-                        callbacksRecieved[0] = true;
+                        callbacksReceived[0] = true;
                     else if (a == 3 && b == 2)
-                        callbacksRecieved[1] = true;
+                        callbacksReceived[1] = true;
                     else
                         throw new ArgumentOutOfRangeException("Unexpected callback with values: a=" + a + ",b=" + b);
 
                     if (callbackCounter[0] == 1)
                     {
                         // Allow for callbacks occurring in any order
-                        Assert.True(callbacksRecieved[0] || callbacksRecieved[1]);
+                        Assert.True(callbacksReceived[0] || callbacksReceived[1]);
                     }
                     else if (callbackCounter[0] == 2)
                     {
-                        Assert.True(callbacksRecieved[0] && callbacksRecieved[1]);
+                        Assert.True(callbacksReceived[0] && callbacksReceived[1]);
                         result.Done = true;
                     }
                     else

@@ -1,7 +1,5 @@
-﻿using System;
+using System;
 using Orleans.Configuration;
-using Orleans.ServiceBus.Providers;
-using Orleans.Streams;
 
 namespace Orleans.Hosting
 {
@@ -14,7 +12,7 @@ namespace Orleans.Hosting
         public static IClientBuilder AddEventHubStreams(
            this IClientBuilder builder,
            string name,
-           Action<ClusterClientEventHubStreamConfigurator> configure)
+           Action<IClusterClientEventHubStreamConfigurator> configure)
         {
             var configurator = new ClusterClientEventHubStreamConfigurator(name,builder);
             configure?.Invoke(configurator);

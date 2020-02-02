@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class SiloInstanceRecord 
+    internal class SiloInstanceRecord
     {
         public const string DEPLOYMENT_ID_PROPERTY_NAME = "DeploymentId";
         public const string SILO_IDENTITY_PROPERTY_NAME = "SiloIdentity";
@@ -24,6 +24,8 @@ namespace Orleans.Runtime.MembershipService
         public const string START_TIME_PROPERTY_NAME = "StartTime";
         public const string I_AM_ALIVE_TIME_PROPERTY_NAME = "IAmAliveTime";
         internal const char Seperator = '-';
+        internal const string TABLE_VERSION_ROW = "VersionRow"; // Range key for version row.
+        public const string MEMBERSHIP_VERSION_PROPERTY_NAME = "MembershipVersion";
 
         public string DeploymentId { get; set; }
         public string SiloIdentity { get; set; }
@@ -40,6 +42,8 @@ namespace Orleans.Runtime.MembershipService
         public string IAmAliveTime { get; set; }
         public int ETag { get; set; }
 
+        public int MembershipVersion { get; set; }
+
         public SiloInstanceRecord() { }
 
         public SiloInstanceRecord(Dictionary<string, AttributeValue> fields)
@@ -54,7 +58,7 @@ namespace Orleans.Runtime.MembershipService
                 Address = fields[ADDRESS_PROPERTY_NAME].S;
 
             int port;
-            if (fields.ContainsKey(PORT_PROPERTY_NAME) && 
+            if (fields.ContainsKey(PORT_PROPERTY_NAME) &&
                 int.TryParse(fields[PORT_PROPERTY_NAME].N, out port))
                 Port = port;
 
@@ -95,6 +99,10 @@ namespace Orleans.Runtime.MembershipService
             if (fields.ContainsKey(ETAG_PROPERTY_NAME) &&
                 int.TryParse(fields[ETAG_PROPERTY_NAME].N, out etag))
                 ETag = etag;
+
+            if (fields.ContainsKey(MEMBERSHIP_VERSION_PROPERTY_NAME) &&
+                int.TryParse(fields[MEMBERSHIP_VERSION_PROPERTY_NAME].N, out int version))
+                MembershipVersion = version;
         }
 
         internal static SiloAddress UnpackRowKey(string rowKey)
@@ -160,9 +168,9 @@ namespace Orleans.Runtime.MembershipService
             if (includeKeys)
             {
                 fields.Add(DEPLOYMENT_ID_PROPERTY_NAME, new AttributeValue(DeploymentId));
-                fields.Add(SILO_IDENTITY_PROPERTY_NAME, new AttributeValue(SiloIdentity)); 
+                fields.Add(SILO_IDENTITY_PROPERTY_NAME, new AttributeValue(SiloIdentity));
             }
-            
+
             if (!string.IsNullOrWhiteSpace(Address))
                 fields.Add(ADDRESS_PROPERTY_NAME, new AttributeValue(Address));
 
@@ -189,6 +197,8 @@ namespace Orleans.Runtime.MembershipService
 
             if (!string.IsNullOrWhiteSpace(IAmAliveTime))
                 fields.Add(I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(IAmAliveTime));
+
+            fields.Add(MEMBERSHIP_VERSION_PROPERTY_NAME, new AttributeValue { N = MembershipVersion.ToString() });
 
             fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = ETag.ToString() });
             return fields;

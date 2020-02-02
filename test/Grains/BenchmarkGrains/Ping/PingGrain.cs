@@ -1,6 +1,7 @@
-﻿using Orleans;
+using Orleans;
 using BenchmarkGrainInterfaces.Ping;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace BenchmarkGrains.Ping
 {
@@ -24,5 +25,7 @@ namespace BenchmarkGrains.Ping
             if (count == 0) return Task.CompletedTask;
             return other.PingPongInterleave(this.self, count - 1);
         }
+
+        public Task<int> GetSiloPort() => Task.FromResult(((ILocalSiloDetails)this.ServiceProvider.GetService(typeof(ILocalSiloDetails))).SiloAddress.Endpoint.Port);
     }
 }

@@ -2,14 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using System.Linq;
 using UnitTests.TimerTests;
+using Orleans.Hosting;
+using Orleans.Internal;
+using TestExtensions;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -23,11 +24,17 @@ namespace Tester.AzureUtils.TimerTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                Guid serviceId = Guid.NewGuid();
-                builder.ConfigureLegacyConfiguration(legacy =>
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
+        }
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.UseAzureTableReminderService(options =>
                 {
-                    legacy.ClusterConfiguration.Globals.ServiceId = serviceId;
-                    legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.AzureTable;
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });
             }
         }

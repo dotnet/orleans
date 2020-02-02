@@ -22,7 +22,7 @@ namespace Orleans.Configuration
         /// <inheritdoc />
         public void ValidateConfiguration()
         {
-            var options = this.serviceProvider.GetService<IOptions<EndpointOptions>>().Value;
+            var options = this.serviceProvider.GetRequiredService<IOptions<EndpointOptions>>().Value;
 
             if (options.AdvertisedIPAddress == null)
             {

@@ -5,11 +5,11 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.ApplicationParts;
 using Orleans.Hosting;
-using Orleans.Logging;
 using Orleans.Metadata;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Logging;
 using RuntimeCodeGen.Interfaces;
 using TestExtensions;
 using Xunit;
@@ -41,9 +41,9 @@ namespace UnitTests
             }
         }
 
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 ILoggerFactory codeGenLoggerFactory = new LoggerFactory();
                 var siloName = hostBuilder.GetConfigurationValue("SiloName") ?? nameof(RuntimeCodeGenTests);

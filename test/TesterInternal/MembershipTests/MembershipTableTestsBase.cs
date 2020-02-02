@@ -8,13 +8,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 
 namespace UnitTests.MembershipTests
 {
@@ -44,7 +44,6 @@ namespace UnitTests.MembershipTests
         protected IOptions<ClusterOptions> clusterOptions;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
         protected readonly IOptions<GatewayOptions> gatewayOptions;
-        protected readonly ClientConfiguration clientConfiguration;
 
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
@@ -63,13 +62,6 @@ namespace UnitTests.MembershipTests
 
             membershipTable = CreateMembershipTable(logger);
             membershipTable.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
-
-            clientConfiguration = new ClientConfiguration
-            {
-                ClusterId = this.clusterId,
-                AdoInvariant = adoVariant,
-                DataConnectionString = fixture.ConnectionString
-            };
 
             this.gatewayOptions = Options.Create(new GatewayOptions());
             gatewayListProvider = CreateGatewayListProvider(logger);
@@ -412,6 +404,43 @@ namespace UnitTests.MembershipTests
             Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromMilliseconds(50), (amAliveTime - member.Item1.IAmAliveTime).Duration().ToString());
         }
 
+        protected async Task MembershipTable_CleanupDefunctSiloEntries(bool extendedProtocol = true)
+        {
+            MembershipTableData data = await membershipTable.ReadAll();
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+
+            Assert.Equal(0, data.Members.Count);
+
+            TableVersion newTableVersion = data.Version.Next();
+
+            MembershipEntry oldEntry = CreateMembershipEntryForTest();
+            oldEntry.IAmAliveTime = oldEntry.IAmAliveTime.AddDays(-10);
+            oldEntry.StartTime = oldEntry.StartTime.AddDays(-10);
+            bool ok = await membershipTable.InsertRow(oldEntry, newTableVersion);
+            var table = await membershipTable.ReadAll();
+
+            Assert.True(ok, "InsertRow failed");
+
+            newTableVersion = table.Version.Next();
+            MembershipEntry newEntry = CreateMembershipEntryForTest();
+            ok = await membershipTable.InsertRow(newEntry, newTableVersion);
+
+            Assert.True(ok, "InsertRow failed");
+
+            data = await membershipTable.ReadAll();
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+
+            Assert.Equal(2, data.Members.Count);
+
+
+            await membershipTable.CleanupDefunctSiloEntries(oldEntry.IAmAliveTime.AddDays(3));
+
+            data = await membershipTable.ReadAll();
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+
+            Assert.Equal(1, data.Members.Count);
+        }
+
         private static int generation;
 
 
@@ -437,7 +466,7 @@ namespace UnitTests.MembershipTests
         private static DateTime GetUtcNowWithSecondsResolution()
         {
             var now = DateTime.UtcNow;
-            return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
+            return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, DateTimeKind.Utc);
         }
 
         private static SiloAddress CreateSiloAddressForTest()

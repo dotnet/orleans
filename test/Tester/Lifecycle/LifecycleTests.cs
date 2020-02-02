@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -142,7 +142,7 @@ namespace Tester
             // run lifecycle
             if (failOnStart.HasValue)
             {
-                await Assert.ThrowsAsync<OrleansLifecycleCanceledException>(() => lifecycle.OnStart());
+                await Assert.ThrowsAsync<Exception>(() => lifecycle.OnStart());
             }
             else
             {

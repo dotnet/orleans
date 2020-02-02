@@ -28,43 +28,43 @@ namespace UnitTests.Serialization
             Assert.Equal(input, output);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_IntOption_Some()
         {
             RoundtripSerializationTest(FSharpOption<int>.Some(10));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_IntOption_None()
         {
             RoundtripSerializationTest(FSharpOption<int>.None);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_Record_ofInt()
         {
             RoundtripSerializationTest(FSharpTypes.Record.ofInt(1));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_Record_ofIntOption_Some()
         {
             RoundtripSerializationTest(RecordOfIntOption.ofInt(1));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_Record_ofIntOption_None()
         {
             RoundtripSerializationTest(RecordOfIntOption.Empty);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_Single_Case_Union()
         {
             RoundtripSerializationTest(SingleCaseDU.ofInt(1));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_Discriminated_Union()
         {
 
@@ -86,7 +86,7 @@ namespace UnitTests.Serialization
 
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void SerializationTests_FSharp_Collections()
         {
             var elements = new List<int>() { 0, 1, 2 };

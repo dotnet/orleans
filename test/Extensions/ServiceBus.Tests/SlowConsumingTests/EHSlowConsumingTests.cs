@@ -40,21 +40,25 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
-            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
-                    hostBuilder.AddPersistentStreams(StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.Create, b=>
-                        b.Configure<EventHubStreamCachePressureOptions>(ob => ob.Configure(options =>
-                           {
-                               options.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
-                               options.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
-                               options.AveragingCachePressureMonitorFlowControlThreshold = null;
-                           }))
-                           .ConfigureComponent<IStreamQueueCheckpointerFactory>((s,n)=>NoOpCheckpointerFactory.Instance)
-                           .UseDynamicClusterConfigDeploymentBalancer());
-                    hostBuilder
-                    .AddMemoryGrainStorage("PubSubStore");
+                    hostBuilder.AddPersistentStreams(
+                        StreamProviderName,
+                        EHStreamProviderWithCreatedCacheListAdapterFactory.Create,
+                        b=>
+                        {
+                            b.Configure<EventHubStreamCachePressureOptions>(ob => ob.Configure(options =>
+                            {
+                                options.SlowConsumingMonitorPressureWindowSize = monitorPressureWindowSize;
+                                options.SlowConsumingMonitorFlowControlThreshold = flowControlThredhold;
+                                options.AveragingCachePressureMonitorFlowControlThreshold = null;
+                            }));
+                            b.ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance);
+                            b.UseDynamicClusterConfigDeploymentBalancer();
+                        });
+                    hostBuilder.AddMemoryGrainStorage("PubSubStore");
                 }
             }
         }

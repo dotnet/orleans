@@ -7,7 +7,7 @@ using TestExtensions.Runners;
 
 namespace DefaultCluster.Tests
 {
-    [TestCategory("BVT"), TestCategory("Functional"), TestCategory("Lease")]
+    [TestCategory("BVT"), TestCategory("Lease")]
     public class GoldenPathInMemoryLeaseProviderTests : GoldenPathLeaseProviderTestRunner, IClassFixture<GoldenPathInMemoryLeaseProviderTests.Fixture>
     {
         public GoldenPathInMemoryLeaseProviderTests(Fixture fixture, ITestOutputHelper output)
@@ -17,10 +17,6 @@ namespace DefaultCluster.Tests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.ConfigureLegacyConfiguration();
-            }
         }
     }
 }

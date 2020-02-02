@@ -5,6 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.ApplicationParts;
 using Orleans.Serialization;
+using Microsoft.Extensions.Hosting;
+using IHostingEnvironment = Orleans.Hosting.IHostingEnvironment;
+using HostBuilderContext = Orleans.Hosting.HostBuilderContext;
+using HostDefaults = Orleans.Hosting.HostDefaults;
+using EnvironmentName = Orleans.Hosting.EnvironmentName;
 
 namespace Orleans
 {
@@ -46,6 +51,7 @@ namespace Orleans
                     services.AddSingleton(this.hostingEnvironment);
                     services.AddSingleton(this.hostBuilderContext);
                     services.AddSingleton(this.appConfiguration);
+                    services.AddSingleton<IHostApplicationLifetime, ClientApplicationLifetime>();
                     services.AddOptions();
                     services.AddLogging();
                 });

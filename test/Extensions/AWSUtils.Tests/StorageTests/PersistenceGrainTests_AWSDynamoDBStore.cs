@@ -28,40 +28,14 @@ namespace AWSUtils.Tests.StorageTests
             {
                 if (AWSTestConstants.IsDynamoDbAvailable)
                 {
-                    Guid serviceId = Guid.NewGuid();
-                    string dataConnectionString = DataConnectionString;
                     builder.Options.InitialSilosCount = 4;
-
-                    builder.ConfigureLegacyConfiguration(legacy =>
-                    {
-                        legacy.ClusterConfiguration.Globals.ServiceId = serviceId;
-                        legacy.ClusterConfiguration.Globals.DataConnectionString = dataConnectionString;
-
-                        legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
-
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2",
-                            new Dictionary<string, string> { { "Config1", "1" }, { "Config2", "2" } });
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
-                        legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
-
-                        // FIXME: How to configure the TestClusterBuilder to use the new extensions?
-                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore",
-                        //    new Dictionary<string, string> {{"DeleteStateOnClear", "true"}, {"DataConnectionString", dataConnectionString}});
-                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore1",
-                        //    new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
-                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore2",
-                        //    new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
-                        //legacy.ClusterConfiguration.Globals.RegisterStorageProvider<DynamoDBGrainStorage>("DDBStore3",
-                        //    new Dictionary<string, string> {{"DataConnectionString", dataConnectionString}});
-                    });
                     builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 }
             }
 
-            public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            public class SiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddMemoryGrainStorage("MemoryStore");
                 }
@@ -168,7 +142,7 @@ namespace AWSUtils.Tests.StorageTests
                 this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "TestTable");
             storage.ConvertToStorageFormat(initialState, entity);
             var convertedState = new GrainStateContainingGrainReferences();
-            convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
+            convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity, initialState.GetType());
             Assert.NotNull(convertedState); // Converted state
             Assert.Equal(initialState.Grain, convertedState.Grain);  // "Grain"
         }
@@ -194,7 +168,7 @@ namespace AWSUtils.Tests.StorageTests
                 await InitDynamoDBTableStorageProvider(
                     this.HostedCluster.ServiceProvider.GetRequiredService<IProviderRuntime>(), "TestTable");
             storage.ConvertToStorageFormat(initialState, entity);
-            var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
+            var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity, initialState.GetType());
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.GrainList.Count, convertedState.GrainList.Count);  // "GrainList size"
             Assert.Equal(initialState.GrainDict.Count, convertedState.GrainDict.Count);  // "GrainDict size"

@@ -1,7 +1,6 @@
 using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
@@ -20,11 +19,11 @@ namespace Orleans.Transactions.TOC
             ParticipantId resource,
             Action deactivate,
             ITransactionalStateStorage<TransactionCommitter<TService>.OperationState> storage,
-            JsonSerializerSettings serializerSettings,
             IClock clock,
             ILogger logger,
-            ITimerManager timerManager)
-            : base(options, resource, deactivate, storage, clock, logger, timerManager)
+            ITimerManager timerManager,
+            IActivationLifetime activationLifetime)
+            : base(options, resource, deactivate, storage, clock, logger, timerManager, activationLifetime)
         {
             this.service = service;
         }

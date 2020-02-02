@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -122,6 +123,15 @@ namespace Orleans
         public static IClientBuilder AddClientInvokeCallback(this IClientBuilder builder, ClientInvokeCallback callback)
         {
             builder.ConfigureServices(services => services.AddSingleton(callback));
+            return builder;
+        }
+
+        /// <summary>
+        /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
+        /// </summary>
+        public static IClientBuilder AddGatewayCountChangedHandler(this IClientBuilder builder, GatewayCountChangedHandler handler)
+        {
+            builder.ConfigureServices(services => services.AddSingleton(handler));
             return builder;
         }
 

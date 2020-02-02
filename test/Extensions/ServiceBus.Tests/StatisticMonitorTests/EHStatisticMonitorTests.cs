@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Azure.EventHubs;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -38,15 +38,20 @@ namespace ServiceBus.Tests.MonitorTests
             }
 
 
-            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams(StreamProviderName, EHStreamProviderForMonitorTestsAdapterFactory.Create, b=>b
-                        .ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance)
-                        .Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval))
-                        .UseDynamicClusterConfigDeploymentBalancer());
+                        .AddPersistentStreams(
+                            StreamProviderName,
+                            EHStreamProviderForMonitorTestsAdapterFactory.Create,
+                            b=>
+                            {
+                                b.ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance);
+                                b.Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval));
+                                b.UseDynamicClusterConfigDeploymentBalancer();
+                            });
                     hostBuilder
                         .ConfigureServices(services =>
                         {
@@ -67,7 +72,7 @@ namespace ServiceBus.Tests.MonitorTests
             seed = new Random();
         }
 
-        [Fact, TestCategory("Functional")]
+        [Fact(Skip = "See https://github.com/dotnet/orleans/issues/4594"), TestCategory("Functional")]
         public async Task EHStatistics_MonitorCalledAccordingly()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), StreamNamespace, StreamProviderName);

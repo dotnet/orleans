@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Reminders DynamoDB</Title>
     <Description>Microsoft Orleans reminders provider for AWS DynamoDB</Description>
     <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

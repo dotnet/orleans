@@ -12,6 +12,7 @@ using Orleans.Providers.GCP.Streams.PubSub;
 using Orleans.Hosting;
 using Microsoft.Extensions.Configuration;
 using Orleans;
+using Orleans.Configuration;
 
 namespace GoogleUtils.Tests.Streaming
 {
@@ -37,17 +38,13 @@ namespace GoogleUtils.Tests.Streaming
                 throw new SkipException("Google PubSub Simulator not available");
             }
 
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
 
-        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        private class MySiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .AddMemoryGrainStorage("PubSubStore")
@@ -56,7 +53,8 @@ namespace GoogleUtils.Tests.Streaming
                         options.ProjectId = GoogleTestUtils.ProjectId;
                         options.TopicId = GoogleTestUtils.TopicId;
                         options.Deadline = TimeSpan.FromSeconds(600);
-                    });
+                    })
+                    .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
             }
         }
 

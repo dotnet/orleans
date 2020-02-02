@@ -2,7 +2,9 @@ using System;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 
@@ -26,9 +28,7 @@ namespace Orleans.Hosting
                 {
                     services.PostConfigure<SiloOptions>(
                         options => options.SiloName =
-                            options.SiloName
-                            ?? context.HostingEnvironment.ApplicationName
-                            ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
+                            options.SiloName ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
                     services.TryAddSingleton<Silo>();
                     DefaultSiloServices.AddDefaultServices(context.GetApplicationPartManager(), services);
@@ -65,8 +65,7 @@ namespace Orleans.Hosting
                 options.GatewayPort = gatewayPort;
             });
 
-            builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
-            builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
+            builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
             builder.ConfigureServices(services =>
             {
                 // If the caller did not override service id or cluster id, configure default values as a fallback.
@@ -101,7 +100,7 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloHostBuilder UseDevelopmentClustering(this ISiloHostBuilder builder, IPEndPoint primarySiloEndpoint)
         {
-            return builder.UseDevelopmentClustering(options => options.PrimarySiloEndpoint = primarySiloEndpoint);
+            return builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
         }
 
         /// <summary>
@@ -135,25 +134,10 @@ namespace Orleans.Hosting
         /// <summary>
         /// Enables support for interacting with the runtime from an external context. For example, outside the context of a grain.
         /// </summary>
-        public static ISiloHostBuilder EnableDirectClient(
-            this ISiloHostBuilder builder)
+        [Obsolete("This method is no longer necessary and will be removed in a future release.")]
+        public static ISiloHostBuilder EnableDirectClient(this ISiloHostBuilder builder)
         {
-            return builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IHostedClient>();
-                services.TryAddSingleton<IHostedClient, HostedClient>();
-                services.TryAddSingleton<InvokableObjectManager>();
-                services.TryAddSingleton<IClusterClient>(
-                    sp =>
-                    {
-                        var result = ActivatorUtilities.CreateInstance<ClusterClient>(sp);
-                        var task = result.Connect();
-                        if (!task.IsCompleted)
-                            throw new InvalidOperationException(
-                                $"{nameof(result.Connect)}() method for internal {nameof(IClusterClient)} must complete synchronously.");
-                        return result;
-                    });
-            });
+            return builder;
         }
 
         /// <summary>
@@ -169,9 +153,7 @@ namespace Orleans.Hosting
                 {
                     services.PostConfigure<SiloOptions>(
                         options => options.SiloName =
-                            options.SiloName
-                            ?? context.HostingEnvironment.ApplicationName
-                            ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
+                            options.SiloName ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
                     services.TryAddSingleton<Silo>();
                     DefaultSiloServices.AddDefaultServices(context.GetApplicationPartManager(), services);
@@ -208,8 +190,7 @@ namespace Orleans.Hosting
                 options.GatewayPort = gatewayPort;
             });
 
-            builder.UseDevelopmentClustering(primarySiloEndpoint ?? new IPEndPoint(IPAddress.Loopback, siloPort));
-            builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
+            builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
             builder.ConfigureServices(services =>
             {
                 // If the caller did not override service id or cluster id, configure default values as a fallback.
@@ -244,7 +225,7 @@ namespace Orleans.Hosting
         /// <returns>The silo builder.</returns>
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, IPEndPoint primarySiloEndpoint)
         {
-            return builder.UseDevelopmentClustering(options => options.PrimarySiloEndpoint = primarySiloEndpoint);
+            return builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
         }
 
         /// <summary>
@@ -278,24 +259,23 @@ namespace Orleans.Hosting
         /// <summary>
         /// Enables support for interacting with the runtime from an external context. For example, outside the context of a grain.
         /// </summary>
-        public static ISiloBuilder EnableDirectClient(
-            this ISiloBuilder builder)
+        [Obsolete("This method is no longer necessary and will be removed in a future release.")]
+        public static ISiloBuilder EnableDirectClient(this ISiloBuilder builder)
         {
-            return builder.ConfigureServices(services =>
+            // Note that this method was added with [Obsolete] to ease migration from ISiloHostBuilder to ISiloBuilder.
+            return builder;
+        }
+
+        private static void ConfigurePrimarySiloEndpoint(OptionsBuilder<DevelopmentClusterMembershipOptions> optionsBuilder, IPEndPoint primarySiloEndpoint)
+        {
+            optionsBuilder.Configure((DevelopmentClusterMembershipOptions options, IOptions<EndpointOptions> endpointOptions) =>
             {
-                services.RemoveAll<IHostedClient>();
-                services.TryAddSingleton<IHostedClient, HostedClient>();
-                services.TryAddSingleton<InvokableObjectManager>();
-                services.TryAddSingleton<IClusterClient>(
-                    sp =>
-                    {
-                        var result = ActivatorUtilities.CreateInstance<ClusterClient>(sp);
-                        var task = result.Connect();
-                        if (!task.IsCompleted)
-                            throw new InvalidOperationException(
-                                $"{nameof(result.Connect)}() method for internal {nameof(IClusterClient)} must complete synchronously.");
-                        return result;
-                    });
+                if (primarySiloEndpoint is null)
+                {
+                    primarySiloEndpoint = endpointOptions.Value.GetPublicSiloEndpoint();
+                }
+
+                options.PrimarySiloEndpoint = primarySiloEndpoint;
             });
         }
     }

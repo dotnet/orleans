@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using Orleans.Core;
-using Orleans.Core.Abstractions.Internal;
 
 namespace Orleans.Runtime
 {
@@ -93,6 +92,11 @@ namespace Orleans.Runtime
         internal static GrainId GetGrainServiceGrainId(short id, int typeData)
         {
             return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(id, typeData));
+        }
+
+        internal static GrainId GetGrainServiceGrainId(int typeData, string systemGrainId)
+        {
+            return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(systemGrainId, typeData));
         }
 
         public Guid PrimaryKey
@@ -240,6 +244,7 @@ namespace Orleans.Runtime
                     fullString = $"*gcl/{Key.KeyExt}/{idString}";
                     break;
                 case UniqueKey.Category.SystemTarget:
+                case UniqueKey.Category.KeyExtSystemTarget:
                     fullString = $"*stg/{Key.N1}/{idString}";
                     break;
                 case UniqueKey.Category.SystemGrain:
@@ -294,6 +299,15 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// Return this GrainId in a standard components form, suitable for later use with the <see cref="FromKeyInfo"/> method.
+        /// </summary>
+        /// <returns>GrainId in a standard components form.</returns>
+        internal (ulong, ulong, ulong, string) ToKeyInfo()
+        {
+            return (Key.N0, Key.N1, Key.TypeCodeData, Key.KeyExt);
+        }
+
+        /// <summary>
         /// Create a new GrainId object by parsing string in a standard form returned from <c>ToParsableString</c> method.
         /// </summary>
         /// <param name="grainId">String containing the GrainId info to be parsed.</param>
@@ -313,6 +327,20 @@ namespace Orleans.Runtime
             // NOTE: This function must be the "inverse" of ToParsableString, and data must round-trip reliably.
 
             var key = UniqueKey.Parse(grainId);
+            return FindOrCreateGrainId(key);
+        }
+
+        /// <summary>
+        /// Create a new GrainId object by parsing components returned form <see cref="ToKeyInfo"/>.
+        /// </summary>
+        /// <param name="grainId">Components containing the GrainId to be parsed.</param>
+        /// <returns>New GrainId object created from the input data.</returns>
+        internal static GrainId FromKeyInfo((ulong, ulong, ulong, string) grainId)
+        {
+            // NOTE: This function must be the "inverse" of ToKeyInfo, and data must round-trip reliably.
+
+            var (n0, n1, typeCodeData, keyExt) = grainId;
+            var key = UniqueKey.NewKey(n0, n1, typeCodeData, keyExt);
             return FindOrCreateGrainId(key);
         }
     }

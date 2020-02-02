@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -10,6 +10,7 @@ using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using TestGrainInterfaces;
+using UnitTests.DtosRefOrleans;
 using Xunit;
 
 namespace NonSilo.Tests
@@ -83,6 +84,18 @@ namespace NonSilo.Tests
             }
         }
 
+        [Fact]
+        public void ClientBuilder_ThrowsDuringStartupIfNoGrainInterfacesAdded()
+        {
+            // Add only an assembly with generated serializers but no grain interfaces
+            var clientBuilder = new ClientBuilder()
+                .UseLocalhostClustering()
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ClassReferencingOrleansTypeDto).Assembly))
+                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
+
+            Assert.Throws<OrleansConfigurationException>(() => clientBuilder.Build());
+        }
+
         /// <summary>
         /// Tests that a builder can not be used to build more than one client.
         /// </summary>
@@ -98,33 +111,6 @@ namespace NonSilo.Tests
                 Assert.Throws<InvalidOperationException>(() => builder.Build());
             }
         }
-
-        /// <summary>
-        /// Tests that configuration cannot be specified twice.
-        /// </summary>
-        [Fact]
-        public void ClientBuilder_DoubleSpecifyConfigurationTest()
-        {
-            var builder = new ClientBuilder()
-                .ConfigureDefaults()
-                .ConfigureServices(RemoveConfigValidators)
-                .UseConfiguration(new ClientConfiguration())
-                .UseConfiguration(new ClientConfiguration());
-            Assert.Throws<InvalidOperationException>(() => builder.Build());
-        }
-
-        /// <summary>
-        /// Tests that a client can be created without specifying configuration.
-        /// </summary>
-        [Fact]
-        public void ClientBuilder_NullConfigurationTest()
-        {
-            var builder = new ClientBuilder()
-                .ConfigureDefaults()
-                .ConfigureServices(RemoveConfigValidators);
-            Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
-        }
-        
 
         /// <summary>
         /// Tests that the <see cref="IClientBuilder.ConfigureServices"/> delegate works as expected.

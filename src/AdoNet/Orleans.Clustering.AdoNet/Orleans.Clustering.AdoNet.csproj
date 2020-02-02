@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans clustering provider for ADO.NET Providers</Title>
     <Description>Microsoft Orleans clustering provider backed by ADO.NET Providers</Description>
     <PackageTags>$(PackageTags) ADO.NET SQL MySQL PostgreSQL Oracle</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -30,57 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Data.Common" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Data.Common" Version="$(SystemDataCommonVersion)" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Storage\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="MySQL-Clustering.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\MySQL\</PackagePath>
-    </None>
-    <None Include="Oracle-Clustering.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\Oracle\</PackagePath>
-    </None>
-    <None Include="PostgreSQL-Clustering.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\PostgreSQL\</PackagePath>
-    </None>
-    <None Include="SQLServer-Clustering.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
-    </None>
-    <None Include="..\Shared\MySQL-Main.sql" Link="MySQL-Main.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\MySQL\</PackagePath>
-    </None>
-    <None Include="..\Shared\Oracle-Main.sql" Link="Oracle-Main.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\Oracle\</PackagePath>
-    </None>
-    <None Include="..\Shared\PostgreSQL-Main.sql" Link="PostgreSQL-Main.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\PostgreSQL\</PackagePath>
-    </None>
-    <None Include="..\Shared\SQLServer-Main.sql" Link="SQLServer-Main.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Pack>true</Pack>
-      <PackagePath>lib\$(TargetFramework)\SQLServer\</PackagePath>
-    </None>
-    <Content Include="Microsoft.Orleans.Clustering.AdoNet.targets">
-      <PackagePath>build/$(TargetFramework)/</PackagePath>
-      <Pack>true</Pack>
-    </Content>
-  </ItemGroup>
 </Project>

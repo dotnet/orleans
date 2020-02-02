@@ -28,8 +28,7 @@ namespace Tester.RelationalUtilities
                     "PostgreSQL-Main.sql",
                     "PostgreSQL-Clustering.sql",
                     "PostgreSQL-Persistence.sql",
-                    "PostgreSQL-Reminders.sql",
-                    "PostgreSQL-Statistics.sql"
+                    "PostgreSQL-Reminders.sql"
                 };
             }
         }

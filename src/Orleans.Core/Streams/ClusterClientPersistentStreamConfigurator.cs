@@ -1,68 +1,39 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
-using Orleans.Providers;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using System;
-using System.Collections.Generic;
-using System.Text;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Providers.Streams.Common;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
-    public interface IClusterClientPersistentStreamConfigurator
+    public interface IPersistentStreamConfigurator : INamedServiceConfigurator { }
+
+    public static class PersistentStreamConfiguratorExtensions
     {
-        IClusterClientPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions)
-        where TOptions : class, new();
+        public static void ConfigureStreamPubSub(this IPersistentStreamConfigurator configurator, StreamPubSubType pubsubType = StreamPubSubOptions.DEFAULT_STREAM_PUBSUB_TYPE)
+        {
+            configurator.Configure<StreamPubSubOptions>(ob => ob.Configure(options => options.PubSubType = pubsubType));
+        }
     }
+
+    public interface IClusterClientPersistentStreamConfigurator : IPersistentStreamConfigurator { }
 
     public static class ClusterClientPersistentStreamConfiguratorExtensions
     {
-        public static IClusterClientPersistentStreamConfigurator ConfigureLifecycle(this IClusterClientPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions)
+        public static void ConfigureLifecycle(this IClusterClientPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamLifecycleOptions>> configureOptions)
         {
-            configurator.Configure<StreamLifecycleOptions>(configureOptions);
-            return configurator;
-        }
-
-        public static IClusterClientPersistentStreamConfigurator ConfigureStreamPubSub(this IClusterClientPersistentStreamConfigurator configurator, StreamPubSubType pubsubType = StreamPubSubOptions.DEFAULT_STREAM_PUBSUB_TYPE)
-        {
-            configurator.Configure<StreamPubSubOptions>(ob => ob.Configure(options => options.PubSubType = pubsubType));
-            return configurator;
+            configurator.Configure(configureOptions);
         }
     }
 
-    public class ClusterClientPersistentStreamConfigurator : IClusterClientPersistentStreamConfigurator
+    public class ClusterClientPersistentStreamConfigurator : NamedServiceConfigurator, IClusterClientPersistentStreamConfigurator
     {
-        protected readonly string name;
-        protected readonly IClientBuilder clientBuilder;
-        private Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory;
         public ClusterClientPersistentStreamConfigurator(string name, IClientBuilder clientBuilder, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
+            : base(name, configureDelegate => clientBuilder.ConfigureServices(configureDelegate))
         {
-            this.name = name;
-            this.clientBuilder = clientBuilder;
-            this.adapterFactory = adapterFactory;
-            //wire stream provider into lifecycle 
-            this.clientBuilder.ConfigureServices(services => this.AddPersistentStream(services));
-        }
-
-        private void AddPersistentStream(IServiceCollection services)
-        {
-            //wire the stream provider into life cycle
-            services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<IClusterClientLifecycle>>(name, 
-                           (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<IClusterClientLifecycle>())
-                           .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory)
-                           .ConfigureNamedOptionForLogging<StreamLifecycleOptions>(name)
-                           .ConfigureNamedOptionForLogging<StreamPubSubOptions>(name);
-        }
-
-        public IClusterClientPersistentStreamConfigurator Configure<TOptions>(Action<OptionsBuilder<TOptions>> configureOptions) where TOptions : class, new()
-        {
-            clientBuilder.ConfigureServices(services =>
-            {
-                configureOptions?.Invoke(services.AddOptions<TOptions>(this.name));
-                services.ConfigureNamedOptionForLogging<TOptions>(this.name);
-            });
-            return this;
+            this.ConfigureComponent(PersistentStreamProvider.Create);
+            this.ConfigureComponent(PersistentStreamProvider.ParticipateIn<IClusterClientLifecycle>);
+            this.ConfigureComponent(adapterFactory);
         }
     }
 }

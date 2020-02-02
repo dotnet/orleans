@@ -1,4 +1,4 @@
-﻿namespace Orleans.Configuration
+namespace Orleans.Configuration
 {
     public class AzureStorageGatewayOptions
     {

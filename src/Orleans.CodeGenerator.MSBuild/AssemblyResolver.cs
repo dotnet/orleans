@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,9 +6,6 @@ using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.Extensions.DependencyModel;
 using Microsoft.Extensions.DependencyModel.Resolution;
-#if NETCOREAPP2_0
-
-#endif
 
 namespace Microsoft.Orleans.CodeGenerator.MSBuild
 {
@@ -20,7 +17,7 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
         private readonly ICompilationAssemblyResolver assemblyResolver;
 
         private readonly DependencyContext resolverRependencyContext;
-#if NETCOREAPP2_0
+#if NETCOREAPP
         private readonly AssemblyLoadContext loadContext;
 #endif
 
@@ -37,7 +34,7 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
                 });
 
             AppDomain.CurrentDomain.AssemblyResolve += this.ResolveAssembly;
-#if NETCOREAPP2_0
+#if NETCOREAPP
             this.loadContext = AssemblyLoadContext.GetLoadContext(typeof(AssemblyResolver).Assembly);
             this.loadContext.Resolving += this.AssemblyLoadContextResolving;
             if (this.loadContext != AssemblyLoadContext.Default)
@@ -51,7 +48,7 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
         {
             AppDomain.CurrentDomain.AssemblyResolve -= this.ResolveAssembly;
 
-#if NETCOREAPP2_0
+#if NETCOREAPP
             this.loadContext.Resolving -= this.AssemblyLoadContextResolving;
             if (this.loadContext != AssemblyLoadContext.Default)
             {
@@ -110,7 +107,7 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
         {
             try
             {
-#if NETCOREAPP2_0
+#if NETCOREAPP
                 return this.loadContext.LoadFromAssemblyPath(path);
 #else
                 return Assembly.LoadFrom(path);
@@ -122,7 +119,7 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
             }
         }
 
-#if !NETCOREAPP2_0
+#if !NETCOREAPP
         internal class AssemblyLoadContext
         {
         }

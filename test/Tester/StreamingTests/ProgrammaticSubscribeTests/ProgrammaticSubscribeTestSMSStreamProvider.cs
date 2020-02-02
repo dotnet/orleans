@@ -1,12 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Orleans;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -15,7 +7,7 @@ using Xunit.Abstractions;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 {
-    [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Functional")]
+    [TestCategory("BVT"), TestCategory("Streaming")]
     public class ProgrammaticSubscribeTestSMSStreamProvider : ProgrammaticSubcribeTestsRunner, IClassFixture<ProgrammaticSubscribeTestSMSStreamProvider.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
@@ -26,9 +18,9 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             }
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName);
                 hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName2, options => options.PubSubType = StreamPubSubType.ExplicitGrainBasedOnly)

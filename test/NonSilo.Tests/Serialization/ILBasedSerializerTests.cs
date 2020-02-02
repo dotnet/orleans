@@ -37,19 +37,20 @@ namespace UnitTests.Serialization
 
             var generator = new ILSerializerGenerator();
             var serializers = generator.GenerateSerializer(input.GetType(), f => f.Name != "One", f => f.Name != "Three");
-            var writer = new SerializationContext(this.fixture.SerializationManager)
+            var writer = new BinaryTokenStreamWriter();
+            var context = new SerializationContext(this.fixture.SerializationManager)
             {
-                StreamWriter = new BinaryTokenStreamWriter()
+                StreamWriter = writer
             };
-            var copy = (FieldTest)serializers.DeepCopy(input, writer);
+            var copy = (FieldTest)serializers.DeepCopy(input, context);
             Assert.Equal(1, copy.One);
             Assert.Equal(2, copy.Two);
             Assert.Equal(0, copy.Three);
             
-            serializers.Serialize(input, writer, input.GetType());
+            serializers.Serialize(input, context, input.GetType());
             var reader = new DeserializationContext(this.fixture.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(writer.ToByteArray())
             };
             var deserialized = (FieldTest)serializers.Deserialize(input.GetType(), reader);
 
@@ -67,14 +68,15 @@ namespace UnitTests.Serialization
             var input = new FieldTest();
             var generator = new ILSerializerGenerator();
             var serializers = generator.GenerateSerializer(input.GetType());
-            var writer = new SerializationContext(this.fixture.SerializationManager)
+            var writer = new BinaryTokenStreamWriter();
+            var context = new SerializationContext(this.fixture.SerializationManager)
             {
-                StreamWriter = new BinaryTokenStreamWriter()
+                StreamWriter = writer
             };
-            serializers.Serialize(input, writer, input.GetType());
+            serializers.Serialize(input, context, input.GetType());
             var reader = new DeserializationContext(this.fixture.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(writer.ToByteArray())
             };
             var deserialized = (FieldTest)serializers.Deserialize(input.GetType(), reader);
 
@@ -97,14 +99,15 @@ namespace UnitTests.Serialization
             };
             var generator = new ILSerializerGenerator();
             var serializers = generator.GenerateSerializer(input.GetType());
-            var writer = new SerializationContext(this.fixture.SerializationManager)
+            var writer = new BinaryTokenStreamWriter();
+            var context = new SerializationContext(this.fixture.SerializationManager)
             {
-                StreamWriter = new BinaryTokenStreamWriter()
+                StreamWriter = writer
             };
-            serializers.Serialize(input, writer, input.GetType());
+            serializers.Serialize(input, context, input.GetType());
             var reader = new DeserializationContext(this.fixture.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(writer.ToByteArray())
             };
             var deserialized = (FieldTest) serializers.Deserialize(input.GetType(), reader);
 
@@ -207,18 +210,21 @@ namespace UnitTests.Serialization
 
         private T SerializerLoop<T>(T input)
         {
+#pragma warning disable CS0618 // Type or member is obsolete
             var serializer = new ILBasedSerializer(new CachedTypeResolver());
+#pragma warning restore CS0618 // Type or member is obsolete
             Assert.True(serializer.IsSupportedType(input.GetType()));
-            
+
+            var writer = new BinaryTokenStreamWriter();
             var serializationContext =
                 new SerializationContext(this.fixture.SerializationManager)
                 {
-                    StreamWriter = new BinaryTokenStreamWriter()
+                    StreamWriter = writer
                 };
             serializer.Serialize(input, serializationContext, typeof(T));
             var deserializationContext = new DeserializationContext(this.fixture.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(serializationContext.StreamWriter.ToBytes())
+                StreamReader = new BinaryTokenStreamReader(writer.ToBytes())
             };
 
             return (T) serializer.Deserialize(typeof(T), deserializationContext);

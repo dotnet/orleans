@@ -6,20 +6,19 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging;
+using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.DependencyInjection;
-using LogLevel = Microsoft.Extensions.Logging.LogLevel;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Configuration;
+using Orleans.Configuration.Overrides;
+using Orleans.Persistence.AzureStorage;
+using Orleans.Providers.Azure;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
-using Orleans.Providers.Azure;
-using Orleans.Persistence.AzureStorage;
-using Orleans.Configuration.Overrides;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Storage
 {
@@ -38,7 +37,7 @@ namespace Orleans.Storage
 
         private GrainStateTableDataManager tableDataManager;
         private JsonSerializerSettings JsonSettings;
-        
+
         // each property can hold 64KB of data and each entity can take 1MB in total, so 15 full properties take
         // 15 * 64 = 960 KB leaving room for the primary key, timestamp etc
         private const int MAX_DATA_CHUNK_SIZE = 64 * 1024;
@@ -50,7 +49,7 @@ namespace Orleans.Storage
         private string name;
 
         /// <summary> Default constructor </summary>
-        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, IOptions<ClusterOptions> clusterOptions, SerializationManager serializationManager, 
+        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, IOptions<ClusterOptions> clusterOptions, SerializationManager serializationManager,
             IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory)
         {
             this.options = options;
@@ -80,9 +79,8 @@ namespace Orleans.Storage
                 var entity = record.Entity;
                 if (entity != null)
                 {
-                    var stateType = grainState.State.GetType();
-                    var loadedState = ConvertFromStorageFormat(entity, stateType);
-                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.State.GetType());
+                    var loadedState = ConvertFromStorageFormat(entity, grainState.Type);
+                    grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
                     grainState.ETag = record.ETag;
                 }
             }
@@ -160,7 +158,7 @@ namespace Orleans.Storage
             {
                 await updateOperation.Invoke().ConfigureAwait(false);
             }
-            catch (StorageException ex) when (ex.IsPreconditionFailed() || ex.IsConflict())
+            catch (StorageException ex) when (ex.IsPreconditionFailed() || ex.IsConflict() || ex.IsNotFound())
             {
                 throw new TableStorageUpdateConditionNotSatisfiedException(grainType, grainReference, tableName, "Unknown", currentETag, ex);
             }
@@ -384,7 +382,7 @@ namespace Orleans.Storage
         private string GetKeyString(GrainReference grainReference)
         {
             var key = String.Format("{0}_{1}", this.clusterOptions.ServiceId, grainReference.ToKeyString());
-            return AzureStorageUtils.SanitizeTableProperty(key);
+            return AzureTableUtils.SanitizeTableProperty(key);
         }
 
         internal class GrainStateRecord
@@ -429,7 +427,7 @@ namespace Orleans.Storage
                 }
                 catch (Exception exc)
                 {
-                    if (AzureStorageUtils.TableStorageDataNotFound(exc))
+                    if (AzureTableUtils.TableStorageDataNotFound(exc))
                     {
                         if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "DataNotFound reading (exception): PartitionKey={0} RowKey={1} from Table={2} Exception={3}", partitionKey, rowKey, TableName, LogFormatter.PrintException(exc));
                         return null;  // No data
@@ -451,6 +449,13 @@ namespace Orleans.Storage
             public async Task Delete(GrainStateRecord record)
             {
                 var entity = record.Entity;
+
+                if (record.ETag == null)
+                {
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_DataNotFound, "Not attempting to delete non-existent persistent state: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
+                    return;
+                }
+
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_Storage_Writing, "Deleting: PartitionKey={0} RowKey={1} from Table={2} with ETag={3}", entity.PartitionKey, entity.RowKey, TableName, record.ETag);
                 await tableManager.DeleteTableEntryAsync(entity, record.ETag).ConfigureAwait(false);
                 record.ETag = null;
@@ -460,7 +465,7 @@ namespace Orleans.Storage
         /// <summary> Decodes Storage exceptions.</summary>
         public bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false)
         {
-            return AzureStorageUtils.EvaluateException(e, out httpStatusCode, out restStatus, getRESTErrors);
+            return AzureTableUtils.EvaluateException(e, out httpStatusCode, out restStatus, getRESTErrors);
         }
 
         private async Task Init(CancellationToken ct)
@@ -471,6 +476,7 @@ namespace Orleans.Storage
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"AzureTableGrainStorage {name} initializing: {this.options.ToString()}");
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, $"AzureTableGrainStorage {name} is using DataConnectionString: {ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)}");
                 this.JsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
+                this.options.ConfigureJsonSerializerSettings?.Invoke(this.JsonSettings);
                 this.tableDataManager = new GrainStateTableDataManager(this.options.TableName, this.options.ConnectionString, this.loggerFactory);
                 await this.tableDataManager.InitTableAsync();
                 stopWatch.Stop();
@@ -500,8 +506,8 @@ namespace Orleans.Storage
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<AzureTableStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureTableStorageOptions>>();
-            IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
+            var optionsSnapshot = services.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>();
+            var clusterOptions = services.GetProviderClusterOptions(name);
             return ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(services, name, optionsSnapshot.Get(name), clusterOptions);
         }
     }

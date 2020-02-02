@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -7,7 +8,7 @@ using Orleans.TestingHost;
 
 namespace TestExtensions
 {
-    public abstract class TestClusterPerTest : OrleansTestingBase, IDisposable
+    public abstract class TestClusterPerTest : OrleansTestingBase, IDisposable, Xunit.IAsyncLifetime
     {
         private readonly ExceptionDispatchInfo preconditionsException;
         static TestClusterPerTest()
@@ -40,7 +41,6 @@ namespace TestExtensions
 
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
-            builder.ConfigureLegacyConfiguration();
             this.ConfigureTestCluster(builder);
 
             var testCluster = builder.Build();
@@ -66,6 +66,20 @@ namespace TestExtensions
         public virtual void Dispose()
         {
             this.HostedCluster?.StopAllSilos();
+        }
+
+        public virtual Task InitializeAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual async Task DisposeAsync()
+        {
+            var cluster = this.HostedCluster;
+            if (cluster != null)
+            {
+                await cluster.StopAllSilosAsync();
+            }
         }
     }
 }

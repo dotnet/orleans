@@ -1,8 +1,6 @@
-﻿
-using Orleans.Runtime;
-using Orleans.Streams;
 using System;
 using System.Collections.Generic;
+using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
@@ -24,7 +22,7 @@ namespace Orleans.Configuration
         private readonly AzureQueueOptions options;
         private readonly string name;
 
-        public AzureQueueOptionsValidator(AzureQueueOptions options, string name)
+        private AzureQueueOptionsValidator(AzureQueueOptions options, string name)
         {
             this.options = options;
             this.name = name;
@@ -39,6 +37,12 @@ namespace Orleans.Configuration
             if (options.QueueNames == null || options.QueueNames?.Count == 0)
                 throw new OrleansConfigurationException(
                     $"{nameof(AzureQueueOptions)} on stream provider {this.name} is invalid. {nameof(AzureQueueOptions.QueueNames)} is invalid");
+        }
+
+        public static IConfigurationValidator Create(IServiceProvider services, string name)
+        {
+            AzureQueueOptions aqOptions = services.GetOptionsByName<AzureQueueOptions>(name);
+            return new AzureQueueOptionsValidator(aqOptions, name);
         }
     }
 }

@@ -1,8 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;DependsOnPostBuildPublish">
+<Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
-    <RuntimeIdentifier />
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <NoPackageAnalysis>true</NoPackageAnalysis>
@@ -32,66 +31,28 @@
   <ItemGroup>
     <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
-    <PackageReference Include="System.Runtime.Loader" Version="$(SystemRuntimeVersion)" />
-    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftExtensionsDependencyModelVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsLoggingVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
-    <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildVersion)" />
-    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildVersion)" />
-    <PackageReference Include="Microsoft.Build" Version="$(MicrosoftBuildVersion)" />
-    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="$(MicrosoftBuildVersion)" />
-    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildVersion)" />
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftExtensionsDependencyModelVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsLoggingVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="$(MicrosoftExtensionsLoggingVersion)" />
+    <PackageReference Include="Microsoft.Build" Version="$(MicrosoftBuildVersion)" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
   </ItemGroup>
-  
-  <!-- Start: PostBuildPublish -->
-  <!-- In order to support incremental builds, only call the Publish target if inputs have changed. -->
-  <PropertyGroup>
-    <PublishCacheFileDir Condition="'$(IntermediateOutputPath)' != ''">$(IntermediateOutputPath)</PublishCacheFileDir>
-    <PublishCacheFileDir Condition="'$(PublishCacheFileDir)' == ''">obj\$(Configuration)\$(TargetFramework)\</PublishCacheFileDir>
-    <PublishCacheFile>$(PublishCacheFileDir)$(MSBuildProjectFile).Publish.cache</PublishCacheFile>
-  </PropertyGroup>
 
+  <!-- Packages included explicitly to prevent build warnings about inconsistent versions -->
   <ItemGroup>
-    <PostBuildPublishInputs Include="@(Compile);@(ReferencePath)" Visible="false" />
-    <PostBuildPublishInputs Remove="@(GeneratedAssemblyInfoFile)" />
+    <PackageReference Include="Microsoft.Win32.Registry" Version="$(MicrosoftWin32RegistryVersion)" />
+    <PackageReference Include="System.CodeDom" Version="$(SystemCodeDomVersion)" />
   </ItemGroup>
 
-  <Target
-    Name="DependsOnPostBuildPublish"
-    DependsOnTargets="PostBuildPublish" />
 
-  <Target
-    Name="PostBuildPublish"
-    AfterTargets="Build"
-    DependsOnTargets="ResolveAssemblyReferences"
-    Inputs="@(PostBuildPublishInputs)"
-    Outputs="$(PublishCacheFile)"
-    Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" >
-    
-    <CallTarget Targets="Publish" />
-
-    <Hash ItemsToHash="@(PostBuildPublishInputs)">
-      <Output TaskParameter="HashResult" PropertyName="Orleans_UpdatedInputPubCacheContents" />
-    </Hash>
-
-    <WriteLinesToFile
-      Overwrite="true"
-      File="$(PublishCacheFile)"
-      Lines="$(Orleans_UpdatedInputPubCacheContents)"
-      WriteOnlyWhenDifferent="True" />
-
-    <ItemGroup>
-      <FileWrites Include="$(PublishCacheFile)" />
-    </ItemGroup>
+  <Target Name="PostBuildPublish" AfterTargets="Build">
+    <!-- So that we can create a nuget package which includes all dependencies, we publish the build. -->
+    <!-- However, we cannot publish during the cross-targeting build, so we skip that. -->
+    <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
   </Target>
-  <!-- END: PostBuildPublish -->
+
 </Project>

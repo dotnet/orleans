@@ -5,19 +5,20 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Queue;
+using Microsoft.Azure.Storage.Queue;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Configuration;
-using Orleans.Serialization;
+using Orleans.Internal;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -41,10 +42,13 @@ namespace Tester.AzureUtils.Streaming
             this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
             BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
         }
-        
+
         public void Dispose()
         {
-            AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, TestDefaultConfiguration.DataConnectionString).Wait();
+            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            {
+                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, TestDefaultConfiguration.DataConnectionString).Wait();
+            }
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("Halo")]
@@ -56,8 +60,19 @@ namespace Tester.AzureUtils.Streaming
                 MessageVisibilityTimeout = TimeSpan.FromSeconds(30),
                 QueueNames = azureQueueNames
             };
-            var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, options, new SimpleQueueCacheOptions(), this.fixture.Services, this.fixture.Services.GetService<IOptions<ClusterOptions>>(), 
-                this.fixture.Services.GetRequiredService<SerializationManager>(), loggerFactory);
+            var serializationManager = this.fixture.Services.GetService<SerializationManager>();
+            var clusterOptions = this.fixture.Services.GetRequiredService<IOptions<ClusterOptions>>();
+            var queueCacheOptions = new SimpleQueueCacheOptions();
+            var queueDataAdapter = new AzureQueueDataAdapterV2(serializationManager);
+            var adapterFactory = new AzureQueueAdapterFactory(
+                AZURE_QUEUE_STREAM_PROVIDER_NAME,
+                options,
+                queueCacheOptions,
+                queueDataAdapter,
+                this.fixture.Services,
+                clusterOptions,
+                serializationManager,
+                loggerFactory);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }

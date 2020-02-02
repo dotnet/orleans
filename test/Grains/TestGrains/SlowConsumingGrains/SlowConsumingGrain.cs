@@ -1,4 +1,5 @@
-﻿using Orleans;
+using Microsoft.Extensions.Logging;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System;
@@ -15,12 +16,17 @@ namespace UnitTests.Grains
     /// </summary>
     public class SlowConsumingGrain : Grain, ISlowConsumingGrain
     {
-        private Logger logger;
+        private ILogger logger;
         public SlowObserver<int> ConsumerObserver { get; private set; }
         public StreamSubscriptionHandle<int> ConsumerHandle { get; set; }
+
+        public SlowConsumingGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(this.GetType().Name + base.IdentityString);
             logger.Info("OnActivateAsync");
             ConsumerHandle = null;
             return Task.CompletedTask;
@@ -58,13 +64,13 @@ namespace UnitTests.Grains
     public class SlowObserver<T> : IAsyncObserver<T>
     {
         public int NumConsumed { get; private set; }
-        private Logger logger;
+        private ILogger logger;
         private SlowConsumingGrain slowConsumingGrain;
-        internal SlowObserver(SlowConsumingGrain grain, Logger logger)
+        internal SlowObserver(SlowConsumingGrain grain, ILogger logger)
         {
             NumConsumed = 0;
             this.slowConsumingGrain = grain;
-            this.logger = logger.GetSubLogger(this.GetType().Name);
+            this.logger = logger;
         }
 
         public async Task OnNextAsync(T item, StreamSequenceToken token = null)

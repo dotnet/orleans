@@ -1,10 +1,13 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
+using Orleans.Internal;
 using Orleans.Runtime.Messaging;
 using Orleans.Streams;
 
@@ -13,10 +16,9 @@ namespace Orleans.Runtime
     /// <summary>
     /// A client which is hosted within a silo.
     /// </summary>
-    internal sealed class HostedClient : IDisposable, IHostedClient
+    internal sealed class HostedClient : IDisposable, IHostedClient, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly BlockingCollection<Message> incomingMessages = new BlockingCollection<Message>();
-        private readonly CancellationTokenSource listeningCts = new CancellationTokenSource();
+        private readonly Channel<Message> incomingMessages;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> extensionsTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
         private readonly AsyncLock lockable = new AsyncLock();
         private readonly IGrainReferenceRuntime grainReferenceRuntime;
@@ -26,8 +28,9 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ISiloMessageCenter siloMessageCenter;
+        private readonly MessagingTrace messagingTrace;
         private bool disposing;
-        private Thread messagePump;
+        private Task messagePump;
 
         public HostedClient(
             IRuntimeClient runtimeClient,
@@ -37,25 +40,26 @@ namespace Orleans.Runtime
             IGrainReferenceRuntime grainReferenceRuntime,
             IInternalGrainFactory grainFactory,
             InvokableObjectManager invokableObjectManager,
-            ISiloMessageCenter messageCenter)
+            ISiloMessageCenter messageCenter,
+            MessagingTrace messagingTrace)
         {
+            this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                AllowSynchronousContinuations = false,
+            });
+
             this.runtimeClient = runtimeClient;
             this.clientObserverRegistrar = clientObserverRegistrar;
             this.grainReferenceRuntime = grainReferenceRuntime;
             this.grainFactory = grainFactory;
             this.invokableObjects = invokableObjectManager;
             this.siloMessageCenter = messageCenter;
+            this.messagingTrace = messagingTrace;
             this.logger = logger;
 
             this.ClientAddress = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, GrainId.NewClientId());
-
-            // Register with the directory and message center so that we can receive messages.
-            this.clientObserverRegistrar.SetHostedClient(this);
-            this.clientObserverRegistrar.ClientAdded(this.ClientId);
-            this.siloMessageCenter.SetHostedClient(this);
-
-            // Start pumping messages.
-            this.Start();
         }
 
         /// <inheritdoc />
@@ -137,7 +141,7 @@ namespace Orleans.Runtime
             if (!this.ClientId.Equals(message.TargetGrain)) return false;
             if (message.IsExpired)
             {
-                message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
+                this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Receive);
                 return true;
             }
 
@@ -149,7 +153,7 @@ namespace Orleans.Runtime
             else
             {
                 // Requests agrainst client objects are scheduled for execution on the client.
-                this.incomingMessages.Add(message);
+                this.incomingMessages.Writer.TryWrite(message);
             }
 
             return true;
@@ -163,44 +167,84 @@ namespace Orleans.Runtime
             Utils.SafeExecute(() => this.clientObserverRegistrar.ClientDropped(this.ClientId));
             Utils.SafeExecute(() => this.clientObserverRegistrar.SetHostedClient(null));
             Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
-            Utils.SafeExecute(() => this.listeningCts.Cancel(false));
-            Utils.SafeExecute(() => this.listeningCts.Dispose());
-            Utils.SafeExecute(() => this.messagePump?.Join());
+            Utils.SafeExecute(() => this.incomingMessages.Writer.TryComplete());
+            Utils.SafeExecute(() => this.messagePump?.GetAwaiter().GetResult());
         }
 
         private void Start()
         {
-            this.messagePump = new Thread(_ => this.RunClientMessagePump())
-            {
-                Name = nameof(HostedClient) + "." + nameof(RunClientMessagePump),
-                IsBackground = true,
-            };
-            this.messagePump.Start();
+            this.messagePump = Task.Run(this.RunClientMessagePump);
         }
 
-        private void RunClientMessagePump()
+        private async Task RunClientMessagePump()
         {
-            while (!this.listeningCts.IsCancellationRequested)
+            var reader = this.incomingMessages.Reader;
+            while (true)
             {
                 try
                 {
-                    var message = this.incomingMessages.Take(this.listeningCts.Token);
-                    if (message == null) continue;
-                    switch (message.Direction)
+                    var more = await reader.WaitToReadAsync();
+                    if (!more)
                     {
-                        case Message.Directions.OneWay:
-                        case Message.Directions.Request:
-                            this.invokableObjects.Dispatch(message);
-                            break;
-                        default:
-                            this.logger.Error(ErrorCode.Runtime_Error_100327, string.Format("Message not supported: {0}.", message));
-                            break;
+                        this.logger.LogInformation($"{nameof(HostedClient)} completed processing all messages. Shutting down.");
+                        break;
+                    }
+
+                    while (reader.TryRead(out var message))
+                    {
+                        if (message == null) continue;
+                        switch (message.Direction)
+                        {
+                            case Message.Directions.OneWay:
+                            case Message.Directions.Request:
+                                this.invokableObjects.Dispatch(message);
+                                break;
+                            default:
+                                this.logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}", message);
+                                break;
+                        }
                     }
                 }
-                catch (Exception exc)
+                catch (Exception exception)
                 {
-                    this.logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
+                    this.logger.LogError((int)ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown an exception: {Exception}. Continuing.", exception);
                 }
+            }
+        }
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
+
+            Task OnStart(CancellationToken cancellation)
+            {
+                if (cancellation.IsCancellationRequested) return Task.CompletedTask;
+
+                // Register with the directory and message center so that we can receive messages.
+                this.clientObserverRegistrar.SetHostedClient(this);
+                this.clientObserverRegistrar.ClientAdded(this.ClientId);
+                this.siloMessageCenter.SetHostedClient(this);
+
+                // Start pumping messages.
+                this.Start();
+
+                var clusterClient = this.runtimeClient.ServiceProvider.GetRequiredService<IClusterClient>();
+                return clusterClient.Connect();
+            }
+
+            async Task OnStop(CancellationToken cancellation)
+            {
+                this.incomingMessages.Writer.TryComplete();
+                
+                if (this.messagePump != null)
+                {
+                    await Task.WhenAny(cancellation.WhenCancelled(), this.messagePump);
+                }
+                
+                if (cancellation.IsCancellationRequested) return;
+
+                var clusterClient = this.runtimeClient.ServiceProvider.GetRequiredService<IClusterClient>();
+                await clusterClient.Close();
             }
         }
     }

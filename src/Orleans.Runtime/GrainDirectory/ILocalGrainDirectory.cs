@@ -5,7 +5,7 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    interface ILocalGrainDirectory : IGrainDirectory
+    internal interface ILocalGrainDirectory : IGrainDirectory
     {
         /// <summary>
         /// Starts the local portion of the directory service.
@@ -76,25 +76,6 @@ namespace Orleans.Runtime.GrainDirectory
         SiloAddress GetPrimaryForGrain(GrainId grain);
 
         /// <summary>
-        /// For testing purposes only.
-        /// Returns the silos that this silo thinks hold copied directory information for
-        /// the provided grain ID.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <returns></returns>
-        List<SiloAddress> GetSilosHoldingDirectoryInformationForGrain(GrainId grain);
-
-        /// <summary>
-        /// For testing purposes only.
-        /// Returns the directory information held by another silo for the provided grain ID.
-        /// The result will be null if no information is held.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <param name="isPrimary"></param>
-        /// <returns></returns>
-        List<ActivationAddress> GetLocalDataForGrain(GrainId grain, out bool isPrimary);
-
-        /// <summary>
         /// Returns the directory information held in a local directory partition for the provided grain ID.
         /// The result will be null if no information is held.
         /// </summary>
@@ -117,11 +98,6 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="silo">the address of the silo</param>
         /// <returns>true if the silo is known to be part of this cluster</returns>
         bool IsSiloInCluster(SiloAddress silo);
-
-        /// <summary>
-        /// The id of this cluster
-        /// </summary>
-        string ClusterId { get; }
 
         /// <summary>
         /// Sets the callback to <see cref="Catalog"/> which is called when a silo is removed from membership.

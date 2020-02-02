@@ -1,4 +1,4 @@
-﻿namespace Orleans.Configuration
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Specify options used for AzureTableBasedMembership
@@ -6,7 +6,7 @@
     public class AzureStorageClusteringOptions
     {
         /// <summary>
-        /// Retry count for Azure Table operations. 
+        /// Retry count for Azure Table operations.
         /// </summary>
         public int MaxStorageBusyRetries { get; set; }
         /// <summary>

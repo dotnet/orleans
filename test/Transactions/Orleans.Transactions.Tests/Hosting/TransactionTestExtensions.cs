@@ -6,7 +6,7 @@ namespace Orleans.Transactions.Tests
     public static class TransactionTestExtensions
     {
         // control the tracing of the various components of the transaction mechanism
-        public static ISiloHostBuilder ConfigureTracingForTransactionTests(this ISiloHostBuilder hostBuilder)
+        public static ISiloBuilder ConfigureTracingForTransactionTests(this ISiloBuilder hostBuilder)
         {
             return hostBuilder
                  .ConfigureLogging(builder => builder.AddFilter("SingleStateTransactionalGrain.data", LogLevel.Trace))

@@ -1,20 +1,18 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.LeaseProviders;
 using Orleans.Providers;
-using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
@@ -30,6 +28,7 @@ namespace Tester.AzureUtils.Lease
 
         //since lease length is 1 min, so set time out to be two minutes to fulfill some test scenario
         public static readonly TimeSpan TimeOut = TimeSpan.FromMinutes(2);
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
@@ -37,35 +36,28 @@ namespace Tester.AzureUtils.Lease
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            private static void ConfigureServices(IServiceCollection services)
-            {
-                var leaseProviderConfig = new AzureBlobLeaseProviderConfig()
-                {
-                    DataConnectionString = TestDefaultConfiguration.DataConnectionString,
-                    BlobContainerName = "test-container-leasebasedqueuebalancer"
-                };
-                services.AddSingleton<AzureBlobLeaseProviderConfig>(leaseProviderConfig);
-                services.AddTransient<AzureBlobLeaseProvider>()
-                    .ConfigureNamedOptionForLogging<LeaseBasedQueueBalancerOptions>(StreamProviderName);
-                services.AddOptions<LeaseBasedQueueBalancerOptions>(StreamProviderName).Configure(options =>
-               {
-                   options.LeaseProviderType = typeof(AzureBlobLeaseProvider);
-                   options.LeaseLength = TimeSpan.FromSeconds(15);
-               });
-                
-            }
-
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
-                    .ConfigureServices(ConfigureServices)
-                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>b
-                    .ConfigurePartitioning(totalQueueCount)
-                    .UseClusterConfigDeploymentLeaseBasedBalancer());
-
-                hostBuilder
+                    .UseAzureBlobLeaseProvider(ob => ob.Configure<IOptions<ClusterOptions>>((options, cluster) =>
+                    {
+                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.BlobContainerName = "cluster-" + cluster.Value.ClusterId + "-leases";
+                    }))
+                    .UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString)
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>
+                    {
+                        b.ConfigurePartitioning(totalQueueCount);
+                        b.UseLeaseBasedQueueBalancer(ob => ob.Configure(options =>
+                        {
+                            options.LeaseLength = TimeSpan.FromSeconds(15);
+                            options.LeaseRenewPeriod = TimeSpan.FromSeconds(10);
+                            options.LeaseAquisitionPeriod = TimeSpan.FromSeconds(10);
+                        }));
+                    })
+                    .ConfigureLogging(builder => builder.AddFilter($"LeaseBasedQueueBalancer-{StreamProviderName}", LogLevel.Trace))
                     .AddMemoryGrainStorage("PubSubStore");
             }
         }
@@ -104,20 +96,27 @@ namespace Tester.AzureUtils.Lease
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
         }
 
-        public static async Task<bool> AgentManagerOwnCorrectAmountOfAgents(int expectedAgentCountMin, int expectedAgentCountMax, IManagementGrain mgmtGrain, bool assertIsTrue)
+        private static async Task<bool> AgentManagerOwnCorrectAmountOfAgents(int expectedAgentCountMin, int expectedAgentCountMax, IManagementGrain mgmtGrain, bool assertIsTrue)
         {
             await Task.Delay(TimeSpan.FromSeconds(10));
+            bool pass;
             try
             {
-                if (assertIsTrue)
-                {
-                    throw new OrleansException($"AgentManager doesn't own correct amount of agents");
-                }
-
-                var agentStarted = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
-                return agentStarted.All(startedAgentInEachSilo => Convert.ToInt32(startedAgentInEachSilo) >= expectedAgentCountMin && Convert.ToInt32(startedAgentInEachSilo) <= expectedAgentCountMax);
+                object[] agentStarted = await mgmtGrain.SendControlCommandToProvider(typeof(PersistentStreamProvider).FullName, StreamProviderName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
+                int[] counts = agentStarted.Select(startedAgentInEachSilo => Convert.ToInt32(startedAgentInEachSilo)).ToArray();
+                int sum = counts.Sum();
+                pass = totalQueueCount == sum &&
+                    counts.All(startedAgentInEachSilo => startedAgentInEachSilo <= expectedAgentCountMax && startedAgentInEachSilo >= expectedAgentCountMin);
+                if(!pass && assertIsTrue)
+                    throw new OrleansException($"AgentManager doesn't own correct amount of agents: {string.Join(",", counts.Select(startedAgentInEachSilo => startedAgentInEachSilo.ToString()))}");
             }
-            catch { return false; }
+            catch
+            {
+                pass = false;
+                if (assertIsTrue)
+                    throw;
+            }
+            return pass;
         }
     }
 }

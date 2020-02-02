@@ -18,14 +18,16 @@ namespace TestExtensions.Runners
     public class GrainPersistenceTestsRunner : OrleansTestingBase
     {
         private readonly ITestOutputHelper output;
+        private readonly string grainNamespace;
         private readonly BaseTestClusterFixture fixture;
         protected readonly ILogger logger;
         protected TestCluster HostedCluster { get; private set; }
 
-        public GrainPersistenceTestsRunner(ITestOutputHelper output, BaseTestClusterFixture fixture)
+        public GrainPersistenceTestsRunner(ITestOutputHelper output, BaseTestClusterFixture fixture, string grainNamespace = "UnitTests.Grains")
         {
             this.output = output;
             this.fixture = fixture;
+            this.grainNamespace = grainNamespace;
             this.logger = fixture.Logger;
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
@@ -37,7 +39,7 @@ namespace TestExtensions.Runners
         public async Task Grain_GrainStorage_Delete()
         {
             Guid id = Guid.NewGuid();
-            IGrainStorageTestGrain grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id);
+            IGrainStorageTestGrain grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id, this.grainNamespace);
 
             await grain.DoWrite(1);
 
@@ -56,7 +58,7 @@ namespace TestExtensions.Runners
         public async Task Grain_GrainStorage_Read()
         {
             Guid id = Guid.NewGuid();
-            IGrainStorageTestGrain grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id);
+            IGrainStorageTestGrain grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id, this.grainNamespace);
 
             int val = await grain.GetValue();
 
@@ -67,7 +69,7 @@ namespace TestExtensions.Runners
         public async Task Grain_GuidKey_GrainStorage_Read_Write()
         {
             Guid id = Guid.NewGuid();
-            IGrainStorageTestGrain grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id);
+            IGrainStorageTestGrain grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id, this.grainNamespace);
 
             int val = await grain.GetValue();
 
@@ -90,7 +92,7 @@ namespace TestExtensions.Runners
         public async Task Grain_LongKey_GrainStorage_Read_Write()
         {
             long id = random.Next();
-            IGrainStorageTestGrain_LongKey grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain_LongKey>(id);
+            IGrainStorageTestGrain_LongKey grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain_LongKey>(id, this.grainNamespace);
 
             int val = await grain.GetValue();
 
@@ -116,7 +118,7 @@ namespace TestExtensions.Runners
             string extKey = random.Next().ToString(CultureInfo.InvariantCulture);
 
             IGrainStorageTestGrain_LongExtendedKey
-                grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain_LongExtendedKey>(id, extKey, null);
+                grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain_LongExtendedKey>(id, extKey, this.grainNamespace);
 
             int val = await grain.GetValue();
 
@@ -147,7 +149,7 @@ namespace TestExtensions.Runners
             string extKey = random.Next().ToString(CultureInfo.InvariantCulture);
 
             IGrainStorageTestGrain_GuidExtendedKey
-                grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain_GuidExtendedKey>(id, extKey, null);
+                grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain_GuidExtendedKey>(id, extKey, this.grainNamespace);
 
             int val = await grain.GetValue();
 
@@ -176,7 +178,7 @@ namespace TestExtensions.Runners
         {
             long id = random.Next();
 
-            IGrainStorageGenericGrain<int> grain = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<int>>(id);
+            IGrainStorageGenericGrain<int> grain = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<int>>(id, this.grainNamespace);
 
             int val = await grain.GetValue();
 
@@ -200,7 +202,7 @@ namespace TestExtensions.Runners
         {
             long id = random.Next();
 
-            IGrainStorageGenericGrain<List<int>> grain = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<List<int>>>(id);
+            IGrainStorageGenericGrain<List<int>> grain = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<List<int>>>(id, this.grainNamespace);
 
             var val = await grain.GetValue();
 
@@ -226,11 +228,11 @@ namespace TestExtensions.Runners
             long id2 = id1;
             long id3 = id1;
 
-            IGrainStorageGenericGrain<int> grain1 = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<int>>(id1);
+            IGrainStorageGenericGrain<int> grain1 = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<int>>(id1, this.grainNamespace);
 
-            IGrainStorageGenericGrain<string> grain2 = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<string>>(id2);
+            IGrainStorageGenericGrain<string> grain2 = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<string>>(id2, this.grainNamespace);
 
-            IGrainStorageGenericGrain<double> grain3 = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<double>>(id3);
+            IGrainStorageGenericGrain<double> grain3 = this.GrainFactory.GetGrain<IGrainStorageGenericGrain<double>>(id3, this.grainNamespace);
 
             int val1 = await grain1.GetValue();
             Assert.Equal(0, val1);  // "Initial value - 1"
@@ -292,7 +294,7 @@ namespace TestExtensions.Runners
             output.WriteLine("ClusterId={0} ServiceId={1}", this.HostedCluster.Options.ClusterId, initialServiceId);
 
             Guid id = Guid.NewGuid();
-            IGrainStorageTestGrain grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id);
+            IGrainStorageTestGrain grain = this.GrainFactory.GetGrain<IGrainStorageTestGrain>(id, this.grainNamespace);
 
             int val = await grain.GetValue();
 

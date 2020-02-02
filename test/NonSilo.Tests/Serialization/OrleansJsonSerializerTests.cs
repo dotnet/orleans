@@ -22,8 +22,9 @@ namespace UnitTests.Serialization
 
         public OrleansJsonSerializerTests()
         {
-            var config = new ClientConfiguration { SerializationProviders = { typeof(OrleansJsonSerializer) } };
-            this.environment = SerializationTestEnvironment.InitializeWithDefaults(config);
+            this.environment = SerializationTestEnvironment.InitializeWithDefaults(
+                builder => builder.Configure<SerializationProviderOptions>(
+                    options => options.SerializationProviders.Add(typeof(OrleansJsonSerializer))));
         }
 
         [Fact]

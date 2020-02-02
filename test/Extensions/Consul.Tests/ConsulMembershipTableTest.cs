@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -105,6 +105,12 @@ namespace Consul.Tests
         public async Task MembershipTable_Consul_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive(false);
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task MembershipTable_Consul_CleanupDefunctSiloEntries()
+        {
+            await MembershipTable_CleanupDefunctSiloEntries(false);
         }
     }
 }

@@ -78,6 +78,7 @@ namespace Orleans.Storage
                 this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(
                     OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory),
                     this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
+                this.options.ConfigureJsonSerializerSettings?.Invoke(this.jsonSettings);
 
                 this.logger.LogInformation((int)ErrorCode.StorageProviderBase, $"AWS DynamoDB Grain Storage {this.name} is initializing: {initMsg}");
 
@@ -143,8 +144,8 @@ namespace Orleans.Storage
 
             if (record != null)
             {
-                var loadedState = ConvertFromStorageFormat(record);
-                grainState.State = loadedState ?? Activator.CreateInstance(grainState.State.GetType());
+                var loadedState = ConvertFromStorageFormat(record, grainState.Type);
+                grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
                 grainState.ETag = record.ETag.ToString();
             }
 
@@ -301,7 +302,7 @@ namespace Orleans.Storage
             return AWSUtils.ValidateDynamoDBPartitionKey(key);
         }
 
-        internal object ConvertFromStorageFormat(GrainStateRecord entity)
+        internal object ConvertFromStorageFormat(GrainStateRecord entity, Type stateType)
         {
             var binaryData = entity.BinaryState;
             var stringData = entity.StringState;
@@ -316,7 +317,7 @@ namespace Orleans.Storage
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {
-                    dataValue = JsonConvert.DeserializeObject<object>(stringData, this.jsonSettings);
+                    dataValue = JsonConvert.DeserializeObject(stringData, stateType, this.jsonSettings);
                 }
 
                 // Else, no data found
@@ -382,8 +383,8 @@ namespace Orleans.Storage
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<DynamoDBStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<DynamoDBStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(services, optionsSnapshot.Get(name), name);
+            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>();
+            return ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(services, optionsMonitor.Get(name), name);
         }
     }
 }

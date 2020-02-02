@@ -15,9 +15,12 @@ namespace Orleans.Streams
         /// <summary>
         /// Initialize this instance
         /// </summary>
-        /// <param name="queueMapper"></param>
-        /// <returns></returns>
         Task Initialize(IStreamQueueMapper queueMapper);
+
+        /// <summary>
+        /// Shutdown queue balancer
+        /// </summary>
+        Task Shutdown();
 
         /// <summary>
         /// Retrieves the latest queue distribution for this balancer.

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
@@ -14,6 +14,7 @@ namespace UnitTests.GrainInterfaces
 
         Task<string> Echo(string data);
         Task<string> EchoError(string data);
+        Task<Nullable<DateTime>> EchoNullable(Nullable<DateTime> value);
     }
 
     public interface IEchoTaskGrain : IGrainWithGuidKey
@@ -58,5 +59,10 @@ namespace UnitTests.GrainInterfaces
         Task<string> CallMethodAV_Await(string data);
         Task<string> CallMethodTask_Block(string data);
         Task<string> CallMethodAV_Block(string data);
+    }
+
+    public interface IDebuggerHelperTestGrain : IGrain
+    {
+        Task OrleansDebuggerHelper_GetGrainInstance_Test();
     }
 }
