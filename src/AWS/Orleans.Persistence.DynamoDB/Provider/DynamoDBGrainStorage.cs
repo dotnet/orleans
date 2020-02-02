@@ -94,7 +94,9 @@ namespace Orleans.Storage
                     {
                         new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
                         new AttributeDefinition { AttributeName = GRAIN_TYPE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
-                    }, this.options.TimeToLive.HasValue ? GRAIN_TTL_PROPERTY_NAME : null);
+                    },
+                    secondaryIndexes: null,
+                    ttlAttributeName: this.options.TimeToLive.HasValue ? GRAIN_TTL_PROPERTY_NAME : null);
                 stopWatch.Stop();
                 this.logger.LogInformation((int)ErrorCode.StorageProviderBase,
                     $"Initializing provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
