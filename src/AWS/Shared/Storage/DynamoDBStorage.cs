@@ -6,13 +6,9 @@ using Orleans;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.Model;
-using Amazon.Runtime;
-using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB
@@ -76,6 +72,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="keys">The keys definitions</param>
         /// <param name="attributes">The attributes used on the key definition</param>
         /// <param name="secondaryIndexes">(optional) The secondary index definitions</param>
+        /// <param name="ttlAttributeName">(optional) The name of the item attribute that indicates the item TTL (if null, ttl won't be enabled)</param>
         /// <returns></returns>
         public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
