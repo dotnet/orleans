@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -74,7 +74,7 @@ namespace DefaultCluster.Tests
             this.runtimeClient = this.HostedCluster.ServiceProvider.GetRequiredService<IRuntimeClient>();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable")]
         public async Task TestClientAddressableHappyPath()
         {
             var myOb = new MyPseudoGrain();
@@ -89,7 +89,7 @@ namespace DefaultCluster.Tests
             this.runtimeClient.DeleteObjectReference(myRef);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable")]
         public async Task TestClientAddressableSadPath()
         {
             const string message = "o hai!";
@@ -107,7 +107,7 @@ namespace DefaultCluster.Tests
             this.runtimeClient.DeleteObjectReference(myRef);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable")]
         public async Task GrainShouldSuccessfullyPullFromClientObject()
         {
             var myOb = new MyProducer();
@@ -124,7 +124,7 @@ namespace DefaultCluster.Tests
             this.runtimeClient.DeleteObjectReference(myRef);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable")]
         public async Task MicroClientAddressableSerialStressTest()
         {
             const int iterationCount = 1000;
@@ -139,7 +139,7 @@ namespace DefaultCluster.Tests
             this.runtimeClient.DeleteObjectReference(myRef);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("ClientAddressable")]
         public async Task MicroClientAddressableParallelStressTest()
         {
             const int iterationCount = 1000;

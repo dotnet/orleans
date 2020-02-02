@@ -4,6 +4,8 @@
     <Title>Microsoft Orleans Client Libraries</Title>
     <Description>Collection of Microsoft Orleans libraries and files needed on the client.</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
 </Project>

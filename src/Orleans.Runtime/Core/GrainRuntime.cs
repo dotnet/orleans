@@ -5,6 +5,8 @@ using Orleans.Configuration;
 using Orleans.Core;
 using Orleans.Timers;
 using Orleans.Storage;
+using Orleans.Runtime.Scheduler;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime
 {
@@ -99,11 +101,24 @@ namespace Orleans.Runtime
             return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, grainStorage, this.loggerFactory);
         }
 
-        private static void CheckRuntimeContext()
+        public static void CheckRuntimeContext()
         {
-            if (RuntimeContext.Current == null)
+            var context = RuntimeContext.Current;
+
+            if (context == null)
             {
-                throw new InvalidOperationException("Activation access violation. A non-activation thread attempted to access activation services.");
+                // Move exceptions into local functions to help inlining this method.
+                ThrowMissingContext();
+                void ThrowMissingContext() => throw new InvalidOperationException("Activation access violation. A non-activation thread attempted to access activation services.");
+            }
+
+            if (context.ActivationContext is SchedulingContext schedulingContext
+                && schedulingContext.Activation is ActivationData activation
+                && (activation.State == ActivationState.Invalid || activation.State == ActivationState.FailedToActivate))
+            {
+                // Move exceptions into local functions to help inlining this method.
+                ThrowInvalidActivation(activation);
+                void ThrowInvalidActivation(ActivationData activationData) => throw new InvalidOperationException($"Attempt to access an invalid activation: {activationData}");
             }
         }
     }

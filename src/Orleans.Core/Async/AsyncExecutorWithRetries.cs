@@ -3,13 +3,13 @@ using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-namespace Orleans
+namespace Orleans.Internal
 {
     /// <summary>
     /// This class is a convenient utility class to execute a certain asynchronous function with retries,
     /// allowing to specify custom retry filters and policies.
     /// </summary>
-    internal static class AsyncExecutorWithRetries
+    public static class AsyncExecutorWithRetries
     {
         public static readonly int INFINITE_RETRIES = -1;
 
@@ -196,12 +196,12 @@ namespace Orleans
     // Implementations should be imutable.
     // If mutable state is needed, extend the next function to pass the state from the caller.
     // example: TimeSpan Next(int attempt, object state, out object newState);
-    internal interface IBackoffProvider
+    public interface IBackoffProvider
     {
         TimeSpan Next(int attempt);
     }
 
-    internal class FixedBackoff : IBackoffProvider
+    public class FixedBackoff : IBackoffProvider
     {
         private readonly TimeSpan fixedDelay;
 

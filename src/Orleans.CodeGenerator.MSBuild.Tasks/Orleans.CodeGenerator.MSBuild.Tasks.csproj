@@ -10,4 +10,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Build.Tasks.Core" Version="$(MicrosoftBuildVersion)" />
   </ItemGroup>
+
+  <!-- Packages included explicitly to prevent build warnings about inconsistent versions -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Win32.Registry" Version="$(MicrosoftWin32RegistryVersion)" />
+  </ItemGroup>
+
 </Project>

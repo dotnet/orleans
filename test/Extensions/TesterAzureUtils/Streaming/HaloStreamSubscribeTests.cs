@@ -1,23 +1,21 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
+using Tester.AzureUtils.Streaming;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
-using Orleans.Hosting;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Tester.AzureUtils.Streaming;
 
 namespace UnitTests.HaloTests.Streaming
 {
@@ -36,9 +34,9 @@ namespace UnitTests.HaloTests.Streaming
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }
 
-            private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class SiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
@@ -54,7 +52,7 @@ namespace UnitTests.HaloTests.Streaming
                             options.DeleteStateOnClear = true;
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName, b=>b
+                        .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>b
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
@@ -62,7 +60,7 @@ namespace UnitTests.HaloTests.Streaming
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                             })));
                     hostBuilder
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2", b=>b
+                        .AddAzureQueueStreams("AzureQueueProvider2", b=>b
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
@@ -75,12 +73,15 @@ namespace UnitTests.HaloTests.Streaming
             public override void Dispose()
             {
                 base.Dispose();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, 
-                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                    TestDefaultConfiguration.DataConnectionString).Wait();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, 
-                    AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), 
-                    TestDefaultConfiguration.DataConnectionString).Wait();
+                if (this.HostedCluster != null)
+                {
+                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                        AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                        TestDefaultConfiguration.DataConnectionString).Wait();
+                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
+                        TestDefaultConfiguration.DataConnectionString).Wait();
+                }
             }
         }
 

@@ -22,9 +22,9 @@ namespace Tester.StreamingTests
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
 
-            public class SiloConfigurator : ISiloBuilderConfigurator
+            public class SiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddSimpleMessageStreamProvider(StreamProvider)
                         .AddMemoryGrainStorage("MemoryStore")
@@ -45,32 +45,32 @@ namespace Tester.StreamingTests
             streamProviderName = Fixture.StreamProvider;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_Basic()
         {
             await Test_Filter_EvenOdd(true);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_EvenOdd()
         {
             await Test_Filter_EvenOdd();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_BadFunc()
         {
             await Assert.ThrowsAsync<ArgumentException>(() =>
                  Test_Filter_BadFunc());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_TwoObsv_Different()
         {
             await Test_Filter_TwoObsv_Different();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("Filters")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
         public async Task SMS_Filter_TwoObsv_Same()
         {
             await Test_Filter_TwoObsv_Same();

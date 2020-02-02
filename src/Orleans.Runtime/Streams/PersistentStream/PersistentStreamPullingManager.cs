@@ -8,6 +8,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Configuration;
 using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
+using Orleans.Internal;
 
 namespace Orleans.Streams
 {
@@ -106,7 +107,7 @@ namespace Orleans.Streams
                 queuePrintTimer.Dispose();
                 this.queuePrintTimer = null;
             }
-            (this.queueBalancer as IDisposable)?.Dispose();
+            await this.queueBalancer.Shutdown();
             this.queueBalancer = null; 
         }
 

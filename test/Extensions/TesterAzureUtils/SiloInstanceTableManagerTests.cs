@@ -4,17 +4,15 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.AzureUtils;
+using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Clustering.AzureStorage;
-using Orleans.Configuration;
+using Orleans.Internal;
 
 namespace Tester.AzureUtils
 {
@@ -94,6 +92,34 @@ namespace Tester.AzureUtils
 
             manager.UnregisterSiloInstance(myEntry);
         }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task SiloInstanceTable_Op_CleanDeadSiloInstance()
+        {
+            // Register a silo entry
+            await manager.TryCreateTableVersionEntryAsync();
+            this.generation = 0;
+            RegisterSiloInstance();
+            // and mark it as dead
+            manager.UnregisterSiloInstance(myEntry);
+
+            // Create new active entries
+            for (int i = 1; i < 5; i++)
+            {
+                this.generation = i;
+                this.siloAddress = SiloAddressUtils.NewLocalSiloAddress(generation);
+                RegisterSiloInstance();
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(3));
+
+            await manager.CleanupDefunctSiloEntries(DateTime.Now - TimeSpan.FromSeconds(1));
+
+            var entries = await manager.FindAllSiloEntries();
+            Assert.Equal(5, entries.Count);
+            Assert.All(entries, e => Assert.NotEqual(SiloInstanceTableTestConstants.INSTANCE_STATUS_DEAD, e.Item1.Status));
+        }
+
 
         [SkippableFact, TestCategory("Functional")]
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()

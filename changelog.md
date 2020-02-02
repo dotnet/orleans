@@ -7,6 +7,589 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [2.4.5] (changes since 2.4.4)
+
+- Non-breaking improvements
+  - Make IFatalErrorHandler public so that it can be replaced by users (#6170)
+  - Allow MayInterleaveAttribute on base grains. Fix for issue #6189 (#6192)
+
+- Non-breaking bug fixes
+  - Azure table grain storage inconsistent state on not found (#6071)
+  - Removed silo status check before cleaning up system targets from… (#6072)
+  - CodeGen: fix ambiguous reference to Orleans namespace (#6171)
+
+### [3.0.2] (changes since 3.0.1)
+
+- Non-breaking improvements
+  - Specify endpoint AddressFamily in Socket constructor (#6168)
+  - Make IFatalErrorHandler public so that it can be replaced by users (#6170)
+ 
+- Non-breaking bug fixes
+  - CodeGen: fix ambiguous reference to Orleans namespace (#6171)
+
+### [3.0.1] (changes since 3.0.0)
+
+- Non-breaking improvements
+  - Azure table grain storage inconsistent state on not found (#6071)
+  - Removed silo status check before cleaing up system targets from… (#6072)
+  - Do not include grain identifier in the ILogger category name (#6122)
+ 
+- Non-breaking bug fixes
+  - Consul: support extended membership protocol (#6095)
+  - Fix routing of gateway count changed events to registered servi… (#6102)
+  - Allow negative values in TypeCodeAttribute. Fixes #6114 (#6127)
+  - DynamoDB: support extended membership protocol (#6126)
+  - Redact logged connection string in ADO storage provider during init (#6139)
+  - Fixed CodeGenerator.MSBuild cannot ResolveAssembly in .NetCore 3.0 (#6143)
+
+### [2.4.4] (changes since 2.4.3)
+
+- Non-breaking improvements
+  - Add warning message at startup (#6041)
+  - Implement CleanupDefunctSiloEntries for Consul membership provider (#6056)
+  - Fixed typo in exception (#6091)
+
+- Non-breaking bug fixes
+  - Fix potential rare NullReferenceException in GrainTimer (#6043)
+  - Consul: support extended membership protocol (#6095)
+  - Fix routing of gateway count changed events to registered servi… (#6102)
+  - Allow negative values in TypeCodeAttribute. Fixes #6114 (#6127)
+  - DynamoDB: support extended membership protocol (#6126)
+  - Redact logged connection string in ADO storage provider during init (#6139)
+
+### [3.0.0] (changes since 3.0.0-rc2)
+
+- Non-breaking improvements
+  - Added consistent logging for all messages dropped due to expiry (#6053)
+  - Implement CleanupDefunctSiloEntries for Consul membership provider (#6056)
+  - Add remark about SQL scripts to client/silo builder documentation (#6062)
+
+### [3.0.0-rc2] (changes since 3.0.0-rc1)
+
+- Non-breaking improvements
+  - Default to cleaning up dead silo entries in the cluster membership table after 7 days. (#6032)
+  - Reduce log noise in SiloConnection (#6037)
+  - Add separate SiloMessagingOptions.SystemResponseTimeout option for SystemTarget calls (#6046)
+  - Added structured logging (#6045)
+  - Transactions: support larger state sizes in Azure Table Storage (#6047)
+  - Add warning message at startup (#6041)
+  - Add TLS middleware with sample (#6035)
+  - Prevent Orleans + Kestrel from interfering with each other's networking services (#6042)
+  - Remove SQL scripts from AdoNet NuGet packages. (#6049)
+
+- Non-breaking bug fixes
+  - Add an explicit reference to Microsoft.Bcl.AsyncInterfaces pack… (#6031)
+  - Fix potential rare NullReferenceException in GrainTimer (#6043)
+
+### [1.5.10] (changes since 1.5.9)
+
+- Non-breaking bug fixes
+  - Remove activation from message target list if constructor threw an exception (#5960)
+
+### [2.4.3] (changes since 2.4.2)
+
+- Non-breaking improvements
+  - Add "UseSiloUnobservedExceptionsHandler" extensions to the ISiloBuilder (#59120)
+
+- Non-breaking bug fixes
+  - Remove activation from message target list if constructor threw an exception (#5958)
+  - Fix Connect blocked when ConnectAsync completed synchronously (#5963)
+  - Stateless worker local compatibility check (#5917)
+  - Fixed wrong condition for getting logContext (#5999)
+  - Fix UTF8 encoding settings that appear to break execution of tests. (#6001)
+  - Use MemFree when MemAvailable is not present (#6005)
+  - Specify DateTimeKind.Utc when constructing DateTime instances (#6020)
+
+### [3.0.0-rc1] (changes since 3.0.0-beta1)
+
+- Non-breaking improvements
+  - Remove unused "SetupSqlScriptFileNames" , It will cause the test to fail (#5872)
+  - Improve codegen's .NET Core 3 compatibility 2 (#5883)
+  - Improve graceful deactivation of grains performing transaction work (#5887)
+  - Add "UseSiloUnobservedExceptionsHandler" extensions to the ISiloBuilder (#59120)
+  - Add hard limits for message header and body size (#5911)
+  - Memory usage for activation data improved. (#5907)
+  - Stream configuration namespace cleanup. (#5923)
+  - Lease based queue balancer refactor. (#5914)
+  - Add detail to SiloHealthMonitor logs for superseded result (#5892)
+  - ClusterHealthMonitor: ignore superseded probes (#5930)
+  - Deny connections to known-dead silos (#5889)
+  - Set Socket.NoDelay = true by default (#5934)
+  - Adds a large sample that runs and tests locally in reliable configuration (#5909, #5953, #5951, #5955, #5984)
+  - Migrate to ASP.NET "Bedrock" abstractions (#5935)
+  - Remove AWS, Service Fabric, & ADO.NET metapackages (#5946)
+  - Improves queries by adding lock hinting to membership protocol (#5954)
+  - Bound connection attempt concurrency in ConnectionManager (#5894)
+  - Cleanup Response class & improve ToString (#5975)
+  - Fix connection log scoping (#5976)
+  - Make CollectionAgeLimitAttribute easy to use! (#5961)
+  - Remove unused IMembershipOracle interface (#5987)
+  - Move FileLoggerProvider from Core to TestingHost (#5992)
+  - Add additional internal health checks for membership (#5988)
+  - Add serializer for RegexStreamNamespacePredicate (#5989)
+  - Remove most instances of MarshalByRefObject (#5994)
+  - Make TestClusterBuilder.AddSiloBuilderConfigurator and TestClusterBuilder.AddClientBuilderConfigurator fluent style APIs. (#5995)
+  - Add IBinaryTokenStreamReader.Length property (#5997)
+  - Remove InternalsVisibleTo set for extensions by making necessary internal types public (#6000)
+  - Propagate message [de]serialization exceptions to callers (#5998)
+  - Improve MethodInfo resolution for grain call filters (#6004)
+  - Improve List<T>/ReadOnlyCollection<T> deep copy performance (#6010)
+  - Cancel pending silo monitoring probe after ProbeTimeout elapses (#6006)
+  - Simplify ConnectionListener.RunAsync (#6014)
+  - Support adding [DebuggerStepThrough] to generated classes via project option (#6017)
+  - Move from WindowsAzure.Storage library to Microsoft.AzureCosmos.Table and Microsoft.Azure.Storage.* packages. (#6013)
+  - Update dependecies to their latest versions (#6025, #5983, #5943, #5973, #5945, #5944)
+
+- Non-breaking bug fixes
+  - Protect ClientState.PendingToSend with lock (#5881)
+  - Fix NullReferenceException in AQStreamsBatchingTests.Dispose (#5888)
+  - Stateless worker local compatibility check (#5917)
+  - Remove activation from message target list if constructor threw an exception (#5958)
+  - Clear RequestContext when spawning connections (#5974)
+  - Fix potential deadlock with Connection.closeRegistration (#5986)
+  - Fixed wrong condition for getting logContext (#5999)
+  - Use MemFree when MemAvailable is not present (#6005)
+  - Avoid generating duplicate method id switch labels (#6007)
+  - CodeGen: disambiguate parameters with duplicate names (#6016)
+  - Specify DateTimeKind.Utc when constructing DateTime instances (#6020)
+  - Use half-duplex connections when accepting a connection from a pre-v3 silo (#6023)
+
+### [1.5.9] (changes since 1.5.8)
+
+- Non-breaking bug fixes
+  - Do not call release header/body on a message in the dispatcher (#5921)
+
+### [2.4.2] (changes since 2.4.1)
+
+- Non-breaking improvements
+  - Close connection on serialization error, to avoid data corruption from client. (#5899)
+  - Add details to grain invocation exception logs (#5895)
+  - Add hard limits for message header and body size (#5908)
+  - Cleanup Message constructors & Headers assignment (#5902)
+  - Remove SAEA pooling (#5915)
+  - Fix default value for MaxMessageHeaderSize and MaxMessageBodySize (#5916)
+  - Improve graceful deactivation of grains performing transaction work (#5887) (#5897)
+  - When deserializling headers, check that we consumed all bytes (#5910)
+
+- Non-breaking bug fixes
+  - Fix header deserialization error handling (#5901)
+  - Do not call release header/body on a message in the dispatcher (#5920)
+
+### [3.0.0-beta1] (changes since 2.3.0)
+
+- Non-breaking improvements
+  - Introduced general component configurator pattern. (#5437)
+  - Linux version of IHostEnvironmentStatistics (#5423)
+  - Grain extensions are now available on system targets and Grain services (#5445)
+  - Added IQueueData adapter for persistent streams. (#5450)
+  - Add Incoming grain call filter extensions for ISiloBuilder (#5466)
+  - Improve serializer performance hygiene (#5409)
+  - Add UseLinuxEnvironmentStatistics method for ISiloBuilder (#5498)
+  - Improve activation & directory convergence (#5424)
+  - Updated stream subscription handle extension functions to handle batch consumption, complerable to what is supported for subscribe. (#5502)
+  - Add square bracket guards (#5521)
+  - Enable TransactionalStateStorageTestRunner to test with custom type (#5514)
+  - Modified component configurator extension functions so order of configuration no longer matters. (#5458)
+  - Fix #5519: use local silo as default primary silo (#5522)
+  - Added batch stream production back in. (#5503)
+  - Cleanup pass of named service configurator (#5528, #5535)
+  - Dropped fluent support for Named Service Configurator (#5539)
+  - Accommodate existing RequestContext.PropagateActivityId value in ClusterClient (#5575)
+  - Fix packaging warning in Orleans.CodeGenerator.MSBuild (#5583)
+  - Provide separate options for worker & IO pool min thread counts (#5584)
+  - Implement IApplicationLifetime for ClientBuilder/SiloHostBuilder (#5586)
+  - Add Analyzers to Orleans (#5589)
+  - Improve Roslyn TypeCode generation (#5604)
+  - Update xUnit & fix minor test project issues (#5598)
+  - Remove lock from CallbackData (#5595)
+  - Execute tasks scheduled against defunct activations (#5588)
+  - Improve cleanup of activations on dead silos (#5646)
+  - Fixes #5661 by allowing configuration to pass in value of MetadataPro… (#5662)
+  - Make transaction log group max size configurable (#5656)
+  - Avoid wrapping exceptions thrown during lifecycle (#5665)
+  - Reduce default liveness probe timeout from 10 seconds to 5. (#5673)
+  - Reduce delay localdirectory when cluster membership is not stable (#5677)
+  - Create GrainReferenceKeyInfo (#5619)
+  - Add codegen error for non-awaitable grain interface methods (#5530)
+  - CodeGenerator: skip empty projects (#5689)
+  - Expose versioning from membership (#5695)
+  - Add UseAzureTableReminderService OptionsBuilder overload (#5703)
+  - Remove ExpectedClusterSize & add MaxOperationBackoffTime (#5702)
+  - Start MembershipTableCleanupAgent in Active instead of RuntimeGrainServices (#5722)
+  - Start ClusterHealthMonitor in Active instead of BecomeActive (#5723)
+  - Grain-based reminders: separate IReminderTable & IReminderTableGrain (#5714)
+  - Dispose TestCluster after tests (#5715)
+  - Check if debugger is attached before break (#5730)
+  - Add validator for DevelopmentClusterMembershipOptions (#5721)
+  - Improve lifecycle logging (#5711)
+  - Minor client/silo teardown tweaks (#5712)
+  - Use nameof instead of magic string (#5735)
+  - Configure application parts in UseTransactions (#5741)
+  - Add core tracing events (#5691)
+  - HostedClient - use a slim IClusterClient implementation (#5745)
+  - Improvements for cluster membership (#5747)
+  - Make PlacementStrategy marker classes public
+  - Changes to Orleans runtime to enable building Indexing as a NuGet package (#5674)
+  - Added better type handling to DynamoDB deserialization (#5764)
+  - Networking stack rewrite (#5436)
+  - Remove message resend support (#5770)
+  - Implement full-duplex silo-to-silo connections (#5776)
+  - Add UsePerfCounterEnvironmentStatistics overload for ISiloBuilder (#5784)
+  - Remove OrleansAzureUtils project and package (#5792)
+  - Send a snapshot of the membership table on gossip (#5796)
+  - Allow configuring outbound connection count & connection retry delay (#5798)
+  - Improve codegen's .NET Core 3 compatibility (#5799)
+  - Support configurable supported roles in transactional state. (#5802)
+  - Fix message header serialization to align with 2.x (#5803)
+  - Gossip status change on shutdown for SystemTargetBasedMembershipTable (#5804)
+  - Introduce support for network protocol versioning (#5807)
+  - Ignore superseded probe results (#5806)
+  - Log a warning when blocking application messages in MessageCenter (#5814)
+  - Wait before aborting connections to defunct silos (#5810)
+  - Check that a silo is not known to be dead before attempting a connection (#5811)
+  - Stop background transaction processing when a grain deactivates (#5832)
+  - Reject failed activations and fix possible race condition (#5825)
+  - Use simple await in Connection (#5831)
+  - Use simple await in HostedClient.RunClientMessagePump (#5830)
+  - Always log stack trace when a Task is enqueued for an invalid activation (#5833)
+  - GatewayManager: return all gateways if all are marked dead (#5813)
+  - Remove generics from grain directory caching (#5836)
+  - Refactor EventHubDataAdapter to be plugable (#5580)
+  - Change connection attempt failure timestamp (#5861)
+
+- Non-breaking bug fixes
+  - Fix catch condition (#5455)
+  - Fix DI scope issue in azure blob (#5545)
+  - On the client, close gateway connection to dead silos (#5561)
+  - Prevent NullReferenceException with some storage providers when state is Nullable<T> (#5570
+  - Fix #5565 - NullReferenceException in ConvertAsync helper (#5582)
+  - Allow default(ImmutableArray<T>) to be serialized (#5587)
+  - Fix NullReferenceException in TestCluster.cs (#5592)
+  - NoOp delete when ETag is null in AzureTableStorage provider (#5577)
+  - Fix potential NullReferenceException in PersistentStreamProvider (#5597)
+  - Fix breakage in Microsoft.Extensions.Hosting (#5610)
+  - Fix ReadLineStartingWithAsync for LinuxEnvironmentStatistics (#5608)
+  - Add null check in MessageCenter.TryDeliverToProxy (#5641)
+  - Fix Nullable<T> (#5663)
+  - Fix Transactions test (#5615)
+  - Fix #5473 - codegen fails on recursively defined types (#5688)
+  - ClusterClient: only call IRuntimeClient.Reset for OutsideRuntimeClient (#5694)
+  - Fix the test trace file name on Unix systems (#5708)
+  - Fixed reminder issue. (#5739)
+  - Fix incorrectly configured listening ports in tests (#5751)
+  - Fix concurrency bug in TestCluster (#5754)
+  - Replace Environment.FailFast with Environment.Exit (#5759)
+  - Fix OnCompleteAsync & OnErrorAsync in StreamImpl. (#5769)
+  - Fix ValidateInitialConnectivity bug (#5766)
+  - Fix #5686 - Json serialization with Postgres (#5763)
+  - Fix exception in LatestVersionSelector when there are no deployed versions of a grain. (#5720)
+  - Fix potential NullReferenceException in CallbackData (#5777)
+  - Fix build on VS 2019 16.2.0 (#5791)
+  - Fix connection preamble process (#5790)
+  - Fixed bug in SMS streams where events were not being delivered to batch observers. (#5801)
+  - Remove LocalSilo from MembershipTableSnapshot. Detect death in gossip (#5800)
+  - Fixed bug preventing OnError from being called on batch consumers. (#5812)
+  - Do not mark disconnected gateways as dead (#5817)
+  - Terminate ConfirmationWorker loop on deactivation (#5821)
+  - Call ProcessTableUpdate before GossipToOthers (#5842)
+  - Added ClientMessagingOptions.LocalAddress to ignore ConfigUtilities.GetLocalIPAddress that automatic pickups network interfaces. (#5838)
+  - Fixes packaging of analyzers (#5845)
+  - Fix potential deadlock between Catalog and LocalGrainDirectory (#5844)
+  - Log options on silo and client startup (#5859)
+  - Handle the case where the clustering provider does not support TableVersion (#5863)
+
+### [2.4.1] (changes since 2.4.0)
+
+- Non-breaking improvements
+  - Added ClientMessagingOptions.LocalAddress to ignore ConfigUtilities.GetLocalIPAddress that automatic pickups network interfaces. (#5838)
+  - Handle the case where the clustering provider does not support TableVersion (#5863)
+
+- Non-breaking bug fixes
+  - Call ProcessTableUpdate before GossipToOthers (#5842)
+  - Fix potential deadlock between Catalog and LocalGrainDirectory (#5844)
+  - Log options on silo and client startup (#5859)
+
+### [2.4.0] (changes since 2.3.0)
+
+- Non-breaking improvements
+  - Improve serializer performance hygiene (#5409)
+  - Add UseLinuxEnvironmentStatistics method for ISiloBuilder (#5498)
+  - Improve activation & directory convergence (#5424)
+  - Updated stream subscription handle extension functions to handle batch consumption, comparable to what is supported for subscribe. (#5502)
+  - Add square bracket guards (#5521)
+  - Added batch stream production back in. (#5503)
+  - Allow default(ImmutableArray<T>) to be serialized (#5587)
+  - Improve Roslyn TypeCode generation (#5604)
+  - Remove lock from CallbackData (#5595)
+  - Execute tasks scheduled against defunct activations (#5588)
+  - Make transaction log group max size configurable (#5656)
+  - Reduce delay local directory when cluster membership is not stable (#5677)
+  - Add Incoming grain call filter extensions for ISiloBuilder (#5466)
+  - ClusterClient: only call IRuntimeClient.Reset for OutsideRuntimeClient (#5694)
+  - CodeGenerator: skip empty projects (#5689)
+  - Add UseAzureTableReminderService OptionsBuilder overload (#5703)
+  - Dispose TestCluster after tests (#5715)
+  - Add validator for DevelopmentClusterMembershipOptions (#5721)
+  - Fix CategoryDiscoverer first-chance exception while debugging (#5710)
+  - Configure application parts in UseTransactions (#5741)
+  - Added better type handling to DynamoDB deserialization (#5764)
+  - Add UsePerfCounterEnvironmentStatistics overload for ISiloBuilder (#5784)
+  - Improve codegen's .NET Core 3 compatibility (#5799)
+  - Support configurable supported roles in transactional state. (#5802)
+  - Cleanup transaction confirmation worker logging. (#5815)
+  - Update xUnit & fix minor test project issues (#5598)
+  - Avoid wrapping exceptions thrown during lifecycle (#5665)
+  - Expose versioning from membership (#5695)
+  - Improve lifecycle logging (#5711)
+  - Improvements for cluster membership (#5747)
+  - Send a snapshot of the membership table on gossip (#5796)
+  - Always log stack trace when a Task is enqueued for an invalid activation (#5833)
+  - Add core tracing events (#5691)
+
+- Non-breaking bug fixes
+  - Use local silo as default primary silo (#5522)
+  - On the client, close gateway connection to dead silos (#5561)
+  - Prevent NullReferenceException with some storage providers when state is Nullable<T> (#5570)
+  - Accommodate existing RequestContext.PropagateActivityId value in ClusterClient (#5575)
+  - Fix #5565 - NullReferenceException in ConvertAsync helper (#5582)
+  - Fix NullReferenceException in TestCluster.cs (#5592)
+  - NoOp delete when ETag is null in AzureTableStorage provider (#5577)
+  - Fix potential NullReferenceException in PersistentStreamProvider (#5597)
+  - Fix breakage in Microsoft.Extensions.Hosting (#5610)
+  - Fix ReadLineStartingWithAsync for LinuxEnvironmentStatistics (#5608)
+  - Add null check in MessageCenter.TryDeliverToProxy (#5641)
+  - Improve cleanup of activations on dead silos (#5646)
+  - Fix Nullable<T> (#5663)
+  - Fixes #5661 by allowing configuration to pass in value of MetadataPro… (#5662)
+  - Fix #5473 - codegen fails on recursively defined types (#5688)
+  - Fix the test trace file name on Unix systems (#5708)
+  - Fixed DynamoDB reminder issue (#5739)
+  - Fix incorrectly configured listening ports in tests (#5751)
+  - Fix concurrency bug in TestCluster (#5754)
+  - Replace Environment.FailFast with Environment.Exit (#5759)
+  - Fix OnCompleteAsync & OnErrorAsync in StreamImpl. (#5769)
+  - Fix exception in LatestVersionSelector when there are no deployed versions of a grain. (#5720)
+  - Fix build on VS 2019 16.2.0 (#5791)
+  - Fixed bug in SMS streams where events were not being delivered to batch observers. (#5801)
+  - Fixed bug preventing OnError from being called on batch consumers. (#5812)
+  - Terminate ConfirmationWorker loop on deactivation (#5821)
+  - Stop background transaction processing when a grain deactivates (#5832)
+  - Reject failed activations and fix possible race condition (#5825)
+
+### [2.3.6] (changes since 2.3.5)
+
+- Non-breaking improvements
+  - ClusterClient: only call IRuntimeClient.Reset for OutsideRuntimeClient (#5694)
+  - CodeGenerator: skip empty projects (#5689)
+  - Add UseAzureTableReminderService OptionsBuilder overload (#5703)
+  - Dispose TestCluster after tests (#5715)
+  - Add validator for DevelopmentClusterMembershipOptions (#5721)
+  - Fix CategoryDiscoverer first-chance exception while debugging (#5710)
+  - Configure application parts in UseTransactions (#5741)
+  - Added better type handling to DynamoDB deserialization (#5764)
+
+- Non-breaking bug fixes
+  - Fix the test trace file name on Unix systems (#5708)
+  - Fixed DynamoDB reminder issue (#5739)
+  - Fix incorrectly configured listening ports in tests (#5751)
+  - Fix concurrency bug in TestCluster (#5754)
+  - Replace Environment.FailFast with Environment.Exit (#5759)
+  - Fix OnCompleteAsync & OnErrorAsync in StreamImpl. (#5769)
+  - Fix exception in LatestVersionSelector when there are no deployed versions of a grain. (#5720)
+
+### [2.3.5] (changes since 2.3.4)
+
+- Non-breaking improvements
+  - Make transaction log group max size configurable (#5656)
+  - Reduce delay local directory when cluster membership is not stable (#5677)
+  - Add Incoming grain call filter extensions for ISiloBuilder (#5466)
+
+- Non-breaking bug fixes
+  - Fixes #5661 by allowing configuration to pass in value of MetadataPro… (#5662)
+  - Fix #5473 - codegen fails on recursively defined types (#5688)
+
+### [2.3.4] (changes since 2.3.3)
+
+- Non-breaking bug fixes
+  - Fix Nullable<T> (#5663)
+
+### [2.3.3] (changes since 2.3.2)
+
+- Non-breaking improvements
+  - Allow default(ImmutableArray<T>) to be serialized (#5587)
+  - Improve Roslyn TypeCode generation (#5604)
+  - Remove lock from CallbackData (#5595)
+  - Execute tasks scheduled against defunct activations (#5588)
+
+- Non-breaking bug fixes
+  - Fix #5565 - NullReferenceException in ConvertAsync helper (#5582)
+  - Fix NullReferenceException in TestCluster.cs (#5592)
+  - NoOp delete when ETag is null in AzureTableStorage provider (#5577)
+  - Fix potential NullReferenceException in PersistentStreamProvider (#5597)
+  - Fix breakage in Microsoft.Extensions.Hosting (#5610)
+  - Fix ReadLineStartingWithAsync for LinuxEnvironmentStatistics (#5608)
+  - Add null check in MessageCenter.TryDeliverToProxy (#5641)
+  - Improve cleanup of activations on dead silos (#5646)
+
+### [2.3.2] (changes since 2.3.1)
+
+- Non-breaking bug fixes
+  - On the client, close gateway connection to dead silos (#5561)
+  - Prevent NullReferenceException with some storage providers when state is Nullable<T> (#5570)
+  - Accommodate existing RequestContext.PropagateActivityId value in ClusterClient (#5575)
+  
+### [2.3.1] (changes since 2.3.0)
+
+- Non-breaking improvements
+  - Improve serializer performance hygiene (#5409)
+  - Add UseLinuxEnvironmentStatistics method for ISiloBuilder (#5498)
+  - Improve activation & directory convergence (#5424)
+  - Updated stream subscription handle extension functions to handle batch consumption, comparable to what is supported for subscribe. (#5502)
+  - Add square bracket guards (#5521)
+  - Added batch stream production back in. (#5503)
+
+- Non-breaking bug fixes
+  - Use local silo as default primary silo (#5522)
+
+### [2.3.0] (changes since 2.2.0)
+
+- Breaking changes
+  - No changes breaking the wire protocol or persisted state that would break a rolling upgrade
+  - Migration to Microsoft.Extensions.Options 2.1.1 (#5385) requires a namespace change in the code
+  - `Refactored stream batch behaviors to support batch consumption.` (#5425) technically a breaking change due to the changes to the batch streaming API. However, it shouldn't break any working application code because the batching functionality wasn't fully wired previously.
+  This release is backward-compatible with 2.x releases.
+
+- Non-breaking improvements
+  - Added 'First' and 'Last' to grain lifecycle stages. (#5248)
+  - Avoid emitting assembly-level GeneratedCodeAttribute (#5270)
+  - Use alias-qualified name in GetBindingFlagsParenthesizedExpressionSyntax (#5269)
+  - Don't allow read only transaction participants to be selected as the manager (#5267)
+  - Add configurable timeout to wait for queued messages being forwarded (#5268)
+  - Sort out LocalGrainDirectory shutdown sequence (#5276)
+  - Add CollectionAge validation to GrainCollectionOptions (#5290)
+  - Optimize memory allocation with custom EqualityComparer (#5210)
+  - Always Interleave modified to also be interleavable. (#5344)
+  - Batching batch containers pulling agent retrieves from cache (#5336)
+  - Invalidate activation cache entries from old epochs (#5352)
+  - Change usages of TypeInfo back to Type (#5338)
+  - Microsoft.Extensions.Hosting support (#5261, #5355)
+  - Persistent state facet (#5373)
+  - Updates XML documentation to call out prereq of `LoadShedding`. (#5387)
+  - Enable tx test kit pkg (#5380)
+  - Update to Microsoft.Extensions.Options 2.1.1 (#5385)
+  - Mark key legacy types/methods as [Obsolete] (#5239)
+  - Upgrade to EventHub 2.2.1 (#5384)
+  - Mark ILBasedSerializer as obsolete (#5396)
+  - Add event on gateway count changed (#5133)
+  - Enable HostedClient by default (#5395)
+  - Enable "cleaning" of all dead entries in the membership table (#5389, #5455)
+  - Remove delegate allocation from interner (#5410)
+  - Remove response callback using a single operation (#5406)
+  - Throw during startup if no grain classes/interfaces in app parts (#5413)
+  - Fix OneWay cache invalidation (#5401)
+  - Adds a LoadSheddingValidator class (#5400, #5416)
+  - Linux version of IHostEnvironmentStatistics (#5423)
+
+- Non-breaking bug fixes
+  - Fix invalid comparison in TransactionAgent (#5289)
+  - Fix package dependency condition for Microsoft.Orleans.Transactions. (#5307)
+  - Fix defensive check in LogConsistentGrain (#5319)
+  - Fix package versioning in csproj files (#5333)
+  - Fix #5342: Incorrect specification of global alias (#5343)
+  - Add handling when pulling agent fails RegisterAsProducer to pubsub (#5354)
+  - Use grain state type when deserializing json state in azure table storage (#4994)
+  - Pulling agent losing subscriptions fix (#5372)
+  - Fix #5398: AmbiguousMatchException in code generator (#5407)
+
+
+### [2.3.0-rc2] (changes since 2.3.0-rc1)
+
+`Refactored stream batch behaviors to support batch consumption.` (#5425) is the only change. While technically it is breaking due to the changes to the batch streaming API, it shouldn't break any working application code because the batching functionality wasn't fully wired previously. No breaking change in the wire protocol or persistence. This release is backward-compatible with 2.x releases.
+
+### [2.3.0-rc1] (changes since 2.2.0)
+
+- Breaking changes
+  - No changes breaking the wire protocol or persisted state that would break a rolling upgrade
+  - Migration to Microsoft.Extensions.Options 2.1.1 (#5385) requires a namespace change in the code
+
+- Non-breaking improvements
+  - Added 'First' and 'Last' to grain lifecycle stages. (#5248)
+  - Avoid emitting assembly-level GeneratedCodeAttribute (#5270)
+  - Use alias-qualified name in GetBindingFlagsParenthesizedExpressionSyntax (#5269)
+  - Don't allow read only transaction participants to be selected as the manager (#5267)
+  - Add configurable timeout to wait for queued messages being forwarded (#5268)
+  - Sort out LocalGrainDirectory shutdown sequence (#5276)
+  - Add CollectionAge validation to GrainCollectionOptions (#5290)
+  - Optimize memory allocation with custom EqualityComparer (#5210)
+  - Always Interleave modified to also be interleavable. (#5344)
+  - Batching batch containers pulling agent retrieves from cache (#5336)
+  - Invalidate activation cache entries from old epochs (#5352)
+  - Change usages of TypeInfo back to Type (#5338)
+  - Microsoft.Extensions.Hosting support (#5261, #5355)
+  - Persistent state facet (#5373)
+  - Updates XML documentation to call out prereq of `LoadShedding`. (#5387)
+  - Enable tx test kit pkg (#5380)
+  - Update to Microsoft.Extensions.Options 2.1.1 (#5385)
+  - Mark key legacy types/methods as [Obsolete] (#5239)
+  - Upgrade to EventHub 2.2.1 (#5384)
+  - Mark ILBasedSerializer as obsolete (#5396)
+  - Add event on gateway count changed (#5133)
+  - Enable HostedClient by default (#5395)
+  - Enable "cleaning" of all dead entries in the membership table (#5389)
+  - Remove delegate allocation from interner (#5410)
+  - Remove response callback using a single operation (#5406)
+  - Throw during startup if no grain classes/interfaces in app parts (#5413)
+  - Fix OneWay cache invalidation (#5401)
+  - Adds a LoadSheddingValidator class (#5400)
+
+- Non-breaking bug fixes
+  - Fix invalid comparison in TransactionAgent (#5289)
+  - Fix package dependency condition for Microsoft.Orleans.Transactions. (#5307)
+  - Fix defensive check in LogConsistentGrain (#5319)
+  - Fix package versioning in csproj files (#5333)
+  - Fix #5342: Incorrect specification of global alias (#5343)
+  - Add handling when pulling agent fails RegisterAsProducer to pubsub (#5354)
+  - Use grain state type when deserializing json state in azure table storage (#4994)
+  - Pulling agent losing subscriptions fix (#5372)
+  - Fix #5398: AmbiguousMatchException in code generator (#5407)
+
+### [1.5.7] (changes since 1.5.6)
+
+Two fixes backported from v2.x
+- Non-breaking bug fixes
+  - Fixes for Multi-Cluster Support (#3974)
+  - Add GSI cache maintenance and tests (#5184)
+
+### [2.2.4] (changes since 2.2.3)
+
+- Non-breaking improvements
+  - Add CollectionAge validation to GrainCollectionOptions (#5290)
+  - Fix package versioning in csproj files (#5333)
+  - Invalidate activation cache entries from old epochs (#5352)
+  - Use grain state type when deserializing json state in azure table storage (#4994)
+  - Updates XML documentation to call out prereq of `LoadShedding`. (#5387)
+
+- Non-breaking bug fixes
+  - Fix defensive check in LogConsistentGrain (#5319)
+  - Fix #5342: Incorrect specification of global alias (#5343)
+  - Add handling when pulling agent fails RegisterAsProducer to pubsub (#5354)
+  - Pulling agent losing subscriptions fix (#5372)
+
+### [2.2.3] (changes since 2.2.2)
+
+- Non-breaking improvements
+  - Avoid emitting assembly-level GeneratedCodeAttribute (#5270)
+  - Add configurable timeout to wait for queued messages being forwarded (#5268)
+  - Sort out LocalGrainDirectory shutdown sequence (#5276)
+
+- Non-breaking bug fixes
+  - Use alias-qualified name in GetBindingFlagsParenthesizedExpressionSyntax (#5269)
+
+### [2.2.2] (changes since 2.2.1)
+
+- Non-breaking bug fixes
+  - Fix package dependency condition for Microsoft.Orleans.Transactions. (#5307)
+
 ### [2.2.1] (changes since 2.2.0)
 
 - Breaking changes
@@ -758,7 +1341,7 @@ The idea is to track end-user facing changes as they occur.*
   - Make PreferLocalPlacement activate in other silos when shutting down #2276
   - Reset GrainClient.ClientInvokeCallback when uninitializing GrainClient #2299
   - Fix ObjectDisposedException in networking layer #2302
-  - Reset client gateway reciever buffer on socket reset. #2316
+  - Reset client gateway receiver buffer on socket reset. #2316
   - Removed calling Trace.Close() from TelemetryConsumer.Close() #2396
   - Removes deadlocking and corrupted hashing in SQL storage provider #2395
   - Fix #2358: Invoke interceptor broken for generic grains #2502
@@ -794,7 +1377,7 @@ The idea is to track end-user facing changes as they occur.*
   - Release BinaryTokenStreamWriter buffers after use in more cases. #2326
   - Provide better handling in Grain when the GrainRuntime or GrainIdentity is null #2338
 - Bug fixes
-  - Reset client gateway reciever buffer on socket reset. #2316
+  - Reset client gateway receiver buffer on socket reset. #2316
   - Removes potential deadlocking and corrupted hashing in ADO.NET storage provider #2395
   - LoadShedQueueFlowControl cast fix #2405
 

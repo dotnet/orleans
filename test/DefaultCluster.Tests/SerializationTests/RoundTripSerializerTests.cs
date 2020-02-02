@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -6,7 +6,7 @@ using Xunit;
 
 namespace UnitTests.SerializerTests
 {
-    [TestCategory("Serialization"), TestCategory("BVT"), TestCategory("Functional")]
+    [TestCategory("Serialization"), TestCategory("BVT")]
     public class RoundTripSerializerTests : HostedTestClusterEnsureDefaultStarted
     {
         public RoundTripSerializerTests(DefaultClusterFixture fixture) : base(fixture)

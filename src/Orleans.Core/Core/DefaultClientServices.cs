@@ -1,13 +1,18 @@
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
 using Orleans.Hosting;
+using Orleans.Messaging;
 using Orleans.Metadata;
+using Orleans.Networking.Shared;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Statistics;
 using Orleans.Streams;
@@ -23,7 +28,8 @@ namespace Orleans
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
 
-            services.TryAddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
+            services.AddSingleton<ClientOptionsLogger>();
+            services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
@@ -61,8 +67,10 @@ namespace Orleans
             services.AddSingleton<BinaryFormatterSerializer>();
             services.AddSingleton<BinaryFormatterISerializableSerializer>();
             services.AddFromExisting<IKeyedSerializer, BinaryFormatterISerializableSerializer>();
+#pragma warning disable CS0618 // Type or member is obsolete
             services.TryAddSingleton<ILBasedSerializer>();
             services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
+#pragma warning restore CS0618 // Type or member is obsolete
 
             // Application parts
             var parts = builder.GetApplicationPartManager();
@@ -78,11 +86,34 @@ namespace Orleans
             // Add default option formatter if none is configured, for options which are requied to be configured 
             services.ConfigureFormatter<ClusterOptions>();
             services.ConfigureFormatter<ClientMessagingOptions>();
-            services.ConfigureFormatter<NetworkingOptions>();
+            services.ConfigureFormatter<ConnectionOptions>();
             services.ConfigureFormatter<StatisticsOptions>();
 
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
+
+            // TODO: abstract or move into some options.
+            services.AddSingleton<SocketSchedulers>();
+            services.AddSingleton<SharedMemoryPool>();
+
+            // Networking
+            services.TryAddSingleton<ConnectionCommon>();
+            services.TryAddSingleton<ConnectionManager>();
+            services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ConnectionManagerLifecycleAdapter<IClusterClientLifecycle>>();
+
+            services.AddSingletonKeyedService<object, IConnectionFactory>(
+                ClientOutboundConnectionFactory.ServicesKey,
+                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
+
+            services.TryAddTransient<IMessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(sp,
+                sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.MaxMessageHeaderSize,
+                sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.MaxMessageBodySize));
+            services.TryAddSingleton<ConnectionFactory, ClientOutboundConnectionFactory>();
+            services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
+            services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
+            services.AddSingleton<GatewayManager>();
+            services.AddSingleton<NetworkingTrace>();
+            services.AddSingleton<MessagingTrace>();
         }
     }
 }

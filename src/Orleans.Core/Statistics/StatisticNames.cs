@@ -2,7 +2,7 @@ using System;
 
 namespace Orleans.Runtime
 {
-    internal class StatisticName
+    public class StatisticName
     {
         public string Name { get; private set; }
 
@@ -22,24 +22,22 @@ namespace Orleans.Runtime
         }
     }
 
-    internal class StatisticNameFormat : StatisticName
+    public class StatisticNameFormat : StatisticName
     {
         public StatisticNameFormat(string name) : base(name)
         {
         }
     }
 
-    internal class StatisticNames
+    public class StatisticNames
     {
         // Networking
-        public static readonly StatisticName NETWORKING_SOCKETS_SILO_SENDING_CLOSED         = new StatisticName("Networking.Sockets.Silo.Sending.Closed");
-        public static readonly StatisticName NETWORKING_SOCKETS_SILO_SENDING_OPENED         = new StatisticName("Networking.Sockets.Silo.Sending.Opened");
-        public static readonly StatisticName NETWORKING_SOCKETS_SILO_RECEIVING_CLOSED       = new StatisticName("Networking.Sockets.Silo.Receiving.Closed");
-        public static readonly StatisticName NETWORKING_SOCKETS_SILO_RECEIVING_OPENED       = new StatisticName("Networking.Sockets.Silo.Receiving.Opened");
-        public static readonly StatisticName NETWORKING_SOCKETS_GATEWAYTOCLIENT_DUPLEX_CLOSED    = new StatisticName("Networking.Sockets.GatewayToClient.Duplex.Closed");
-        public static readonly StatisticName NETWORKING_SOCKETS_GATEWAYTOCLIENT_DUPLEX_OPENED    = new StatisticName("Networking.Sockets.GatewayToClient.Duplex.Opened");
-        public static readonly StatisticName NETWORKING_SOCKETS_CLIENTTOGATEWAY_DUPLEX_CLOSED    = new StatisticName("Networking.Sockets.ClientToGateway.Duplex.Closed");
-        public static readonly StatisticName NETWORKING_SOCKETS_CLIENTTOGATEWAY_DUPLEX_OPENED    = new StatisticName("Networking.Sockets.ClientToGateway.Duplex.Opened");
+        public static readonly StatisticName NETWORKING_SOCKETS_SILO_CLOSED         = new StatisticName("Networking.Sockets.Silo.Closed");
+        public static readonly StatisticName NETWORKING_SOCKETS_SILO_OPENED         = new StatisticName("Networking.Sockets.Silo.Opened");
+        public static readonly StatisticName NETWORKING_SOCKETS_GATEWAYTOCLIENT_CLOSED    = new StatisticName("Networking.Sockets.GatewayToClient.Closed");
+        public static readonly StatisticName NETWORKING_SOCKETS_GATEWAYTOCLIENT_OPENED    = new StatisticName("Networking.Sockets.GatewayToClient.Opened");
+        public static readonly StatisticName NETWORKING_SOCKETS_CLIENTTOGATEWAY_CLOSED    = new StatisticName("Networking.Sockets.ClientToGateway.Closed");
+        public static readonly StatisticName NETWORKING_SOCKETS_CLIENTTOGATEWAY_OPENED    = new StatisticName("Networking.Sockets.ClientToGateway.Opened");
 
         // Messaging
         public static readonly StatisticName MESSAGING_SENT_MESSAGES_TOTAL                  = new StatisticName("Messaging.Sent.Messages.Total");
@@ -77,9 +75,7 @@ namespace Orleans.Runtime
         public static readonly StatisticName MESSAGING_IMA_ENQUEUED_TO_SYSTEM_TARGET                = new StatisticName("Messaging.Processing.IMA.Enqueued.ToSystemTargetContex");
         public static readonly StatisticName MESSAGING_IMA_ENQUEUED_TO_ACTIVATION                   = new StatisticName("Messaging.Processing.IMA.Enqueued.ToActivationContex");
 
-        public static readonly StatisticName MESSAGING_IGC_FORWARDED                                = new StatisticName("Messaging.Processing.IGC.Forwarded");
-        public static readonly StatisticName MESSAGING_IGC_RESENT                                   = new StatisticName("Messaging.Processing.IGC.Resent");
-        public static readonly StatisticName MESSAGING_IGC_REROUTE                                  = new StatisticName("Messaging.Processing.IGC.ReRoute");
+        public static readonly StatisticName MESSAGING_DISPATCHER_FORWARDED                         = new StatisticName("Messaging.Processing.Dispatcher.Forwarded");
         public static readonly StatisticName MESSAGING_PROCESSING_ACTIVATION_DATA_ALL               = new StatisticName("Messaging.Processing.ActivationData.All");
 
         public static readonly StatisticNameFormat MESSAGING_PINGS_SENT_PER_SILO               = new StatisticNameFormat("Messaging.Pings.Sent.{0}");

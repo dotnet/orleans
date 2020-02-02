@@ -1,4 +1,4 @@
-﻿//*********************************************************
+//*********************************************************
 //    Copyright (c) Microsoft. All rights reserved.
 //    
 //    Apache 2.0 License
@@ -16,9 +16,8 @@
 
 using System;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
+using Newtonsoft.Json;
 using Orleans;
-using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage;
 
@@ -27,7 +26,7 @@ namespace Samples.StorageProviders
     /// <summary>
     /// Base class for JSON-based grain storage providers.
     /// </summary>
-    public abstract class BaseJSONStorageProvider : IStorageProvider
+    public abstract class BaseJSONStorageProvider : IGrainStorage
     {
         /// <summary>
         /// Storage provider name
@@ -45,18 +44,6 @@ namespace Samples.StorageProviders
         /// </summary>
         protected BaseJSONStorageProvider()
         {
-        }
-
-        /// <summary>
-        /// Initializes the storage provider.
-        /// </summary>
-        /// <param name="name">The name of this provider instance.</param>
-        /// <param name="providerRuntime">A Orleans runtime object managing all storage providers.</param>
-        /// <param name="config">Configuration info for this provider instance.</param>
-        /// <returns>Completion promise for this operation.</returns>
-        public virtual Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -128,8 +115,7 @@ namespace Samples.StorageProviders
         /// </remarks>
         protected static string ConvertToStorageFormat(IGrainState grainState)
         {
-            JavaScriptSerializer serializer = new JavaScriptSerializer();
-            return serializer.Serialize(grainState.State);
+            return JsonConvert.SerializeObject(grainState.State);
         }
 
         /// <summary>
@@ -139,8 +125,7 @@ namespace Samples.StorageProviders
         /// <param name="entityData">JSON storage format representation of the grain state.</param>
         protected static void ConvertFromStorageFormat(IGrainState grainState, string entityData)
         {
-            JavaScriptSerializer deserializer = new JavaScriptSerializer();
-            object data = deserializer.Deserialize(entityData, grainState.State.GetType());
+            object data = JsonConvert.DeserializeObject(entityData, grainState.State.GetType());
             grainState.State = data;
         }
     }

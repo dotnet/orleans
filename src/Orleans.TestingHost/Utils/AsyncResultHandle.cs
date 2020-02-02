@@ -6,7 +6,7 @@ namespace Orleans.TestingHost.Utils
     /// <summary>
     /// This class is for internal testing use only.
     /// </summary>
-    public class AsyncResultHandle : MarshalByRefObject
+    public class AsyncResultHandle
     {
         bool done = false;
         bool continueFlag = false;

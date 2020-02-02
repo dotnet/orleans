@@ -19,6 +19,7 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder UseTransactions(this ISiloHostBuilder builder, bool withStatisticsReporter = true)
         {
             return builder.ConfigureServices(services => services.UseTransactions(withStatisticsReporter))
+                          .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITransactionManagerExtension).Assembly))
                           .AddGrainExtension<ITransactionManagerExtension, TransactionManagerExtension>()
                           .AddGrainExtension<ITransactionalResourceExtension, TransactionalResourceExtension>();
         }
@@ -32,6 +33,7 @@ namespace Orleans.Hosting
         public static ISiloBuilder UseTransactions(this ISiloBuilder builder, bool withStatisticsReporter = true)
         {
             return builder.ConfigureServices(services => services.UseTransactions(withStatisticsReporter))
+                          .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITransactionManagerExtension).Assembly))
                           .AddGrainExtension<ITransactionManagerExtension, TransactionManagerExtension>()
                           .AddGrainExtension<ITransactionalResourceExtension, TransactionalResourceExtension>();
         }

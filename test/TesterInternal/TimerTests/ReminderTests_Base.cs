@@ -1,4 +1,4 @@
-﻿//#define USE_SQL_SERVER
+//#define USE_SQL_SERVER
 
 using System;
 using System.Collections.Generic;
@@ -9,13 +9,12 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Tester;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -44,14 +43,13 @@ namespace UnitTests.TimerTests
             HostedCluster = fixture.HostedCluster;
             GrainFactory = fixture.GrainFactory;
 
-            ClientConfiguration configuration = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
             var filters = new LoggerFilterOptions();
 #if DEBUG
             filters.AddFilter("Storage", LogLevel.Trace);
             filters.AddFilter("Reminder", LogLevel.Trace);
 #endif
 
-            log = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName(configuration.ClientName, configuration.ClusterId), filters).CreateLogger<ReminderTests_Base>();
+            log = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("client", DateTime.Now.ToString("yyyyMMdd_hhmmss")), filters).CreateLogger<ReminderTests_Base>();
         }
 
         public IGrainFactory GrainFactory { get; }

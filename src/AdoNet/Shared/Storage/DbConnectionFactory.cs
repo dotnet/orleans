@@ -31,6 +31,8 @@ namespace Orleans.Tests.SqlUtils
                 { AdoNetInvariants.InvariantNameOracleDatabase, new Tuple<string, string>("Oracle.ManagedDataAccess", "Oracle.ManagedDataAccess.Client.OracleClientFactory") },
                 { AdoNetInvariants.InvariantNamePostgreSql, new Tuple<string, string>("Npgsql", "Npgsql.NpgsqlFactory") },
                 { AdoNetInvariants.InvariantNameSqlLite, new Tuple<string, string>("Microsoft.Data.SQLite", "Microsoft.Data.SQLite.SqliteFactory") },
+                { AdoNetInvariants.InvariantNameSqlServerDotnetCore, new Tuple<string, string>("Microsoft.Data.SqlClient", "Microsoft.Data.SqlClient.SqlClientFactory") },
+                { AdoNetInvariants.InvariantNameMySqlConnector, new Tuple<string, string>("MySqlConnector", "MySql.Data.MySqlClient.MySqlClientFactory") },
             };
 
         private static CachedFactory GetFactory(string invariantName)
@@ -54,7 +56,7 @@ namespace Orleans.Tests.SqlUtils
             {
                 throw new InvalidOperationException($"Unable to find and/or load a candidate assembly for '{invariantName}' invariant name.", exc);
             }
-            
+
             if (asm == null)
                 throw new InvalidOperationException($"Can't find database provider factory with '{invariantName}' invariant name. Please make sure that your ADO.Net provider package library is deployed with your application.");
 

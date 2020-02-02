@@ -3,11 +3,16 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streams
 {
-    internal interface IInternalAsyncObservable<T> : IAsyncObservable<T>
+    internal interface IInternalAsyncObservable<T> : IAsyncObservable<T>, IAsyncBatchObservable<T>
     {
         Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncObserver<T> observer,
+            StreamSequenceToken token = null);
+
+        Task<StreamSubscriptionHandle<T>> ResumeAsync(
+            StreamSubscriptionHandle<T> handle,
+            IAsyncBatchObserver<T> observer,
             StreamSequenceToken token = null);
 
         Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle);
@@ -18,7 +23,7 @@ namespace Orleans.Streams
     }
 
         
-    internal interface IInternalAsyncBatchObserver<in T> : IAsyncBatchObserver<T>
+    internal interface IInternalAsyncBatchObserver<T> : IAsyncBatchProducer<T>
     {
         Task Cleanup();
     }

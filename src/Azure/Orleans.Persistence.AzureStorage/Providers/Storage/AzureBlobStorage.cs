@@ -4,11 +4,11 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Azure.Storage;
+using Microsoft.Azure.Storage.Blob;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Providers.Azure;
@@ -38,10 +38,10 @@ namespace Orleans.Storage
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(
             string name,
-            AzureBlobStorageOptions options, 
-            SerializationManager serializationManager, 
-            IGrainFactory grainFactory, 
-            ITypeResolver typeResolver, 
+            AzureBlobStorageOptions options,
+            SerializationManager serializationManager,
+            IGrainFactory grainFactory,
+            ITypeResolver typeResolver,
             ILoggerFactory loggerFactory)
         {
             this.name = name;
@@ -119,7 +119,7 @@ namespace Orleans.Storage
             {
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Writing, "Writing: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
 
-                var (contents, mimeType) = ConvertToStorageFormat(grainState.State);;
+                var (contents, mimeType) = ConvertToStorageFormat(grainState.State); ;
 
                 var blob = container.GetBlockBlobReference(blobName);
                 blob.Properties.ContentType = mimeType;
@@ -213,6 +213,8 @@ namespace Orleans.Storage
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, "AzureTableGrainStorage is using DataConnectionString: {0}", ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString));
                 this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
 
+                this.options.ConfigureJsonSerializerSettings?.Invoke(this.jsonSettings);
+
                 var account = CloudStorageAccount.Parse(this.options.ConnectionString);
                 var blobClient = account.CreateCloudBlobClient();
                 container = blobClient.GetContainerReference(this.options.ContainerName);
@@ -285,8 +287,8 @@ namespace Orleans.Storage
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<AzureBlobStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureBlobStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, optionsSnapshot.Get(name));
+            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>();
+            return ActivatorUtilities.CreateInstance<AzureBlobGrainStorage>(services, name, optionsMonitor.Get(name));
         }
     }
 }

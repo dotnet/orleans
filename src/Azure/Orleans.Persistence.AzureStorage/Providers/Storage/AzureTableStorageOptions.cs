@@ -1,11 +1,8 @@
 using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Options;
-using Microsoft.WindowsAzure.Storage;
+using Microsoft.Azure.Cosmos.Table;
 using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Configuration
 {
@@ -41,6 +38,7 @@ namespace Orleans.Configuration
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
+        public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
     }
     /// <summary>
     /// Configuration validator for AzureTableStorageOptions
@@ -68,7 +66,7 @@ namespace Orleans.Configuration
                     $"Configuration for AzureTableStorageProvider {name} is invalid. {nameof(this.options.ConnectionString)} is not valid.");
             try
             {
-                AzureStorageUtils.ValidateTableName(this.options.TableName);
+                AzureTableUtils.ValidateTableName(this.options.TableName);
             }
             catch (Exception e)
             {

@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -245,8 +246,8 @@ namespace Orleans.Streams
             StreamConsumerCollection streamDataCollection;
             if (!pubSubCache.TryGetValue(streamId, out streamDataCollection))
             {
-                streamDataCollection = new StreamConsumerCollection(DateTime.UtcNow);
-                pubSubCache.Add(streamId, streamDataCollection);
+                // If stream is not in pubsub cache, then we've received no events on this stream, and will aquire the subscriptions from pubsub when we do.
+                return;
             }
 
             StreamConsumerData data;

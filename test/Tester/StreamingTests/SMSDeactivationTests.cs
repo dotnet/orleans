@@ -30,9 +30,9 @@ namespace UnitTests.StreamingTests
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
                      .AddMemoryGrainStorage("PubSubStore")

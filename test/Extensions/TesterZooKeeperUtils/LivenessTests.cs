@@ -21,18 +21,11 @@ namespace Tester.ZooKeeperUtils
             ZookeeperTestUtils.EnsureZooKeeper();
 
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString;
-                legacy.ClusterConfiguration.PrimaryNode = null;
-                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
-                legacy.ClientConfiguration.GatewayProvider = ClientConfiguration.GatewayProviderType.ZooKeeper;
-            });
         }
 
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.UseZooKeeperClustering(options => { options.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
             }

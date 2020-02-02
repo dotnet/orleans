@@ -1,4 +1,4 @@
-﻿
+
 using Orleans.LogConsistency;
 using Orleans.Storage;
 using Orleans.Configuration;
@@ -47,8 +47,8 @@ namespace Orleans.EventSourcing.CustomStorage
     {
         public static ILogViewAdaptorFactory Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<CustomStorageLogConsistencyOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<CustomStorageLogConsistencyOptions>>();
-            return ActivatorUtilities.CreateInstance<LogConsistencyProvider>(services, optionsSnapshot.Get(name));
+            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CustomStorageLogConsistencyOptions>>();
+            return ActivatorUtilities.CreateInstance<LogConsistencyProvider>(services, optionsMonitor.Get(name));
         }
     }
 }

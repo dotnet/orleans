@@ -1,19 +1,25 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>Tester.AdoNet</RootNamespace>
     <AssemblyName>Tester.AdoNet</AssemblyName>
     <DefineConstants>$(DefineConstants);TESTER_SQLUTILS</DefineConstants>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="1.1.0" />
+    <PackageReference Include="MySqlConnector" Version="0.61.0" />
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
     <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
-    <PackageReference Include="System.Data.SqlClient" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Data.SqlClient" Version="$(SystemDataSqlClientVersion)" />
     <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
     <PackageReference Include="Microsoft.Data.SQLite" Version="$(MicrosoftDataSQLiteVersion)" />
     <PackageReference Include="Npgsql" Version="$(NpgsqlVersion)" />
     <PackageReference Include="MySql.Data" Version="$(MySqlDataVersion)" />
-    <DotNetCliToolReference Include="dotnet-xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="System.Security.Permissions" Version="$(SystemSecurityPermissionsVersion)" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="$(SystemConfigurationConfigurationManagerVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,9 +40,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\AdoNet\OrleansSQLUtils\OrleansSQLUtils.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\Orleans.Reminders.AdoNet.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
-    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.Legacy\Orleans.TestingHost.Legacy.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />

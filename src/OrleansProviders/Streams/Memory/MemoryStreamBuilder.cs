@@ -1,48 +1,45 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using System;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
-using Orleans.Hosting;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using Orleans.Streams;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using Orleans.Providers;
 
-namespace Orleans.Providers
+namespace Orleans.Hosting
 {
-    public class SiloMemoryStreamConfigurator<TSerializer> : SiloRecoverableStreamConfigurator
+    public interface IMemoryStreamConfigurator : INamedServiceConfigurator { }
+
+    public static class MemoryStreamConfiguratorExtensions
+    {
+        public static void ConfigurePartitioning(this IMemoryStreamConfigurator configurator, int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
+        {
+            configurator.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
+        }
+    }
+
+    public interface ISiloMemoryStreamConfigurator : IMemoryStreamConfigurator, ISiloRecoverableStreamConfigurator { }
+
+    public class SiloMemoryStreamConfigurator<TSerializer> : SiloRecoverableStreamConfigurator, ISiloMemoryStreamConfigurator
           where TSerializer : class, IMemoryMessageBodySerializer
     {
         public SiloMemoryStreamConfigurator(
             string name, Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
             : base(name, configureServicesDelegate, MemoryAdapterFactory<TSerializer>.Create)
         {
-            this.configureDelegate(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
+            this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
             configureAppPartsDelegate(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
-        }
-
-        public SiloMemoryStreamConfigurator<TSerializer> ConfigurePartitioning(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
-        {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
-            return this;
         }
     }
 
-    public class ClusterClientMemoryStreamConfigurator<TSerializer> : ClusterClientPersistentStreamConfigurator
+    public interface IClusterClientMemoryStreamConfigurator : IMemoryStreamConfigurator, IClusterClientPersistentStreamConfigurator { }
+
+    public class ClusterClientMemoryStreamConfigurator<TSerializer> : ClusterClientPersistentStreamConfigurator, IClusterClientMemoryStreamConfigurator
           where TSerializer : class, IMemoryMessageBodySerializer
     {
         public ClusterClientMemoryStreamConfigurator(string name, IClientBuilder builder)
          : base(name, builder, MemoryAdapterFactory<TSerializer>.Create)
         {
-            this.clientBuilder
+            builder
                 .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
-        }
-
-        public ClusterClientMemoryStreamConfigurator<TSerializer> ConfigurePartitioning(int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
-        {
-            this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfQueues));
-            return this;
         }
     }
 }

@@ -1,11 +1,14 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.MultiCluster;
+using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Runtime.MultiClusterNetwork
 {
@@ -23,22 +26,36 @@ namespace Orleans.Runtime.MultiClusterNetwork
         private readonly SafeRandom random;
         private readonly string clusterId;
         private readonly IReadOnlyList<string> defaultMultiCluster;
-
+        private readonly bool multiClusterActive;
+        private readonly int maxMultiClusterGateways;
         private readonly TimeSpan backgroundGossipInterval;
         private TimeSpan resendActiveStatusAfter;
+
+        private readonly object gatewayCacheUpdateLock = new object();
+        private MembershipTableSnapshot cachedSnapshot;
+        private List<SiloAddress> gatewayCache = new List<SiloAddress>();
 
         private List<IGossipChannel> gossipChannels;
         private IGrainTimer timer;
         private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly MembershipTableManager tableManager;
         private readonly IInternalGrainFactory grainFactory;
         private MultiClusterConfiguration injectedConfig;
         private readonly ILoggerFactory loggerFactory;
-        public MultiClusterOracle(ILocalSiloDetails siloDetails, MultiClusterGossipChannelFactory channelFactory, ISiloStatusOracle siloStatusOracle, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory, IOptions<MultiClusterOptions> multiClusterOptions)
+        public MultiClusterOracle(
+            ILocalSiloDetails siloDetails,
+            MultiClusterGossipChannelFactory channelFactory,
+            ISiloStatusOracle siloStatusOracle,
+            MembershipTableManager tableManager,
+            IInternalGrainFactory grainFactory,
+            ILoggerFactory loggerFactory,
+            IOptions<MultiClusterOptions> multiClusterOptions)
             : base(Constants.MultiClusterOracleId, siloDetails.SiloAddress, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
             this.channelFactory = channelFactory;
             this.siloStatusOracle = siloStatusOracle;
+            this.tableManager = tableManager;
             this.grainFactory = grainFactory;
 
             logger = loggerFactory.CreateLogger<MultiClusterOracle>();
@@ -46,6 +63,8 @@ namespace Orleans.Runtime.MultiClusterNetwork
             clusterId = siloDetails.ClusterId;
             var multiClusterOptionsSnapshot = multiClusterOptions.Value;
             defaultMultiCluster = multiClusterOptionsSnapshot.DefaultMultiCluster?.ToList();
+            this.multiClusterActive = multiClusterOptionsSnapshot.HasMultiClusterNetwork;
+            this.maxMultiClusterGateways = multiClusterOptionsSnapshot.MaxMultiClusterGateways;
             random = new SafeRandom();
 
             // to avoid convoying, each silo varies these period intervals a little
@@ -193,6 +212,62 @@ namespace Orleans.Runtime.MultiClusterNetwork
             timer.Start();
         }
 
+        public List<SiloAddress> GetApproximateMultiClusterGateways()
+        {
+            if (ReferenceEquals(this.cachedSnapshot, this.tableManager.MembershipTableSnapshot))
+            {
+                return this.gatewayCache;
+            }
+
+            lock (this.gatewayCacheUpdateLock)
+            {
+                var currentMembership = this.tableManager.MembershipTableSnapshot;
+                if (ReferenceEquals(this.cachedSnapshot, currentMembership))
+                {
+                    return this.gatewayCache;
+                }
+
+                var activeSilos = new List<SiloAddress>();
+                var activeEntries = new List<MembershipEntry>();
+                foreach (var entry in currentMembership.Entries)
+                {
+                    var silo = entry.Key;
+                    var status = entry.Value.Status;
+                    if (status == SiloStatus.Active)
+                    {
+                        activeEntries.Add(entry.Value);
+                        activeSilos.Add(entry.Key);
+                    }
+                }
+
+                List<SiloAddress> result;
+
+                // take all the active silos if their count does not exceed the desired number of gateways
+                if (activeEntries.Count <= this.maxMultiClusterGateways)
+                {
+                    result = activeSilos;
+                }
+                else
+                {
+                    result = MembershipHelper.DeterministicBalancedChoice(
+                        activeSilos,
+                        this.maxMultiClusterGateways,
+                       (SiloAddress a) => new UpdateFaultCombo(currentMembership.Entries[a]),
+                       logger);
+                }
+
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    var gateways = string.Join(", ", result.Select(silo => silo.ToString()));
+                    logger.Debug($"-DetermineMultiClusterGateways {gateways}");
+                }
+
+                Interlocked.Exchange(ref this.cachedSnapshot, currentMembership);
+                this.gatewayCache = result;
+                return result;
+            }
+        }
+
         private void OnGossipTimerTick(object _)
         {
             logger.Trace("-timer");
@@ -205,7 +280,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
         {
             logger.Debug("--- PublishChanges: assess");
 
-            var activeLocalGateways = this.siloStatusOracle.GetApproximateMultiClusterGateways();
+            var activeLocalGateways = this.GetApproximateMultiClusterGateways();
 
             var iAmGateway = activeLocalGateways.Contains(Silo);
 

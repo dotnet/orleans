@@ -7,7 +7,9 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.Runtime.TestHooks;
 using Orleans.TestingHost.Utils;
 
@@ -46,10 +48,14 @@ namespace Orleans.TestingHost
 
             this.AddClientBuilderConfigurator<AddTestHooksApplicationParts>();
             this.AddSiloBuilderConfigurator<AddTestHooksApplicationParts>();
+            this.AddSiloBuilderConfigurator<ConfigureStaticClusterDeploymentOptions>();
             this.ConfigureBuilder(ConfigureDefaultPorts);
         }
-        
-        public Dictionary<string, object> Properties { get; } = new Dictionary<string, object>();
+
+        /// <summary>
+        /// Configuration values which will be provided to the silos and clients created by this builder.
+        /// </summary>
+        public Dictionary<string, string> Properties { get; } = new Dictionary<string, string>();
 
         public TestClusterOptions Options { get; }
 
@@ -77,14 +83,27 @@ namespace Orleans.TestingHost
             return this;
         }
 
-        public void AddSiloBuilderConfigurator<TSiloBuilderConfigurator>() where TSiloBuilderConfigurator : ISiloBuilderConfigurator, new()
+        /// <summary>
+        /// Adds an implementation of <see cref="ISiloConfigurator"/>, <see cref="IHostConfigurator"/>, or <see cref="ISiloBuilderConfigurator"/> to configure silos created by the test cluster.
+        /// </summary>
+        /// <typeparam name="T">The configurator type.</typeparam>
+        public TestClusterBuilder AddSiloBuilderConfigurator<T>() where T : new()
         {
-            this.Options.SiloBuilderConfiguratorTypes.Add(typeof(TSiloBuilderConfigurator).AssemblyQualifiedName);
+#pragma warning disable CS0618 // Type or member is obsolete
+            if (!typeof(ISiloConfigurator).IsAssignableFrom(typeof(T)) && !typeof(IHostConfigurator).IsAssignableFrom(typeof(T)) && !typeof(ISiloBuilderConfigurator).IsAssignableFrom(typeof(T)))
+            {
+                throw new ArgumentException($"The type {typeof(T)} is not assignable to either {nameof(ISiloConfigurator)}, {nameof(IHostConfigurator)}, or {nameof(ISiloBuilderConfigurator)}.");
+            }
+#pragma warning restore CS0618 // Type or member is obsolete
+
+            this.Options.SiloBuilderConfiguratorTypes.Add(typeof(T).AssemblyQualifiedName);
+            return this;
         }
 
-        public void AddClientBuilderConfigurator<TClientBuilderConfigurator>() where TClientBuilderConfigurator : IClientBuilderConfigurator, new()
+        public TestClusterBuilder AddClientBuilderConfigurator<TClientBuilderConfigurator>() where TClientBuilderConfigurator : IClientBuilderConfigurator, new()
         {
             this.Options.ClientBuilderConfiguratorTypes.Add(typeof(TClientBuilderConfigurator).AssemblyQualifiedName);
+            return this;
         }
 
         public TestCluster Build()
@@ -96,6 +115,7 @@ namespace Orleans.TestingHost
                 action();
             }
 
+            configBuilder.AddInMemoryCollection(this.Properties);
             configBuilder.AddInMemoryCollection(this.Options.ToDictionary());
             foreach (var buildAction in this.configureHostConfigActions)
             {
@@ -154,7 +174,7 @@ namespace Orleans.TestingHost
                 basePort = basePort - (basePort % consecutivePortsToCheck);
                 int endPort = basePort + consecutivePortsToCheck;
 
-                // make sure non of the ports in the sub range are in use
+                // make sure none of the ports in the sub range are in use
                 if (tcpConnInfoArray.All(endpoint => endpoint.Port < basePort || endpoint.Port >= endPort))
                     return basePort;
             }
@@ -162,16 +182,34 @@ namespace Orleans.TestingHost
             throw new InvalidOperationException("Cannot find enough free ports to spin up a cluster");
         }
 
-        internal class AddTestHooksApplicationParts : IClientBuilderConfigurator, ISiloBuilderConfigurator
+        internal class AddTestHooksApplicationParts : IClientBuilderConfigurator, ISiloConfigurator
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
             }
 
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
+            }
+        }
+
+        internal class ConfigureStaticClusterDeploymentOptions : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.ConfigureServices((context, services) =>
+                {
+                    var initialSilos = int.Parse(context.Configuration[nameof(TestClusterOptions.InitialSilosCount)]);
+                    var siloNames = Enumerable.Range(0, initialSilos).Select(GetSiloName).ToList();
+                    services.Configure<StaticClusterDeploymentOptions>(options => options.SiloNames = siloNames);
+                });
+            }
+
+            private static string GetSiloName(int instanceNumber)
+            {
+                return instanceNumber == 0 ? Silo.PrimarySiloName : $"Secondary_{instanceNumber}";
             }
         }
     }

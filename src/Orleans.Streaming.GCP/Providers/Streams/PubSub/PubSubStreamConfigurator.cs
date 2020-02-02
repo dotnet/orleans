@@ -1,14 +1,12 @@
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using Orleans.Providers.Streams.Common;
 using Orleans.ApplicationParts;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     public class SiloPubSubStreamConfigurator<TDataAdapter> : SiloPersistentStreamConfigurator
          where TDataAdapter : IPubSubDataAdapter
@@ -21,7 +19,7 @@ namespace Orleans.Streams
                     parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly)
                         .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
                 });
-            this.configureDelegate(services =>
+            this.ConfigureDelegate(services =>
             {
                 services.ConfigureNamedOptionForLogging<PubSubOptions>(name)
                     .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
@@ -31,9 +29,10 @@ namespace Orleans.Streams
 
         public SiloPubSubStreamConfigurator<TDataAdapter> ConfigurePubSub(Action<OptionsBuilder<PubSubOptions>> configureOptions)
         {
-            this.Configure<PubSubOptions>(configureOptions);
+            this.Configure(configureOptions);
             return this;
         }
+
         public SiloPubSubStreamConfigurator<TDataAdapter> ConfigureCache(int cacheSize = SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE)
         {
             this.Configure<SimpleQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
@@ -53,7 +52,7 @@ namespace Orleans.Streams
         public ClusterClientPubSubStreamConfigurator(string name, IClientBuilder builder)
             : base(name, builder, PubSubAdapterFactory<TDataAdapter>.Create)
         {
-            this.clientBuilder
+            builder
                 .ConfigureApplicationParts(parts =>
                 {
                     parts.AddFrameworkPart(typeof(PubSubAdapterFactory<>).Assembly)
@@ -64,7 +63,7 @@ namespace Orleans.Streams
 
         public ClusterClientPubSubStreamConfigurator<TDataAdapter> ConfigurePubSub(Action<OptionsBuilder<PubSubOptions>> configureOptions)
         {
-            this.Configure<PubSubOptions>(configureOptions);
+            this.Configure(configureOptions);
             return this;
         }
 

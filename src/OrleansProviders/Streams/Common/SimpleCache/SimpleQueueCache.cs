@@ -104,7 +104,7 @@ namespace Orleans.Providers.Streams.Common
                 cacheCursorHistogram.RemoveAt(0); // remove the last bucket
             }
             purgedItems = allItems;
-            Log(logger, "TryPurgeFromCache: purged {0} items from cache.", purgedItems.Count);
+            Log(logger, "TryPurgeFromCache: purged {PurgedItemsCount} items from cache.", purgedItems.Count);
             return true;
         }
 
@@ -142,7 +142,7 @@ namespace Orleans.Providers.Streams.Common
         {
             if (msgs == null) throw new ArgumentNullException(nameof(msgs));
 
-            Log(logger, "AddToCache: added {0} items to cache.", msgs.Count);
+            Log(logger, "AddToCache: added {ItemCount} items to cache.", msgs.Count);
             foreach (var message in msgs)
             {
                 Add(message, message.SequenceToken);
@@ -165,7 +165,7 @@ namespace Orleans.Providers.Streams.Common
 
         internal void InitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken sequenceToken)
         {
-            Log(logger, "InitializeCursor: {0} to sequenceToken {1}", cursor, sequenceToken);
+            Log(logger, "InitializeCursor: {Cursor} to sequenceToken {SequenceToken}", cursor, sequenceToken);
 
             // Nothing in cache, unset token, and wait for more data.
             if (cachedMessages.Count == 0)
@@ -215,7 +215,7 @@ namespace Orleans.Providers.Streams.Common
 
         internal void RefreshCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken sequenceToken)
         {
-            Log(logger, "RefreshCursor: {0} to sequenceToken {1}", cursor, sequenceToken);
+            Log(logger, "RefreshCursor: {RefreshCursor} to sequenceToken {SequenceToken}", cursor, sequenceToken);
 
             // set if unset
             if (!cursor.IsSet)
@@ -232,7 +232,7 @@ namespace Orleans.Providers.Streams.Common
         /// <returns></returns>
         internal bool TryGetNextMessage(SimpleQueueCacheCursor cursor, out IBatchContainer batch)
         {
-            Log(logger, "TryGetNextMessage: {0}", cursor);
+            Log(logger, "TryGetNextMessage: {Cursor}", cursor);
 
             batch = null;
             if (!cursor.IsSet) return false;
@@ -254,7 +254,7 @@ namespace Orleans.Providers.Streams.Common
 
         private void AdvanceCursor(SimpleQueueCacheCursor cursor, LinkedListNode<SimpleQueueCacheItem> item)
         {
-            Log(logger, "UpdateCursor: {0} to item {1}", cursor, item.Value.Batch);
+            Log(logger, "UpdateCursor: {Cursor} to item {Item}", cursor, item.Value.Batch);
 
             cursor.Element.Value.CacheBucket.UpdateNumCursors(-1); // remove from prev bucket
             cursor.Set(item);
@@ -263,7 +263,7 @@ namespace Orleans.Providers.Streams.Common
 
         internal void SetCursor(SimpleQueueCacheCursor cursor, LinkedListNode<SimpleQueueCacheItem> item)
         {
-            Log(logger, "SetCursor: {0} to item {1}", cursor, item.Value.Batch);
+            Log(logger, "SetCursor: {Cursor} to item {Item}", cursor, item.Value.Batch);
 
             cursor.Set(item);
             cursor.Element.Value.CacheBucket.UpdateNumCursors(1);  // add to next bucket
@@ -271,7 +271,7 @@ namespace Orleans.Providers.Streams.Common
 
         internal void UnsetCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken token)
         {
-            Log(logger, "UnsetCursor: {0}", cursor);
+            Log(logger, "UnsetCursor: {Cursor}", cursor);
 
             if (cursor.IsSet)
             {
@@ -317,8 +317,8 @@ namespace Orleans.Providers.Streams.Common
 
         internal static void Log(ILogger logger, string format, params object[] args)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(format, args);
-            //if(logger.IsInfo) logger.Info(format, args);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(format, args);
+            //if(logger.IsInfo) logger.LogInformation(format, args);
         }
     }
 }

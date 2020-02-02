@@ -1,27 +1,28 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System;
 using System.Threading.Tasks;
+using Microsoft.Azure.Cosmos.Table;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.AzureStorage;
 using Orleans.Transactions.AzureStorage.Tests;
 using Orleans.Transactions.TestKit.xUnit;
-using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
 using TestExtensions;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Azure.Tests
 {
-    public class TestState : TestKit.ITestState
+    public class TestState : IEquatable<TestState>
     {
-        public int state { get; set; } = 1;
+        public int State { get; set; }
+
+        public bool Equals(TestState other)
+        {
+            return other == null?false:this.State.Equals(other.State);
+        }
     }
 
     public class AzureTransactionalStateStorageTests : TransactionalStateStorageTestRunnerxUnit<TestState>, IClassFixture<TestFixture>
@@ -29,7 +30,7 @@ namespace Orleans.Transactions.Azure.Tests
         private const string tableName = "StateStorageTests";
         private const string partition = "testpartition";
         public AzureTransactionalStateStorageTests(TestFixture fixture, ITestOutputHelper testOutput)
-            :base(()=>StateStorageFactory(fixture), ()=>new TestState(), fixture.GrainFactory, testOutput)
+            :base(()=>StateStorageFactory(fixture), (seed)=>new TestState(){State = seed}, fixture.GrainFactory, testOutput)
         {
         }
 
@@ -39,7 +40,7 @@ namespace Orleans.Transactions.Azure.Tests
             var jsonSettings = TransactionalStateFactory.GetJsonSerializerSettings(
                 fixture.HostedCluster.ServiceProvider.GetRequiredService<ITypeResolver>(),
                 fixture.GrainFactory);
-            var stateStorage = new AzureTableTransactionalStateStorage<TestState>(table, $"{partition}{DateTime.UtcNow.Ticks}", jsonSettings, 
+            var stateStorage = new AzureTableTransactionalStateStorage<TestState>(table, $"{partition}{DateTime.UtcNow.Ticks}", jsonSettings,
                 NullLoggerFactory.Instance.CreateLogger<AzureTableTransactionalStateStorage<TestState>>());
             return stateStorage;
         }

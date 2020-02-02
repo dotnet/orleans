@@ -8,6 +8,9 @@ namespace Orleans
         /// <summary>The application level payload that is the actual state.</summary>
         object State { get; set; }
 
+        /// <summary>Type of the grain state</summary>
+        Type Type { get; }
+
         /// <summary>An e-tag that allows optimistic concurrency checks at the storage provider level.</summary>
         string ETag { get; set; }
     }
@@ -17,22 +20,18 @@ namespace Orleans
     /// </summary>
     /// <typeparam name="T">The type of application level payload.</typeparam>
     [Serializable]
-    internal class GrainState<T> : IGrainState
+    public class GrainState<T> : IGrainState
     {
         public T State;
 
         object IGrainState.State
         {
-            get
-            {
-                return State;
-                
-            }
-            set
-            {
-                State = (T)value;
-            }
+            get => State;
+            set => State = (T)value;
         }
+
+        /// <inheritdoc />
+        public Type Type => typeof(T);
 
         /// <inheritdoc />
         public string ETag { get; set; }

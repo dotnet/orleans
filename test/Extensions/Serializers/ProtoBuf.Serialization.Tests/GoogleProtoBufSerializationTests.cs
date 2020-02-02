@@ -1,4 +1,6 @@
-﻿using Google.Protobuf;
+using Google.Protobuf;
+using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using System;
@@ -16,18 +18,13 @@ namespace ProtoBuf.Serialization.Tests
     public class GoogleProtoBufSerializationTests : SerializationTestsBase
     {
         public GoogleProtoBufSerializationTests() : base(SerializationTestEnvironment.InitializeWithDefaults(
-            new ClientConfiguration
-            {
-                SerializationProviders =
-                {
-                    typeof(ProtobufSerializer)
-                }
-            }))
+            builder => builder.Configure<SerializationProviderOptions>(
+                options => options.SerializationProviders.Add(typeof(ProtobufSerializer)))))
         {
 
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
         public void ProtoBufSerializationTest_1_DirectGoogleProtoBuf()
         {
             var book = CreateAddressBook();

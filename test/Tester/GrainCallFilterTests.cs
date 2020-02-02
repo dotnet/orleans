@@ -30,9 +30,9 @@ namespace UnitTests.General
                 builder.AddClientBuilderConfigurator<ClientConfigurator>();
             }
 
-            private class SiloInvokerTestSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class SiloInvokerTestSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddIncomingGrainCallFilter(context =>
@@ -290,6 +290,34 @@ namespace UnitTests.General
             // This grain method throws, but the exception should be handled by one of the filters and converted
             // into a specific message.
             await Assert.ThrowsAsync<InvalidCastException>(() => grain.IncorrectResultType());
+        }
+
+        /// <summary>
+        /// Tests that <see cref="IIncomingGrainCallContext.ImplementationMethod"/> and <see cref="IGrainCallContext.InterfaceMethod"/> are non-null
+        /// for a call made to a grain and that they match the correct methods.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_Incoming_GenericInterface_ConcreteGrain_Test()
+        {
+            var id = random.Next();
+            var hungry = this.fixture.GrainFactory.GetGrain<IHungryGrain<Apple>>(id);
+            var caterpillar = this.fixture.GrainFactory.GetGrain<ICaterpillarGrain>(id);
+            var omnivore = this.fixture.GrainFactory.GetGrain<IOmnivoreGrain>(id);
+
+            RequestContext.Set("tag", "hungry-eat");
+            await hungry.Eat(new Apple());
+            await ((IHungryGrain<Apple>)caterpillar).Eat(new Apple());
+
+            RequestContext.Set("tag", "omnivore-eat");
+            await omnivore.Eat("string");
+            await ((IOmnivoreGrain)caterpillar).Eat("string");
+
+            RequestContext.Set("tag", "caterpillar-eat");
+            await caterpillar.Eat("string");
+
+            RequestContext.Set("tag", "hungry-eatwith");
+            await caterpillar.EatWith(new Apple(), "butter");
+            await hungry.EatWith(new Apple(), "butter");
         }
     }
 }

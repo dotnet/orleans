@@ -1,5 +1,8 @@
 
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
@@ -9,35 +12,52 @@ using UnitTests.Grains;
 
 namespace TestGrains
 {
+    [RegexImplicitStreamSubscription("THIS.WONT.MATCH.ONLY.FOR.TESTING.SERIALIZATION")]
     [ImplicitStreamSubscription(StreamNamespace)]
     public class GeneratedEventCollectorGrain : Grain, IGeneratedEventCollectorGrain
     {
         public const string StreamNamespace = "Generated";
 
-        private Logger logger;
+        private ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
-        private int counter;
+        private int accumulated;
+
+        public GeneratedEventCollectorGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger("GeneratedEvenCollectorGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             var streamProvider = GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(this.GetPrimaryKey(), StreamNamespace);
 
-            await stream.SubscribeAsync(
-                (e, t) =>
+            IList<StreamSubscriptionHandle<GeneratedEvent>> handles = await stream.GetAllSubscriptionHandles();
+            if (handles.Count == 0)
+            {
+                await stream.SubscribeAsync(OnNextAsync);
+            }
+            else
+            {
+                foreach (StreamSubscriptionHandle<GeneratedEvent> handle in handles)
                 {
-                    counter++;
-                    logger.Info("Received a generated event {0}, of {1} events", e, counter);
-                    if (e.EventType == GeneratedEvent.GeneratedEventType.Fill)
-                    {
-                        return Task.CompletedTask;
-                    }
-                    var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
-                    return reporter.ReportResult(this.GetPrimaryKey(), GeneratedStreamTestConstants.StreamProviderName, StreamNamespace, counter);
-                });
+                    await handle.ResumeAsync(OnNextAsync);
+                }
+            }
+        }
+
+        public Task OnNextAsync(IList<SequentialItem<GeneratedEvent>> items)
+        {
+            this.accumulated += items.Count;
+            logger.Info("Received {Count} generated event.  Accumulated {Accumulated} events so far.", items.Count, this.accumulated);
+            if (items.Last().Item.EventType == GeneratedEvent.GeneratedEventType.Fill)
+            {
+                return Task.CompletedTask;
+            }
+            var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
+            return reporter.ReportResult(this.GetPrimaryKey(), GeneratedStreamTestConstants.StreamProviderName, StreamNamespace, this.accumulated);
         }
     }
 }

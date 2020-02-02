@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Orleans;
+using Orleans.Internal;
 using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -29,13 +29,13 @@ namespace DefaultCluster.Tests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public void EchoGrain_GetGrain()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_Echo()
         {
             Stopwatch clock = new Stopwatch();
@@ -51,7 +51,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(expectedEcho, received);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_EchoError()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
@@ -68,7 +68,7 @@ namespace DefaultCluster.Tests.General
             }).WithTimeout(timeout);
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Echo"), TestCategory("Timeout")]
         public async Task EchoGrain_Timeout_Wait()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
@@ -93,7 +93,7 @@ namespace DefaultCluster.Tests.General
             Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Echo")]
         public async Task EchoGrain_Timeout_Await()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
@@ -117,7 +117,7 @@ namespace DefaultCluster.Tests.General
             Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Echo"), TestCategory("Timeout")]
+        [Fact, TestCategory("SlowBVT"), TestCategory("Echo"), TestCategory("Timeout")]
         public async Task EchoGrain_Timeout_Result()
         {
             grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
@@ -141,7 +141,7 @@ namespace DefaultCluster.Tests.General
             Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_LastEcho()
         {
             Stopwatch clock = new Stopwatch();
@@ -163,7 +163,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(expectedEchoError, received); // LastEcho-Error
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_Ping()
         {
             Stopwatch clock = new Stopwatch();
@@ -180,7 +180,7 @@ namespace DefaultCluster.Tests.General
             this.Logger.Info("{0} took {1}", what, clock.Elapsed);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_Local()
         {
             Stopwatch clock = new Stopwatch();
@@ -196,7 +196,7 @@ namespace DefaultCluster.Tests.General
             this.Logger.Info("{0} took {1}", what, clock.Elapsed);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_Remote()
         {
             Stopwatch clock = new Stopwatch();
@@ -220,7 +220,7 @@ namespace DefaultCluster.Tests.General
             this.Logger.Info("{0} took {1}", what, clock.Elapsed);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_OtherSilo()
         {
             Stopwatch clock = new Stopwatch();
@@ -236,7 +236,7 @@ namespace DefaultCluster.Tests.General
             this.Logger.Info("{0} took {1}", what, clock.Elapsed);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_OtherSilo_Membership()
         {
             Stopwatch clock = new Stopwatch();
@@ -252,7 +252,7 @@ namespace DefaultCluster.Tests.General
             this.Logger.Info("{0} took {1}", what, clock.Elapsed);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoTaskGrain_Await()
         {
             IBlockingEchoTaskGrain g = this.GrainFactory.GetGrain<IBlockingEchoTaskGrain>(GetRandomGrainId());
@@ -267,7 +267,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(expectedEcho, received); // CallMethodTask_Await
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Echo")]
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoTaskGrain_Await_Reentrant()
         {
             IReentrantBlockingEchoTaskGrain g = this.GrainFactory.GetGrain<IReentrantBlockingEchoTaskGrain>(GetRandomGrainId());
@@ -280,6 +280,28 @@ namespace DefaultCluster.Tests.General
 
             received = await g.CallMethodTask_Await(expectedEcho);
             Assert.Equal(expectedEcho, received); // CallMethodTask_Await
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
+        public async Task EchoGrain_EchoNullable()
+        {
+            Stopwatch clock = new Stopwatch();
+
+            clock.Start();
+            var grain = this.GrainFactory.GetGrain<IEchoGrain>(Guid.NewGuid());
+            this.Logger.Info("CreateGrain took " + clock.Elapsed);
+
+            clock.Restart();
+            var now = DateTime.Now;
+            var received = await grain.EchoNullable(now);
+            this.Logger.Info("EchoGrain.EchoNullable took " + clock.Elapsed);
+
+            Assert.Equal(now, received);
+
+            clock.Restart();
+            received = await grain.EchoNullable(null);
+            this.Logger.Info("EchoGrain.EchoNullable took " + clock.Elapsed);
+            Assert.Null(received);
         }
 
         // ---------- Utility methods ----------

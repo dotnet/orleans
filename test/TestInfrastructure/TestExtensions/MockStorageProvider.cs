@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -12,11 +12,38 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Microsoft.Extensions.Logging;
+using Orleans.Hosting;
 
 namespace UnitTests.StorageTests
 {
+    public static class SiloBuilderExtensions
+    {
+        public static ISiloBuilder AddTestStorageProvider<T>(this ISiloBuilder builder, string name) where T : IGrainStorage
+        {
+            return builder.AddTestStorageProvider(name, (sp, n) => ActivatorUtilities.CreateInstance<T>(sp));
+        }
+
+        public static ISiloBuilder AddTestStorageProvider<T>(this ISiloBuilder builder, string name, Func<IServiceProvider, string, T> createInstance) where T : IGrainStorage
+        {
+            return builder.ConfigureServices(services =>
+            {
+                services.AddSingletonNamedService<IGrainStorage>(name, (sp, n) => createInstance(sp, n));
+
+                if (typeof(ILifecycleParticipant<ISiloLifecycle>).IsAssignableFrom(typeof(T)))
+                {
+                    services.AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (svc, n) => (ILifecycleParticipant<ISiloLifecycle>)svc.GetRequiredServiceByName<IGrainStorage>(name));
+                }
+
+                if (typeof(IControllable).IsAssignableFrom(typeof(T)))
+                {
+                    services.AddSingletonNamedService<IControllable>(name, (svc, n) => (IControllable)svc.GetRequiredServiceByName<IGrainStorage>(name));
+                }
+            });
+        }
+    }
+
     [DebuggerDisplay("MockStorageProvider:{Name}")]
-    public class MockStorageProvider : IControllable, IStorageProvider
+    public class MockStorageProvider : IControllable, IGrainStorage
     {
         public enum Commands
         {
@@ -52,13 +79,29 @@ namespace UnitTests.StorageTests
 
         public string Name { get; private set; }
 
-        public MockStorageProvider()
-            : this(2)
+        public MockStorageProvider(ILoggerFactory loggerFactory, SerializationManager serializationManager)
+            : this(Guid.NewGuid().ToString(), 2, loggerFactory, serializationManager)
         { }
-        public MockStorageProvider(int numKeys)
+
+        public MockStorageProvider(string name, ILoggerFactory loggerFactory, SerializationManager serializationManager)
+            : this(name, 2, loggerFactory, serializationManager)
+        { }
+
+        public MockStorageProvider(string name, int numKeys, ILoggerFactory loggerFactory, SerializationManager serializationManager)
         {
             _id = ++_instanceNum;
             this.numKeys = numKeys;
+
+            this.Name = name;
+            this.logger = loggerFactory.CreateLogger(string.Format("Storage.{0}-{1}", this.GetType().Name, this._id));
+
+            logger.Info(0, "Init Name={0}", name);
+            this.serializationManager = serializationManager;
+            Interlocked.Increment(ref initCount);
+
+            StateStore = new HierarchicalKeyStore(numKeys);
+
+            logger.Info(0, "Finished Init Name={0}", name);
         }
 
         public StateForTest GetProviderState()
@@ -134,23 +177,6 @@ namespace UnitTests.StorageTests
                 LastState = storedState;
                 return storedState;
             }
-        }
-
-        public virtual Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            this.Name = name;
-            string loggerName = string.Format("Storage.{0}-{1}", this.GetType().Name, _id);
-            this.logger = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(loggerName);
-
-            logger.Info(0, "Init Name={0} Config={1}", name, config);
-            this.serializationManager = providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
-            Interlocked.Increment(ref initCount);
-            
-            //blocked by port HierarchicalKeyStore to coreclr
-            StateStore = new HierarchicalKeyStore(numKeys);
-            
-            logger.Info(0, "Finished Init Name={0} Config={1}", name, config);
-            return Task.CompletedTask;
         }
 
         public virtual Task Close()

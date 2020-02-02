@@ -1,7 +1,8 @@
-﻿
+
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Placement;
 using Orleans.Providers.Streams.Generator;
@@ -70,12 +71,16 @@ namespace TestGrains
         private FaultsState Faults { get { return myFaults ?? (myFaults = FaultInjectionTracker.GetOrAdd(this.GetPrimaryKey(), key => new FaultsState())); } }
      
         // grain instance state
-        private Logger logger;
+        private ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
+
+        public ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger("RecoverableStreamCollectorGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             Faults.onActivateFault.TryFire(InjectFault);

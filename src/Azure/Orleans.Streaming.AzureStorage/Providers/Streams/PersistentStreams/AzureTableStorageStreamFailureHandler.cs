@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Orleans.Streaming.AzureStorage;
 
 namespace Orleans.Providers.Streams.PersistentStreams
 {

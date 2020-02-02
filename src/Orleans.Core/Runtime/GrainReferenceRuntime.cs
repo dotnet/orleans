@@ -1,5 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
+using Orleans.Internal;
 using Orleans.Serialization;
 using System;
 using System.Collections.Concurrent;
@@ -81,15 +82,17 @@ namespace Orleans.Runtime
 
                 return Task.FromResult(default(T));
             }
-
+#if !NETSTANDARD2_1
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
+#endif
             return resultTask.ToTypedTask<T>();
         }
 
         public TGrainInterface Convert<TGrainInterface>(IAddressable grain)
-        {
-            return this.internalGrainFactory.Cast<TGrainInterface>(grain);
-        }
+            => this.internalGrainFactory.Cast<TGrainInterface>(grain);
+
+        public object Convert(IAddressable grain, Type interfaceType)
+            => this.internalGrainFactory.Cast(grain, interfaceType);
 
         private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
         {
@@ -128,7 +131,7 @@ namespace Orleans.Runtime
         {
             bool isOneWayCall = (options & InvokeMethodOptions.OneWay) != 0;
 
-            var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
+            var resolver = isOneWayCall ? null : new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.RuntimeClient.SendRequest(reference, request, resolver, debugContext, options, reference.GenericArguments);
             return isOneWayCall ? null : resolver.Task;
         }

@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -23,24 +25,26 @@ namespace UnitTests.General
         private readonly TimeSpan endWait = TimeSpan.FromMinutes(5);
 
         enum Fail { First, Random, Last }
-
-        public ClusterConfiguration ClusterConfiguration { get; set; }
-
+        
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                this.ClusterConfiguration = legacy.ClusterConfiguration;
-            });
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            builder.AddSiloBuilderConfigurator<Configurator>();
+            builder.AddClientBuilderConfigurator<Configurator>();
         }
 
-        private class SiloConfigurator : ISiloBuilderConfigurator
+        private class Configurator : ISiloConfigurator, IClientBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddMemoryGrainStorage("MemoryStore")
-                    .AddMemoryGrainStorageAsDefault();
+                    .AddMemoryGrainStorageAsDefault()
+                    .UseInMemoryReminderService();
+            }
+
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<GatewayOptions>(
+                    options => options.GatewayListRefreshPeriod = TimeSpan.FromMilliseconds(100));
             }
         }
 
@@ -272,8 +276,7 @@ namespace UnitTests.General
             int count = 0, index = 0;
 
             // Figure out the primary directory partition and the silo hosting the ReminderTableGrain.
-            bool usingReminderGrain = this.ClusterConfiguration.Globals.ReminderServiceType.Equals(GlobalConfiguration.ReminderServiceProviderType.ReminderTableGrain);
-            IReminderTable tableGrain = this.GrainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
+            var tableGrain = this.GrainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
             var tableGrainId = ((GrainReference)tableGrain).GrainId;
             SiloAddress reminderTableGrainPrimaryDirectoryAddress = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.Primary)).PrimaryForGrain;
             // ask a detailed report from the directory partition owner, and get the actionvation addresses
@@ -289,12 +292,9 @@ namespace UnitTests.General
                     continue;
                 }
                 // Don't fail primary directory partition and the silo hosting the ReminderTableGrain.
-                if (usingReminderGrain)
+                if (siloAddress.Equals(reminderTableGrainPrimaryDirectoryAddress) || siloAddress.Equals(reminderGrainActivation.Silo))
                 {
-                    if (siloAddress.Equals(reminderTableGrainPrimaryDirectoryAddress) || siloAddress.Equals(reminderGrainActivation.Silo))
-                    {
-                        continue;
-                    }
+                    continue;
                 }
                 ids.Add(siloHandle.SiloAddress.GetConsistentHashCode(), siloHandle);
             }

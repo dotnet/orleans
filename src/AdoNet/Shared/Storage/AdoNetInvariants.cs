@@ -21,13 +21,18 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// A list of the supported invariants.
         /// </summary>
+        /// <remarks>The invariant names here do not match the namespaces as is often the convention.
+        /// Current exception is MySQL Connector library that uses the same invariant as MySQL compared
+        /// to the official Oracle distribution.</remarks>
         public static ICollection<string> Invariants { get; } = new Collection<string>(new List<string>(new[]
         {
             InvariantNameMySql,
             InvariantNameOracleDatabase,
             InvariantNamePostgreSql,
             InvariantNameSqlLite,
-            InvariantNameSqlServer
+            InvariantNameSqlServer,
+            InvariantNameSqlServerDotnetCore,
+            InvariantNameMySqlConnector
         }));
 
         /// <summary>
@@ -54,5 +59,15 @@ namespace Orleans.Tests.SqlUtils
         /// PostgreSQL invariant name string.
         /// </summary>
         public const string InvariantNamePostgreSql = "Npgsql";
+
+        /// <summary>
+        /// Dotnet core Microsoft SQL Server invariant name string.
+        /// </summary>
+        public const string InvariantNameSqlServerDotnetCore = "Microsoft.Data.SqlClient";
+
+        /// <summary>
+        /// An open source implementation of the MySQL connector library.
+        /// </summary>
+        public const string InvariantNameMySqlConnector = "MySql.Data.MySqlConnector";
     }
 }

@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using System;
@@ -17,7 +17,7 @@ namespace Tester.SerializationTests
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void ConstructorIsCalled()
         {
             SimplePocoClassSerializer.CallCounter = 0;
@@ -27,7 +27,7 @@ namespace Tester.SerializationTests
             Assert.Equal(input.A, output.A);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void StaticMethodStillRegistered()
         {
             SimplePocoClassSerializer.CallCounter = 0;

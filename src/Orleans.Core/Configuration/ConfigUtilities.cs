@@ -572,9 +572,6 @@ namespace Orleans.Runtime.Configuration
             sb.Append("   Orleans version: ").AppendLine(RuntimeVersion.Current);
             sb.Append("   .NET version: ").AppendLine(Environment.Version.ToString());
             sb.Append("   OS version: ").AppendLine(Environment.OSVersion.ToString());
-#if BUILD_FLAVOR_LEGACY
-            sb.Append("   App config file: ").AppendLine(AppDomain.CurrentDomain.SetupInformation.ConfigurationFile); 
-#endif
             sb.AppendFormat("   GC Type={0} GCLatencyMode={1}",
                               GCSettings.IsServerGC ? "Server" : "Client",
                               Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode))

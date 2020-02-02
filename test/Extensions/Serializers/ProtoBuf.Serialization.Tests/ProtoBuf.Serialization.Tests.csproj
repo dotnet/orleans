@@ -2,14 +2,16 @@
   <PropertyGroup>
     <RootNamespace>ProtoBuf.Serialization.Tests</RootNamespace>
     <AssemblyName>ProtoBuf.Serialization.Tests</AssemblyName>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
     <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
     <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
     <PackageReference Include="protobuf-net" Version="$(ProtobufNetVersion)" />
-    <DotNetCliToolReference Include="dotnet-xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -31,52 +33,39 @@
 
   <Choose>
     <When Condition="$(OrleansTestingHostVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.TestingHost" Version="$(OrleansTestingHostVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
-  <Choose>
-    <When Condition="$(OrleansCoreLegacyVersion) == $(VersionPrefix)">
-      <ItemGroup >
-        <ProjectReference Include="..\..\..\..\src\Orleans.Core.Legacy\Orleans.Core.Legacy.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Core.Legacy" Version="$(OrleansCoreLegacyVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.TestingHost" Version="$(OrleansTestingHostVersion)" />
       </ItemGroup>
     </Otherwise>
   </Choose>
 
   <Choose>
     <When Condition="$(OrleansSerializersVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\..\..\src\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.OrleansGoogleUtils" Version="$(OrleansSerializersVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.OrleansGoogleUtils" Version="$(OrleansSerializersVersion)" />
       </ItemGroup>
     </Otherwise>
   </Choose>
 
   <Choose>
     <When Condition="$(OrleansSerializersVersion) == $(VersionPrefix)">
-      <ItemGroup >
+      <ItemGroup>
         <ProjectReference Include="..\..\..\..\src\Serializers\Orleans.Serialization.ProtobufNet\Orleans.Serialization.ProtobufNet.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.ProtobufNet" Version="$(OrleansSerializersVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.ProtobufNet" Version="$(OrleansSerializersVersion)" />
       </ItemGroup>
     </Otherwise>
   </Choose>

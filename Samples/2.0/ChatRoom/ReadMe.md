@@ -1,6 +1,6 @@
 # Chat Room Sample OVerview
 
-This is a simple sample using [Orleans Streaming feature](http://dotnet.github.io/orleans/Documentation/Orleans-Streams/index.html) to build a simple chatroom application. In this application, each client can 
+This is a simple sample using [Orleans Streaming feature](http://dotnet.github.io/orleans/Documentation/streaming/index.html) to build a simple chatroom application. In this application, each client can 
 - set its user name for ther chatroom application
 - join a channel by channel name
 - send messages to the channel

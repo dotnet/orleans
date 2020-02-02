@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -10,11 +11,15 @@ namespace UnitTests.Grains
     public class ConsumerEventCountingGrain : Grain, IConsumerEventCountingGrain
     {
         private int _numConsumedItems;
-        private Logger _logger;
+        private ILogger _logger;
         private IAsyncObservable<int> _consumer;
         private StreamSubscriptionHandle<int> _subscriptionHandle;
         internal const string StreamNamespace = "HaloStreamingNamespace";
 
+        public ConsumerEventCountingGrain(ILoggerFactory loggerFactory)
+        {
+            _logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         private class AsyncObserver<T> : IAsyncObserver<T>
         {
@@ -43,7 +48,6 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            _logger = this.GetLogger("ConsumerEventCountingGrain " + IdentityString);
             _logger.Info("Consumer.OnActivateAsync");
             _numConsumedItems = 0;
             _subscriptionHandle = null;

@@ -1,3 +1,7 @@
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using System;
@@ -16,11 +20,24 @@ namespace Tester.ClientConnectionTests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 1;
-            builder.ConfigureLegacyConfiguration(legacy =>
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            builder.AddClientBuilderConfigurator<ClientConfigurator>();
+        }
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                legacy.ClusterConfiguration.Globals.OpenConnectionTimeout = Timeout;
-                legacy.ClientConfiguration.ResponseTimeout = Timeout;
-            });
+                hostBuilder.Configure<ConnectionOptions>(options => options.OpenConnectionTimeout = Timeout);
+            }
+        }
+
+        public class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<ClientMessagingOptions>(options => options.ResponseTimeout = Timeout);
+            }
         }
 
         [Fact, TestCategory("Functional")]

@@ -23,9 +23,9 @@ namespace UnitTests.StreamingTests
                builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
             }
 
-            public class SiloHostConfigurator : ISiloBuilderConfigurator
+            public class SiloHostConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddFaultInjectionMemoryStorage("PubSubStore");
                 }
@@ -37,7 +37,7 @@ namespace UnitTests.StreamingTests
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task RegisterConsumerFaultTest()
         {
             this.fixture.Logger.Info("************************ RegisterConsumerFaultTest *********************************");
@@ -65,7 +65,7 @@ namespace UnitTests.StreamingTests
             Assert.Equal(2, consumers);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task UnregisterConsumerFaultTest()
         {
             this.fixture.Logger.Info("************************ UnregisterConsumerFaultTest *********************************");
@@ -113,7 +113,7 @@ namespace UnitTests.StreamingTests
         /// TODO: Fix rendezvous implementation.
         /// </summary>
         /// <returns></returns>
-        [Fact(Skip = "This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
+        [Fact(Skip = "This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension"), TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task RegisterProducerFaultTest()
         {
             this.fixture.Logger.Info("************************ RegisterProducerFaultTest *********************************");
@@ -145,7 +145,7 @@ namespace UnitTests.StreamingTests
         /// This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension in the producer management calls.
         /// TODO: Fix rendezvous implementation.
         /// </summary>
-        [Fact(Skip = "This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
+        [Fact(Skip = "This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension"), TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task UnregisterProducerFaultTest()
         {
             this.fixture.Logger.Info("************************ UnregisterProducerFaultTest *********************************");

@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Telemetry Consumer - Microsoft Azure Application Insights</Title>
     <Description>Microsoft Azure Application Insights implementation of Orleans Telemetry API.</Description>
     <PackageTags>$(PackageTags) Azure ApplicationInsights</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

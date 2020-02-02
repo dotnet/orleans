@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -45,6 +45,15 @@ namespace Orleans.CodeGenerator.Utilities
             }
 
             foreach (var t in type.TypeArguments) yield return t;
+        }
+
+        public static IEnumerable<INamedTypeSymbol> GetNestedHierarchy(this INamedTypeSymbol type)
+        {
+            while (type != null)
+            {
+                yield return type;
+                type = type.ContainingType;
+            }
         }
 
         public static string GetGenericTypeSuffix(this INamedTypeSymbol type)
@@ -115,8 +124,8 @@ namespace Orleans.CodeGenerator.Utilities
 
         public static bool HasBaseType(this ITypeSymbol typeSymbol, INamedTypeSymbol baseType)
         {
-            if (baseType.Equals(typeSymbol.BaseType)) return true;
-            if (typeSymbol.BaseType == null) return false;
+            if (SymbolEqualityComparer.Default.Equals(baseType, typeSymbol.BaseType)) return true;
+            if (typeSymbol.BaseType is null) return false;
             return typeSymbol.BaseType.HasBaseType(baseType);
         }
 
@@ -125,7 +134,7 @@ namespace Orleans.CodeGenerator.Utilities
             var attributes = symbol.GetAttributes();
             foreach (var attr in attributes)
             {
-                if (attr.AttributeClass.Equals(attributeType)) return true;
+                if (SymbolEqualityComparer.Default.Equals(attr.AttributeClass, attributeType)) return true;
             }
 
             return false;
@@ -164,7 +173,7 @@ namespace Orleans.CodeGenerator.Utilities
             var temp = default(List<AttributeData>);
             foreach (var attr in symbol.GetAttributes())
             {
-                if (!attr.AttributeClass.Equals(attributeType) && !attr.AttributeClass.HasBaseType(attributeType)) continue;
+                if (!SymbolEqualityComparer.Default.Equals(attr.AttributeClass, attributeType) && !attr.AttributeClass.HasBaseType(attributeType)) continue;
 
                 if (temp == null) temp = new List<AttributeData>();
                 temp.Add(attr);
@@ -192,25 +201,27 @@ namespace Orleans.CodeGenerator.Utilities
             }
         }
 
-        public static IEnumerable<TSymbol> GetDeclaredMembers<TSymbol>(this ITypeSymbol type) where TSymbol : ISymbol
+        public static IEnumerable<TSymbol> GetDeclaredInstanceMembers<TSymbol>(this ITypeSymbol type) where TSymbol : ISymbol
         {
             foreach (var candidate in type.GetMembers())
             {
+                if (candidate.IsStatic) continue;
                 if (candidate is TSymbol symbol) yield return symbol;
             }
         }
 
-        public static IEnumerable<TSymbol> GetAllMembers<TSymbol>(this ITypeSymbol type) where TSymbol : ISymbol
+        public static IEnumerable<TSymbol> GetInstanceMembers<TSymbol>(this ITypeSymbol type) where TSymbol : ISymbol
         {
             foreach (var candidate in type.GetMembers())
             {
+                if (candidate.IsStatic) continue;
                 if (candidate is TSymbol symbol) yield return symbol;
             }
 
             var baseType = type.BaseType;
             if (baseType != null)
             {
-                foreach (var t in baseType.GetAllMembers<TSymbol>()) yield return t;
+                foreach (var t in baseType.GetInstanceMembers<TSymbol>()) yield return t;
             }
         }
 

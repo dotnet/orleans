@@ -1,4 +1,4 @@
-﻿using Microsoft.FSharp.Collections;
+using Microsoft.FSharp.Collections;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -23,7 +23,7 @@ namespace UnitTests.Serialization
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void DeepCopyTests_BuiltinCollections()
         {
             {
@@ -77,7 +77,7 @@ namespace UnitTests.Serialization
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void DeepCopyTests_ImmutableCollections()
         {
             {
@@ -127,7 +127,7 @@ namespace UnitTests.Serialization
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void DeepCopyTests_UserDefinedType()
         {
             {
@@ -152,7 +152,7 @@ namespace UnitTests.Serialization
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void DeepCopyTests_FSharp_Collections()
         {
             // F# list
@@ -197,7 +197,7 @@ namespace UnitTests.Serialization
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("FSharp"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("FSharp"), TestCategory("Serialization")]
         public void DeepCopyTests_FSharp_Types()
         {
             // discriminated union case with an array field

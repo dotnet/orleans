@@ -1,3 +1,4 @@
+#if !NETCOREAPP
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,11 +9,12 @@ using Orleans;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using TestGrainInterfaces;
-using Orleans.Runtime.Configuration;
+using Orleans.Internal;
 using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
-using Tester;
+using Orleans.Hosting;
+using Orleans.Configuration;
 
 // ReSharper disable InconsistentNaming
 
@@ -58,10 +60,10 @@ namespace Tests.GeoClusterTests
 
         public class ClientWrapper : ClientWrapperBase
         {
-            public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
-                (name, gwPort, clusterId, configUpdater, clientConfgirator) => new ClientWrapper(name, gwPort, clusterId, configUpdater, clientConfgirator);
+            public static readonly Func<string, int, string, Action<IClientBuilder>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, clientConfgirator) => new ClientWrapper(name, gwPort, clusterId, clientConfgirator);
 
-            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer, Action<IClientBuilder> clientConfigurator) : base(name, gatewayport, clusterId, customizer, clientConfigurator)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<IClientBuilder> clientConfigurator) : base(name, gatewayport, clusterId, clientConfigurator)
             {
                 this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
@@ -89,24 +91,26 @@ namespace Tests.GeoClusterTests
         private string cluster1;
         private ClientWrapper[] clients;
 
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.Configure<MultiClusterOptions>(options => options.GlobalSingleInstanceRetryInterval = TimeSpan.FromSeconds(5));
+            }
+        }
+
         private async Task Setup_Clusters(bool largesetup)
         {
             await RunWithTimeout("Setup_Clusters", largesetup ? 120000 : 60000, async () =>
             {
                 // use a random global service id for testing purposes
                 var globalserviceid = Guid.NewGuid();
-
-                Action<ClusterConfiguration> configurationcustomizer = (ClusterConfiguration c) =>
-                {
-                    // run the retry process every 5 seconds to keep this test shorter
-                    c.Globals.GlobalSingleInstanceRetryInterval = TimeSpan.FromSeconds(5);
-                };
-
+                
                 // Create two clusters, each with a single silo.
                 cluster0 = "cluster0";
                 cluster1 = "cluster1";
-                NewGeoCluster(globalserviceid, cluster0, (short)(largesetup ? 3 : 1), configurationcustomizer);
-                NewGeoCluster(globalserviceid, cluster1, (short)(largesetup ? 4 : 1), configurationcustomizer);
+                NewGeoCluster<SiloConfigurator>(globalserviceid, cluster0, (short)(largesetup ? 3 : 1));
+                NewGeoCluster<SiloConfigurator>(globalserviceid, cluster1, (short)(largesetup ? 4 : 1));
 
                 if (!largesetup)
                 {
@@ -659,3 +663,4 @@ namespace Tests.GeoClusterTests
 
     }
 }
+#endif

@@ -4,6 +4,8 @@ namespace Orleans.Runtime.Scheduler
 {
     internal class SchedulingContext : ISchedulingContext
     {
+        public WorkItemGroup WorkItemGroup { get; set; }
+
         public ActivationData Activation { get; private set; }
 
         public SystemTarget SystemTarget { get; private set; }

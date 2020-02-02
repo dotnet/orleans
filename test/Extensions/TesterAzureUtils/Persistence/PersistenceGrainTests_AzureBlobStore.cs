@@ -10,6 +10,7 @@ using Orleans.Runtime.Configuration;
 using TestExtensions;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Orleans.Storage;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -25,9 +26,9 @@ namespace Tester.AzureUtils.Persistence
     {
         public class Fixture : BaseAzureTestClusterFixture
         {
-            private class StorageSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class StorageSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddAzureBlobGrainStorage("AzureStore", (AzureBlobStorageOptions options) =>
                     {
@@ -57,19 +58,6 @@ namespace Tester.AzureUtils.Persistence
             {
                 builder.Options.InitialSilosCount = 4;
                 builder.Options.UseTestClusterMembership = false;
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.Globals.ServiceId = Guid.NewGuid();
-                    legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
-
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2",
-                        new Dictionary<string, string> {{"Config1", "1"}, {"Config2", "2"}});
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
-                    
-                });
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
                 builder.AddSiloBuilderConfigurator<StorageSiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
@@ -133,7 +121,7 @@ namespace Tester.AzureUtils.Persistence
             await base.Grain_Generic_AzureStore_DiffTypes();
         }
 
-        [SkippableFact, TestCategory("Functional")]
+        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5651"), TestCategory("Functional")]
         public async Task Grain_AzureBlobStore_SiloRestart()
         {
             await base.Grain_AzureStore_SiloRestart();

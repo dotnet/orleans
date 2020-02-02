@@ -1,12 +1,10 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
-using Tester;
+using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -24,21 +22,21 @@ namespace UnitTests.StuckGrainTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
                 builder.Options.InitialSilosCount = 1;
                 builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromSeconds(3));
-                    legacy.ClusterConfiguration.Globals.MaxRequestProcessingTime = TimeSpan.FromSeconds(3);
-                    legacy.ClusterConfiguration.Globals.CollectionQuantum = TimeSpan.FromSeconds(1);
-                });
             }
 
-            private class SiloHostConfigurator : LegacySiloBuilderConfigurator {
-                public override void Configure(ISiloHostBuilder hostBuilder)
+            private class SiloHostConfigurator : ISiloConfigurator
+            {
+                public void Configure(ISiloBuilder hostBuilder)
                 {
-                    GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
+                    hostBuilder.Configure<GrainCollectionOptions>(options =>
+                    {
+                        options.CollectionAge = TimeSpan.FromSeconds(3);
+                        options.CollectionQuantum = TimeSpan.FromSeconds(1);
+                    });
+
+                    hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxRequestProcessingTime = TimeSpan.FromSeconds(3));
                 }
             }
         }

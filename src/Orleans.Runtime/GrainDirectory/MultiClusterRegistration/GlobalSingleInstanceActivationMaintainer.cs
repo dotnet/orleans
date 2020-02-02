@@ -12,6 +12,7 @@ using OutcomeState = Orleans.Runtime.GrainDirectory.GlobalSingleInstanceResponse
 using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.MultiCluster;
 using System.Threading;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.GrainDirectory
 {

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Reflection;
 
@@ -13,10 +14,12 @@ namespace Orleans.Configuration.Validators
     internal class ApplicationPartValidator : IConfigurationValidator
     {
         private readonly IApplicationPartManager applicationPartManager;
+        private readonly IServiceProvider serviceProvider;
 
-        public ApplicationPartValidator(IApplicationPartManager applicationPartManager)
+        public ApplicationPartValidator(IApplicationPartManager applicationPartManager, IServiceProvider serviceProvider)
         {
             this.applicationPartManager = applicationPartManager;
+            this.serviceProvider = serviceProvider;
         }
 
         /// <inheritdoc />
@@ -39,6 +42,47 @@ namespace Orleans.Configuration.Validators
                 throw new OrleansConfigurationException(
                     $"None of the assemblies added to {nameof(ApplicationPartManager)} contain generated code." +
                     " Ensure that code generation has been executed for grain interface and class assemblies.");
+            }
+
+            var allProviders = this.applicationPartManager.FeatureProviders;
+            var nonFrameworkParts = this.applicationPartManager.ApplicationParts
+                .Where(part => !(part is AssemblyPart asm) || !asm.IsFrameworkAssembly)
+                .ToList();
+
+            var isSilo = this.serviceProvider.GetService(typeof(ILocalSiloDetails)) != null;
+            if (isSilo)
+            {
+                var providers = allProviders.OfType<IApplicationFeatureProvider<GrainClassFeature>>();
+                var grains = new GrainClassFeature();
+                foreach (var provider in providers)
+                {
+                    provider.PopulateFeature(nonFrameworkParts, grains);
+                }
+
+                var hasGrains = grains.Classes.Any();
+                if (!hasGrains)
+                {
+                    throw new OrleansConfigurationException(
+                        $"None of the assemblies added to {nameof(ApplicationPartManager)} contain generated code for grain classes." +
+                        " Ensure that code generation has been executed for grain interface and grain class assemblies and that they have been added as application parts.");
+                }
+            }
+
+            {
+                var providers = allProviders.OfType<IApplicationFeatureProvider<GrainInterfaceFeature>>();
+                var grainInterfaces = new GrainInterfaceFeature();
+                foreach (var provider in providers)
+                {
+                    provider.PopulateFeature(nonFrameworkParts, grainInterfaces);
+                }
+
+                bool hasGrainInterfaces = grainInterfaces.Interfaces.Any();
+                if (!hasGrainInterfaces)
+                {
+                    throw new OrleansConfigurationException(
+                        $"None of the assemblies added to {nameof(ApplicationPartManager)} contain generated code for grain interfaces." +
+                        " Ensure that code generation has been executed for grain interface and grain class assemblies and that they have been added as application parts.");
+                }
             }
         }
     }

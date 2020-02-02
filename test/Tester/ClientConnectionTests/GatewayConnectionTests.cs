@@ -15,8 +15,10 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Configuration.Internal;
 
-namespace Tester.ClientConnectionTests
+namespace Tester
 {
     public class TestGatewayManager : IGatewayListProvider
     {
@@ -50,18 +52,39 @@ namespace Tester.ClientConnectionTests
         {
             builder.Options.UseTestClusterMembership = false;
             builder.Options.InitialSilosCount = 1;
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClientConfiguration.GatewayListRefreshPeriod = TimeSpan.FromMilliseconds(100);
-            });
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
         }
 
-        public class ClientBuilderConfigurator : LegacyClientBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public override void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                var primaryGw = this.ClusterConfiguration.Overrides["Primary"].ProxyGatewayEndpoint.ToGatewayUri();
+                hostBuilder.UseLocalhostClustering();
+                hostBuilder.ConfigureServices((context, services) =>
+                {
+                    var cfg = context.Configuration;
+                    var siloPort = int.Parse(cfg[nameof(TestClusterOptions.BaseSiloPort)]);
+                    var gatewayPort = int.Parse(cfg[nameof(TestClusterOptions.BaseGatewayPort)]);
+                    services.Configure<EndpointOptions>(options =>
+                    {
+                        options.SiloPort = siloPort;
+                        options.GatewayPort = gatewayPort;
+                    });
+                });
+            }
+        }
+
+        public class ClientBuilderConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                var basePort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
+                var primaryGw = new IPEndPoint(IPAddress.Loopback, basePort).ToGatewayUri();
+                clientBuilder.Configure<GatewayOptions>(options =>
+                {
+                    options.GatewayListRefreshPeriod = TimeSpan.FromMilliseconds(100);
+                });
                 clientBuilder.ConfigureServices(services =>
                 {
                     services.AddSingleton(sp =>
@@ -90,7 +113,8 @@ namespace Tester.ClientConnectionTests
             var timeoutCount = 0;
 
             // Fake Gateway
-            var port = this.HostedCluster.Client.Configuration().Gateways.First().Port + 2;
+            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var port = gateways.First().Port + 2;
             var endpoint = new IPEndPoint(IPAddress.Loopback, port);
             var evt = new SocketAsyncEventArgs();
             var gatewayManager = this.runtimeClient.ServiceProvider.GetService<TestGatewayManager>();

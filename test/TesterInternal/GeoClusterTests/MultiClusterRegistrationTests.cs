@@ -1,18 +1,18 @@
+#if !NETCOREAPP
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.TestingHost;
-using TestExtensions;
 using TestGrainInterfaces;
 using Tests.GeoClusterTests;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Hosting;
+using Orleans.Internal;
 
 namespace UnitTests.GeoClusterTests
 {
@@ -95,16 +95,18 @@ namespace UnitTests.GeoClusterTests
 
         private Task StartClustersAndClients(params short[] silos)
         {
-            return StartClustersAndClients(null, null, silos);
+            return StartClustersAndClients(null, silos);
         }
-        public class SiloConfigurator : ISiloBuilderConfigurator
+
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddSimpleMessageStreamProvider("SMSProvider");
             }
         }
-        private Task StartClustersAndClients(Action<ClusterConfiguration> config_customizer, Action<ClientConfiguration> clientconfig_customizer, params short[] silos)
+
+        private Task StartClustersAndClients(Action<TestClusterBuilder> configureTestCluster, params short[] silos)
         {
             WriteLog("Creating clusters and clients...");
             var stopwatch = new System.Diagnostics.Stopwatch();
@@ -116,12 +118,6 @@ namespace UnitTests.GeoClusterTests
 
             System.Threading.ThreadPool.SetMaxThreads(8, 8);
 
-            // configuration for cluster
-            Action<ClusterConfiguration> addtracing = (ClusterConfiguration c) =>
-            {
-                config_customizer?.Invoke(c);
-            };
-
             // Create clusters and clients
             ClusterNames = new string[silos.Length];
             Clients = new ClientWrapper[silos.Length][];
@@ -130,9 +126,13 @@ namespace UnitTests.GeoClusterTests
                 var numsilos = silos[i];
                 var clustername = ClusterNames[i] = ((char)('A' + i)).ToString();
                 var c = Clients[i] = new ClientWrapper[numsilos];
-                NewGeoCluster<SiloConfigurator>(globalserviceid, clustername, silos[i], addtracing);
+                NewGeoCluster<SiloConfigurator>(globalserviceid, clustername, silos[i], configureTestCluster);
                 // create one client per silo
-                Parallel.For(0, numsilos, paralleloptions, (j) => c[j] = this.NewClient(clustername, j, ClientWrapper.Factory, null, clientBuilder => clientBuilder.AddSimpleMessageStreamProvider("SMSProvider")));
+                Parallel.For(0, numsilos, paralleloptions, (j) => c[j] = this.NewClient(
+                    clustername,
+                    j,
+                    ClientWrapper.Factory,
+                    clientBuilder => clientBuilder.AddSimpleMessageStreamProvider("SMSProvider")));
             }
 
             WriteLog("Clusters and clients are ready (elapsed = {0})", stopwatch.Elapsed);
@@ -154,17 +154,17 @@ namespace UnitTests.GeoClusterTests
 
         public class ClientWrapper : ClientWrapperBase
         {
-            public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
-                (name, gwPort, clusterId, configUpdater, clientConfigurator) => new ClientWrapper(name, gwPort, clusterId, configUpdater, clientConfigurator);
+            public static readonly Func<string, int, string, Action<IClientBuilder>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, clientConfigurator) => new ClientWrapper(name, gwPort, clusterId, clientConfigurator);
             
-            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> configCustomizer, Action<IClientBuilder> clientConfigurator) : base(name, gatewayport, clusterId, configCustomizer, clientConfigurator)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<IClientBuilder> clientConfigurator) : base(name, gatewayport, clusterId, clientConfigurator)
             {
                 this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
             public int CallGrain(int i)
             {
                 var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
-                this.Client.Logger().Info("Call Grain {0}", grainRef);
+                this.Logger.Info("Call Grain {0}", grainRef);
                 Task<int> toWait = grainRef.SayHelloAsync();
                 toWait.Wait();
                 return toWait.GetResult();
@@ -172,7 +172,7 @@ namespace UnitTests.GeoClusterTests
             public string GetRuntimeId(int i)
             {
                 var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
-                this.Client.Logger().Info("GetRuntimeId {0}", grainRef);
+                this.Logger.Info("GetRuntimeId {0}", grainRef);
                 Task<string> toWait = grainRef.GetRuntimeId();
                 toWait.Wait();
                 return toWait.GetResult();
@@ -180,7 +180,7 @@ namespace UnitTests.GeoClusterTests
             public void Deactivate(int i)
             {
                 var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
-                this.Client.Logger().Info("Deactivate {0}", grainRef);
+                this.Logger.Info("Deactivate {0}", grainRef);
                 Task toWait = grainRef.Deactivate();
                 toWait.GetResult();
             }
@@ -188,7 +188,7 @@ namespace UnitTests.GeoClusterTests
             public void EnableStreamNotifications(int i)
             {
                 var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
-                this.Client.Logger().Info("EnableStreamNotifications {0}", grainRef);
+                this.Logger.Info("EnableStreamNotifications {0}", grainRef);
                 Task toWait = grainRef.EnableStreamNotifications();
                 toWait.GetResult();
             }
@@ -197,11 +197,11 @@ namespace UnitTests.GeoClusterTests
             public void Subscribe(int i, IClusterTestListener listener)
             {
                 var grainRef = this.GrainFactory.GetGrain<IClusterTestGrain>(i);
-                this.Client.Logger().Info("Create Listener object {0}", grainRef);
+                this.Logger.Info("Create Listener object {0}", grainRef);
                 listeners.Add(listener);
                 var obj = this.GrainFactory.CreateObjectReference<IClusterTestListener>(listener).Result;
                 listeners.Add(obj);
-                this.Client.Logger().Info("Subscribe {0}", grainRef);
+                this.Logger.Info("Subscribe {0}", grainRef);
                 Task toWait = grainRef.Subscribe(obj);
                 toWait.GetResult();
             }
@@ -228,7 +228,7 @@ namespace UnitTests.GeoClusterTests
             }
         }
 
-        public class ClusterTestListener : MarshalByRefObject, IClusterTestListener, IAsyncObserver<int>
+        public class ClusterTestListener : IClusterTestListener, IAsyncObserver<int>
         {
             public ClusterTestListener(Action<int> oncall)
             {
@@ -451,9 +451,7 @@ namespace UnitTests.GeoClusterTests
         {
             await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () =>
             {
-                Action<ClusterConfiguration> c =
-                  (cc) => { cc.Globals.DirectoryLazyDeregistrationDelay = TimeSpan.FromSeconds(5); };
-                return StartClustersAndClients(c, null, 2, 2);
+                return StartClustersAndClients(2, 2);
             });
 
             await RunWithTimeout("BlockedDeact", 10 * 1000, async () =>
@@ -499,10 +497,7 @@ namespace UnitTests.GeoClusterTests
         {
             await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () =>
             {
-                Action<ClusterConfiguration> c =
-                  (cc) => {
-                  };
-                return StartClustersAndClients(c, null, 1, 1);
+                return StartClustersAndClients(1, 1);
             });
 
             await RunWithTimeout("CacheCleanup", 1000000, async () =>
@@ -549,10 +544,7 @@ namespace UnitTests.GeoClusterTests
         {
             await RunWithTimeout("Start Clusters and Clients", 180 * 1000, () =>
             {
-                Action<ClusterConfiguration> c =
-                  (cc) => {
-                  };
-                return StartClustersAndClients(c, null, 3, 3);
+                return StartClustersAndClients(3, 3);
             });
 
             await RunWithTimeout("CacheCleanupMultiple", 1000000, async () =>
@@ -612,3 +604,4 @@ namespace UnitTests.GeoClusterTests
         }
     }
 }
+#endif

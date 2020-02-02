@@ -23,31 +23,31 @@ namespace Orleans.Storage
             grainStore = new Dictionary<string, GrainStateStore>();
             base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for MemoryStorageGrain virtually indefinitely.
             logger = this.ServiceProvider.GetRequiredService<ILogger<MemoryStorageGrain>>();
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             grainStore = null;
             return Task.CompletedTask;
         }
 
         public Task<IGrainState> ReadStateAsync(string stateStore, string grainStoreKey)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("ReadStateAsync for {0} grain: {1}", stateStore, grainStoreKey);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ReadStateAsync for {StateStore} grain: {GrainStoreKey}", stateStore, grainStoreKey);
             GrainStateStore storage = GetStoreForGrain(stateStore);
             var grainState = storage.GetGrainState(grainStoreKey);
             return Task.FromResult(grainState);
         }
-        
+
         public Task<string> WriteStateAsync(string stateStore, string grainStoreKey, IGrainState grainState)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("WriteStateAsync for {0} grain: {1} eTag: {2}", stateStore, grainStoreKey, grainState.ETag);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("WriteStateAsync for {StateStore} grain: {GrainStoreKey} eTag: {ETag}", stateStore, grainStoreKey, grainState.ETag);
             GrainStateStore storage = GetStoreForGrain(stateStore);
             storage.UpdateGrainState(grainStoreKey, grainState);
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Done WriteStateAsync for {0} grain: {1} eTag: {2}", stateStore, grainStoreKey, grainState.ETag);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Done WriteStateAsync for {StateStore} grain: {GrainStoreKey} eTag: {ETag}", stateStore, grainStoreKey, grainState.ETag);
             return Task.FromResult(grainState.ETag);
         }
 
@@ -129,14 +129,14 @@ namespace Orleans.Storage
                 if (string.IsNullOrEmpty(currentETag) && receivedEtag == null)
                     return;
 
-                // if current state and new state have matching etags, we're good
-                if (receivedEtag == currentETag)
+                // if current state and new state have matching etags, or we're to ignore the ETag, we're good
+                if (receivedEtag == currentETag || receivedEtag == StorageProviderUtils.ANY_ETAG)
                     return;
 
                 // else we have an etag mismatch
                 if (logger.IsEnabled(LogLevel.Warning))
                 {
-                    logger.Warn(0, $"Etag mismatch during {operation} for grain {grainStoreKey}: Expected = {currentETag ?? "null"} Received = {receivedEtag}");
+                    logger.LogWarning(0, "Etag mismatch during {Operation} for grain {GrainStoreKey}: Expected = {Expected} Received = {Received}", operation, grainStoreKey, currentETag ?? "null", receivedEtag);
                 }
                 throw new MemoryStorageEtagMismatchException(currentETag, receivedEtag);
             }
@@ -151,6 +151,7 @@ namespace Orleans.Storage
                     ETag = string.Empty;
                 }
                 public object State { get; set; }
+                public Type Type => typeof(object);
                 public string ETag { get; set; }
             }
             private static readonly IGrainState Deleted = new DeletedState();

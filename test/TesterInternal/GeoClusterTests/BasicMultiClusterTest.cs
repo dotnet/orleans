@@ -1,11 +1,11 @@
-﻿using System;
+#if !NETCOREAPP
+using System;
 using System.Collections.Generic;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Runtime.Configuration;
-using Tester;
+using Orleans.Internal;
 
 namespace Tests.GeoClusterTests
 {
@@ -18,12 +18,12 @@ namespace Tests.GeoClusterTests
         // this client is used to call into the management grain.
         public class ClientWrapper : TestingClusterHost.ClientWrapperBase
         {
-            public static readonly Func<string, int, string, Action<ClientConfiguration>, Action<IClientBuilder>, ClientWrapper> Factory =
-                (name, gwPort, clusterId, configUpdater, clientConfigurator) => new ClientWrapper(name, gwPort, clusterId, configUpdater, clientConfigurator);
+            public static readonly Func<string, int, string, Action<IClientBuilder>, ClientWrapper> Factory =
+                (name, gwPort, clusterId, clientConfigurator) => new ClientWrapper(name, gwPort, clusterId, clientConfigurator);
 
-            public ClientWrapper(string name, int gatewayport, string clusterId, Action<ClientConfiguration> customizer, Action<IClientBuilder> clientConfigurator)
+            public ClientWrapper(string name, int gatewayport, string clusterId, Action<IClientBuilder> clientConfigurator)
                 // use null clusterId, in this test, because we are testing non-geo clients
-                : base(name, gatewayport, clusterId, customizer, clientConfigurator)
+                : base(name, gatewayport, clusterId, clientConfigurator)
             {
                 this.systemManagement = this.GrainFactory.GetGrain<IManagementGrain>(0);
             }
@@ -69,3 +69,4 @@ namespace Tests.GeoClusterTests
         }
     }
 }
+#endif

@@ -79,7 +79,8 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         public static IStreamProvider Create(IServiceProvider services, string name)
         {
-            return ActivatorUtilities.CreateInstance<SimpleMessageStreamProvider>(services, name, services.GetService<IOptionsSnapshot<SimpleMessageStreamProviderOptions>>().Get(name));
+            return ActivatorUtilities.CreateInstance<SimpleMessageStreamProvider>(services, name,
+                services.GetRequiredService<IOptionsMonitor<SimpleMessageStreamProviderOptions>>().Get(name));
         }
     }
 }

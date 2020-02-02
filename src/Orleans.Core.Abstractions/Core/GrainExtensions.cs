@@ -64,6 +64,18 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Casts the provided <paramref name="grain"/> to the provided <paramref name="interfaceType"/>.
+        /// </summary>
+        /// <param name="grain">The grain.</param>
+        /// <param name="interfaceType">The resulting interface type.</param>
+        /// <returns>A reference to <paramref name="grain"/> which implements <paramref name="interfaceType"/>.</returns>
+        public static object Cast(this IAddressable grain, Type interfaceType)
+        {
+
+            return grain.AsWeaklyTypedReference().Runtime.Convert(grain, interfaceType);
+        }
+
+        /// <summary>
         /// Binds the grain reference to the provided <see cref="IGrainFactory"/>.
         /// </summary>
         /// <param name="grain">The grain reference.</param>

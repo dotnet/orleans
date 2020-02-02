@@ -2,13 +2,10 @@ using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
-using Orleans.Runtime.Configuration;
-using Orleans.Storage;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
 using TestExtensions;
 using Xunit;
-using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.StreamingTests.PlugableQueueBalancerTests
@@ -31,15 +28,19 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
                 builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
             }
 
-            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("PubSubStore")
-                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>b
-                        .ConfigurePartitioning(totalQueueCount)
-                        .ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n)));
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(
+                            StreamProviderName,
+                            b=>
+                            {
+                                b.ConfigurePartitioning(totalQueueCount);
+                                b.ConfigurePartitionBalancing((s, n) => ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancerForTest>(s, n));
+                            });
                         
                 }
             }

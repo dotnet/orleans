@@ -1,12 +1,16 @@
-﻿using System;
+using System;
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO.Pipelines;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Serialization;
+using Orleans.Runtime.Messaging;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -19,12 +23,14 @@ namespace UnitTests.Serialization
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
         private readonly MessageFactory messageFactory;
+        private readonly IMessageSerializer messageSerializer;
 
         public MessageSerializerTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
             this.messageFactory = this.fixture.Services.GetRequiredService<MessageFactory>();
+            this.messageSerializer = this.fixture.Services.GetRequiredService<IMessageSerializer>();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
@@ -33,7 +39,7 @@ namespace UnitTests.Serialization
             RunTest(1000);
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("Functional")]
         public async Task MessageTest_TtlUpdatedOnAccess()
         {
             var request = new InvokeMethodRequest(0, 0, 0, null);
@@ -41,7 +47,7 @@ namespace UnitTests.Serialization
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
             await Task.Delay(TimeSpan.FromMilliseconds(500));
-            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(500));
+            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
@@ -52,23 +58,95 @@ namespace UnitTests.Serialization
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
             await Task.Delay(TimeSpan.FromMilliseconds(500));
-
-            int dummy;
-            var serialized = message.Serialize(this.fixture.SerializationManager, out dummy, out dummy);
-            int length = serialized.Sum<ArraySegment<byte>>(x => x.Count);
-            byte[] data = new byte[length];
-            int n = 0;
-            foreach (var buffer in serialized)
-            {
-                Array.Copy(buffer.Array, buffer.Offset, data, n, buffer.Count);
-                n += buffer.Count;
-            }
-            message.ReleaseBodyAndHeaderBuffers();
-
-            Message deserializedMessage = DeserializeMessage(length, data);
+            var deserializedMessage = RoundTripMessage(message);
 
             Assert.NotNull(deserializedMessage.TimeToLive);
-            Assert.InRange(deserializedMessage.TimeToLive.Value, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(500));
+            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_SerializeHeaderTooBig()
+        {
+            try
+            {
+                // Create a ridiculously big RequestContext
+                var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
+                RequestContext.Set("big_object", new byte[maxHeaderSize + 1]);
+
+                var request = new InvokeMethodRequest(0, 0, 0, null);
+                var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+
+                var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+                var writer = pipe.Writer;
+                Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref writer, message));
+            }
+            finally
+            {
+                RequestContext.Clear();
+            }
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_SerializeBodyTooBig()
+        {
+            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
+
+            // Create a request with a ridiculously big argument
+            var arg = new byte[maxBodySize + 1];
+            var request = new InvokeMethodRequest(0, 0, 0, new[] { arg });
+            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+
+            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+            var writer = pipe.Writer;
+            Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref writer, message));
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_DeserializeHeaderTooBig()
+        {
+            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
+            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
+
+            DeserializeFakeMessage(maxHeaderSize + 1, maxBodySize - 1);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_DeserializeBodyTooBig()
+        {
+            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
+            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
+
+            DeserializeFakeMessage(maxHeaderSize - 1, maxBodySize + 1);
+        }
+
+        private void DeserializeFakeMessage(int headerSize, int bodySize)
+        {
+            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+            var writer = pipe.Writer;
+
+            Span<byte> lengthFields = stackalloc byte[8];
+            BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerSize);
+            BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), bodySize);
+            writer.Write(lengthFields);
+            writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+
+            pipe.Reader.TryRead(out var readResult);
+            var reader = readResult.Buffer;
+            Assert.Throws<OrleansException>(() => this.messageSerializer.TryRead(ref reader, out var message));
+        }
+
+        private Message RoundTripMessage(Message message)
+        {
+            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+            var writer = pipe.Writer;
+            this.messageSerializer.Write(ref writer, message);
+            writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+
+            pipe.Reader.TryRead(out var readResult);
+            var reader = readResult.Buffer;
+            var (requiredBytes, _, _) = this.messageSerializer.TryRead(ref reader, out var deserializedMessage);
+            Assert.Equal(0, requiredBytes);
+            return deserializedMessage;
         }
 
         private void RunTest(int numItems)
@@ -93,20 +171,8 @@ namespace UnitTests.Serialization
 
             string s = resp.ToString();
             output.WriteLine(s);
-
-            int dummy;
-            var serialized = resp.Serialize(this.fixture.SerializationManager, out dummy, out dummy);
-            int length = serialized.Sum<ArraySegment<byte>>(x => x.Count);
-            byte[] data = new byte[length];
-            int n = 0;
-            foreach (var buffer in serialized)
-            {
-                Array.Copy(buffer.Array, buffer.Offset, data, n, buffer.Count);
-                n += buffer.Count;
-            }
-            resp.ReleaseBodyAndHeaderBuffers();
-
-            var resp1 = DeserializeMessage(length, data);
+            
+            var resp1 = RoundTripMessage(resp);
 
             //byte[] serialized = resp.FormatForSending();
             //Message resp1 = new Message(serialized, serialized.Length);
@@ -120,38 +186,13 @@ namespace UnitTests.Serialization
             Assert.True(resp.SendingGrain.Equals(resp1.SendingGrain));
             Assert.True(resp.SendingSilo.Equals(resp1.SendingSilo)); //SendingSilo is incorrect
             Assert.True(resp1.IsUsingInterfaceVersions);
-            List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.GetDeserializedBody(this.fixture.SerializationManager));
+            List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.BodyObject);
             Assert.Equal<int>(numItems, responseList.Count); //Body list has wrong number of entries
             for (int k = 0; k < numItems; k++)
             {
                 Assert.IsAssignableFrom<string>(responseList[k]); //Body list item " + k + " has wrong type
                 Assert.Equal((string)(requestBody[k]), (string)(responseList[k])); //Body list item " + k + " is incorrect
             }
-        }
-
-        private Message DeserializeMessage(int length, byte[] data)
-        {
-            int headerLength = BitConverter.ToInt32(data, 0);
-            int bodyLength = BitConverter.ToInt32(data, 4);
-            Assert.Equal<int>(length, headerLength + bodyLength + 8); //Serialized lengths are incorrect
-            byte[] header = new byte[headerLength];
-            Array.Copy(data, 8, header, 0, headerLength);
-            byte[] body = new byte[bodyLength];
-            Array.Copy(data, 8 + headerLength, body, 0, bodyLength);
-            var headerList = new List<ArraySegment<byte>>();
-            headerList.Add(new ArraySegment<byte>(header));
-            var bodyList = new List<ArraySegment<byte>>();
-            bodyList.Add(new ArraySegment<byte>(body));
-            var context = new DeserializationContext(this.fixture.SerializationManager)
-            {
-                StreamReader = new BinaryTokenStreamReader(headerList)
-            };
-            var deserializedMessage = new Message
-            {
-                Headers = SerializationManager.DeserializeMessageHeaders(context)
-            };
-            deserializedMessage.SetBodyBytes(bodyList);
-            return deserializedMessage;
         }
     }
 }

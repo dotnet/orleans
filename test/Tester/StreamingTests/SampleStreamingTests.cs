@@ -31,9 +31,9 @@ namespace UnitTests.StreamingTests
                 builder.AddClientBuilderConfigurator<ClientConfiguretor>();
             }
 
-            public class SiloConfigurator : ISiloBuilderConfigurator
+            public class SiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddSimpleMessageStreamProvider(StreamProvider)
                          .AddMemoryGrainStorage("PubSubStore");
@@ -56,7 +56,7 @@ namespace UnitTests.StreamingTests
             logger = this.fixture.Logger;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void SampleStreamingTests_StreamTypeMismatch_ShouldThrowOrleansException()
         {
             var streamId = Guid.NewGuid();
@@ -67,7 +67,7 @@ namespace UnitTests.StreamingTests
                 });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task SampleStreamingTests_1()
         {
             this.logger.Info("************************ SampleStreamingTests_1 *********************************");

@@ -22,9 +22,9 @@ namespace UnitTests.StreamingTests
                 builder.AddClientBuilderConfigurator<ClientConfiguretor>();
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
-            public class SiloConfigurator : ISiloBuilderConfigurator
+            public class SiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddSimpleMessageStreamProvider(StreamProvider)
                         .AddMemoryGrainStorage("PubSubStore");
@@ -49,42 +49,42 @@ namespace UnitTests.StreamingTests
             runner = new SubscriptionMultiplicityTestRunner(Fixture.StreamProvider, fixture.HostedCluster);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSMultipleSubscriptionTest()
         {
             this.fixture.Logger.Info("************************ SMSMultipleSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSAddAndRemoveSubscriptionTest()
         {
             this.fixture.Logger.Info("************************ SMSAddAndRemoveSubscriptionTest *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSResubscriptionTest()
         {
             this.fixture.Logger.Info("************************ SMSResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSResubscriptionAfterDeactivationTest()
         {
             this.fixture.Logger.Info("************************ ResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSActiveSubscriptionTest()
         {
             this.fixture.Logger.Info("************************ SMSActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSSubscribeFromClientTest()
         {
             this.fixture.Logger.Info("************************ SMSSubscribeFromClientTest *********************************");

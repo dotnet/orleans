@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -495,8 +496,10 @@ namespace Orleans.Runtime.GrainDirectory
         /// This method is supposed to be used by handoff manager to update the partitions when the system view (set of live silos) changes.
         /// </summary>
         /// <param name="other"></param>
-        internal void Merge(GrainDirectoryPartition other)
+        /// <returns>Activations which must be deactivated.</returns>
+        internal Dictionary<SiloAddress, List<ActivationAddress>> Merge(GrainDirectoryPartition other)
         {
+            Dictionary<SiloAddress, List<ActivationAddress>> activationsToRemove = null;
             lock (lockable)
             {
                 foreach (var pair in other.partitionData)
@@ -507,10 +510,17 @@ namespace Orleans.Runtime.GrainDirectory
                         var activationsToDrop = partitionData[pair.Key].Merge(pair.Key, pair.Value);
                         if (activationsToDrop == null) continue;
 
+                        if (activationsToRemove == null) activationsToRemove = new Dictionary<SiloAddress, List<ActivationAddress>>();
                         foreach (var siloActivations in activationsToDrop)
                         {
-                            var remoteCatalog = grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, siloActivations.Key);
-                            remoteCatalog.DeleteActivations(siloActivations.Value).Ignore();
+                            if (activationsToRemove.TryGetValue(siloActivations.Key, out var activations))
+                            {
+                                activations.AddRange(siloActivations.Value);
+                            }
+                            else
+                            {
+                                activationsToRemove[siloActivations.Key] = siloActivations.Value;
+                            }
                         }
                     }
                     else
@@ -519,6 +529,8 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
             }
+
+            return activationsToRemove;
         }
 
         /// <summary>

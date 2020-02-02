@@ -1,14 +1,10 @@
-using Orleans.Runtime.Configuration;
 using Orleans.Tests.SqlUtils;
 using Orleans.TestingHost;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using UnitTests.General;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Hosting;
-using Orleans.TestingHost.Utils;
-using Orleans.Configuration;
 
 namespace UnitTests.MembershipTests
 {
@@ -22,13 +18,22 @@ namespace UnitTests.MembershipTests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName).Result;
-            builder.ConfigureLegacyConfiguration(legacy =>
+            builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                legacy.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
-                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AdoNet;
-                legacy.ClusterConfiguration.PrimaryNode = null;
-                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
-            });
+                var cfg = hostBuilder.GetConfiguration();
+                var connectionString = cfg["RelationalStorageConnectionString"];
+                hostBuilder.UseAdoNetClustering(options =>
+                {
+                    options.ConnectionString = connectionString;
+                    options.Invariant = AdoNetInvariants.InvariantNameSqlServer;
+                });
+            }
         }
 
         [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
@@ -71,14 +76,22 @@ namespace UnitTests.MembershipTests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNamePostgreSql, TestDatabaseName).Result;
-            builder.ConfigureLegacyConfiguration(legacy =>
+            builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                legacy.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
-                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AdoNet;
-                legacy.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
-                legacy.ClusterConfiguration.PrimaryNode = null;
-                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
-            });
+                var cfg = hostBuilder.GetConfiguration();
+                var connectionString = cfg["RelationalStorageConnectionString"];
+                hostBuilder.UseAdoNetClustering(options =>
+                {
+                    options.ConnectionString = connectionString;
+                    options.Invariant = AdoNetInvariants.InvariantNamePostgreSql;
+                });
+            }
         }
 
         [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
@@ -122,14 +135,22 @@ namespace UnitTests.MembershipTests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameMySql, TestDatabaseName).Result;
-            builder.ConfigureLegacyConfiguration(legacy =>
+            builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                legacy.ClusterConfiguration.Globals.DataConnectionString = relationalStorage.CurrentConnectionString;
-                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AdoNet;
-                legacy.ClusterConfiguration.Globals.AdoInvariant = AdoNetInvariants.InvariantNameMySql;
-                legacy.ClusterConfiguration.PrimaryNode = null;
-                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
-            });
+                var cfg = hostBuilder.GetConfiguration();
+                var connectionString = cfg["RelationalStorageConnectionString"];
+                hostBuilder.UseAdoNetClustering(options =>
+                {
+                    options.ConnectionString = connectionString;
+                    options.Invariant = AdoNetInvariants.InvariantNameMySql;
+                });
+            }
         }
 
         [Fact, TestCategory("Membership"), TestCategory("MySql")]

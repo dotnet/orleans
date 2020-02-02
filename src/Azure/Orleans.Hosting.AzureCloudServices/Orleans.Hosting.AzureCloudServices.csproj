@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Hosting on Azure Cloud Services</Title>
     <Description>Hosting utilities for Azure Cloud Services of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Azure Cloud Services</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

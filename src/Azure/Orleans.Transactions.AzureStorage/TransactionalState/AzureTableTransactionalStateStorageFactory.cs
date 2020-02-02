@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -23,8 +23,8 @@ namespace Orleans.Transactions.AzureStorage
 
         public static ITransactionalStateStorageFactory Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<AzureTableTransactionalStateOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<AzureTableTransactionalStateOptions>>();
-            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorageFactory>(services, name, optionsSnapshot.Get(name));
+            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<AzureTableTransactionalStateOptions>>();
+            return ActivatorUtilities.CreateInstance<AzureTableTransactionalStateStorageFactory>(services, name, optionsMonitor.Get(name));
         }
 
         public AzureTableTransactionalStateStorageFactory(string name, AzureTableTransactionalStateOptions options, IOptions<ClusterOptions> clusterOptions, ITypeResolver typeResolver, IGrainFactory grainFactory, ILoggerFactory loggerFactory)
@@ -53,7 +53,7 @@ namespace Orleans.Transactions.AzureStorage
         {
             string grainKey = context.GrainInstance.GrainReference.ToShortKeyString();
             var key = $"{grainKey}_{this.clusterOptions.ServiceId}_{stateName}";
-            return AzureStorageUtils.SanitizeTableProperty(key);
+            return AzureTableUtils.SanitizeTableProperty(key);
         }
 
         private async Task CreateTable()

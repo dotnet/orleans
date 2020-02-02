@@ -31,8 +31,6 @@ namespace Orleans.Runtime
 
         public static bool ReportDetailedThreadTimeTrackingStats(this StatisticsLevel level) => level.IsVerbose2();
 
-        public static bool CollectContextSwitchesStats(this StatisticsLevel level) => level.IsVerbose2();
-
         public static bool PerformStageAnalysis(this StatisticsLevel level) => level.IsVerbose2();
 
         public static bool CollectShedulerQueuesStats(this StatisticsLevel level) => level.IsVerbose2();

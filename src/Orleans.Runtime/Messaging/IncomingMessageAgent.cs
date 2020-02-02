@@ -1,17 +1,18 @@
 using System;
-using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class IncomingMessageAgent : DedicatedAsynchAgent
+    internal class IncomingMessageAgent : TaskSchedulerAgent
     {
         private readonly IMessageCenter messageCenter;
         private readonly ActivationDirectory directory;
         private readonly OrleansTaskScheduler scheduler;
         private readonly Dispatcher dispatcher;
         private readonly MessageFactory messageFactory;
+        private readonly MessagingTrace messagingTrace;
         private readonly Message.Categories category;
 
         internal IncomingMessageAgent(
@@ -21,9 +22,9 @@ namespace Orleans.Runtime.Messaging
             OrleansTaskScheduler sched, 
             Dispatcher dispatcher, 
             MessageFactory messageFactory,
-            ExecutorService executorService,
-            ILoggerFactory loggerFactory) :
-            base(cat.ToString(), executorService, loggerFactory)
+            ILoggerFactory loggerFactory,
+            MessagingTrace messagingTrace) :
+            base(cat.ToString(), loggerFactory)
         {
             category = cat;
             messageCenter = mc;
@@ -31,6 +32,7 @@ namespace Orleans.Runtime.Messaging
             scheduler = sched;
             this.dispatcher = dispatcher;
             this.messageFactory = messageFactory;
+            this.messagingTrace = messagingTrace;
             OnFault = FaultBehavior.RestartOnFault;
             messageCenter.RegisterLocalMessageHandler(cat, ReceiveMessage);
         }
@@ -41,28 +43,36 @@ namespace Orleans.Runtime.Messaging
             if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Started incoming message agent for silo at {0} for {1} messages", messageCenter.MyAddress, category);
         }
 
-        protected override void Run()
+        protected override async Task Run()
         {
-            CancellationToken ct = Cts.Token;
+            var reader = messageCenter.GetReader(category);
             while (true)
             {
+                var moreTask = reader.WaitToReadAsync();
+                var more = moreTask.IsCompletedSuccessfully ? moreTask.GetAwaiter().GetResult() : await moreTask;
+                if (!more) return;
+
                 // Get an application message
-                var msg = messageCenter.WaitMessage(category, ct);
-                if (msg == null)
+                while (reader.TryRead(out var msg))
                 {
-                    if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Dequeued a null message, exiting");
-                    // Null return means cancelled
-                    break;
+                    this.messagingTrace.OnDequeueInboundMessage(msg);
+                    if (msg == null)
+                    {
+                        if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Dequeued a null message, exiting");
+                        // Null return means cancelled
+                        continue;
+                    }
+                    else
+                    {
+                        ReceiveMessage(msg);
+                    }
                 }
-
-
-                ReceiveMessage(msg);
             }
         }
 
         private void ReceiveMessage(Message msg)
         {
-            MessagingProcessingStatisticsGroup.OnImaMessageReceived(msg);
+            this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
 
             ISchedulingContext context;
             // Find the activation it targets; first check for a system activation, then an app activation
@@ -82,12 +92,12 @@ namespace Orleans.Runtime.Messaging
                 switch (msg.Direction)
                 {
                     case Message.Directions.Request:
-                        MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
+                        this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
                         scheduler.QueueWorkItem(new RequestWorkItem(target, msg), context);
                         break;
 
                     case Message.Directions.Response:
-                        MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
+                        this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
                         scheduler.QueueWorkItem(new ResponseWorkItem(target, msg), context);
                         break;
 
@@ -142,10 +152,8 @@ namespace Orleans.Runtime.Messaging
 
         private void EnqueueReceiveMessage(Message msg, ActivationData targetActivation, ISchedulingContext context)
         {
-            MessagingProcessingStatisticsGroup.OnImaMessageEnqueued(context);
-
-            if (targetActivation != null) targetActivation.IncrementEnqueuedOnDispatcherCount();
-
+            this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
+            targetActivation?.IncrementEnqueuedOnDispatcherCount();
             scheduler.QueueWorkItem(new ClosureWorkItem(() =>
             {
                 try
@@ -154,7 +162,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 finally
                 {
-                    if (targetActivation != null) targetActivation.DecrementEnqueuedOnDispatcherCount();
+                    targetActivation?.DecrementEnqueuedOnDispatcherCount();
                 }
             },
             "Dispatcher.ReceiveMessage"), context);

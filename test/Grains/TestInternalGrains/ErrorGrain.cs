@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -15,9 +16,12 @@ namespace UnitTests.Grains
     {
         private int counter;
 
+        public ErrorGrain(ILoggerFactory loggerFactory) : base(loggerFactory)
+        {
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger(String.Format("ErrorGrain-{0}-{1}-{2}", RuntimeIdentity, Identity, Data.ActivationId));
             logger.Info("Activate.");
             return Task.CompletedTask;
         }

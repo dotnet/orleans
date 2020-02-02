@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Tester.StorageFacet.Abstractions;
@@ -47,7 +47,7 @@ namespace Tester.StorageFacet.Implementations
 
     public static class BlobExampleStorageExtensions
     {
-        public static void UseBlobExampleStorage(this ISiloHostBuilder builder, string name)
+        public static void UseBlobExampleStorage(this ISiloBuilder builder, string name)
         {
             builder.ConfigureServices(services =>
             {

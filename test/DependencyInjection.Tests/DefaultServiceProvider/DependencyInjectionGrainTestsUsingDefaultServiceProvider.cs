@@ -1,13 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
-using UnitTests.Grains;
 using Xunit;
 
 namespace DependencyInjection.Tests.DefaultServiceProvider
@@ -21,10 +13,7 @@ namespace DependencyInjection.Tests.DefaultServiceProvider
             {
                 builder.Options.InitialSilosCount = 1;
                 builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
-                //Orleans would use ASP.NET DI container solution by default, so no need to configure ServiceProviderFactory here
             }
-
-
         }
 
         public DependencyInjectionGrainTestsUsingDefaultServiceProvider(Fixture fixture)

@@ -1,4 +1,7 @@
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -19,13 +22,21 @@ namespace Tester.AzureUtils
         {
             TestUtils.CheckForAzureStorage();
             builder.Options.UseTestClusterMembership = false;
-            builder.ConfigureLegacyConfiguration(legacy =>
+            builder.AddSiloBuilderConfigurator<Configurator>();
+            builder.AddClientBuilderConfigurator<Configurator>();
+        }
+
+        public class Configurator : ISiloConfigurator, IClientBuilderConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                legacy.ClusterConfiguration.Globals.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                legacy.ClusterConfiguration.Globals.LivenessType = GlobalConfiguration.LivenessProviderType.AzureTable;
-                legacy.ClusterConfiguration.PrimaryNode = null;
-                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
-            });
+                hostBuilder.UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
+            }
+
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
+            }
         }
 
         [SkippableFact, TestCategory("Functional")]

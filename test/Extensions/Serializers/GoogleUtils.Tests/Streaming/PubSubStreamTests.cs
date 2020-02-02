@@ -4,8 +4,6 @@ using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
-using Orleans.Runtime.Configuration;
-using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.Streaming;
@@ -31,9 +29,9 @@ namespace GoogleUtils.Tests.Streaming
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
 
-        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        private class MySiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)

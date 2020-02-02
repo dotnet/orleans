@@ -20,8 +20,8 @@ namespace Orleans.Runtime
         {
             this.statisticsOptions = statisticsOptions.Value;
             this.logStatistics = new LogStatistics(this.statisticsOptions.LogWriteInterval, false, serializationStatistics, loggerFactory);
-            MessagingStatisticsGroup.Init(false);
-            NetworkingStatisticsGroup.Init(false);
+            MessagingStatisticsGroup.Init();
+            NetworkingStatisticsGroup.Init();
         }
 
         internal void Start(IMessageCenter transport, GrainId clientId)

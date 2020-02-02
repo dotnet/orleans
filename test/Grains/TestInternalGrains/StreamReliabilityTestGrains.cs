@@ -1,9 +1,10 @@
-﻿//#define USE_GENERICS
+//#define USE_GENERICS
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -12,6 +13,7 @@ using UnitTests.StreamingTests;
 
 namespace UnitTests.Grains
 {
+    [Serializable]
     public class StreamReliabilityTestGrainState
     {
         // For producer and consumer 
@@ -53,7 +55,7 @@ namespace UnitTests.Grains
 #endif
     {
         [NonSerialized]
-        private Logger logger;
+        private ILogger logger;
 
 #if USE_GENERICS
         private IAsyncStream<T> Stream { get; set; }
@@ -66,9 +68,13 @@ namespace UnitTests.Grains
 #endif
         private const string StreamNamespace = StreamTestsConstants.StreamReliabilityNamespace;
 
+        public StreamReliabilityTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger("StreamReliabilityTestGrain-" + this.IdentityString);
             logger.Info(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
                 State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
 
@@ -340,13 +346,17 @@ namespace UnitTests.Grains
     public class StreamUnsubscribeTestGrain : Grain<StreamReliabilityTestGrainState>, IStreamUnsubscribeTestGrain
     {
         [NonSerialized]
-        private Logger logger;
+        private ILogger logger;
 
         private const string StreamNamespace = StreamTestsConstants.StreamReliabilityNamespace;
 
+        public StreamUnsubscribeTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger("StreamUnsubscribeTestGrain-" + this.IdentityString);
             logger.Info(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
                 State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
             return Task.CompletedTask;

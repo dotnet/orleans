@@ -1,76 +1,46 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Configuration;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
-using Orleans.TestingHost;
 
 namespace TestExtensions
 {
     public class SerializationTestEnvironment : IDisposable
     {
-        public SerializationTestEnvironment(ClientConfiguration config = null, Action<IClientBuilder> configureClientBuilder = null)
+        public SerializationTestEnvironment(Action<IClientBuilder> configureClientBuilder = null)
         {
-            if (config == null) config = this.DefaultConfig();
-
             var builder = new ClientBuilder()
                 .ConfigureDefaults()
-                .Configure<ClusterOptions>(options =>
-                {
-                    options.ClusterId = nameof(SerializationTestEnvironment);
-                    options.ServiceId = Guid.NewGuid().ToString();
-                })
-                .UseConfiguration(config);
+                .UseLocalhostClustering();
             configureClientBuilder?.Invoke(builder);
             this.Client = builder.Build();
             this.RuntimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
         }
 
         public IClusterClient Client { get; set; }
-
-        private ClientConfiguration DefaultConfig()
-        {
-            var result = new ClientConfiguration();
-            MixinDefaults(result);
-            return result;
-        }
-
-        private static void MixinDefaults(ClientConfiguration config)
-        {
-            if (config.GatewayProvider == ClientConfiguration.GatewayProviderType.None)
-            {
-                config.GatewayProvider = ClientConfiguration.GatewayProviderType.Config;
-                config.Gateways.Add(new IPEndPoint(0, 0));
-            }
-        }
-
+        
         internal OutsideRuntimeClient RuntimeClient { get; set; }
 
-        public static SerializationTestEnvironment InitializeWithDefaults(ClientConfiguration config = null, Action<IClientBuilder> configureClientBuilder = null)
+        public static SerializationTestEnvironment InitializeWithDefaults(Action<IClientBuilder> configureClientBuilder = null)
         {
-            config = config ?? new ClientConfiguration();
-            MixinDefaults(config);
-
-            var result = new SerializationTestEnvironment(config, configureClientBuilder);
+            var result = new SerializationTestEnvironment(configureClientBuilder);
             return result;
-        }
-
-        public static SerializationTestEnvironment Initialize(List<TypeInfo> serializationProviders = null, TypeInfo fallbackProvider = null)
-        {
-            return Initialize(serializationProviders?.Select(t => t.AsType()).ToList(), fallbackProvider?.AsType());
         }
 
         public static SerializationTestEnvironment Initialize(List<Type> serializationProviders = null, Type fallbackProvider = null)
         {
-            var config = new ClientConfiguration {FallbackSerializationProvider = fallbackProvider};
-            if (serializationProviders != null) config.SerializationProviders.AddRange(serializationProviders);
-            return InitializeWithDefaults(config);
+            return InitializeWithDefaults(clientBuilder => clientBuilder.Configure<SerializationProviderOptions>(options =>
+            {
+                options.FallbackSerializationProvider = fallbackProvider;
+                if (serializationProviders != null)
+                {
+                    options.SerializationProviders.AddRange(serializationProviders);
+                }
+            }));
         }
         
         public IGrainFactory GrainFactory => this.RuntimeClient.InternalGrainFactory;

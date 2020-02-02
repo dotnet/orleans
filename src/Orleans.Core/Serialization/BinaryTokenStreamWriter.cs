@@ -4,28 +4,28 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Text;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
+
     internal static class BinaryTokenStreamWriterExtensions
     {
-        internal static void Write(this IBinaryTokenStreamWriter @this, SerializationTokenType t)
+        internal static void Write<TWriter>(this TWriter @this, SerializationTokenType t) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write((byte)t);
         }
 
         /// <summary> Write a <c>CorrelationId</c> value to the stream. </summary>
-        internal static void Write(this IBinaryTokenStreamWriter @this, CorrelationId id)
+        internal static void Write<TWriter>(this TWriter @this, CorrelationId id) where TWriter : IBinaryTokenStreamWriter
         {
-            @this.Write(id.ToByteArray());
+            @this.Write(id.ToInt64());
         }
 
         /// <summary> Write a <c>ActivationAddress</c> value to the stream. </summary>
-        internal static void Write(this IBinaryTokenStreamWriter @this, ActivationAddress addr)
+        internal static void Write<TWriter>(this TWriter @this, ActivationAddress addr) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write(addr.Silo ?? SiloAddress.Zero);
 
@@ -34,7 +34,7 @@ namespace Orleans.Serialization
             @this.Write(addr.Activation ?? ActivationId.Zero);
         }
 
-        internal static void Write(this IBinaryTokenStreamWriter @this, UniqueKey key)
+        internal static void Write<TWriter>(this TWriter @this, UniqueKey key) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write(key.N0);
             @this.Write(key.N1);
@@ -43,14 +43,14 @@ namespace Orleans.Serialization
         }
 
         /// <summary> Write a <c>ActivationId</c> value to the stream. </summary>
-        internal static void Write(this IBinaryTokenStreamWriter @this, ActivationId id)
+        internal static void Write<TWriter>(this TWriter @this, ActivationId id) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write(id.Key);
         }
 
         /// <summary> Write a <c>GrainId</c> value to the stream. </summary>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
-        internal static void Write(this IBinaryTokenStreamWriter @this, GrainId id)
+        internal static void Write<TWriter>(this TWriter @this, GrainId id) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write(id.Key);
         }
@@ -61,7 +61,7 @@ namespace Orleans.Serialization
         /// <param name="this">The IBinaryTokenStreamReader to read from</param>
         /// <param name="a">Data object for which header should be written.</param>
         /// <param name="expected">The most recent Expected Type currently active for this stream.</param>
-        internal static void WriteArrayHeader(this IBinaryTokenStreamWriter @this, Array a, Type expected = null)
+        internal static void WriteArrayHeader<TWriter>(this TWriter @this, Array a, Type expected = null) where TWriter : IBinaryTokenStreamWriter
         {
             @this.WriteTypeHeader(a.GetType(), expected);
             for (var i = 0; i < a.Rank; i++)
@@ -71,7 +71,7 @@ namespace Orleans.Serialization
         }
 
         // Back-references
-        internal static void WriteReference(this IBinaryTokenStreamWriter @this, int offset)
+        internal static void WriteReference<TWriter>(this TWriter @this, int offset) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write((byte)SerializationTokenType.Reference);
             @this.Write(offset);

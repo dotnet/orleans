@@ -17,7 +17,7 @@ namespace DefaultCluster.Tests.General
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task StateClassTests_StateClass()
         {
             await StateClassTests_Test("UnitTests.Grains.SimplePersistentGrain");

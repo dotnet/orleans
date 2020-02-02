@@ -1,10 +1,14 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -20,29 +24,23 @@ namespace UnitTests.StreamingTests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 4;
-
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>(PubSubStoreProviderName);
-
-                    legacy.ClusterConfiguration.Globals.MaxResendCount = 0;
-                    legacy.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromSeconds(30);
-
-                    legacy.ClientConfiguration.ClientSenderBuckets = 8192;
-                    legacy.ClientConfiguration.ResponseTimeout = TimeSpan.FromSeconds(30);
-                    legacy.ClientConfiguration.MaxResendCount = 0;
-                });
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
                 builder.AddClientBuilderConfigurator<ClientConfiguretor>();
             }
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
-                    .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1);
+                    .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
+                    .ConfigureServices(services =>
+                    {
+                        services.AddSingleton<ErrorInjectionStorageProvider>();
+                        services.AddSingletonNamedService<IGrainStorage, ErrorInjectionStorageProvider>(PubSubStoreProviderName);
+                        services.AddSingletonNamedService<IControllable, ErrorInjectionStorageProvider>(PubSubStoreProviderName);
+                    });
             }
         }
         public class ClientConfiguretor : IClientBuilderConfigurator

@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Queue;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Orleans.Runtime;
-using Orleans.AzureUtils.Utilities;
 using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Azure.Storage.Queue;
+using Microsoft.Azure.Storage.RetryPolicies;
+using Microsoft.Extensions.Logging;
+using Orleans.AzureUtils.Utilities;
+using Orleans.Runtime;
 using Orleans.Streaming.AzureStorage;
+using Orleans.Internal;
 
 namespace Orleans.AzureUtils
 {
@@ -21,7 +22,7 @@ namespace Orleans.AzureUtils
     /// http://blogs.msdn.com/b/windowsazurestorage/archive/tags/scalability/
     /// http://blogs.msdn.com/b/windowsazurestorage/archive/2010/12/30/windows-azure-storage-architecture-overview.aspx
     /// http://blogs.msdn.com/b/windowsazurestorage/archive/2010/11/06/how-to-get-most-out-of-windows-azure-tables.aspx
-    /// 
+    ///
     /// </summary>
     internal static class AzureQueueDefaultPolicies
     {
@@ -322,7 +323,7 @@ namespace Orleans.AzureUtils
         private void ReportErrorAndRethrow(Exception exc, string operation, AzureQueueErrorCode errorCode)
         {
             var errMsg = String.Format(
-                "Error doing {0} for Azure storage queue {1} " + Environment.NewLine 
+                "Error doing {0} for Azure storage queue {1} " + Environment.NewLine
                 + "Exception = {2}", operation, QueueName, exc);
             logger.Error((int)errorCode, errMsg, exc);
             throw new AggregateException(errMsg, exc);
@@ -336,7 +337,7 @@ namespace Orleans.AzureUtils
         {
             try
             {
-                var storageAccount = AzureStorageUtils.GetCloudStorageAccount(storageConnectionString);
+                var storageAccount = AzureQueueUtils.GetCloudStorageAccount(storageConnectionString);
                 CloudQueueClient operationsClient = storageAccount.CreateCloudQueueClient();
                 operationsClient.DefaultRequestOptions.RetryPolicy = retryPolicy;
                 operationsClient.DefaultRequestOptions.ServerTimeout = timeout;
@@ -408,4 +409,3 @@ namespace Orleans.AzureUtils
         }
     }
 }
-

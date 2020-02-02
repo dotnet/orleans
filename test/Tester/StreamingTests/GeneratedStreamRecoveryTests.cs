@@ -6,7 +6,6 @@ using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
@@ -33,21 +32,21 @@ namespace UnitTests.StreamingTests
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
-            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                          .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("MemoryStore")
                         .AddPersistentStreams(StreamProviderName,
-                            GeneratorAdapterFactory.Create, b=>
-                            b.Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options =>
-                                {
-                                    options.TotalQueueCount = TotalQueueCount;
-                                }))
-                            .UseDynamicClusterConfigDeploymentBalancer()
-                            .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                            GeneratorAdapterFactory.Create,
+                            b =>
+                            {
+                                b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                                b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount));
+                                b.UseDynamicClusterConfigDeploymentBalancer();
+                            });
                 }
             }
         }

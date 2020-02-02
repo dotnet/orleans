@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +11,7 @@ using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Services;
+using UnitTests.GrainInterfaces;
 
 namespace Tester
 {
@@ -43,6 +44,11 @@ namespace Tester
         public Task<string> GetServiceConfigProperty()
         {
             return GrainService.GetServiceConfigProperty();
+        }
+
+        public Task<string> EchoViaExtension(string what)
+        {
+            return GrainService.AsReference<IEchoExtension>().Echo(what);
         }
     }
 
@@ -107,7 +113,7 @@ namespace Tester
 
     public static class TestGrainServicesSiloBuilderExtensions
     {
-        public static ISiloHostBuilder AddTestGrainService(this ISiloHostBuilder builder, string configProperty)
+        public static ISiloBuilder AddTestGrainService(this ISiloBuilder builder, string configProperty)
         {
             return builder.AddGrainService<TestGrainService>()
                 .ConfigureServices(services => services

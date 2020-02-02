@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Azure.Storage.Queue;
 using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Queue;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -16,7 +16,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         protected readonly string QueueName;
         protected AzureQueueDataManager Queue;
         private readonly ILoggerFactory loggerFactory;
-        public string Name { get ; private set; }
+        public string Name { get; private set; }
         public bool IsRewindable { get { return false; } }
 
         public StreamProviderDirection Direction { get { return StreamProviderDirection.WriteOnly; } }
@@ -74,7 +74,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             {
                 //new CloudQueueMessage(byte[]) not supported in netstandard
                 cloudMsg = new CloudQueueMessage(null as string);
-                cloudMsg.SetMessageContent(data as byte[]);
+                cloudMsg.SetMessageContent2(data as byte[]);
             }
             else if (isString)
             {

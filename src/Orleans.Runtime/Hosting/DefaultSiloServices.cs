@@ -39,6 +39,9 @@ using System.Reflection;
 using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
+using Microsoft.AspNetCore.Connections;
+using Orleans.Networking.Shared;
+using Orleans.Configuration.Internal;
 
 namespace Orleans.Hosting
 {
@@ -58,8 +61,11 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
             services.TryAddSingleton<ISiloHost, SiloWrapper>();
             services.TryAddTransient<ILifecycleSubject, LifecycleSubject>();
-            services.TryAddSingleton<ISiloLifecycleSubject, SiloLifecycleSubject>();
-            services.TryAddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
+            services.TryAddSingleton<SiloLifecycleSubject>();
+            services.TryAddFromExisting<ISiloLifecycleSubject, SiloLifecycleSubject>();
+            services.TryAddFromExisting<ISiloLifecycle, SiloLifecycleSubject>();
+            services.AddSingleton<SiloOptionsLogger>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
             services.PostConfigure<SiloMessagingOptions>(options =>
             {
                 //
@@ -91,7 +97,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related
             services.TryAddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
-            services.TryAddSingleton<IStreamSubscriptionHandleFactory, StreamSubscriptionHandlerFactory>();
 
             services.TryAddSingleton<FallbackSystemTarget>();
             services.TryAddSingleton<LifecycleSchedulingSystemTarget>();
@@ -103,6 +108,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
             services.TryAddSingleton<OrleansTaskScheduler>();
+            services.AddFromExisting<IHealthCheckParticipant, OrleansTaskScheduler>();
             services.TryAddSingleton<GrainFactory>(sp => sp.GetService<InsideRuntimeClient>().ConcreteGrainFactory);
             services.TryAddFromExisting<IGrainFactory, GrainFactory>();
             services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
@@ -119,11 +125,15 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddFromExisting<ISiloMessageCenter, MessageCenter>();
             services.TryAddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);
+            services.AddSingleton<Gateway>(sp => sp.GetRequiredService<MessageCenter>().Gateway);
             services.TryAddSingleton<Dispatcher>(sp => sp.GetRequiredService<Catalog>().Dispatcher);
             services.TryAddSingleton<InsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
+            services.TryAddSingleton<IGrainServiceFactory, GrainServiceFactory>();
+
+            services.TryAddSingleton<IFatalErrorHandler, FatalErrorHandler>();
 
             services.TryAddSingleton<MultiClusterGossipChannelFactory>();
             services.TryAddSingleton<MultiClusterOracle>();
@@ -131,9 +141,30 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IMultiClusterOracle, MultiClusterOracle>();
             services.TryAddSingleton<DeploymentLoadPublisher>();
 
-            services.TryAddSingleton<MembershipOracle>();
-            services.TryAddFromExisting<IMembershipOracle, MembershipOracle>();
-            services.TryAddFromExisting<ISiloStatusOracle, MembershipOracle>();
+            services.TryAddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
+            services.TryAddSingleton<MembershipTableManager>();
+            services.AddFromExisting<IHealthCheckParticipant, MembershipTableManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
+            services.TryAddSingleton<MembershipSystemTarget>();
+            services.AddFromExisting<IMembershipService, MembershipSystemTarget>();
+            services.TryAddSingleton<IMembershipGossiper, MembershipGossiper>();
+            services.TryAddSingleton<IRemoteSiloProber, RemoteSiloProber>();
+            services.TryAddSingleton<SiloStatusOracle>();
+            services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracle>();
+            services.AddSingleton<ClusterHealthMonitor>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor>();
+            services.AddFromExisting<IHealthCheckParticipant, ClusterHealthMonitor>();
+            services.AddSingleton<MembershipAgent>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipAgent>();
+            services.AddFromExisting<IHealthCheckParticipant, MembershipAgent>();
+            services.AddSingleton<MembershipTableCleanupAgent>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableCleanupAgent>();
+            services.AddFromExisting<IHealthCheckParticipant, MembershipTableCleanupAgent>();
+            services.AddSingleton<SiloStatusListenerManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloStatusListenerManager>();
+            services.AddSingleton<ClusterMembershipService>();
+            services.TryAddFromExisting<IClusterMembershipService, ClusterMembershipService>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterMembershipService>();
 
             services.TryAddSingleton<ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();
@@ -232,8 +263,10 @@ namespace Orleans.Hosting
             services.AddSingleton<BinaryFormatterSerializer>();
             services.AddSingleton<BinaryFormatterISerializableSerializer>();
             services.AddFromExisting<IKeyedSerializer, BinaryFormatterISerializableSerializer>();
+#pragma warning disable CS0618 // Type or member is obsolete
             services.AddSingleton<ILBasedSerializer>();
             services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
+#pragma warning restore CS0618 // Type or member is obsolete
 
             // Transactions
             services.TryAddSingleton<ITransactionAgent, DisabledTransactionAgent>();
@@ -254,7 +287,7 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<SchedulingOptions>();
             services.ConfigureFormatter<PerformanceTuningOptions>();
             services.ConfigureFormatter<SerializationProviderOptions>();
-            services.ConfigureFormatter<NetworkingOptions>();
+            services.ConfigureFormatter<ConnectionOptions>();
             services.ConfigureFormatter<SiloMessagingOptions>();
             services.ConfigureFormatter<TypeManagementOptions>();
             services.ConfigureFormatter<ClusterMembershipOptions>();
@@ -268,14 +301,22 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<TelemetryOptions>();
             services.ConfigureFormatter<LoadSheddingOptions>();
             services.ConfigureFormatter<EndpointOptions>();
+            services.ConfigureFormatter<ClusterOptions>();
 
             // This validator needs to construct the IMembershipOracle and the IMembershipTable
             // so move it in the end so other validator are called first
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
+            services.AddTransient<IConfigurationValidator, DevelopmentClusterMembershipOptionsValidator>();
 
-            // Disable hosted client by default.
-            services.TryAddSingleton<IHostedClient, DisabledHostedClient>();
+            // Enable hosted client.
+            services.TryAddSingleton<HostedClient>();
+            services.TryAddFromExisting<IHostedClient, HostedClient>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, HostedClient>();
+            services.TryAddSingleton<InvokableObjectManager>();
+            services.TryAddSingleton<InternalClusterClient>();
+            services.TryAddFromExisting<IInternalClusterClient, InternalClusterClient>();
+            services.TryAddFromExisting<IClusterClient, InternalClusterClient>();
 
             // Enable collection specific Age limits
             services.AddOptions<GrainCollectionOptions>()
@@ -290,7 +331,7 @@ namespace Orleans.Hosting
                         if (attr != null)
                         {
                             var className = TypeUtils.GetFullName(grainClass.ClassType);
-                            options.ClassSpecificCollectionAge[className] = TimeSpan.FromMinutes(attr.Minutes);
+                            options.ClassSpecificCollectionAge[className] = attr.Amount;
                         }
                     }
                 });
@@ -298,7 +339,43 @@ namespace Orleans.Hosting
             // Validate all CollectionAgeLimit values for the right configuration.
             services.AddTransient<IConfigurationValidator, GrainCollectionOptionsValidator>();
 
+            services.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
+
             services.TryAddSingleton<ITimerManager, TimerManagerImpl>();
+
+            // persistent state facet support
+            services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
+            services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
+
+            // Networking
+            services.TryAddSingleton<ConnectionCommon>();
+            services.TryAddSingleton<ConnectionManager>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, ConnectionManagerLifecycleAdapter<ISiloLifecycle>>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionMaintainer>();
+
+            services.AddSingletonKeyedService<object, IConnectionFactory>(
+                SiloConnectionFactory.ServicesKey,
+                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
+            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(
+                SiloConnectionListener.ServicesKey,
+                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
+            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(
+                GatewayConnectionListener.ServicesKey,
+                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
+
+            services.TryAddTransient<IMessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(sp,
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize,
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize));
+            services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
+            services.AddSingleton<NetworkingTrace>();
+            services.AddSingleton<RuntimeMessagingTrace>();
+            services.AddFromExisting<MessagingTrace, RuntimeMessagingTrace>();
+
+            // Use Orleans server.
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
+            services.AddSingleton<SocketSchedulers>();
+            services.AddSingleton<SharedMemoryPool>();
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -76,6 +76,11 @@ namespace Orleans.CodeGenerator.MSBuild
         /// </summary>
         public string AssemblyName { get; set; }
 
+        /// <summary>
+        /// Whether or not to add <see cref="DebuggerStepThroughAttribute"/> to generated code.
+        /// </summary>
+        public bool DebuggerStepThrough { get; set; }
+
         public async Task<bool> Execute(CancellationToken cancellationToken)
         {
             var stopwatch = Stopwatch.StartNew();
@@ -123,13 +128,23 @@ namespace Orleans.CodeGenerator.MSBuild
             this.Log.LogDebug($"GetCompilation completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
 
+            if (!compilation.SyntaxTrees.Any())
+            {
+                this.Log.LogWarning($"Skipping empty project, {compilation.AssemblyName}.");
+                return true;
+            }
+
             if (compilation.ReferencedAssemblyNames.All(name => name.Name != AbstractionsAssemblyShortName))
             {
-                this.Log.LogWarning($"Assembly {compilation.AssemblyName} does not reference {AbstractionsAssemblyShortName} (references: {string.Join(", ", compilation.ReferencedAssemblyNames)})");
+                this.Log.LogWarning($"Project {compilation.AssemblyName} does not reference {AbstractionsAssemblyShortName} (references: {string.Join(", ", compilation.ReferencedAssemblyNames)})");
                 return false;
             }
 
-            var generator = new CodeGenerator(compilation, this.Log);
+            var options = new CodeGeneratorOptions
+            {
+                DebuggerStepThrough = this.DebuggerStepThrough
+            };
+            var generator = new CodeGenerator(compilation, options, this.Log);
             var syntax = generator.GenerateCode(cancellationToken);
             this.Log.LogDebug($"GenerateCode completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();

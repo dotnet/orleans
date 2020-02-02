@@ -17,7 +17,6 @@ using Microsoft.Extensions.Options;
 
 namespace Orleans.TestingHost
 {
-
     /// <summary>
     /// A host class for local testing with Orleans using in-process silos. 
     /// Runs a Primary and optionally secondary silos in separate app domains, and client in the main app domain.
@@ -27,7 +26,7 @@ namespace Orleans.TestingHost
     /// Make sure that your test project references your test grains and test grain interfaces 
     /// projects, and has CopyLocal=True set on those references [which should be the default].
     /// </remarks>
-    public class TestCluster
+    public class TestCluster : IDisposable
     {
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
         private readonly TestClusterOptions options;
@@ -43,7 +42,16 @@ namespace Orleans.TestingHost
         /// <summary>
         /// List of handles to the secondary silos.
         /// </summary>
-        public IReadOnlyList<SiloHandle> SecondarySilos => this.additionalSilos;
+        public IReadOnlyList<SiloHandle> SecondarySilos
+        {
+            get
+            {
+                lock (this.additionalSilos)
+                {
+                    return new List<SiloHandle>(this.additionalSilos);
+                }
+            }
+        }
 
         /// <summary>
         /// Collection of all known silos.
@@ -58,7 +66,10 @@ namespace Orleans.TestingHost
                     result.Add(this.Primary);
                 }
 
-                result.AddRange(this.additionalSilos);
+                lock (this.additionalSilos)
+                {
+                    result.AddRange(this.additionalSilos);
+                }
 
                 return result.AsReadOnly();
             }
@@ -140,7 +151,10 @@ namespace Orleans.TestingHost
                 WriteLog(startMsg);
                 await InitializeAsync();
 
-                await WaitForInitialStabilization();
+                if (this.options.InitializeClientOnDeploy)
+                {
+                    await WaitForInitialStabilization();
+                }
             }
             catch (TimeoutException te)
             {
@@ -218,14 +232,22 @@ namespace Orleans.TestingHost
         /// <returns>List of current silos.</returns>
         public IEnumerable<SiloHandle> GetActiveSilos()
         {
+            var additional = new List<SiloHandle>();
+            lock (additionalSilos)
+            {
+                additional.AddRange(additionalSilos);
+            }
+
             WriteLog("GetActiveSilos: Primary={0} + {1} Additional={2}",
-                Primary, additionalSilos.Count, Runtime.Utils.EnumerableToString(additionalSilos));
+                Primary, additional.Count, Runtime.Utils.EnumerableToString(additional));
 
             if (Primary?.IsActive == true) yield return Primary;
-            if (additionalSilos.Count > 0)
-                foreach (var s in additionalSilos)
-                    if (s?.IsActive == true)
-                        yield return s;
+            
+
+            if (additional.Count > 0)
+            foreach (var s in additional)
+                if (s?.IsActive == true)
+                    yield return s;
         }
 
         /// <summary>
@@ -246,7 +268,7 @@ namespace Orleans.TestingHost
         /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
         public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
         {
-            var clusterMembershipOptions = this.ServiceProvider.GetService<IOptions<ClusterMembershipOptions>>().Value;
+            var clusterMembershipOptions = this.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
             TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
             await Task.Delay(stabilizationTime);
@@ -314,12 +336,19 @@ namespace Orleans.TestingHost
                 }
                 catch (Exception)
                 {
-                    this.additionalSilos.AddRange(siloStartTasks.Where(t => t.Exception == null).Select(t => t.Result));
+                    lock (additionalSilos)
+                    {
+                        this.additionalSilos.AddRange(siloStartTasks.Where(t => t.Exception == null).Select(t => t.Result));
+                    }
+
                     throw;
                 }
 
                 instances.AddRange(siloStartTasks.Select(t => t.Result));
-                this.additionalSilos.AddRange(instances);
+                lock (additionalSilos)
+                {
+                    this.additionalSilos.AddRange(instances);
+                }
             }
 
             return instances;
@@ -350,7 +379,10 @@ namespace Orleans.TestingHost
         {
             try
             {
-                await this.InternalClient?.Close();
+                if (InternalClient != null)
+                {
+                    await this.InternalClient.Close();
+                }                
             }
             catch (Exception exc)
             {
@@ -400,7 +432,10 @@ namespace Orleans.TestingHost
                 }
                 else
                 {
-                    additionalSilos.Remove(instance);
+                    lock (additionalSilos)
+                    {
+                        additionalSilos.Remove(instance);
+                    }
                 }
             }
         }
@@ -415,6 +450,17 @@ namespace Orleans.TestingHost
             {
                 // do NOT stop, just kill directly, to simulate crash.
                 await StopSiloAsync(instance, false);
+                if (Primary == instance)
+                {
+                    Primary = null;
+                }
+                else
+                {
+                    lock (additionalSilos)
+                    {
+                        additionalSilos.Remove(instance);
+                    }
+                }
             }
         }
 
@@ -423,8 +469,11 @@ namespace Orleans.TestingHost
         /// </summary>
         public async Task KillClientAsync()
         {
-            await this.InternalClient?.AbortAsync();
-            this.InternalClient = null;
+            if (InternalClient != null)
+            {
+                await this.InternalClient.AbortAsync();
+                this.InternalClient = null;
+            }
         }
 
         /// <summary>
@@ -446,7 +495,10 @@ namespace Orleans.TestingHost
                 }
                 else
                 {
-                    additionalSilos.Add(newInstance);
+                    lock (additionalSilos)
+                    {
+                        additionalSilos.Add(newInstance);
+                    }
                 }
 
                 return newInstance;
@@ -464,7 +516,10 @@ namespace Orleans.TestingHost
             if (siloName == null) throw new ArgumentNullException(nameof(siloName));
             var siloHandle = this.Silos.Single(s => s.Name.Equals(siloName, StringComparison.Ordinal));
             var newInstance = await this.StartSiloAsync(this.Silos.IndexOf(siloHandle), this.options);
-            additionalSilos.Add(newInstance);
+            lock (additionalSilos)
+            {
+                additionalSilos.Add(newInstance);
+            }
             return newInstance;
         }
 
@@ -540,7 +595,7 @@ namespace Orleans.TestingHost
                 InitialData = siloSpecificOptions.ToDictionary()
             });
 
-            var handle = await this.CreateSiloAsync(siloSpecificOptions.SiloName,configurationSources);
+            var handle = await this.CreateSiloAsync(siloSpecificOptions.SiloName, configurationSources);
             handle.InstanceNumber = (short)instanceNumber;
             Interlocked.Increment(ref this.startedInstances);
             return handle;
@@ -578,6 +633,17 @@ namespace Orleans.TestingHost
         private void FlushLogToConsole()
         {
             Console.WriteLine(GetLog());
+        }
+
+        public void Dispose()
+        {
+            foreach (var handle in this.SecondarySilos)
+            {
+                handle.Dispose();
+            }
+
+            this.Primary?.Dispose();
+            this.Client?.Dispose();
         }
     }
 }

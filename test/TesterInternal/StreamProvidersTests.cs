@@ -12,7 +12,11 @@ using Xunit.Abstractions;
 using System.Threading.Tasks;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
+using UnitTests.StorageTests;
+using Orleans.Storage;
+using Orleans.Providers;
+using Orleans.Internal;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace UnitTests.Streaming
 {
@@ -26,21 +30,21 @@ namespace UnitTests.Streaming
             {
                 this.ServiceId = builder.Options.ServiceId;
                 builder.Options.InitialSilosCount = 4;
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test2");
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.ErrorInjectionStorageProvider>("ErrorInjector");
-                    legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("lowercase");
-                });
                 builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
             }
 
-            public class SiloHostConfigurator : ISiloBuilderConfigurator
+            public class SiloHostConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
-                    hostBuilder.AddMemoryGrainStorage("MemoryStore");
+                    hostBuilder
+                        .AddMemoryGrainStorage("MemoryStore")
+                        .ConfigureServices(services =>
+                        {
+                            services.AddSingleton<ErrorInjectionStorageProvider>();
+                            services.AddSingletonNamedService<IGrainStorage, ErrorInjectionStorageProvider>("ErrorInjector");
+                            services.AddSingletonNamedService<IControllable, ErrorInjectionStorageProvider>("ErrorInjector");
+                        });
                 }
             }
         }
@@ -122,9 +126,9 @@ namespace UnitTests.Streaming
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
 
-            public class SiloConfigurator : ISiloBuilderConfigurator
+            public class SiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
                         .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)

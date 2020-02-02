@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -46,7 +46,7 @@ namespace Orleans.Configuration.Overrides
         {
             configureOptions?.Invoke(collection.AddOptions<TOptions>(name));
             return collection.ConfigureNamedOptionForLogging<TOptions>(name)
-                             .AddSingletonNamedService(name, (sp, n) => sp.GetRequiredService<IOptionsSnapshot<TOptions>>().Get(n));
+                             .AddSingletonNamedService(name, (sp, n) => sp.GetRequiredService<IOptionsMonitor<TOptions>>().Get(n));
         }
     }
 }

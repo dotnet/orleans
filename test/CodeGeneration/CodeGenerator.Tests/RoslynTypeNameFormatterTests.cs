@@ -16,6 +16,9 @@ using Orleans.Runtime;
 using Orleans.Utilities;
 using Xunit;
 using Xunit.Abstractions;
+using Orleans.CodeGenerator.Model;
+using System.Text;
+using Orleans.Serialization;
 
 namespace CodeGenerator.Tests
 {
@@ -40,7 +43,12 @@ namespace CodeGenerator.Tests
             typeof(List<int*[]>.Enumerator),
             typeof(List<>.Enumerator),
             typeof(Generic<>),
-            typeof(Generic<>.Nested<>)
+            typeof(Generic<>.Nested),
+            typeof(Generic<>.NestedGeneric<>),
+            typeof(Generic<>.NestedMultiGeneric<,>),
+            typeof(Generic<int>.Nested),
+            typeof(Generic<int>.NestedGeneric<bool>),
+            typeof(Generic<int>.NestedMultiGeneric<Generic<int>.NestedGeneric<bool>, double>)
         };
 
         private static readonly Type[] Grains =
@@ -123,6 +131,18 @@ namespace CodeGenerator.Tests
                 var actual = RoslynTypeNameFormatter.Format(symbol, RoslynTypeNameFormatter.Style.FullName);
                 this.output.WriteLine($"Expected FullName: {expected}\nActual FullName:   {actual}");
                 Assert.Equal(expected, actual);
+            }
+        }
+
+        [Fact]
+        public void TypeKeyMatchesRuntimeTypeKey()
+        {
+            foreach (var (type, symbol) in GetTypeSymbolPairs(nameof(Types)))
+            {
+                var expectedTypeKey = TypeUtilities.OrleansTypeKeyString(type);
+                var actualTypeKey = OrleansLegacyCompat.OrleansTypeKeyString(symbol);
+                this.output.WriteLine($"Type: {RuntimeTypeNameFormatter.Format(type)}");
+                Assert.Equal(expectedTypeKey, actualTypeKey);
             }
         }
 
@@ -231,11 +251,6 @@ namespace CodeGenerator.Tests
             return pairs;
         }
 
-        public class Generic<T>
-        {
-            public class Nested<TU> { }
-        }
-
         public interface IMyGrainInterface : IGrainWithGuidKey
         {
             Task One(int a, int b, int c);
@@ -313,5 +328,15 @@ namespace CodeGenerator.Tests
             public Task<T> Two() => throw new NotImplementedException();
             public Task<TU> Three<TU>() => throw new NotImplementedException();
         }
+    }
+}
+
+namespace System
+{
+    public class Generic<T>
+    {
+        public class Nested { }
+        public class NestedGeneric<TU> { }
+        public class NestedMultiGeneric<TU, TV> { }
     }
 }

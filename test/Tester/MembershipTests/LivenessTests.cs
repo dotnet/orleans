@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -183,10 +185,15 @@ namespace UnitTests.MembershipTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
+            builder.AddClientBuilderConfigurator<ClientConfigurator>();
+        }
+
+        public class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                legacy.ClientConfiguration.PreferedGatewayIndex = 1;
-            });
+                clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 1);
+            }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Membership")]

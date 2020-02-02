@@ -8,7 +8,7 @@ namespace Orleans.Configuration
         /// </summary>
         [RedactConnectionString]
         public string ConnectionString { get; set; }
-        
+
         /// <summary>
         /// Table name for Azure Storage
         /// </summary>

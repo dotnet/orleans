@@ -8,6 +8,7 @@ using Orleans.CodeGenerator;
 using Orleans.Serialization;
 using Orleans.Runtime;
 using Orleans.Metadata;
+using Microsoft.Extensions.DependencyInjection;
 #if NETCOREAPP
 using System.Runtime.Loader;
 #endif
@@ -66,9 +67,17 @@ namespace Orleans.CodeGeneration
 
         private static string GenerateSourceForAssembly(Assembly grainAssembly, LogLevel logLevel)
         {
-            using (var loggerFactory = new LoggerFactory())
+            var serviceCollection = new ServiceCollection()
+                .AddLogging(logging =>
+                {
+                    logging
+                    .AddConsole()
+                    .SetMinimumLevel(logLevel);
+                });
+
+            using (var services = serviceCollection.BuildServiceProvider())
             {
-                loggerFactory.AddConsole(logLevel);
+                var loggerFactory = services.GetRequiredService<ILoggerFactory>();
                 var parts = new ApplicationPartManager()
                     .AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator())
                     .AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>())

@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -26,15 +25,19 @@ namespace UnitTests.StreamingTests
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
-            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
-                        .AddPersistentStreams(StreamProviderName,
-                            ControllableTestAdapterFactory.Create, b=>b
-                         .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly)
-                         .UseDynamicClusterConfigDeploymentBalancer());
+                        .AddPersistentStreams(
+                            StreamProviderName,
+                            ControllableTestAdapterFactory.Create,
+                            b=>
+                            {
+                                b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                                b.UseDynamicClusterConfigDeploymentBalancer();
+                            });
                 }
             }
         }

@@ -7,9 +7,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework />
-    <TargetFrameworks>netcoreapp2.0;netcoreapp2.1;net461</TargetFrameworks>
-    <TargetFrameworks Condition="'$(OS)' != 'Windows_NT'">netcoreapp2.0;netcoreapp2.1</TargetFrameworks>
+    <TargetFrameworks>netcoreapp3.1;net461</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
@@ -40,17 +38,25 @@
   <ItemGroup>
     <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
-    <PackageReference Include="System.Runtime.Loader" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftExtensionsDependencyModelVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsLoggingVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
     <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildVersion)" />
     <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildVersion)" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="$(MicrosoftBclAsyncInterfacesVersion)" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="All" Version="$(MicrosoftNETFrameworkReferenceAssembliesVersion)" />
   </ItemGroup>
+
+  <!-- Packages included explicitly to prevent build warnings about inconsistent versions -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Win32.Registry" Version="$(MicrosoftWin32RegistryVersion)" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- This must come after all other PackageReference elements -->
     <PackageReference Update="@(PackageReference)" PrivateAssets="All" Publish="true" />
   </ItemGroup>
+  
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj">
       <PrivateAssets>all</PrivateAssets>
@@ -63,44 +69,11 @@
     </ProjectReference>
   </ItemGroup>
 
-  <!-- Start: PostBuildPublish -->
-  <!-- In order to support incremental builds, only call the Publish target if inputs have changed. -->
-  <PropertyGroup>
-    <PublishCacheFileDir Condition="'$(IntermediateOutputPath)' != ''">$(IntermediateOutputPath)</PublishCacheFileDir>
-    <PublishCacheFileDir Condition="'$(PublishCacheFileDir)' == ''">obj\$(Configuration)\$(TargetFramework)\</PublishCacheFileDir>
-    <PublishCacheFile>$(PublishCacheFileDir)$(MSBuildProjectFile).Publish.cache</PublishCacheFile>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PostBuildPublishInputs Include="@(Compile);@(ReferencePath)" />
-    <PostBuildPublishInputs Remove="@(GeneratedAssemblyInfoFile)" />
-  </ItemGroup>
-
-  <Target
-    Name="PostBuildPublish"
-    AfterTargets="Build"
-    DependsOnTargets="ResolveAssemblyReferences"
-    Inputs="@(PostBuildPublishInputs)"
-    Outputs="$(PublishCacheFile)"
-    Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" >
-    
-    <CallTarget Targets="Publish" />
-
-    <Hash ItemsToHash="@(PostBuildPublishInputs)">
-      <Output TaskParameter="HashResult" PropertyName="Orleans_UpdatedInputPubCacheContents" />
-    </Hash>
-
-    <WriteLinesToFile
-      Overwrite="true"
-      File="$(PublishCacheFile)"
-      Lines="$(Orleans_UpdatedInputPubCacheContents)"
-      WriteOnlyWhenDifferent="True" />
-    
-    <ItemGroup>
-      <FileWrites Include="$(PublishCacheFile)" />
-    </ItemGroup>
+  <Target Name="PostBuildPublish" AfterTargets="Build">
+    <!-- So that we can create a nuget package which includes all dependencies, we publish the build. -->
+    <!-- However, we cannot publish during the cross-targeting build, so we skip that. -->
+    <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
   </Target>
-  <!-- END: PostBuildPublish -->
   
   <Target Name="PackTaskDependencies" BeforeTargets="GenerateNuspec">
    <!-- 

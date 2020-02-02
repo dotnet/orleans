@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
@@ -548,7 +549,7 @@ namespace UnitTests.StreamingTests
 //    await BasicTestAsync(producer, consumer);
 //}
 
-//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Streaming")]
 //public async Task StreamTest_2_ProducerJoinsFirstConsumerLater()
 //{
 //    logger.Info("\n\n ************************ StreamTest_2_ProducerJoinsFirstConsumerLater ********************************* \n\n");
@@ -562,7 +563,7 @@ namespace UnitTests.StreamingTests
 
 
 
-//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Streaming")]
 //public async Task StreamTestProducerOnly()
 //{
 //    streamId = Guid.NewGuid();
@@ -570,7 +571,7 @@ namespace UnitTests.StreamingTests
 //    await TestGrainProducerOnlyAsync(streamId, this.streamProviderName);
 //}
 
-//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Streaming")]
 //public void AQProducerOnly()
 //{
 //    streamId = Guid.NewGuid();
@@ -598,7 +599,7 @@ namespace UnitTests.StreamingTests
 
 ////------------------------ MANY to One ----------------------//
 
-//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Streaming")]
 //public async Task StreamTest_Many_5_ManyProducerGrainsOneConsumerGrain()
 //{
 //    logger.Info("\n\n ************************ StreamTest_6_ManyProducerGrainsOneConsumerGrain ********************************* \n\n");
@@ -609,7 +610,7 @@ namespace UnitTests.StreamingTests
 //    await BasicTestAsync(producer, consumer);
 //}
 
-//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Streaming")]
 //public async Task StreamTest_Many6_OneProducerGrainManyConsumerGrains()
 //{
 //    logger.Info("\n\n ************************ StreamTest_7_OneProducerGrainManyConsumerGrains ********************************* \n\n");

@@ -14,14 +14,17 @@ namespace DefaultCluster.Tests.General
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+// Note: .NET Core does not implement serialization for NameValueCollection, so this test is not valid on .NET Core.
+#if !NETCOREAPP
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public async Task ExternalTypesTest_GrainWithAbstractExternalTypeParam()
         {
             var grainWitAbstractTypeParam = this.GrainFactory.GetGrain<IExternalTypeGrain>(0);
             await grainWitAbstractTypeParam.GetAbstractModel(new List<NameObjectCollectionBase>() { new NameValueCollection() });
         }
+#endif
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public async Task ExternalTypesTest_GrainWithEnumExternalTypeParam()
         {
             var grainWithEnumTypeParam = this.GrainFactory.GetGrain<IExternalTypeGrain>(0);

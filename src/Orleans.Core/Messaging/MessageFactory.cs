@@ -11,11 +11,13 @@ namespace Orleans.Runtime
     {
         private readonly SerializationManager serializationManager;
         private readonly ILogger logger;
+        private readonly MessagingTrace messagingTrace;
 
-        public MessageFactory(SerializationManager serializationManager, ILogger<MessageFactory> logger)
+        public MessageFactory(SerializationManager serializationManager, ILogger<MessageFactory> logger, MessagingTrace messagingTrace)
         {
             this.serializationManager = serializationManager;
             this.logger = logger;
+            this.messagingTrace = messagingTrace;
         }
 
         public Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
@@ -36,15 +38,15 @@ namespace Orleans.Runtime
             if (options.IsTransactional())
             {
                 SetTransaction(message, options);
-            } else
+            }
+            else
             {
                 // clear transaction info if not in transaction
                 message.RequestContextData?.Remove(TransactionContext.Orleans_TransactionContext_Key);
             }
 
-
+            messagingTrace.OnCreateMessage(message);
             return message;
-
         }
 
         private void SetTransaction(Message message, InvokeMethodOptions options)
@@ -94,6 +96,7 @@ namespace Orleans.Runtime
                 IsReadOnly = request.IsReadOnly,
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
                 TargetSilo = request.SendingSilo,
+                TraceContext = request.TraceContext,
                 TransactionInfo = request.TransactionInfo
             };
 
@@ -134,6 +137,7 @@ namespace Orleans.Runtime
                 response.RequestContextData = contextData;
             }
 
+            messagingTrace.OnCreateMessage(response);
             return response;
         }
 

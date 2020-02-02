@@ -2,6 +2,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Hosting;
 using Orleans.Runtime;
 
@@ -13,6 +14,19 @@ namespace Orleans.Statistics
         /// Use Windows performance counters as source for host environment statistics
         /// </summary>
         public static ISiloHostBuilder UsePerfCounterEnvironmentStatistics(this ISiloHostBuilder builder)
+        {
+            return builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<PerfCounterEnvironmentStatistics>();
+                services.AddFromExisting<IHostEnvironmentStatistics, PerfCounterEnvironmentStatistics>();
+                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, PerfCounterEnvironmentStatistics>();
+            });
+        }
+
+        /// <summary>
+        /// Use Windows performance counters as source for host environment statistics
+        /// </summary>
+        public static ISiloBuilder UsePerfCounterEnvironmentStatistics(this ISiloBuilder builder)
         {
             return builder.ConfigureServices(services =>
             {

@@ -1,26 +1,24 @@
-﻿using Microsoft.Azure.EventHubs;
+using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
     public class EventHubQueueCacheForTesting : EventHubQueueCache
     {
-        public EventHubQueueCacheForTesting(IStreamQueueCheckpointer<string> checkpointer, ICacheDataAdapter<EventData, CachedEventHubMessage> cacheDataAdapter,
-            ICacheDataComparer<CachedEventHubMessage> comparer, ILogger logger, IEvictionStrategy<CachedEventHubMessage> evictionStrategy)
-            :base(checkpointer, cacheDataAdapter, comparer, logger, evictionStrategy, null, null)
+        public EventHubQueueCacheForTesting(IObjectPool<FixedSizeBuffer> bufferPool, IEventHubDataAdapter dataAdapter, IEvictionStrategy evictionStrategy, IStreamQueueCheckpointer<string> checkpointer,
+            ILogger logger)
+            :base("test", EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, null, null)
             { }
 
         public int ItemCount => this.cache.ItemCount;
     }
-    public class EHEvictionStrategyForTesting : EventHubCacheEvictionStrategy
+    public class EHEvictionStrategyForTesting : ChronologicalEvictionStrategy
     {
         public EHEvictionStrategyForTesting(ILogger logger, ICacheMonitor cacheMonitor = null, TimeSpan? monitorWriteInterval = null, TimePurgePredicate timePurage = null)
             :base(logger, timePurage, cacheMonitor, monitorWriteInterval)
@@ -34,11 +32,11 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private long sequenceNumberCounter = 0;
         private int eventIndex = 1;
         private string eventHubOffset = "OffSet";
-        public MockEventHubCacheAdaptor(SerializationManager serializationManager, IObjectPool<FixedSizeBuffer> bufferPool)
-            : base(serializationManager, bufferPool)
+        public MockEventHubCacheAdaptor(SerializationManager serializationManager)
+            : base(serializationManager)
         { }
 
-        public override StreamPosition GetStreamPosition(EventData queueMessage)
+        public override StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
             var steamIdentity = new StreamIdentity(Guid.NewGuid(), "EmptySpace");
             var sequenceToken = new EventHubSequenceTokenV2(this.eventHubOffset, this.sequenceNumberCounter++, this.eventIndex);

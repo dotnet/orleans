@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
@@ -8,13 +9,12 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class AdaptiveDirectoryCacheMaintainer<TValue> : DedicatedAsynchAgent
+    internal class AdaptiveDirectoryCacheMaintainer : DedicatedAsynchAgent
     {
         private static readonly TimeSpan SLEEP_TIME_BETWEEN_REFRESHES = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromMinutes(1); // this should be something like minTTL/4
 
-        private readonly AdaptiveGrainDirectoryCache<TValue> cache;
+        private readonly AdaptiveGrainDirectoryCache cache;
         private readonly LocalGrainDirectory router;
-        private readonly Func<List<ActivationAddress>, TValue> updateFunc;
         private readonly IInternalGrainFactory grainFactory;
 
         private long lastNumAccesses;       // for stats
@@ -22,14 +22,12 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal AdaptiveDirectoryCacheMaintainer(
             LocalGrainDirectory router,
-            AdaptiveGrainDirectoryCache<TValue> cache,
-            Func<List<ActivationAddress>, TValue> updateFunc,
+            AdaptiveGrainDirectoryCache cache,
             IInternalGrainFactory grainFactory,
             ExecutorService executorService,
             ILoggerFactory loggerFactory)
             :base(executorService, loggerFactory)
         {
-            this.updateFunc = updateFunc;
             this.grainFactory = grainFactory;
             this.router = router;
             this.cache = cache;
@@ -166,7 +164,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (tuple.Item3 != null)
                 {
                     // the server returned an updated entry
-                    var updated = updateFunc(tuple.Item3);
+                    var updated = tuple.Item3.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList().AsReadOnly();
                     cache.AddOrUpdate(tuple.Item1, updated, tuple.Item2);
                     cnt1++;
                 }
@@ -206,7 +204,7 @@ namespace Orleans.Runtime.GrainDirectory
             foreach (GrainId grain in grains)
             {
                 // NOTE: should this be done with TryGet? Won't Get invoke the LRU getter function?
-                AdaptiveGrainDirectoryCache<TValue>.GrainDirectoryCacheEntry entry = cache.Get(grain);
+                AdaptiveGrainDirectoryCache.GrainDirectoryCacheEntry entry = cache.Get(grain);
 
                 if (entry != null)
                 {

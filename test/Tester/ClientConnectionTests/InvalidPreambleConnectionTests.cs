@@ -2,7 +2,9 @@ using System;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -15,13 +17,13 @@ namespace Tester.ClientConnectionTests
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration();
         }
 
         [Fact, TestCategory("Functional")]
-        public void ShouldCloseConnectionWhenClientSendsInvalidPreambleSize()
+        public async Task ShouldCloseConnectionWhenClientSendsInvalidPreambleSize()
         {
-            var gwEndpoint = this.HostedCluster.Client.Configuration().Gateways.First();
+            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
+            var gwEndpoint = gateways.First().ToIPEndPoint();
 
             using (Socket s = new Socket(gwEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
             {
