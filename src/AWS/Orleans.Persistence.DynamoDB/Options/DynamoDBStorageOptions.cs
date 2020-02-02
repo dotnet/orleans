@@ -67,7 +67,6 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan? TimeToLive { get; set; }
         public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
-
     }
 
     /// <summary>
