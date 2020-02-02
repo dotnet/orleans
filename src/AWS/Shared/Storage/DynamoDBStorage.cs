@@ -6,9 +6,13 @@ using Orleans;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
+using Amazon.Runtime;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB
@@ -73,12 +77,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="attributes">The attributes used on the key definition</param>
         /// <param name="secondaryIndexes">(optional) The secondary index definitions</param>
         /// <returns></returns>
-        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
+        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
             try
             {
                 if (await GetTableDescription(tableName) == null)
-                    await CreateTable(tableName, keys, attributes, secondaryIndexes);
+                    await CreateTable(tableName, keys, attributes, secondaryIndexes, ttlAttributeName);
             }
             catch (Exception exc)
             {
@@ -124,7 +128,7 @@ namespace Orleans.Transactions.DynamoDB
             return null;
         }
 
-        private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
+        private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
             var useProvisionedThroughput = readCapacityUnits > 0 && writeCapacityUnits > 0;
             var request = new CreateTableRequest
@@ -166,6 +170,14 @@ namespace Orleans.Transactions.DynamoDB
 
                 } while (description.TableStatus == TableStatus.CREATING);
 
+                if (!string.IsNullOrEmpty(ttlAttributeName))
+                {
+                    await ddbClient.UpdateTimeToLiveAsync(new UpdateTimeToLiveRequest
+                    {
+                        TableName = tableName,
+                        TimeToLiveSpecification = new TimeToLiveSpecification { AttributeName = ttlAttributeName, Enabled = true }
+                    });
+                }
                 if (description.TableStatus != TableStatus.ACTIVE)
                     throw new InvalidOperationException($"Failure creating table {tableName}");
             }
