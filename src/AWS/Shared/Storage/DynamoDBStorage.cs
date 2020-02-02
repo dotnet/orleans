@@ -100,12 +100,12 @@ namespace Orleans.Transactions.DynamoDB
             {
                 // AWS DynamoDB instance (auth via explicit credentials)
                 var credentials = new BasicAWSCredentials(this.accessKey, this.secretKey);
-                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
             }
             else
             {
                 // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig {ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
             }
         }
 
