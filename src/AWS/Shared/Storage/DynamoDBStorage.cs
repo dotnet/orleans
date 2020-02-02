@@ -126,25 +126,31 @@ namespace Orleans.Transactions.DynamoDB
 
         private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
         {
+            var useProvisionedThroughput = readCapacityUnits > 0 && writeCapacityUnits > 0;
             var request = new CreateTableRequest
             {
                 TableName = tableName,
                 AttributeDefinitions = attributes,
                 KeySchema = keys,
-                ProvisionedThroughput = new ProvisionedThroughput
+                BillingMode = useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
+                ProvisionedThroughput = useProvisionedThroughput ? new ProvisionedThroughput
                 {
                     ReadCapacityUnits = readCapacityUnits,
                     WriteCapacityUnits = writeCapacityUnits
-                }
+                } : null
             };
 
             if (secondaryIndexes != null && secondaryIndexes.Count > 0)
             {
-                var indexThroughput = new ProvisionedThroughput { ReadCapacityUnits = readCapacityUnits, WriteCapacityUnits = writeCapacityUnits };
-                secondaryIndexes.ForEach(i =>
+                if (useProvisionedThroughput)
                 {
-                    i.ProvisionedThroughput = indexThroughput;
-                });
+                    var indexThroughput = new ProvisionedThroughput {ReadCapacityUnits = readCapacityUnits, WriteCapacityUnits = writeCapacityUnits};
+                    secondaryIndexes.ForEach(i =>
+                    {
+                        i.ProvisionedThroughput = indexThroughput;
+                    });
+                }
+
                 request.GlobalSecondaryIndexes = secondaryIndexes;
             }
 
