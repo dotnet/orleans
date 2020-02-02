@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+using System;
+using Newtonsoft.Json;
 using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
 
@@ -59,6 +60,12 @@ namespace Orleans.Configuration
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
+
+        /// <summary>
+        /// Specifies a time span in which the item would be expired in the future
+        /// every StateWrite will increase the TTL of the grain
+        /// </summary>
+        public TimeSpan? TimeToLive { get; set; }
     }
 
     /// <summary>
