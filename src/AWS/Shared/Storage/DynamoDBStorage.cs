@@ -72,13 +72,14 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="keys">The keys definitions</param>
         /// <param name="attributes">The attributes used on the key definition</param>
         /// <param name="secondaryIndexes">(optional) The secondary index definitions</param>
+        /// <param name="ttlAttributeName">(optional) The name of the item attribute that indicates the item TTL (if null, ttl won't be enabled)</param>
         /// <returns></returns>
-        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
+        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
             try
             {
                 if (await GetTableDescription(tableName) == null)
-                    await CreateTable(tableName, keys, attributes, secondaryIndexes);
+                    await CreateTable(tableName, keys, attributes, secondaryIndexes, ttlAttributeName);
             }
             catch (Exception exc)
             {
@@ -124,7 +125,7 @@ namespace Orleans.Transactions.DynamoDB
             return null;
         }
 
-        private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
+        private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
             var useProvisionedThroughput = readCapacityUnits > 0 && writeCapacityUnits > 0;
             var request = new CreateTableRequest
@@ -166,6 +167,14 @@ namespace Orleans.Transactions.DynamoDB
 
                 } while (description.TableStatus == TableStatus.CREATING);
 
+                if (!string.IsNullOrEmpty(ttlAttributeName))
+                {
+                    await ddbClient.UpdateTimeToLiveAsync(new UpdateTimeToLiveRequest
+                    {
+                        TableName = tableName,
+                        TimeToLiveSpecification = new TimeToLiveSpecification { AttributeName = ttlAttributeName, Enabled = true }
+                    });
+                }
                 if (description.TableStatus != TableStatus.ACTIVE)
                     throw new InvalidOperationException($"Failure creating table {tableName}");
             }

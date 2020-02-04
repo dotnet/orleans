@@ -30,6 +30,7 @@ namespace Orleans.Storage
         private const string BINARY_STATE_PROPERTY_NAME = "BinaryState";
         private const string GRAIN_TYPE_PROPERTY_NAME = "GrainType";
         private const string ETAG_PROPERTY_NAME = "ETag";
+        private const string GRAIN_TTL_PROPERTY_NAME = "Ttl";
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
 
         private readonly DynamoDBStorageOptions options;
@@ -87,14 +88,16 @@ namespace Orleans.Storage
                 await storage.InitializeTable(this.options.TableName,
                     new List<KeySchemaElement>
                     {
-                    new KeySchemaElement { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, KeyType = KeyType.HASH },
-                    new KeySchemaElement { AttributeName = GRAIN_TYPE_PROPERTY_NAME, KeyType = KeyType.RANGE }
+                        new KeySchemaElement { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, KeyType = KeyType.HASH },
+                        new KeySchemaElement { AttributeName = GRAIN_TYPE_PROPERTY_NAME, KeyType = KeyType.RANGE }
                     },
                     new List<AttributeDefinition>
                     {
-                    new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
-                    new AttributeDefinition { AttributeName = GRAIN_TYPE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
-                    });
+                        new AttributeDefinition { AttributeName = GRAIN_REFERENCE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S },
+                        new AttributeDefinition { AttributeName = GRAIN_TYPE_PROPERTY_NAME, AttributeType = ScalarAttributeType.S }
+                    },
+                    secondaryIndexes: null,
+                    ttlAttributeName: this.options.TimeToLive.HasValue ? GRAIN_TTL_PROPERTY_NAME : null);
                 stopWatch.Stop();
                 this.logger.LogInformation((int)ErrorCode.StorageProviderBase,
                     $"Initializing provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
@@ -183,6 +186,10 @@ namespace Orleans.Storage
         private async Task WriteStateInternal(IGrainState grainState, GrainStateRecord record, bool clear = false)
         {
             var fields = new Dictionary<string, AttributeValue>();
+            if (this.options.TimeToLive.HasValue)
+            {                                
+                fields.Add(GRAIN_TTL_PROPERTY_NAME, new AttributeValue { N = ((DateTimeOffset)DateTime.UtcNow.Add(this.options.TimeToLive.Value)).ToUnixTimeSeconds().ToString() });
+            }
 
             if (record.BinaryState != null && record.BinaryState.Length > 0)
             {
