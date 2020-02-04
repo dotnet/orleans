@@ -230,7 +230,17 @@ namespace Orleans.CodeGenerator.Generators
                     }
 
                     var methodResult = asyncMethod ? AwaitExpression(invocation) : (ExpressionSyntax)invocation;
-                    body.Add(ReturnStatement(methodResult));
+
+                    var isUntypedValueTaskMethod =
+                        SymbolEqualityComparer.Default.Equals(wellKnownTypes.ValueTask, methodReturnType);
+                    if (isUntypedValueTaskMethod)
+                    {
+                        body.Add(ExpressionStatement(methodResult));
+                    }
+                    else
+                    {
+                        body.Add(ReturnStatement(methodResult));
+                    }
                 }
                 else throw new NotSupportedException($"Method {method} has unsupported return type, {method.ReturnType}.");
 
@@ -403,7 +413,7 @@ namespace Orleans.CodeGenerator.Generators
 
             var interfaceIdArgument = parameters[0].Name.ToIdentifierName();
             var methodIdArgument = parameters[1].Name.ToIdentifierName();
-            
+
             var callThrowMethodNotImplemented = InvocationExpression(IdentifierName("ThrowMethodNotImplemented"))
                 .WithArgumentList(ArgumentList(SeparatedList(new[]
                 {
