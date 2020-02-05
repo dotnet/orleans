@@ -154,7 +154,7 @@ This document is intended to capture some of the tried and proven application pa
 
 -   Inheritance
 
-    -   Inheriting grain interfaces is easy
+    -   Grain classes inherit fromt he Grain base class. Grain intrerfaces (one or more) can be added to each grain.
 
     -   Disambiguation may be needed to implement the same interface in multiple
         grain glasses
@@ -382,20 +382,12 @@ Scaling out and in
 
 Testing
 
--   UnitTestingBase class is used for unit testing
-
--   Starting two or more silos in app domains and a client in the main app
-    domain
-
--   Simplifies the versions of what is used internally
+        -   Microsoft.Orleans.TestingHost NuGet package contains TestCluster which can be used to create an in-memory cluster, comprised of two silos by default, which can be used to test grains.
+        
+        -   Addtional information can be found [here](https://dotnet.github.io/orleans/Documentation/tutorials_and_samples/testing.html)
 
 Troubleshooting
 
--   Logs (Silo and Frontend logging)
-
-    -   WAD may not pick up the logging in the event of a startup failure
-
-    -   Remote Desktop Protocol (RDP) to the machines for verification
 
 -   Use Azure table-based membership for development and testing
 
@@ -411,11 +403,7 @@ Troubleshooting
 
     -   Make sure that firewall is open for TCP ports: 11111 and 30000
 
-    -   Check the logs and don’t forget that there is an extra log for startup
-        errors
-
-    -   RDP into the server or worker role instance and attempt to start it
-        manually
+    -   Check the logs, including the extra log that contains startup errors
 
 -   Frontend (Client) cannot connect to the silo cluster
 
