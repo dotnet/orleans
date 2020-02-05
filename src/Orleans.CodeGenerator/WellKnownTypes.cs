@@ -72,6 +72,7 @@ namespace Orleans.CodeGenerator
                 String = compilation.GetSpecialType(SpecialType.System_String),
                 Task = Type("System.Threading.Tasks.Task"),
                 Task_1 = Type("System.Threading.Tasks.Task`1"),
+                ValueTask = Type("System.Threading.Tasks.ValueTask"),
                 TimeSpan = Type("System.TimeSpan"),
                 IPAddress = Type("System.Net.IPAddress"),
                 IPEndPoint = Type("System.Net.IPEndPoint"),
@@ -222,6 +223,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol String { get; private set; }
         public INamedTypeSymbol Task { get; private set; }
         public INamedTypeSymbol Task_1 { get; private set; }
+        public INamedTypeSymbol ValueTask { get; private set; }
         public INamedTypeSymbol TransactionAttribute { get; private set; }
         public INamedTypeSymbol TransactionOption { get; private set; }
         public INamedTypeSymbol Type { get; private set; }
