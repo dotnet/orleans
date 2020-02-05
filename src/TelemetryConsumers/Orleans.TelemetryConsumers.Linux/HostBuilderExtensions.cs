@@ -18,7 +18,7 @@ namespace Orleans.Statistics
     {
         internal static readonly string InvalidOS = $"Tried to add '{nameof(LinuxEnvironmentStatistics)}' on non-linux OS";
 
-        internal ILogger _logger; 
+        private readonly ILogger _logger; 
 
         public LinuxEnvironmentStatisticsValidator(ILogger<LinuxEnvironmentStatisticsValidator> logger)
         {
@@ -32,7 +32,7 @@ namespace Orleans.Statistics
 
             if (!isLinux)
             {
-                _logger.Warn(ErrorCode.OS_InvalidOS, InvalidOS);
+                _logger.LogWarning((int)ErrorCode.OS_InvalidOS, InvalidOS);
             }
 
             var missingFiles = LinuxEnvironmentStatistics.RequiredFiles
