@@ -1046,6 +1046,9 @@ namespace Orleans
         Transactions_SendingTMRequest = TransactionsBase + 1,
         Transactions_ReceivedTMResponse = TransactionsBase + 2,
         Transactions_TMError = TransactionsBase + 3,
+
+        OSBase = Runtime + 4600,
+        OS_InvalidOS = OSBase + 1
     }
 }
 // ReSharper restore InconsistentNaming

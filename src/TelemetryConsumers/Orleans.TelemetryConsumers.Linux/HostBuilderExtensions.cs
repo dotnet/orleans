@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration.Internal;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -17,6 +17,12 @@ namespace Orleans.Statistics
     internal class LinuxEnvironmentStatisticsValidator : IConfigurationValidator
     {
         internal static readonly string InvalidOS = $"Tried to add '{nameof(LinuxEnvironmentStatistics)}' on non-linux OS";
+        private readonly ILogger _logger; 
+
+        public LinuxEnvironmentStatisticsValidator(ILogger<LinuxEnvironmentStatisticsValidator> logger)
+        {
+            _logger = logger;
+        }
 
         /// <inheritdoc />
         public void ValidateConfiguration()
@@ -25,7 +31,7 @@ namespace Orleans.Statistics
 
             if (!isLinux)
             {
-                throw new OrleansConfigurationException(InvalidOS);
+                _logger.LogWarning((int)ErrorCode.OS_InvalidOS, InvalidOS);
             }
 
             var missingFiles = LinuxEnvironmentStatistics.RequiredFiles
