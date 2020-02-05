@@ -17,7 +17,6 @@ namespace Orleans.Statistics
     internal class LinuxEnvironmentStatisticsValidator : IConfigurationValidator
     {
         internal static readonly string InvalidOS = $"Tried to add '{nameof(LinuxEnvironmentStatistics)}' on non-linux OS";
-
         private readonly ILogger _logger; 
 
         public LinuxEnvironmentStatisticsValidator(ILogger<LinuxEnvironmentStatisticsValidator> logger)
