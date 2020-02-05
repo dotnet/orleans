@@ -1,14 +1,18 @@
 # Best Practices
 
-Orleans was built with the goal to greatly simplify building of distributed scalable applications, especially for the cloud. Orleans invented the Virtual Actor Model as an evolution of the Actor Model optimized for the cloud scenarios.
+Orleans was built with the goal to greatly simplify building of distributed scalable applications, especially for the cloud. 
+Orleans invented the Virtual Actor Model as an evolution of the Actor Model optimized for the cloud scenarios.
 
-Grains (virtual actors) are the base building blocks of an Orleans-based application. They encapsulate state and behavior of application entities and maintain their lifecycle, The programming model of Orleans and the characteristics of its runtime fit some types of applications better than others. This document is intended to capture some of the tried and proven application patterns that work well in Orleans.
+Grains (virtual actors) are the base building blocks of an Orleans-based application. 
+They encapsulate state and behavior of application entities and maintain their lifecycle. 
+The programming model of Orleans and the characteristics of its runtime fit some types of applications better than others. 
+This document is intended to capture some of the tried and proven application patterns that work well in Orleans.
 
 ## Orleans should be considered when:
 
 -   Significant number (hundreds, millions, billions, and even trillions) of loosely coupled entities. To put the number in perspective, Orleans can easily create a grain for every person on Earth in a small cluster, so long as a subset of that total number is active at any point in time. 
 
-    -   Example: Additonal examples are: user profiles, purchase orders, application/game sessions, stocks
+    -   Examples: user profiles, purchase orders, application/game sessions, stocks
 
 -   Entities are small enough to be single-threaded
 
@@ -78,7 +82,7 @@ Grains (virtual actors) are the base building blocks of an Orleans-based applica
 
     -   Single coordinator/Registry/Monitor
 
-    -   Do staged aggregation If required
+    -   Do staged aggregation if required
 
 **Asynchronicity**:
 
@@ -131,7 +135,13 @@ Grains (virtual actors) are the base building blocks of an Orleans-based applica
 
     -   Deadlock can occur due to call cycles
 
-        -   Example: The grain calls itself
+        -   Examples: 
+        
+            -   The grain calls itself
+        
+            -   Grains A calls B while C is also calling A (A->B->C->A)
+            
+            -   Grain A calls Grain B as Grain B is calling Grain A (A->B->A)
 
     -   Timeouts are used to automatically break deadlocks
 
