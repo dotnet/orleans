@@ -30,7 +30,7 @@ namespace Orleans.Storage
         private const string BINARY_STATE_PROPERTY_NAME = "BinaryState";
         private const string GRAIN_TYPE_PROPERTY_NAME = "GrainType";
         private const string ETAG_PROPERTY_NAME = "ETag";
-        private const string GRAIN_TTL_PROPERTY_NAME = "Ttl";
+        private const string GRAIN_TTL_PROPERTY_NAME = "GrainTtl";
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
 
         private readonly DynamoDBStorageOptions options;
