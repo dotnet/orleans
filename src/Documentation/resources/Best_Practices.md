@@ -173,8 +173,7 @@ extensible storage functionality.
 -   Orleans.IGrainState is extended by a .NET interface which contains fields
     that should be included in the grain’s persisted state.
 
--   GrainBase\<T\> is extended by the grain class that adds a strongly typed
-    State property into the grain’s base class.
+-   Grains are persisted by using [IPersistentState\<TState\>](https://dotnet.github.io/orleans/Documentation/grains/grain_persistence/index.html) is extended by the grain class that adds a strongly typed State property into the grain’s base class.
 
 -   The initial State.ReadStateAsync() automatically occurs prior to
     ActiveAsync() has been called for a grain.
@@ -197,7 +196,7 @@ extensible storage functionality.
         -   Timing (immediate/none/minutes) can also be controlled as to when to
             update.
 
-    -   Each grain class can only be associated with one storage provider.
+    -   PersistetState classes, like other grain classes, can only be associated with one storage provider.
 
         -   [StorageProvider(ProviderName=”name”)] attribute associates the
             grain class with a particular provider
@@ -223,7 +222,7 @@ Built-in Storage Providers
     -   Configure the Azure storage account information with an optional
         DeleteStateOnClear (hard or soft deletions)
 
-    -   Orleans serializer efficiently stores binary data in one Azure table
+    -   Orleans serializer efficiently stores JSON data in one Azure table
         cell
 
     -   Data size limit == max size of the Azure column which is 64kb of binary
@@ -231,11 +230,6 @@ Built-in Storage Providers
 
     -   Community contributed code that extends the use of multiple table
         columns which increases the overall maximum size to 1mb.
-
--   SharedStorageProvider will write data to multiple underlying storage
-    providers by using the grain id hash.
-
-    -   Example: *need to create*
 
 Storage Provider Debugging Tips
 
@@ -308,47 +302,30 @@ Writing Custom Providers
 
 -   Orleans automatically manages clusters
 
-    -   Worker roles (silo) can fail and join at any time which is handled
-        automatically
+    -   Failed nodes --that is that can fail and join at any moment-- are automatically handled by Orleans
 
-    -   A silo instance table exists for diagnostics
+    -   The same silo instance table that is created for the clustering protocol can also be used for diagnostics. The table keeps a history of all of the silos in the cluster.
 
     -   There are also configuration options of an aggressive or a more lenient
         failure detection
 
 -   Failures can happen at any time and are a normal occurrence
 
-    -   Lost grains are automatically reactivated
+    -   In the event a silo fails, the grains that were activated on the failed silo will automatically be reactived later on other silos within the cluster. 
 
-    -   Grains that are making in-process calls can fail or timeout
+    -   Grains have an ability to timeout. A retry solution such as Polly can assist with retries. 
 
-    -   Orleans provides it best effort for grain delivery
+    -   Orleans provides a message delivery guaruntee where each message is delivered at-most-once. 
 
-    -   All of the network messages can be lost and should be retried by the application
-        if it is crucial
+    -   It is a responsibility of the caller to [retry](https://github.com/App-vNext/Polly/wiki/Retry) any failed calls if needed. 
 
         -   Common practice is to retry from end-to-end from the client/front
             end
-
--   Currently there is not a graceful shutdown
 
     -   A Azure upgrade or reboot is treated as a node failure
 
 ## Deployment and Production Management
 
-Service Monitoring
-
--   Orleans provided information
-
-    -   Windows performance counters
-
-    -   Compact Azure metrics table
-
-    -   Extremely detailed Azure statistics table
-
-    -   Trace specific logging events
-
--   Create a custom performance counters
 
 Scaling out and in
 
@@ -356,15 +333,13 @@ Scaling out and in
 
 -   Add or Remove instances
 
--   Orleans automatically rebalances and takes advantage of the new hardware
+-   Orleans automatically rebalances and takes advantage of the new hardware. However, activated grains are not rebalanced when a new silo is added to the cluster. 
 
 ## Logging and Testing
 
 -   Logging, Tracing, and Monitoring
 
     -   GrainBase.GetLogger() exposes Info(), Warn(), Error(), Verbose()
-
-    -   .NET tracing and Runtimes trace to a local file by default
 
     -   Azure Diagnostics is also easily consumed
 
