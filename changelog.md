@@ -7,6 +7,11 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.1.0-rc2] (changes since 3.1.0-rc1)
+
+- Non-breaking bug fixes
+  - Add missing dependency to Orleans.CodeGenerator (#6297)
+
 ### [3.1.0-rc1] (changes since 3.0.2)
 
 - Non-breaking improvements
