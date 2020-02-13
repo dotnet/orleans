@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans;
+using Orleans.Connections.Security;
 using Orleans.Connections.Security.Tests;
 using Orleans.Hosting;
 using Orleans.TestingHost;
@@ -17,6 +19,7 @@ namespace NetCore.Tests
     {
         private const string CertificateSubjectName = "fakedomain.faketld";
         private const string CertificateConfigKey = "certificate";
+        private const string ClientCertificateModeKey = "CertificateMode";
 
         [Fact]
         public void CanCreateCertificates()
@@ -28,7 +31,7 @@ namespace NetCore.Tests
             var decoded = TestCertificateHelper.ConvertFromBase64(encoded);
             Assert.Equal(original, decoded);
         }
-
+        
         private class TlsConfigurator : ISiloConfigurator, IClientBuilderConfigurator
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
@@ -37,14 +40,17 @@ namespace NetCore.Tests
 
                 var encodedCertificate = configuration[CertificateConfigKey];
                 var localCertificate = TestCertificateHelper.ConvertFromBase64(encodedCertificate);
-                clientBuilder.UseTls(localCertificate, options =>
+
+                var certificateModeString = configuration[ClientCertificateModeKey];
+                var certificateMode = (RemoteCertificateMode)Enum.Parse(typeof(RemoteCertificateMode), certificateModeString);
+
+                clientBuilder.UseTls(options =>
                 {
                     options.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
-                    options.RemoteCertificateValidation = (remoteCertificate, chain, errors) =>
-                    {
-                        return true;
-                    };
-
+                    options.AllowAnyRemoteCertificate();
+                    options.LocalCertificate = localCertificate;
+                    options.RemoteCertificateMode = RemoteCertificateMode.RequireCertificate;
+                    options.ClientCertificateMode = certificateMode;
                     options.OnAuthenticateAsClient = (connection, sslOptions) =>
                     {
                         sslOptions.TargetHost = CertificateSubjectName;
@@ -59,14 +65,16 @@ namespace NetCore.Tests
                 var config = hostBuilder.GetConfiguration();
                 var encodedCertificate = config[CertificateConfigKey];
                 var localCertificate = TestCertificateHelper.ConvertFromBase64(encodedCertificate);
+
+                var certificateModeString = config[ClientCertificateModeKey];
+                var certificateMode = (RemoteCertificateMode)Enum.Parse(typeof(RemoteCertificateMode), certificateModeString);
+
                 hostBuilder.UseTls(localCertificate, options =>
                 {
                     options.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
-                    options.RemoteCertificateValidation = (remoteCertificate, chain, errors) =>
-                    {
-                        return true;
-                    };
-
+                    options.AllowAnyRemoteCertificate();
+                    options.RemoteCertificateMode = RemoteCertificateMode.AllowCertificate;
+                    options.ClientCertificateMode = certificateMode;
                     options.OnAuthenticateAsClient = (connection, sslOptions) =>
                     {
                         sslOptions.TargetHost = CertificateSubjectName;
@@ -75,8 +83,15 @@ namespace NetCore.Tests
             }
         }
 
-        [Fact]
-        public async Task TlsBasicEndToEnd()
+        [Theory]
+        [InlineData(null, RemoteCertificateMode.AllowCertificate)]
+        [InlineData(null, RemoteCertificateMode.NoCertificate)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate)]
+        public async Task TlsEndToEnd(string[] oids, RemoteCertificateMode certificateMode)
         {
             TestCluster testCluster = default;
             try
@@ -86,10 +101,10 @@ namespace NetCore.Tests
                     .AddClientBuilderConfigurator<TlsConfigurator>();
 
                 var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
-                    CertificateSubjectName,
-                    new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid });
+                    CertificateSubjectName, oids);
                 var encodedCertificate = TestCertificateHelper.ConvertToBase64(certificate);
                 builder.Properties[CertificateConfigKey] = encodedCertificate;
+                builder.Properties[ClientCertificateModeKey] = certificateMode.ToString();
 
                 testCluster = builder.Build();
                 await testCluster.DeployAsync();
@@ -103,8 +118,11 @@ namespace NetCore.Tests
             }
             finally
             {
-                await testCluster?.StopAllSilosAsync();
-                testCluster?.Dispose();
+                if (testCluster != null)
+                {
+                    await testCluster.StopAllSilosAsync();
+                    testCluster.Dispose();
+                }
             }
         }
     }

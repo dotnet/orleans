@@ -18,10 +18,13 @@ namespace Orleans.Connections.Security
 
         /// <summary>
         /// <para>
-        /// Specifies the local certificate used to authenticate TLS connections. This is ignored if LocalCertificateSelector is set.
+        /// Specifies the local certificate used to authenticate TLS connections. This is ignored on server if LocalCertificateSelector is set.
         /// </para>
         /// <para>
-        /// If the certificate has an Extended Key Usage extension, the usages must include Server Authentication (OID 1.3.6.1.5.5.7.3.1).
+        /// To omit client authentication set to <c>null</c> on client and set <see cref="RemoteCertificateMode"/> to <see cref="RemoteCertificateMode.AllowCertificate"/> or <see cref="RemoteCertificateMode.NoCertificate"/> on server.
+        /// </para>
+        /// <para>
+        /// If the certificate has an Extended Key Usage extension, the usages must include Server Authentication (OID 1.3.6.1.5.5.7.3.1) for server and Client Authentication (OID 1.3.6.1.5.5.7.3.2) for client.
         /// </para>
         /// </summary>
         public X509Certificate2 LocalCertificate { get; set; }
@@ -41,6 +44,11 @@ namespace Orleans.Connections.Security
         /// Specifies the remote endpoint certificate requirements for a TLS connection. Defaults to <see cref="RemoteCertificateMode.RequireCertificate"/>.
         /// </summary>
         public RemoteCertificateMode RemoteCertificateMode { get; set; } = RemoteCertificateMode.RequireCertificate;
+
+        /// <summary>
+        /// Specifies the client authentication certificate requirements for a TLS connection to Silo. Defaults to <see cref="RemoteCertificateMode.AllowCertificate"/>.
+        /// </summary>
+        public RemoteCertificateMode ClientCertificateMode { get; set; } = RemoteCertificateMode.AllowCertificate;
 
         /// <summary>
         /// Specifies a callback for additional remote certificate validation that will be invoked during authentication. This will be ignored
