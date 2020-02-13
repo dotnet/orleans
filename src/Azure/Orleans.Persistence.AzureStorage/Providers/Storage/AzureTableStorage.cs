@@ -59,7 +59,7 @@ namespace Orleans.Storage
             this.grainFactory = grainFactory;
             this.typeResolver = typeResolver;
             this.loggerFactory = loggerFactory;
-            var loggerName = $"{typeof(AzureTableGrainStorageFactory).FullName}.{name}";
+            var loggerName = $"{typeof(AzureTableGrainStorageFactory).FullName}.{name}"; // dynamic data
             this.logger = this.loggerFactory.CreateLogger(loggerName);
         }
 

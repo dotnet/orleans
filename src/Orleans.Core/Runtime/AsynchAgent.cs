@@ -55,7 +55,7 @@ namespace Orleans.Runtime
             OnFault = FaultBehavior.IgnoreFault;
 
             this.loggerFactory = loggerFactory;
-            this.Log = loggerFactory.CreateLogger(loggerName);
+            this.Log = loggerFactory.CreateLogger(loggerName);  // Still ends with dynamic "/"+nameSuffix for SchedulerAsyncAgents currently.
             this.executorService = executorService;
             this.executorFaultHandler = new ExecutorFaultHandler(this);
         }

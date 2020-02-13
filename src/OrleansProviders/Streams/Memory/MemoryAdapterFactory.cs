@@ -154,7 +154,7 @@ namespace Orleans.Providers
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
             var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
-            var receiverLogger = this.loggerFactory.CreateLogger($"{typeof(MemoryAdapterReceiver<TSerializer>).FullName}.{this.Name}.{queueId}");
+            var receiverLogger = this.loggerFactory.CreateLogger($"{typeof(MemoryAdapterReceiver<TSerializer>).FullName}.{this.Name}.{queueId}"); //dynamic data
             var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
             IQueueAdapterReceiver receiver = new MemoryAdapterReceiver<TSerializer>(GetQueueGrain(queueId), receiverLogger, this.serializer, receiverMonitor);
             return receiver;
@@ -195,7 +195,7 @@ namespace Orleans.Providers
         {
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side. 
             CreateBufferPoolIfNotCreatedYet();
-            var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.Name}.{queueId}");
+            var logger = this.loggerFactory.CreateLogger($"{typeof(MemoryPooledCache<TSerializer>).FullName}.{this.Name}.{queueId}"); //dynamic data
             var monitor = this.CacheMonitorFactory(new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId), this.telemetryProducer);
             return new MemoryPooledCache<TSerializer>(bufferPool, purgePredicate, logger, this.serializer, monitor, this.statisticOptions.StatisticMonitorWriteInterval);
         }

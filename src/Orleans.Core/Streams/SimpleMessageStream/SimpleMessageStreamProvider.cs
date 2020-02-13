@@ -28,7 +28,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             this.loggerFactory = loggerFactory;
             this.Name = name;
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}");
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}"); // Dynamic data
             this.options = options;
             this.providerRuntime = providerRuntime as IStreamProviderRuntime;
             this.runtimeClient = providerRuntime.ServiceProvider.GetService<IRuntimeClient>();

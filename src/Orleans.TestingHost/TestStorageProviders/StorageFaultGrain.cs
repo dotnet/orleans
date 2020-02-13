@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -26,7 +26,7 @@ namespace Orleans.TestingHost
         public override async Task OnActivateAsync()
         {
             await base.OnActivateAsync();
-            logger = this.ServiceProvider.GetService<ILoggerFactory>().CreateLogger($"{typeof (StorageFaultGrain).FullName}-{IdentityString}-{RuntimeIdentity}");
+            logger = this.ServiceProvider.GetService<ILoggerFactory>().CreateLogger($"{typeof (StorageFaultGrain).FullName}-{IdentityString}-{RuntimeIdentity}"); //dynamic data, but because this is for tests, I'm not worried about it
             readFaults = new Dictionary<GrainReference, Exception>();
             writeFaults = new Dictionary<GrainReference, Exception>();
             clearfaults = new Dictionary<GrainReference, Exception>();

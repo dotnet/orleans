@@ -203,7 +203,7 @@ namespace Orleans.Transactions
 
             this.participantId = new ParticipantId(this.config.StateName, this.context.GrainInstance.GrainReference, this.config.SupportedRoles);
 
-            this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.context.GrainIdentity.IdentityString}");
+            this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.context.GrainIdentity.IdentityString}"); // Dynamic Data
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
             ITransactionalStateStorage<TState> storage = storageFactory.Create<TState>(this.config.StorageName, this.config.StateName);

@@ -52,7 +52,7 @@ namespace Orleans.Storage
         {
             this.name = name;
             this.loggerFactory = loggerFactory;
-            var loggerName = $"{typeof(DynamoDBGrainStorage).FullName}.{name}";
+            var loggerName = $"{typeof(DynamoDBGrainStorage).FullName}.{name}"; // dynamic data
             this.logger = loggerFactory.CreateLogger(loggerName);
             this.options = options;
             this.serializationManager = serializationManager;

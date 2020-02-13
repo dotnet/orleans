@@ -143,7 +143,7 @@ namespace Orleans.Runtime.Scheduler
             totalQueuingDelay = TimeSpan.Zero;
             quantumExpirations = 0;
             TaskScheduler = new ActivationTaskScheduler(this, loggerFactory);
-            log = IsSystemPriority ? loggerFactory.CreateLogger($"{this.GetType().Namespace} {Name}.{this.GetType().Name}") : loggerFactory.CreateLogger<WorkItemGroup>();
+            log = IsSystemPriority ? loggerFactory.CreateLogger($"{this.GetType().Namespace} {Name}.{this.GetType().Name}") : loggerFactory.CreateLogger<WorkItemGroup>(); //Nasty Dynamic Data
 
             if (schedulerStatistics.CollectShedulerQueuesStats)
             {

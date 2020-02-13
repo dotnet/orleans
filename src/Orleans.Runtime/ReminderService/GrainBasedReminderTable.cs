@@ -19,7 +19,7 @@ namespace Orleans.Runtime.ReminderService
         public override Task OnActivateAsync()
         {
             var loggerFactory = this.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            logger = loggerFactory.CreateLogger(String.Format("{0}_{1}", typeof(GrainBasedReminderTable).FullName, Data.Address.ToString()));
+            logger = loggerFactory.CreateLogger(String.Format("{0}_{1}", typeof(GrainBasedReminderTable).FullName, Data.Address.ToString())); // Dynamic data
             logger.Info("GrainBasedReminderTable {0} Activated. Full identity: {1}", Identity, Data.Address.ToFullString());
             remTable = new Table(loggerFactory);
             base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for GrainBasedReminderTable virtually indefinitely.
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.ReminderService
         public Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
             ReminderTableData t = remTable.ReadRows(begin, end);
-            logger.Debug("Read {0} reminders from memory: {1}, {2}", t.Reminders.Count, Environment.NewLine, Utils.EnumerableToString(t.Reminders));
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Read {0} reminders from memory: {1}, {2}", t.Reminders.Count, Environment.NewLine, Utils.EnumerableToString(t.Reminders));
             return Task.FromResult(t);
         }
 

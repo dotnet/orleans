@@ -75,7 +75,7 @@ namespace Orleans.Streams
             this.adapterFactory = adapterFactory;
 
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
-            logger = loggerFactory.CreateLogger($"{GetType().FullName}.{streamProviderName}");
+            logger = loggerFactory.CreateLogger($"{GetType().FullName}.{streamProviderName}"); // dynamic data
             Log(ErrorCode.PersistentStreamPullingManager_01, "Created {0} for Stream Provider {1}.", GetType().Name, streamProviderName);
             this.loggerFactory = loggerFactory;
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_PULLING_AGENTS, strProviderName), () => queuesToAgentsMap.Count);

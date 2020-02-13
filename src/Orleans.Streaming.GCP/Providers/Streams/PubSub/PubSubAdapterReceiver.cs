@@ -1,4 +1,4 @@
-﻿using Google.Cloud.PubSub.V1;
+using Google.Cloud.PubSub.V1;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -44,7 +44,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
             _dataAdapter = dataAdapter;
 
-            _logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{topicId}.{queueId}");
+            _logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{topicId}.{queueId}"); // dynamic data
             _pending = new List<PendingDelivery>();
         }
 

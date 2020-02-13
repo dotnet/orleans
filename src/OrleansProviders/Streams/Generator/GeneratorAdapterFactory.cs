@@ -297,7 +297,7 @@ namespace Orleans.Providers.Streams.Generator
             CreateBufferPoolIfNotCreatedYet();
             var dimensions = new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId);
             var cacheMonitor = this.CacheMonitorFactory(dimensions, this.telemetryProducer);
-            return new GeneratorPooledCache(bufferPool, this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.Name}.{queueId}"), serializationManager, 
+            return new GeneratorPooledCache(bufferPool, this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.Name}.{queueId}"), serializationManager, //dynamic data
                 cacheMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
         }
 

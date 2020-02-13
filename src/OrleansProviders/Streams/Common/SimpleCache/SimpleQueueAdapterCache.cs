@@ -38,7 +38,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="queueId"></param>
         public IQueueCache CreateQueueCache(QueueId queueId)
         {
-            return new SimpleQueueCache(cacheSize, this.loggerFactory.CreateLogger($"{typeof(SimpleQueueCache).FullName}.{providerName}.{queueId}"));
+            return new SimpleQueueCache(cacheSize, this.loggerFactory.CreateLogger($"{typeof(SimpleQueueCache).FullName}.{providerName}.{queueId}")); //dynamic data
         }
 
         /// <summary>

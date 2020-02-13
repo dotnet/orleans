@@ -160,7 +160,7 @@ namespace Orleans.ServiceBus.Providers
                 this.ReceiverMonitorFactory = (dimensions, logger, telemetryProducer) => new DefaultEventHubReceiverMonitor(dimensions, telemetryProducer);
             }
 
-            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.ehOptions.Path}");
+            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.ehOptions.Path}"); // Dynamic data
         }
 
         //should only need checkpointer on silo side, so move its init logic when it is used

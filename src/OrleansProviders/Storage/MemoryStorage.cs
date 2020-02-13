@@ -52,7 +52,7 @@ namespace Orleans.Storage
         {
             this.options = options;
             this.name = name;
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}");
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}"); //dynamic data
             this.grainFactory = grainFactory;
 
             //Init

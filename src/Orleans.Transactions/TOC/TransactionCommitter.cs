@@ -129,7 +129,7 @@ namespace Orleans.Transactions
 
             this.participantId = new ParticipantId(this.config.ServiceName, this.context.GrainInstance.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.PriorityManager);
 
-            this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.ServiceName}.{this.context.GrainIdentity.IdentityString}");
+            this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.ServiceName}.{this.context.GrainIdentity.IdentityString}"); //dynamic data
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
             ITransactionalStateStorage<OperationState> storage = storageFactory.Create<OperationState>(this.config.StorageName, this.config.ServiceName);

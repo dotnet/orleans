@@ -79,7 +79,7 @@ namespace Orleans.ServiceBus.Providers
             this.cacheFactory = cacheFactory ?? throw new ArgumentNullException(nameof(cacheFactory));
             this.checkpointerFactory = checkpointerFactory ?? throw new ArgumentNullException(nameof(checkpointerFactory));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{settings.Hub.Path}.{settings.Partition}");
+            this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{settings.Hub.Path}.{settings.Partition}"); // Dynamic Data
             this.monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
             this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loadSheddingOptions = loadSheddingOptions ?? throw new ArgumentNullException(nameof(loadSheddingOptions));
