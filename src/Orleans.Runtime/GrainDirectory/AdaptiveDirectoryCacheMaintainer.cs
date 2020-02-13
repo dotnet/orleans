@@ -25,7 +25,7 @@ namespace Orleans.Runtime.GrainDirectory
             AdaptiveGrainDirectoryCache cache,
             IInternalGrainFactory grainFactory,
             ILoggerFactory loggerFactory)
-            :base(nameSuffix: null, loggerFactory)
+            : base(loggerFactory)
         {
             this.grainFactory = grainFactory;
             this.router = router;

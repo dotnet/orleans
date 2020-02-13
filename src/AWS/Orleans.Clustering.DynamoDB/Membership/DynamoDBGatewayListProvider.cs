@@ -1,4 +1,4 @@
-﻿using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,26 +18,30 @@ namespace Orleans.Clustering.DynamoDB
         private DynamoDBStorage storage;
         private string clusterId;
         private readonly string INSTANCE_STATUS_ACTIVE = ((int)SiloStatus.Active).ToString();
-        private readonly ILoggerFactory loggerFactory;
+        private readonly ILogger logger;
         private readonly DynamoDBGatewayOptions options;
-        private readonly TimeSpan maxStaleness;
 
         public DynamoDBGatewayListProvider(
-            ILoggerFactory loggerFactory, 
+            ILogger<DynamoDBGatewayListProvider> logger, 
             IOptions<DynamoDBGatewayOptions> options,
             IOptions<ClusterOptions> clusterOptions, 
             IOptions<GatewayOptions> gatewayOptions)
         {
-            this.loggerFactory = loggerFactory;
+            this.logger = logger;
             this.options = options.Value;
             this.clusterId = clusterOptions.Value.ClusterId;
-            this.maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
+            this.MaxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
         }
 
         public Task InitializeGatewayListProvider()
         {
-            this.storage = new DynamoDBStorage(this.loggerFactory, this.options.Service, this.options.AccessKey, this.options.SecretKey,
-                 this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
+            this.storage = new DynamoDBStorage(
+                this.logger,
+                this.options.Service,
+                this.options.AccessKey,
+                this.options.SecretKey,
+                this.options.ReadCapacityUnits,
+                this.options.WriteCapacityUnits);
 
             return this.storage.InitializeTable(this.options.TableName,
                 new List<KeySchemaElement>
@@ -79,10 +83,7 @@ namespace Orleans.Clustering.DynamoDB
             return records;
         }
 
-        public TimeSpan MaxStaleness
-        {
-            get { return this.maxStaleness; }
-        }
+        public TimeSpan MaxStaleness { get; }
 
         public bool IsUpdatable
         {

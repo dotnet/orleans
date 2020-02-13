@@ -20,13 +20,13 @@ namespace Orleans.Runtime.MembershipService
         public SiloStatusOracle(
             ILocalSiloDetails localSiloDetails,
             MembershipTableManager membershipTableManager,
-            ILoggerFactory loggerFactory,
+            ILogger<SiloStatusOracle> logger,
             SiloStatusListenerManager listenerManager)
         {
             this.localSiloDetails = localSiloDetails;
             this.membershipTableManager = membershipTableManager;
             this.listenerManager = listenerManager;
-            this.log = loggerFactory.CreateLogger("MembershipOracle");
+            this.log = logger;
         }
 
         public SiloStatus CurrentStatus => this.membershipTableManager.CurrentStatus;

@@ -23,7 +23,6 @@ namespace Orleans.Clustering.DynamoDB
         private const int MAX_BATCH_SIZE = 25;
 
         private readonly ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
         private DynamoDBStorage storage;
         private readonly DynamoDBClusteringOptions options;
         private readonly string clusterId;
@@ -33,7 +32,6 @@ namespace Orleans.Clustering.DynamoDB
             IOptions<DynamoDBClusteringOptions> clusteringOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
-            this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<DynamoDBMembershipTable>();
             this.options = clusteringOptions.Value;
             this.clusterId = clusterOptions.Value.ClusterId;
@@ -41,7 +39,7 @@ namespace Orleans.Clustering.DynamoDB
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            this.storage = new DynamoDBStorage(this.loggerFactory, this.options.Service, this.options.AccessKey, this.options.SecretKey,
+            this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
                   this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
 
             logger.Info(ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");

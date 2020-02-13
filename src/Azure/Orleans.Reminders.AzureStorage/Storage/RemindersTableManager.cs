@@ -100,7 +100,7 @@ namespace Orleans.Runtime.ReminderService
         }
 
         private RemindersTableManager(string serviceId, string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
-            : base(tableName, storageConnectionString, loggerFactory)
+            : base(tableName, storageConnectionString, loggerFactory.CreateLogger<RemindersTableManager>())
         {
             ClusterId = clusterId;
             ServiceId = serviceId;
