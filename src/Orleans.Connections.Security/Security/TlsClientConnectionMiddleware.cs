@@ -31,9 +31,8 @@ namespace Orleans.Connections.Security
             _next = next;
 
             // capture the certificate now so it can't be switched after validation
-            _certificate = options.LocalCertificate;
+            _certificate = ValidateCertificate(options.LocalCertificate, options.ClientCertificateMode);
 
-            EnsureCertificateIsAllowedForClientAuth(_certificate);
 
             _options = options;
             _logger = loggerFactory?.CreateLogger<TlsServerConnectionMiddleware>();
@@ -119,7 +118,7 @@ namespace Orleans.Connections.Security
                 {
                     var sslOptions = new TlsClientAuthenticationOptions
                     {
-                        ClientCertificates = new X509CertificateCollection(new[] { _certificate }),
+                        ClientCertificates = _certificate == null ? null : new X509CertificateCollection(new[] { _certificate }),
                         EnabledSslProtocols = _options.SslProtocols,
                     };
 
@@ -199,8 +198,30 @@ namespace Orleans.Connections.Security
             }
         }
 
+        private static X509Certificate2 ValidateCertificate(X509Certificate2 certificate, RemoteCertificateMode mode)
+        {
+            switch (mode)
+            {
+                case RemoteCertificateMode.NoCertificate:
+                    return null;
+                case RemoteCertificateMode.AllowCertificate:
+                    //if certificate exists but can not be used for client authentication.
+                    if (certificate != null && CertificateLoader.IsCertificateAllowedForClientAuth(certificate))
+                        return certificate;
+                    return null;
+                case RemoteCertificateMode.RequireCertificate:
+                    EnsureCertificateIsAllowedForClientAuth(certificate);
+                    return certificate;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
+            }
+        }
+
         protected static void EnsureCertificateIsAllowedForClientAuth(X509Certificate2 certificate)
         {
+            if (certificate == null)
+                throw new InvalidOperationException("No certificate provided for client authentication.");
+
             if (!CertificateLoader.IsCertificateAllowedForClientAuth(certificate))
             {
                 throw new InvalidOperationException($"Invalid client certificate for client authentication: {certificate.Thumbprint}");

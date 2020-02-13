@@ -29,14 +29,16 @@ namespace Orleans.Connections.Security.Tests
 
             request.CertificateExtensions.Add(new X509KeyUsageExtension(KeyUsageFlags, false));
 
-            var extendedKeyUsages = new OidCollection();
-            foreach (var oid in extendedKeyUsageOids ?? Array.Empty<string>())
+            if (extendedKeyUsageOids != null && extendedKeyUsageOids.Length > 0)
             {
-                extendedKeyUsages.Add(new Oid(oid));
+                var extendedKeyUsages = new OidCollection();
+                foreach (var oid in extendedKeyUsageOids)
+                {
+                    extendedKeyUsages.Add(new Oid(oid));
+                }
+                var extension = new X509EnhancedKeyUsageExtension(extendedKeyUsages, false);
+                request.CertificateExtensions.Add(extension);
             }
-
-            var extension = new X509EnhancedKeyUsageExtension(extendedKeyUsages, false);
-            request.CertificateExtensions.Add(extension);
 
             var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.Subtract(TimeSpan.FromDays(10)), DateTimeOffset.UtcNow.AddYears(5));
 
