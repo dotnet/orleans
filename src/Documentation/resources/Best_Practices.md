@@ -344,19 +344,7 @@ Scaling out and in
             this.logger = logger;
         }  '
 
-    -   Azure Diagnostics is also easily consumed
-
-    -   Logger.LogConsumer.Add() allows the developer to choose their own
-        logging consumer
-
-    -   Default tracing levels can be overridden for grains and runtime
-        components
-
-        -   Example: `<TraceLevelOverrideLogPrefix="Application"
-            TraceLevel=“Verbose">`
-
-        -   Example: `<TraceLevelOverrideLogPrefix=“Runtime"
-            TraceLevel=“Warning">`
+    -   [Microsoft.Extensions.Logging](https://docs.microsoft.com/en-us/dotnet/api/microsoft.extensions.logging?view=dotnet-plat-ext-3.1) is utilized for functional and flexible logging
 
 Testing
 
