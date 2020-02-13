@@ -322,8 +322,6 @@ Writing Custom Providers
         -   Common practice is to retry from end-to-end from the client/front
             end
 
-    -   A Azure upgrade or reboot is treated as a node failure
-
 ## Deployment and Production Management
 
 
@@ -339,7 +337,12 @@ Scaling out and in
 
 -   Logging, Tracing, and Monitoring
 
-    -   GrainBase.GetLogger() exposes Info(), Warn(), Error(), Verbose()
+    -   Inject [logging](https://github.com/dotnet/orleans/blob/master/Samples/3.0/HelloWorld/src/HelloWorld.Grains/HelloGrain.cs#L14through) Dependency injection
+    
+        'public HelloGrain(ILogger<HelloGrain> logger)
+        {
+            this.logger = logger;
+        }  '
 
     -   Azure Diagnostics is also easily consumed
 
