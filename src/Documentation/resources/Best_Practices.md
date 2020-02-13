@@ -339,18 +339,15 @@ Scaling out and in
 
     -   Inject [logging](https://github.com/dotnet/orleans/blob/master/Samples/3.0/HelloWorld/src/HelloWorld.Grains/HelloGrain.cs#L14through) Dependency injection
     
-        'public HelloGrain(ILogger<HelloGrain> logger)
-        {
-            this.logger = logger;
-        }  '
+        -   `public HelloGrain(ILogger<HelloGrain> logger) {this.logger = logger;}`
 
     -   [Microsoft.Extensions.Logging](https://docs.microsoft.com/en-us/dotnet/api/microsoft.extensions.logging?view=dotnet-plat-ext-3.1) is utilized for functional and flexible logging
 
 Testing
-
-        -   Microsoft.Orleans.TestingHost NuGet package contains TestCluster which can be used to create an in-memory cluster, comprised of two silos by default, which can be used to test grains.
-        
-        -   Addtional information can be found [here](https://dotnet.github.io/orleans/Documentation/tutorials_and_samples/testing.html)
+    
+-   Microsoft.Orleans.TestingHost NuGet package contains TestCluster which can be used to create an in-memory cluster, comprised of two silos by default, which can be used to test grains.
+    
+-   Additional information can be found [here](https://dotnet.github.io/orleans/Documentation/tutorials_and_samples/testing.html)
 
 Troubleshooting
 
