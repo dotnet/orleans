@@ -35,9 +35,9 @@ namespace Orleans.Runtime
         protected TaskSchedulerAgent(string nameSuffix, ILoggerFactory loggerFactory)
         {
             Cts = new CancellationTokenSource();
-            var thisType = GetType();
-
-            type = thisType.Namespace + "." + thisType.Name;
+            
+            type = GetType().FullName;
+            string loggerName = type;
             if (type.StartsWith("Orleans.", StringComparison.Ordinal))
             {
                 type = type.Substring(8);
@@ -45,6 +45,7 @@ namespace Orleans.Runtime
             if (!string.IsNullOrEmpty(nameSuffix))
             {
                 Name = type + "/" + nameSuffix;
+                loggerName = loggerName + "/" + nameSuffix;
             }
             else
             {
@@ -55,7 +56,7 @@ namespace Orleans.Runtime
             OnFault = FaultBehavior.IgnoreFault;
 
             this.loggerFactory = loggerFactory;
-            this.Log = loggerFactory.CreateLogger(Name);
+            this.Log = loggerFactory.CreateLogger(loggerName);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]

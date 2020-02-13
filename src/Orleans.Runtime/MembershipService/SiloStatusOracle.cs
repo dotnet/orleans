@@ -26,7 +26,7 @@ namespace Orleans.Runtime.MembershipService
             this.localSiloDetails = localSiloDetails;
             this.membershipTableManager = membershipTableManager;
             this.listenerManager = listenerManager;
-            this.log = loggerFactory.CreateLogger("MembershipOracle");
+            this.log = loggerFactory.CreateLogger($"{typeof(SiloStatusOracle).Namespace}.MembershipOracle");
         }
 
         public SiloStatus CurrentStatus => this.membershipTableManager.CurrentStatus;
