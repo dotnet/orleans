@@ -13,7 +13,6 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly MessageCenter messageCenter;
         private readonly ILocalSiloDetails siloDetails;
-        private readonly MultiClusterOptions multiClusterOptions;
         private readonly ConnectionOptions connectionOptions;
         private readonly Gateway gateway;
         private readonly OverloadDetector overloadDetector;
@@ -26,7 +25,6 @@ namespace Orleans.Runtime.Messaging
             Gateway gateway,
             OverloadDetector overloadDetector,
             ILocalSiloDetails siloDetails,
-            IOptions<MultiClusterOptions> multiClusterOptions,
             ConnectionOptions connectionOptions,
             MessageCenter messageCenter,
             ConnectionCommon connectionShared)
@@ -37,7 +35,6 @@ namespace Orleans.Runtime.Messaging
             this.overloadDetector = overloadDetector;
             this.siloDetails = siloDetails;
             this.messageCenter = messageCenter;
-            this.multiClusterOptions = multiClusterOptions.Value;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.myAddress = siloDetails.SiloAddress;
             this.MessageReceivedCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
@@ -55,12 +52,6 @@ namespace Orleans.Runtime.Messaging
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Receive);
                 return;
-            }
-
-            // return address translation for geo clients (replace sending address cli/* with gcl/*)
-            if (this.multiClusterOptions.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
-            {
-                msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.siloDetails.ClusterId);
             }
 
             // Are we overloaded?
@@ -128,14 +119,6 @@ namespace Orleans.Runtime.Messaging
                             grainId, grainId.Key.ClusterId, this.siloDetails.ClusterId);
                     this.Log.Error(ErrorCode.GatewayAcceptor_WrongClusterId, message);
                     throw new InvalidOperationException(message);
-                }
-            }
-            else
-            {
-                //convert handshake cliendId to a GeoClient ID 
-                if (this.multiClusterOptions.HasMultiClusterNetwork)
-                {
-                    grainId = GrainId.NewClientId(grainId.PrimaryKey, this.siloDetails.ClusterId);
                 }
             }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,10 +11,6 @@ namespace Orleans.LogConsistency
     /// </summary>
     public interface ILogConsistencyDiagnostics
     {
-
-        /// <summary>Gets a list of all currently unresolved connection issues.</summary>
-        IEnumerable<ConnectionIssue> UnresolvedConnectionIssues { get; }
-
         /// <summary>Turns on the statistics collection for this log-consistent grain.</summary>
         void EnableStatsCollection();
 

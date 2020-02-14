@@ -11,7 +11,6 @@ using Orleans.Runtime.LogConsistency;
 using Orleans.Runtime.MembershipService;
 using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
-using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.ReminderService;
@@ -119,7 +118,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ActivationCollector>();
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
-            services.TryAddSingleton(sp => sp.GetRequiredService<LocalGrainDirectory>().GsiActivationMaintainer);
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
@@ -135,10 +133,6 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<IFatalErrorHandler, FatalErrorHandler>();
 
-            services.TryAddSingleton<MultiClusterGossipChannelFactory>();
-            services.TryAddSingleton<MultiClusterOracle>();
-            services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();
-            services.TryAddFromExisting<IMultiClusterOracle, MultiClusterOracle>();
             services.TryAddSingleton<DeploymentLoadPublisher>();
 
             services.TryAddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
@@ -173,10 +167,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ImplicitStreamSubscriberTable>();
             services.TryAddSingleton<MessageFactory>();
 
-            services.TryAddSingleton<IGrainRegistrar<GlobalSingleInstanceRegistration>, GlobalSingleInstanceRegistrar>();
-            services.TryAddSingleton<IGrainRegistrar<ClusterLocalRegistration>, ClusterLocalRegistrar>();
-            services.TryAddSingleton<RegistrarManager>();
-            services.TryAddSingleton<Factory<Grain, IMultiClusterRegistrationStrategy, ILogConsistencyProtocolServices>>(FactoryUtility.Create<Grain, IMultiClusterRegistrationStrategy, ProtocolServices>);
+            services.TryAddSingleton<Factory<Grain, ILogConsistencyProtocolServices>>(FactoryUtility.Create<Grain, ProtocolServices>);
             services.TryAddSingleton(FactoryUtility.Create<GrainDirectoryPartition>);
 
             // Placement
@@ -296,7 +287,6 @@ namespace Orleans.Hosting
             services.ConfigureFormatter<GrainCollectionOptions>();
             services.ConfigureFormatter<GrainVersioningOptions>();
             services.ConfigureFormatter<ConsistentRingOptions>();
-            services.ConfigureFormatter<MultiClusterOptions>();
             services.ConfigureFormatter<StatisticsOptions>();
             services.ConfigureFormatter<TelemetryOptions>();
             services.ConfigureFormatter<LoadSheddingOptions>();

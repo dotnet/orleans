@@ -157,7 +157,6 @@ namespace Orleans.Runtime.GrainDirectory
                     duplicates = directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
                 }
 
-                localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(directoryPartitionsMap[removedSilo].GetItems());
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removed copied partition of silo " + removedSilo);
                 directoryPartitionsMap.Remove(removedSilo);
                 DestroyDuplicateActivations(duplicates);
@@ -422,8 +421,6 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     directoryPartitionsMap[source].Update(partition);
                 }
-
-                localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(partition);
             }
         }
 

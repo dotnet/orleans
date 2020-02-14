@@ -343,9 +343,8 @@ namespace Orleans.Runtime
             try
             {
                 PlacementStrategy unused;
-                MultiClusterRegistrationStrategy unusedActivationStrategy;
                 string grainClassName;
-                GrainTypeManager.GetTypeInfo(grain.TypeCode, out grainClassName, out unused, out unusedActivationStrategy);
+                GrainTypeManager.GetTypeInfo(grain.TypeCode, out grainClassName, out unused);
                 report.GrainClassTypeName = grainClassName;
             }
             catch (Exception exc)
@@ -418,9 +417,9 @@ namespace Orleans.Runtime
                 (data.IsReentrant || data.MayInterleave((InvokeMethodRequest)message.BodyObject));
         }
 
-        public void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
+        public void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, string genericArguments = null)
         {
-            GrainTypeManager.GetTypeInfo(typeCode, out grainClass, out placement, out activationStrategy, genericArguments);
+            GrainTypeManager.GetTypeInfo(typeCode, out grainClass, out placement, genericArguments);
         }
 
         public int ActivationCount { get { return activations.Count; } }
@@ -459,11 +458,10 @@ namespace Orleans.Runtime
                 
                 int typeCode = address.Grain.TypeCode;
                 string actualGrainType = null;
-                MultiClusterRegistrationStrategy activationStrategy;
 
                 if (typeCode != 0)
                 {
-                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement, out activationStrategy, genericArguments);
+                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement, genericArguments);
                     if (string.IsNullOrEmpty(grainType))
                     {
                         grainType = actualGrainType;
@@ -473,7 +471,6 @@ namespace Orleans.Runtime
                 {
                     // special case for Membership grain.
                     placement = SystemPlacement.Singleton;
-                    activationStrategy = ClusterLocalRegistration.Singleton;
                 }
 
                 if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
@@ -488,7 +485,6 @@ namespace Orleans.Runtime
                         address,
                         genericArguments,
                         placement,
-                        activationStrategy,
                         this.activationCollector,
                         ageLimit,
                         this.messagingOptions,
@@ -682,8 +678,7 @@ namespace Orleans.Runtime
                 if (typeCode != 0)
                 {
                     PlacementStrategy unused;
-                    MultiClusterRegistrationStrategy unusedActivationStrategy;
-                    GetGrainTypeInfo(typeCode, out grainClassName, out unused, out unusedActivationStrategy, genericArguments);
+                    GetGrainTypeInfo(typeCode, out grainClassName, out unused, genericArguments);
                 }
                 else
                 {
@@ -1324,12 +1319,6 @@ namespace Orleans.Runtime
         {
             return scheduler.RunOrQueueTask(() => directory.LookupAsync(grain), this.SchedulingContext);
         }
-
-        public Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId)
-        {
-            return scheduler.RunOrQueueTask(() => directory.LookupInCluster(grain, clusterId), this.SchedulingContext);
-        }
-
 
         public bool LocalLookup(GrainId grain, out List<ActivationData> addresses)
         {

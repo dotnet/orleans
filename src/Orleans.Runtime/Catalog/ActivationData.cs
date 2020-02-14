@@ -43,7 +43,6 @@ namespace Orleans.Runtime
             ActivationAddress addr,
             string genericArguments,
             PlacementStrategy placedUsing,
-            IMultiClusterRegistrationStrategy registrationStrategy,
             IActivationCollector collector,
             TimeSpan ageLimit,
             IOptions<SiloMessagingOptions> messagingOptions,
@@ -65,7 +64,6 @@ namespace Orleans.Runtime
             Address = addr;
             State = ActivationState.Create;
             PlacedUsing = placedUsing;
-            RegistrationStrategy = registrationStrategy;
             if (!Grain.IsSystemTarget)
             {
                 this.collector = collector;
@@ -293,8 +291,6 @@ namespace Orleans.Runtime
         }
 
         public PlacementStrategy PlacedUsing { get; private set; }
-
-        public IMultiClusterRegistrationStrategy RegistrationStrategy { get; private set; }
 
         // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
         internal bool IsStatelessWorker => this.PlacedUsing is StatelessWorkerPlacement;
