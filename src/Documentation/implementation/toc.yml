@@ -8,7 +8,7 @@
 - name: Cluster Management
   href: cluster_management.md
 - name: Streams Implementation
-  href: streams_implementation.md
+  href: streams_implementation/toc.yml
 - name: Load Balancing
   href: load_balancing.md
 - name: Unit Testing
