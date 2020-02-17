@@ -52,10 +52,19 @@ You will also probably need to add `using` statements.
 
 ## Add Orleans NuGet Packages
 
-1. To the Silo project, add the `Microsoft.Orleans.Server` and `Microsoft.Extensions.Logging.Console` NuGet packages.
-2. To the Client project, add the `Microsoft.Orleans.Client` and `Microsoft.Extensions.Logging.Console` NuGet packages.
-3. To the GrainInterfaces, add the `Microsoft.Orleans.Core.Abstractions` and `Microsoft.Orleans.CodeGenerator.MSBuild` packages.
-4. To the Grains project, add the `Microsoft.Orleans.Core.Abstractions` and `Microsoft.Orleans.CodeGenerator.MSBuild` NuGet pacakges, as well as the `Microsoft.Extensions.Logging.Abstractions` package for logging.
+1. To the Silo project, add the following NuGetPackages
+    - `Microsoft.Orleans.Server`
+    - `Microsoft.Extensions.Logging.Console`
+2. To the Client project, add the following NuGetPackages
+    - `Microsoft.Orleans.Client`
+    - `Microsoft.Extensions.Logging.Console`
+3. To the GrainInterfaces, add the following NuGetPackages
+    - `Microsoft.Orleans.Core.Abstractions`
+    - `Microsoft.Orleans.CodeGenerator.MSBuild`
+4. To the Grains project, add the following NuGetPackages
+    - `Microsoft.Orleans.Core.Abstractions` 
+    - `Microsoft.Orleans.CodeGenerator.MSBuild`
+    - `Microsoft.Extensions.Logging.Abstractions`
 
 `Microsoft.Orleans.Server` and `Microsoft.Orleans.Client` are meta-packages that bring dependency that you will most likely need on the Silo and Client side.
 
@@ -198,10 +207,20 @@ namespace OrleansBasics
         {
             try
             {
-                using (var client = await ConnectClient())
+                var exitRequested = false;
+                while (!exitRequested)
                 {
-                    await DoClientWork(client);
-                    Console.ReadKey();
+                    using (var client = await ConnectClient())
+                    {
+                        var reconnectRequested = false;
+                        while (!reconnectRequested)
+                        {
+                            await DoClientWork(client);
+                            var key = Console.ReadKey();
+                            if (key.Key == ConsoleKey.R) { reconnectRequested = true; } 
+                            if (key.Key == ConsoleKey.X) { exitRequested = true; }
+                        }
+                    }
                 }
 
                 return 0;
@@ -210,7 +229,7 @@ namespace OrleansBasics
             {
                 Console.WriteLine($"\nException while trying to run client: {e.Message}");
                 Console.WriteLine("Make sure the silo the client is trying to connect to is running.");
-                Console.WriteLine("\nPress any key to exit.");
+                Console.WriteLine("\nPress 'r' to reconnect, 'x' to exit, any other key to send another message.")
                 Console.ReadKey();
                 return 1;
             }
@@ -238,7 +257,7 @@ namespace OrleansBasics
         {
             // example of calling grains from the initialized client
             var friend = client.GetGrain<IHello>(0);
-            var response = await friend.SayHello("Good morning, HelloGrain!");
+            var response = await friend.SayHello($"Good morning, HelloGrain ({DateTime.Now})!");
             Console.WriteLine("\n\n{0}\n\n", response);
         }
     }
