@@ -12,6 +12,7 @@ namespace Orleans.Runtime
     {
         void Dump();
     }
+    
     internal class LogStatistics : IDisposable
     {
         internal const string STATS_LOG_PREFIX = "Statistics: ^^^";
