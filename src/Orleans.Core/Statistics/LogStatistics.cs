@@ -8,6 +8,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
+    public interface IStatisticsManager
+    {
+        void Dump();
+    }
     internal class LogStatistics : IDisposable
     {
         internal const string STATS_LOG_PREFIX = "Statistics: ^^^";

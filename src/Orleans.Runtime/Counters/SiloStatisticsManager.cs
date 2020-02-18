@@ -5,7 +5,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.Counters
 {
-    internal class SiloStatisticsManager
+    internal class SiloStatisticsManager : IStatisticsManager
     {
         private LogStatistics logStatistics;
         private CountersStatistics countersPublisher;
@@ -28,6 +28,11 @@ namespace Orleans.Runtime.Counters
         {
             countersPublisher.Start();
             logStatistics.Start();
+        }
+
+        public void Dump()
+        {
+            logStatistics?.DumpCounters();
         }
 
         internal void Stop()

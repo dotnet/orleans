@@ -127,7 +127,7 @@
   <!-- Versioning properties -->
   <PropertyGroup>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">3.0.0</VersionPrefix>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">3.0.4</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->

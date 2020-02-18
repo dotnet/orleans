@@ -8,7 +8,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    internal class ClientStatisticsManager : IDisposable
+    internal class ClientStatisticsManager : IStatisticsManager, IDisposable
     {
         private readonly StatisticsOptions statisticsOptions;
         private readonly LogStatistics logStatistics;
@@ -28,6 +28,12 @@ namespace Orleans.Runtime
         {
             this.logStatistics.Start();
         }
+
+        public void Dump()
+        {
+            this.logStatistics.DumpCounters();
+        }
+
 
         internal void Stop()
         {

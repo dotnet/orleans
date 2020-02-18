@@ -88,6 +88,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
             services.TryAddSingleton<SiloStatisticsManager>();
+            services.TryAddSingleton<IStatisticsManager>(x=>x.GetService<SiloStatisticsManager>());
             services.TryAddSingleton<ApplicationRequestsStatisticsGroup>();
             services.TryAddSingleton<StageAnalysisStatisticsGroup>();
             services.TryAddSingleton<SchedulerStatisticsGroup>();
