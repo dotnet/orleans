@@ -34,7 +34,6 @@ namespace Orleans.Runtime
             this.logStatistics.DumpCounters();
         }
 
-
         internal void Stop()
         {
             this.logStatistics.Stop();
