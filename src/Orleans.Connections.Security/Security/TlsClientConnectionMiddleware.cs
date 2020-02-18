@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.Extensions.Logging;
+using Orleans.Connections.Security.Internal;
 
 namespace Orleans.Connections.Security
 {
@@ -30,9 +31,8 @@ namespace Orleans.Connections.Security
             _next = next;
 
             // capture the certificate now so it can't be switched after validation
-            _certificate = options.LocalCertificate;
+            _certificate = ValidateCertificate(options.LocalCertificate, options.ClientCertificateMode);
 
-            EnsureCertificateIsAllowedForClientAuth(_certificate);
 
             _options = options;
             _logger = loggerFactory?.CreateLogger<TlsServerConnectionMiddleware>();
@@ -65,15 +65,15 @@ namespace Orleans.Connections.Security
                 leaveOpen: true
             );
 
-            SslDuplexPipe sslDuplexPipe = null;
+            TlsDuplexPipe tlsDuplexPipe = null;
 
             if (_options.RemoteCertificateMode == RemoteCertificateMode.NoCertificate)
             {
-                sslDuplexPipe = new SslDuplexPipe(context.Transport, inputPipeOptions, outputPipeOptions);
+                tlsDuplexPipe = new TlsDuplexPipe(context.Transport, inputPipeOptions, outputPipeOptions);
             }
             else
             {
-                sslDuplexPipe = new SslDuplexPipe(context.Transport, inputPipeOptions, outputPipeOptions, s => new SslStream(
+                tlsDuplexPipe = new TlsDuplexPipe(context.Transport, inputPipeOptions, outputPipeOptions, s => new SslStream(
                     s,
                     leaveInnerStreamOpen: false,
                     userCertificateValidationCallback: (sender, certificate, chain, sslPolicyErrors) =>
@@ -109,40 +109,57 @@ namespace Orleans.Connections.Security
                     }));
             }
 
-            var sslStream = sslDuplexPipe.Stream;
+            var sslStream = tlsDuplexPipe.Stream;
 
             using (var cancellationTokeSource = new CancellationTokenSource(_options.HandshakeTimeout))
-            using (cancellationTokeSource.Token.UnsafeRegister(state => ((ConnectionContext)state).Abort(), context))
+            using (cancellationTokeSource.Token.UnsafeRegisterCancellation(state => ((ConnectionContext)state).Abort(), context))
             {
                 try
                 {
-                    var sslOptions = new SslClientAuthenticationOptions
+                    var sslOptions = new TlsClientAuthenticationOptions
                     {
-                        ClientCertificates = new X509CertificateCollection(new[] { _certificate }),
+                        ClientCertificates = _certificate == null ? null : new X509CertificateCollection(new[] { _certificate }),
                         EnabledSslProtocols = _options.SslProtocols,
-                        CertificateRevocationCheckMode = _options.CheckCertificateRevocation ? X509RevocationMode.Online : X509RevocationMode.NoCheck,
-                        ApplicationProtocols = new List<SslApplicationProtocol>(),
                     };
 
                     _options.OnAuthenticateAsClient?.Invoke(context, sslOptions);
 
-                    await sslStream.AuthenticateAsClientAsync(sslOptions, CancellationToken.None);
+#if NETCOREAPP
+                    await sslStream.AuthenticateAsClientAsync(sslOptions.Value, cancellationTokeSource.Token);
+#else
+                    await sslStream.AuthenticateAsClientAsync(
+                        sslOptions.TargetHost,
+                        sslOptions.ClientCertificates,
+                        sslOptions.EnabledSslProtocols,
+                        sslOptions.CertificateRevocationCheckMode == X509RevocationMode.Online);
+#endif
                 }
                 catch (OperationCanceledException)
                 {
                     _logger?.LogDebug(2, "Authentication timed out");
+#if NETCOREAPP
                     await sslStream.DisposeAsync();
+#else
+                    sslStream.Dispose();
+#endif
                     return;
                 }
                 catch (Exception ex) when (ex is IOException || ex is AuthenticationException)
                 {
                     _logger?.LogDebug(1, ex, "Authentication failed");
+#if NETCOREAPP
                     await sslStream.DisposeAsync();
+#else
+                    sslStream.Dispose();
+#endif
                     return;
                 }
             }
 
+#if NETCOREAPP
             feature.ApplicationProtocol = sslStream.NegotiatedApplicationProtocol.Protocol;
+#endif
+
             context.Features.Set<ITlsApplicationProtocolFeature>(feature);
             feature.LocalCertificate = ConvertToX509Certificate2(sslStream.LocalCertificate);
             feature.RemoteCertificate = ConvertToX509Certificate2(sslStream.RemoteCertificate);
@@ -158,14 +175,19 @@ namespace Orleans.Connections.Security
 
             try
             {
-                context.Transport = sslDuplexPipe;
+                context.Transport = tlsDuplexPipe;
 
-                // Disposing the stream will dispose the sslDuplexPipe
+                // Disposing the stream will dispose the tlsDuplexPipe
+#if NETCOREAPP
                 await using (sslStream)
-                await using (sslDuplexPipe)
+                await using (tlsDuplexPipe)
+#else
+                using (sslStream)
+                using (tlsDuplexPipe)
+#endif
                 {
                     await _next(context);
-                    // Dispose the inner stream (SslDuplexPipe) before disposing the SslStream
+                    // Dispose the inner stream (tlsDuplexPipe) before disposing the SslStream
                     // as the duplex pipe can hit an ODE as it still may be writing.
                 }
             }
@@ -176,8 +198,30 @@ namespace Orleans.Connections.Security
             }
         }
 
+        private static X509Certificate2 ValidateCertificate(X509Certificate2 certificate, RemoteCertificateMode mode)
+        {
+            switch (mode)
+            {
+                case RemoteCertificateMode.NoCertificate:
+                    return null;
+                case RemoteCertificateMode.AllowCertificate:
+                    //if certificate exists but can not be used for client authentication.
+                    if (certificate != null && CertificateLoader.IsCertificateAllowedForClientAuth(certificate))
+                        return certificate;
+                    return null;
+                case RemoteCertificateMode.RequireCertificate:
+                    EnsureCertificateIsAllowedForClientAuth(certificate);
+                    return certificate;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
+            }
+        }
+
         protected static void EnsureCertificateIsAllowedForClientAuth(X509Certificate2 certificate)
         {
+            if (certificate == null)
+                throw new InvalidOperationException("No certificate provided for client authentication.");
+
             if (!CertificateLoader.IsCertificateAllowedForClientAuth(certificate))
             {
                 throw new InvalidOperationException($"Invalid client certificate for client authentication: {certificate.Thumbprint}");

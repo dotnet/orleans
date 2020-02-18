@@ -83,9 +83,20 @@ namespace Orleans.TestingHost
             return this;
         }
 
-        public TestClusterBuilder AddSiloBuilderConfigurator<TSiloBuilderConfigurator>() where TSiloBuilderConfigurator : ISiloBuilderConfigurator, new()
+        /// <summary>
+        /// Adds an implementation of <see cref="ISiloConfigurator"/>, <see cref="IHostConfigurator"/>, or <see cref="ISiloBuilderConfigurator"/> to configure silos created by the test cluster.
+        /// </summary>
+        /// <typeparam name="T">The configurator type.</typeparam>
+        public TestClusterBuilder AddSiloBuilderConfigurator<T>() where T : new()
         {
-            this.Options.SiloBuilderConfiguratorTypes.Add(typeof(TSiloBuilderConfigurator).AssemblyQualifiedName);
+#pragma warning disable CS0618 // Type or member is obsolete
+            if (!typeof(ISiloConfigurator).IsAssignableFrom(typeof(T)) && !typeof(IHostConfigurator).IsAssignableFrom(typeof(T)) && !typeof(ISiloBuilderConfigurator).IsAssignableFrom(typeof(T)))
+            {
+                throw new ArgumentException($"The type {typeof(T)} is not assignable to either {nameof(ISiloConfigurator)}, {nameof(IHostConfigurator)}, or {nameof(ISiloBuilderConfigurator)}.");
+            }
+#pragma warning restore CS0618 // Type or member is obsolete
+
+            this.Options.SiloBuilderConfiguratorTypes.Add(typeof(T).AssemblyQualifiedName);
             return this;
         }
 
@@ -171,22 +182,22 @@ namespace Orleans.TestingHost
             throw new InvalidOperationException("Cannot find enough free ports to spin up a cluster");
         }
 
-        internal class AddTestHooksApplicationParts : IClientBuilderConfigurator, ISiloBuilderConfigurator
+        internal class AddTestHooksApplicationParts : IClientBuilderConfigurator, ISiloConfigurator
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
             }
 
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
             }
         }
 
-        internal class ConfigureStaticClusterDeploymentOptions : ISiloBuilderConfigurator
+        internal class ConfigureStaticClusterDeploymentOptions : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.ConfigureServices((context, services) =>
                 {

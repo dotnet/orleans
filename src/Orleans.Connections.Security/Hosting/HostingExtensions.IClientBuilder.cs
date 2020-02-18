@@ -103,7 +103,7 @@ namespace Orleans
 
             var options = new TlsOptions();
             configureOptions(options);
-            if (options.LocalCertificate is null && options.LocalServerCertificateSelector is null)
+            if (options.LocalCertificate is null && options.ClientCertificateMode == RemoteCertificateMode.RequireCertificate)
             {
                 throw new InvalidOperationException("No certificate specified");
             }

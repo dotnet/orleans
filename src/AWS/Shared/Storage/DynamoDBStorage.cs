@@ -72,13 +72,14 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="keys">The keys definitions</param>
         /// <param name="attributes">The attributes used on the key definition</param>
         /// <param name="secondaryIndexes">(optional) The secondary index definitions</param>
+        /// <param name="ttlAttributeName">(optional) The name of the item attribute that indicates the item TTL (if null, ttl won't be enabled)</param>
         /// <returns></returns>
-        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
+        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
             try
             {
                 if (await GetTableDescription(tableName) == null)
-                    await CreateTable(tableName, keys, attributes, secondaryIndexes);
+                    await CreateTable(tableName, keys, attributes, secondaryIndexes, ttlAttributeName);
             }
             catch (Exception exc)
             {
@@ -89,23 +90,23 @@ namespace Orleans.Transactions.DynamoDB
 
         private void CreateClient()
         {
-            if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            if (this.service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                this.service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 // Local DynamoDB instance (for testing)
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
-                ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = service });
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this.service });
             }
-            else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
+            else if (!string.IsNullOrEmpty(this.accessKey) && !string.IsNullOrEmpty(this.secretKey))
             {
                 // AWS DynamoDB instance (auth via explicit credentials)
-                var credentials = new BasicAWSCredentials(accessKey, secretKey);
-                ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                var credentials = new BasicAWSCredentials(this.accessKey, this.secretKey);
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
             }
             else
             {
                 // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig {ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
             }
         }
 
@@ -124,27 +125,33 @@ namespace Orleans.Transactions.DynamoDB
             return null;
         }
 
-        private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
+        private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
+            var useProvisionedThroughput = readCapacityUnits > 0 && writeCapacityUnits > 0;
             var request = new CreateTableRequest
             {
                 TableName = tableName,
                 AttributeDefinitions = attributes,
                 KeySchema = keys,
-                ProvisionedThroughput = new ProvisionedThroughput
+                BillingMode = useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
+                ProvisionedThroughput = useProvisionedThroughput ? new ProvisionedThroughput
                 {
                     ReadCapacityUnits = readCapacityUnits,
                     WriteCapacityUnits = writeCapacityUnits
-                }
+                } : null
             };
 
             if (secondaryIndexes != null && secondaryIndexes.Count > 0)
             {
-                var indexThroughput = new ProvisionedThroughput { ReadCapacityUnits = readCapacityUnits, WriteCapacityUnits = writeCapacityUnits };
-                secondaryIndexes.ForEach(i =>
+                if (useProvisionedThroughput)
                 {
-                    i.ProvisionedThroughput = indexThroughput;
-                });
+                    var indexThroughput = new ProvisionedThroughput {ReadCapacityUnits = readCapacityUnits, WriteCapacityUnits = writeCapacityUnits};
+                    secondaryIndexes.ForEach(i =>
+                    {
+                        i.ProvisionedThroughput = indexThroughput;
+                    });
+                }
+
                 request.GlobalSecondaryIndexes = secondaryIndexes;
             }
 
@@ -160,6 +167,14 @@ namespace Orleans.Transactions.DynamoDB
 
                 } while (description.TableStatus == TableStatus.CREATING);
 
+                if (!string.IsNullOrEmpty(ttlAttributeName))
+                {
+                    await ddbClient.UpdateTimeToLiveAsync(new UpdateTimeToLiveRequest
+                    {
+                        TableName = tableName,
+                        TimeToLiveSpecification = new TimeToLiveSpecification { AttributeName = ttlAttributeName, Enabled = true }
+                    });
+                }
                 if (description.TableStatus != TableStatus.ACTIVE)
                     throw new InvalidOperationException($"Failure creating table {tableName}");
             }

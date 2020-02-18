@@ -20,9 +20,9 @@ namespace Tester.EventSourcingTests
             builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();
         }
 
-        private class TestSiloConfigurator : ISiloBuilderConfigurator
+        private class TestSiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 // we use a slowed-down memory storage provider
                 hostBuilder

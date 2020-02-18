@@ -26,9 +26,9 @@ namespace Tester.AzureUtils
             builder.AddClientBuilderConfigurator<Configurator>();
         }
 
-        public class Configurator : ISiloBuilderConfigurator, IClientBuilderConfigurator
+        public class Configurator : ISiloConfigurator, IClientBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
             }

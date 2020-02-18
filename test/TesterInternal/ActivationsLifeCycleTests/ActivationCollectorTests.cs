@@ -39,9 +39,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             this.logger = this.testCluster.Client.ServiceProvider.GetRequiredService<ILogger<ActivationCollectorTests>>();
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 var config = hostBuilder.GetConfiguration();
                 var collectionAgeLimit = TimeSpan.Parse(config["DefaultCollectionAgeLimit"]);

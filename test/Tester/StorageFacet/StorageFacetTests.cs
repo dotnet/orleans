@@ -19,9 +19,9 @@ namespace Tester
                 builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
             }
 
-            private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class TestSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     // Setup storage feature infrastructure.
                     // - Setup infrastructure.

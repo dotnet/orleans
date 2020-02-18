@@ -26,9 +26,9 @@ namespace UnitTests.StuckGrainTests
                 builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
             }
 
-            private class SiloHostConfigurator : ISiloBuilderConfigurator
+            private class SiloHostConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.Configure<GrainCollectionOptions>(options =>
                     {

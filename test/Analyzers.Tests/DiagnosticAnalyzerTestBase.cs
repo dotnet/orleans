@@ -3,7 +3,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -13,6 +15,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.DependencyModel;
+using Roslyn.Utilities;
 using Xunit;
 
 namespace Analyzers.Tests
@@ -53,7 +56,6 @@ namespace Analyzers.Tests
             var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error);
 
             Assert.Empty(errors);
-
             var analyzer = this.CreateDiagnosticAnalyzer();
             var compilationWithAnalyzers
                 = compilation
@@ -77,16 +79,25 @@ namespace Analyzers.Tests
             var assemblies = new[]
             {
                 typeof(Task).Assembly,
-                typeof(Orleans.Grain).Assembly
+                typeof(Orleans.Grain).Assembly,
+                typeof(Attribute).Assembly,
+                typeof(int).Assembly,
+                typeof(object).Assembly,
             }; 
 
             var metadataReferences = assemblies
-                .SelectMany(x => x.GetReferencedAssemblies())
-                .Select(Assembly.Load)
+                .SelectMany(x => x.GetReferencedAssemblies().Select(Assembly.Load))
                 .Concat(assemblies)
+                .Distinct()
                 .Select(x => MetadataReference.CreateFromFile(x.Location))
                 .Cast<MetadataReference>()
                 .ToList();
+
+            var assemblyPath = Path.GetDirectoryName(typeof(object).Assembly.Location);
+            metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "mscorlib.dll")));
+            metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.dll")));
+            metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Core.dll")));
+            metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.dll")));
 
             var solution = new AdhocWorkspace()
                 .CurrentSolution

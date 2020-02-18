@@ -34,6 +34,7 @@ namespace Orleans.Connections.Security
 
         public PipeWriter Output { get; }
 
+#if NETCOREAPP
         public override async ValueTask DisposeAsync()
         {
             lock (_disposeLock)
@@ -53,5 +54,24 @@ namespace Orleans.Connections.Security
         {
             throw new NotSupportedException();
         }
+#else
+        protected override void Dispose(bool disposing)
+        {
+            lock (_disposeLock)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+                _disposed = true;
+            }
+
+            if (disposing)
+            {
+                Input.Complete();
+                Output.Complete();
+            }
+        }
+#endif
     }
 }

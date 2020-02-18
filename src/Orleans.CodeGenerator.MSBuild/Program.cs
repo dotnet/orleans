@@ -108,6 +108,8 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
                         case nameof(cmd.DebuggerStepThrough):
                             cmd.DebuggerStepThrough = bool.Parse(value);
                             break;
+                        case "InputHash":
+                            break;
                         case nameof(LogLevel):
                             if (!Enum.TryParse(ignoreCase: true, value: value, result: out logLevel))
                             {

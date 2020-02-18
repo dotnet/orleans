@@ -511,9 +511,9 @@ namespace Tests.GeoClusterTests
         }
     }
 
-    internal class LogConsistencyProviderSiloConfigurator : ISiloBuilderConfigurator
+    internal class LogConsistencyProviderSiloConfigurator : ISiloConfigurator
     {
-        public void Configure(ISiloHostBuilder hostBuilder)
+        public void Configure(ISiloBuilder hostBuilder)
         {
             hostBuilder.AddCustomStorageBasedLogConsistencyProvider("StateStorage");
             hostBuilder.AddCustomStorageBasedLogConsistencyProvider("LogStorage");

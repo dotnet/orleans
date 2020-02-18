@@ -67,10 +67,10 @@ namespace Orleans.Connections.Security
         {
             // ValueTask uses .GetAwaiter().GetResult() if necessary
             // https://github.com/dotnet/corefx/blob/f9da3b4af08214764a51b2331f3595ffaf162abe/src/System.Threading.Tasks.Extensions/src/System/Threading/Tasks/ValueTask.cs#L156
-            return ReadAsyncInternal(new Memory<byte>(buffer, offset, count), default).Result;
+            return ReadAsyncInternal(new Memory<byte>(buffer, offset, count), CancellationToken.None).Result;
         }
 
-        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken = default)
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
             return ReadAsyncInternal(new Memory<byte>(buffer, offset, count), cancellationToken).AsTask();
         }
@@ -153,7 +153,7 @@ namespace Orleans.Connections.Security
 
         public override IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
         {
-            var task = ReadAsync(buffer, offset, count, default, state);
+            var task = ReadAsync(buffer, offset, count, CancellationToken.None, state);
             if (callback != null)
             {
                 task.ContinueWith(t => callback.Invoke(t));
@@ -191,7 +191,7 @@ namespace Orleans.Connections.Security
 
         public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
         {
-            var task = WriteAsync(buffer, offset, count, default, state);
+            var task = WriteAsync(buffer, offset, count, CancellationToken.None, state);
             if (callback != null)
             {
                 task.ContinueWith(t => callback.Invoke(t));

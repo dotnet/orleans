@@ -60,6 +60,12 @@ namespace Orleans.Configuration
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
+
+        /// <summary>
+        /// Specifies a time span in which the item would be expired in the future
+        /// every StateWrite will increase the TTL of the grain
+        /// </summary>
+        public TimeSpan? TimeToLive { get; set; }
         public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
     }
 

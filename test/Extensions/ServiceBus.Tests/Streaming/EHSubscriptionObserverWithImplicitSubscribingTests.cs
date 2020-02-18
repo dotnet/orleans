@@ -25,9 +25,9 @@ namespace ServiceBus.Tests.StreamingTests
             }
         }
 
-        private class SiloConfigurator : ISiloBuilderConfigurator
+        private class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .AddEventHubStreams(StreamProviderName, b =>

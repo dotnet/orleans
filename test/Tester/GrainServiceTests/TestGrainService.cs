@@ -113,7 +113,7 @@ namespace Tester
 
     public static class TestGrainServicesSiloBuilderExtensions
     {
-        public static ISiloHostBuilder AddTestGrainService(this ISiloHostBuilder builder, string configProperty)
+        public static ISiloBuilder AddTestGrainService(this ISiloBuilder builder, string configProperty)
         {
             return builder.AddGrainService<TestGrainService>()
                 .ConfigureServices(services => services

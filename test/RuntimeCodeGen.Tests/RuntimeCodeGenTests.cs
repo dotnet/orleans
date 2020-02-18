@@ -41,9 +41,9 @@ namespace UnitTests
             }
         }
 
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 ILoggerFactory codeGenLoggerFactory = new LoggerFactory();
                 var siloName = hostBuilder.GetConfigurationValue("SiloName") ?? nameof(RuntimeCodeGenTests);

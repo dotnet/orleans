@@ -22,9 +22,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .ConfigureServices(services => services.AddSingletonNamedService<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
@@ -51,9 +51,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .ConfigureTracingForTransactionTests()
@@ -90,10 +90,10 @@ namespace Orleans.Transactions.AzureStorage.Tests
             base.ConfigureTestCluster(builder);
         }
 
-        public class TxSiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class TxSiloBuilderConfigurator : ISiloConfigurator
         {
             private static readonly double probability = 0.05;
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .ConfigureTracingForTransactionTests()

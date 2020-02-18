@@ -18,12 +18,12 @@ namespace UnitTests.StorageTests
 {
     public static class SiloBuilderExtensions
     {
-        public static ISiloHostBuilder AddTestStorageProvider<T>(this ISiloHostBuilder builder, string name) where T : IGrainStorage
+        public static ISiloBuilder AddTestStorageProvider<T>(this ISiloBuilder builder, string name) where T : IGrainStorage
         {
             return builder.AddTestStorageProvider(name, (sp, n) => ActivatorUtilities.CreateInstance<T>(sp));
         }
 
-        public static ISiloHostBuilder AddTestStorageProvider<T>(this ISiloHostBuilder builder, string name, Func<IServiceProvider, string, T> createInstance) where T : IGrainStorage
+        public static ISiloBuilder AddTestStorageProvider<T>(this ISiloBuilder builder, string name, Func<IServiceProvider, string, T> createInstance) where T : IGrainStorage
         {
             return builder.ConfigureServices(services =>
             {

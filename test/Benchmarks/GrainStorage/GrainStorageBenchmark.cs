@@ -36,17 +36,17 @@ namespace Benchmarks.GrainStorage
             this.host.Deploy();
         }
 
-        public class SiloMemoryStorageConfigurator : ISiloBuilderConfigurator
+        public class SiloMemoryStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddMemoryGrainStorageAsDefault();
             }
         }
 
-        public class SiloAzureTableStorageConfigurator : ISiloBuilderConfigurator
+        public class SiloAzureTableStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddAzureTableGrainStorageAsDefault(options =>
                 {
@@ -55,9 +55,9 @@ namespace Benchmarks.GrainStorage
             }
         }
 
-        public class SiloAzureBlobStorageConfigurator : ISiloBuilderConfigurator
+        public class SiloAzureBlobStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddAzureBlobGrainStorageAsDefault(options =>
                 {
