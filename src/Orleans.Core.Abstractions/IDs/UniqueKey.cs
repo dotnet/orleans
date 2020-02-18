@@ -24,7 +24,7 @@ namespace Orleans.Runtime
             Grain = 3,
             Client = 4,
             KeyExtGrain = 6,
-            GeoClient = 7,
+            // 7 was GeoClient 
             KeyExtSystemTarget = 8,
         }
 
@@ -59,10 +59,9 @@ namespace Orleans.Runtime
 
         public bool HasKeyExt => IsKeyExt(IdCategory);
 
-        private static bool IsKeyExt(Category category) 
+        private static bool IsKeyExt(Category category)
             => category == Category.KeyExtGrain
-                        || category == Category.KeyExtSystemTarget
-                        || category == Category.GeoClient; // geo clients use the KeyExt string to specify the cluster id
+                        || category == Category.KeyExtSystemTarget;
 
         internal static readonly UniqueKey Empty =
             new UniqueKey
@@ -227,16 +226,6 @@ namespace Orleans.Runtime
             return PrimaryKeyToGuid(out unused);
         }
 
-        public string ClusterId
-        {
-            get
-            {
-                if (IdCategory != Category.GeoClient)
-                    throw new InvalidOperationException("ClusterId is only defined for geo clients");
-                return this.KeyExt;
-            }
-        }
-
         public override bool Equals(object o)
         {
             return o is UniqueKey && Equals((UniqueKey)o);
@@ -370,10 +359,6 @@ namespace Orleans.Runtime
                         throw new ArgumentException("Extended key is empty or white space.", "keyExt");
                     }
                 }
-            }
-            else if (category != Category.GeoClient && null != keyExt)
-            {
-                throw new ArgumentException("Extended key field is not null in non-extended UniqueIdentifier.");
             }
         }
 

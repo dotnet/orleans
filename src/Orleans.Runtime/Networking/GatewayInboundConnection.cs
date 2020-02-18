@@ -109,19 +109,6 @@ namespace Orleans.Runtime.Messaging
                 throw new InvalidOperationException($"Unexpected direct silo connection on proxy endpoint from {siloAddress?.ToString() ?? "unknown silo"}");
             }
 
-            // refuse clients that are connecting to the wrong cluster
-            if (grainId.Category == UniqueKey.Category.GeoClient)
-            {
-                if (grainId.Key.ClusterId != this.siloDetails.ClusterId)
-                {
-                    var message = string.Format(
-                            "Refusing connection by client {0} because of cluster id mismatch: client={1} silo={2}",
-                            grainId, grainId.Key.ClusterId, this.siloDetails.ClusterId);
-                    this.Log.Error(ErrorCode.GatewayAcceptor_WrongClusterId, message);
-                    throw new InvalidOperationException(message);
-                }
-            }
-
             try
             {
                 this.gateway.RecordOpenedConnection(this, grainId);
