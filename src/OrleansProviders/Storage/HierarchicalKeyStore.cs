@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 
 namespace Orleans.Storage
@@ -11,12 +10,12 @@ namespace Orleans.Storage
     {
         public string Etag { get; private set; }
 
-        private const string KEY_VALUE_PAIR_SEPERATOR = "+";
-        private const string KEY_VALUE_SEPERATOR = "=";
+        private const char KEY_VALUE_PAIR_SEPERATOR = '+';
+        private const char KEY_VALUE_SEPERATOR = '=';
 
         private long lastETagCounter = 1;
         [NonSerialized]
-        private readonly IDictionary<string, IDictionary<string, object>> dataTable;
+        private readonly Dictionary<string, IDictionary<string, object>> dataTable;
         private readonly int numKeyLayers;
         private readonly object lockable = new object();
 
@@ -66,7 +65,7 @@ namespace Orleans.Storage
             lock (lockable)
             {
                 IDictionary<string, object> data = GetDataStore(keys);
-                
+
 #if DEBUG
                 Trace.TraceInformation("ReadMultiRow: Keys={0} returning Data={1}",
                     StorageProviderUtils.PrintKeys(keys), StorageProviderUtils.PrintData(data));
@@ -104,25 +103,17 @@ namespace Orleans.Storage
 
             string keyStr = MakeStoreKey(keys);
 
-            bool removedEntry = false;
             lock (lockable)
             {
-                IDictionary<string, object> data;
-                if (dataTable.TryGetValue(keyStr, out data))
-                {
-                    var kv = new KeyValuePair<string, IDictionary<string, object>>(keyStr, data);
-                    dataTable.Remove(kv);
-                    removedEntry = true;
-                }
-
                 // No change to Etag
 #if DEBUG
-                Trace.TraceInformation("DeleteRow: Keys={0} Removed={1} Data={2} Etag={3}",
+                var removedEntry = dataTable.TryGetValue(keyStr, out var data);
+                Trace.TraceInformation("DeleteRow: Keys={0} Removed={2} Data={1} Etag={3}",
                     StorageProviderUtils.PrintKeys(keys),
-                    StorageProviderUtils.PrintData(data), 
+                    StorageProviderUtils.PrintData(data),
                     removedEntry, Etag);
 #endif
-                return removedEntry;
+                return dataTable.Remove(keyStr);
             }
         }
 
@@ -142,11 +133,9 @@ namespace Orleans.Storage
             var sb = new StringBuilder();
             lock (lockable)
             {
-                string[] keys = dataTable.Keys.ToArray();
-                foreach (var key in keys)
+                foreach (var kv in dataTable)
                 {
-                    var data = dataTable[key];
-                    sb.AppendFormat("{0} => {1}", key, StorageProviderUtils.PrintData(data)).AppendLine();
+                    sb.AppendFormat("{0} => {1}", kv.Key, StorageProviderUtils.PrintData(kv.Value)).AppendLine();
                 }
             }
 #if !DEBUG
@@ -164,12 +153,7 @@ namespace Orleans.Storage
 
             lock (lockable)
             {
-                IDictionary<string, object> data;
-                if (dataTable.ContainsKey(keyStr))
-                {
-                    data = dataTable[keyStr];
-                }
-                else
+                if (!dataTable.TryGetValue(keyStr, out var data))
                 {
                     data = new Dictionary<string, object>(); // Empty data set
                     dataTable[keyStr] = data;
@@ -183,22 +167,19 @@ namespace Orleans.Storage
 
         private IList<IDictionary<string, object>> FindDataStores(IList<Tuple<string, string>> keys)
         {
-            var results = new List<IDictionary<string, object>>();
-
             if (numKeyLayers == keys.Count)
             {
-                results.Add(GetDataStore(keys));
+                return new[] { GetDataStore(keys) };
             }
-            else
-            {
-                string keyStr = MakeStoreKey(keys);
 
-                lock (lockable)
-                {
-                    foreach (var key in dataTable.Keys)
-                    if (key.StartsWith(keyStr))
-                        results.Add(dataTable[key]);
-                }
+            var results = new List<IDictionary<string, object>>();
+            string keyStr = MakeStoreKey(keys);
+
+            lock (lockable)
+            {
+                foreach (var kv in dataTable)
+                    if (kv.Key.StartsWith(keyStr, StringComparison.Ordinal))
+                        results.Add(kv.Value);
             }
             return results;
         }
@@ -209,12 +190,12 @@ namespace Orleans.Storage
             bool first = true;
             foreach (var keyPair in keys)
             {
-                if (first) 
+                if (first)
                     first = false;
-                else 
+                else
                     sb.Append(KEY_VALUE_PAIR_SEPERATOR);
 
-                sb.Append(keyPair.Item1 + KEY_VALUE_SEPERATOR + keyPair.Item2);
+                sb.Append(keyPair.Item1).Append(KEY_VALUE_SEPERATOR).Append(keyPair.Item2);
             }
             return sb.ToString();
         }
