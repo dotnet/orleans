@@ -2,6 +2,8 @@
   href: index.md
 - name: Grain Identity
   href: grain_identity.md
+  name: Grain Placement
+  hred: grain_placement.md
 - name: Timers and Reminders
   href: timers_and_reminders.md
 - name: Observers
