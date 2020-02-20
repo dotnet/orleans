@@ -17,7 +17,7 @@ namespace Orleans.Runtime.Scheduler
 
         public override string Name
         {
-            get { return String.Format("ResponseWorkItem:Id={0},Type={1} {2}", response.Id, response.Result, response.DebugContext); }
+            get { return $"ResponseWorkItem:Id={response.Id},Type={response.Result}"; }
         }
 
         public override void Execute()

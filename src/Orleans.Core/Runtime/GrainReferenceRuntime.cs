@@ -3,7 +3,6 @@ using Orleans.CodeGeneration;
 using Orleans.Internal;
 using Orleans.Serialization;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,11 +12,7 @@ namespace Orleans.Runtime
 {
     internal class GrainReferenceRuntime : IGrainReferenceRuntime
     {
-        private const bool USE_DEBUG_CONTEXT = false;
-        private const bool USE_DEBUG_CONTEXT_PARAMS = false;
-        private static readonly ConcurrentDictionary<int, string> debugContexts = new ConcurrentDictionary<int, string>();
-        
-        private readonly Func<GrainReference, InvokeMethodRequest, string, InvokeMethodOptions, Task<object>> sendRequestDelegate;
+        private readonly Func<GrainReference, InvokeMethodRequest, InvokeMethodOptions, Task<object>> sendRequestDelegate;
         private readonly ILogger logger;
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly SerializationManager serializationManager;
@@ -70,7 +65,7 @@ namespace Orleans.Runtime
             if (IsUnordered(reference))
                 options |= InvokeMethodOptions.Unordered;
 
-            Task<object> resultTask = InvokeMethod_Impl(reference, request, null, options);
+            Task<object> resultTask = InvokeMethod_Impl(reference, request, options);
 
             if (resultTask == null)
             {
@@ -94,51 +89,31 @@ namespace Orleans.Runtime
         public object Convert(IAddressable grain, Type interfaceType)
             => this.internalGrainFactory.Cast(grain, interfaceType);
 
-        private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, InvokeMethodOptions options)
         {
-            if (debugContext == null && USE_DEBUG_CONTEXT)
-            {
-                if (USE_DEBUG_CONTEXT_PARAMS)
-                {
-#pragma warning disable 162
-                    // This is normally unreachable code, but kept for debugging purposes
-                    debugContext = GetDebugContext(reference.InterfaceName, reference.GetMethodName(reference.InterfaceId, request.MethodId), request.Arguments);
-#pragma warning restore 162
-                }
-                else
-                {
-                    var hash = reference.InterfaceId ^ request.MethodId;
-                    if (!debugContexts.TryGetValue(hash, out debugContext))
-                    {
-                        debugContext = GetDebugContext(reference.InterfaceName, reference.GetMethodName(reference.InterfaceId, request.MethodId), request.Arguments);
-                        debugContexts[hash] = debugContext;
-                    }
-                }
-            }
-
             // Call any registered client pre-call interceptor function.
             CallClientInvokeCallback(reference, request);
 
             if (this.filters?.Length > 0)
             {
-                return InvokeWithFilters(reference, request, debugContext, options);
+                return InvokeWithFilters(reference, request, options);
             }
             
-            return SendRequest(reference, request, debugContext, options);
+            return SendRequest(reference, request, options);
         }
 
-        private Task<object> SendRequest(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        private Task<object> SendRequest(GrainReference reference, InvokeMethodRequest request, InvokeMethodOptions options)
         {
             bool isOneWayCall = (options & InvokeMethodOptions.OneWay) != 0;
 
             var resolver = isOneWayCall ? null : new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-            this.RuntimeClient.SendRequest(reference, request, resolver, debugContext, options, reference.GenericArguments);
+            this.RuntimeClient.SendRequest(reference, request, resolver, options, reference.GenericArguments);
             return isOneWayCall ? null : resolver.Task;
         }
 
-        private async Task<object> InvokeWithFilters(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        private async Task<object> InvokeWithFilters(GrainReference reference, InvokeMethodRequest request, InvokeMethodOptions options)
         {
-            var invoker = new OutgoingCallInvoker(reference, request, options, debugContext, this.sendRequestDelegate, this.grainReferenceMethodCache, this.filters);
+            var invoker = new OutgoingCallInvoker(reference, request, options, this.sendRequestDelegate, this.grainReferenceMethodCache, this.filters);
             await invoker.Invoke();
             return invoker.Result;
         }
@@ -166,27 +141,6 @@ namespace Orleans.Runtime
                     exc);
                 throw;
             }
-        }
-
-        private static String GetDebugContext(string interfaceName, string methodName, object[] arguments)
-        {
-            // String concatenation is approx 35% faster than string.Format here
-            //debugContext = String.Format("{0}:{1}()", interfaceName, methodName);
-            var debugContext = new StringBuilder();
-            debugContext.Append(interfaceName);
-            debugContext.Append(":");
-            debugContext.Append(methodName);
-            if (USE_DEBUG_CONTEXT_PARAMS && arguments != null && arguments.Length > 0)
-            {
-                debugContext.Append("(");
-                debugContext.Append(Utils.EnumerableToString(arguments));
-                debugContext.Append(")");
-            }
-            else
-            {
-                debugContext.Append("()");
-            }
-            return debugContext.ToString();
         }
 
         private static void CheckForGrainArguments(object[] arguments)

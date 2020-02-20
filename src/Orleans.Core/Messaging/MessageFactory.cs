@@ -123,11 +123,6 @@ namespace Orleans.Runtime
                 }
             }
 
-            if (request.DebugContext != null)
-            {
-                response.DebugContext = request.DebugContext;
-            }
-
             response.CacheInvalidationHeader = request.CacheInvalidationHeader;
             response.TimeToLive = request.TimeToLive;
 
