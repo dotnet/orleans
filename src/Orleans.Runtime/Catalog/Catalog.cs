@@ -25,7 +25,7 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
-    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime, IDisposable
+    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime
     {
         [Serializable]
         internal class NonExistentActivationException : Exception
@@ -234,6 +234,11 @@ namespace Orleans.Runtime
                 "Catalog.GCTimer");
             t.Start();
             gcTimer = t;
+        }
+
+        internal void Stop()
+        {
+            this.gcTimer?.Dispose();
         }
 
         private Task OnTimer(object _)
@@ -1418,11 +1423,6 @@ namespace Orleans.Runtime
                     DeactivateActivations(activationsToShutdown).Ignore();
                 }
             }
-        }
-
-        void IDisposable.Dispose()
-        {
-            this.gcTimer?.Dispose();
         }
     }
 }

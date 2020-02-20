@@ -143,11 +143,11 @@ namespace Orleans.Runtime.Scheduler
 
         public void Stop()
         {
-            // Stop system work groups. Application work groups should already have been stopped
-            // by a call to StopApplicationTurns.
+            // Stop system work groups.
+            var stopAll = !this.applicationTurnsStopped;
             foreach (var group in workgroupDirectory.Values)
             {
-                if (group.IsSystemGroup)
+                if (stopAll || group.IsSystemGroup)
                 {
                     group.Stop();
                 }
