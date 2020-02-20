@@ -10,7 +10,6 @@ using Orleans.MultiCluster;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
-using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Placement;
 using Orleans.Storage;
 
@@ -80,20 +79,6 @@ namespace Orleans.TestingHost
             var mc = this.host.Services.GetRequiredService<MessageCenter>();
             mc.ShouldDrop = null;
             simulatedMessageLoss.Clear();
-        }
-
-        internal Func<ILogConsistencyProtocolMessage,bool> ProtocolMessageFilterForTesting
-        {
-            get
-            {
-                var mco = this.host.Services.GetRequiredService<MultiClusterOracle>();
-                return mco.ProtocolMessageFilterForTesting;
-            }
-            set
-            {
-                var mco = this.host.Services.GetRequiredService<MultiClusterOracle>();
-                mco.ProtocolMessageFilterForTesting = value;
-            }
         }
 
         private bool ShouldDrop(Message msg)

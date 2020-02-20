@@ -111,7 +111,6 @@ namespace Orleans.Runtime.MembershipService
     }
 
     [Reentrant]
-    [OneInstancePerCluster]
     internal class MembershipTableSystemTarget : SystemTarget, IMembershipTableSystemTarget
     {
         private InMemoryMembershipTable table;

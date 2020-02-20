@@ -9,7 +9,6 @@ using System.Linq;
 namespace Orleans.Runtime.ReminderService
 {
     [Reentrant]
-    [OneInstancePerCluster]
     internal class GrainBasedReminderTable : Grain, IReminderTableGrain
     {
         private readonly Table remTable;

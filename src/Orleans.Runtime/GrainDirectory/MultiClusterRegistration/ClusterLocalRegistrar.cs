@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using System.Collections.Generic;
@@ -7,14 +7,15 @@ namespace Orleans.Runtime.GrainDirectory
 {
     /// <summary>
     /// The registrar for the Cluster-Local Registration Strategy.
+    /// TODO Merge back logic in LocalGrainDirectory
     /// </summary>
-    internal class ClusterLocalRegistrar : IGrainRegistrar<ClusterLocalRegistration>
+    internal class ClusterLocalRegistrar
     {
         private readonly GrainDirectoryPartition directoryPartition;
 
-        public ClusterLocalRegistrar(LocalGrainDirectory directory)
+        public ClusterLocalRegistrar(GrainDirectoryPartition directoryPartition)
         {
-            directoryPartition = directory.DirectoryPartition;
+            this.directoryPartition = directoryPartition;
         }
 
         public bool IsSynchronous { get { return true; } }
@@ -41,27 +42,6 @@ namespace Orleans.Runtime.GrainDirectory
         public void Delete(GrainId gid)
         {
             directoryPartition.RemoveGrain(gid);
-        }
-
-
-        public Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation)
-        {
-            throw new InvalidOperationException();
-        }
-
-        public Task UnregisterAsync(List<ActivationAddress> addresses, UnregistrationCause cause)
-        {
-            throw new InvalidOperationException();
-        }
-
-        public Task DeleteAsync(GrainId gid)
-        {
-            throw new InvalidOperationException();
-        }
-
-        public void InvalidateCache(ActivationAddress address)
-        {
-            // no need to do anything since the directory does not cache activations in remote clusters
         }
     }
 }

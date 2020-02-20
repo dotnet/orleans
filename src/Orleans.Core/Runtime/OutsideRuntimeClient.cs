@@ -29,15 +29,14 @@ namespace Orleans
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager localObjects;
-        private bool firstMessageReceived;
+
         private bool disposing;
 
         private ClientProviderRuntime clientProviderRuntime;
 
         internal readonly ClientStatisticsManager ClientStatistics;
         private readonly MessagingTrace messagingTrace;
-        private GrainId clientId;
-        private readonly GrainId handshakeClientId;
+        private readonly GrainId clientId;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
         private readonly TimeSpan typeMapRefreshInterval;
@@ -97,7 +96,7 @@ namespace Orleans
             this.ClientStatistics = clientStatisticsManager;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            this.handshakeClientId = GrainId.NewClientId();
+            this.clientId = GrainId.NewClientId();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             this.typeMapRefreshInterval = typeManagementOptions.Value.TypeMapRefreshInterval;
@@ -162,7 +161,7 @@ namespace Orleans
                 // Client init / sign-on message
                 logger.Info(ErrorCode.ClientInitializing, string.Format(
                     "{0} Initializing OutsideRuntimeClient on {1} at {2} Client Id = {3} {0}",
-                    BARS, Dns.GetHostName(), localAddress, handshakeClientId));
+                    BARS, Dns.GetHostName(), localAddress,  clientId));
                 string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}' in AppDomain={2}",
                     BARS, RuntimeVersion.Current, PrintAppDomainDetails());
                 logger.Info(ErrorCode.ClientStarting, startMsg);
@@ -200,7 +199,7 @@ namespace Orleans
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
             await Task.Run(() => this.StartInternal(retryFilter)).ConfigureAwait(false);
 
-            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + handshakeClientId);
+            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + clientId);
         }
         
         // used for testing to (carefully!) allow two clients in the same process
@@ -210,10 +209,10 @@ namespace Orleans
             await ExecuteWithRetries(async () => await gatewayManager.StartAsync(CancellationToken.None), retryFilter);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
-            MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
+            MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
             MessageCenter.RegisterLocalMessageHandler(Message.Categories.Application, this.HandleMessage);
             MessageCenter.Start();
-            CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, handshakeClientId);
+            CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, clientId);
 
             // Keeping this thread handling it very simple for now. Just queue task on thread pool.
             Task.Run(this.RunClientMessagePump).Ignore();
@@ -297,24 +296,6 @@ namespace Orleans
 
         private void HandleMessage(Message message)
         {
-            // when we receive the first message, we update the
-            // clientId for this client because it may have been modified to
-            // include the cluster name
-            if (!firstMessageReceived)
-            {
-                firstMessageReceived = true;
-                if (!handshakeClientId.Equals(message.TargetGrain))
-                {
-                    clientId = message.TargetGrain;
-                    MessageCenter.UpdateClientId(clientId);
-                    CurrentActivationAddress = ActivationAddress.GetAddress(MessageCenter.MyAddress, clientId, CurrentActivationAddress.Activation);
-                }
-                else
-                {
-                    clientId = handshakeClientId;
-                }
-            }
-
             switch (message.Direction)
             {
                 case Message.Directions.Response:

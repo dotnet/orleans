@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans.Core;
 using System.Collections.Generic;
 using Orleans.GrainDirectory;
@@ -30,11 +30,5 @@ namespace Orleans.Runtime
         /// Observable Grain life cycle
         /// </summary>
         IGrainLifecycle ObservableLifecycle { get; }
-        
-        /// <summary>
-        /// Multi-cluster registration strategy for this grain activation.
-        /// Used by protocols that coordinate multiple instances.
-        /// </summary>
-        IMultiClusterRegistrationStrategy RegistrationStrategy { get; }
     }
 }

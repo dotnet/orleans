@@ -16,7 +16,6 @@ using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.LogConsistency;
 using Orleans.Runtime.Messaging;
-using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
@@ -68,7 +67,6 @@ namespace Orleans.Runtime
         private IReminderService reminderService;
         private SystemTarget fallbackScheduler;
         private readonly ISiloStatusOracle siloStatusOracle;
-        private readonly IMultiClusterOracle multiClusterOracle;
         private readonly ExecutorService executorService;
         private Watchdog platformWatchdog;
         private readonly TimeSpan initTimeout;
@@ -87,7 +85,6 @@ namespace Orleans.Runtime
         internal string Name => this.siloDetails.Name;
         internal OrleansTaskScheduler LocalScheduler { get { return scheduler; } }
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
-        internal IMultiClusterOracle LocalMultiClusterOracle { get { return multiClusterOracle; } }
         internal IConsistentRingProvider RingProvider { get; private set; }
         internal ICatalog Catalog => catalog;
 
@@ -108,7 +105,6 @@ namespace Orleans.Runtime
 
         private bool isFastKilledNeeded = false; // Set to true if something goes wrong in the shutdown/stop phase
 
-        private SchedulingContext multiClusterOracleContext;
         private SchedulingContext reminderServiceContext;
         private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
         private EventHandler processExitHandler;
@@ -221,16 +217,6 @@ namespace Orleans.Runtime
             siloStatusOracle = Services.GetRequiredService<ISiloStatusOracle>();
             this.membershipService = Services.GetRequiredService<IMembershipService>();
             this.clusterOptions = Services.GetRequiredService<IOptions<ClusterOptions>>().Value;
-            var multiClusterOptions = Services.GetRequiredService<IOptions<MultiClusterOptions>>().Value;
-
-            if (!multiClusterOptions.HasMultiClusterNetwork)
-            {
-                logger.Info("Skip multicluster oracle creation (no multicluster network configured)");
-            }
-            else
-            {
-                multiClusterOracle = Services.GetRequiredService<IMultiClusterOracle>();
-            }
 
             this.SystemStatus = SystemStatus.Created;
             AsynchAgent.IsStarting = false;
@@ -288,9 +274,6 @@ namespace Orleans.Runtime
             var siloControl = ActivatorUtilities.CreateInstance<SiloControl>(Services);
             RegisterSystemTarget(siloControl);
 
-            logger.Debug("Creating {0} System Target", "ProtocolGateway");
-            RegisterSystemTarget(new ProtocolGateway(this.SiloAddress, this.loggerFactory));
-
             logger.Debug("Creating {0} System Target", "DeploymentLoadPublisher");
             RegisterSystemTarget(Services.GetRequiredService<DeploymentLoadPublisher>());
             
@@ -299,7 +282,6 @@ namespace Orleans.Runtime
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
 
             logger.Debug("Creating {0} System Target", "RemoteClusterGrainDirectory");
-            RegisterSystemTarget(LocalGrainDirectory.RemoteClusterGrainDirectory);
 
             logger.Debug("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
 
@@ -318,12 +300,6 @@ namespace Orleans.Runtime
                 RegisterSystemTarget((SystemTarget)this.membershipService);
             }
 
-            if (multiClusterOracle != null && multiClusterOracle is SystemTarget)
-            {
-                logger.Debug("Creating {0} System Target", "MultiClusterOracle");
-                RegisterSystemTarget((SystemTarget)multiClusterOracle);
-            }
-            
             logger.Debug("Finished creating System Targets for this silo.");
         }
 
@@ -455,23 +431,6 @@ namespace Orleans.Runtime
             await StartAsyncTaskWithPerfAnalysis("Init type manager", () => scheduler
                 .QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager.SchedulingContext)
                 .WithTimeout(this.initTimeout, $"TypeManager Initializing failed due to timeout {initTimeout}"), stopWatch);
-
-            //if running in multi cluster scenario, start the MultiClusterNetwork Oracle
-            if (this.multiClusterOracle != null)
-            {
-                await StartAsyncTaskWithPerfAnalysis("Start multicluster oracle", StartMultiClusterOracle, stopWatch);
-                async Task StartMultiClusterOracle()
-                {
-                    logger.Info("Starting multicluster oracle with my ServiceId={0} and ClusterId={1}.",
-                        this.clusterOptions.ServiceId, this.clusterOptions.ClusterId);
-
-                    this.multiClusterOracleContext = (multiClusterOracle as SystemTarget)?.SchedulingContext ??
-                                                     this.fallbackScheduler.SchedulingContext;
-                    await scheduler.QueueTask(() => multiClusterOracle.Start(), multiClusterOracleContext)
-                        .WithTimeout(initTimeout, $"Starting MultiClusterOracle failed due to timeout {initTimeout}");
-                    logger.Debug("multicluster oracle created successfully.");
-                }
-            }
 
             try
             {
