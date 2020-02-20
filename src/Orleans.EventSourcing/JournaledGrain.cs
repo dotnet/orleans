@@ -235,16 +235,6 @@ namespace Orleans.EventSourcing
         {
         }
 
-
-        /// <inheritdoc />
-        protected IEnumerable<ConnectionIssue> UnresolvedConnectionIssues
-        {
-            get
-            {
-                return LogViewAdaptor.UnresolvedConnectionIssues;
-            }
-        }
-
         /// <inheritdoc />
         protected void EnableStatsCollection()
         {
@@ -340,24 +330,6 @@ namespace Orleans.EventSourcing
         Task ILogConsistencyProtocolParticipant.DeactivateProtocolParticipant()
         {
             return LogViewAdaptor.PostOnDeactivate();
-        }
-
-        /// <summary>
-        /// Receive a protocol message from other clusters, passed on to log view adaptor.
-        /// </summary>
-        [AlwaysInterleave]
-        Task<ILogConsistencyProtocolMessage> ILogConsistencyProtocolParticipant.OnProtocolMessageReceived(ILogConsistencyProtocolMessage payload)
-        {
-            return LogViewAdaptor.OnProtocolMessageReceived(payload);
-        }
-
-        /// <summary>
-        /// Receive a configuration change, pass on to log view adaptor.
-        /// </summary>
-        [AlwaysInterleave]
-        Task ILogConsistencyProtocolParticipant.OnMultiClusterConfigurationChange(MultiCluster.MultiClusterConfiguration next)
-        {
-            return LogViewAdaptor.OnMultiClusterConfigurationChange(next);
         }
 
         /// <summary>

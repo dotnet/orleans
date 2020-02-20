@@ -19,7 +19,6 @@ namespace Orleans.Runtime
 
         private readonly Dictionary<int, GrainClassData> implementationIndex;
         private readonly Dictionary<int, PlacementStrategy> placementStrategiesIndex;
-        private readonly Dictionary<int, MultiClusterRegistrationStrategy> registrationStrategiesIndex;
 
         [NonSerialized] // Client shouldn't need this
         private readonly Dictionary<string, string> primaryImplementations;
@@ -46,7 +45,6 @@ namespace Orleans.Runtime
             primaryImplementations = new Dictionary<string, string>();
             implementationIndex = new Dictionary<int, GrainClassData>();
             placementStrategiesIndex = new Dictionary<int, PlacementStrategy>();
-            registrationStrategiesIndex = new Dictionary<int, MultiClusterRegistrationStrategy>();
             unordered = new HashSet<int>();
             this.localTestMode = localTestMode;
             this.defaultPlacementStrategy = defaultPlacementStrategy;
@@ -92,17 +90,9 @@ namespace Orleans.Runtime
                     placementStrategiesIndex.Add(kvp.Key, kvp.Value);
                 }
             }
-
-            foreach (var kvp in map.registrationStrategiesIndex)
-            {
-                if (!registrationStrategiesIndex.ContainsKey(kvp.Key))
-                {
-                    registrationStrategiesIndex.Add(kvp.Key, kvp.Value);
-                }
-            }
         }
 
-        internal void AddEntry(Type iface, Type grain, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy, bool primaryImplementation)
+        internal void AddEntry(Type iface, Type grain, PlacementStrategy placement, bool primaryImplementation)
         {
             lock (this)
             {
@@ -117,8 +107,6 @@ namespace Orleans.Runtime
                     implementationIndex.Add(grainTypeCode, implementation);
                 if (!placementStrategiesIndex.ContainsKey(grainTypeCode))
                     placementStrategiesIndex.Add(grainTypeCode, placement);
-                if (!registrationStrategiesIndex.ContainsKey(grainTypeCode))
-                    registrationStrategiesIndex.Add(grainTypeCode, registrationStrategy);
 
                 grainInterfaceData.AddImplementation(implementation, primaryImplementation);
                 if (primaryImplementation)
@@ -204,20 +192,18 @@ namespace Orleans.Runtime
             return table[ifaceId].InterfaceVersion;
         }
 
-        internal bool TryGetTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy registrationStrategy, string genericArguments = null)
+        internal bool TryGetTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, string genericArguments = null)
         {
             lock (this)
             {
                 grainClass = null;
                 placement = this.defaultPlacementStrategy;
-                registrationStrategy = null;
                 if (!implementationIndex.ContainsKey(typeCode))
                     return false;
 
                 var implementation = implementationIndex[typeCode];
                 grainClass = implementation.GetClassName(genericArguments);
                 placement = placementStrategiesIndex[typeCode];
-                registrationStrategy = registrationStrategiesIndex[typeCode];
                 return true;
             }
         }

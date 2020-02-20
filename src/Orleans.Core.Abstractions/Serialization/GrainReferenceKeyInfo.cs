@@ -66,8 +66,7 @@ namespace Orleans.Serialization
             get
             {
                 var category = UniqueKey.GetCategory(Key.Item3);
-                return category == UniqueKey.Category.KeyExtGrain
-                    || category == UniqueKey.Category.GeoClient; // geo clients use the KeyExt string to specify the cluster id
+                return category == UniqueKey.Category.KeyExtGrain;
             }
         }
 

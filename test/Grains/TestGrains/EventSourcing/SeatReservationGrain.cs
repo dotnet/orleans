@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -25,7 +25,6 @@ namespace TestGrains
     /// 
     /// </summary>
     
-    [OneInstancePerCluster]
     [StorageProvider(ProviderName = "Default")]
     [LogConsistencyProvider(ProviderName = "StateStorage")]
     public class SeatReservationGrain : JournaledGrain<ReservationState,SeatReservation>, ISeatReservationGrain

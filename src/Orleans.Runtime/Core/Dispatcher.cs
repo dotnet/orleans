@@ -32,6 +32,7 @@ namespace Orleans.Runtime
         private readonly RuntimeMessagingTrace messagingTrace;
         private readonly SchedulingOptions schedulingOptions;
         private readonly ILogger invokeWorkItemLogger;
+
         internal Dispatcher(
             OrleansTaskScheduler scheduler, 
             ISiloMessageCenter transport, 

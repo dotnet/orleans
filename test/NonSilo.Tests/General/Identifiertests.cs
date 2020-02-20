@@ -50,7 +50,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void UniqueKeyToByteArrayWithoutKeyExt()
         {
-            var key = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.GeoClient);
+            var key = UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.Client);
 
             var result = key.ToByteArray();
 

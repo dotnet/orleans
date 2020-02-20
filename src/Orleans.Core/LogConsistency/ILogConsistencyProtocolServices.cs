@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
@@ -19,15 +19,6 @@ namespace Orleans.LogConsistency
     public interface ILogConsistencyProtocolServices
     {
         /// <summary>
-        /// Send a message to a remote cluster.
-        /// </summary>
-        /// <param name="payload">the message</param>
-        /// <param name="clusterId">the destination cluster id</param>
-        /// <returns></returns>
-        Task<ILogConsistencyProtocolMessage> SendMessage(ILogConsistencyProtocolMessage payload, string clusterId);
-
-
-        /// <summary>
         /// The untyped reference for this grain.
         /// </summary>
         GrainReference GrainReference { get;  }
@@ -36,51 +27,12 @@ namespace Orleans.LogConsistency
         /// The serialization manager.
         /// </summary>
         SerializationManager SerializationManager { get; }
-        
-        /// <summary>
-        /// The multicluster registration strategy for this grain.
-        /// </summary>
-        IMultiClusterRegistrationStrategy RegistrationStrategy { get; }
-
-
-        /// <summary>
-        /// Whether this cluster is running in a multi-cluster network.
-        /// </summary>
-        /// <returns></returns>
-        bool MultiClusterEnabled { get; }
-
-        // If there is no multi-cluster network,
-        // we use a default multi-cluster configuration containing just one cluster (this one), named "I"
-        // this is more convenient and consistent than returning null or invalid,
-        // since it means the log-consistency providers do the right thing (run like a single-cluster configuration)
 
         /// <summary>
         /// The id of this cluster. Returns "I" if no multi-cluster network is present.
         /// </summary>
         /// <returns></returns>
         string MyClusterId { get; }
-
-    
-        /// <summary>
-        /// The current multicluster configuration of this silo 
-        /// (as injected by the administrator) or null if none.
-        /// </summary>
-        MultiClusterConfiguration MultiClusterConfiguration { get; }
-
-        /// <summary>
-        /// List of all clusters that currently appear to have at least one active
-        /// gateway reporting to the multi-cluster network. 
-        /// There are no guarantees that this membership view is complete or consistent.
-        /// If there is no multi-cluster network, returns a list containing the single element "I".
-        /// </summary>
-        /// <returns></returns>
-        IEnumerable<string>  ActiveClusters { get; }
-
-
-        void SubscribeToMultiClusterConfigurationChanges();
-
-        void UnsubscribeFromMultiClusterConfigurationChanges();
-
 
         /// <summary>
         /// Log an error that occurred in a log-consistency protocol.

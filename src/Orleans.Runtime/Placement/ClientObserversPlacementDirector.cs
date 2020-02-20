@@ -27,13 +27,6 @@ namespace Orleans.Runtime.Placement
                         return ChooseRandomActivation(addresses.Addresses, context);
                     }
 
-                case UniqueKey.Category.GeoClient:
-                    {
-                        // we need to look up the activations in the remote cluster
-                        addresses = await context.LookupInCluster(target, target.Key.ClusterId);
-                        return ChooseRandomActivation(addresses.Addresses, context);
-                    }
-
                 default:
                     throw new InvalidOperationException("Unsupported client type. Grain " + target);
             }

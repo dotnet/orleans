@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.MultiCluster;
 using Orleans.Runtime.MembershipService;
-using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
@@ -18,11 +17,8 @@ namespace Orleans.Runtime.Management
     /// <summary>
     /// Implementation class for the Orleans management grain.
     /// </summary>
-    [OneInstancePerCluster]
     internal class ManagementGrain : Grain, IManagementGrain
     {
-        private readonly MultiClusterOptions multiClusterOptions;
-        private readonly IMultiClusterOracle multiClusterOracle;
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly GrainTypeManager grainTypeManager;
@@ -30,8 +26,6 @@ namespace Orleans.Runtime.Management
         private readonly MembershipTableManager membershipTableManager;
         private readonly ILogger logger;
         public ManagementGrain(
-            IOptions<MultiClusterOptions> multiClusterOptions,
-            IMultiClusterOracle multiClusterOracle,
             IInternalGrainFactory internalGrainFactory,
             ISiloStatusOracle siloStatusOracle,
             GrainTypeManager grainTypeManager, 
@@ -40,8 +34,6 @@ namespace Orleans.Runtime.Management
             MembershipTableManager membershipTableManager)
         {
             this.membershipTableManager = membershipTableManager;
-            this.multiClusterOptions = multiClusterOptions.Value;
-            this.multiClusterOracle = multiClusterOracle;
             this.internalGrainFactory = internalGrainFactory;
             this.siloStatusOracle = siloStatusOracle;
             this.grainTypeManager = grainTypeManager;
@@ -340,62 +332,6 @@ namespace Orleans.Runtime.Management
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
             return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
-        }
-
-        private IMultiClusterOracle GetMultiClusterOracle()
-        {
-            if (!this.multiClusterOptions.HasMultiClusterNetwork)
-                throw new OrleansException("No multicluster network configured");
-            return this.multiClusterOracle;
-        }
-
-        public Task<List<IMultiClusterGatewayInfo>> GetMultiClusterGateways()
-        {
-            return Task.FromResult(GetMultiClusterOracle().GetGateways().Cast<IMultiClusterGatewayInfo>().ToList());
-        }
-
-        public Task<MultiClusterConfiguration> GetMultiClusterConfiguration()
-        {
-            return Task.FromResult(GetMultiClusterOracle().GetMultiClusterConfiguration());
-        }
-
-        public async Task<MultiClusterConfiguration> InjectMultiClusterConfiguration(IEnumerable<string> clusters, string comment = "", bool checkForLaggingSilosFirst = true)
-        {
-            var multiClusterOracle = GetMultiClusterOracle();
-
-            var configuration = new MultiClusterConfiguration(DateTime.UtcNow, clusters.ToList(), comment);
-
-            if (!MultiClusterConfiguration.OlderThan(multiClusterOracle.GetMultiClusterConfiguration(), configuration))
-                throw new OrleansException("Could not inject multi-cluster configuration: current configuration is newer than clock");
-
-            if (checkForLaggingSilosFirst)
-            {
-                try
-                {
-                    var laggingSilos = await multiClusterOracle.FindLaggingSilos(multiClusterOracle.GetMultiClusterConfiguration());
-
-                    if (laggingSilos.Count > 0)
-                    {
-                        var msg = string.Format("Found unstable silos {0}", string.Join(",", laggingSilos));
-                        throw new OrleansException(msg);
-                    }
-                }
-                catch (Exception e)
-                {
-                    throw new OrleansException("Could not inject multi-cluster configuration: stability check failed", e);
-                }
-            }
-
-            await multiClusterOracle.InjectMultiClusterConfiguration(configuration);
-
-            return configuration;
-        }
-
-        public Task<List<SiloAddress>> FindLaggingSilos()
-        {
-            var multiClusterOracle = GetMultiClusterOracle();
-            var expected = multiClusterOracle.GetMultiClusterConfiguration();
-            return multiClusterOracle.FindLaggingSilos(expected);
         }
     }
 }
