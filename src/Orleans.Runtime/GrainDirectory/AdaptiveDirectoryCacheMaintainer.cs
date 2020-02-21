@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class AdaptiveDirectoryCacheMaintainer : DedicatedAsynchAgent
+    internal class AdaptiveDirectoryCacheMaintainer : TaskSchedulerAgent
     {
         private static readonly TimeSpan SLEEP_TIME_BETWEEN_REFRESHES = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromMinutes(1); // this should be something like minTTL/4
 
@@ -24,9 +24,8 @@ namespace Orleans.Runtime.GrainDirectory
             LocalGrainDirectory router,
             AdaptiveGrainDirectoryCache cache,
             IInternalGrainFactory grainFactory,
-            ExecutorService executorService,
             ILoggerFactory loggerFactory)
-            :base(executorService, loggerFactory)
+            :base(nameSuffix: null, loggerFactory)
         {
             this.grainFactory = grainFactory;
             this.router = router;
@@ -37,7 +36,7 @@ namespace Orleans.Runtime.GrainDirectory
             OnFault = FaultBehavior.RestartOnFault;
         }
 
-        protected override void Run()
+        protected override async Task Run()
         {
             while (router.Running)
             {
@@ -124,7 +123,7 @@ namespace Orleans.Runtime.GrainDirectory
                 ProduceStats();
 
                 // recheck every X seconds (Consider making it a configurable parameter)
-                Thread.Sleep(SLEEP_TIME_BETWEEN_REFRESHES);
+                await Task.Delay(SLEEP_TIME_BETWEEN_REFRESHES);
             }
         }
 
