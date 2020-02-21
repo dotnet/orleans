@@ -12,8 +12,7 @@ namespace Orleans.Runtime
     {
         private readonly InvokeMethodRequest request;
         private readonly InvokeMethodOptions options;
-        private readonly string debugContext;
-        private readonly Func<GrainReference, InvokeMethodRequest, string, InvokeMethodOptions, Task<object>> sendRequest;
+        private readonly Func<GrainReference, InvokeMethodRequest, InvokeMethodOptions, Task<object>> sendRequest;
         private readonly InterfaceToImplementationMappingCache mapping;
         private readonly IOutgoingGrainCallFilter[] filters;
         private readonly GrainReference grainReference;
@@ -25,7 +24,6 @@ namespace Orleans.Runtime
         /// <param name="grain">The grain reference.</param>
         /// <param name="request">The request.</param>
         /// <param name="options"></param>
-        /// <param name="debugContext"></param>
         /// <param name="sendRequest"></param>
         /// <param name="filters">The invocation interceptors.</param>
         /// <param name="mapping">The implementation map.</param>
@@ -33,14 +31,12 @@ namespace Orleans.Runtime
             GrainReference grain,
             InvokeMethodRequest request,
             InvokeMethodOptions options,
-            string debugContext,
-            Func<GrainReference, InvokeMethodRequest, string, InvokeMethodOptions, Task<object>> sendRequest,
+            Func<GrainReference, InvokeMethodRequest, InvokeMethodOptions, Task<object>> sendRequest,
             InterfaceToImplementationMappingCache mapping,
             IOutgoingGrainCallFilter[] filters)
         {
             this.request = request;
             this.options = options;
-            this.debugContext = debugContext;
             this.sendRequest = sendRequest;
             this.mapping = mapping;
             this.grainReference = grain;
@@ -98,7 +94,7 @@ namespace Orleans.Runtime
                 {
                     // Finally call the root-level invoker.
                     stage++;
-                    var resultTask = this.sendRequest(this.grainReference, this.request, this.debugContext, this.options);
+                    var resultTask = this.sendRequest(this.grainReference, this.request, this.options);
                     if (resultTask != null)
                     {
                         this.Result = await resultTask;

@@ -291,14 +291,14 @@ namespace Orleans
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "CallbackData is IDisposable but instances exist beyond lifetime of this method so cannot Dispose yet.")]
-        public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
+        public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, InvokeMethodOptions options, string genericArguments)
         {
             var message = this.messageFactory.CreateMessage(request, options);
             OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
-            SendRequestMessage(target, message, context, debugContext, options, genericArguments);
+            SendRequestMessage(target, message, context, options, genericArguments);
         }
 
-        private void SendRequestMessage(GrainReference target, Message message, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
+        private void SendRequestMessage(GrainReference target, Message message, TaskCompletionSource<object> context, InvokeMethodOptions options, string genericArguments)
         {
             var targetGrainId = target.GrainId;
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
@@ -323,10 +323,6 @@ namespace Orleans
                 message.TargetObserverId = target.ObserverId;
             }
 
-            if (debugContext != null)
-            {
-                message.DebugContext = debugContext;
-            }
             if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
             {
                 // don't set expiration for system target messages.
