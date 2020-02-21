@@ -210,7 +210,7 @@ namespace Orleans
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
             MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
-            MessageCenter.RegisterLocalMessageHandler(Message.Categories.Application, this.HandleMessage);
+            MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
             MessageCenter.Start();
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, clientId);
 
