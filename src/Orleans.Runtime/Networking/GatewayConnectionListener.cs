@@ -25,7 +25,6 @@ namespace Orleans.Runtime.Messaging
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<SiloConnectionOptions> siloConnectionOptions,
             OverloadDetector overloadDetector,
-            Gateway gateway,
             ILocalSiloDetails localSiloDetails,
             IOptions<EndpointOptions> endpointOptions,
             MessageCenter messageCenter,
@@ -35,7 +34,7 @@ namespace Orleans.Runtime.Messaging
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
             this.overloadDetector = overloadDetector;
-            this.gateway = gateway;
+            this.gateway = messageCenter.Gateway;
             this.localSiloDetails = localSiloDetails;
             this.messageCenter = messageCenter;
             this.connectionShared = connectionShared;
