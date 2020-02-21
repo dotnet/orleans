@@ -248,8 +248,6 @@ namespace Orleans.Runtime
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            StartTaskWithPerfAnalysis("Start Scheduler", scheduler.Start, new Stopwatch());
-
             // SystemTarget for provider init calls
             this.lifecycleSchedulingSystemTarget = Services.GetRequiredService<LifecycleSchedulingSystemTarget>();
             this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
@@ -722,8 +720,11 @@ namespace Orleans.Runtime
                     $"Failed to {operation}. About to FastKill this silo.", exc);
                 this.isFastKilledNeeded = true;
             }
+
             // Stop the gateway
             SafeExecute(messageCenter.StopAcceptingClientMessages);
+
+            SafeExecute(() => catalog?.Stop());
         }
 
         private async Task OnActiveStop(CancellationToken ct)

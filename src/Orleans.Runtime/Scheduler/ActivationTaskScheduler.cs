@@ -10,7 +10,7 @@ namespace Orleans.Runtime.Scheduler
     /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
     /// </summary>
     [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
-    internal class ActivationTaskScheduler : TaskScheduler, ITaskScheduler
+    internal class ActivationTaskScheduler : TaskScheduler
     {
         private readonly ILogger logger;
 
