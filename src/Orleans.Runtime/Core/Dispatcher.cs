@@ -374,15 +374,15 @@ namespace Orleans.Runtime
 
                 var newChain = new List<RequestInvocationHistory>();
                 newChain.AddRange(prevChain.Cast<RequestInvocationHistory>());
-                newChain.Add(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
+                newChain.Add(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation));
 
                 throw new DeadlockException(
                     string.Format(
                         "Deadlock Exception for grain call chain {0}.",
                         Utils.EnumerableToString(
                             newChain,
-                            elem => string.Format("{0}.{1}", elem.GrainId, elem.DebugContext))),
-                    newChain.Select(req => new Tuple<GrainId, string>(req.GrainId, req.DebugContext)).ToList());
+                            elem => elem.GrainId.ToString())),
+                    newChain.Select(req => req.GrainId).ToList());
             }
         }
 

@@ -17,7 +17,7 @@ namespace Orleans.Runtime.Scheduler
 
         public override string Name
         {
-            get { return String.Format("RequestWorkItem:Id={0} {1}", request.Id, request.DebugContext); }
+            get { return $"RequestWorkItem:Id={request.Id}"; }
         }
 
         public override IGrainContext GrainContext => this.target;

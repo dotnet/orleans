@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -49,7 +48,7 @@ namespace Orleans.Runtime
         /// <param name="timeout">New response timeout value</param>
         void SetResponseTimeout(TimeSpan timeout);
 
-        void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null);
+        void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, InvokeMethodOptions options, string genericArguments);
 
         void SendResponse(Message request, Response response);
 

@@ -299,12 +299,6 @@ namespace Orleans.Runtime
             set { Headers.TransactionInfo = value; }
         }
 
-        public string DebugContext
-        {
-            get { return GetNotNullString(Headers.DebugContext); }
-            set { Headers.DebugContext = value; }
-        }
-
         public List<ActivationAddress> CacheInvalidationHeader
         {
             get { return Headers.CacheInvalidationHeader; }
@@ -390,13 +384,6 @@ namespace Orleans.Runtime
         {
             var sb = new StringBuilder();
 
-            string debugContex = DebugContext;
-            if (!string.IsNullOrEmpty(debugContex))
-            {
-                // if DebugContex is present, print it first.
-                sb.Append(debugContex).Append(".");
-            }
-
             AppendIfExists(HeadersContainer.Headers.CACHE_INVALIDATION_HEADER, sb, (m) => m.CacheInvalidationHeader);
             AppendIfExists(HeadersContainer.Headers.CATEGORY, sb, (m) => m.Category);
             AppendIfExists(HeadersContainer.Headers.DIRECTION, sb, (m) => m.Direction);
@@ -456,7 +443,7 @@ namespace Orleans.Runtime
                         break;
                 }
             }
-            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}: {9}",
+            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}",
                 IsReadOnly ? "ReadOnly " : "", //0
                 IsAlwaysInterleave ? "IsAlwaysInterleave " : "", //1
                 IsNewPlacement ? "NewPlacement " : "", // 2
@@ -465,8 +452,7 @@ namespace Orleans.Runtime
                 String.Format("{0}{1}{2}", SendingSilo, SendingGrain, SendingActivation), //5
                 String.Format("{0}{1}{2}{3}", TargetSilo, TargetGrain, TargetActivation, TargetObserverId), //6
                 Id, //7
-                ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "", //8
-                DebugContext); //9
+                ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : ""); //8
         }
 
         internal void SetTargetPlacement(PlacementResult value)
@@ -563,7 +549,7 @@ namespace Orleans.Runtime
                 CACHE_INVALIDATION_HEADER = 1 << 1,
                 CATEGORY = 1 << 2,
                 CORRELATION_ID = 1 << 3,
-                DEBUG_CONTEXT = 1 << 4,
+                DEBUG_CONTEXT = 1 << 4, // No longer used
                 DIRECTION = 1 << 5,
                 TIME_TO_LIVE = 1 << 6,
                 FORWARD_COUNT = 1 << 7,
@@ -619,7 +605,6 @@ namespace Orleans.Runtime
             private ResponseTypes _result;
             private ITransactionInfo _transactionInfo;
             private TimeSpan? _timeToLive;
-            private string _debugContext;
             private List<ActivationAddress> _cacheInvalidationHeader;
             private string _newGrainType;
             private string _genericGrainType;
@@ -833,16 +818,6 @@ namespace Orleans.Runtime
                 }
             }
 
-
-            public string DebugContext
-            {
-                get { return _debugContext; }
-                set
-                {
-                    _debugContext = value;
-                }
-            }
-
             public List<ActivationAddress> CacheInvalidationHeader
             {
                 get { return _cacheInvalidationHeader; }
@@ -944,7 +919,6 @@ namespace Orleans.Runtime
                 headers = _isUsingIfaceVersion == default(bool) ? headers & ~Headers.IS_USING_INTERFACE_VERSION : headers | Headers.IS_USING_INTERFACE_VERSION;
                 headers = _result == default(ResponseTypes)? headers & ~Headers.RESULT : headers | Headers.RESULT;
                 headers = _timeToLive == null ? headers & ~Headers.TIME_TO_LIVE : headers | Headers.TIME_TO_LIVE;
-                headers = string.IsNullOrEmpty(_debugContext) ? headers & ~Headers.DEBUG_CONTEXT : headers | Headers.DEBUG_CONTEXT;
                 headers = _cacheInvalidationHeader == null || _cacheInvalidationHeader.Count == 0 ? headers & ~Headers.CACHE_INVALIDATION_HEADER : headers | Headers.CACHE_INVALIDATION_HEADER;
                 headers = string.IsNullOrEmpty(_newGrainType) ? headers & ~Headers.NEW_GRAIN_TYPE : headers | Headers.NEW_GRAIN_TYPE;
                 headers = string.IsNullOrEmpty(GenericGrainType) ? headers & ~Headers.GENERIC_GRAIN_TYPE : headers | Headers.GENERIC_GRAIN_TYPE;
@@ -986,9 +960,6 @@ namespace Orleans.Runtime
                 {
                     writer.Write((byte)input.Category);
                 }
-
-                if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
-                    writer.Write(input.DebugContext);
 
                 if ((headers & Headers.DIRECTION) != Headers.NONE)
                     writer.Write((byte)input.Direction.Value);
@@ -1122,7 +1093,7 @@ namespace Orleans.Runtime
                     result.Category = (Categories)reader.ReadByte();
 
                 if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
-                    result.DebugContext = reader.ReadString();
+                    _ = reader.ReadString();
 
                 if ((headers & Headers.DIRECTION) != Headers.NONE)
                     result.Direction = (Message.Directions)reader.ReadByte();

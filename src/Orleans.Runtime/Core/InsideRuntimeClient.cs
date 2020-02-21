@@ -134,9 +134,8 @@ namespace Orleans.Runtime
             GrainReference target,
             InvokeMethodRequest request,
             TaskCompletionSource<object> context,
-            string debugContext,
             InvokeMethodOptions options,
-            string genericArguments = null)
+            string genericArguments)
         {
             var message = this.messageFactory.CreateMessage(request, options);
 
@@ -181,11 +180,6 @@ namespace Orleans.Runtime
             if (target.IsObserverReference)
             {
                 message.TargetObserverId = target.ObserverId;
-            }
-
-            if (debugContext != null)
-            {
-                message.DebugContext = debugContext;
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
@@ -297,7 +291,7 @@ namespace Orleans.Runtime
                 RequestContextExtensions.Import(message.RequestContextData);
                 if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
-                    UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
+                    UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation));
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop
                     // in RuntimeClient.CreateMessage -> RequestContextExtensions.ExportToMessage(message);
                 }
