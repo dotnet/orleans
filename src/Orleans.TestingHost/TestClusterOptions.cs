@@ -34,6 +34,7 @@ namespace Orleans.TestingHost
                 [nameof(ApplicationBaseDirectory)] = this.ApplicationBaseDirectory,
                 [nameof(ConfigureFileLogging)] = this.ConfigureFileLogging.ToString(),
                 [nameof(AssumeHomogenousSilosForTesting)] = this.AssumeHomogenousSilosForTesting.ToString(),
+                [nameof(GatewayPerSilo)] = this.GatewayPerSilo.ToString(),
             };
             
             if (this.SiloBuilderConfiguratorTypes != null)
