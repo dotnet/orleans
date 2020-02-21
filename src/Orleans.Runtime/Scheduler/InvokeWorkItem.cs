@@ -35,7 +35,7 @@ namespace Orleans.Runtime.Scheduler
 
         public override string Name
         {
-            get { return String.Format("InvokeWorkItem:Id={0} {1}", message.Id, message.DebugContext); }
+            get { return  $"InvokeWorkItem:Id={message.Id}"; }
         }
 
         public override void Execute()
