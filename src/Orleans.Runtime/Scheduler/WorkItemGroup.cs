@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -192,6 +193,12 @@ namespace Orleans.Runtime.Scheduler
 
             if (this.IsShutdown)
             {
+                if (this.cancellationToken.IsCancellationRequested)
+                {
+                    // If the system is shutdown, do not schedule the task.
+                    return;
+                }
+
                 // Log diagnostics and continue to schedule the task.
                 LogEnqueueOnStoppedScheduler(task);
             }
@@ -327,6 +334,8 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
+                RuntimeContext.SetExecutionContext(this.SchedulingContext);
+
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
                 int count = 0;
                 var stopwatch = ValueStopwatch.StartNew();
@@ -341,11 +350,12 @@ namespace Orleans.Runtime.Scheduler
                         {
                             this.log.LogWarning(
                                 (int)ErrorCode.SchedulerSkipWorkCancelled,
-                                "Thread {Thread} is exiting work loop due to cancellation token. WorkItemGroup: {WorkItemGroup}, Have {WorkItemCount} work items in the queue.",
+                                "Thread {Thread} is exiting work loop due to cancellation token. WorkItemGroup: {WorkItemGroup}, Have {WorkItemCount} work items in the queue",
                                 Thread.CurrentThread.ToString(),
                                 this.ToString(),
                                 this.WorkItemCount);
-                            break;
+
+                            return;
                         }
                     }
 
@@ -424,7 +434,7 @@ namespace Orleans.Runtime.Scheduler
                 // If our run list is empty, then we're waiting.
                 lock (lockable)
                 {
-                    if (WorkItemCount > 0)
+                    if (WorkItemCount > 0 && !this.IsShutdown)
                     {
                         state = WorkGroupStatus.Runnable;
                         masterScheduler.ScheduleExecution(this);
@@ -434,6 +444,8 @@ namespace Orleans.Runtime.Scheduler
                         state = WorkGroupStatus.Waiting;
                     }
                 }
+
+                RuntimeContext.ResetExecutionContext();
             }
         }
 

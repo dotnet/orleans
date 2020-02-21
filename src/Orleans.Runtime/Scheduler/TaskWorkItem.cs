@@ -7,7 +7,7 @@ namespace Orleans.Runtime.Scheduler
     internal class TaskWorkItem : WorkItemBase
     {
         private readonly Task task;
-        private readonly ITaskScheduler scheduler;
+        private readonly OrleansTaskScheduler scheduler;
         private readonly ILogger logger;
 
         public override string Name { get { return String.Format("TaskRunner for task {0}", task.Id); } }
@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Scheduler
         /// <param name="t">Task to be performed</param>
         /// <param name="context">Execution context</param>
         /// <param name="logger">logger to use</param>
-        internal TaskWorkItem(ITaskScheduler sched, Task t, ISchedulingContext context, ILogger logger)
+        internal TaskWorkItem(OrleansTaskScheduler sched, Task t, ISchedulingContext context, ILogger logger)
         {
             scheduler = sched;
             task = t;
@@ -41,8 +41,15 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Executing TaskWorkItem for Task Id={0},Name={1},Status={2} on Scheduler={3}", task.Id, Name, task.Status, this.scheduler);
 #endif
-
-            scheduler.RunTask(task);
+            try
+            {
+                RuntimeContext.SetExecutionContext(this.SchedulingContext);
+                scheduler.RunTask(task);
+            }
+            finally
+            {
+                RuntimeContext.ResetExecutionContext();
+            }
 
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Completed Task Id={0},Name={1} with Status={2} {3}",
