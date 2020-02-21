@@ -1,5 +1,5 @@
 using System;
-using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime
 {
@@ -9,38 +9,18 @@ namespace Orleans.Runtime
 
         [ThreadStatic]
         private static RuntimeContext context;
-        public static RuntimeContext Current 
-        { 
-            get { return context; } 
-        }
 
-        internal static ISchedulingContext CurrentActivationContext
-        {
-            get { return RuntimeContext.Current != null ? RuntimeContext.Current.ActivationContext : null; }
-        }
+        public static RuntimeContext Current { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => context ??= new RuntimeContext(); }
 
-        internal static void InitializeThread()
-        {
-            // There seems to be an implicit coupling of threads and contexts here that may be fragile. 
-            // E.g. if InitializeThread() is mistakenly called on a wrong thread, would that thread be considered a worker pool thread from that point on? 
-            // Is there a better/safer way to identify worker threads? 
-            if (context != null)
-            {
-                // Currently only orleans own threads are being initialized,
-                // but in perspective - this method will be called on external ones,
-                // so that mechanism of thread de-initialization will be needed.
-                return; 
-            }
+        internal static ISchedulingContext CurrentActivationContext { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => Current?.ActivationContext; }
 
-            context = new RuntimeContext();
-        }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void SetExecutionContext(ISchedulingContext shedContext)
         {
-            if (context == null) throw new InvalidOperationException("SetExecutionContext called on unexpected non-WorkerPool thread");
-            context.ActivationContext = shedContext;
+            Current.ActivationContext = shedContext;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void ResetExecutionContext()
         {
             context.ActivationContext = null;
