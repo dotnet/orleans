@@ -31,7 +31,7 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(UniqueKey.NewKey(Guid.NewGuid(), UniqueKey.Category.Grain));
         }
 
-        public static GrainId NewClientId(string clusterId = null)
+        public static GrainId NewClientId()
         {
             return NewClientId(Guid.NewGuid());
         }
