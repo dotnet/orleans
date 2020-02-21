@@ -87,7 +87,7 @@ Event order also depends on a particular stream provider. In SMS streams, the pr
 
 ## Streams Implementation
 
-The [Orleans Streams Implementation](../implementation/streams_implementation.md) provides a high level overview of the internal implementation.
+The [Orleans Streams Implementation](../implementation/streams_implementation/index.md) provides a high level overview of the internal implementation.
 
 ## Code Samples
 

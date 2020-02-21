@@ -23,7 +23,7 @@ Orleans Scheduler is a component within the Orleans runtime responsible for exec
 Orleans provides cluster management via a built-in membership protocol, which we sometimes refer to as Silo Membership.
 The goal of this protocol is for all silos (Orleans servers) to agree on the set of currently alive silos, detect failed silos, and allow new silos to join the cluster.
 
-## [Streams Implementation](streams_implementation.md)
+## [Streams Implementation](streams_implementation/index.md)
 
 This section provides a high level overview of Orleans Stream implementation.
 It describes concepts and details that are not visible on the application level.
