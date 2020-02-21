@@ -88,7 +88,6 @@ namespace Orleans.Runtime
             ActivationCount = activationCount;
             RecentlyUsedActivationCount = recentlyUsedActivationCount;
             SendQueueLength = messageCenter.SendQueueLength;
-            ReceiveQueueLength = messageCenter.ReceiveQueueLength;
             CpuUsage = hostEnvironmentStatistics.CpuUsage;
             AvailableMemory = hostEnvironmentStatistics.AvailableMemory;
             MemoryUsage = appEnvironmentStatistics.MemoryUsage;
@@ -107,7 +106,6 @@ namespace Orleans.Runtime
                 + $"ActivationCount={ActivationCount} " 
                 + $"RecentlyUsedActivationCount={RecentlyUsedActivationCount} "
                 + $"SendQueueLength={SendQueueLength} "
-                + $"ReceiveQueueLength={ReceiveQueueLength} "
                 + $"CpuUsage={CpuUsage} "
                 + $"AvailableMemory={AvailableMemory} "
                 + $"MemoryUsage={MemoryUsage} "

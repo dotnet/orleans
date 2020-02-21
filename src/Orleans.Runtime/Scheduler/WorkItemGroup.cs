@@ -236,6 +236,17 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
+        /// <summary>
+        /// For debugger purposes only.
+        /// </summary>
+        internal IEnumerable<Task> GetScheduledTasks()
+        {
+            foreach (var task in this.workItems)
+            {
+                yield return task;
+            }
+        }
+
         [MethodImpl(MethodImplOptions.NoInlining)]
         private void LogEnqueueOnStoppedScheduler(Task task)
         {

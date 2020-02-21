@@ -94,7 +94,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<SerializationStatisticsGroup>();
             services.TryAddSingleton<OverloadDetector>();
 
-            services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related
             services.TryAddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
 
@@ -133,7 +132,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
-            services.TryAddFromExisting<ISiloMessageCenter, MessageCenter>();
             services.TryAddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);
             services.TryAddSingleton<Dispatcher>(sp => sp.GetRequiredService<Catalog>().Dispatcher);
             services.TryAddSingleton<InsideRuntimeClient>();

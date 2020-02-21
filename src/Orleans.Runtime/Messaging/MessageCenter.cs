@@ -4,10 +4,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using System.Threading.Channels;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class MessageCenter : ISiloMessageCenter, IDisposable
+    internal class MessageCenter : IMessageCenter, IDisposable
     {
         public Gateway Gateway { get; set; }
         private readonly ILogger log;
@@ -17,13 +18,13 @@ namespace Orleans.Runtime.Messaging
         private Action<Message> sniffIncomingMessageHandler;
 
         internal OutboundMessageQueue OutboundQueue { get; set; }
-        private InboundMessageQueue inboundQueue;
         private readonly MessageFactory messageFactory;
         private readonly ILoggerFactory loggerFactory;
         private readonly ConnectionManager senderManager;
         private readonly MessagingTrace messagingTrace;
-        private readonly Action<Message>[] messageHandlers;
         private SiloMessagingOptions messagingOptions;
+        private IncomingMessageHandler messageHandler;
+
         internal bool IsBlockingApplicationMessages { get; private set; }
 
         public void SetHostedClient(IHostedClient client) => this.hostedClient = client;
@@ -61,7 +62,6 @@ namespace Orleans.Runtime.Messaging
 
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
 
-            inboundQueue = new InboundMessageQueue(this.loggerFactory.CreateLogger<InboundMessageQueue>(), statisticsOptions, this.messagingTrace);
             OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager, siloStatusOracle, this.messagingTrace);
 
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Completed initialization.");
@@ -70,8 +70,6 @@ namespace Orleans.Runtime.Messaging
             {
                 Gateway = gatewayFactory(this);
             }
-
-            messageHandlers = new Action<Message>[Enum.GetValues(typeof(Message.Categories)).Length];
         }
 
         public void Start()
@@ -141,15 +139,17 @@ namespace Orleans.Runtime.Messaging
 
         public void OnReceivedMessage(Message message)
         {
-            var handler = this.messageHandlers[(int)message.Category];
-            if (handler != null)
+            var handler = this.messageHandler;
+            if (handler is null)
             {
-                handler(message);
+                ThrowNullMessageHandler();
             }
             else
             {
-                this.inboundQueue.PostMessage(message);
+                handler.ReceiveMessage(message);
             }
+
+            static void ThrowNullMessageHandler() => throw new InvalidOperationException("MessageCenter does not have a message handler set");
         }
 
         public void RerouteMessage(Message message)
@@ -212,24 +212,19 @@ namespace Orleans.Runtime.Messaging
             this.OnReceivedMessage(error);
         }
 
-        public ChannelReader<Message> GetReader(Message.Categories type) => inboundQueue.GetReader(type);
-
-        public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)
+        public void RegisterLocalMessageHandler(IncomingMessageHandler handler)
         {
-            messageHandlers[(int) category] = handler;
+            this.messageHandler = handler;
         }
 
         public void Dispose()
         {
-            inboundQueue?.Dispose();
             OutboundQueue?.Dispose();
 
             GC.SuppressFinalize(this);
         }
 
         public int SendQueueLength { get { return OutboundQueue.GetCount(); } }
-
-        public int ReceiveQueueLength { get { return inboundQueue.Count; } }
 
         /// <summary>
         /// Indicates that application messages should be blocked from being sent or received.
