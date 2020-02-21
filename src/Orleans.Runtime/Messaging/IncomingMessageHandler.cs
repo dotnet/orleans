@@ -1,76 +1,37 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class IncomingMessageAgent : TaskSchedulerAgent
+    internal sealed class IncomingMessageHandler
     {
-        private readonly IMessageCenter messageCenter;
+        private readonly MessageCenter messageCenter;
         private readonly ActivationDirectory directory;
         private readonly OrleansTaskScheduler scheduler;
         private readonly Dispatcher dispatcher;
         private readonly MessageFactory messageFactory;
+        private readonly ILogger<IncomingMessageHandler> log;
         private readonly MessagingTrace messagingTrace;
-        private readonly Message.Categories category;
 
-        internal IncomingMessageAgent(
-            Message.Categories cat, 
-            IMessageCenter mc,
+        internal IncomingMessageHandler(
+            MessageCenter mc,
             ActivationDirectory ad, 
             OrleansTaskScheduler sched, 
             Dispatcher dispatcher, 
             MessageFactory messageFactory,
-            ILoggerFactory loggerFactory,
-            MessagingTrace messagingTrace) :
-            base(cat.ToString(), loggerFactory)
+            ILogger<IncomingMessageHandler> log,
+            MessagingTrace messagingTrace)
         {
-            category = cat;
-            messageCenter = mc;
-            directory = ad;
-            scheduler = sched;
+            this.messageCenter = mc;
+            this.directory = ad;
+            this.scheduler = sched;
             this.dispatcher = dispatcher;
             this.messageFactory = messageFactory;
+            this.log = log;
             this.messagingTrace = messagingTrace;
-            OnFault = FaultBehavior.RestartOnFault;
-            messageCenter.RegisterLocalMessageHandler(cat, ReceiveMessage);
         }
 
-        public override void Start()
-        {
-            base.Start();
-            if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Started incoming message agent for silo at {0} for {1} messages", messageCenter.MyAddress, category);
-        }
-
-        protected override async Task Run()
-        {
-            var reader = messageCenter.GetReader(category);
-            while (true)
-            {
-                var moreTask = reader.WaitToReadAsync();
-                var more = moreTask.IsCompletedSuccessfully ? moreTask.GetAwaiter().GetResult() : await moreTask;
-                if (!more) return;
-
-                // Get an application message
-                while (reader.TryRead(out var msg))
-                {
-                    this.messagingTrace.OnDequeueInboundMessage(msg);
-                    if (msg == null)
-                    {
-                        if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Dequeued a null message, exiting");
-                        // Null return means cancelled
-                        continue;
-                    }
-                    else
-                    {
-                        ReceiveMessage(msg);
-                    }
-                }
-            }
-        }
-
-        private void ReceiveMessage(Message msg)
+        public void ReceiveMessage(Message msg)
         {
             this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
 
@@ -78,14 +39,14 @@ namespace Orleans.Runtime.Messaging
             // Find the activation it targets; first check for a system activation, then an app activation
             if (msg.TargetGrain.IsSystemTarget)
             {
-                SystemTarget target = directory.FindSystemTarget(msg.TargetActivation);
+                SystemTarget target = this.directory.FindSystemTarget(msg.TargetActivation);
                 if (target == null)
                 {
                     MessagingStatisticsGroup.OnRejectedMessage(msg);
                     Message response = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
-                        String.Format("SystemTarget {0} not active on this silo. Msg={1}", msg.TargetGrain, msg));
-                    messageCenter.SendMessage(response);
-                    Log.Warn(ErrorCode.MessagingMessageFromUnknownActivation, "Received a message {0} for an unknown SystemTarget: {1}", msg, msg.TargetAddress);
+                        string.Format("SystemTarget {0} not active on this silo. Msg={1}", msg.TargetGrain, msg));
+                    this.messageCenter.SendMessage(response);
+                    this.log.Warn(ErrorCode.MessagingMessageFromUnknownActivation, "Received a message {0} for an unknown SystemTarget: {1}", msg, msg.TargetAddress);
                     return;
                 }
                 context = target.SchedulingContext;
@@ -93,23 +54,23 @@ namespace Orleans.Runtime.Messaging
                 {
                     case Message.Directions.Request:
                         this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
-                        scheduler.QueueWorkItem(new RequestWorkItem(target, msg), context);
+                        this.scheduler.QueueWorkItem(new RequestWorkItem(target, msg), context);
                         break;
 
                     case Message.Directions.Response:
                         this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
-                        scheduler.QueueWorkItem(new ResponseWorkItem(target, msg), context);
+                        this.scheduler.QueueWorkItem(new ResponseWorkItem(target, msg), context);
                         break;
 
                     default:
-                        Log.Error(ErrorCode.Runtime_Error_100097, "Invalid message: " + msg);
+                        this.log.Error(ErrorCode.Runtime_Error_100097, "Invalid message: " + msg);
                         break;
                 }
             }
             else
             {
                 // Run this code on the target activation's context, if it already exists
-                ActivationData targetActivation = directory.FindTarget(msg.TargetActivation);
+                ActivationData targetActivation = this.directory.FindTarget(msg.TargetActivation);
                 if (targetActivation != null)
                 {
                     lock (targetActivation)
@@ -120,11 +81,11 @@ namespace Orleans.Runtime.Messaging
                             // Response messages are not subject to overload checks.
                             if (msg.Direction != Message.Directions.Response)
                             {
-                                var overloadException = target.CheckOverloaded(Log);
+                                var overloadException = target.CheckOverloaded(this.log);
                                 if (overloadException != null)
                                 {
                                     // Send rejection as soon as we can, to avoid creating additional work for runtime
-                                    dispatcher.RejectMessage(msg, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + target);
+                                    this.dispatcher.RejectMessage(msg, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + target);
                                     return;
                                 }
                             }
@@ -148,24 +109,24 @@ namespace Orleans.Runtime.Messaging
                     EnqueueReceiveMessage(msg, null, null);
                 }
             }
-        }
 
-        private void EnqueueReceiveMessage(Message msg, ActivationData targetActivation, ISchedulingContext context)
-        {
-            this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
-            targetActivation?.IncrementEnqueuedOnDispatcherCount();
-            scheduler.QueueWorkItem(new ClosureWorkItem(() =>
+            void EnqueueReceiveMessage(Message msg, ActivationData targetActivation, ISchedulingContext context)
             {
-                try
+                this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
+                targetActivation?.IncrementEnqueuedOnDispatcherCount();
+                scheduler.QueueWorkItem(new ClosureWorkItem(() =>
                 {
-                    dispatcher.ReceiveMessage(msg);
-                }
-                finally
-                {
-                    targetActivation?.DecrementEnqueuedOnDispatcherCount();
-                }
-            },
-            "Dispatcher.ReceiveMessage"), context);
+                    try
+                    {
+                        dispatcher.ReceiveMessage(msg);
+                    }
+                    finally
+                    {
+                        targetActivation?.DecrementEnqueuedOnDispatcherCount();
+                    }
+                },
+                "Dispatcher.ReceiveMessage"), context);
+            }
         }
     }
 }

@@ -214,9 +214,6 @@ namespace Orleans
             MessageCenter.Start();
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, clientId);
 
-            // Keeping this thread handling it very simple for now. Just queue task on thread pool.
-            Task.Run(this.RunClientMessagePump).Ignore();
-
             await ExecuteWithRetries(
                 async () => this.GrainTypeResolver = await MessageCenter.GetGrainTypeResolver(this.InternalGrainFactory),
                 retryFilter);
@@ -259,38 +256,6 @@ namespace Orleans
             catch(Exception ex)
             {
                 this.logger.Warn(ErrorCode.TypeManager_GetClusterGrainTypeResolverError, "Refresh the GrainTypeResolver failed. Will be retried after", ex);
-            }
-        }
-
-        private async Task RunClientMessagePump()
-        {
-            incomingMessagesThreadTimeTracking?.OnStartExecution();
-
-            var reader = MessageCenter.GetReader(Message.Categories.Application);
-
-            while (true)
-            {
-                try
-                {
-                    var moreTask = reader.WaitToReadAsync();
-                    var more = moreTask.IsCompletedSuccessfully ? moreTask.Result : await moreTask.ConfigureAwait(false);
-                    if (!more)
-                    {
-                        incomingMessagesThreadTimeTracking?.OnStopExecution();
-                        return;
-                    }
-
-                    // Continue reading if there're more messages
-                    while (reader.TryRead(out var message))
-                    {
-                        if (message == null) continue;
-                        this.HandleMessage(message);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    this.logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception. Continuing.", exception);
-                }
             }
         }
 

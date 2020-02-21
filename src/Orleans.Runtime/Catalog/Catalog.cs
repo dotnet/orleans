@@ -112,7 +112,7 @@ namespace Orleans.Runtime
             ActivationDirectory activationDirectory,
             ActivationCollector activationCollector,
             GrainCreator grainCreator,
-            ISiloMessageCenter messageCenter,
+            MessageCenter messageCenter,
             PlacementDirectorsManager placementDirectorsManager,
             MessageFactory messageFactory,
             SerializationManager serializationManager,

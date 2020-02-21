@@ -27,7 +27,7 @@ namespace Orleans.Runtime
         private readonly ClientObserverRegistrar clientObserverRegistrar;
         private readonly ILogger logger;
         private readonly IInternalGrainFactory grainFactory;
-        private readonly ISiloMessageCenter siloMessageCenter;
+        private readonly MessageCenter siloMessageCenter;
         private readonly MessagingTrace messagingTrace;
         private bool disposing;
         private Task messagePump;
@@ -40,7 +40,7 @@ namespace Orleans.Runtime
             IGrainReferenceRuntime grainReferenceRuntime,
             IInternalGrainFactory grainFactory,
             InvokableObjectManager invokableObjectManager,
-            ISiloMessageCenter messageCenter,
+            MessageCenter messageCenter,
             MessagingTrace messagingTrace)
         {
             this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
