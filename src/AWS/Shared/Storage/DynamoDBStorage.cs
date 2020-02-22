@@ -38,6 +38,7 @@ namespace Orleans.Transactions.DynamoDB
         public const int DefaultWriteCapacityUnits = 5;
         private int readCapacityUnits = DefaultReadCapacityUnits;
         private int writeCapacityUnits = DefaultWriteCapacityUnits;
+        private readonly bool useProvisionedThroughput;
         private AmazonDynamoDBClient ddbClient;
         private ILogger Logger;
 
@@ -50,10 +51,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="service"></param>
         /// <param name="readCapacityUnits"></param>
         /// <param name="writeCapacityUnits"></param>
+        /// <param name="useProvisionedThroughput"></param>
         public DynamoDBStorage(ILoggerFactory loggerFactory, string service,
             string accessKey = "", string secretKey = "",
             int readCapacityUnits = DefaultReadCapacityUnits,
-            int writeCapacityUnits = DefaultWriteCapacityUnits)
+            int writeCapacityUnits = DefaultWriteCapacityUnits,
+            bool useProvisionedThroughput = true)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             this.accessKey = accessKey;
@@ -61,6 +64,7 @@ namespace Orleans.Transactions.DynamoDB
             this.service = service;
             this.readCapacityUnits = readCapacityUnits;
             this.writeCapacityUnits = writeCapacityUnits;
+            this.useProvisionedThroughput = useProvisionedThroughput;
             Logger = loggerFactory.CreateLogger<DynamoDBStorage>();
             CreateClient();
         }
@@ -127,14 +131,13 @@ namespace Orleans.Transactions.DynamoDB
 
         private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
-            var useProvisionedThroughput = readCapacityUnits > 0 && writeCapacityUnits > 0;
             var request = new CreateTableRequest
             {
                 TableName = tableName,
                 AttributeDefinitions = attributes,
                 KeySchema = keys,
-                BillingMode = useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
-                ProvisionedThroughput = useProvisionedThroughput ? new ProvisionedThroughput
+                BillingMode = this.useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
+                ProvisionedThroughput = this.useProvisionedThroughput ? new ProvisionedThroughput
                 {
                     ReadCapacityUnits = readCapacityUnits,
                     WriteCapacityUnits = writeCapacityUnits
@@ -143,7 +146,7 @@ namespace Orleans.Transactions.DynamoDB
 
             if (secondaryIndexes != null && secondaryIndexes.Count > 0)
             {
-                if (useProvisionedThroughput)
+                if (this.useProvisionedThroughput)
                 {
                     var indexThroughput = new ProvisionedThroughput {ReadCapacityUnits = readCapacityUnits, WriteCapacityUnits = writeCapacityUnits};
                     secondaryIndexes.ForEach(i =>
