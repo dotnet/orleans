@@ -18,7 +18,7 @@ namespace Orleans.Networking.Shared
 
         private static string GenerateId(long id)
         {
-#if NETSTANDARD2_1
+#if NETCOREAPP
             return string.Create(13, id, (buffer, value) =>
             {
                 char[] encode32Chars = s_encode32Chars;
