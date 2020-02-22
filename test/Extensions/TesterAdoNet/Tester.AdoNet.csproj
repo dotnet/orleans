@@ -18,6 +18,7 @@
     <PackageReference Include="Npgsql" Version="$(NpgsqlVersion)" />
     <PackageReference Include="MySql.Data" Version="$(MySqlDataVersion)" />
     <PackageReference Include="System.Security.Permissions" Version="$(SystemSecurityPermissionsVersion)" />
+    <PackageReference Include="System.Security.Cryptography.Cng" Version="$(SystemSecurityCryptographyVersion)" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="$(SystemConfigurationConfigurationManagerVersion)" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>

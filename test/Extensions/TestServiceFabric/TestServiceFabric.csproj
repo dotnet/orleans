@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>TestServiceFabric</RootNamespace>
     <AssemblyName>TestServiceFabric</AssemblyName>
@@ -17,6 +17,7 @@
     <PackageReference Include="NSubstitute" Version="$(NSubstituteVersion)" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsOptionsVersion)" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="$(SystemDiagnosticsEventLogVersion)" />
   </ItemGroup>
 
   <ItemGroup>

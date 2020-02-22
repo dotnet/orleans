@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>TestVersionGrains</RootNamespace>
     <AssemblyName>TestVersionGrains</AssemblyName>
@@ -6,6 +6,10 @@
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="System.Diagnostics.EventLog" Version="$(SystemDiagnosticsEventLogVersion)" />
+  </ItemGroup>
+  
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />

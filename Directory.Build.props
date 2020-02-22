@@ -64,6 +64,7 @@
     <SystemCodeDomVersion>4.7.0</SystemCodeDomVersion>
     <SystemSecurityPermissionsVersion>4.7.0</SystemSecurityPermissionsVersion>
     <SystemDiagnosticsDiagnosticsSourceVersion>4.7.0</SystemDiagnosticsDiagnosticsSourceVersion>
+    <SystemSecurityCryptographyVersion>4.7.0</SystemSecurityCryptographyVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>16.4.0</MicrosoftBuildVersion>
