@@ -568,8 +568,7 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.MembershipBase, string.Format("Unable to clean up defunct membership records on table {0} for clusterId {1}: Exception={2}",
-                    this.options.TableName, this.clusterId, exc));
+                this.logger.Error(ErrorCode.MembershipBase, $"Unable to clean up defunct membership records on table {this.options.TableName} for clusterId {this.clusterId}", exc);
                 throw;
             }
         }
