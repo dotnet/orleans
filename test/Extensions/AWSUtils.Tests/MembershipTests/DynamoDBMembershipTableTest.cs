@@ -89,6 +89,12 @@ namespace AWSUtils.Tests.MembershipTests
             await MembershipTable_UpdateRow();
         }
 
+        [SkippableFact, TestCategory("Functional")]
+        public async Task MembershipTable_DynamoDB_CleanupDefunctSiloEntries()
+        {
+            await MembershipTable_CleanupDefunctSiloEntries();
+        }
+
         [SkippableFact]
         public async Task MembershipTable_DynamoDB_UpdateRowInParallel()
         {
