@@ -8,7 +8,7 @@ namespace Orleans.Networking.Shared
     {
         private readonly object _workSync = new object();
         private readonly ConcurrentQueue<Work> _workItems = new ConcurrentQueue<Work>();
-#if NETSTANDARD2_1
+#if NETCOREAPP
         private static readonly Action<IOQueue> Callback = ctx => ctx.Execute();
 #else
         private static readonly System.Threading.WaitCallback WaitCallback = ctx => ((IOQueue)ctx).Execute();
@@ -26,7 +26,7 @@ namespace Orleans.Networking.Shared
             {
                 if (!_doingWork)
                 {
-#if NETSTANDARD2_1
+#if NETCOREAPP
                     System.Threading.ThreadPool.QueueUserWorkItem(Callback, this, preferLocal: false);
 #else
                     System.Threading.ThreadPool.UnsafeQueueUserWorkItem(WaitCallback, this);

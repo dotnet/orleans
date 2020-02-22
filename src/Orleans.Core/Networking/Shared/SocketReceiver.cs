@@ -12,7 +12,7 @@ namespace Orleans.Networking.Shared
 
         public SocketAwaitableEventArgs WaitForDataAsync()
         {
-#if NETSTANDARD2_1
+#if NETCOREAPP
             _awaitableEventArgs.SetBuffer(Memory<byte>.Empty);
 #else
             _awaitableEventArgs.SetBuffer(Array.Empty<byte>(), 0, 0);
@@ -28,7 +28,7 @@ namespace Orleans.Networking.Shared
 
         public SocketAwaitableEventArgs ReceiveAsync(Memory<byte> buffer)
         {
-#if NETSTANDARD2_1
+#if NETCOREAPP
             _awaitableEventArgs.SetBuffer(buffer);
 #else
             var array = buffer.GetArray();
