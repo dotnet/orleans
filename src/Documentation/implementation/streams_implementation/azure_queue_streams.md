@@ -17,9 +17,17 @@ The minimal configuration requires at least to specify the connection string, as
 
 ``` csharp
 hostBuilder
-  .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider", optionsBuilder => optionsBuilder.Configure(options => {
-    options.ConnectionString = "xxx";
-  }))
+  .AddAzureQueueStreams("AzureQueueProvider", configurator => {
+    configurator.ConfigureAzureQueue(
+      ob => ob.Configure(options => {
+        options.ConnectionString = "xxx";
+        options.QueueNames = new List<string> { "yourprefix-azurequeueprovider-0" };
+      }));
+    configurator.ConfigureCacheSize(1024);
+    configurator.ConfigurePullingAgent(ob => ob.Configure(options => {
+      options.GetQueueMsgsTimerPeriod = TimeSpan.FromMilliseconds(200);
+    }));
+  })
   // a PubSubStore could be needed, as example Azure Table Storage
   .AddAzureTableGrainStorage("PubSubStore", options => {
     options.ConnectionString = "xxx";
