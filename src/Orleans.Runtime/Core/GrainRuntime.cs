@@ -103,17 +103,16 @@ namespace Orleans.Runtime
 
         public static void CheckRuntimeContext()
         {
-            var context = RuntimeContext.Current;
+            var context = RuntimeContext.CurrentGrainContext;
 
-            if (context == null)
+            if (context is null)
             {
                 // Move exceptions into local functions to help inlining this method.
                 ThrowMissingContext();
                 void ThrowMissingContext() => throw new InvalidOperationException("Activation access violation. A non-activation thread attempted to access activation services.");
             }
 
-            if (context.ActivationContext is SchedulingContext schedulingContext
-                && schedulingContext.Activation is ActivationData activation
+            if (context is ActivationData activation
                 && (activation.State == ActivationState.Invalid || activation.State == ActivationState.FailedToActivate))
             {
                 // Move exceptions into local functions to help inlining this method.

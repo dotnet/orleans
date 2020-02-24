@@ -24,7 +24,6 @@ namespace Orleans.Runtime.Scheduler
             this.activation = activation;
             this.message = message;
             this.dispatcher = dispatcher;
-            this.SchedulingContext = activation.SchedulingContext;
             activation.IncrementInFlightCount();
         }
 
@@ -38,11 +37,13 @@ namespace Orleans.Runtime.Scheduler
             get { return  $"InvokeWorkItem:Id={message.Id}"; }
         }
 
+        public override IGrainContext GrainContext => this.activation;
+
         public override void Execute()
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.SchedulingContext);
+                RuntimeContext.SetExecutionContext(this.activation);
                 var grain = activation.GrainInstance;
                 var runtimeClient = this.dispatcher.RuntimeClient;
                 Task task = runtimeClient.Invoke(grain, this.activation, this.message);

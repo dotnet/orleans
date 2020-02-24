@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.ConsistentRing;
@@ -53,7 +53,7 @@ namespace Orleans.Runtime.Services
         /// <summary>
         /// Resolves the Grain Reference invoking this request.
         /// </summary>
-        protected GrainReference CallingGrainReference => (RuntimeContext.Current?.ActivationContext as SchedulingContext)?.Activation?.GrainReference;
+        protected GrainReference CallingGrainReference => RuntimeContext.CurrentGrainContext?.GrainReference;
 
         /// <summary>
         /// Moved from InsideRuntimeClient.cs

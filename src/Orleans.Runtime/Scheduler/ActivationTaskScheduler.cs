@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Scheduler
 #if EXTRA_STATS
             turnsExecutedStatistic = CounterStatistic.FindOrCreate(name + ".TasksExecuted");
 #endif
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Created {0} with SchedulingContext={1}", this, workerGroup.SchedulingContext);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Created {0} with GrainContext={1}", this, workerGroup.GrainContext);
         }
 
         /// <summary>Gets an enumerable of the tasks currently scheduled on this scheduler.</summary>
@@ -38,7 +38,7 @@ namespace Orleans.Runtime.Scheduler
 
         public void RunTask(Task task)
         {
-            RuntimeContext.SetExecutionContext(workerGroup.SchedulingContext);
+            RuntimeContext.SetExecutionContext(workerGroup.GrainContext);
             bool done = TryExecuteTask(task);
             if (!done)
                 logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete4, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
@@ -77,7 +77,7 @@ namespace Orleans.Runtime.Scheduler
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
         {
             RuntimeContext ctx = RuntimeContext.Current;
-            bool canExecuteInline = ctx != null && object.Equals(ctx.ActivationContext, workerGroup.SchedulingContext);
+            bool canExecuteInline = ctx != null && object.Equals(ctx.GrainContext, workerGroup.GrainContext);
 
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace))

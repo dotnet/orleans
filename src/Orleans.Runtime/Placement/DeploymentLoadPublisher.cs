@@ -143,7 +143,7 @@ namespace Orleans.Runtime
         internal async Task<ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>> RefreshStatistics()
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("RefreshStatistics.");
-            await this.scheduler.RunOrQueueTask( () =>
+            await this.scheduler.RunOrQueueTask(() =>
                 {
                     var tasks = new List<Task>();
                     List<SiloAddress> members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToList();
@@ -169,7 +169,7 @@ namespace Orleans.Runtime
                         task.Ignore();
                     }
                     return Task.WhenAll(tasks);
-                }, SchedulingContext);
+                }, this);
             return periodicStats;
         }
 
