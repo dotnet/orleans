@@ -119,7 +119,7 @@ namespace Orleans.Runtime
             this.RuntimeClient.Scheduler.CheckSchedulingContextValidity(ctxt);
             name = name ?? ctxt.Name + "Timer";
 
-            var timer = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler,this.timerLogger, asyncCallback, state, dueTime, period, name);
+            var timer = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler, this.timerLogger, asyncCallback, state, dueTime, period, name);
             timer.Start();
             return timer;
         }

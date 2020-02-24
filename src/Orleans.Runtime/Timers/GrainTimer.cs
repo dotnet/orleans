@@ -139,11 +139,6 @@ namespace Orleans.Runtime
             return $"GrainTimer.{this.Name ?? string.Empty} TimerCallbackHandler:{callbackTarget ?? string.Empty}->{callbackMethodInfo ?? string.Empty}";
         }
 
-        public int GetNumTicks()
-        {
-            return totalNumTicks;
-        }
-
         // The reason we need to check CheckTimerFreeze on both the SafeTimer and this GrainTimer
         // is that SafeTimer may tick OK (no starvation by .NET thread pool), but then scheduler.QueueWorkItem
         // may not execute and starve this GrainTimer callback.
