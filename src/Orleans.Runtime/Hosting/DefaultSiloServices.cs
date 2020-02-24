@@ -221,6 +221,7 @@ namespace Orleans.Hosting
 
             // Grain activation
             services.TryAddSingleton<Catalog>();
+            services.AddFromExisting<IHealthCheckParticipant, Catalog>();
             services.TryAddSingleton<GrainCreator>();
             services.TryAddSingleton<IGrainActivator, DefaultGrainActivator>();
             services.TryAddScoped<ActivationData.GrainActivationContextFactory>();

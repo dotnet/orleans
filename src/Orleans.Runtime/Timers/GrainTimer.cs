@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
-
 namespace Orleans.Runtime
 {
     internal class GrainTimer : IGrainTimer
@@ -41,31 +40,6 @@ namespace Orleans.Runtime
             timerFrequency = period;
             previousTickTime = DateTime.UtcNow;
             totalNumTicks = 0;
-        }
-
-        internal static GrainTimer FromTimerCallback(
-            OrleansTaskScheduler scheduler,
-            ILogger logger,
-            TimerCallback callback,
-            object state,
-            TimeSpan dueTime,
-            TimeSpan period,
-            string name = null)
-        {
-            return new GrainTimer(
-                scheduler,
-                null,
-                logger, 
-                ob =>
-                {
-                    if (callback != null)
-                        callback(ob);
-                    return Task.CompletedTask;
-                },
-                state,
-                dueTime,
-                period,
-                name);
         }
 
         internal static IGrainTimer FromTaskCallback(
