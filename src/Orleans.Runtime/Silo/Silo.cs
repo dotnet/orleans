@@ -310,8 +310,6 @@ namespace Orleans.Runtime
 
             this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
 
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<ClientObserverRegistrar>());
-
             var reminderTable = Services.GetService<IReminderTable>();
             if (reminderTable != null)
             {

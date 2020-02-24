@@ -220,12 +220,11 @@ namespace Orleans.Runtime.ReminderService
             {
                 try
                 {
+                    overrideDelay = null;
                     switch (Status)
                     {
                         case GrainServiceStatus.Booting:
-                            overrideDelay = InitialReadRetryPeriod;
                             await DoInitialReadAndUpdateReminders();
-                            overrideDelay = null;
                             break;
                         case GrainServiceStatus.Started:
                             await ReadAndUpdateReminders();
@@ -237,6 +236,7 @@ namespace Orleans.Runtime.ReminderService
                 catch (Exception exception)
                 {
                     this.logger.LogWarning(exception, "Exception while reading reminders: {Exception}", exception);
+                    overrideDelay = random.NextTimeSpan(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20));
                 }
             }
         }
