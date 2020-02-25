@@ -43,7 +43,7 @@
 --
 -- 7. In the storage operations queries the columns need to be in the exact same order
 -- since the storage table operations support optionally streaming.
-CREATE TABLE "STORAGE"
+CREATE TABLE "ORLEANSSTORAGE"
 (
 
     -- These are for the book keeping. Orleans calculates
@@ -84,7 +84,7 @@ CREATE TABLE "STORAGE"
     -- by using the fields. That is, after the indexed queries have pinpointed the right
     -- rows down to [0, n] relevant ones, n being the number of collided value pairs.
 );
-CREATE INDEX "IX_STORAGE" ON "STORAGE" ("GRAINIDHASH", "GRAINTYPEHASH") PARALLEL
+CREATE INDEX "IX_ORLEANSSTORAGE" ON "ORLEANSSTORAGE" ("GRAINIDHASH", "GRAINTYPEHASH") PARALLEL
 COMPRESS;
 /
 
@@ -116,7 +116,7 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
     -- If the @GrainStateVersion is not zero, this branch assumes it exists in this database.
     -- The NULL value is supplied by Orleans when the state is new.
     IF newGrainStateVersion IS NOT NULL THEN
-        UPDATE Storage
+        UPDATE OrleansStorage
         SET
             PayloadBinary = PARAM_PAYLOADBINARY,
             PayloadJson = PARAM_PAYLOADJSON,
@@ -145,7 +145,7 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
     -- The grain state has not been read. The following locks rather pessimistically
     -- to ensure only one INSERT succeeds.
     IF PARAM_GRAINSTATEVERSION IS NULL THEN
-        INSERT INTO Storage
+        INSERT INTO OrleansStorage
         (
             GrainIdHash,
             GrainIdN0,
@@ -177,7 +177,7 @@ CREATE OR REPLACE FUNCTION WriteToStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRA
          (
             -- There should not be any version of this grain state.
             SELECT 1
-            FROM Storage
+            FROM OrleansStorage
             WHERE
                 GrainIdHash = PARAM_GRAINIDHASH AND PARAM_GRAINIDHASH IS NOT NULL
                 AND GrainTypeHash = PARAM_GRAINTYPEHASH AND PARAM_GRAINTYPEHASH IS NOT NULL
@@ -206,7 +206,7 @@ CREATE OR REPLACE FUNCTION ClearStorage(PARAM_GRAINIDHASH IN NUMBER, PARAM_GRAIN
   newGrainStateVersion NUMBER := PARAM_GRAINSTATEVERSION;
   PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
-    UPDATE Storage
+    UPDATE OrleansStorage
     SET
         PayloadBinary = NULL,
         PayloadJson = NULL,
@@ -253,7 +253,7 @@ VALUES
     'ReadFromStorageKey',
     '
      SELECT PayloadBinary, PayloadXml, PayloadJson, Version
-     FROM Storage
+     FROM OrleansStorage
      WHERE GrainIdHash = :GrainIdHash AND :GrainIdHash IS NOT NULL
        AND (GrainIdN0 = :GrainIdN0 OR :GrainIdN0 IS NULL)
        AND (GrainIdN1 = :GrainIdN1 OR :GrainIdN1 IS NULL)
