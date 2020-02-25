@@ -1,4 +1,4 @@
-CREATE TABLE Storage
+CREATE TABLE OrleansStorage
 (
     grainidhash integer NOT NULL,
     grainidn0 bigint NOT NULL,
@@ -14,8 +14,8 @@ CREATE TABLE Storage
     version integer
 );
 
-CREATE INDEX ix_storage
-    ON storage USING btree
+CREATE INDEX ix_orleansstorage
+    ON orleansstorage USING btree
     (grainidhash, graintypehash);
 
 CREATE OR REPLACE FUNCTION writetostorage(
@@ -59,7 +59,7 @@ AS $function$
     -- See further information at https://dotnet.github.io/orleans/Documentation/Core-Features/Grain-Persistence.html. 
     IF _GrainStateVersion IS NOT NULL
     THEN
-        UPDATE Storage
+        UPDATE OrleansStorage
         SET
             PayloadBinary = _PayloadBinary,
             PayloadJson = _PayloadJson,
@@ -88,7 +88,7 @@ AS $function$
     -- to ensure only on INSERT succeeds.
     IF _GrainStateVersion IS NULL
     THEN
-        INSERT INTO Storage
+        INSERT INTO OrleansStorage
         (
             GrainIdHash,
             GrainIdN0,
@@ -120,7 +120,7 @@ AS $function$
          (
             -- There should not be any version of this grain state.
             SELECT 1
-            FROM Storage
+            FROM OrleansStorage
             WHERE
                 GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
                 AND GrainTypeHash = _GrainTypeHash AND _GrainTypeHash IS NOT NULL
@@ -162,7 +162,7 @@ VALUES
         (now() at time zone ''utc''),
         Version
     FROM
-        Storage
+        OrleansStorage
     WHERE
         GrainIdHash = @GrainIdHash
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
@@ -177,7 +177,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'ClearStorageKey','
-    UPDATE Storage
+    UPDATE OrleansStorage
     SET
         PayloadBinary = NULL,
         PayloadJson = NULL,

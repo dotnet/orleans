@@ -43,7 +43,7 @@
 --
 -- 7. In the storage operations queries the columns need to be in the exact same order
 -- since the storage table operations support optionally streaming.
-CREATE TABLE Storage
+CREATE TABLE OrleansStorage
 (
     -- These are for the book keeping. Orleans calculates
     -- these hashes (see RelationalStorageProvide implementation),
@@ -85,18 +85,18 @@ CREATE TABLE Storage
     -- rows down to [0, n] relevant ones, n being the number of collided value pairs.
 );
 
-CREATE NONCLUSTERED INDEX IX_Storage ON Storage(GrainIdHash, GrainTypeHash);
+CREATE NONCLUSTERED INDEX IX_OrleansStorage ON OrleansStorage(GrainIdHash, GrainTypeHash);
 
 -- This ensures lock escalation will not lock the whole table, which can potentially be enormous.
 -- See more information at https://www.littlekendra.com/2016/02/04/why-rowlock-hints-can-make-queries-slower-and-blocking-worse-in-sql-server/.
-ALTER TABLE Storage SET(LOCK_ESCALATION = DISABLE);
+ALTER TABLE OrleansStorage SET(LOCK_ESCALATION = DISABLE);
 
--- A feature with ID is compression. If it is supported, it is used for Storage table. This is an Enterprise feature.
+-- A feature with ID is compression. If it is supported, it is used for OrleansStorage table. This is an Enterprise feature.
 -- This consumes more processor cycles, but should save on space on GrainIdString, GrainTypeString and ServiceId, which
 -- contain mainly the same values. Also the payloads will be compressed.
 IF EXISTS (SELECT 1 FROM sys.dm_db_persisted_sku_features WHERE feature_id = 100)
 BEGIN
-    ALTER TABLE Storage REBUILD PARTITION = ALL WITH(DATA_COMPRESSION = PAGE);
+    ALTER TABLE OrleansStorage REBUILD PARTITION = ALL WITH(DATA_COMPRESSION = PAGE);
 END
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
@@ -128,7 +128,7 @@ VALUES
     -- The NULL value is supplied by Orleans when the state is new.
     IF @GrainStateVersion IS NOT NULL
     BEGIN
-        UPDATE Storage
+        UPDATE OrleansStorage
         SET
             PayloadBinary = @PayloadBinary,
             PayloadJson = @PayloadJson,
@@ -153,7 +153,7 @@ VALUES
     -- to ensure only one INSERT succeeds.
     IF @GrainStateVersion IS NULL
     BEGIN
-        INSERT INTO Storage
+        INSERT INTO OrleansStorage
         (
             GrainIdHash,
             GrainIdN0,
@@ -185,7 +185,7 @@ VALUES
          (
             -- There should not be any version of this grain state.
             SELECT 1
-            FROM Storage WITH(XLOCK, ROWLOCK, HOLDLOCK, INDEX(IX_Storage))
+            FROM OrleansStorage WITH(XLOCK, ROWLOCK, HOLDLOCK, INDEX(IX_OrleansStorage))
             WHERE
                 GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
                 AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
@@ -213,7 +213,7 @@ VALUES
     'BEGIN TRANSACTION;
     SET XACT_ABORT, NOCOUNT ON;
     DECLARE @NewGrainStateVersion AS INT = @GrainStateVersion;
-    UPDATE Storage
+    UPDATE OrleansStorage
     SET
         PayloadBinary = NULL,
         PayloadJson = NULL,
@@ -253,7 +253,7 @@ VALUES
         PayloadJson,
         Version
     FROM
-        Storage
+        OrleansStorage
     WHERE
         GrainIdHash = @GrainIdHash AND @GrainIdHash IS NOT NULL
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL
