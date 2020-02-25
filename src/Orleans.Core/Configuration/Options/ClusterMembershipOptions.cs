@@ -99,7 +99,7 @@ namespace Orleans.Configuration
         /// entries older than <see cref="DefunctSiloExpiration" /> are removed. This value is per-silo.
         /// </summary>
         public TimeSpan? DefunctSiloCleanupPeriod { get; set; } = DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD;
-        public static readonly TimeSpan? DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD = TimeSpan.FromDays(7);
+        public static readonly TimeSpan? DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD = TimeSpan.FromHours(1);
 
         /// <summary>
         /// TEST ONLY - Do not modify in production environments
