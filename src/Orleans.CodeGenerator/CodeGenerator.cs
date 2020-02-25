@@ -478,11 +478,6 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
-            if (type.HasUnsupportedMetadata)
-            {
-                return false;
-            }
-
             if (type.SpecialType != SpecialType.None)
             {
                 return false;
@@ -499,12 +494,15 @@ namespace Orleans.CodeGenerator
                 case TypeKind.Pointer:
                 case TypeKind.TypeParameter:
                 case TypeKind.Submission:
-                    {
-                        return false;
-                    }
+                    return false;
             }
 
             if (type.IsStatic)
+            {
+                return false;
+            }
+
+            if (type.HasUnsupportedMetadata)
             {
                 return false;
             }
