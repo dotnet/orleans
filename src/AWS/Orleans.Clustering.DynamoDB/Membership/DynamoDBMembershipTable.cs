@@ -1,6 +1,5 @@
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
-using Amazon.Util;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -546,21 +545,14 @@ namespace Orleans.Clustering.DynamoDB
                 var keys = new Dictionary<string, AttributeValue>
                 {
                     { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
-                    { $":{SiloInstanceRecord.STATUS_PROPERTY_NAME}", new AttributeValue(((int)SiloStatus.Dead).ToString()) },
-                    { $":{SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME}", new AttributeValue(beforeDate.ToString(AWSSDKUtils.ISO8601DateFormat)) }
                 };
-                var filters = new List<string>
-                {
-                    $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}",
-                    $"{SiloInstanceRecord.STATUS_PROPERTY_NAME} = :{SiloInstanceRecord.STATUS_PROPERTY_NAME}",
-                    $"{SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME} < :{SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME}"
-                };
-                var compoundFilter = string.Join(" and ", filters);
-
-                var defunctRecords = await this.storage.QueryAllAsync(this.options.TableName, keys, compoundFilter, item => new SiloInstanceRecord(item));
+                var filter = $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}";
+                
+                var records = await this.storage.QueryAllAsync(this.options.TableName, keys, filter, item => new SiloInstanceRecord(item));
+                var defunctRecordKeys = records.Where(r => SiloIsDefunct(r, beforeDate)).Select(r => r.GetKeys());
 
                 var tasks = new List<Task>();
-                foreach (var batch in defunctRecords.Select(r => r.GetKeys()).BatchIEnumerable(MAX_BATCH_SIZE))
+                foreach (var batch in defunctRecordKeys.BatchIEnumerable(MAX_BATCH_SIZE))
                 {
                     tasks.Add(this.storage.DeleteEntriesAsync(this.options.TableName, batch));
                 }
@@ -571,6 +563,13 @@ namespace Orleans.Clustering.DynamoDB
                 this.logger.Error(ErrorCode.MembershipBase, $"Unable to clean up defunct membership records on table {this.options.TableName} for clusterId {this.clusterId}", exc);
                 throw;
             }
+        }
+
+        private static bool SiloIsDefunct(SiloInstanceRecord silo, DateTimeOffset beforeDate)
+        {
+            return DateTimeOffset.TryParse(silo.IAmAliveTime, out var iAmAliveTime)
+                    && iAmAliveTime < beforeDate
+                    && silo.Status == (int)SiloStatus.Dead;
         }
     }
 }

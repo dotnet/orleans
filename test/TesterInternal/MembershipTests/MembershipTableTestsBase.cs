@@ -416,6 +416,7 @@ namespace UnitTests.MembershipTests
             MembershipEntry oldEntry = CreateMembershipEntryForTest();
             oldEntry.IAmAliveTime = oldEntry.IAmAliveTime.AddDays(-10);
             oldEntry.StartTime = oldEntry.StartTime.AddDays(-10);
+            oldEntry.Status = SiloStatus.Dead;
             bool ok = await membershipTable.InsertRow(oldEntry, newTableVersion);
             var table = await membershipTable.ReadAll();
 
