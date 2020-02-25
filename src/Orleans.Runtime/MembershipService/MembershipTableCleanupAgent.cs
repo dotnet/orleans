@@ -43,7 +43,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task CleanupDefunctSilos()
         {
-            if (this.clusterMembershipOptions.DefunctSiloCleanupPeriod == default)
+            if (!this.clusterMembershipOptions.DefunctSiloCleanupPeriod.HasValue)
             {
                 if (this.log.IsEnabled(LogLevel.Debug))
                 {
@@ -53,21 +53,29 @@ namespace Orleans.Runtime.MembershipService
                 return;
             }
 
-            var dateLimit = DateTime.UtcNow - this.clusterMembershipOptions.DefunctSiloExpiration;
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting membership table cleanup agent");
             try
             {
-                while (await this.cleanupDefunctSilosTimer.NextTick())
+                var random = new SafeRandom();
+                var period = this.clusterMembershipOptions.DefunctSiloCleanupPeriod.Value;
+
+                // The first cleanup should be scheduled for shortly after silo startup.
+                var delay = random.NextTimeSpan(TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(10));
+                while (await this.cleanupDefunctSilosTimer.NextTick(delay))
                 {
+                    // Select a random time within the next window.
+                    // The purpose of this is to add jitter to a process which could be affected by contention with other silos.
+                    delay = random.NextTimeSpan(period, period + TimeSpan.FromMinutes(5));
                     try
                     {
+                        var dateLimit = DateTime.UtcNow - this.clusterMembershipOptions.DefunctSiloExpiration;
                         await this.membershipTableProvider.CleanupDefunctSiloEntries(dateLimit);
                     }
                     catch (Exception exception) when (exception is NotImplementedException || exception is MissingMethodException)
                     {
-                        this.log.Error(
-                            ErrorCode.MembershipCleanDeadEntriesFailure,
-                            "DeleteDeadMembershipTableEntries operation is not supported by the current implementation of IMembershipTable. Disabling the timer now.");
+                        this.log.LogError(
+                            (int)ErrorCode.MembershipCleanDeadEntriesFailure,
+                            $"{nameof(IMembershipTable.CleanupDefunctSiloEntries)} operation is not supported by the current implementation of {nameof(IMembershipTable)}. Disabling the timer now.");
                         return;
                     }
                     catch (Exception exception)
