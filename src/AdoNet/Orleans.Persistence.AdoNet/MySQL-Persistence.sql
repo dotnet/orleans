@@ -111,6 +111,8 @@ BEGIN
 
     SET _newGrainStateVersion = _GrainStateVersion;
 
+    -- Default level is REPEATABLE READ and may cause Gap Lock issues
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
     START TRANSACTION;
     UPDATE Storage
     SET
@@ -161,6 +163,8 @@ BEGIN
 
     SET _newGrainStateVersion = _GrainStateVersion;
 
+    -- Default level is REPEATABLE READ and may cause Gap Lock issues
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
     START TRANSACTION;
 
     -- Grain state is not null, so the state must have been read from the storage before.
