@@ -168,7 +168,9 @@ namespace Orleans.Runtime
                             {
                                 try
                                 {
-                                    logger.Trace("UnregisterAfterNonexistingActivation addr={0} origin={1}", nonExistentActivation, origin);
+                                    if (this.logger.IsEnabled(LogLevel.Trace))
+                                        logger.Trace("UnregisterAfterNonexistingActivation addr={ActivationAddress} origin={SiloAddress}", nonExistentActivation, origin);
+
                                     await this.grainLocator.Unregister(nonExistentActivation, UnregistrationCause.NonexistentActivation);
                                 }
                                 catch (Exception exc)

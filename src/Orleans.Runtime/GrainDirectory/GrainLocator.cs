@@ -37,8 +37,9 @@ namespace Orleans.Runtime.GrainDirectory
             if (entry == null)
                 return results;
 
-            results.Add(ConvertToActivationAddress(entry));
-            this.cache.AddOrUpdate(grainId, results.Select(item => Tuple.Create(item.Silo, item.Activation)).ToList(), 0);
+            var activationAddress = ConvertToActivationAddress(entry);
+            results.Add(activationAddress);
+            this.cache.AddOrUpdate(grainId, new List<Tuple<SiloAddress, ActivationId>> { Tuple.Create(activationAddress.Silo, activationAddress.Activation) }, 0);
 
             return results;
         }
@@ -64,9 +65,9 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (this.cache.LookUp(grainId, out var results))
             {
-                addresses = results
-                    .Select(tuple => ActivationAddress.GetAddress(tuple.Item1, grainId, tuple.Item2))
-                    .ToList();
+                // IGrainDirectory only supports single activation
+                var result = results[0];
+                addresses = new List<ActivationAddress>() { ActivationAddress.GetAddress(result.Item1, grainId, result.Item2) };
                 return true;
             }
 
@@ -77,34 +78,28 @@ namespace Orleans.Runtime.GrainDirectory
         public async Task Unregister(ActivationAddress address, UnregistrationCause cause)
         {
             if (address.Grain.IsClient)
+            {
                 await this.inClusterGrainLocator.Unregister(address, cause);
-
-            await this.grainDirectory.Unregister(ConvertToGrainAddress(address));
-            this.cache.Remove(address.Grain);
+            }
+            else
+            {
+                await this.grainDirectory.Unregister(ConvertToGrainAddress(address));
+                this.cache.Remove(address.Grain);
+            }
         }
 
         public async Task UnregisterMany(List<ActivationAddress> addresses, UnregistrationCause cause)
         {
             var tasks = addresses.Select(addr => Unregister(addr, cause)).ToList();
             await Task.WhenAll(tasks);
-            foreach (var addr in addresses)
-                this.cache.Remove(addr.Grain);
         }
 
         private static ActivationAddress ConvertToActivationAddress(GrainAddress addr)
         {
-            try
-            {
-                return ActivationAddress.GetAddress(
-                        SiloAddress.FromParsableString(addr.SiloAddress),
-                        GrainId.FromParsableString(addr.GrainId),
-                        ActivationId.GetActivationId(UniqueKey.Parse(addr.ActivationId.AsSpan())));
-            }
-            catch (Exception)
-            {
-
-                throw;
-            }
+            return ActivationAddress.GetAddress(
+                    SiloAddress.FromParsableString(addr.SiloAddress),
+                    GrainId.FromParsableString(addr.GrainId),
+                    ActivationId.GetActivationId(UniqueKey.Parse(addr.ActivationId.AsSpan())));
         }
 
         private static GrainAddress ConvertToGrainAddress(ActivationAddress addr)
