@@ -152,7 +152,7 @@ namespace CodeGenerator.Tests
         [Fact]
         public void TypeCodesMatch()
         {
-            var wellKnownTypes = WellKnownTypes.FromCompilation(this.compilation);
+            var wellKnownTypes = new WellKnownTypes(this.compilation);
             foreach (var (type, symbol) in GetTypeSymbolPairs(nameof(Grains)))
             {
                 this.output.WriteLine($"Type: {RuntimeTypeNameFormatter.Format(type)}");
@@ -191,7 +191,7 @@ namespace CodeGenerator.Tests
         [Fact]
         public void MethodIdsMatch()
         {
-            var wellKnownTypes = WellKnownTypes.FromCompilation(this.compilation);
+            var wellKnownTypes = new WellKnownTypes(this.compilation);
             foreach (var (type, typeSymbol) in GetTypeSymbolPairs(nameof(Grains)))
             {
                 this.output.WriteLine($"Type: {RuntimeTypeNameFormatter.Format(type)}");
