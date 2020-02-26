@@ -9,7 +9,6 @@ using Orleans.Storage;
 namespace Orleans.Core
 {
     public class StateStorageBridge<TState> : IStorage<TState>
-        where TState : new()
     {
         private readonly string name;
         private readonly GrainReference grainRef;
@@ -48,7 +47,7 @@ namespace Orleans.Core
             this.name = name;
             this.grainRef = grainRef;
             this.store = store;
-            this.grainState = new GrainState<TState>(new TState());
+            this.grainState = new GrainState<TState>(Activator.CreateInstance<TState>());
         }
 
         /// <summary>
@@ -130,7 +129,7 @@ namespace Orleans.Core
                 sw.Stop();
 
                 // Reset the in-memory copy of the state
-                grainState.State = new TState();
+                grainState.State = Activator.CreateInstance<TState>();
 
                 // Update counters
                 StorageStatisticsGroup.OnStorageDelete(name, grainRef, sw.Elapsed);
