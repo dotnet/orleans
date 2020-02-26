@@ -94,7 +94,7 @@ namespace Orleans.Runtime
             grain.Data.DelayDeactivation(timeSpan);
         }
 
-        public IStorage<TGrainState> GetStorage<TGrainState>(Grain grain) where TGrainState : new()
+        public IStorage<TGrainState> GetStorage<TGrainState>(Grain grain)
         {
             IGrainStorage grainStorage = grain.GetGrainStorage(ServiceProvider);
             string grainTypeName = grain.GetType().FullName;
