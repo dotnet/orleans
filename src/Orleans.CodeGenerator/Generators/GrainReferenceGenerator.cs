@@ -231,9 +231,8 @@ namespace Orleans.CodeGenerator.Generators
 
                     var methodResult = asyncMethod ? AwaitExpression(invocation) : (ExpressionSyntax)invocation;
 
-                    var isUntypedValueTaskMethod =
-                        SymbolEqualityComparer.Default.Equals(wellKnownTypes.ValueTask, methodReturnType);
-                    if (isUntypedValueTaskMethod)
+                    if (this.wellKnownTypes.ValueTask is WellKnownTypes.Some valueTask
+                        && SymbolEqualityComparer.Default.Equals(valueTask.Value, methodReturnType))
                     {
                         body.Add(ExpressionStatement(methodResult));
                     }
@@ -312,7 +311,7 @@ namespace Orleans.CodeGenerator.Generators
                 var enumType = wellKnownTypes.TransactionOption;
                 var txRequirement = (int)attr.ConstructorArguments.First().Value;
                 var values = enumType.GetMembers().OfType<IFieldSymbol>().ToList();
-                var mapping = values.ToDictionary(m => (int) m.ConstantValue, m => m.Name);
+                var mapping = values.ToDictionary(m => (int)m.ConstantValue, m => m.Name);
                 if (!mapping.TryGetValue(txRequirement, out var value))
                 {
                     throw new NotSupportedException(
