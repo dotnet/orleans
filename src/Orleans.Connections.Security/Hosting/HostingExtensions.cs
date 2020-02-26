@@ -12,7 +12,7 @@ namespace Orleans
             this IConnectionBuilder builder,
             TlsOptions options)
         {
-            if (options == null)
+            if (options is null)
             {
                 throw new ArgumentNullException(nameof(options));
             }
@@ -29,7 +29,7 @@ namespace Orleans
             this IConnectionBuilder builder,
             TlsOptions options)
         {
-            if (options == null)
+            if (options is null)
             {
                 throw new ArgumentNullException(nameof(options));
             }

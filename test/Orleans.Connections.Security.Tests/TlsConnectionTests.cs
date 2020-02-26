@@ -102,6 +102,7 @@ namespace NetCore.Tests
 
                 var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
                     CertificateSubjectName, oids);
+                
                 var encodedCertificate = TestCertificateHelper.ConvertToBase64(certificate);
                 builder.Properties[CertificateConfigKey] = encodedCertificate;
                 builder.Properties[ClientCertificateModeKey] = certificateMode.ToString();
