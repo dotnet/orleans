@@ -5,7 +5,7 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal interface ILocalGrainDirectory : IGrainDirectory
+    internal interface ILocalGrainDirectory : IInClusterGrainDirectory
     {
         /// <summary>
         /// Starts the local portion of the directory service.
