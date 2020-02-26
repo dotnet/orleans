@@ -128,10 +128,20 @@ namespace Orleans.Runtime.Messaging
 
                     if (this.Log.IsEnabled(LogLevel.Information))
                     {
-                        this.Log.LogInformation(
-                            "Closing connection with remote endpoint {EndPoint}",
-                            this.RemoteEndPoint,
-                            Environment.StackTrace);
+                        if (exception is null)
+                        {
+                            this.Log.LogInformation(
+                                "Closing connection with remote endpoint {EndPoint}",
+                                this.RemoteEndPoint);
+                        }
+                        else
+                        {
+                            this.Log.LogInformation(
+                                exception,
+                                "Closing connection with remote endpoint {EndPoint}. Exception: {Exception}",
+                                this.RemoteEndPoint,
+                                exception);
+                        }
                     }
 
                     // Try to gracefully stop the reader/writer loops.
