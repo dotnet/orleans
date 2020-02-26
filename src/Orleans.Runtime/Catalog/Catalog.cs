@@ -764,7 +764,7 @@ namespace Orleans.Runtime
             DeactivateActivationImpl(data, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE);
         }
 
-        // To be called fro within Activation context.
+        // To be called from within Activation context.
         // To be used only if an activation is stuck for a long time, since it can lead to a duplicate activation
         internal void DeactivateStuckActivation(ActivationData activationData)
         {

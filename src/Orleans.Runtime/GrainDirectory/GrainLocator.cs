@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,7 +54,7 @@ namespace Orleans.Runtime.GrainDirectory
             var activationAddress = ConvertToActivationAddress(result);
             this.cache.AddOrUpdate(
                 activationAddress.Grain,
-                new List<Tuple<SiloAddress,ActivationId>>() { Tuple.Create(activationAddress.Silo, activationAddress.Activation) },
+                new List<Tuple<SiloAddress, ActivationId>>() { Tuple.Create(activationAddress.Silo, activationAddress.Activation) },
                 0);
             return activationAddress;
         }
@@ -75,23 +76,16 @@ namespace Orleans.Runtime.GrainDirectory
             return false;
         }
 
-        public async Task Unregister(ActivationAddress address, UnregistrationCause cause)
+        public Task UnregisterMany(List<ActivationAddress> addresses, UnregistrationCause cause)
         {
-            if (address.Grain.IsClient)
-            {
-                await this.inClusterGrainLocator.Unregister(address, cause);
-            }
-            else
-            {
-                await this.grainDirectory.Unregister(ConvertToGrainAddress(address));
-                this.cache.Remove(address.Grain);
-            }
+            var grainAddresses = addresses.Select(addr => ConvertToGrainAddress(addr)).ToList();
+            return this.grainDirectory.UnregisterMany(grainAddresses);
         }
 
-        public async Task UnregisterMany(List<ActivationAddress> addresses, UnregistrationCause cause)
+        public async Task Unregister(ActivationAddress address, UnregistrationCause cause)
         {
-            var tasks = addresses.Select(addr => Unregister(addr, cause)).ToList();
-            await Task.WhenAll(tasks);
+            await this.grainDirectory.Unregister(ConvertToGrainAddress(address));
+            this.cache.Remove(address.Grain);
         }
 
         private static ActivationAddress ConvertToActivationAddress(GrainAddress addr)
