@@ -13,7 +13,7 @@ namespace Orleans.GrainDirectory
     /// The methods here can be called remotely (where extended by IRemoteGrainDirectory) or
     /// locally (where extended by ILocalGrainDirectory)
     /// </summary>
-    interface IInClusterGrainDirectory
+    interface IDhtGrainDirectory
     {
         /// <summary>
         /// Record a new grain activation by adding it to the directory.

@@ -7,11 +7,11 @@ namespace Orleans.Runtime.GrainDirectory
     /// <summary>
     /// Implementation of <see cref="IGrainLocator"/> that uses the in memory distributed directory of Orleans
     /// </summary>
-    internal class InClusterGrainLocator : IGrainLocator
+    internal class DhtGrainLocator : IGrainLocator
     {
         private readonly ILocalGrainDirectory localGrainDirectory;
 
-        public InClusterGrainLocator(ILocalGrainDirectory localGrainDirectory)
+        public DhtGrainLocator(ILocalGrainDirectory localGrainDirectory)
         {
             this.localGrainDirectory = localGrainDirectory;
         }

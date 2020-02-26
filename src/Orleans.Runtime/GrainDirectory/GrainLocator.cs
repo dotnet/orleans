@@ -16,10 +16,10 @@ namespace Orleans.Runtime.GrainDirectory
     internal class GrainLocator : IGrainLocator
     {
         private readonly IGrainDirectory grainDirectory;
-        private readonly InClusterGrainLocator inClusterGrainLocator;
+        private readonly DhtGrainLocator inClusterGrainLocator;
         private readonly IGrainDirectoryCache cache;
 
-        public GrainLocator(IGrainDirectory grainDirectory, InClusterGrainLocator inClusterGrainLocator)
+        public GrainLocator(IGrainDirectory grainDirectory, DhtGrainLocator inClusterGrainLocator)
         {
             this.grainDirectory = grainDirectory;
             this.inClusterGrainLocator = inClusterGrainLocator;
