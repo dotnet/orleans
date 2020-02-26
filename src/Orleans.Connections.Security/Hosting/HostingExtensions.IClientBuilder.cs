@@ -60,7 +60,7 @@ namespace Orleans
 
             if (!certificate.HasPrivateKey)
             {
-                throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", nameof(certificate));
+                TlsConnectionBuilderExtensions.ThrowNoPrivateKey(certificate, nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -87,7 +87,7 @@ namespace Orleans
 
             if (!certificate.HasPrivateKey)
             {
-                throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", nameof(certificate));
+                TlsConnectionBuilderExtensions.ThrowNoPrivateKey(certificate, nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -120,7 +120,7 @@ namespace Orleans
 
             if (options.LocalCertificate is X509Certificate2 certificate && !certificate.HasPrivateKey)
             {
-                throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", nameof(options.LocalCertificate));
+                TlsConnectionBuilderExtensions.ThrowNoPrivateKey(certificate, $"{nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)}");
             }
 
             return builder.Configure<ClientConnectionOptions>(connectionOptions =>
