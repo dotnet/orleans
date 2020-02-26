@@ -241,10 +241,10 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        protected override Task StartInBackground()
+        protected override async Task StartInBackground()
         {
+            await DoInitialReadAndUpdateReminders();
             this.runTask = RunAsync();
-            return Task.CompletedTask;
         }
 
         private async Task DoInitialReadAndUpdateReminders()
