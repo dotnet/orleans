@@ -245,7 +245,7 @@ namespace UnitTests.Grains
             var grainId = ((GrainReference)grain).GrainId;
             if (this.catalog.FastLookup(grainId, out var addresses))
             {
-                return Task.FromResult(addresses.Addresses.Single().ToString());
+                return Task.FromResult(addresses.Single().ToString());
             }
 
             return Task.FromResult<string>(null);
