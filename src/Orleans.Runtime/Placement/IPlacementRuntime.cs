@@ -12,9 +12,9 @@ namespace Orleans.Runtime.Placement
         /// <param name="grain"></param>
         /// <param name="addresses">Local addresses will always be complete, remote may be partial</param>
         /// <returns>True if remote addresses are complete within freshness constraint</returns>
-        bool FastLookup(GrainId grain, out AddressesAndTag addresses);
+        bool FastLookup(GrainId grain, out List<ActivationAddress> addresses);
 
-        Task<AddressesAndTag> FullLookup(GrainId grain);
+        Task<List<ActivationAddress>> FullLookup(GrainId grain);
 
         bool LocalLookup(GrainId grain, out List<ActivationData> addresses);
         

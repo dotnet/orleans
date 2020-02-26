@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
@@ -26,6 +27,7 @@ namespace Orleans.Runtime
         private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementDirectorsManager placementDirectorsManager;
         private readonly ILocalGrainDirectory localGrainDirectory;
+        private readonly IGrainLocator grainLocator;
         private readonly ActivationCollector activationCollector;
         private readonly MessageFactory messageFactory;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
@@ -40,6 +42,7 @@ namespace Orleans.Runtime
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementDirectorsManager placementDirectorsManager,
             ILocalGrainDirectory localGrainDirectory,
+            IGrainLocator grainLocator,
             ActivationCollector activationCollector,
             MessageFactory messageFactory,
             CompatibilityDirectorManager compatibilityDirectorManager,
@@ -54,6 +57,7 @@ namespace Orleans.Runtime
             this.invokeWorkItemLogger = loggerFactory.CreateLogger<InvokeWorkItem>();
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
+            this.grainLocator = grainLocator;
             this.activationCollector = activationCollector;
             this.messageFactory = messageFactory;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
@@ -164,8 +168,10 @@ namespace Orleans.Runtime
                             {
                                 try
                                 {
-                                    await this.localGrainDirectory.UnregisterAfterNonexistingActivation(
-                                        nonExistentActivation, origin);
+                                    if (this.logger.IsEnabled(LogLevel.Trace))
+                                        logger.Trace("UnregisterAfterNonexistingActivation addr={ActivationAddress} origin={SiloAddress}", nonExistentActivation, origin);
+
+                                    await this.grainLocator.Unregister(nonExistentActivation, UnregistrationCause.NonexistentActivation);
                                 }
                                 catch (Exception exc)
                                 {

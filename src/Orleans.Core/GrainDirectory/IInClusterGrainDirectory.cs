@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -13,7 +13,7 @@ namespace Orleans.GrainDirectory
     /// The methods here can be called remotely (where extended by IRemoteGrainDirectory) or
     /// locally (where extended by ILocalGrainDirectory)
     /// </summary>
-    interface IGrainDirectory
+    interface IInClusterGrainDirectory
     {
         /// <summary>
         /// Record a new grain activation by adding it to the directory.
