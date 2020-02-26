@@ -134,9 +134,9 @@ namespace Orleans.Connections.Security
                         sslOptions.CertificateRevocationCheckMode == X509RevocationMode.Online);
 #endif
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
-                    _logger?.LogDebug(2, "Authentication timed out");
+                    _logger?.LogWarning(2, ex, "Authentication timed out");
 #if NETCOREAPP
                     await sslStream.DisposeAsync();
 #else
@@ -144,9 +144,9 @@ namespace Orleans.Connections.Security
 #endif
                     return;
                 }
-                catch (Exception ex) when (ex is IOException || ex is AuthenticationException)
+                catch (Exception ex)
                 {
-                    _logger?.LogDebug(1, ex, "Authentication failed");
+                    _logger?.LogWarning(1, ex, "Authentication failed: {Exception}", ex);
 #if NETCOREAPP
                     await sslStream.DisposeAsync();
 #else
@@ -219,8 +219,10 @@ namespace Orleans.Connections.Security
 
         protected static void EnsureCertificateIsAllowedForClientAuth(X509Certificate2 certificate)
         {
-            if (certificate == null)
+            if (certificate is null)
+            {
                 throw new InvalidOperationException("No certificate provided for client authentication.");
+            }
 
             if (!CertificateLoader.IsCertificateAllowedForClientAuth(certificate))
             {
