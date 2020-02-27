@@ -25,7 +25,7 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
-    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime, IDisposable
+    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime, IHealthCheckParticipant
     {
         [Serializable]
         internal class NonExistentActivationException : Exception
@@ -85,7 +85,8 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private int collectionNumber;
         private int destroyActivationsNumber;
-        private IDisposable gcTimer;
+        private IAsyncTimer gcTimer;
+        private Task gcTimerTask;
         private readonly string localSiloName;
         private readonly CounterStatistic activationsCreated;
         private readonly CounterStatistic activationsDestroyed;
@@ -121,7 +122,8 @@ namespace Orleans.Runtime
             IOptions<SchedulingOptions> schedulingOptions,
             IOptions<GrainCollectionOptions> collectionOptions,
             IOptions<SiloMessagingOptions> messagingOptions,
-            RuntimeMessagingTrace messagingTrace)
+            RuntimeMessagingTrace messagingTrace,
+            IAsyncTimerFactory timerFactory)
             : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
@@ -181,6 +183,7 @@ namespace Orleans.Runtime
             maxWarningRequestProcessingTime = this.messagingOptions.Value.ResponseTimeout.Multiply(5);
             maxRequestProcessingTime = this.messagingOptions.Value.MaxRequestProcessingTime;
             grainDirectory.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
+            this.gcTimer = timerFactory.Create(this.activationCollector.Quantum, "Catalog.GCTimer");
         }
 
         /// <summary>
@@ -222,23 +225,29 @@ namespace Orleans.Runtime
 
         internal void Start()
         {
-            if (gcTimer != null) gcTimer.Dispose();
-
-            var t = GrainTimer.FromTaskCallback(
-                this.RuntimeClient.Scheduler,
-                this.loggerFactory.CreateLogger<GrainTimer>(),
-                OnTimer,
-                null,
-                TimeSpan.Zero,
-                this.activationCollector.Quantum,
-                "Catalog.GCTimer");
-            t.Start();
-            gcTimer = t;
+            this.gcTimerTask = this.RunActivationCollectionLoop();
         }
 
-        private Task OnTimer(object _)
+        internal async Task Stop()
         {
-            return CollectActivationsImpl(true);
+            this.gcTimer?.Dispose();
+
+            if (this.gcTimerTask is Task task) await task;
+        }
+
+        private async Task RunActivationCollectionLoop()
+        {
+            while (await this.gcTimer.NextTick())
+            {
+                try
+                {
+                    await this.CollectActivationsImpl(true);
+                }
+                catch (Exception exception)
+                {
+                    this.logger.LogError(exception, "Exception while collecting activations: {Exception}", exception);
+                }
+            }
         }
 
         public Task CollectActivations(TimeSpan ageLimit)
@@ -248,8 +257,7 @@ namespace Orleans.Runtime
 
         private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default(TimeSpan))
         {
-            var watch = new Stopwatch();
-            watch.Start();
+            var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
             logger.Info(ErrorCode.Catalog_BeforeCollection, "Before collection#{0}: memory={1}MB, #activations={2}, collector={3}.",
@@ -1435,9 +1443,14 @@ namespace Orleans.Runtime
             }
         }
 
-        void IDisposable.Dispose()
+        public bool CheckHealth(DateTime lastCheckTime)
         {
-            this.gcTimer?.Dispose();
+            if (this.gcTimer is IAsyncTimer timer)
+            {
+                return timer.CheckHealth(lastCheckTime);
+            }
+
+            return true;
         }
     }
 }

@@ -339,15 +339,14 @@ namespace Orleans.Runtime
 
             this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
 
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<ClientObserverRegistrar>());
-
             var reminderTable = Services.GetService<IReminderTable>();
             if (reminderTable != null)
             {
                 logger.Info($"Creating reminder grain service for type={reminderTable.GetType()}");
-                
+
                 // Start the reminder service system target
-                reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory); ;
+                var timerFactory = this.Services.GetRequiredService<IAsyncTimerFactory>();
+                reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory, timerFactory);
                 RegisterSystemTarget((SystemTarget)reminderService);
             }
 

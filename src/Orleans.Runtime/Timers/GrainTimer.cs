@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
-
 namespace Orleans.Runtime
 {
     internal class GrainTimer : IGrainTimer
@@ -163,11 +162,6 @@ namespace Orleans.Runtime
             var callbackTarget = callback?.Target?.ToString() ?? string.Empty; 
             var callbackMethodInfo = callback?.GetMethodInfo()?.ToString() ?? string.Empty;
             return $"GrainTimer.{this.Name ?? string.Empty} TimerCallbackHandler:{callbackTarget ?? string.Empty}->{callbackMethodInfo ?? string.Empty}";
-        }
-
-        public int GetNumTicks()
-        {
-            return totalNumTicks;
         }
 
         // The reason we need to check CheckTimerFreeze on both the SafeTimer and this GrainTimer

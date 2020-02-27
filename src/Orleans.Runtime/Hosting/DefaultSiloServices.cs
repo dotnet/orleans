@@ -167,6 +167,7 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterMembershipService>();
 
             services.TryAddSingleton<ClientObserverRegistrar>();
+            services.TryAddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();
             services.TryAddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
@@ -232,6 +233,7 @@ namespace Orleans.Hosting
 
             // Grain activation
             services.TryAddSingleton<Catalog>();
+            services.AddFromExisting<IHealthCheckParticipant, Catalog>();
             services.TryAddSingleton<GrainCreator>();
             services.TryAddSingleton<IGrainActivator, DefaultGrainActivator>();
             services.TryAddScoped<ActivationData.GrainActivationContextFactory>();
