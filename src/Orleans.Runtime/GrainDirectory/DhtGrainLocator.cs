@@ -7,11 +7,11 @@ namespace Orleans.Runtime.GrainDirectory
     /// <summary>
     /// Implementation of <see cref="IGrainLocator"/> that uses the in memory distributed directory of Orleans
     /// </summary>
-    internal class InClusterGrainLocator : IGrainLocator
+    internal class DhtGrainLocator : IGrainLocator
     {
         private readonly ILocalGrainDirectory localGrainDirectory;
 
-        public InClusterGrainLocator(ILocalGrainDirectory localGrainDirectory)
+        public DhtGrainLocator(ILocalGrainDirectory localGrainDirectory)
         {
             this.localGrainDirectory = localGrainDirectory;
         }
@@ -33,7 +33,7 @@ namespace Orleans.Runtime.GrainDirectory
         public async Task<ActivationAddress> Register(ActivationAddress address)
             => (await this.localGrainDirectory.RegisterAsync(address, singleActivation: true)).Address;
 
-        public Task Unregister(ActivationAddress address, UnregistrationCause cause)
+        public  Task Unregister(ActivationAddress address, UnregistrationCause cause)
             => this.localGrainDirectory.UnregisterAsync(address, cause);
 
         public Task UnregisterMany(List<ActivationAddress> addresses, UnregistrationCause cause)
