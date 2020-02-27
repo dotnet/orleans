@@ -487,7 +487,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                TransactionContext.Clear();
+                RequestContext.Clear();
             }
         }
 
