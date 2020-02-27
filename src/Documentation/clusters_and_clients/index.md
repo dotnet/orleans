@@ -171,6 +171,7 @@ public class Program
                 services.AddSingleton<ClusterClientHostedService>();
                 services.AddSingleton<IHostedService>(sp => sp.GetService<ClusterClientHostedService>());
                 services.AddSingleton<IClusterClient>(sp => sp.GetService<ClusterClientHostedService>().Client);
+                services.AddSingleton<IGrainFactory>(sp => sp.GetService<ClusterClientHostedService>().Client);
             })
             .ConfigureLogging(builder => builder.AddConsole())
             .RunConsoleAsync();
