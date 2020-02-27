@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,7 +12,7 @@ using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal class ClientObserverRegistrar : SystemTarget, IClientObserverRegistrar, ISiloStatusListener
+    internal class ClientObserverRegistrar : SystemTarget, IClientObserverRegistrar, ILifecycleParticipant<ISiloLifecycle>
     {
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MIN = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MAX = TimeSpan.FromSeconds(30);
@@ -20,25 +21,32 @@ namespace Orleans.Runtime
         private readonly ILocalGrainDirectory grainDirectory;
         private readonly SiloAddress myAddress;
         private readonly OrleansTaskScheduler scheduler;
+        private readonly IClusterMembershipService clusterMembershipService;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly ILogger logger;
+        private readonly IAsyncTimer refreshTimer;
+        private readonly CancellationTokenSource shutdownCancellation = new CancellationTokenSource();
         private IHostedClient hostedClient;
         private Gateway gateway;
-        private IDisposable refreshTimer;
+        private Task clientRefreshLoopTask;
         
         public ClientObserverRegistrar(
             ILocalSiloDetails siloDetails,
-            ILocalGrainDirectory dir,
+            ILocalGrainDirectory grainDirectory,
             OrleansTaskScheduler scheduler,
             IOptions<SiloMessagingOptions> messagingOptions,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IClusterMembershipService clusterMembershipService,
+            IAsyncTimerFactory timerFactory)
             : base(Constants.ClientObserverRegistrarId, siloDetails.SiloAddress, loggerFactory)
         {
-            grainDirectory = dir;
-            myAddress = siloDetails.SiloAddress;
+            this.grainDirectory = grainDirectory;
+            this.myAddress = siloDetails.SiloAddress;
             this.scheduler = scheduler;
+            this.clusterMembershipService = clusterMembershipService;
             this.messagingOptions = messagingOptions.Value;
-            logger = loggerFactory.CreateLogger<ClientObserverRegistrar>();
+            this.logger = loggerFactory.CreateLogger<ClientObserverRegistrar>();
+            this.refreshTimer = timerFactory.Create(this.messagingOptions.ClientRegistrationRefresh, "ClientObserverRegistrar.ClientRefreshTimer");
         }
 
         internal void SetHostedClient(IHostedClient client)
@@ -53,6 +61,7 @@ namespace Orleans.Runtime
         internal void SetGateway(Gateway gateway)
         {
             this.gateway = gateway;
+
             // Only start ClientRefreshTimer if this silo has a gateway.
             // Need to start the timer in the system target context.
             scheduler.QueueAction(Start, this.SchedulingContext).Ignore();
@@ -60,16 +69,52 @@ namespace Orleans.Runtime
 
         private void Start()
         {
-            if (this.refreshTimer != null) return;
-            var random = new SafeRandom();
-            var randomOffset = random.NextTimeSpan(this.messagingOptions.ClientRegistrationRefresh);
-            this.refreshTimer = this.RegisterTimer(
-                this.OnClientRefreshTimer,
-                null,
-                randomOffset,
-                this.messagingOptions.ClientRegistrationRefresh,
-                "ClientObserverRegistrar.ClientRefreshTimer");
+            if (clientRefreshLoopTask is object)
+            {
+                return;
+            }
+
+            clientRefreshLoopTask = RunClientRefreshLoop();
             if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Client registrar service started successfully."); }
+        }
+
+        private async Task RunClientRefreshLoop()
+        {
+            var membershipUpdates = this.clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(this.shutdownCancellation.Token);
+
+            Task<bool> membershipTask = null;
+            Task<bool> timerTask = this.refreshTimer.NextTick(new SafeRandom().NextTimeSpan(this.messagingOptions.ClientRegistrationRefresh));
+
+            while (true)
+            {
+                membershipTask ??= membershipUpdates.MoveNextAsync().AsTask();
+                timerTask ??= this.refreshTimer.NextTick();
+
+                // Wait for either of the tasks to complete.
+                await Task.WhenAny(membershipTask, timerTask);
+
+                if (timerTask.IsCompleted)
+                {
+                    if (!await timerTask)
+                    {
+                        break;
+                    }
+
+                    timerTask = null;
+                }
+
+                if (membershipTask.IsCompleted)
+                {
+                    if (!await membershipTask)
+                    {
+                        break;
+                    }
+
+                    membershipTask = null;
+                }
+
+                await OnRefreshClients();
+            }
         }
 
         internal void ClientAdded(GrainId clientId)
@@ -117,28 +162,38 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task OnClientRefreshTimer(object data)
+        private async Task OnRefreshClients()
         {
             try
             {
-                var clients = new List<GrainId>();
-                if (this.gateway != null) clients.AddRange(gateway.GetConnectedClients());
-                var hostedClientId = this.hostedClient?.ClientId;
-                if (hostedClientId != null) clients.Add(hostedClientId);
+                List<GrainId> clients = null;
+                if (this.gateway is Gateway gw)
+                {
+                    var gatewayClients = gw.GetConnectedClients();
+                    clients = new List<GrainId>(gatewayClients.Count + 1);
+                    clients.AddRange(gatewayClients);
+                }
+
+                if (this.hostedClient?.ClientId is GrainId hostedClientId)
+                {
+                    clients ??= new List<GrainId>(1);
+                    clients.Add(hostedClientId);
+                }
 
                 var tasks = new List<Task>();
                 foreach (GrainId clientId in clients)
                 {
                     var addr = GetClientActivationAddress(clientId);
-                    Task task = grainDirectory.RegisterAsync(addr, singleActivation:false).
+                    Task task = grainDirectory.RegisterAsync(addr, singleActivation: false).
                         LogException(logger, ErrorCode.ClientRegistrarFailedToRegister_2, String.Format("Directory.RegisterAsync {0} failed.", addr));
                     tasks.Add(task);
                 }
+
                 await Task.WhenAll(tasks);
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.ClientRegistrarTimerFailed, 
+                logger.Error(ErrorCode.ClientRegistrarTimerFailed,
                     String.Format("OnClientRefreshTimer has thrown an exceptions."), exc);
             }
         }
@@ -154,15 +209,22 @@ namespace Orleans.Runtime
             return ActivationAddress.GetAddress(myAddress, clientId, ActivationId.GetActivationId(key));
         }
 
-        public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
+        public void Participate(ISiloLifecycle lifecycle)
         {
-            if (status != SiloStatus.Dead)
-                return;
+            lifecycle.Subscribe(
+                nameof(ClientObserverRegistrar),
+                ServiceLifecycleStage.RuntimeServices,
+                _ => Task.CompletedTask,
+                async ct =>
+                {
+                    shutdownCancellation.Cancel();
+                    refreshTimer?.Dispose();
 
-            if (Equals(updatedSilo, this.Silo))
-                refreshTimer?.Dispose();
-
-            scheduler.QueueTask(() => OnClientRefreshTimer(null), SchedulingContext).Ignore();
+                    if (clientRefreshLoopTask is Task task)
+                    {
+                        await Task.WhenAny(ct.WhenCancelled(), task);
+                    }
+                });
         }
     }
 }
