@@ -8,9 +8,12 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ObjectPool;
 using Orleans.Configuration;
 using Orleans.Messaging;
+
+#if NETCOREAPP
+using Microsoft.Extensions.ObjectPool;
+#endif
 
 namespace Orleans.Runtime.Messaging
 {
@@ -81,8 +84,6 @@ namespace Orleans.Runtime.Messaging
         /// <returns>A <see cref="Task"/> which completes when the connection terminates and has completed processing.</returns>
         public async Task Run()
         {
-            RequestContext.Clear();
-
             Exception error = default;
             try
             {
