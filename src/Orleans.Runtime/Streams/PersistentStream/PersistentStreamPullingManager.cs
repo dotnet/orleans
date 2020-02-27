@@ -43,8 +43,9 @@ namespace Orleans.Streams
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
             StreamPullingAgentOptions options,
-            ILoggerFactory loggerFactory)
-            : base(id, runtime.ExecutingSiloAddress, loggerFactory)
+            ILoggerFactory loggerFactory,
+            SiloAddress siloAddress)
+            : base(id, siloAddress, loggerFactory)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
             {
@@ -217,7 +218,7 @@ namespace Orleans.Streams
                 try
                 {
                     var agentId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE);
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, pubSub, queueId, this.options);
+                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, pubSub, queueId, this.options, this.Silo);
                     providerRuntime.RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);
                     agents.Add(agent);

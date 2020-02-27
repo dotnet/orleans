@@ -73,24 +73,9 @@ namespace Orleans.Providers
             }
         }
 
-        public string ServiceId => this.clusterOptions.ServiceId;
-
-        public string SiloIdentity
-        {
-            get
-            {
-                throw new InvalidOperationException("Cannot access SiloIdentity from client.");
-            }
-        }
-
         public string ExecutingEntityIdentity()
         {
             return this.runtimeClient.CurrentActivationIdentity;
-        }
-
-        public SiloAddress ExecutingSiloAddress
-        {
-            get { throw new NotImplementedException(); }
         }
 
         public void RegisterSystemTarget(ISystemTarget target)
