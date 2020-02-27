@@ -75,7 +75,7 @@ The major difference between making calls to grains from client code and from wi
 Grains are constrained to be single-threaded by the Orleans runtime, while clients may be multi-threaded.
 Orleans does not provide any such guarantee on the client side, and so it is up to the client to manage its own concurrency using whatever synchronization constructs are appropriate for its environment – locks, events, `Tasks`, etc.
 
-### Receiving notifications
+### Receiving Notifications
 
 There are situations in which a simple request-response pattern is not enough, and the client needs to receive asynchronous notifications.
 For example, a user might want to be notified when a new message has been published by someone that she is following.
@@ -85,6 +85,118 @@ Calls to observers do not provide any indication of success or failure, as they 
 So it is a responsibility of the application code to build a higher level reliability mechanism on top of observers where necessary. 
 
 Another mechanism that can be used for delivering asynchronous messages to clients is [Streams](../streaming/index.md). Streams expose indications of success or failure of delivery of individual messages, and hence enable reliable communication back to the client.
+
+### Client Connectivity
+
+There are two scenarios in which a cluster client can experience connectivity issues:
+
+* When the `IClusterClient.Connect` method is called initially.
+* When making calls on grain references which were obtained from a connected cluster client.
+
+In the first case, the `Connect` method will throw an exception to indicate what went wrong. This is typically (but not necessarily) a `SiloUnavailableException`. If this happens, the cluster client instance is unusable and should be disposed. A retry filter function can optionally be provided to the `Connect` method which could, for instance, wait for a specified duration before making another attempt. If no retry filter is provided, or if the retry filter returns `false`, the client gives up for good.
+
+If `Connect` returns successfully, the cluster client is guaranteed to be usable until it is disposed. This means that even if the client experiences connection issues, it will attempt to recover indefinitely. The exact recovery behavior can be configured on a `GatewayOptions` object provided by the `ClientBuilder`, e.g.:
+
+```csharp
+var client = new ClientBuilder()
+    // ...
+    .Configure<GatewayOptions>(opts => GatewayListRefreshPeriod = TimeSpan.FromMinutes(10)) // Default is 1 min.
+    .Build();
+```
+
+In the second case, where a connection issue occurs during a grain call, a `SiloUnavailableException` will be thrown on the client side. This could be handled like so:
+
+``` csharp
+IPlayerGrain player = client.GetGrain<IPlayerGrain>(playerId);
+
+try
+{
+    await player.JoinGame(game);
+}
+catch (SiloUnavailableException)
+{
+    // Lost connection to the cluster...
+}
+```
+
+The grain reference is not invalidated in this situation; the call could be retried on the same reference later, when a connection might have been re-established.
+
+### Dependency Injection
+
+The recommended way to use a cluster client in a program that uses the .NET Generic Host is to inject an `IClusterClient` singleton instance via dependency injection, which can then be accepted as a constructor parameter in hosted services, ASP.NET controllers, etc.
+
+Note that when co-hosting an Orleans silo in the same process that will be connecting to it, it is *not* necessary to manually create a client; Orleans will automatically provide one and manage its lifetime appropriately.
+
+When connecting to a cluster in a different process (e.g. on a different machine), a common pattern is to create a hosted service like this:
+
+```csharp
+public class ClusterClientHostedService : IHostedService
+{
+    public IClusterClient Client { get; }
+
+    public ClusterClientHostedService(ILoggerProvider loggerProvider)
+    {
+        Client = new ClientBuilder()
+            // Appropriate client configuration here, e.g.:
+            .UseLocalhostClustering()
+            .ConfigureLogging(builder => builder.AddProvider(loggerProvider))
+            .Build();
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        // A retry filter could be provided here.
+        await Client.Connect();
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await Client.Close();
+
+        Client.Dispose();
+    }
+}
+```
+
+The service is then registered like this:
+
+```csharp
+public class Program
+{
+    static Task Main()
+    {
+        return new HostBuilder()
+            .ConfigureServices(services =>
+            {
+                services.AddSingleton<ClusterClientHostedService>();
+                services.AddSingleton<IHostedService>(sp => sp.GetService<ClusterClientHostedService>());
+                services.AddSingleton<IClusterClient>(sp => sp.GetService<ClusterClientHostedService>().Client);
+                services.AddSingleton<IGrainFactory>(sp => sp.GetService<ClusterClientHostedService>().Client);
+            })
+            .ConfigureLogging(builder => builder.AddConsole())
+            .RunConsoleAsync();
+    }
+}
+```
+
+At this point, an `IClusterClient` instance could be consumed anywhere that dependency injection is supported, such as in an ASP.NET controller:
+
+```csharp
+public class HomeController : Controller
+{
+    readonly IClusterClient _client;
+
+    public HomeController(IClusterClient client) => _client = client;
+
+    public IActionResult Index()
+    {
+        var grain = _client.GetGrain<IMyGrain>();
+        var model = grain.GetModel();
+
+        return View(model);
+    }
+}
+```
 
 ### Example
 
