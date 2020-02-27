@@ -1156,6 +1156,10 @@ namespace Orleans.Runtime
                 }
                 throw;
             }
+            finally
+            {
+                RequestContext.Clear();
+            }
         }
 
         private async Task<ActivationData> CallGrainDeactivateAndCleanupStreams(ActivationData activation, CancellationToken ct)
