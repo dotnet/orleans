@@ -9,7 +9,7 @@ namespace Orleans.Runtime.GrainDirectory
         public static IGrainLocator GetGrainLocator(IServiceProvider sp)
         {
             var customDirectory = sp.GetService<IGrainDirectory>();
-            var inClusterGrainLocator = new InClusterGrainLocator(sp.GetRequiredService<ILocalGrainDirectory>());
+            var inClusterGrainLocator = new DhtGrainLocator(sp.GetRequiredService<ILocalGrainDirectory>());
 
             return customDirectory != null
                 ? new GrainLocator(customDirectory, inClusterGrainLocator)

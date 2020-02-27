@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,10 +16,10 @@ namespace Orleans.Runtime.GrainDirectory
     internal class GrainLocator : IGrainLocator
     {
         private readonly IGrainDirectory grainDirectory;
-        private readonly InClusterGrainLocator inClusterGrainLocator;
+        private readonly DhtGrainLocator inClusterGrainLocator;
         private readonly IGrainDirectoryCache cache;
 
-        public GrainLocator(IGrainDirectory grainDirectory, InClusterGrainLocator inClusterGrainLocator)
+        public GrainLocator(IGrainDirectory grainDirectory, DhtGrainLocator inClusterGrainLocator)
         {
             this.grainDirectory = grainDirectory;
             this.inClusterGrainLocator = inClusterGrainLocator;
@@ -53,7 +54,7 @@ namespace Orleans.Runtime.GrainDirectory
             var activationAddress = ConvertToActivationAddress(result);
             this.cache.AddOrUpdate(
                 activationAddress.Grain,
-                new List<Tuple<SiloAddress,ActivationId>>() { Tuple.Create(activationAddress.Silo, activationAddress.Activation) },
+                new List<Tuple<SiloAddress, ActivationId>>() { Tuple.Create(activationAddress.Silo, activationAddress.Activation) },
                 0);
             return activationAddress;
         }
@@ -75,23 +76,30 @@ namespace Orleans.Runtime.GrainDirectory
             return false;
         }
 
-        public async Task Unregister(ActivationAddress address, UnregistrationCause cause)
+        public async Task UnregisterMany(List<ActivationAddress> addresses, UnregistrationCause cause)
         {
-            if (address.Grain.IsClient)
+            try
             {
-                await this.inClusterGrainLocator.Unregister(address, cause);
+                var grainAddresses = addresses.Select(addr => ConvertToGrainAddress(addr)).ToList();
+                await this.grainDirectory.UnregisterMany(grainAddresses);
             }
-            else
+            finally
             {
-                await this.grainDirectory.Unregister(ConvertToGrainAddress(address));
-                this.cache.Remove(address.Grain);
+                foreach (var address in addresses)
+                    this.cache.Remove(address.Grain);
             }
         }
 
-        public async Task UnregisterMany(List<ActivationAddress> addresses, UnregistrationCause cause)
+        public async Task Unregister(ActivationAddress address, UnregistrationCause cause)
         {
-            var tasks = addresses.Select(addr => Unregister(addr, cause)).ToList();
-            await Task.WhenAll(tasks);
+            try
+            {
+                await this.grainDirectory.Unregister(ConvertToGrainAddress(address));
+            }
+            finally
+            {
+                this.cache.Remove(address.Grain);
+            }
         }
 
         private static ActivationAddress ConvertToActivationAddress(GrainAddress addr)
