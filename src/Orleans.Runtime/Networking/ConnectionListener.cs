@@ -180,11 +180,11 @@ namespace Orleans.Runtime.Messaging
                     var connectionTask = connection.Run();
                     this.connections.TryAdd(connection, connectionTask);
                     await connectionTask;
-                    this.NetworkingTrace.LogInformation("Connection {@Connection} terminated", connection);
+                    this.NetworkingTrace.LogInformation("Connection {Connection} terminated", connection);
                 }
                 catch (Exception exception)
                 {
-                    this.NetworkingTrace.LogInformation(exception, "Connection {@Connection} terminated with an exception", connection);
+                    this.NetworkingTrace.LogInformation(exception, "Connection {Connection} terminated with an exception", connection);
                 }
                 finally
                 {
