@@ -72,8 +72,6 @@ namespace Orleans.Runtime.Messaging
         /// <returns>A <see cref="Task"/> which completes when the connection terminates and has completed processing.</returns>
         public async Task Run()
         {
-            RequestContext.Clear();
-
             Exception error = default;
             try
             {
