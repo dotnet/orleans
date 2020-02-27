@@ -76,10 +76,13 @@ namespace Orleans.Runtime.GrainDirectory
             return false;
         }
 
-        public Task UnregisterMany(List<ActivationAddress> addresses, UnregistrationCause cause)
+        public async Task UnregisterMany(List<ActivationAddress> addresses, UnregistrationCause cause)
         {
             var grainAddresses = addresses.Select(addr => ConvertToGrainAddress(addr)).ToList();
-            return this.grainDirectory.UnregisterMany(grainAddresses);
+            await this.grainDirectory.UnregisterMany(grainAddresses);
+
+            foreach (var address in addresses)
+                this.cache.Remove(address.Grain);
         }
 
         public async Task Unregister(ActivationAddress address, UnregistrationCause cause)
