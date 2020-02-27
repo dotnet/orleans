@@ -42,31 +42,6 @@ namespace Orleans.Runtime
             totalNumTicks = 0;
         }
 
-        internal static GrainTimer FromTimerCallback(
-            OrleansTaskScheduler scheduler,
-            ILogger logger,
-            TimerCallback callback,
-            object state,
-            TimeSpan dueTime,
-            TimeSpan period,
-            string name = null)
-        {
-            return new GrainTimer(
-                scheduler,
-                null,
-                logger, 
-                ob =>
-                {
-                    if (callback != null)
-                        callback(ob);
-                    return Task.CompletedTask;
-                },
-                state,
-                dueTime,
-                period,
-                name);
-        }
-
         internal static IGrainTimer FromTaskCallback(
             OrleansTaskScheduler scheduler,
             ILogger logger,
