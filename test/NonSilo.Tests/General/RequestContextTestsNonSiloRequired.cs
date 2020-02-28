@@ -34,7 +34,6 @@ namespace UnitTests.General
             RequestContextTestUtils.SetActivityId(Guid.Empty);
             RequestContext.Clear();
             headers.Clear();
-            this.fixture.RuntimeClient.ClientInvokeCallback = null;
         }
 
         public void Dispose()
@@ -47,7 +46,6 @@ namespace UnitTests.General
             RequestContextTestUtils.ClearActivityId();
             RequestContext.Clear();
             headers.Clear();
-            this.fixture.RuntimeClient.ClientInvokeCallback = null;
         }
 
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]

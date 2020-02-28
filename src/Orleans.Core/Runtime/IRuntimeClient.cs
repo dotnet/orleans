@@ -26,17 +26,6 @@ namespace Orleans.Runtime
         IServiceProvider ServiceProvider { get; }
 
         /// <summary>
-        /// Global pre-call interceptor function
-        /// Synchronous callback made just before a message is about to be constructed and sent by a client to a grain.
-        /// This call will be made from the same thread that constructs the message to be sent, so any thread-local settings
-        /// such as <c>Orleans.RequestContext</c> will be picked up.
-        /// The action receives an <see cref="InvokeMethodRequest"/> with details of the method to be invoked, including InterfaceId and MethodId,
-        /// and a <see cref="IGrain"/> which is the GrainReference this request is being sent through
-        /// </summary>
-        /// <remarks>This callback method should return promptly and do a minimum of work, to avoid blocking calling thread or impacting throughput.</remarks>
-        ClientInvokeCallback ClientInvokeCallback { get; set; }
-
-        /// <summary>
         /// Get the current response timeout setting for this client.
         /// </summary>
         /// <returns>Response timeout value</returns>
