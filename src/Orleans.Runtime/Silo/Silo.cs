@@ -103,7 +103,6 @@ namespace Orleans.Runtime
 
         private SchedulingContext reminderServiceContext;
         private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
-        private EventHandler processExitHandler;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Silo"/> class.
@@ -342,17 +341,6 @@ namespace Orleans.Runtime
 
             logger.Info(ErrorCode.SiloStarting, "Silo Start()");
 
-            var processExitHandlingOptions = this.Services.GetRequiredService<IOptions<ProcessExitHandlingOptions>>().Value;
-            if (processExitHandlingOptions.FastKillOnProcessExit)
-            {
-                var weakCapture = new WeakReference<Silo>(this);
-                this.processExitHandler = (sender, args) =>
-                {
-                    if (weakCapture.TryGetTarget(out var silo)) silo.HandleProcessExit(sender, args);
-                };
-                AppDomain.CurrentDomain.ProcessExit += this.processExitHandler;
-            }
-            
             //TODO: setup thead pool directly to lifecycle
             StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
                 this.ConfigureThreadPoolAndServicePointSettings, Stopwatch.StartNew());
@@ -630,12 +618,6 @@ namespace Orleans.Runtime
             }
             finally
             {
-                if (this.processExitHandler != null)
-                {
-                    AppDomain.CurrentDomain.ProcessExit -= this.processExitHandler;
-                    this.processExitHandler = null;
-                }
-
                 SafeExecute(scheduler.Stop);
                 SafeExecute(scheduler.PrintStatistics);
             }
