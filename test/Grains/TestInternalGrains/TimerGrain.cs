@@ -20,7 +20,7 @@ namespace UnitTestGrains
         IDisposable defaultTimer;
         private static readonly TimeSpan period = TimeSpan.FromMilliseconds(100);
         string DefaultTimerName = "DEFAULT TIMER";
-        ISchedulingContext context;
+        IGrainContext context;
 
         private ILogger logger;
 
@@ -32,7 +32,7 @@ namespace UnitTestGrains
         public override Task OnActivateAsync()
         {
             ThrowIfDeactivating();
-            context = RuntimeContext.Current.ActivationContext;
+            context = RuntimeContext.CurrentGrainContext;
             defaultTimer = this.RegisterTimer(Tick, DefaultTimerName, period, period);
             allTimers = new Dictionary<string, IDisposable>();
             return Task.CompletedTask;
@@ -47,10 +47,10 @@ namespace UnitTestGrains
         private Task Tick(object data)
         {
             counter++;
-            logger.Info(data.ToString() + " Tick # " + counter + " RuntimeContext = " + RuntimeContext.Current.ActivationContext.ToString());
+            logger.Info(data.ToString() + " Tick # " + counter + " RuntimeContext = " + RuntimeContext.Current?.ToString());
 
             // make sure we run in the right activation context.
-            if(!Equals(context, RuntimeContext.Current.ActivationContext))
+            if(!Equals(context, RuntimeContext.CurrentGrainContext))
                 logger.Error((int)ErrorCode.Runtime_Error_100146, "grain not running in the right activation context");
 
             string name = (string)data;
@@ -135,7 +135,7 @@ namespace UnitTestGrains
         private Exception tickException;
         private IDisposable timer;
         private string timerName;
-        private ISchedulingContext context;
+        private IGrainContext context;
         private TaskScheduler activationTaskScheduler;
 
         private ILogger logger;
@@ -150,7 +150,7 @@ namespace UnitTestGrains
 
         public override Task OnActivateAsync()
         {
-            context = RuntimeContext.Current.ActivationContext;
+            context = RuntimeContext.CurrentGrainContext;
             activationTaskScheduler = TaskScheduler.Current;
             return Task.CompletedTask;
         }
@@ -231,12 +231,12 @@ namespace UnitTestGrains
 
         private void CheckRuntimeContext(string what)
         {
-            if (RuntimeContext.Current.ActivationContext == null 
-                || !RuntimeContext.Current.ActivationContext.Equals(context))
+            if (RuntimeContext.CurrentGrainContext == null 
+                || !RuntimeContext.CurrentGrainContext.Equals(context))
             {
                 throw new InvalidOperationException(
                     string.Format("{0} in timer callback with unexpected activation context: Expected={1} Actual={2}",
-                                  what, context, RuntimeContext.Current.ActivationContext));
+                                  what, context, RuntimeContext.CurrentGrainContext));
             }
             if (TaskScheduler.Current.Equals(activationTaskScheduler) && TaskScheduler.Current is ActivationTaskScheduler)
             {

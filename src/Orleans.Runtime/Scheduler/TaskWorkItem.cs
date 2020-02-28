@@ -19,11 +19,11 @@ namespace Orleans.Runtime.Scheduler
         /// <param name="t">Task to be performed</param>
         /// <param name="context">Execution context</param>
         /// <param name="logger">logger to use</param>
-        internal TaskWorkItem(OrleansTaskScheduler sched, Task t, ISchedulingContext context, ILogger logger)
+        internal TaskWorkItem(OrleansTaskScheduler sched, Task t, IGrainContext context, ILogger logger)
         {
             scheduler = sched;
             task = t;
-            SchedulingContext = context;
+            GrainContext = context;
             this.logger = logger;
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Created TaskWorkItem {0} for Id={1} State={2} with Status={3} Scheduler={4}",
@@ -36,6 +36,8 @@ namespace Orleans.Runtime.Scheduler
             get { return WorkItemType.Task; }
         }
 
+        public override IGrainContext GrainContext { get; }
+
         public override void Execute()
         {
 #if DEBUG
@@ -43,7 +45,7 @@ namespace Orleans.Runtime.Scheduler
 #endif
             try
             {
-                RuntimeContext.SetExecutionContext(this.SchedulingContext);
+                RuntimeContext.SetExecutionContext(this.GrainContext);
                 scheduler.RunTask(task);
             }
             finally

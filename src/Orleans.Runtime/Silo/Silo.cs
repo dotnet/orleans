@@ -101,7 +101,7 @@ namespace Orleans.Runtime
 
         private bool isFastKilledNeeded = false; // Set to true if something goes wrong in the shutdown/stop phase
 
-        private SchedulingContext reminderServiceContext;
+        private IGrainContext reminderServiceContext;
         private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
         private EventHandler processExitHandler;
 
@@ -252,7 +252,7 @@ namespace Orleans.Runtime
 
             try
             {
-                await this.scheduler.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
+                await this.scheduler.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken), this.lifecycleSchedulingSystemTarget);
             }
             catch (Exception exc)
             {
@@ -322,7 +322,7 @@ namespace Orleans.Runtime
             }
 
             RegisterSystemTarget(catalog);
-            await scheduler.QueueAction(catalog.Start, catalog.SchedulingContext)
+            await scheduler.QueueAction(catalog.Start, catalog)
                 .WithTimeout(initTimeout, $"Starting Catalog failed due to timeout {initTimeout}");
 
             // SystemTarget for provider init calls
@@ -417,7 +417,7 @@ namespace Orleans.Runtime
             
             var versionStore = Services.GetService<IVersionStore>();
             await StartAsyncTaskWithPerfAnalysis("Init type manager", () => scheduler
-                .QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager.SchedulingContext)
+                .QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager)
                 .WithTimeout(this.initTimeout, $"TypeManager Initializing failed due to timeout {initTimeout}"), stopWatch);
 
             try
@@ -431,7 +431,7 @@ namespace Orleans.Runtime
                 async Task StartDeploymentLoadCollector()
                 {
                     var deploymentLoadPublisher = Services.GetRequiredService<DeploymentLoadPublisher>();
-                    await this.scheduler.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher.SchedulingContext)
+                    await this.scheduler.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher)
                         .WithTimeout(this.initTimeout, $"Starting DeploymentLoadPublisher failed due to timeout {initTimeout}");
                     logger.Debug("Silo deployment load publisher started successfully.");
                 }
@@ -476,8 +476,7 @@ namespace Orleans.Runtime
                 async Task StartReminderService()
                 {
                     // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
-                    this.reminderServiceContext = (this.reminderService as SystemTarget)?.SchedulingContext ??
-                                                  this.fallbackScheduler.SchedulingContext;
+                    this.reminderServiceContext = (this.reminderService as IGrainContext) ?? this.fallbackScheduler;
                     await this.scheduler.QueueTask(this.reminderService.Start, this.reminderServiceContext)
                         .WithTimeout(this.initTimeout, $"Starting ReminderService failed due to timeout {initTimeout}");
                     this.logger.Debug("Reminder service started successfully.");
@@ -504,7 +503,7 @@ namespace Orleans.Runtime
             RegisterSystemTarget(grainService);
             grainServices.Add(grainService);
 
-            await this.scheduler.QueueTask(() => grainService.Init(Services), grainService.SchedulingContext).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
+            await this.scheduler.QueueTask(() => grainService.Init(Services), grainService).WithTimeout(this.initTimeout, $"GrainService Initializing failed due to timeout {initTimeout}");
             logger.Info($"Grain Service {service.GetType().FullName} registered successfully.");
         }
 
@@ -512,7 +511,7 @@ namespace Orleans.Runtime
         {
             var grainService = (GrainService)service;
 
-            await this.scheduler.QueueTask(grainService.Start, grainService.SchedulingContext).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
+            await this.scheduler.QueueTask(grainService.Start, grainService).WithTimeout(this.initTimeout, $"Starting GrainService failed due to timeout {initTimeout}");
             logger.Info($"Grain Service {service.GetType().FullName} started successfully.");
         }
 
@@ -626,7 +625,7 @@ namespace Orleans.Runtime
 
             try
             {
-                await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
+                await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget);
             }
             finally
             {
@@ -692,7 +691,7 @@ namespace Orleans.Runtime
                     logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
 
                     //Stop LocalGrainDirectory
-                    await scheduler.QueueTask(()=>localGrainDirectory.Stop(true), localGrainDirectory.CacheValidator.SchedulingContext)
+                    await scheduler.QueueTask(()=>localGrainDirectory.Stop(true), localGrainDirectory.CacheValidator)
                         .WithCancellation(ct, "localGrainDirectory Stop failed because the task was cancelled");
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
                     //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
@@ -727,7 +726,7 @@ namespace Orleans.Runtime
             foreach (var grainService in grainServices)
             {
                 await this.scheduler
-                    .QueueTask(grainService.Stop, grainService.SchedulingContext)
+                    .QueueTask(grainService.Stop, grainService)
                     .WithCancellation(ct, "Stopping GrainService failed because the task was cancelled");
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
@@ -774,7 +773,7 @@ namespace Orleans.Runtime
                 Utils.SafeExecute(() =>
                 {
                     var activationData = enumerator.Current.Value;
-                    var workItemGroup = scheduler.GetWorkItemGroup(activationData.SchedulingContext);
+                    var workItemGroup = scheduler.GetWorkItemGroup(activationData);
                     if (workItemGroup == null)
                     {
                         sb.AppendFormat("Activation with no work item group!! Grain {0}, activation {1}.",

@@ -64,7 +64,7 @@ namespace Orleans.Runtime.Providers
             var systemTarget = target as SystemTarget;
             if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
             systemTarget.RuntimeClient = this.runtimeClient;
-            scheduler.RegisterWorkContext(systemTarget.SchedulingContext);
+            scheduler.RegisterWorkContext(systemTarget);
             activationDirectory.RecordNewSystemTarget(systemTarget);
         }
 
@@ -73,7 +73,7 @@ namespace Orleans.Runtime.Providers
             var systemTarget = target as SystemTarget;
             if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
             activationDirectory.RemoveSystemTarget(systemTarget);
-            scheduler.UnregisterWorkContext(systemTarget.SchedulingContext);
+            scheduler.UnregisterWorkContext(systemTarget);
         }
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)

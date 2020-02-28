@@ -24,12 +24,14 @@ namespace Orleans
             var grainBase = grain as Grain;
             if (grainBase != null)
             {
-                if (grainBase.Data?.GrainReference == null)
+                if (grainBase.Data?.GrainReference is GrainReference grainRef)
+                {
+                    return grainRef;
+                }
+                else
                 {
                     throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, nameof(grain));
                 }
-
-                return grainBase.Data.GrainReference;
             }
 
             var systemTarget = grain as ISystemTargetBase;
@@ -100,11 +102,11 @@ namespace Orleans
             var grainBase = grain as Grain;
             if (grainBase != null)
             {
-                if (grainBase.Data == null || grainBase.Data.Identity == null)
+                if (grainBase.Data == null || grainBase.Data.GrainId == null)
                 {
                     throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
                 }
-                return grainBase.Data.Identity;
+                return grainBase.Data.GrainId;
             }
 
             throw new ArgumentException(String.Format("GetGrainId has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");

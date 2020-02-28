@@ -26,7 +26,7 @@ namespace Orleans.Runtime
 
         private GrainTimer(OrleansTaskScheduler scheduler, IActivationData activationData, ILogger logger, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
-            var ctxt = RuntimeContext.CurrentActivationContext;
+            var ctxt = RuntimeContext.CurrentGrainContext;
             scheduler.CheckSchedulingContextValidity(ctxt);
             this.scheduler = scheduler;
             this.activationData = activationData;
@@ -93,7 +93,7 @@ namespace Orleans.Runtime
             asyncCallback = null;
         }
 
-        private async Task TimerTick(object state, ISchedulingContext context)
+        private async Task TimerTick(object state, IGrainContext context)
         {
             if (TimerAlreadyStopped)
                 return;

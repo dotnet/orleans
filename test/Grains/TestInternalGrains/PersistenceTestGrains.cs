@@ -673,7 +673,7 @@ namespace UnitTests.Grains
         private const int Multiple = 100;
 
         private IReentrentGrainWithState _other;
-        private ISchedulingContext _context;
+        private IGrainContext _context;
         private TaskScheduler _scheduler;
         private ILogger logger;
         private bool executing;
@@ -686,7 +686,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            _context = RuntimeContext.Current.ActivationContext;
+            _context = RuntimeContext.CurrentGrainContext;
             _scheduler = TaskScheduler.Current;
             executing = false;
             return base.OnActivateAsync();
@@ -831,7 +831,7 @@ namespace UnitTests.Grains
                 //Environment.Exit(1);
             }
 
-            if (RuntimeContext.Current == null || RuntimeContext.Current.ActivationContext == null)
+            if (RuntimeContext.CurrentGrainContext == null)
             {
                 var errorMsg = "Found RuntimeContext.Current == null.\n" + TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
                 this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
@@ -839,7 +839,7 @@ namespace UnitTests.Grains
                 //Environment.Exit(1);
             }
 
-            var context = RuntimeContext.Current.ActivationContext;
+            var context = RuntimeContext.CurrentGrainContext;
             var scheduler = TaskScheduler.Current;
 
             executing = true;

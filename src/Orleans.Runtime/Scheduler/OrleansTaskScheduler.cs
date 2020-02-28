@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Scheduler
         private readonly SchedulerStatisticsGroup schedulerStatistics;
         private readonly IOptions<StatisticsOptions> statisticsOptions;
         private readonly ILogger taskWorkItemLogger;
-        private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory;
+        private readonly ConcurrentDictionary<IGrainContext, WorkItemGroup> workgroupDirectory;
         private readonly ILogger<WorkItemGroup> workItemGroupLogger;
         private readonly ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger;
         private readonly CancellationTokenSource cancellationTokenSource;
@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Scheduler
             TurnWarningLengthThreshold = options.Value.TurnWarningLengthThreshold;
             this.MaxPendingItemsSoftLimit = options.Value.MaxPendingWorkItemsSoftLimit;
             this.StoppedWorkItemGroupWarningInterval = options.Value.StoppedActivationWarningInterval;
-            workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
+            workgroupDirectory = new ConcurrentDictionary<IGrainContext, WorkItemGroup>();
                         
             this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
             IntValueStatistic.FindOrCreate(StatisticNames.SCHEDULER_WORKITEMGROUP_COUNT, () => WorkItemGroupCount);
@@ -175,7 +175,7 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("QueueTask: Id={0} with Status={1} AsyncState={2} when TaskScheduler.Current={3}", task.Id, task.Status, task.AsyncState, Current);
 #endif
-            var context = contextObj as ISchedulingContext;
+            var context = contextObj as IGrainContext;
             var workItemGroup = GetWorkItemGroup(context);
             if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystemGroup)
             {
@@ -210,21 +210,21 @@ namespace Orleans.Runtime.Scheduler
         }
 
         // Enqueue a work item to a given context
-        public void QueueWorkItem(IWorkItem workItem, ISchedulingContext context)
+        public void QueueWorkItem(IWorkItem workItem)
         {
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("QueueWorkItem " + context);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("QueueWorkItem " + workItem);
 #endif
             if (workItem is TaskWorkItem)
             {
                 var error = String.Format("QueueWorkItem was called on OrleansTaskScheduler for TaskWorkItem {0} on Context {1}."
                     + " Should only call OrleansTaskScheduler.QueueWorkItem on WorkItems that are NOT TaskWorkItem. Tasks should be queued to the scheduler via QueueTask call.",
-                    workItem.ToString(), context);
+                    workItem.ToString(), workItem.GrainContext);
                 logger.Error(ErrorCode.SchedulerQueueWorkItemWrongCall, error);
                 throw new InvalidOperationException(error);
             }
 
-            var workItemGroup = GetWorkItemGroup(context);
+            var workItemGroup = GetWorkItemGroup(workItem.GrainContext);
             if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystemGroup)
             {
                 // Drop the task on the floor if it's an application work item and application turns are stopped
@@ -232,8 +232,6 @@ namespace Orleans.Runtime.Scheduler
                 logger.Warn(ErrorCode.SchedulerAppTurnsStopped_1, msg);
                 return;
             }
-
-            workItem.SchedulingContext = context;
             
             // We must wrap any work item in Task and enqueue it as a task to the right scheduler via Task.Start.
             Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
@@ -250,7 +248,7 @@ namespace Orleans.Runtime.Scheduler
         }
 
         // Only required if you have work groups flagged by a context that is not a WorkGroupingContext
-        public WorkItemGroup RegisterWorkContext(ISchedulingContext context)
+        public WorkItemGroup RegisterWorkContext(IGrainContext context)
         {
             if (context is null)
             {
@@ -266,19 +264,24 @@ namespace Orleans.Runtime.Scheduler
                 this.schedulerStatistics,
                 this.statisticsOptions);
 
-            if (context is SchedulingContext schedulingContext)
+
+            if (context is SystemTarget systemTarget)
             {
-                schedulingContext.WorkItemGroup = wg;
+                systemTarget.WorkItemGroup = wg;
+            }
+
+            if (context is ActivationData activation)
+            {
+                activation.WorkItemGroup = wg;
             }
 
             workgroupDirectory.TryAdd(context, wg);
             
-
             return wg;
         }
 
         // Only required if you have work groups flagged by a context that is not a WorkGroupingContext
-        public void UnregisterWorkContext(ISchedulingContext context)
+        public void UnregisterWorkContext(IGrainContext context)
         {
             if (context is null)
             {
@@ -291,21 +294,28 @@ namespace Orleans.Runtime.Scheduler
                 workGroup.Stop();
             }
 
-            if (context is SchedulingContext schedulingContext)
+            if (context is SystemTarget systemTarget)
             {
-                schedulingContext.WorkItemGroup = null;
+                systemTarget.WorkItemGroup = null;
+            }
+
+            if (context is ActivationData activation)
+            {
+                activation.WorkItemGroup = null;
             }
         }
 
         // public for testing only -- should be private, otherwise
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public WorkItemGroup GetWorkItemGroup(ISchedulingContext context)
+        public WorkItemGroup GetWorkItemGroup(IGrainContext context)
         {
             switch (context)
             {
                 case null:
                     return null;
-                case SchedulingContext schedulingContext when schedulingContext.WorkItemGroup is WorkItemGroup wg:
+                case SystemTarget systemTarget when systemTarget.WorkItemGroup is WorkItemGroup wg:
+                    return wg;
+                case ActivationData activation when activation.WorkItemGroup is WorkItemGroup wg:
                     return wg;
                 default:
                     {
@@ -317,7 +327,7 @@ namespace Orleans.Runtime.Scheduler
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private void ThrowNoWorkItemGroup(ISchedulingContext context)
+        private void ThrowNoWorkItemGroup(IGrainContext context)
         {
             var error = string.Format("QueueWorkItem was called on a non-null context {0} but there is no valid WorkItemGroup for it.", context);
             logger.Error(ErrorCode.SchedulerQueueWorkItemWrongContext, error);
@@ -325,7 +335,7 @@ namespace Orleans.Runtime.Scheduler
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        internal void CheckSchedulingContextValidity(ISchedulingContext context)
+        internal void CheckSchedulingContextValidity(IGrainContext context)
         {
             if (context is null)
             {
@@ -340,10 +350,7 @@ namespace Orleans.Runtime.Scheduler
 
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
         {
-            //bool canExecuteInline = WorkerPoolThread.CurrentContext != null;
-
-            var ctx = RuntimeContext.Current;
-            bool canExecuteInline = ctx == null || ctx.ActivationContext==null;
+            bool canExecuteInline = RuntimeContext.CurrentGrainContext is null;
 
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace)) 
@@ -378,7 +385,7 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("RunTask: Id={0} with Status={1} AsyncState={2} when TaskScheduler.Current={3}", task.Id, task.Status, task.AsyncState, Current);
 #endif
-            var context = RuntimeContext.CurrentActivationContext;
+            var context = RuntimeContext.CurrentGrainContext;
             var workItemGroup = GetWorkItemGroup(context);
 
             if (workItemGroup == null)

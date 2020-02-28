@@ -54,7 +54,7 @@ namespace Orleans.Runtime
             this.hostedClient = client;
             if (client != null)
             {
-                this.scheduler.QueueAction(Start, this.SchedulingContext).Ignore();
+                this.scheduler.QueueAction(Start, this).Ignore();
             }
         }
 
@@ -64,7 +64,7 @@ namespace Orleans.Runtime
 
             // Only start ClientRefreshTimer if this silo has a gateway.
             // Need to start the timer in the system target context.
-            scheduler.QueueAction(Start, this.SchedulingContext).Ignore();
+            scheduler.QueueAction(Start, this).Ignore();
         }
 
         private void Start()
@@ -124,8 +124,7 @@ namespace Orleans.Runtime
             var addr = GetClientActivationAddress(clientId);
             scheduler.QueueTask(
                 () => ExecuteWithRetries(() => grainDirectory.RegisterAsync(addr, singleActivation:false), ErrorCode.ClientRegistrarFailedToRegister, String.Format("Directory.RegisterAsync {0} failed.", addr)),
-                this.SchedulingContext)
-                        .Ignore();
+                this).Ignore();
         }
 
         internal void ClientDropped(GrainId clientId)
@@ -133,8 +132,7 @@ namespace Orleans.Runtime
             var addr = GetClientActivationAddress(clientId);
             scheduler.QueueTask(
                 () => ExecuteWithRetries(() => grainDirectory.UnregisterAsync(addr, Orleans.GrainDirectory.UnregistrationCause.Force), ErrorCode.ClientRegistrarFailedToUnregister, String.Format("Directory.UnRegisterAsync {0} failed.", addr)), 
-                this.SchedulingContext)
-                        .Ignore();
+                this).Ignore();
         }
 
         private async Task ExecuteWithRetries(Func<Task> functionToExecute, ErrorCode errorCode, string errorStr)

@@ -160,7 +160,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void OnEnqueueMessageOnActivation(Message message, ISchedulingContext context)
+        public void OnEnqueueMessageOnActivation(Message message, IGrainContext context)
         {
             if (this.IsEnabled(EnqueueMessageOnActivationEventName))
             {

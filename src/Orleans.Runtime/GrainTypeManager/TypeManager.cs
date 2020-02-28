@@ -100,7 +100,7 @@ namespace Orleans.Runtime
                     this.logger.LogInformation("Expediting cluster type map refresh due to new silo, {SiloAddress}", updatedSilo);
                 }
 
-                this.scheduler.QueueTask(() => this.OnRefreshClusterMapTimer(null), SchedulingContext);
+                this.scheduler.QueueTask(() => this.OnRefreshClusterMapTimer(null), this);
             }
         }
 
@@ -245,7 +245,7 @@ namespace Orleans.Runtime
             try
             {
                 var remoteTypeManager = this.grainFactory.GetSystemTarget<ISiloTypeManager>(Constants.TypeManagerId, siloAddress);
-                var siloTypeCodeMap = await scheduler.QueueTask(() => remoteTypeManager.GetSiloTypeCodeMap(), SchedulingContext);
+                var siloTypeCodeMap = await scheduler.QueueTask(() => remoteTypeManager.GetSiloTypeCodeMap(), this);
                 return new KeyValuePair<SiloAddress, GrainInterfaceMap>(siloAddress, siloTypeCodeMap);
             }
             catch (Exception ex)

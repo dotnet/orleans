@@ -5,31 +5,28 @@ namespace Orleans.Runtime
 {
     internal class RuntimeContext
     {
-        public ISchedulingContext ActivationContext { get; private set; }
+        public IGrainContext GrainContext { get; private set; }
 
         [ThreadStatic]
         private static RuntimeContext context;
 
-        public static RuntimeContext Current { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => context ??= new RuntimeContext(); }
+        public static RuntimeContext Current => context;
 
-        internal static ISchedulingContext CurrentActivationContext { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => Current?.ActivationContext; }
+        internal static IGrainContext CurrentGrainContext { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => context?.GrainContext; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void SetExecutionContext(ISchedulingContext shedContext)
+        internal static void SetExecutionContext(IGrainContext shedContext)
         {
-            Current.ActivationContext = shedContext;
+            context ??= new RuntimeContext();
+            context.GrainContext = shedContext;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void ResetExecutionContext()
         {
-            context.ActivationContext = null;
+            context.GrainContext = null;
         }
 
-        public override string ToString()
-        {
-            return String.Format("RuntimeContext: ActivationContext={0}", 
-                ActivationContext != null ? ActivationContext.ToString() : "null");
-        }
+        public override string ToString() => $"RuntimeContext: GrainContext={GrainContext?.ToString() ?? "null"}";
     }
 }

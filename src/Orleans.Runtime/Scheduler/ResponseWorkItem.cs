@@ -20,11 +20,13 @@ namespace Orleans.Runtime.Scheduler
             get { return String.Format("ResponseWorkItem:Id={0},Type={1} {2}", response.Id, response.Result, response.DebugContext); }
         }
 
+        public override IGrainContext GrainContext => this.target;
+
         public override void Execute()
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.SchedulingContext);
+                RuntimeContext.SetExecutionContext(this.target);
                 target.HandleResponse(response);
             }
             finally
