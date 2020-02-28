@@ -104,10 +104,7 @@ namespace Orleans.Runtime
         }
 
         public IServiceProvider ServiceProvider { get; }
-
-        /// <inheritdoc />
-        public ClientInvokeCallback ClientInvokeCallback { get; set; }
-
+        
         public IStreamProviderRuntime CurrentStreamProviderRuntime { get; internal set; }
 
         public OrleansTaskScheduler Scheduler { get; }
