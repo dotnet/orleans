@@ -282,10 +282,11 @@ namespace Orleans.Runtime.Scheduler
             {
                 if (this.HasWork)
                 {
-                    ReportWorkGroupProblem(
-                        String.Format("WorkItemGroup is being shutdown while still active. workItemCount = {0}."
-                        + "The likely reason is that the task is not being 'awaited' properly.", WorkItemCount),
-                        ErrorCode.SchedulerWorkGroupStopping);
+                    log.LogWarning(
+                        (int)ErrorCode.SchedulerWorkGroupStopping,
+                        "WorkItemGroup is being shutdown while still active. workItemCount = {WorkItemCount}. The likely reason is that the task is not being 'awaited' properly. Status: {Status}",
+                        WorkItemCount,
+                        DumpStatus());
                 }
 
                 if (this.IsShutdown)
@@ -481,12 +482,6 @@ namespace Orleans.Runtime.Scheduler
                 }
                 return sb.ToString();
             }
-        }
-
-        private void ReportWorkGroupProblem(string what, ErrorCode errorCode)
-        {
-            var msg = string.Format("{0} {1}", what, DumpStatus());
-            log.Warn(errorCode, msg);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
