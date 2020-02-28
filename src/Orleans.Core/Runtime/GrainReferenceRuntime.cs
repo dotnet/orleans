@@ -91,9 +91,6 @@ namespace Orleans.Runtime
 
         private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, InvokeMethodOptions options)
         {
-            // Call any registered client pre-call interceptor function.
-            CallClientInvokeCallback(reference, request);
-
             if (this.filters?.Length > 0)
             {
                 return InvokeWithFilters(reference, request, options);
@@ -116,31 +113,6 @@ namespace Orleans.Runtime
             var invoker = new OutgoingCallInvoker(reference, request, options, this.sendRequestDelegate, this.grainReferenceMethodCache, this.filters);
             await invoker.Invoke();
             return invoker.Result;
-        }
-
-        private void CallClientInvokeCallback(GrainReference reference, InvokeMethodRequest request)
-        {
-            // Make callback to any registered client callback function, allowing opportunity for an application to set any additional RequestContext info, etc.
-            // Should we set some kind of callback-in-progress flag to detect and prevent any inappropriate callback loops on this GrainReference?
-            try
-            {
-                var callback = this.RuntimeClient.ClientInvokeCallback; // Take copy to avoid potential race conditions
-                if (callback == null) return;
-
-                // Call ClientInvokeCallback only for grain calls, not for system targets.
-                var grain = reference as IGrain;
-                if (grain != null)
-                {
-                    callback(request, grain);
-                }
-            }
-            catch (Exception exc)
-            {
-                logger.Warn(ErrorCode.ProxyClient_ClientInvokeCallback_Error,
-                    "Error while invoking ClientInvokeCallback function " + this.RuntimeClient?.ClientInvokeCallback,
-                    exc);
-                throw;
-            }
         }
 
         private static void CheckForGrainArguments(object[] arguments)

@@ -104,28 +104,7 @@ namespace Orleans
         {
             return builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
         }
-
-        /// <summary>
-        /// Adds a client invocation callback.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="callback">The callback.</param>
-        /// <remarks>
-        /// A <see cref="ClientInvokeCallback"/> is a global pre-call interceptor.
-        /// Synchronous callback made just before a message is about to be constructed and sent by a client to a grain.
-        /// This call will be made from the same thread that constructs the message to be sent, so any thread-local settings
-        /// such as <c>Orleans.RequestContext</c> will be picked up.
-        /// The action receives an <see cref="InvokeMethodRequest"/> with details of the method to be invoked, including InterfaceId and MethodId,
-        /// and a <see cref="IGrain"/> which is the GrainReference this request is being sent through
-        /// This callback method should return promptly and do a minimum of work, to avoid blocking calling thread or impacting throughput.
-        /// </remarks>
-        /// <returns>The builder.</returns>
-        public static IClientBuilder AddClientInvokeCallback(this IClientBuilder builder, ClientInvokeCallback callback)
-        {
-            builder.ConfigureServices(services => services.AddSingleton(callback));
-            return builder;
-        }
-
+        
         /// <summary>
         /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
         /// </summary>
