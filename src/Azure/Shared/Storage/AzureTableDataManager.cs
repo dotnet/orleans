@@ -27,6 +27,8 @@ namespace Orleans.Streaming.EventHubs
 namespace Orleans.Tests.AzureUtils
 #elif ORLEANS_TRANSACTIONS
 namespace Orleans.Transactions.AzureStorage
+#elif ORLEANS_DIRECTORY
+namespace Orleans.GrainDirectory.AzureStorage.Utilities
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
@@ -202,6 +204,45 @@ namespace Orleans.Transactions.AzureStorage
                     // SaveChangesOptions.ReplaceOnUpdate,
                     var opResult = await tableReference.ExecuteAsync(TableOperation.InsertOrReplace(data));
                     return opResult.Etag;
+                }
+                catch (Exception exc)
+                {
+                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_06,
+                        $"Intermediate error upserting entry {(data == null ? "null" : data.ToString())} to the table {TableName}", exc);
+                    throw;
+                }
+            }
+            finally
+            {
+                CheckAlertSlowAccess(startTime, operation);
+            }
+        }
+
+        /// <summary>
+        /// Inserts a data entry in the Azure table: creates a new one if does not exists
+        /// </summary>
+        /// <param name="data">Data to be inserted or replaced in the table.</param>
+        /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
+        public async Task<(bool isSuccess, string eTag)> InsertTableEntryAsync(T data)
+        {
+            const string operation = "InsertTableEntry";
+            var startTime = DateTime.UtcNow;
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("{0} entry {1} into table {2}", operation, data, TableName);
+
+            try
+            {
+                try
+                {
+                    // WAS:
+                    // svc.AttachTo(TableName, data, null);
+                    // svc.UpdateObject(data);
+                    // SaveChangesOptions.ReplaceOnUpdate,
+                    var opResult = await tableReference.ExecuteAsync(TableOperation.Insert(data));
+                    return (true, opResult.Etag);
+                }
+                catch (StorageException storageException) when (storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.Conflict)
+                {
+                    return (false, null);
                 }
                 catch (Exception exc)
                 {

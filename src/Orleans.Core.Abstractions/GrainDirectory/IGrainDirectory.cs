@@ -58,5 +58,22 @@ namespace Orleans.GrainDirectory
         /// Id of the specific Grain activation
         /// </summary>
         public string ActivationId { get; set; }
+
+        public override bool Equals(object obj)
+        {
+            return obj is GrainAddress address &&
+                   this.SiloAddress == address.SiloAddress &&
+                   this.GrainId == address.GrainId &&
+                   this.ActivationId == address.ActivationId;
+        }
+
+        public override int GetHashCode()
+        {
+            var hashCode = 1043893337;
+            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(this.SiloAddress);
+            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(this.GrainId);
+            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(this.ActivationId);
+            return hashCode;
+        }
     }
 }
