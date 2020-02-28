@@ -109,7 +109,7 @@ namespace Orleans.Runtime.GrainDirectory
                                         localDirectory.MyAddress,
                                         captureChunk,
                                         captureIsFullCopy),
-                                localDirectory.RemoteGrainDirectory.SchedulingContext);
+                                localDirectory.RemoteGrainDirectory);
                     lastPromise[captureSilo] = task;
                     tasks.Add(task);
                 }
@@ -449,7 +449,7 @@ namespace Orleans.Runtime.GrainDirectory
             silosHoldingMyPartition.Remove(silo);
             localDirectory.Scheduler.QueueTask(() =>
                 localDirectory.GetDirectoryReference(silo).RemoveHandoffPartition(localDirectory.MyAddress),
-                localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
+                localDirectory.RemoteGrainDirectory).Ignore();
         }
 
         private void DestroyDuplicateActivations(Dictionary<SiloAddress, List<ActivationAddress>> duplicates)
@@ -488,7 +488,7 @@ namespace Orleans.Runtime.GrainDirectory
                 this.pendingOperations.Enqueue((name, action));
                 if (this.pendingOperations.Count <= 2)
                 {
-                    this.localDirectory.Scheduler.QueueTask(this.ExecutePendingOperations, this.localDirectory.RemoteGrainDirectory.SchedulingContext);
+                    this.localDirectory.Scheduler.QueueTask(this.ExecutePendingOperations, this.localDirectory.RemoteGrainDirectory);
                 }
             }
         }

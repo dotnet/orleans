@@ -10,7 +10,7 @@ namespace Orleans.Runtime.Scheduler
     {
         string Name { get; }
         WorkItemType ItemType { get; }
-        ISchedulingContext SchedulingContext { get; set; }
+        IGrainContext GrainContext { get; }
         TimeSpan TimeSinceQueued { get; }
         DateTime TimeQueued { get; set;  }
         bool IsSystemPriority { get; }

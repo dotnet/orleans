@@ -56,14 +56,14 @@ namespace Orleans.Runtime
 
         internal static void OnDispatcherMessageReceive(Message msg)
         {
-            ISchedulingContext context = RuntimeContext.Current != null ? RuntimeContext.Current.ActivationContext : null;
+            var context = RuntimeContext.CurrentGrainContext;
             dispatcherMessagesProcessingReceivedPerDirection[(int)msg.Direction].Increment();
             dispatcherMessagesReceivedTotal.Increment();
             if (context == null)
             {
                 dispatcherReceivedByContext[0].Increment();
             }
-            else if (context.ContextType == SchedulingContextType.Activation)
+            else if (context is IActivationData)
             {
                 dispatcherReceivedByContext[1].Increment();
             }
@@ -91,17 +91,17 @@ namespace Orleans.Runtime
             imaReceived.Increment();
         }
 
-        internal static void OnImaMessageEnqueued(ISchedulingContext context)
+        internal static void OnImaMessageEnqueued(IGrainContext context)
         {
             if (context == null)
             {
                 imaEnqueuedByContext[0].Increment();
             }
-            else if (context.ContextType == SchedulingContextType.SystemTarget)
+            else if (context is ISystemTargetBase)
             {
                 imaEnqueuedByContext[1].Increment();
             }
-            else if (context.ContextType == SchedulingContextType.Activation)
+            else if (context is IActivationData)
             {
                 imaEnqueuedByContext[2].Increment();
             }

@@ -3,16 +3,21 @@ using System;
 
 namespace Orleans.Runtime
 {
-    //TODO: this interface should not meta-data for a grain activation. 
-    internal interface IActivationData
+    /// <summary>
+    /// Represents a grain from the perpsective of the runtime.
+    /// </summary>
+    internal interface IGrainContext : IEquatable<IGrainContext>
     {
         GrainReference GrainReference { get; }
-        GrainId Identity { get; }
-        string GrainTypeName { get; }
-        Grain GrainInstance { get; }
+        GrainId GrainId { get; }
+        IAddressable GrainInstance { get; }
         ActivationId ActivationId { get; }
         ActivationAddress Address { get; }
         IServiceProvider ServiceProvider { get; }
+    }
+
+    internal interface IActivationData : IGrainContext
+    {
         void DelayDeactivation(TimeSpan timeSpan);
         void OnTimerCreated(IGrainTimer timer);
         void OnTimerDisposed(IGrainTimer timer);

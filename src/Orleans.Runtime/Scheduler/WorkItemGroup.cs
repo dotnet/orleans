@@ -54,19 +54,11 @@ namespace Orleans.Runtime.Scheduler
             get { return Utils.Since(TimeQueued); }
         }
 
-        public ISchedulingContext SchedulingContext { get; set; }
+        public bool IsSystemPriority => this.GrainContext is SystemTarget systemTarget && !systemTarget.IsLowPriority;
 
-        public bool IsSystemPriority
-        {
-            get { return SchedulingUtils.IsSystemPriorityContext(SchedulingContext); }
-        }
+        internal bool IsSystemGroup => this.GrainContext is ISystemTargetBase;
 
-        internal bool IsSystemGroup
-        {
-            get { return SchedulingUtils.IsSystemContext(SchedulingContext); }
-        }
-
-        public string Name { get { return SchedulingContext == null ? "unknown" : SchedulingContext.Name; } }
+        public string Name => GrainContext?.ToString() ?? "Unknown";
 
         internal int ExternalWorkItemCount
         {
@@ -127,7 +119,7 @@ namespace Orleans.Runtime.Scheduler
         
         internal WorkItemGroup(
             OrleansTaskScheduler sched,
-            ISchedulingContext schedulingContext,
+            IGrainContext grainContext,
             ILogger<WorkItemGroup> logger,
             ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
             CancellationToken ct,
@@ -135,7 +127,7 @@ namespace Orleans.Runtime.Scheduler
             IOptions<StatisticsOptions> statisticsOptions)
         {
             masterScheduler = sched;
-            SchedulingContext = schedulingContext;
+            GrainContext = grainContext;
             cancellationToken = ct;
             this.schedulerStatistics = schedulerStatistics;
             state = WorkGroupStatus.Waiting;
@@ -150,13 +142,13 @@ namespace Orleans.Runtime.Scheduler
 
             if (schedulerStatistics.CollectShedulerQueuesStats)
             {
-                queueTracking = new QueueTrackingStatistic("Scheduler." + SchedulingContext.Name, statisticsOptions);
+                queueTracking = new QueueTrackingStatistic("Scheduler." + this.Name, statisticsOptions);
                 queueTracking.OnStartExecution();
             }
 
             if (schedulerStatistics.CollectPerWorkItemStats)
             {
-                workItemGroupStatisticsNumber = schedulerStatistics.RegisterWorkItemGroup(SchedulingContext.Name, SchedulingContext,
+                workItemGroupStatisticsNumber = schedulerStatistics.RegisterWorkItemGroup(this.Name, this.GrainContext,
                     () =>
                     {
                         var sb = new StringBuilder();
@@ -184,9 +176,9 @@ namespace Orleans.Runtime.Scheduler
             if (log.IsEnabled(LogLevel.Trace))
             {
                 this.log.LogTrace(
-                    "EnqueueWorkItem {Task} into {SchedulingContext} when TaskScheduler.Current={TaskScheduler}",
+                    "EnqueueWorkItem {Task} into {GrainContext} when TaskScheduler.Current={TaskScheduler}",
                     task,
-                    this.SchedulingContext,
+                    this.GrainContext,
                     System.Threading.Tasks.TaskScheduler.Current);
             }
 #endif
@@ -226,10 +218,10 @@ namespace Orleans.Runtime.Scheduler
                 if (log.IsEnabled(LogLevel.Trace))
                 {
                     log.LogTrace(
-                        "Add to RunQueue {Task}, #{SequenceNumber}, onto {SchedulingContext}",
+                        "Add to RunQueue {Task}, #{SequenceNumber}, onto {GrainContext}",
                         task,
                         thisSequenceNumber,
-                        SchedulingContext);
+                        GrainContext);
                 }
 #endif
                 masterScheduler.ScheduleExecution(this);
@@ -338,6 +330,8 @@ namespace Orleans.Runtime.Scheduler
             get { return WorkItemType.WorkItemGroup; }
         }
 
+        public IGrainContext GrainContext { get; }
+
         // Execute one or more turns for this activation. 
         // This method is always called in a single-threaded environment -- that is, no more than one
         // thread will be in this method at once -- but other asynch threads may still be queueing tasks, etc.
@@ -345,7 +339,7 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.SchedulingContext);
+                RuntimeContext.SetExecutionContext(this.GrainContext);
 
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
                 int count = 0;
@@ -384,9 +378,9 @@ namespace Orleans.Runtime.Scheduler
                     if (log.IsEnabled(LogLevel.Trace))
                     {
                         log.LogTrace(
-                        "About to execute task {Task} in SchedulingContext={SchedulingContext}",
+                        "About to execute task {Task} in GrainContext={GrainContext}",
                         OrleansTaskExtentions.ToString(task),
-                        this.SchedulingContext);
+                        this.GrainContext);
                     }
 #endif
                     var taskStart = stopwatch.Elapsed;
@@ -414,9 +408,9 @@ namespace Orleans.Runtime.Scheduler
                             this.schedulerStatistics.NumLongRunningTurns.Increment();
                             this.log.LogWarning(
                                 (int)ErrorCode.SchedulerTurnTooLong3,
-                                "Task {Task} in WorkGroup {SchedulingContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}",
+                                "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}",
                                 OrleansTaskExtentions.ToString(task),
-                                this.SchedulingContext.ToString(),
+                                this.GrainContext.ToString(),
                                 taskLength.ToString("g"),
                                 OrleansTaskScheduler.TurnWarningLengthThreshold,
                                 Thread.CurrentThread.ToString());
@@ -492,9 +486,16 @@ namespace Orleans.Runtime.Scheduler
                 }
 
                 sb.AppendFormat("TaskRunner={0}; ", TaskScheduler);
-                if (SchedulingContext != null)
+                if (GrainContext != null)
                 {
-                    sb.AppendFormat("Detailed SchedulingContext=<{0}>", SchedulingContext.DetailedStatus());
+                    var detailedStatus = this.GrainContext switch
+                    {
+                        ActivationData activationData => activationData.ToDetailedString(includeExtraDetails: true),
+                        SystemTarget systemTarget => systemTarget.ToDetailedString(),
+                        object obj => obj.ToString(),
+                        _ => "None"
+                    };
+                    sb.AppendFormat("Detailed context=<{0}>", detailedStatus);
                 }
                 return sb.ToString();
             }

@@ -108,7 +108,7 @@ namespace Orleans.Runtime
 
         void IRingRangeListener.RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased)
         {
-            scheduler.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this.SchedulingContext).Ignore();
+            scheduler.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
         }
 
         /// <summary>Invoked when the ring range owned by the service instance changes because of a change in the cluster state</summary>

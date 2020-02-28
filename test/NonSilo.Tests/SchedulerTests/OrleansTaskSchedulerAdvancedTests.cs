@@ -70,7 +70,8 @@ namespace UnitTests.SchedulerTests
                             // ReSharper restore AccessToModifiedClosure
                         }).Ignore();
                     }
-                }), context);
+                },
+                context));
 
             // Pause to let things run
             Thread.Sleep(1500);
@@ -117,7 +118,8 @@ namespace UnitTests.SchedulerTests
                     });
                     task1.Ignore();
                     task2.Ignore();
-                }), context);
+                },
+                context));
 
             var timeoutLimit = TimeSpan.FromMilliseconds(1500);
             try
@@ -189,7 +191,8 @@ namespace UnitTests.SchedulerTests
 
                 Thread.Sleep(TimeSpan.FromSeconds(1));
                 this.mainDone = true;
-            }), context);
+            },
+            context));
 
             try { await result1.Task.WithTimeout(TimeSpan.FromSeconds(3)); }
             catch (TimeoutException) { Assert.True(false, "Timeout-1"); }
@@ -349,7 +352,8 @@ namespace UnitTests.SchedulerTests
 
                 Log(16, "Finished Outer ClosureWorkItem Task Id=" + wrapper.Id);
                 this.mainDone = true;
-            }), context);
+            },
+            context));
 
             Log(17, "Waiting for ClosureWorkItem to spawn wrapper Task");
             for (int i = 0; i < 5 * WaitFactor; i++)
@@ -458,7 +462,8 @@ namespace UnitTests.SchedulerTests
 
                 Log(12, "Finished Outer TaskWorkItem Task Id=" + wrapper.Id);
                 this.mainDone = true;
-            }), context);
+            },
+            context));
 
             Log(13, "Waiting for ClosureWorkItem to spawn wrapper Task");
             for (int i = 0; i < 5 * WaitFactor; i++)
@@ -512,7 +517,8 @@ namespace UnitTests.SchedulerTests
                     Task task3 = task2.ContinueWith((_) => { n = n / 5; this.output.WriteLine("===> 3"); });
                     Task task4 = task3.ContinueWith((_) => { n = n - 2; this.output.WriteLine("===> 4"); result.SetResult(true); });
                     task4.Ignore();
-                }), context);
+                },
+                context));
             // ReSharper restore AccessToModifiedClosure
 
             Assert.True(result.Task.Wait(TwoSeconds));
@@ -540,9 +546,10 @@ namespace UnitTests.SchedulerTests
                 Task<int> task2 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 2a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 2b"); return 2; });
                 Task<int> task3 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 3a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 3b"); return 3; });
                 Task<int> task4 = Task<int>.Factory.StartNew(() => { this.output.WriteLine("===> 4a"); Thread.Sleep(OneSecond); n = n + 3; this.output.WriteLine("===> 4b"); return 4; });
-                tasks = new Task<int>[] {task1, task2, task3, task4};
+                tasks = new Task<int>[] { task1, task2, task3, task4 };
                 result.SetResult(true);
-            }),context);
+            },
+            context));
             // ReSharper restore AccessToModifiedClosure
             Assert.True(result.Task.Wait(TwoSeconds)); // Wait for main (one that creates tasks) work item to finish.
 
@@ -688,11 +695,11 @@ namespace UnitTests.SchedulerTests
                 TaskScheduler.Current);
         }
 
-        private static void CheckRuntimeContext(ISchedulingContext context)
+        private static void CheckRuntimeContext(IGrainContext context)
         {
             Assert.NotNull(RuntimeContext.Current); // Runtime context should not be null
-            Assert.NotNull(RuntimeContext.Current.ActivationContext); // Activation context should not be null
-            Assert.Equal(context,  RuntimeContext.Current.ActivationContext);  // "Activation context"
+            Assert.NotNull(RuntimeContext.CurrentGrainContext); // Activation context should not be null
+            Assert.Equal(context, RuntimeContext.CurrentGrainContext);  // "Activation context"
         }
     }
 }

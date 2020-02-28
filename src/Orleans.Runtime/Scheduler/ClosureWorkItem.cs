@@ -11,22 +11,24 @@ namespace Orleans.Runtime.Scheduler
 
         public override string Name => this.name ?? GetMethodName(this.continuation);
 
-        public ClosureWorkItem(Action closure)
+        public ClosureWorkItem(Action closure, IGrainContext grainContext)
         {
             continuation = closure;
+            this.GrainContext = grainContext;
         }
 
-        public ClosureWorkItem(Action closure, string name)
+        public ClosureWorkItem(Action closure, string name, IGrainContext grainContext)
         {
             continuation = closure;
             this.name = name;
+            this.GrainContext = grainContext;
         }
 
         public override void Execute()
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.SchedulingContext);
+                RuntimeContext.SetExecutionContext(this.GrainContext);
                 continuation();
             }
             finally
@@ -36,6 +38,8 @@ namespace Orleans.Runtime.Scheduler
         }
 
         public override WorkItemType ItemType => WorkItemType.Closure;
+
+        public override IGrainContext GrainContext { get; }
 
         internal static string GetMethodName(Delegate action)
         {
@@ -56,17 +60,23 @@ namespace Orleans.Runtime.Scheduler
         public override string Name => this.name ?? ClosureWorkItem.GetMethodName(this.continuation);
         public Task Task => this.completion.Task;
 
-        public AsyncClosureWorkItem(Func<Task> closure, string name = null)
+        public AsyncClosureWorkItem(Func<Task> closure, string name, IGrainContext grainContext)
         {
             this.continuation = closure;
             this.name = name;
+            this.GrainContext = grainContext;
+        }
+        public AsyncClosureWorkItem(Func<Task> closure, IGrainContext grainContext)
+        {
+            this.continuation = closure;
+            this.GrainContext = grainContext;
         }
 
         public override async void Execute()
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.SchedulingContext);
+                RuntimeContext.SetExecutionContext(this.GrainContext);
                 RequestContext.Clear();
                 await this.continuation();
                 this.completion.TrySetResult(true);
@@ -82,6 +92,8 @@ namespace Orleans.Runtime.Scheduler
         }
 
         public override WorkItemType ItemType => WorkItemType.Closure;
+
+        public override IGrainContext GrainContext { get; }
     }
 
     internal class AsyncClosureWorkItem<T> : WorkItemBase
@@ -92,18 +104,25 @@ namespace Orleans.Runtime.Scheduler
 
         public override string Name => this.name ?? ClosureWorkItem.GetMethodName(this.continuation);
         public Task<T> Task => this.completion.Task;
-        
-        public AsyncClosureWorkItem(Func<Task<T>> closure, string name = null)
+
+        public AsyncClosureWorkItem(Func<Task<T>> closure, string name, IGrainContext grainContext)
         {
             this.continuation = closure;
             this.name = name;
+            this.GrainContext = grainContext;
+        }
+
+        public AsyncClosureWorkItem(Func<Task<T>> closure, IGrainContext grainContext)
+        {
+            this.continuation = closure;
+            this.GrainContext = grainContext;
         }
 
         public override async void Execute()
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.SchedulingContext);
+                RuntimeContext.SetExecutionContext(this.GrainContext);
                 RequestContext.Clear();
                 var result = await this.continuation();
                 this.completion.TrySetResult(result);
@@ -119,5 +138,7 @@ namespace Orleans.Runtime.Scheduler
         }
 
         public override WorkItemType ItemType => WorkItemType.Closure;
+
+        public override IGrainContext GrainContext { get; }
     }
 }

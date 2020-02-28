@@ -121,7 +121,7 @@ namespace DefaultCluster.Tests.General
             var observer = new ObserverTests.SimpleGrainObserver(
                 (a, b, result) =>
                 {
-                    Assert.Null(RuntimeContext.Current);
+                    Assert.Null(RuntimeContext.CurrentGrainContext);
                     callbackCounter[0]++;
 
                     if (a == 3 && b == 0)

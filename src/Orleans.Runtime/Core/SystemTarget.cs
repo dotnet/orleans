@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Scheduler;
@@ -12,20 +11,20 @@ namespace Orleans.Runtime
     /// Made public for GrainSerive to inherit from it.
     /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
-    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable
+    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable, IGrainContext
     {
         private readonly GrainId grainId;
-        private readonly SchedulingContext schedulingContext;
+        private GrainReference selfReference;
         private IGrainMethodInvoker lastInvoker;
         private Message running;
 
         /// <summary>Silo address of the system target.</summary>
         public SiloAddress Silo { get; }
+        internal ActivationAddress ActivationAddress { get; }
+
         GrainId ISystemTargetBase.GrainId => grainId;
-        internal SchedulingContext SchedulingContext => schedulingContext;
         internal ActivationId ActivationId { get; set; }
         private ISiloRuntimeClient runtimeClient;
-        private readonly ILoggerFactory loggerFactory;
         private readonly ILogger timerLogger;
         internal ISiloRuntimeClient RuntimeClient
         {
@@ -51,6 +50,18 @@ namespace Orleans.Runtime
 
         IGrainReferenceRuntime ISystemTargetBase.GrainReferenceRuntime => this.RuntimeClient.GrainReferenceRuntime;
 
+        GrainReference IGrainContext.GrainReference => selfReference ??= GrainReference.FromGrainId(this.grainId, this.RuntimeClient.GrainReferenceRuntime, systemTargetSilo: this.Silo);
+
+        GrainId IGrainContext.GrainId => this.grainId;
+
+        IAddressable IGrainContext.GrainInstance => this;
+
+        ActivationId IGrainContext.ActivationId => this.ActivationId;
+
+        ActivationAddress IGrainContext.Address => this.ActivationAddress;
+
+        IServiceProvider IGrainContext.ServiceProvider => this.RuntimeClient.ServiceProvider;
+
         /// <summary>Only needed to make Reflection happy.</summary>
         protected SystemTarget()
         {
@@ -64,12 +75,16 @@ namespace Orleans.Runtime
         internal SystemTarget(GrainId grainId, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
         {
             this.grainId = grainId;
-            Silo = silo;
-            this.loggerFactory = loggerFactory;
-            ActivationId = ActivationId.GetSystemActivation(grainId, silo);
-            schedulingContext = new SchedulingContext(this, lowPriority);
+            this.Silo = silo;
+            this.ActivationAddress = ActivationAddress.GetAddress(this.Silo, this.grainId, this.ActivationId);
+            this.ActivationId = ActivationId.GetSystemActivation(grainId, silo);
+            this.IsLowPriority = lowPriority;
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
         }
+
+        public bool IsLowPriority { get; }
+
+        internal WorkItemGroup WorkItemGroup { get; set; }
 
         IGrainMethodInvoker IInvokable.GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType)
         {
@@ -115,9 +130,9 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
         {
-            var ctxt = RuntimeContext.CurrentActivationContext;
+            var ctxt = RuntimeContext.CurrentGrainContext;
             this.RuntimeClient.Scheduler.CheckSchedulingContextValidity(ctxt);
-            name = name ?? ctxt.Name + "Timer";
+            name = name ?? ctxt.GrainId + "Timer";
 
             var timer = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler, this.timerLogger, asyncCallback, state, dueTime, period, name);
             timer.Start();
@@ -128,10 +143,10 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             return String.Format("[{0}SystemTarget: {1}{2}{3}]",
-                 SchedulingContext.IsSystemPriorityContext ? String.Empty : "LowPriority",
+                 IsLowPriority ? "LowPriority" : string.Empty,
                  Silo,
                  this.grainId,
-                 ActivationId);
+                 this.ActivationId);
         }
 
         /// <summary>Adds details about message currently being processed</summary>
@@ -139,5 +154,7 @@ namespace Orleans.Runtime
         {
             return String.Format("{0} CurrentlyExecuting={1}", ToString(), running != null ? running.ToString() : "null");
         }
+
+        bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
     }
 }

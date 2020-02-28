@@ -5,28 +5,28 @@ namespace Orleans.Runtime.Scheduler
 {
     internal static class SchedulerExtensions
     {
-        internal static Task<T> QueueTask<T>(this OrleansTaskScheduler scheduler, Func<Task<T>> taskFunc, ISchedulingContext targetContext)
+        internal static Task<T> QueueTask<T>(this OrleansTaskScheduler scheduler, Func<Task<T>> taskFunc, IGrainContext targetContext)
         {
-            var workItem = new AsyncClosureWorkItem<T>(taskFunc);
-            scheduler.QueueWorkItem(workItem, targetContext);
+            var workItem = new AsyncClosureWorkItem<T>(taskFunc, targetContext);
+            scheduler.QueueWorkItem(workItem);
             return workItem.Task;
         }
 
-        internal static Task QueueTask(this OrleansTaskScheduler scheduler, Func<Task> taskFunc, ISchedulingContext targetContext)
+        internal static Task QueueTask(this OrleansTaskScheduler scheduler, Func<Task> taskFunc, IGrainContext targetContext)
         {
-            var workItem = new AsyncClosureWorkItem(taskFunc);
-            scheduler.QueueWorkItem(workItem, targetContext);
+            var workItem = new AsyncClosureWorkItem(taskFunc, targetContext);
+            scheduler.QueueWorkItem(workItem);
             return workItem.Task;
         }
 
-        internal static Task QueueNamedTask(this OrleansTaskScheduler scheduler, Func<Task> taskFunc, ISchedulingContext targetContext, string activityName = null)
+        internal static Task QueueNamedTask(this OrleansTaskScheduler scheduler, Func<Task> taskFunc, IGrainContext targetContext, string activityName = null)
         {
-            var workItem = new AsyncClosureWorkItem(taskFunc, activityName);
-            scheduler.QueueWorkItem(workItem, targetContext);
+            var workItem = new AsyncClosureWorkItem(taskFunc, activityName, targetContext);
+            scheduler.QueueWorkItem(workItem);
             return workItem.Task;
         }
 
-        internal static Task QueueAction(this OrleansTaskScheduler scheduler, Action action, ISchedulingContext targetContext)
+        internal static Task QueueAction(this OrleansTaskScheduler scheduler, Action action, IGrainContext targetContext)
         {
             var resolver = new TaskCompletionSource<bool>();
             Action syncFunc =
@@ -42,7 +42,7 @@ namespace Orleans.Runtime.Scheduler
                         resolver.TrySetException(exc);
                     }
                 };
-            scheduler.QueueWorkItem(new ClosureWorkItem(() => syncFunc()), targetContext);
+            scheduler.QueueWorkItem(new ClosureWorkItem(() => syncFunc(), targetContext));
             return resolver.Task;
         }
 
@@ -52,7 +52,7 @@ namespace Orleans.Runtime.Scheduler
         /// <param name="scheduler"></param>
         /// <param name="action"></param>
         /// <param name="targetContext"></param>
-        internal static Task RunOrQueueAction(this OrleansTaskScheduler scheduler, Action action, ISchedulingContext targetContext)
+        internal static Task RunOrQueueAction(this OrleansTaskScheduler scheduler, Action action, IGrainContext targetContext)
         {
             return scheduler.RunOrQueueTask(() =>
             {
@@ -62,11 +62,10 @@ namespace Orleans.Runtime.Scheduler
         }
 
 
-        internal static Task<T> RunOrQueueTask<T>(this OrleansTaskScheduler scheduler, Func<Task<T>> taskFunc, ISchedulingContext targetContext)
+        internal static Task<T> RunOrQueueTask<T>(this OrleansTaskScheduler scheduler, Func<Task<T>> taskFunc, IGrainContext targetContext)
         {
-            ISchedulingContext currentContext = RuntimeContext.CurrentActivationContext;
-            if (SchedulingUtils.IsAddressableContext(currentContext)
-                && currentContext.Equals(targetContext))
+            var currentContext = RuntimeContext.CurrentGrainContext;
+            if (currentContext is object && currentContext.Equals(targetContext))
             {
                 try
                 {
@@ -83,11 +82,10 @@ namespace Orleans.Runtime.Scheduler
             return scheduler.QueueTask(taskFunc, targetContext);
         }
 
-        internal static Task RunOrQueueTask(this OrleansTaskScheduler scheduler, Func<Task> taskFunc, ISchedulingContext targetContext)
+        internal static Task RunOrQueueTask(this OrleansTaskScheduler scheduler, Func<Task> taskFunc, IGrainContext targetContext)
         {
-            var currentContext = RuntimeContext.CurrentActivationContext;
-            if (SchedulingUtils.IsAddressableContext(currentContext)
-                && currentContext.Equals(targetContext))
+            var currentContext = RuntimeContext.CurrentGrainContext;
+            if (currentContext is object && currentContext.Equals(targetContext))
             {
                 try
                 {
