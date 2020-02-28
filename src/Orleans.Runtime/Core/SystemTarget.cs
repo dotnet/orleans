@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Scheduler;
@@ -15,11 +14,14 @@ namespace Orleans.Runtime
     public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable, IGrainContext
     {
         private readonly GrainId grainId;
+        private GrainReference selfReference;
         private IGrainMethodInvoker lastInvoker;
         private Message running;
 
         /// <summary>Silo address of the system target.</summary>
         public SiloAddress Silo { get; }
+        internal ActivationAddress ActivationAddress { get; }
+
         GrainId ISystemTargetBase.GrainId => grainId;
         internal ActivationId ActivationId { get; set; }
         private ISiloRuntimeClient runtimeClient;
@@ -48,7 +50,7 @@ namespace Orleans.Runtime
 
         IGrainReferenceRuntime ISystemTargetBase.GrainReferenceRuntime => this.RuntimeClient.GrainReferenceRuntime;
 
-        GrainReference IGrainContext.GrainReference => GrainReference.FromGrainId(this.grainId, this.RuntimeClient.GrainReferenceRuntime, systemTargetSilo: this.Silo);
+        GrainReference IGrainContext.GrainReference => selfReference ??= GrainReference.FromGrainId(this.grainId, this.RuntimeClient.GrainReferenceRuntime, systemTargetSilo: this.Silo);
 
         GrainId IGrainContext.GrainId => this.grainId;
 
@@ -56,7 +58,7 @@ namespace Orleans.Runtime
 
         ActivationId IGrainContext.ActivationId => this.ActivationId;
 
-        ActivationAddress IGrainContext.Address => ActivationAddress.GetAddress(this.Silo, this.grainId, this.ActivationId);
+        ActivationAddress IGrainContext.Address => this.ActivationAddress;
 
         IServiceProvider IGrainContext.ServiceProvider => this.RuntimeClient.ServiceProvider;
 
@@ -74,6 +76,7 @@ namespace Orleans.Runtime
         {
             this.grainId = grainId;
             this.Silo = silo;
+            this.ActivationAddress = ActivationAddress.GetAddress(this.Silo, this.grainId, this.ActivationId);
             this.ActivationId = ActivationId.GetSystemActivation(grainId, silo);
             this.IsLowPriority = lowPriority;
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
