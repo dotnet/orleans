@@ -143,7 +143,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     var response = await validator.LookUpMany(cachedGrainAndETagList);
                     ProcessCacheRefreshResponse(capture, response);
-                }, router.CacheValidator.SchedulingContext).Ignore();
+                }, router.CacheValidator).Ignore();
 
                 if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} is sending request to silo {1} with {2} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);                
             }

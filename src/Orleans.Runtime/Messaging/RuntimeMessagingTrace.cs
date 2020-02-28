@@ -57,8 +57,8 @@ namespace Orleans.Runtime
                 new EventId((int)ErrorCode.Messaging_Dispatcher_ForwardingRequests, DispatcherForwardingMultipleEventName),
                 "Forwarding {MessageCount} requests destined for address {OldAddress} to address {ForwardingAddress} after {FailedOperation}");
 
-        private static readonly Action<ILogger, Message, ActivationData, Exception> LogDispatcherSelectTargetFailed =
-            LoggerMessage.Define<Message, ActivationData>(
+        private static readonly Action<ILogger, Message, IGrainContext, Exception> LogDispatcherSelectTargetFailed =
+            LoggerMessage.Define<Message, IGrainContext>(
                 LogLevel.Error,
                 new EventId((int)ErrorCode.Dispatcher_SelectTarget_Failed, DispatcherSelectTargetFailedEventName),
                 "Failed to address message {Message} from activation {Activation}");
@@ -152,7 +152,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal void OnDispatcherSelectTargetFailed(Message message, ActivationData sendingActivation, Exception exception)
+        internal void OnDispatcherSelectTargetFailed(Message message, IGrainContext sendingActivation, Exception exception)
         {
             if (this.IsEnabled(DispatcherSelectTargetFailedEventName))
             {

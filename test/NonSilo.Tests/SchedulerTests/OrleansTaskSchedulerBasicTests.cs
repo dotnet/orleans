@@ -10,25 +10,27 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
 using Orleans.Internal;
+using Orleans;
 
 // ReSharper disable ConvertToConstant.Local
 
 namespace UnitTests.SchedulerTests
 {
-    internal class UnitTestSchedulingContext : ISchedulingContext
+    internal class UnitTestSchedulingContext : IGrainContext
     {
-        public SchedulingContextType ContextType { get { return SchedulingContextType.Activation; } }
+        public GrainReference GrainReference => throw new NotImplementedException();
 
-        public string Name { get { return "UnitTestSchedulingContext"; } }
+        public GrainId GrainId => throw new NotImplementedException();
 
-        public bool IsSystemPriorityContext { get { return false; } }
+        public IAddressable GrainInstance => throw new NotImplementedException();
 
-        public string DetailedStatus() { return ToString(); }
+        public ActivationId ActivationId => throw new NotImplementedException();
 
-        public bool Equals(ISchedulingContext other)
-        {
-            return base.Equals(other);
-        }
+        public ActivationAddress Address => throw new NotImplementedException();
+
+        public IServiceProvider ServiceProvider => throw new NotImplementedException();
+
+        bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
     }
     
     [TestCategory("BVT"), TestCategory("Scheduler")]
@@ -95,11 +97,11 @@ namespace UnitTests.SchedulerTests
 
             int n = 0;
             // ReSharper disable AccessToModifiedClosure
-            IWorkItem item1 = new ClosureWorkItem(() => { n = n + 5; });
-            IWorkItem item2 = new ClosureWorkItem(() => { n = n * 3; });
+            IWorkItem item1 = new ClosureWorkItem(() => { n = n + 5; }, this.rootContext);
+            IWorkItem item2 = new ClosureWorkItem(() => { n = n * 3; }, this.rootContext);
             // ReSharper restore AccessToModifiedClosure
-            this.scheduler.QueueWorkItem(item1, this.rootContext);
-            this.scheduler.QueueWorkItem(item2, this.rootContext);
+            this.scheduler.QueueWorkItem(item1);
+            this.scheduler.QueueWorkItem(item2);
 
             // Pause to let things run
             Thread.Sleep(1000);
@@ -295,10 +297,11 @@ namespace UnitTests.SchedulerTests
                     tasks[taskNum].Start(this.scheduler);
                     bool ok = tasks[taskNum].Wait(TimeSpan.FromMilliseconds(NumTasks * 100));
                     Assert.True(ok, "Wait completed successfully inside ClosureWorkItem-" + taskNum);
-                });
+                },
+                this.rootContext);
             }
 
-            foreach (var workItem in workItems) this.scheduler.QueueWorkItem(workItem, this.rootContext);
+            foreach (var workItem in workItems) this.scheduler.QueueWorkItem(workItem);
             foreach (var flag in flags) flag.Set();
             for (int i = 0; i < tasks.Length; i++)
             {
@@ -346,7 +349,8 @@ namespace UnitTests.SchedulerTests
                 {
                     result0.SetException(exc);
                 }
-            }), this.rootContext);
+            },
+            this.rootContext));
 
             await result0.Task.WithTimeout(TimeSpan.FromMinutes(1));
             Assert.True(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
@@ -394,7 +398,8 @@ namespace UnitTests.SchedulerTests
                 {
                     result0.SetException(exc);
                 }
-            }), this.rootContext);
+            },
+            this.rootContext));
 
             await result0.Task.WithTimeout(TimeSpan.FromMinutes(1));
             Assert.True(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
@@ -533,9 +538,9 @@ namespace UnitTests.SchedulerTests
                 }
             };
 
-            IWorkItem workItem = new ClosureWorkItem(closure);
+            IWorkItem workItem = new ClosureWorkItem(closure, context);
 
-            this.scheduler.QueueWorkItem(workItem, context);
+            this.scheduler.QueueWorkItem(workItem);
 
             // Pause to let things run
             this.output.WriteLine("Main-task sleeping");

@@ -181,7 +181,6 @@ namespace NonSilo.Tests.Membership
             if (!gracefulShutdown) cts.Cancel();
             Assert.Equal(0, timers.First().DisposedCounter);
             var stopped = this.lifecycle.OnStop(cts.Token);
-            Assert.Equal(gracefulShutdown, !stopped.IsCompleted);
 
             // Complete any timers that were waiting.
             while (timerCalls.TryDequeue(out var t)) t.Completion.TrySetResult(false);

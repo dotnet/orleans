@@ -432,12 +432,12 @@ namespace Orleans.Runtime.GrainDirectory
                 if (status.IsTerminating())
                 {
                     // QueueAction up the "Remove" to run on a system turn
-                    Scheduler.QueueAction(() => RemoveServer(updatedSilo, status), CacheValidator.SchedulingContext).Ignore();
+                    Scheduler.QueueAction(() => RemoveServer(updatedSilo, status), CacheValidator).Ignore();
                 }
                 else if (status == SiloStatus.Active)      // do not do anything with SiloStatus.Starting -- wait until it actually becomes active
                 {
                     // QueueAction up the "Remove" to run on a system turn
-                    Scheduler.QueueAction(() => AddServer(updatedSilo), CacheValidator.SchedulingContext).Ignore();
+                    Scheduler.QueueAction(() => AddServer(updatedSilo), CacheValidator).Ignore();
                 }
             }
         }

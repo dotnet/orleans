@@ -377,7 +377,7 @@ namespace Orleans.Runtime
         /// <param name="activation"></param>
         public void RegisterMessageTarget(ActivationData activation)
         {
-            scheduler.RegisterWorkContext(activation.SchedulingContext);
+            scheduler.RegisterWorkContext(activation);
             activations.RecordNewTarget(activation);
             activationsCreated.Increment();
         }
@@ -394,7 +394,7 @@ namespace Orleans.Runtime
             this.activationCollector.TryCancelCollection(activation);
             activationsDestroyed.Increment();
 
-            scheduler.UnregisterWorkContext(activation.SchedulingContext);
+            scheduler.UnregisterWorkContext(activation);
 
             if (activation.GrainInstance == null) return;
 
@@ -641,7 +641,7 @@ namespace Orleans.Runtime
                     {
                         await this.scheduler.RunOrQueueTask(
                                     () => this.grainLocator.Unregister(address, UnregistrationCause.Force),
-                                    SchedulingContext).WithTimeout(UnregisterTimeout);
+                                    this).WithTimeout(UnregisterTimeout);
                     }
                     catch (Exception ex)
                     {
@@ -776,7 +776,7 @@ namespace Orleans.Runtime
             // stuck (it might never run the deactivation process), we remove it from the directory directly
             scheduler.RunOrQueueTask(
                 () => this.grainLocator.Unregister(activationData.Address, UnregistrationCause.Force),
-                SchedulingContext)
+                this)
                 .Ignore();
         }
 
@@ -976,7 +976,7 @@ namespace Orleans.Runtime
                 foreach (var activation in list)
                 {
                     var activationData = activation; // Capture loop variable
-                    var task = scheduler.RunOrQueueTask(() => CallGrainDeactivateAndCleanupStreams(activationData, cts.Token), activationData.SchedulingContext);
+                    var task = scheduler.RunOrQueueTask(() => CallGrainDeactivateAndCleanupStreams(activationData, cts.Token), activationData);
                     tasks2.Add(new Tuple<Task, ActivationData>(task, activationData));
                 }
                 var asyncQueue = new AsyncBatchedContinuationQueue<ActivationData>();
@@ -1008,7 +1008,7 @@ namespace Orleans.Runtime
                     {
                         await scheduler.RunOrQueueTask(() =>
                             this.grainLocator.UnregisterMany(activationsToDeactivate, UnregistrationCause.Force),
-                            SchedulingContext);
+                            this);
                     }
                 }
                 catch (Exception exc)
@@ -1266,7 +1266,7 @@ namespace Orleans.Runtime
             // Among those that are registered in the directory, we currently do not have any multi activations.
             if (activation.IsUsingGrainDirectory)
             {
-                var result = await scheduler.RunOrQueueTask(() => this.grainLocator.Register(address), this.SchedulingContext);
+                var result = await scheduler.RunOrQueueTask(() => this.grainLocator.Register(address), this);
                 if (address.Equals(result)) return ActivationRegistrationResult.Success;
                
                 return new ActivationRegistrationResult(existingActivationAddress: result);
@@ -1316,7 +1316,7 @@ namespace Orleans.Runtime
             {
                 activation.SetState(ActivationState.Activating);
             }
-            return scheduler.QueueTask(() => CallGrainActivate(activation, requestContextData), activation.SchedulingContext); // Target grain's scheduler context);
+            return scheduler.QueueTask(() => CallGrainActivate(activation, requestContextData), activation); // Target grain);
             // ActivationData will transition out of ActivationState.Activating via Dispatcher.OnActivationCompletedRequest
         }
 
@@ -1333,7 +1333,7 @@ namespace Orleans.Runtime
 
         public Task<List<ActivationAddress>> FullLookup(GrainId grain)
         {
-            return scheduler.RunOrQueueTask(() => this.grainLocator.Lookup(grain), this.SchedulingContext);
+            return scheduler.RunOrQueueTask(() => this.grainLocator.Lookup(grain), this);
         }
 
         public bool LocalLookup(GrainId grain, out List<ActivationData> addresses)

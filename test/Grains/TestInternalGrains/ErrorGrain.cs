@@ -186,11 +186,11 @@ namespace UnitTests.Grains
 
         public async Task<bool> ExecuteDelayed(TimeSpan delay)
         {
-            object ctxBefore = RuntimeContext.CurrentActivationContext;
+            object ctxBefore = RuntimeContext.CurrentGrainContext;
 
             await Task.Delay(delay);
-            object ctxInside = RuntimeContext.CurrentActivationContext;
-            return ctxBefore.Equals(ctxInside);
+            object ctxInside = RuntimeContext.CurrentGrainContext;
+            return ReferenceEquals(ctxBefore, ctxInside);
         }
     }
 }

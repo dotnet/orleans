@@ -35,7 +35,7 @@ namespace Orleans.Runtime.Messaging
         {
             this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
 
-            ISchedulingContext context;
+            IGrainContext context;
             // Find the activation it targets; first check for a system activation, then an app activation
             if (msg.TargetGrain.IsSystemTarget)
             {
@@ -49,17 +49,17 @@ namespace Orleans.Runtime.Messaging
                     this.log.Warn(ErrorCode.MessagingMessageFromUnknownActivation, "Received a message {0} for an unknown SystemTarget: {1}", msg, msg.TargetAddress);
                     return;
                 }
-                context = target.SchedulingContext;
+                context = target;
                 switch (msg.Direction)
                 {
                     case Message.Directions.Request:
-                        this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
-                        this.scheduler.QueueWorkItem(new RequestWorkItem(target, msg), context);
+                        this.messagingTrace.OnEnqueueMessageOnActivation(msg, target);
+                        this.scheduler.QueueWorkItem(new RequestWorkItem(target, msg));
                         break;
 
                     case Message.Directions.Response:
-                        this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
-                        this.scheduler.QueueWorkItem(new ResponseWorkItem(target, msg), context);
+                        this.messagingTrace.OnEnqueueMessageOnActivation(msg, target);
+                        this.scheduler.QueueWorkItem(new ResponseWorkItem(target, msg));
                         break;
 
                     default:
@@ -91,7 +91,7 @@ namespace Orleans.Runtime.Messaging
                             }
 
                             // Run ReceiveMessage in context of target activation
-                            context = target.SchedulingContext;
+                            context = target;
                         }
                         else
                         {
@@ -110,7 +110,7 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            void EnqueueReceiveMessage(Message msg, ActivationData targetActivation, ISchedulingContext context)
+            void EnqueueReceiveMessage(Message msg, ActivationData targetActivation, IGrainContext context)
             {
                 this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
                 targetActivation?.IncrementEnqueuedOnDispatcherCount();
@@ -125,7 +125,8 @@ namespace Orleans.Runtime.Messaging
                         targetActivation?.DecrementEnqueuedOnDispatcherCount();
                     }
                 },
-                "Dispatcher.ReceiveMessage"), context);
+                "Dispatcher.ReceiveMessage",
+                context));
             }
         }
     }

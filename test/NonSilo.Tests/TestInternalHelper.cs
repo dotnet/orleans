@@ -13,7 +13,7 @@ namespace UnitTests.TesterInternal
     public class TestInternalHelper
     {
         internal static OrleansTaskScheduler InitializeSchedulerForTesting(
-            ISchedulingContext context,
+            IGrainContext context,
             ILoggerFactory loggerFactory)
         {
             var services = new ServiceCollection();
