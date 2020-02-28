@@ -7,9 +7,7 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 
 namespace Orleans.Runtime.Providers
 {
@@ -24,40 +22,34 @@ namespace Orleans.Runtime.Providers
         private readonly IStreamPubSub implictPubSub;
         private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private readonly ILoggerFactory loggerFactory;
+        private readonly ILocalSiloDetails siloDetails;
         private readonly ILogger logger;
         public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
 
-        public string ServiceId { get; }
-        public string SiloIdentity { get; }
-
         public SiloProviderRuntime(
-            ILocalSiloDetails siloDetails,
-            IOptions<ClusterOptions> clusterOptions,
             IConsistentRingProvider consistentRingProvider,
             ISiloRuntimeClient runtimeClient,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
             ISiloStatusOracle siloStatusOracle,
             OrleansTaskScheduler scheduler,
             ActivationDirectory activationDirectory,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            ILocalSiloDetails siloDetails)
         {
             this.loggerFactory = loggerFactory;
+            this.siloDetails = siloDetails;
             this.siloStatusOracle = siloStatusOracle;
             this.scheduler = scheduler;
             this.activationDirectory = activationDirectory;
             this.consistentRingProvider = consistentRingProvider;
             this.runtimeClient = runtimeClient;
-            this.ServiceId = clusterOptions.Value.ServiceId;
-            this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
             this.logger = this.loggerFactory.CreateLogger<SiloProviderRuntime>();
             this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
             var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
             this.implictPubSub = tmp;
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
         }
-
-        public SiloAddress ExecutingSiloAddress => this.siloStatusOracle.SiloAddress;
 
         public void RegisterSystemTarget(ISystemTarget target)
         {
@@ -105,7 +97,16 @@ namespace Orleans.Runtime.Providers
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
             var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
             var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(pubsubOptions.PubSubType), adapterFactory, queueBalancer, pullingAgentOptions, this.loggerFactory);
+            var manager = new PersistentStreamPullingManager(
+                managerId,
+                streamProviderName,
+                this,
+                this.PubSub(pubsubOptions.PubSubType),
+                adapterFactory,
+                queueBalancer,
+                pullingAgentOptions,
+                this.loggerFactory,
+                this.siloDetails.SiloAddress);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();

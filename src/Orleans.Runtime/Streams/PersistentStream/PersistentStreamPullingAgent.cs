@@ -48,8 +48,9 @@ namespace Orleans.Streams
             ILoggerFactory loggerFactory,
             IStreamPubSub streamPubSub,
             QueueId queueId,
-            StreamPullingAgentOptions options)
-            : base(id, runtime.ExecutingSiloAddress, true, loggerFactory)
+            StreamPullingAgentOptions options,
+            SiloAddress siloAddress)
+            : base(id, siloAddress, true, loggerFactory)
         {
             if (runtime == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: runtime reference should not be null");
             if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
