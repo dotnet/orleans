@@ -321,7 +321,7 @@ namespace Orleans.Runtime
             }
 
             RegisterSystemTarget(catalog);
-            await scheduler.QueueAction(catalog.Start, catalog)
+            await scheduler.QueueActionAsync(catalog.Start, catalog)
                 .WithTimeout(initTimeout, $"Starting Catalog failed due to timeout {initTimeout}");
 
             // SystemTarget for provider init calls

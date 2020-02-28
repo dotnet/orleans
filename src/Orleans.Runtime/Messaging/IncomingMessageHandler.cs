@@ -114,7 +114,7 @@ namespace Orleans.Runtime.Messaging
             {
                 this.messagingTrace.OnEnqueueMessageOnActivation(msg, context);
                 targetActivation?.IncrementEnqueuedOnDispatcherCount();
-                scheduler.QueueWorkItem(new ClosureWorkItem(() =>
+                scheduler.QueueAction(() =>
                 {
                     try
                     {
@@ -125,8 +125,7 @@ namespace Orleans.Runtime.Messaging
                         targetActivation?.DecrementEnqueuedOnDispatcherCount();
                     }
                 },
-                "Dispatcher.ReceiveMessage",
-                context));
+                context);
             }
         }
     }

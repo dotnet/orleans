@@ -48,14 +48,6 @@ namespace Orleans.Runtime.Scheduler
             //  Consider getting rid of ResetExecutionContext completely and just making sure we always call SetExecutionContext before TryExecuteTask.
         }
 
-        internal void RunTaskOutsideContext(Task task)
-        {
-            bool done = TryExecuteTask(task);
-            if (!done)
-                logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete4, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
-                    task.Id, task.Status);
-        }
-
         /// <summary>Queues a task to the scheduler.</summary>
         /// <param name="task">The task to be queued.</param>
         protected override void QueueTask(Task task)
