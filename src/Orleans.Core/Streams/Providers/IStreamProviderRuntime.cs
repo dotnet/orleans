@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
@@ -18,8 +17,6 @@ namespace Orleans.Streams
         /// </summary>
         /// <remarks>Exposed for logging purposes.</remarks>
         string ExecutingEntityIdentity();
-
-        SiloAddress ExecutingSiloAddress { get; }
 
         /// <summary>
         /// Returns the stream directory.

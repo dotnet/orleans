@@ -493,7 +493,7 @@ namespace Orleans.Runtime
 
         private bool TryInstallExtension(int interfaceId, IInvokable invokable, string genericGrainType, ref IGrainMethodInvoker invoker)
         {
-            IGrainExtension extension = TryGetCurrentActivationData(out ActivationData activationData)
+            IGrainExtension extension = TryGetCurrentGrainContext(out ActivationData activationData)
                 ? activationData.ActivationServices.GetServiceByKey<int, IGrainExtension>(interfaceId)
                 : this.ServiceProvider.GetServiceByKey<int, IGrainExtension>(interfaceId);
 
@@ -675,7 +675,7 @@ namespace Orleans.Runtime
             {
                 if (RuntimeContext.Current == null) return this.HostedClient.ToString();
 
-                var currentActivation = this.GetCurrentActivationData();
+                var currentActivation = GetCurrentGrainContext();
                 return currentActivation.Address.ToString();
             }
         }
@@ -768,7 +768,7 @@ namespace Orleans.Runtime
         public StreamDirectory GetStreamDirectory()
         {
             if (RuntimeContext.Current == null) return this.HostedClient.StreamDirectory;
-            var currentActivation = GetCurrentActivationData();
+            var currentActivation = GetCurrentGrainContext();
             return currentActivation.GetStreamDirectory();
         }
 
@@ -828,26 +828,21 @@ namespace Orleans.Runtime
             var context = RuntimeContext.CurrentActivationContext;
             return (context.ContextType == SchedulingContextType.SystemTarget)
                 ? (context as SchedulingContext)?.SystemTarget.ExtensionInvoker
-                : GetCurrentActivationData(context).ExtensionInvoker;
+                : GetCurrentGrainContext(context).ExtensionInvoker;
         }
 
-        private ActivationData GetCurrentActivationData(ISchedulingContext context = null)
+        private static ActivationData GetCurrentGrainContext(ISchedulingContext context = null)
         {
-            context = context ?? RuntimeContext.CurrentActivationContext;
-            if (TryGetCurrentActivationData(context, out ActivationData activationData)) return activationData;
+            if (TryGetCurrentGrainContext(out ActivationData activationData, context)) return activationData;
             return ThrowInvalidOperationException();
             ActivationData ThrowInvalidOperationException() => throw new InvalidOperationException("Attempting to GetCurrentActivationData when not in an activation scope");
         }
 
-        private bool TryGetCurrentActivationData(out ActivationData activationData)
+        private static bool TryGetCurrentGrainContext(out ActivationData activationData, ISchedulingContext context = null)
         {
-            return TryGetCurrentActivationData(RuntimeContext.CurrentActivationContext, out activationData);
-        }
-
-        private bool TryGetCurrentActivationData(ISchedulingContext context, out ActivationData activationData)
-        {
+            context ??= RuntimeContext.CurrentActivationContext;
             activationData = (context as SchedulingContext)?.Activation;
-            return (activationData != null);
+            return activationData != null;
         }
 
         internal static IGrainExtensionMethodInvoker TryGetExtensionMethodInvoker(GrainTypeManager typeManager, Type handlerType)

@@ -26,10 +26,6 @@ namespace Orleans.Runtime
             context.ActivationContext = null;
         }
 
-        public override string ToString()
-        {
-            return String.Format("RuntimeContext: ActivationContext={0}", 
-                ActivationContext != null ? ActivationContext.ToString() : "null");
-        }
+        public override string ToString() => $"RuntimeContext: ActivationContext={ActivationContext?.ToString() ?? "null"}";
     }
 }

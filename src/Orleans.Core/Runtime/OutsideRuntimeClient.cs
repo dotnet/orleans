@@ -115,8 +115,6 @@ namespace Orleans
         {
             try
             {
-                AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
-
                 this.ServiceProvider = services;
 
                 var connectionLostHandlers = this.ServiceProvider.GetServices<ConnectionToClusterLostHandler>();
@@ -456,11 +454,6 @@ namespace Orleans
             
             try
             {
-                AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
-            }
-            catch (Exception) { }
-            try
-            {
                 if (clientProviderRuntime != null)
                 {
                     clientProviderRuntime.Reset().WaitWithThrow(ResetTimeout);
@@ -501,19 +494,6 @@ namespace Orleans
             var reference = (GrainReference)obj;
             if (!localObjects.TryDeregister(reference.ObserverId))
                 throw new ArgumentException("Reference is not associated with a local object.", "reference");
-        }
-
-        private void CurrentDomain_DomainUnload(object sender, EventArgs e)
-        {
-            try
-            {
-                logger.Warn(ErrorCode.ProxyClient_AppDomain_Unload,
-                    $"Current AppDomain={PrintAppDomainDetails()} is unloading.");
-            }
-            catch (Exception)
-            {
-                // just ignore, make sure not to throw from here.
-            }
         }
 
         private string PrintAppDomainDetails()
