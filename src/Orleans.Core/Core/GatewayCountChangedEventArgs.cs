@@ -18,6 +18,7 @@ namespace Orleans
     /// <param name="sender">The sender.</param>
     /// <param name="e">The event arguments.</param>
     public delegate void GatewayCountChangedHandler(object sender, GatewayCountChangedEventArgs e);
+
     public class GatewayCountChangedEventArgs : EventArgs
     {
         /// <summary>
@@ -41,11 +42,4 @@ namespace Orleans
             this.PreviousNumberOfConnectedGateways = previousNumberOfConnectedGateways;
         }
     }
-
-    /// <summary>
-    /// The delegate called before every request to a grain.
-    /// </summary>
-    /// <param name="request">The request.</param>
-    /// <param name="grain">The grain.</param>
-    public delegate void ClientInvokeCallback(InvokeMethodRequest request, IGrain grain);
 }
