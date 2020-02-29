@@ -131,7 +131,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task ValidateInitialConnectivity()
         {
             // Continue attempting to validate connectivity until some reasonable timeout.
-            var maxAttemptTime = this.clusterMembershipOptions.ProbeTimeout.Multiply(5 * this.clusterMembershipOptions.NumMissedProbesLimit);
+            var maxAttemptTime = this.clusterMembershipOptions.ProbeTimeout.Multiply(5.0 * this.clusterMembershipOptions.NumMissedProbesLimit);
             var attemptNumber = 1;
             var now = this.getUtcDateTime();
             var attemptUntil = now + maxAttemptTime;

@@ -1,10 +1,11 @@
 param(
     [string[]] $directories,
     [string] $testFilter,
-    [string] $outDir,
     [string] $dotnet)
 
-$maxDegreeOfParallelism = 4
+$maxDegreeOfParallelism = $env:NUMBER_OF_PROCESSORS
+Write-Host "Max Job Parallelism = $maxDegreeOfParallelism"
+
 $failed = $false
 
 if( 
@@ -67,9 +68,10 @@ foreach ($d in $directories)
     if (-not $testFilter.StartsWith('"')) { $testFilter = "`"$testFilter"; }
     if (-not $testFilter.EndsWith('"')) { $testFilter = "$testFilter`""; }
 
+    $jobName = $([System.IO.Path]::GetFileName($d))
     $cmdLine = 'test --no-build --configuration "' + $env:BuildConfiguration + '" --filter ' + $testFilter + ' --logger "trx" -- -parallel none -noshadow'
-    Write-Host $dotnet $cmdLine
-    Start-Job $ExecuteCmd -ArgumentList @($dotnet, $cmdLine, $d) -Name $([System.IO.Path]::GetFileName($d)) | Out-Null
+    Write-Host $jobName $dotnet $cmdLine
+    Start-Job $ExecuteCmd -ArgumentList @($dotnet, $cmdLine, $d) -Name $jobName | Out-Null
     Write-Host ''
 }
 

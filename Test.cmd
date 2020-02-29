@@ -7,6 +7,10 @@ SET CMDHOME=%~dp0
 @REM Remove trailing backslash \
 set CMDHOME=%CMDHOME:~0,-1%
 
+:: Clear the 'Platform' env variable for this session, as it's a per-project setting within the build, and
+:: misleading value (such as 'MCD' in HP PCs) may lead to build breakage (issue: #69).
+set Platform=
+
 :: Disable multilevel lookup https://github.com/dotnet/core-setup/blob/master/Documentation/design-docs/multilevel-sharedfx-lookup.md
 set DOTNET_MULTILEVEL_LOOKUP=0 
 
@@ -14,12 +18,6 @@ call Ensure-DotNetSdk.cmd
 
 pushd "%CMDHOME%"
 @cd
-
-SET TestResultDir=%CMDHOME%\Binaries\%BuildConfiguration%\TestResults
-
-if not exist %TestResultDir% md %TestResultDir%
-
-SET _Directory=bin\%BuildConfiguration%\net461\win10-x64
 
 set TESTS=^
 %CMDHOME%\test\Extensions\TesterAzureUtils,^
@@ -49,7 +47,7 @@ if []==[%TEST_FILTERS%] set "TEST_FILTERS=Category=BVT^|Category=SlowBVT"
 @Echo Test assemblies = %TESTS%
 @Echo Test filters = %TEST_FILTERS%
 
-PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.ps1 -directories %TESTS% -testFilter '%TEST_FILTERS%' -outDir '%TestResultDir%' -dotnet '%_dotnet%'"
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.ps1 -directories %TESTS% -testFilter '%TEST_FILTERS%' -dotnet '%_dotnet%'"
 set testresult=%errorlevel%
 popd
 endlocal&set testresult=%testresult%
