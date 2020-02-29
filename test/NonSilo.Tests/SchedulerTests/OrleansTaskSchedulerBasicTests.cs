@@ -28,8 +28,6 @@ namespace UnitTests.SchedulerTests
 
         public ActivationAddress Address => throw new NotImplementedException();
 
-        public IServiceProvider ServiceProvider => throw new NotImplementedException();
-
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
     }
     
