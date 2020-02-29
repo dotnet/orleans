@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -16,6 +15,7 @@ namespace Orleans.Runtime.Scheduler
     [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
     internal class WorkItemGroup : IWorkItem
     {
+        private static readonly WaitCallback ExecuteWorkItemCallback = obj => ((WorkItemGroup)obj).Execute();
         private enum WorkGroupStatus
         {
             Waiting = 0,
@@ -222,7 +222,7 @@ namespace Orleans.Runtime.Scheduler
                         GrainContext);
                 }
 #endif
-                masterScheduler.ScheduleExecution(this);
+                ScheduleExecution(this);
             }
         }
 
@@ -282,10 +282,11 @@ namespace Orleans.Runtime.Scheduler
             {
                 if (this.HasWork)
                 {
-                    ReportWorkGroupProblem(
-                        String.Format("WorkItemGroup is being shutdown while still active. workItemCount = {0}."
-                        + "The likely reason is that the task is not being 'awaited' properly.", WorkItemCount),
-                        ErrorCode.SchedulerWorkGroupStopping);
+                    log.LogWarning(
+                        (int)ErrorCode.SchedulerWorkGroupStopping,
+                        "WorkItemGroup is being shutdown while still active. workItemCount = {WorkItemCount}. The likely reason is that the task is not being 'awaited' properly. Status: {Status}",
+                        WorkItemCount,
+                        DumpStatus());
                 }
 
                 if (this.IsShutdown)
@@ -424,7 +425,7 @@ namespace Orleans.Runtime.Scheduler
                     if (WorkItemCount > 0 && !this.IsShutdown)
                     {
                         state = WorkGroupStatus.Runnable;
-                        masterScheduler.ScheduleExecution(this);
+                        ScheduleExecution(this);
                     }
                     else
                     {
@@ -483,10 +484,14 @@ namespace Orleans.Runtime.Scheduler
             }
         }
 
-        private void ReportWorkGroupProblem(string what, ErrorCode errorCode)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ScheduleExecution(WorkItemGroup workItem)
         {
-            var msg = string.Format("{0} {1}", what, DumpStatus());
-            log.Warn(errorCode, msg);
+#if NETCOREAPP
+            ThreadPool.UnsafeQueueUserWorkItem(workItem, preferLocal: true);
+#else
+            ThreadPool.UnsafeQueueUserWorkItem(ExecuteWorkItemCallback, workItem);
+#endif
         }
     }
 }

@@ -13,7 +13,6 @@ namespace Orleans.Runtime.Providers
 {
     internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime
     {
-        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activationDirectory;
         private readonly IConsistentRingProvider consistentRingProvider;
@@ -31,7 +30,6 @@ namespace Orleans.Runtime.Providers
             IConsistentRingProvider consistentRingProvider,
             ISiloRuntimeClient runtimeClient,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
-            ISiloStatusOracle siloStatusOracle,
             OrleansTaskScheduler scheduler,
             ActivationDirectory activationDirectory,
             ILoggerFactory loggerFactory,
@@ -39,7 +37,6 @@ namespace Orleans.Runtime.Providers
         {
             this.loggerFactory = loggerFactory;
             this.siloDetails = siloDetails;
-            this.siloStatusOracle = siloStatusOracle;
             this.scheduler = scheduler;
             this.activationDirectory = activationDirectory;
             this.consistentRingProvider = consistentRingProvider;
