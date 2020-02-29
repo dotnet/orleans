@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Scheduler
             return workItem.Task;
         }
 
-        internal static Task QueueAction(this OrleansTaskScheduler scheduler, Action action, IGrainContext targetContext)
+        internal static Task QueueActionAsync(this OrleansTaskScheduler scheduler, Action action, IGrainContext targetContext)
         {
             var resolver = new TaskCompletionSource<bool>();
             Action syncFunc =
@@ -42,7 +42,7 @@ namespace Orleans.Runtime.Scheduler
                         resolver.TrySetException(exc);
                     }
                 };
-            scheduler.QueueWorkItem(new ClosureWorkItem(() => syncFunc(), targetContext));
+            scheduler.QueueAction(syncFunc, targetContext);
             return resolver.Task;
         }
 

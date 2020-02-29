@@ -226,12 +226,16 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public override Task OnActivateAsync()
+        public override async Task OnActivateAsync()
         {
+            Assert.NotNull(TaskScheduler.Current);
+            Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
             var startMe =
                 new Task(
                     () =>
                     {
+                        Assert.NotNull(TaskScheduler.Current);
+                        Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
                         logger.Info("OnActivateAsync");
 
                         watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
@@ -245,9 +249,11 @@ namespace UnitTests.Grains
             Func<Task> asyncCont =
                 async () =>
                 {
+                    Assert.NotNull(TaskScheduler.Current);
+                    Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
                     logger.Info("Started-OnActivateAsync");
 
-                    Assert.True(doingActivate, "Doing Activate");
+                    Assert.True(doingActivate, "Doing Activate 1");
                     Assert.False(doingDeactivate, "Not doing Deactivate");
 
                     try
@@ -263,7 +269,7 @@ namespace UnitTests.Grains
                         Assert.True(false, msg);
                     }
 
-                    Assert.True(doingActivate, "Doing Activate");
+                    Assert.True(doingActivate, "Doing Activate 2");
                     Assert.False(doingDeactivate, "Not doing Deactivate");
 
                     await Task.Delay(TimeSpan.FromSeconds(1));
@@ -274,7 +280,7 @@ namespace UnitTests.Grains
                 };
             var awaitMe = startMe.ContinueWith(_ => asyncCont()).Unwrap();
             startMe.Start();
-            return awaitMe;
+            await awaitMe;
         }
 
         public override Task OnDeactivateAsync()
