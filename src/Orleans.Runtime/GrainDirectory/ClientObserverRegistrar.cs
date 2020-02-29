@@ -54,7 +54,7 @@ namespace Orleans.Runtime
             this.hostedClient = client;
             if (client != null)
             {
-                this.scheduler.QueueAction(Start, this).Ignore();
+                this.scheduler.QueueAction(Start, this);
             }
         }
 
@@ -64,7 +64,7 @@ namespace Orleans.Runtime
 
             // Only start ClientRefreshTimer if this silo has a gateway.
             // Need to start the timer in the system target context.
-            scheduler.QueueAction(Start, this).Ignore();
+            scheduler.QueueAction(Start, this);
         }
 
         private void Start()

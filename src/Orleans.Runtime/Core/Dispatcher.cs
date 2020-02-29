@@ -162,7 +162,7 @@ namespace Orleans.Runtime
                         // We would add a counter here, except that there's already a counter for this in the Catalog.
                         // Note that this has to run in a non-null scheduler context, so we always queue it to the catalog's context
                         var origin = message.SendingSilo;
-                        scheduler.QueueWorkItem(new ClosureWorkItem(
+                        scheduler.QueueAction(
                             // don't use message.TargetAddress, cause it may have been removed from the headers by this time!
                             async () =>
                             {
@@ -179,8 +179,7 @@ namespace Orleans.Runtime
                                         $"Failed to un-register NonExistentActivation {nonExistentActivation}", exc);
                                 }
                             },
-                            "LocalGrainDirectory.UnregisterAfterNonexistingActivation",
-                            catalog));
+                            catalog);
 
                         ProcessRequestToInvalidActivation(message, nonExistentActivation, null, "Non-existent activation");
                     }
@@ -493,15 +492,15 @@ namespace Orleans.Runtime
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
             if (rejectMessages)
             {
-                scheduler.QueueWorkItem(new ClosureWorkItem(
+                scheduler.QueueAction(
                     () => RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation),
-                    catalog));
+                    catalog);
             }
             else
             {
-                scheduler.QueueWorkItem(new ClosureWorkItem(
+                scheduler.QueueAction(
                     () => TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc),
-                    catalog));
+                    catalog);
             }
         }
 
@@ -522,7 +521,7 @@ namespace Orleans.Runtime
             this.messagingTrace.OnDispatcherForwardingMultiple(messages.Count, oldAddress, forwardingAddress, failedOperation, exc);
 
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
-            scheduler.QueueWorkItem(new ClosureWorkItem(
+            scheduler.QueueAction(
                 () =>
                 {
                     foreach (var message in messages)
@@ -537,7 +536,7 @@ namespace Orleans.Runtime
                         }
                     }
                 },
-                catalog));
+                catalog);
         }
 
         internal void TryForwardRequest(Message message, ActivationAddress oldAddress, ActivationAddress forwardingAddress, string failedOperation, Exception exc = null)
