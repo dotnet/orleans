@@ -13,11 +13,11 @@ namespace Orleans.Runtime
         IAddressable GrainInstance { get; }
         ActivationId ActivationId { get; }
         ActivationAddress Address { get; }
-        IServiceProvider ServiceProvider { get; }
     }
 
     internal interface IActivationData : IGrainContext
     {
+        IServiceProvider ServiceProvider { get; }
         void DelayDeactivation(TimeSpan timeSpan);
         void OnTimerCreated(IGrainTimer timer);
         void OnTimerDisposed(IGrainTimer timer);

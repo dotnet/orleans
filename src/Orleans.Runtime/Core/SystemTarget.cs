@@ -59,9 +59,7 @@ namespace Orleans.Runtime
         ActivationId IGrainContext.ActivationId => this.ActivationId;
 
         ActivationAddress IGrainContext.Address => this.ActivationAddress;
-
-        IServiceProvider IGrainContext.ServiceProvider => this.RuntimeClient.ServiceProvider;
-
+        
         /// <summary>Only needed to make Reflection happy.</summary>
         protected SystemTarget()
         {
