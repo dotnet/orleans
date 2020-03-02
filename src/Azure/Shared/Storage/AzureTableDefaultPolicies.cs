@@ -23,7 +23,7 @@ namespace Orleans.Hosting.AzureCloudServices
 #elif ORLEANS_TRANSACTIONS
 namespace Orleans.Transactions.AzureStorage
 #elif ORLEANS_DIRECTORY
-namespace Orleans.GrainDirectory.AzureStorage.Utilities
+namespace Orleans.GrainDirectory.AzureStorage
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
