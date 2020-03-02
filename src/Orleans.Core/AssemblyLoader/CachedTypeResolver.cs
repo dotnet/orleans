@@ -110,7 +110,7 @@ namespace Orleans.Runtime
             // For types in an Orleans namespace, allow remapping the assembly to another assembly.
             // This is in order to support migration from version 1.x to 2.x, during which assemblies
             // were split and renamed.
-            if (fullName.StartsWith("Orleans."))
+            if (fullName.StartsWith("Orleans.", StringComparison.Ordinal))
             {
                 var asmSeparator = fullName.LastIndexOf(',');
                 if (asmSeparator > -1)

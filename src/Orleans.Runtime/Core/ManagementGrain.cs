@@ -302,7 +302,7 @@ namespace Orleans.Runtime.Management
             var first = path.FirstOrDefault();
             if (first == null) return;
 
-            if (first.StartsWith("@"))
+            if (first.StartsWith("@", StringComparison.Ordinal))
             {
                 first = first.Substring(1);
                 if (path.Count() != 1)
