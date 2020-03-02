@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Options;
-using Orleans.GrainDirectory.AzureStorage.Utilities;
+using Orleans.GrainDirectory.AzureStorage;
 using Orleans.Runtime;
 
 namespace Orleans.Configuration
