@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,8 +21,6 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         private class GrainDirectoryEntity : TableEntity
         {
-            public string GrainId { get; set; }
-
             public string SiloAddress { get; set; }
 
             public string ActivationId { get; set; }
@@ -29,7 +29,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 return new GrainAddress
                 {
-                    GrainId = this.GrainId,
+                    GrainId = HttpUtility.UrlDecode(this.RowKey, Encoding.UTF8),
                     SiloAddress = this.SiloAddress,
                     ActivationId = this.ActivationId,
                 };
@@ -40,8 +40,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 return new GrainDirectoryEntity
                 {
                     PartitionKey = clusterId,
-                    RowKey = AzureTableUtils.SanitizeTableProperty(address.GrainId),
-                    GrainId = address.GrainId,
+                    RowKey = HttpUtility.UrlEncode(address.GrainId, Encoding.UTF8),
                     SiloAddress = address.SiloAddress,
                     ActivationId = address.ActivationId,
                 };
@@ -62,7 +61,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public async Task<GrainAddress> Lookup(string grainId)
         {
-            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, AzureTableUtils.SanitizeTableProperty(grainId));
+            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, HttpUtility.UrlEncode(grainId, Encoding.UTF8));
 
             if (result == null)
                 return null;
@@ -80,7 +79,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public async Task Unregister(GrainAddress address)
         {
-            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, AzureTableUtils.SanitizeTableProperty(address.GrainId));
+            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, HttpUtility.UrlEncode(address.GrainId, Encoding.UTF8));
 
             // No entry found
             if (result == null)
@@ -114,7 +113,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             var pkFilter = TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.PartitionKey), QueryComparisons.Equal, this.clusterId);
             string rkFilter = TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.RowKey), QueryComparisons.Equal, AzureTableUtils.SanitizeTableProperty(addresses[0].GrainId)),
+                    TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.RowKey), QueryComparisons.Equal, HttpUtility.UrlEncode(addresses[0].GrainId, Encoding.UTF8)),
                     TableOperators.And,
                     TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.ActivationId), QueryComparisons.Equal, addresses[0].ActivationId)
                     );
@@ -122,7 +121,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             foreach (var addr in addresses.Skip(1))
             {
                 var tmp = TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.RowKey), QueryComparisons.Equal, AzureTableUtils.SanitizeTableProperty(addr.GrainId)),
+                    TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.RowKey), QueryComparisons.Equal, HttpUtility.UrlEncode(addr.GrainId, Encoding.UTF8)),
                     TableOperators.And,
                     TableQuery.GenerateFilterCondition(nameof(GrainDirectoryEntity.ActivationId), QueryComparisons.Equal, addr.ActivationId)
                     );
