@@ -47,7 +47,7 @@ namespace Orleans.Runtime
 
                 return GetTemplatedName(type.DeclaringType) + "." + GetUntemplatedTypeName(type.Name);
             }
-            
+
             if (type.IsGenericType) return GetSimpleTypeName(fullName != null && fullName(type) ? GetFullName(type) : type.Name);
 
             return fullName != null && fullName(type) ? GetFullName(type) : type.Name;
@@ -229,7 +229,7 @@ namespace Orleans.Runtime
 
             foreach (var innerType in innerTypes)
             {
-                if (innerType.StartsWith("[[")) // Resolve and load generic types recursively
+                if (innerType.StartsWith("[[", StringComparison.Ordinal)) // Resolve and load generic types recursively
                 {
                     InnerGenericTypeArgs(GenericTypeArgsString(innerType));
                     string genericTypeArg = className.Trim('[', ']');
@@ -258,7 +258,7 @@ namespace Orleans.Runtime
             int endTokensNeeded = 0;
             string curStartToken = "";
             string curEndToken = "";
-            var tokenPairs = new[] { new { Start = "[[", End = "]]" }, new { Start = "[", End = "]" } }; // Longer tokens need to come before shorter ones
+            var tokenPairs = new[] { (Start: "[[", End: "]]"), (Start: "[", End: "]") }; // Longer tokens need to come before shorter ones
 
             foreach (var candidate in candidatesWithPositions)
             {
@@ -266,7 +266,7 @@ namespace Orleans.Runtime
                 {
                     foreach (var token in tokenPairs)
                     {
-                        if (candidate.Str.StartsWith(token.Start))
+                        if (candidate.Str.StartsWith(token.Start, StringComparison.Ordinal))
                         {
                             curStartToken = token.Start;
                             curEndToken = token.End;
@@ -276,10 +276,10 @@ namespace Orleans.Runtime
                     }
                 }
 
-                if (curStartToken != "" && candidate.Str.StartsWith(curStartToken))
+                if (curStartToken != "" && candidate.Str.StartsWith(curStartToken, StringComparison.Ordinal))
                     endTokensNeeded++;
 
-                if (curEndToken != "" && candidate.Str.EndsWith(curEndToken))
+                if (curEndToken != "" && candidate.Str.EndsWith(curEndToken, StringComparison.Ordinal))
                 {
                     endPos = candidate.Pos;
                     endTokensNeeded--;
@@ -525,7 +525,7 @@ namespace Orleans.Runtime
             return assembly.IsDynamic ? Enumerable.Empty<Type>() : GetDefinedTypes(assembly, logger).Where(type => !type.IsNestedPrivate && whereFunc(type));
         }
 
-        public static IEnumerable<Type> GetDefinedTypes(Assembly assembly, ILogger logger=null)
+        public static IEnumerable<Type> GetDefinedTypes(Assembly assembly, ILogger logger = null)
         {
             try
             {

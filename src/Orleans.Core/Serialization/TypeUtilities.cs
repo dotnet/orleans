@@ -165,7 +165,7 @@ namespace Orleans.Serialization
         private static string GetBaseTypeKey(Type t)
         {
             string namespacePrefix = "";
-            if ((t.Namespace != null) && !t.Namespace.StartsWith("System.") && !t.Namespace.Equals("System"))
+            if ((t.Namespace != null) && !t.Namespace.StartsWith("System.", StringComparison.Ordinal) && !t.Namespace.Equals("System"))
             {
                 namespacePrefix = t.Namespace + '.';
             }
