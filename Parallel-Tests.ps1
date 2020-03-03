@@ -3,7 +3,7 @@ param(
     [string] $testFilter,
     [string] $dotnet)
 
-$maxDegreeOfParallelism = ($env:NUMBER_OF_PROCESSORS, 4).Minimum
+$maxDegreeOfParallelism = [math]::min($env:NUMBER_OF_PROCESSORS, 4)
 Write-Host "Max Job Parallelism = $maxDegreeOfParallelism"
 
 $failed = $false
