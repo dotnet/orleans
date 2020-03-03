@@ -7,6 +7,23 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.1.1] (changes since 3.1.0)
+
+- Non-breaking improvements
+  - Remove new() constraint for grain persistence (#6351)
+  - Improve TLS troubleshooting experience (#6352)
+  - Remove unnecessary RequestContext.Clear in networking (#6357)
+  - Cleanup GrainBasedReminderTable (#6355)
+  - Avoid using GrainTimer in non-grain contexts (#6342)
+
+- Non-breaking bug fixes
+  - Fix CleanupDefunctSiloMembership & MembershipTableTests (#6344)
+  - Schedule IMembershipTable.CleanupDefunctSiloEntries more frequently (#6346)
+  - CodeGenerator fixes (#6347)
+  - Fix handling of gateways in Orleans.TestingHost (#6348)
+  - Avoid destructuring in log templates (#6356)
+  - Clear RequestContext after use (#6358)
+
 ### [3.1.0] (changes since 3.0.0)
 
 - Non-breaking improvements
