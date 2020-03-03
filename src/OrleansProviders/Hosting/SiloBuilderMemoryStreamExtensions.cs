@@ -5,7 +5,7 @@ using Orleans.Streams;
 
 namespace Orleans.Hosting
 {
-    public static class SiloBuilderExtensions
+    public static class SiloBuilderMemoryStreamExtensions
     {
         /// <summary>
         /// Configure silo to use memory streams.
