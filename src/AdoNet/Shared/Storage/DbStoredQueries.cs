@@ -148,7 +148,7 @@ namespace Orleans.Tests.SqlUtils
                         ReminderName = record.GetValue<string>(nameof(Columns.ReminderName)),
                         StartAt = record.GetValue<DateTime>(nameof(Columns.StartTime)),
 
-                        //Use the GetInt32 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
+                        //Use the GetInt64 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
                         //GetValue<int> causes an InvalidCastException with oracle data provider. See https://github.com/dotnet/orleans/issues/3561
                         Period = TimeSpan.FromMilliseconds(record.GetInt64(nameof(Columns.Period))),
                         ETag = GetVersion(record).ToString()
