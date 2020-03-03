@@ -19,6 +19,12 @@ call Ensure-DotNetSdk.cmd
 pushd "%CMDHOME%"
 @cd
 
+SET TestResultDir=%CMDHOME%\Binaries\%BuildConfiguration%\TestResults
+
+if not exist %TestResultDir% md %TestResultDir%
+
+SET _Directory=bin\%BuildConfiguration%\net461\win10-x64
+
 set TESTS=^
 %CMDHOME%\test\Extensions\TesterAzureUtils,^
 %CMDHOME%\test\TesterInternal,^
