@@ -7,6 +7,10 @@ SET CMDHOME=%~dp0
 @REM Remove trailing backslash \
 set CMDHOME=%CMDHOME:~0,-1%
 
+:: Clear the 'Platform' env variable for this session, as it's a per-project setting within the build, and
+:: misleading value (such as 'MCD' in HP PCs) may lead to build breakage (issue: #69).
+set Platform=
+
 :: Disable multilevel lookup https://github.com/dotnet/core-setup/blob/master/Documentation/design-docs/multilevel-sharedfx-lookup.md
 set DOTNET_MULTILEVEL_LOOKUP=0 
 
