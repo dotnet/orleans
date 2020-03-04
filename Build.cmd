@@ -38,7 +38,7 @@ call %_dotnet% build --no-restore %BUILD_FLAGS% /bl:%BuildConfiguration%-Build.b
 
 
 :Package
-@echo Package BuildConfiguration ============================
+@echo Package %BuildConfiguration% ============================
 SET STEP=Pack %BuildConfiguration%
 
 call %_dotnet% pack --no-build --no-restore %BUILD_FLAGS% /bl:%BuildConfiguration%-Pack.binlog /p:Configuration=%BuildConfiguration%%AdditionalConfigurationProperties% "%SOLUTION%"
