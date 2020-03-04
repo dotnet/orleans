@@ -4,7 +4,6 @@ using Orleans.Transactions.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit.Consistency
@@ -36,7 +35,7 @@ namespace Orleans.Transactions.TestKit.Consistency
 
         private int MyNumber => (int)(this.GetPrimaryKeyLong() % ConsistencyTestOptions.MaxGrains);
 
-        public const double recursionProbability = .1 - .9 * (1 / (10 * 40 - 1));
+        public const double recursionProbability = .1 - .9 * (1.0 / (10 * 40 - 1));
 
         public async Task<Observation[]> Run(ConsistencyTestOptions options, int depth, string stack, int maxgrain, DateTime stopAfter)
         {

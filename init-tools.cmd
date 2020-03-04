@@ -12,7 +12,7 @@ if [%1]==[force] (
   if exist "%TOOLRUNTIME_DIR%" rmdir /S /Q "%TOOLRUNTIME_DIR%"
 )
 
-:: If sempahore exists do nothing
+:: If semaphore exists do nothing
 if exist "%BUILD_TOOLS_SEMAPHORE%" (
   echo Tools are already initialized.
   goto :EOF
@@ -39,7 +39,7 @@ if NOT exist "%DOTNET_LOCAL_PATH%" (
 
 :afterdotnetrestore
 
-:: Create sempahore file
+:: Create semaphore file
 echo Done initializing tools.
 echo Init-Tools.cmd completed. > "%BUILD_TOOLS_SEMAPHORE%"
 exit /b 0
