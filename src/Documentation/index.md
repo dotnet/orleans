@@ -194,7 +194,7 @@ Orleans supports filters for both incoming and outgoing calls. Some common use-c
 ### Request Context
 
 Metadata and other information can be passed along a series of requests using [request context](grains/request_context.md).
-Request context can be used for holing distributed tracing information or any other user-defined values.
+Request context can be used for holding distributed tracing information or any other user-defined values.
 
 ## Getting Started
 
