@@ -117,7 +117,16 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ActivationCollector>();
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
-            services.TryAddSingleton<IGrainLocator>(sp => GrainLocatorFactory.GetGrainLocator(sp));
+            services.AddSingleton<DhtGrainLocator>();
+            if (services.FirstOrDefault(service => service.ServiceType == typeof(IGrainDirectory)) != null)
+            {
+                services.AddSingleton<IGrainLocator, GrainLocator>();
+                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainLocator>();
+            }
+            else
+            {
+                services.AddFromExisting<IGrainLocator, DhtGrainLocator>();
+            }
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();

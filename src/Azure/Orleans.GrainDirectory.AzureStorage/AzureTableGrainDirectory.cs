@@ -106,7 +106,12 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 await Task.WhenAll(tasks);
             }
-            
+        }
+
+        public Task UnregisterSilos(List<string> siloAddresses)
+        {
+            // Too costly to implement using Azure Table
+            return Task.CompletedTask;
         }
 
         private async Task UnregisterManyBlock(List<GrainAddress> addresses)
