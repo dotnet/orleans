@@ -398,7 +398,17 @@ namespace Orleans.Tests.SqlUtils
 
             internal TimeSpan Period
             {
-                set { Add(nameof(Period), (long)value.TotalMilliseconds); }
+                set {
+                    if (value.TotalMilliseconds <= int.MaxValue)
+                    {
+                        // Original casting.  Here to maintain backwards compatibility
+                        Add(nameof(Period), (int)value.TotalMilliseconds);
+                    }
+                    else
+                    {
+                        Add(nameof(Period), (long)value.TotalMilliseconds);
+                    }
+                }
             }
 
             internal SiloStatus Status
