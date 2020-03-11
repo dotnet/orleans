@@ -110,7 +110,7 @@ This document is intended to capture some of the tried and proven application pa
 
     -   Fan-out:
 
-        -   `var tasks = new List\<Task\>();  
+        -   `var tasks = new List<Task>();  
             foreach(var grain in grains)  
             { tasks.Add(grain.Foo()) }  
             await Task.WhenAll(tasks);  
