@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -201,14 +201,20 @@ namespace Orleans.CodeGenerator.Compatibility
                             builder.Append(assembly.Identity.GetDisplayName());
                             break;
                         case Style.RuntimeTypeNameFormatter:
-                            var isSystemAssembly = type.ContainingAssembly.GetTypeByMetadataName("System.Int32") != null;
-                            if (isSystemAssembly) return;
+                            if (IsSystemNamespace(type.ContainingNamespace)) return;
                             builder.Append(",");
                             builder.Append(assembly.Identity.Name);
                             break;
                     }
 
                     break;
+            }
+
+            static bool IsSystemNamespace(INamespaceSymbol ns)
+            {
+                if (ns is null || ns.IsGlobalNamespace) return false;
+                if (ns.ContainingNamespace is INamespaceSymbol parent && !parent.IsGlobalNamespace) return IsSystemNamespace(parent);
+                return string.Equals(ns.Name, "System", StringComparison.Ordinal) || ns.Name.StartsWith("System.", StringComparison.Ordinal);
             }
         }
     }
