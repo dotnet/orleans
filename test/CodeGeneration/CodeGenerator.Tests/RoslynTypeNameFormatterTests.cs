@@ -20,6 +20,13 @@ using Orleans.CodeGenerator.Model;
 using System.Text;
 using Orleans.Serialization;
 
+[assembly: System.Reflection.AssemblyCompanyAttribute("Microsoft")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("2.0.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("2.0.0")]
+[assembly: System.Reflection.AssemblyProductAttribute("Microsoft Orleans")]
+[assembly: System.Reflection.AssemblyTitleAttribute("CodeGenerator.Tests")]
+[assembly: System.Reflection.AssemblyVersionAttribute("2.0.0.0")]
+
 namespace CodeGenerator.Tests
 {
     /// <summary>
@@ -103,7 +110,8 @@ namespace CodeGenerator.Tests
                     MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "mscorlib.dll")),
                     MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.dll")),
                     MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Core.dll")),
-                    MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.dll"))
+                    MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.dll")),
+                    MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.Serialization.Formatters.dll"))
                 };
             }
         }
@@ -318,15 +326,15 @@ namespace CodeGenerator.Tests
         public interface IMyGenericGrainInterface<T> : IGrainWithGuidKey
         {
             Task One(T a, int b, int c);
-            Task<T> Two();
-            Task<TU> Three<TU>();
+            Task<T> Two(T val);
+            Task<TU> Three<TU>(TU val);
         }
 
         public class MyGenericGrainClass<T> : Grain, IMyGenericGrainInterface<T>
         {
             public Task One(T a, int b, int c) => throw new NotImplementedException();
-            public Task<T> Two() => throw new NotImplementedException();
-            public Task<TU> Three<TU>() => throw new NotImplementedException();
+            public Task<T> Two(T val) => throw new NotImplementedException();
+            public Task<TU> Three<TU>(TU val) => throw new NotImplementedException();
         }
     }
 }

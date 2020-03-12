@@ -1,6 +1,6 @@
 param(
     [string[]] $directories,
-    [string] $testFilter,
+    [string] $testFilter = $null,
     [string] $dotnet)
 
 $maxDegreeOfParallelism = [math]::min($env:NUMBER_OF_PROCESSORS, 4)
@@ -20,6 +20,15 @@ else
     Write-Host Not changing [Console]::InputEncoding
 }
 
+if ([string]::IsNullOrWhiteSpace($testFilter)) {
+    $testFilter = $env:TEST_FILTERS;
+}
+
+if ([string]::IsNullOrWhiteSpace($testFilter)) {
+    $testFilter = "Category=BVT|Category=SlowBVT";
+}
+
+Write-Host "Test filters: `"$testFilter`"";
 
 function Receive-CompletedJobs {
     $succeeded = $true
