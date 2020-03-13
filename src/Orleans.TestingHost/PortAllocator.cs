@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Threading;
+using System.Threading.Tasks;
 using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
@@ -13,7 +15,7 @@ namespace Orleans.TestingHost
     {
         private bool disposed;
         private readonly object lockObj = new object();
-        private readonly Dictionary<int, Mutex> allocatedPorts = new Dictionary<int, Mutex>();
+        private readonly Dictionary<int, string> allocatedPorts = new Dictionary<int, string>();
 
         public (int, int) AllocateConsecutivePortPairs(int numPorts = 5)
         {
@@ -49,7 +51,7 @@ namespace Orleans.TestingHost
 
                 foreach (var pair in allocatedPorts)
                 {
-                    pair.Value.ReleaseMutex();
+                    MutexManager.Instance.Release(pair.Value);
                 }
 
                 allocatedPorts.Clear();
@@ -66,7 +68,7 @@ namespace Orleans.TestingHost
         {
             const int MaxAttempts = 10;
 
-            var allocations = new List<(int Port, Mutex Mutex)>();
+            var allocations = new List<(int Port, string Mutex)>();
 
             for (int attempts = 0; attempts < MaxAttempts; attempts++)
             {
@@ -82,16 +84,16 @@ namespace Orleans.TestingHost
                     for (var i = 0; i < consecutivePortsToCheck; i++)
                     {
                         var port = basePort + i;
-                        var mutex = new Mutex(false, $"Global.TestCluster.{port.ToString(CultureInfo.InvariantCulture)}");
-                        if (mutex.WaitOne(500))
+                        var name = $"Global.TestCluster.{port.ToString(CultureInfo.InvariantCulture)}";
+                        if (MutexManager.Instance.Acquire(name, 500))
                         {
-                            allocations.Add((port, mutex));
+                            allocations.Add((port, name));
                         }
                         else
                         {
                             foreach (var allocation in allocations)
                             {
-                                allocation.Mutex.ReleaseMutex();
+                                MutexManager.Instance.Release(allocation.Mutex);
                             }
 
                             allocations.Clear();
@@ -118,6 +120,88 @@ namespace Orleans.TestingHost
             }
 
             throw new InvalidOperationException("Cannot find enough free ports to spin up a cluster");
+        }
+
+        private class MutexManager
+        {
+            private readonly Dictionary<string, Mutex> _mutexes = new Dictionary<string, Mutex>();
+            private readonly BlockingCollection<Action> _workItems = new BlockingCollection<Action>();
+            private readonly Thread _thread;
+
+            public static MutexManager Instance { get; } = new MutexManager();
+
+            private MutexManager()
+            {
+                _thread = new Thread(Run)
+                {
+                    Name = "MutexManager.Worker",
+                    IsBackground = true,
+                };
+                _thread.Start();
+            }
+
+            public bool Acquire(string name, int millisecondsTimeout)
+            {
+                var completion = new TaskCompletionSource<bool>(TaskContinuationOptions.RunContinuationsAsynchronously);
+                _workItems.Add(() =>
+                {
+                    try
+                    {
+                        if (!_mutexes.TryGetValue(name, out var value))
+                        {
+                            _mutexes[name] = value = new Mutex(false, name);
+                        }
+
+                        completion.TrySetResult(value.WaitOne(millisecondsTimeout));
+                    }
+                    catch (Exception exception)
+                    {
+                        completion.TrySetException(exception);
+                    }
+                });
+
+                return completion.Task.GetAwaiter().GetResult();
+            }
+
+            public bool Release(string name)
+            {
+                var completion = new TaskCompletionSource<bool>(TaskContinuationOptions.RunContinuationsAsynchronously);
+                _workItems.Add(() =>
+                {
+                    try
+                    {
+                        if (!_mutexes.TryGetValue(name, out var value))
+                        {
+                            completion.TrySetResult(false);
+                            return;
+                        }
+
+                        _mutexes.Remove(name);
+                        value.ReleaseMutex();
+                        completion.TrySetResult(true);
+                    }
+                    catch (Exception exception)
+                    {
+                        completion.TrySetException(exception);
+                    }
+                });
+
+                return completion.Task.GetAwaiter().GetResult();
+            }
+
+            private void Run()
+            {
+                foreach (var action in _workItems.GetConsumingEnumerable())
+                {
+                    try
+                    {
+                        action();
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
         }
     }
 }
