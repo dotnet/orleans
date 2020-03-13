@@ -253,15 +253,22 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         public void Dispose()
         {
-            if (!deployedSilos.Any()) return;
-
-            var primarySilo = this.deployedSilos[0];
-            foreach (var silo in this.deployedSilos.Skip(1))
+            try
             {
-                silo.Dispose();
+                if (!deployedSilos.Any()) return;
+
+                var primarySilo = this.deployedSilos[0];
+                foreach (var silo in this.deployedSilos.Skip(1))
+                {
+                    silo.Dispose();
+                }
+                primarySilo.Dispose();
+                this.Client?.Dispose();
             }
-            primarySilo.Dispose();
-            this.Client?.Dispose();
+            finally
+            {
+                this.cluster?.Dispose();
+            }
         }
 
         public Task InitializeAsync()

@@ -66,7 +66,7 @@ namespace Orleans.TestingHost
 
         private int GetAvailableConsecutiveServerPorts(IPEndPoint[] tcpConnInfoArray, int portStartRange, int portEndRange, int consecutivePortsToCheck)
         {
-            const int MaxAttempts = 10;
+            const int MaxAttempts = 100;
 
             var allocations = new List<(int Port, string Mutex)>();
 
