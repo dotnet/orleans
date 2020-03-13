@@ -243,10 +243,9 @@ namespace Orleans.CodeGenerator.Compatibility
         private static void GetBaseTypeKey(ITypeSymbol type, StringBuilder sb)
         {
             var namespacePrefix = "";
-            var ns = type.ContainingNamespace?.ToString();
-            if (ns != null && !ns.StartsWith("System.") && !ns.Equals("System"))
+            if (!RoslynTypeHelper.IsSystemNamespace(type.ContainingNamespace))
             {
-                namespacePrefix = ns + '.';
+                namespacePrefix = type.ContainingNamespace.ToString() + '.';
             }
 
             if (type.DeclaredAccessibility == Accessibility.Public && type.ContainingType != null)
