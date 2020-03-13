@@ -401,7 +401,7 @@ namespace Orleans.Tests.SqlUtils
                 set {
                     if (value.TotalMilliseconds <= int.MaxValue)
                     {
-                        // Original casting.  Here to maintain backwards compatibility
+                        // Original casting when old schema is used.  Here to maintain backwards compatibility
                         Add(nameof(Period), (int)value.TotalMilliseconds);
                     }
                     else

@@ -250,7 +250,8 @@ namespace Orleans.Tests.SqlUtils
             try
             {
                 var ordinal = record.GetOrdinal(fieldName);
-                return record.GetInt64(ordinal);
+                // Original casting when old schema is used.  Here to maintain backwards compatibility
+                return record.GetFieldType(ordinal) == typeof(int) ? record.GetInt32(ordinal) : record.GetInt64(ordinal);
             }
             catch (IndexOutOfRangeException e)
             {
