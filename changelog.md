@@ -7,7 +7,7 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
-### [3.1.1] (changes since 3.1.0)
+### [3.1.2] (changes since 3.1.0)
 
 - Non-breaking improvements
   - Remove new() constraint for grain persistence (#6351)
