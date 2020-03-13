@@ -28,9 +28,11 @@ namespace Orleans.TestingHost
     /// </remarks>
     public class TestCluster : IDisposable
     {
+        private readonly object _lockObj = new object();
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
         private readonly TestClusterOptions options;
         private readonly StringBuilder log = new StringBuilder();
+        private bool _disposed;
         private int startedInstances;
 
         /// <summary>
@@ -117,14 +119,23 @@ namespace Orleans.TestingHost
         /// Delegate used to create and start an individual silo.
         /// </summary>
         public Func<string, IList<IConfigurationSource>, Task<SiloHandle>> CreateSiloAsync { private get; set; } = InProcessSiloHandle.CreateAsync;
+
+        /// <summary>
+        /// The port allocator.
+        /// </summary>
+        public ITestClusterPortAllocator PortAllocator { get; }
         
         /// <summary>
         /// Configures the test cluster plus client in-process.
         /// </summary>
-        public TestCluster(TestClusterOptions options, IReadOnlyList<IConfigurationSource> configurationSources)
+        public TestCluster(
+            TestClusterOptions options,
+            IReadOnlyList<IConfigurationSource> configurationSources,
+            ITestClusterPortAllocator portAllocator)
         {
             this.options = options;
             this.ConfigurationSources = configurationSources.ToArray();
+            this.PortAllocator = portAllocator;
         }
 
         /// <summary>
@@ -589,7 +600,7 @@ namespace Orleans.TestingHost
 
             // Add overrides.
             if (configurationOverrides != null) configurationSources.AddRange(configurationOverrides);
-            var siloSpecificOptions = TestSiloSpecificOptions.Create(clusterOptions, instanceNumber, startSiloOnNewPort);
+            var siloSpecificOptions = TestSiloSpecificOptions.Create(this, clusterOptions, instanceNumber, startSiloOnNewPort);
             configurationSources.Add(new MemoryConfigurationSource
             {
                 InitialData = siloSpecificOptions.ToDictionary()
@@ -637,13 +648,33 @@ namespace Orleans.TestingHost
 
         public void Dispose()
         {
-            foreach (var handle in this.SecondarySilos)
+            if (_disposed)
             {
-                handle.Dispose();
+                return;
             }
 
-            this.Primary?.Dispose();
-            this.Client?.Dispose();
+            lock (_lockObj)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                foreach (var handle in this.SecondarySilos)
+                {
+                    handle.Dispose();
+                }
+
+                this.Primary?.Dispose();
+                this.Client?.Dispose();
+
+                if (this.PortAllocator is object)
+                {
+                    this.PortAllocator.Dispose();
+                }
+
+                _disposed = true;
+            }
         }
     }
 }
