@@ -51,7 +51,7 @@ namespace Orleans.TestingHost
 
                 foreach (var pair in allocatedPorts)
                 {
-                    MutexManager.Instance.Release(pair.Value);
+                    MutexManager.Instance.SignalRelease(pair.Value);
                 }
 
                 allocatedPorts.Clear();
@@ -85,7 +85,7 @@ namespace Orleans.TestingHost
                     {
                         var port = basePort + i;
                         var name = $"Global.TestCluster.{port.ToString(CultureInfo.InvariantCulture)}";
-                        if (MutexManager.Instance.Acquire(name, 500))
+                        if (MutexManager.Instance.Acquire(name))
                         {
                             allocations.Add((port, name));
                         }
@@ -93,7 +93,7 @@ namespace Orleans.TestingHost
                         {
                             foreach (var allocation in allocations)
                             {
-                                MutexManager.Instance.Release(allocation.Mutex);
+                                MutexManager.Instance.SignalRelease(allocation.Mutex);
                             }
 
                             allocations.Clear();
@@ -140,9 +140,10 @@ namespace Orleans.TestingHost
                 _thread.Start();
             }
 
-            public bool Acquire(string name, int millisecondsTimeout)
+            public bool Acquire(string name)
             {
-                var completion = new TaskCompletionSource<bool>(TaskContinuationOptions.RunContinuationsAsynchronously);
+                var result = new [] { 0 };
+                var signal = new ManualResetEventSlim(initialState: false);
                 _workItems.Add(() =>
                 {
                     try
@@ -152,41 +153,35 @@ namespace Orleans.TestingHost
                             _mutexes[name] = value = new Mutex(false, name);
                         }
 
-                        completion.TrySetResult(value.WaitOne(millisecondsTimeout));
+                        if (value.WaitOne(500))
+                        {
+                            Interlocked.Increment(ref result[0]);
+                        }
                     }
-                    catch (Exception exception)
+                    finally
                     {
-                        completion.TrySetException(exception);
+                        signal.Set();
                     }
                 });
 
-                return completion.Task.GetAwaiter().GetResult();
+                if (!signal.Wait(TimeSpan.FromSeconds(10)))
+                {
+                    throw new TimeoutException("Timed out while waiting for MutexManager to acquire mutex.");
+                }
+
+                return result[0] == 1;
             }
 
-            public bool Release(string name)
+            public void SignalRelease(string name)
             {
-                var completion = new TaskCompletionSource<bool>(TaskContinuationOptions.RunContinuationsAsynchronously);
                 _workItems.Add(() =>
                 {
-                    try
+                    if (_mutexes.TryGetValue(name, out var value))
                     {
-                        if (!_mutexes.TryGetValue(name, out var value))
-                        {
-                            completion.TrySetResult(false);
-                            return;
-                        }
-
                         _mutexes.Remove(name);
                         value.ReleaseMutex();
-                        completion.TrySetResult(true);
-                    }
-                    catch (Exception exception)
-                    {
-                        completion.TrySetException(exception);
                     }
                 });
-
-                return completion.Task.GetAwaiter().GetResult();
             }
 
             private void Run()
