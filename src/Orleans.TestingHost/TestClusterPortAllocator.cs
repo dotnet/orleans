@@ -159,15 +159,28 @@ namespace Orleans.TestingHost
                 {
                     try
                     {
-                        if (!_mutexes.TryGetValue(name, out var value))
+                        if (!_mutexes.TryGetValue(name, out var mutex))
                         {
-                            _mutexes[name] = value = new Mutex(false, name);
+                            mutex = new Mutex(false, name);
+                            if (mutex.WaitOne(500))
+                            {
+                                // Acquired
+                                _mutexes[name] = mutex;
+                                Interlocked.Increment(ref result[0]);
+                            }
+
+                            // Failed to acquire: the mutex is already held by another process.
+                            try
+                            {
+                                mutex.ReleaseMutex();
+                            }
+                            finally
+                            {
+                                mutex.Close();
+                            }
                         }
 
-                        if (value.WaitOne(500))
-                        {
-                            Interlocked.Increment(ref result[0]);
-                        }
+                        // Failed to acquire: the mutex is already held by this process.
                     }
                     finally
                     {
@@ -191,6 +204,7 @@ namespace Orleans.TestingHost
                     {
                         _mutexes.Remove(name);
                         value.ReleaseMutex();
+                        value.Close();
                     }
                 });
             }
@@ -217,7 +231,14 @@ namespace Orleans.TestingHost
                 {
                     foreach (var mutex in _mutexes.Values)
                     {
-                        mutex.ReleaseMutex();
+                        try
+                        {
+                            mutex.ReleaseMutex();
+                        }
+                        finally
+                        {
+                            mutex.Close();
+                        }
                     }
 
                     _mutexes.Clear();
