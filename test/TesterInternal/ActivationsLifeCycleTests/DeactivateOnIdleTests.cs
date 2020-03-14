@@ -44,8 +44,15 @@ namespace UnitTests.ActivationsLifeCycleTests
         
         public void Dispose()
         {
-            testCluster?.StopAllSilos();
-            testCluster = null;
+            try
+            {
+                testCluster?.StopAllSilos();
+            }
+            finally
+            {
+                testCluster?.Dispose();
+                testCluster = null;
+            }
         }
 
         [Fact, TestCategory("Functional")]

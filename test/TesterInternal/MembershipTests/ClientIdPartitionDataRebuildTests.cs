@@ -165,7 +165,15 @@ namespace UnitTests.MembershipTests
 
         public void Dispose()
         {
-            this.hostedCluster?.StopAllSilos();
+            try
+            {
+                hostedCluster?.StopAllSilos();
+            }
+            finally
+            {
+                hostedCluster?.Dispose();
+                hostedCluster = null;
+            }
         }
     }
 }

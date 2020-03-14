@@ -16,7 +16,7 @@ using System.Text;
 
 namespace Benchmarks.Transactions
 {
-    public class TransactionBenchmark
+    public class TransactionBenchmark : IDisposable
     {
         private TestCluster host;
         private int runs;
@@ -145,6 +145,11 @@ namespace Benchmarks.Transactions
         public void Teardown()
         {
             host.StopAllSilos();
+        }
+
+        public void Dispose()
+        {
+            host?.Dispose();
         }
 
         public sealed class SiloTransactionConfigurator : ISiloConfigurator
