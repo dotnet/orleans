@@ -24,23 +24,8 @@
 
   <ItemGroup>
     <None Include="App.config" />
-    <Content Include="$(SourceRoot)src\Orleans.TestingHost\ClientConfigurationForTesting.xml" Link="ClientConfigurationForTesting.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="$(SourceRoot)src\Orleans.TestingHost\OrleansConfigurationForTesting.xml" Link="OrleansConfigurationForTesting.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="TesterInternal.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="MockStats_ClientConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="MockStats_ServerConfiguration.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 </Project>
