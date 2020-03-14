@@ -6,7 +6,6 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Threading;
-using System.Threading.Tasks;
 using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
@@ -138,6 +137,18 @@ namespace Orleans.TestingHost
                     IsBackground = true,
                 };
                 _thread.Start();
+                AppDomain.CurrentDomain.DomainUnload += this.OnAppDomainUnload;
+            }
+
+            private void OnAppDomainUnload(object sender, EventArgs e)
+            {
+                Shutdown();
+            }
+
+            private void Shutdown()
+            {
+                _workItems.CompleteAdding();
+                _thread.Join();
             }
 
             public bool Acquire(string name)
@@ -186,15 +197,30 @@ namespace Orleans.TestingHost
 
             private void Run()
             {
-                foreach (var action in _workItems.GetConsumingEnumerable())
+                try
                 {
-                    try
+                    foreach (var action in _workItems.GetConsumingEnumerable())
                     {
-                        action();
+                        try
+                        {
+                            action();
+                        }
+                        catch
+                        {
+                        }
                     }
-                    catch
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    foreach (var mutex in _mutexes.Values)
                     {
+                        mutex.ReleaseMutex();
                     }
+
+                    _mutexes.Clear();
                 }
             }
         }
