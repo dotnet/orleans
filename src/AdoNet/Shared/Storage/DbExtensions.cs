@@ -218,7 +218,6 @@ namespace Orleans.Tests.SqlUtils
             }
         }
 
-
         /// <summary>
         /// Returns a value with the given <see paramref="fieldName"/> as int.
         /// </summary>
@@ -232,6 +231,27 @@ namespace Orleans.Tests.SqlUtils
             {
                 var ordinal = record.GetOrdinal(fieldName);
                 return record.GetInt32(ordinal);
+            }
+            catch (IndexOutOfRangeException e)
+            {
+                throw new DataException($"Field '{fieldName}' not found in data record.", e);
+            }
+        }
+
+        /// <summary>
+        /// Returns a value with the given <see paramref="fieldName"/> as long.
+        /// </summary>
+        /// <param name="record">The record from which to retrieve the value.</param>
+        /// <param name="fieldName">The name of the field.</param>
+        /// <exception cref="DataException"/>
+        /// <returns>Integer value in the given field indicated by <see paramref="fieldName"/>.</returns>
+        public static long GetInt64(this IDataRecord record, string fieldName)
+        {
+            try
+            {
+                var ordinal = record.GetOrdinal(fieldName);
+                // Original casting when old schema is used.  Here to maintain backwards compatibility
+                return record.GetFieldType(ordinal) == typeof(int) ? record.GetInt32(ordinal) : record.GetInt64(ordinal);
             }
             catch (IndexOutOfRangeException e)
             {
