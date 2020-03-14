@@ -77,7 +77,7 @@ namespace Tester.HeterogeneousSilosTests
 
         public void Dispose()
         {
-            cluster?.StopAllSilos();
+            cluster?.Dispose();
             cluster = null;
         }
 
@@ -201,8 +201,17 @@ namespace Tester.HeterogeneousSilosTests
 
         public async Task DisposeAsync()
         {
-            if (this.cluster == null) return;
-            await cluster.StopAllSilosAsync();
+            try
+            {
+                if (this.cluster is TestCluster c)
+                {
+                    await c.StopAllSilosAsync();
+                }
+            }
+            finally
+            {
+                this.cluster?.Dispose();
+            }
         }
     }
 }
