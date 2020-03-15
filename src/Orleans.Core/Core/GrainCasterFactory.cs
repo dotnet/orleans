@@ -38,7 +38,7 @@ namespace Orleans
         /// <param name="interfaceType">The interface type.</param>
         /// <param name="grainReferenceType">The grain reference implementation type.</param>
         /// <returns>A grain reference caster delegate.</returns>
-        public static GrainFactory.GrainReferenceCaster CreateGrainReferenceCaster(
+        public static GrainReferenceFactory.GrainReferenceCaster CreateGrainReferenceCaster(
             Type interfaceType,
             Type grainReferenceType)
         {
@@ -119,7 +119,7 @@ namespace Orleans
             il.Emit(OpCodes.Ldloc_0);
             il.Emit(OpCodes.Ret);
 
-            return (GrainFactory.GrainReferenceCaster)method.CreateDelegate(typeof(GrainFactory.GrainReferenceCaster));
+            return (GrainReferenceFactory.GrainReferenceCaster)method.CreateDelegate(typeof(GrainReferenceFactory.GrainReferenceCaster));
         }
         
         /// <summary>
