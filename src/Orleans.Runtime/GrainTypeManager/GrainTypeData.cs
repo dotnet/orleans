@@ -14,7 +14,6 @@ namespace Orleans.Runtime
     /// <summary>
     /// Grain type meta data
     /// </summary>
-    [Serializable]
     internal class GrainTypeData
     {
         internal Type Type { get; private set; }
@@ -23,7 +22,7 @@ namespace Orleans.Runtime
         internal bool IsReentrant { get; private set; }
         internal bool IsStatelessWorker { get; private set; }
         internal Func<InvokeMethodRequest, bool> MayInterleave { get; private set; }
-   
+
         public GrainTypeData(Type type)
         {
             Type = type;
@@ -85,7 +84,6 @@ namespace Orleans.Runtime
             }
         }
 
-#pragma warning disable 612,618
         internal static PlacementStrategy GetPlacementStrategy(Type grainClass, PlacementStrategy defaultPlacement)
         {
             PlacementStrategy placement;
@@ -105,6 +103,13 @@ namespace Orleans.Runtime
         {
             var attr = grainClass.GetCustomAttribute<GrainDirectoryAttribute>();
             return attr != default ? attr.GrainDirectoryName : GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY;
+        }
+
+        public GrainTypeData MakeGenericType(Type[] typeArgs)
+        {
+            // Need to make a non-generic instance of the class to access the static data field. The field itself is independent of the instantiated type.
+            var concreteActivationType = this.Type.MakeGenericType(typeArgs);
+            return new GrainTypeData(concreteActivationType);
         }
 
         /// <summary>
