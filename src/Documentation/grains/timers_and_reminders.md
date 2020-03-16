@@ -105,10 +105,10 @@ Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
 }
 ```
 
- To start a reminder, use the **Grain.RegisterOrUpdateReminder** method, which returns an **IOrleansReminder** object:
+ To start a reminder, use the **Grain.RegisterOrUpdateReminder** method, which returns an **IGrainReminder** object:
 
 ``` csharp
-protected Task<IOrleansReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+protected Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
 ```
 
 * reminderName is a string that must uniquely identify the reminder within the scope of the contextual grain.
@@ -118,17 +118,17 @@ protected Task<IOrleansReminder> RegisterOrUpdateReminder(string reminderName, T
 Since reminders survive the lifetime of any single activation, they must be explicitly cancelled (as opposed to being disposed). You cancel a reminder by calling **Grain.UnregisterReminder**:
 
 ``` csharp
-protected Task UnregisterReminder(IOrleansReminder reminder)
+protected Task UnregisterReminder(IGrainReminder reminder)
 ```
 
 reminder is the handle object returned by **Grain.RegisterOrUpdateReminder**.
 
- Instances of **IOrleansReminder** aren't guaranteed to be valid beyond the lifespan of an activation. If you wish to identify a reminder in a way that persists, use a string containing the reminder's name.
+ Instances of **IGrainReminder** aren't guaranteed to be valid beyond the lifespan of an activation. If you wish to identify a reminder in a way that persists, use a string containing the reminder's name.
 
- If you only have the reminder's name and need the corresponding instance of  **IOrleansReminder**, call the **Grain.GetReminder** method:
+ If you only have the reminder's name and need the corresponding instance of  **IGrainReminder**, call the **Grain.GetReminder** method:
 
 ``` csharp
-protected Task<IOrleansReminder> GetReminder(string reminderName)
+protected Task<IGrainReminder> GetReminder(string reminderName)
 ```
 
 ## Which Should I Use?
