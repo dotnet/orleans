@@ -77,6 +77,8 @@ namespace Orleans.Runtime.Messaging
                 if (msg.TargetGrain.IsSystemTarget())
                 {
                     msg.TargetSilo = this.myAddress;
+                    var inputGrainId = msg.TargetGrain;
+                    msg.TargetGrain = GrainTypePrefix.ReplaceSystemTargetSilo(inputGrainId, this.myAddress);
                     msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 
@@ -87,6 +89,14 @@ namespace Orleans.Runtime.Messaging
             {
                 // send directly
                 msg.TargetSilo = targetAddress;
+
+                if (msg.TargetGrain.IsSystemTarget())
+                {
+                    var inputGrainId = msg.TargetGrain;
+                    msg.TargetGrain = GrainTypePrefix.ReplaceSystemTargetSilo(inputGrainId, targetAddress);
+                    msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
+                }
+
                 this.messageCenter.SendMessage(msg);
             }
         }

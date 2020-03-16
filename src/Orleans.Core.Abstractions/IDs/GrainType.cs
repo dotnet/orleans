@@ -27,8 +27,6 @@ namespace Orleans.Runtime
 
         public static GrainType Create(string value) => new GrainType(Encoding.UTF8.GetBytes(value));
 
-        public static GrainType CreateForSystemTarget(string name) => Create(GrainTypePrefix.SystemTargetPrefix + name);
-
         public static explicit operator SpanId(GrainType kind) => kind._value;
 
         public static explicit operator GrainType(SpanId id) => new GrainType(id);

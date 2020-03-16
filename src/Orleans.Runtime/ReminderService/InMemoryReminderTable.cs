@@ -6,12 +6,13 @@ namespace Orleans.Runtime.ReminderService
 {
     internal class InMemoryReminderTable : IReminderTable, ILifecycleParticipant<ISiloLifecycle>
     {
+        internal const long ReminderTableGrainId = 12345;
         private readonly IReminderTableGrain reminderTableGrain;
         private bool isAvailable;
 
         public InMemoryReminderTable(IGrainFactory grainFactory)
         {
-            this.reminderTableGrain = grainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
+            this.reminderTableGrain = grainFactory.GetGrain<IReminderTableGrain>(ReminderTableGrainId);
         }
 
         public Task Init() => Task.CompletedTask;

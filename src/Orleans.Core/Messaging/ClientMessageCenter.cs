@@ -393,7 +393,7 @@ namespace Orleans.Messaging
 
         private IClusterTypeManager GetTypeManager(SiloAddress destination, IInternalGrainFactory grainFactory)
         {
-            return grainFactory.GetSystemTarget<IClusterTypeManager>(Constants.TypeManagerId, destination);
+            return grainFactory.GetSystemTarget<IClusterTypeManager>(Constants.TypeManagerType, destination);
         }
 
         private SiloAddress GetLiveGatewaySiloAddress()

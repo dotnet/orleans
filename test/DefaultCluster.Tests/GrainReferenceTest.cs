@@ -157,22 +157,6 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact(Skip = "GrainReference interning is not currently implemented."), TestCategory("Serialization"), TestCategory("Interner")]
-        public void GrainReference_Interning_Sys_DirectoryGrain()
-        {
-            var g1 = GrainReference.FromGrainId(Constants.DirectoryServiceId, null);
-            var g2 = GrainReference.FromGrainId(Constants.DirectoryServiceId, null);
-            Assert.Equal(g1, g2); // Should be equal GrainReferences.
-            Assert.Same(g1, g2); // Should be same / interned GrainReference object
-
-            // Round-trip through Serializer
-            var g3 = this.HostedCluster.SerializationManager.RoundTripSerializationForTesting(g1);
-            Assert.Equal(g3, g1);
-            Assert.Equal(g3, g2);
-            Assert.Same(g3, g1);
-            Assert.Same(g3, g2);
-        }
-
-        [Fact(Skip = "GrainReference interning is not currently implemented."), TestCategory("Serialization"), TestCategory("Interner")]
         public void GrainReference_Interning_Sys_StoreGrain()
         {
             var g1 = (GrainReference)this.GrainFactory.GetGrain<IMemoryStorageGrain>(0);

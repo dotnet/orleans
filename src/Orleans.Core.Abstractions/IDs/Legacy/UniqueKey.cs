@@ -105,7 +105,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private static UniqueKey NewKey(ulong n0, ulong n1, Category category, long typeData, string keyExt)
+        internal static UniqueKey NewKey(ulong n0, ulong n1, Category category, long typeData, string keyExt)
         {
             if (!IsKeyExt(category) && keyExt != null)
                 throw new ArgumentException("Only key extended grains can specify a non-null key extension.");

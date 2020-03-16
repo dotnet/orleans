@@ -207,5 +207,7 @@ namespace Orleans
         /// <param name="grainInterfaceType">the runtime type of the grain interface</param>
         /// <returns></returns>
         IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey, string keyExtension);
+
+        TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable;
     }
 }

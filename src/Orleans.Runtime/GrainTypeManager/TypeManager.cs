@@ -36,7 +36,7 @@ namespace Orleans.Runtime
             IInternalGrainFactory grainFactory,
             CachedVersionSelectorManager versionSelectorManager,
             ILoggerFactory loggerFactory)
-            : base(Constants.TypeManagerId, myAddr, loggerFactory)
+            : base(Constants.TypeManagerType, myAddr, loggerFactory)
         {
             if (grainTypeManager == null)
                 throw new ArgumentNullException(nameof(grainTypeManager));
@@ -244,7 +244,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                var remoteTypeManager = this.grainFactory.GetSystemTarget<ISiloTypeManager>(Constants.TypeManagerId, siloAddress);
+                var remoteTypeManager = this.grainFactory.GetSystemTarget<ISiloTypeManager>(Constants.TypeManagerType, siloAddress);
                 var siloTypeCodeMap = await scheduler.QueueTask(() => remoteTypeManager.GetSiloTypeCodeMap(), this);
                 return new KeyValuePair<SiloAddress, GrainInterfaceMap>(siloAddress, siloTypeCodeMap);
             }

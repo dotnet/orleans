@@ -69,14 +69,12 @@ namespace Orleans.Runtime
         /// <summary>Constructs a reference to the grain with the specified Id.</summary>
         /// <param name="grainId">The Id of the grain to refer to.</param>
         /// <param name="genericArgument">Type arguments in case of a generic grain.</param>
-        /// <param name="systemTargetSilo">Target silo in case of a system target reference.</param>
         /// <param name="observerId">Observer ID in case of an observer reference.</param>
         /// <param name="runtime">The runtime which this grain reference is bound to.</param>
-        private GrainReference(GrainId grainId, string genericArgument, SiloAddress systemTargetSilo, GuidId observerId, IGrainReferenceRuntime runtime)
+        private GrainReference(GrainId grainId, string genericArgument, GuidId observerId, IGrainReferenceRuntime runtime)
         {
             GrainId = grainId;
             this.genericArguments = genericArgument;
-            this.SystemTargetSilo = systemTargetSilo;
             this.observerId = observerId;
             this.runtime = runtime;
             if (string.IsNullOrEmpty(genericArgument))
@@ -88,7 +86,8 @@ namespace Orleans.Runtime
             var isSystemTarget = grainId.IsSystemTarget();
             if (isSystemTarget)
             {
-                if (systemTargetSilo == null)
+                this.SystemTargetSilo = GrainTypePrefix.GetSystemTargetSilo(grainId);
+                if (SystemTargetSilo == null)
                 {
                     throw new ArgumentNullException("systemTargetSilo", String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, but passing null systemTargetSilo.", grainId));
                 }
@@ -102,10 +101,6 @@ namespace Orleans.Runtime
                 {
                     throw new ArgumentException(String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, and also passing non-null observerId {1}.", grainId, observerId), "genericArgument");
                 }
-            }
-            else if (systemTargetSilo != null)
-            {
-                throw new ArgumentException(String.Format("Trying to create a GrainReference for non-SystemTarget grain id {0}, but passing a non-null systemTargetSilo {1}.", grainId, systemTargetSilo), "systemTargetSilo");
             }
 
             // ObserverId checks
@@ -121,11 +116,6 @@ namespace Orleans.Runtime
                 {
                     throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null genericArguments {1}.", grainId, genericArguments), "genericArgument");
                 }
-
-                if (systemTargetSilo != null)
-                {
-                    throw new ArgumentException(String.Format("Trying to create a GrainReference for Client grain id {0}, and also passing non-null systemTargetSilo {1}.", grainId, systemTargetSilo), "genericArgument");
-                }
             }
             else if (observerId != null)
             {
@@ -138,7 +128,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other">The reference to copy.</param>
         protected GrainReference(GrainReference other)
-            : this(other.GrainId, other.genericArguments, other.SystemTargetSilo, other.ObserverId, other.runtime)
+            : this(other.GrainId, other.genericArguments, other.ObserverId, other.runtime)
         {
             this.invokeMethodOptions = other.invokeMethodOptions;
         }
@@ -153,15 +143,14 @@ namespace Orleans.Runtime
         /// <param name="grainId">The ID of the grain to refer to.</param>
         /// <param name="runtime">The runtime client</param>
         /// <param name="genericArguments">Type arguments in case of a generic grain.</param>
-        /// <param name="systemTargetSilo">Target silo in case of a system target reference.</param>
-        internal static GrainReference FromGrainId(GrainId grainId, IGrainReferenceRuntime runtime, string genericArguments = null, SiloAddress systemTargetSilo = null)
+        internal static GrainReference FromGrainId(GrainId grainId, IGrainReferenceRuntime runtime, string genericArguments = null)
         {
-            return new GrainReference(grainId, genericArguments, systemTargetSilo, null, runtime);
+            return new GrainReference(grainId, genericArguments, null, runtime);
         }
 
         internal static GrainReference NewObserverGrainReference(GrainId grainId, GuidId observerId, IGrainReferenceRuntime runtime)
         {
-            return new GrainReference(grainId, null, null, observerId, runtime);
+            return new GrainReference(grainId, null, observerId, runtime);
         }
 
         /// <summary>
@@ -413,8 +402,10 @@ namespace Orleans.Runtime
             {
                 grainIdStr = trimmed.Slice(grainIdIndex, systemTargetIndex - grainIdIndex).Trim();
                 ReadOnlySpan<char> systemTargetStr = trimmed.Slice(systemTargetIndex + SYSTEM_TARGET_STR_WITH_EQUAL_SIGN.Length);
-                SiloAddress siloAddress = SiloAddress.FromParsableString(systemTargetStr.ToString());
-                return FromGrainId(LegacyGrainId.FromParsableString(grainIdStr), runtime, null, siloAddress);
+
+                // TODO: Incorporate SiloAddress into GrainId or entirely remove FromKeyString - perhaps shift to a legacy/compat library
+                _ = SiloAddress.FromParsableString(systemTargetStr.ToString());
+                return FromGrainId(LegacyGrainId.FromParsableString(grainIdStr), runtime, null);
             }
             else
             {
@@ -435,7 +426,9 @@ namespace Orleans.Runtime
             }
             else if (keyInfo.HasTargetSilo)
             {
-                return FromGrainId(LegacyGrainId.FromKeyInfo(keyInfo.Key), runtime, null, SiloAddress.New(keyInfo.TargetSilo.endpoint, keyInfo.TargetSilo.generation));
+                // TODO: Incorporate SiloAddress into GrainId - perhaps shift to a legacy/compat library
+                _ = SiloAddress.New(keyInfo.TargetSilo.endpoint, keyInfo.TargetSilo.generation);
+                return FromGrainId(LegacyGrainId.FromKeyInfo(keyInfo.Key), runtime, null);
             }
             else
             {

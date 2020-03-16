@@ -17,7 +17,7 @@ namespace Orleans.Runtime.MembershipService
             ILoggerFactory loggerFactory,
             ILogger<MembershipSystemTarget> log,
             IInternalGrainFactory grainFactory)
-            : base(Constants.MembershipOracleId, localSiloDetails.SiloAddress, loggerFactory)
+            : base(Constants.MembershipOracleType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.membershipTableManager = membershipTableManager;
             this.log = log;
@@ -66,7 +66,7 @@ namespace Orleans.Runtime.MembershipService
                 try
                 {
                     RequestContext.Set(RequestContext.PING_APPLICATION_HEADER, true);
-                    var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, remoteSilo);
+                    var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleType, remoteSilo);
                     task = remoteOracle.Ping(probeNumber);
 
                     // Update stats counter. Only count Pings that were successfuly sent, but not necessarily replied to.
@@ -120,7 +120,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, silo);
+                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleType, silo);
                 try
                 {
                     await remoteOracle.MembershipChangeNotification(snapshot);

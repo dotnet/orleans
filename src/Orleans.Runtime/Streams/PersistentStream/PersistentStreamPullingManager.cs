@@ -9,6 +9,8 @@ using Orleans.Runtime;
 using Orleans.Configuration;
 using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
 using Orleans.Internal;
+using System.Threading;
+using System.Globalization;
 
 namespace Orleans.Streams
 {
@@ -33,10 +35,11 @@ namespace Orleans.Streams
         private readonly IQueueAdapterFactory adapterFactory;
         private RunState managerState;
         private IDisposable queuePrintTimer;
+        private int nextAgentId;
         private int NumberRunningAgents { get { return queuesToAgentsMap.Count; } }
 
         internal PersistentStreamPullingManager(
-            GrainId id, 
+            GrainId managerId,
             string strProviderName, 
             IStreamProviderRuntime runtime,
             IStreamPubSub streamPubSub,
@@ -45,7 +48,7 @@ namespace Orleans.Streams
             StreamPullingAgentOptions options,
             ILoggerFactory loggerFactory,
             SiloAddress siloAddress)
-            : base(id, siloAddress, loggerFactory)
+            : base(managerId, siloAddress, lowPriority: false, loggerFactory)
         {
             if (string.IsNullOrWhiteSpace(strProviderName))
             {
@@ -219,7 +222,8 @@ namespace Orleans.Streams
                     continue;
                 try
                 {
-                    var agentId = LegacyGrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE);
+                    var agentIdNumber = Interlocked.Increment(ref nextAgentId);
+                    var agentId = GrainTypePrefix.GetSystemTargetGrainId(Constants.StreamPullingAgentType, this.Silo, $"{streamProviderName}_{agentIdNumber}_{queueId.ToStringWithHashCode()}");
                     var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, pubSub, queueId, this.options, this.Silo);
                     providerRuntime.RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);

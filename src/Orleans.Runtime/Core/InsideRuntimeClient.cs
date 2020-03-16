@@ -165,7 +165,7 @@ namespace Orleans.Runtime
                 SiloAddress targetSilo = (target.SystemTargetSilo ?? MySilo);
                 message.TargetSilo = targetSilo;
                 message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
-                message.Category = targetGrainId.Equals(Constants.MembershipOracleId) ?
+                message.Category = targetGrainId.Type.Equals(Constants.MembershipOracleType) ?
                     Message.Categories.Ping : Message.Categories.System;
                 sharedData = this.systemSharedCallbackData;
             }

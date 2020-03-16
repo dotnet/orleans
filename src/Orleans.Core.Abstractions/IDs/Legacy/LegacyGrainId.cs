@@ -55,25 +55,15 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(key);
         }
 
-        internal static LegacyGrainId GetSystemGrainId(Guid guid)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewKey(guid, UniqueKey.Category.SystemGrain));
-        }
-
         // For testing only.
         internal static LegacyGrainId GetGrainIdForTesting(Guid guid)
         {
             return FindOrCreateGrainId(UniqueKey.NewKey(guid, UniqueKey.Category.None));
         }
 
-        internal static LegacyGrainId NewSystemTargetGrainIdByTypeCode(int typeData)
+        internal static LegacyGrainId GetSystemTargetGrainId(long typeData)
         {
-            return FindOrCreateGrainId(UniqueKey.NewSystemTargetKey(Guid.NewGuid(), typeData));
-        }
-
-        internal static LegacyGrainId GetSystemTargetGrainId(short systemGrainId)
-        {
-            return FindOrCreateGrainId(UniqueKey.NewSystemTargetKey(systemGrainId));
+            return FindOrCreateGrainId(UniqueKey.NewSystemTargetKey(Guid.Empty, typeData));
         }
 
         internal static LegacyGrainId GetGrainId(long typeCode, long primaryKey, string keyExt = null)
@@ -179,6 +169,16 @@ namespace Orleans.Runtime
             }
         }
 
+        public static GrainType CreateGrainTypeForGrain(int typeCode)
+        {
+            return GrainType.Create($"{GrainTypePrefix.LegacyGrainPrefix}{typeCode:X16}");
+        }
+
+        public static GrainType CreateGrainTypeForSystemTarget(int typeCode)
+        {
+            return GrainType.Create($"{GrainTypePrefix.SystemTargetPrefix}{typeCode:X16}");
+        }
+
         private SpanId GetGrainKey()
         {
             // TODO: intern
@@ -230,7 +230,10 @@ namespace Orleans.Runtime
             {
                 // TODO: noalloc
                 var typeCodeString = Encoding.UTF8.GetString(typeCodeBytes, 16);
-                typeCodeData = ulong.Parse(typeCodeString, NumberStyles.HexNumber);
+                if (!ulong.TryParse(typeCodeString, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out typeCodeData))
+                {
+                    return null;
+                }
             }
 
             ulong n0, n1;
@@ -242,11 +245,17 @@ namespace Orleans.Runtime
 
                 // TODO: noalloc
                 var n0String = Encoding.UTF8.GetString(idBytes, fieldLength);
-                n0 = ulong.Parse(n0String, NumberStyles.HexNumber);
+                if (!ulong.TryParse(n0String, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out n0))
+                {
+                    return null;
+                }
 
                 // TODO: noalloc
                 var n1String = Encoding.UTF8.GetString(idBytes + fieldLength, fieldLength);
-                n1 = ulong.Parse(n1String, NumberStyles.HexNumber);
+                if (!ulong.TryParse(n1String, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out n1))
+                {
+                    return null;
+                }
 
                 const int keySpanPrefixLength = fieldLength + fieldLength + 1;
                 if (keySpan.Length > keySpanPrefixLength && idBytes[keySpanPrefixLength - 1] == (byte)'+')
@@ -387,6 +396,15 @@ namespace Orleans.Runtime
                     GetUniformHashCode(),              // 6
                     GetUniformHashCode(),              // 7
                     Key.HasKeyExt ? String.Format(", KeyExtension: {0}", kx) : "");   // 8
+        }
+
+        public static bool IsLegacyGrainType(Type type)
+        {
+            return typeof(IGrainWithGuidKey).IsAssignableFrom(type)
+                || typeof(IGrainWithIntegerKey).IsAssignableFrom(type)
+                || typeof(IGrainWithStringKey).IsAssignableFrom(type)
+                || typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(type)
+                || typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(type);
         }
 
         internal string ToStringWithHashCode()

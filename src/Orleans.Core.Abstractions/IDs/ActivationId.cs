@@ -15,10 +15,12 @@ namespace Orleans.Runtime
         public static readonly ActivationId Zero;
 
         private static readonly Interner<UniqueKey, ActivationId> interner;
+        private static readonly Interner<GrainId, ActivationId> interner2;
 
         static ActivationId()
         {
             interner = new Interner<UniqueKey, ActivationId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq);
+            interner2 = new Interner<GrainId, ActivationId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq);
             Zero = FindOrCreate(UniqueKey.Empty);
         }
 
@@ -46,7 +48,15 @@ namespace Orleans.Runtime
         // Need to remove it all together. For now, just use grain id as activation id.
         public static ActivationId GetDeterministic(GrainId grain)
         {
-            return FindOrCreate(((LegacyGrainId)grain).Key);
+            return interner2.FindOrCreate(grain, CreateActivationId);
+
+            static ActivationId CreateActivationId(GrainId grainId)
+            {
+                var a = (ulong)grainId.Type.GetHashCode();
+                var b = (ulong)grainId.Key.GetHashCode();
+                var key = UniqueKey.NewKey(a, b, UniqueKey.Category.KeyExtGrain, typeData: 0, keyExt: grainId.ToString());
+                return new ActivationId(key);
+            }
         }
 
         internal static ActivationId GetActivationId(UniqueKey key)

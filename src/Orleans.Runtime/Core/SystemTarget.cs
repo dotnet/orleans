@@ -50,7 +50,7 @@ namespace Orleans.Runtime
 
         IGrainReferenceRuntime ISystemTargetBase.GrainReferenceRuntime => this.RuntimeClient.GrainReferenceRuntime;
 
-        GrainReference IGrainContext.GrainReference => selfReference ??= GrainReference.FromGrainId(this.grainId, this.RuntimeClient.GrainReferenceRuntime, systemTargetSilo: this.Silo);
+        GrainReference IGrainContext.GrainReference => selfReference ??= GrainReference.FromGrainId(this.grainId, this.RuntimeClient.GrainReferenceRuntime);
 
         GrainId IGrainContext.GrainId => this.grainId;
 
@@ -65,12 +65,17 @@ namespace Orleans.Runtime
         {
         }
 
-        internal SystemTarget(LegacyGrainId grainId, SiloAddress silo, ILoggerFactory loggerFactory)
-            : this(grainId, silo, false, loggerFactory)
+        internal SystemTarget(GrainType grainType, SiloAddress silo, ILoggerFactory loggerFactory)
+            : this(GrainTypePrefix.GetSystemTargetGrainId(grainType, silo), silo, false, loggerFactory)
         {
         }
 
-        internal SystemTarget(LegacyGrainId grainId, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
+        internal SystemTarget(GrainType grainType, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
+            : this(GrainTypePrefix.GetSystemTargetGrainId(grainType, silo), silo, lowPriority, loggerFactory)
+        {
+        }
+
+        internal SystemTarget(GrainId grainId, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
         {
             this.grainId = grainId;
             Silo = silo;

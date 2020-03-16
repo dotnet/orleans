@@ -66,7 +66,7 @@ namespace Orleans.Runtime.Messaging
 
             // If we've stopped application message processing, then filter those out now
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            if (messageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && !Constants.SystemMembershipTableId.Equals(msg.SendingGrain))
+            if (messageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && !Constants.SystemMembershipTableType.Equals(msg.SendingGrain))
             {
                 // We reject new requests, and drop all other messages
                 if (msg.Direction != Message.Directions.Request)

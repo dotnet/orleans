@@ -55,15 +55,15 @@ namespace Orleans.Runtime
 
         public readonly bool IsDefault => _type.IsDefault && _key.IsDefault;
 
-        public override bool Equals(object obj) => obj is GrainId id && this.Equals(id);
+        public override readonly bool Equals(object obj) => obj is GrainId id && this.Equals(id);
 
-        public bool Equals(GrainId other) => this.Type.Equals(other.Type) && this._key.Equals(other._key);
+        public readonly bool Equals(GrainId other) => this.Type.Equals(other.Type) && this._key.Equals(other._key);
 
         public override readonly int GetHashCode() => HashCode.Combine(_type, _key);
 
         public readonly uint GetUniformHashCode() => unchecked((uint)this.GetHashCode());
 
-        public uint GetHashCode_Modulo(uint umod)
+        public readonly uint GetHashCode_Modulo(uint umod)
         {
             int key = GetHashCode();
             int mod = (int)umod;
@@ -79,7 +79,7 @@ namespace Orleans.Runtime
             info.AddValue("kh", _key.GetHashCode());
         }
 
-        public int CompareTo(GrainId other)
+        public readonly int CompareTo(GrainId other)
         {
             var typeComparison = _type.CompareTo(other._type);
             if (typeComparison != 0) return typeComparison;

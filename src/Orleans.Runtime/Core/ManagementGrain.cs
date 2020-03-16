@@ -328,7 +328,7 @@ namespace Orleans.Runtime.Management
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
+            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
         }
     }
 }

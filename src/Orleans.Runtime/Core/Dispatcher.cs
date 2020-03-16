@@ -792,7 +792,7 @@ namespace Orleans.Runtime
 
         internal void SendSystemTargetMessage(Message message)
         {
-            message.Category = message.TargetGrain.Equals(Constants.MembershipOracleId) ? 
+            message.Category = message.TargetGrain.Equals(Constants.MembershipOracleType) ? 
                 Message.Categories.Ping : Message.Categories.System;
 
             if (message.TargetSilo == null)
