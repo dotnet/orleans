@@ -7,6 +7,16 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.1.3] (changes since 3.1.2)
+
+- Breaking changes (for rolling upgrades from 3.1.0 and 3.1.2 running on .NET Core 3.1)
+  - Omit assembly name for all types from System namespace during codegen (#6394)
+  - Fix System namespace classification in Orleans.CodeGenerator (#6396)
+
+- Non-breaking improvements
+  - Amended Linux stats registration to add services on Linux only (#6375)
+  - Update performance counter dependencies (#6397)
+
 ### [3.1.2] (changes since 3.1.0)
 
 - Non-breaking improvements
