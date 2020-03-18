@@ -357,7 +357,7 @@ namespace Orleans.Runtime.Scheduler
                             this.log.LogWarning(
                                 (int)ErrorCode.SchedulerSkipWorkCancelled,
                                 "Thread {Thread} is exiting work loop due to cancellation token. WorkItemGroup: {WorkItemGroup}, Have {WorkItemCount} work items in the queue",
-                                Thread.CurrentThread.ToString(),
+                                Thread.CurrentThread.ManagedThreadId.ToString(),
                                 this.ToString(),
                                 this.WorkItemCount);
 
@@ -414,7 +414,7 @@ namespace Orleans.Runtime.Scheduler
                                 this.GrainContext.ToString(),
                                 taskLength.ToString("g"),
                                 OrleansTaskScheduler.TurnWarningLengthThreshold,
-                                Thread.CurrentThread.ToString());
+                                Thread.CurrentThread.ManagedThreadId.ToString());
                         }
 
                         CurrentTask = null;
@@ -430,7 +430,7 @@ namespace Orleans.Runtime.Scheduler
                     (int)ErrorCode.Runtime_Error_100032,
                     ex,
                     "Worker thread {Thread} caught an exception thrown from IWorkItem.Execute: {Exception}",
-                    Thread.CurrentThread,
+                    Thread.CurrentThread.ManagedThreadId,
                     ex);
             }
             finally
