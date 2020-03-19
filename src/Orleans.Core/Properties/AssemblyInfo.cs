@@ -27,3 +27,6 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("CodeGenerator.Tests")]
 
 [assembly: KnownAssembly(typeof(IGrain))]
+
+// Mocking libraries
+[assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]

@@ -12,3 +12,6 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestInternalGrainInterfaces")]
 [assembly: InternalsVisibleTo("TestInternalGrains")]
+
+// Mocking libraries
+[assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
