@@ -167,6 +167,7 @@ namespace Orleans.TestingHost
                                 // Acquired
                                 _mutexes[name] = mutex;
                                 Interlocked.Increment(ref result[0]);
+                                return;
                             }
 
                             // Failed to acquire: the mutex is already held by another process.
@@ -235,6 +236,7 @@ namespace Orleans.TestingHost
                         {
                             mutex.ReleaseMutex();
                         }
+                        catch { }
                         finally
                         {
                             mutex.Close();
