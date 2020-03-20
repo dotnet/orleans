@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Net;
 using Microsoft.Azure.Storage.Queue;
 using Microsoft.Azure.Storage.RetryPolicies;
 using Microsoft.Extensions.Logging;
@@ -149,6 +150,13 @@ namespace Orleans.AzureUtils
                 CloudQueue queueRef = queue ?? queueOperationsClient.GetQueueReference(QueueName);
                 await queueRef.ClearAsync();
                 logger.Info((int)AzureQueueErrorCode.AzureQueue_05, "Cleared Azure Queue {0}", QueueName);
+            }
+            catch (Microsoft.Azure.Storage.StorageException exc)
+            {
+                if (exc.RequestInformation?.HttpStatusCode != (int)HttpStatusCode.NotFound)
+                {
+                    ReportErrorAndRethrow(exc, "ClearQueue", AzureQueueErrorCode.AzureQueue_06);
+                }
             }
             catch (Exception exc)
             {
