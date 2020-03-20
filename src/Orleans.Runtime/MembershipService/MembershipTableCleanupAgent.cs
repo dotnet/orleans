@@ -73,6 +73,7 @@ namespace Orleans.Runtime.MembershipService
                     }
                     catch (Exception exception) when (exception is NotImplementedException || exception is MissingMethodException)
                     {
+                        this.cleanupDefunctSilosTimer.Dispose();
                         this.log.LogError(
                             (int)ErrorCode.MembershipCleanDeadEntriesFailure,
                             $"{nameof(IMembershipTable.CleanupDefunctSiloEntries)} operation is not supported by the current implementation of {nameof(IMembershipTable)}. Disabling the timer now.");

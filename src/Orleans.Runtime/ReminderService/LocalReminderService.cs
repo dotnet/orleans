@@ -230,6 +230,7 @@ namespace Orleans.Runtime.ReminderService
                             await ReadAndUpdateReminders();
                             break;
                         default:
+                            listRefreshTimer.Dispose();
                             return;
                     }
                 }
