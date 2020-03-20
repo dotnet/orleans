@@ -25,6 +25,8 @@ namespace Orleans.Runtime.GrainDirectory
 
         private HashSet<SiloAddress> knownDeadSilos = new HashSet<SiloAddress>();
 
+        private Task listenToClusterChangeTask;
+
         internal interface ITestAccessor
         {
             MembershipVersion LastMembershipVersion { get; set; }
@@ -117,6 +119,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (this.cache.LookUp(grainId, out var results))
             {
+
                 // IGrainDirectory only supports single activation
                 var result = results[0];
 
@@ -167,19 +170,18 @@ namespace Orleans.Runtime.GrainDirectory
         {
             Task onStart(CancellationToken ct)
             {
-                ListenToClusterChange().Ignore();
+                this.listenToClusterChangeTask = ListenToClusterChange();
                 return Task.CompletedTask;
             };
-            Task onStop(CancellationToken ct)
+            async Task onStop(CancellationToken ct)
             {
                 this.shutdownToken.Cancel();
-                return Task.CompletedTask;
+                await listenToClusterChangeTask;
             };
             lifecycle.Subscribe(nameof(GrainLocator), ServiceLifecycleStage.RuntimeGrainServices, onStart, onStop);
         }
 
-        // Internal for test only. Do not call directly this method
-        internal async Task ListenToClusterChange()
+        private async Task ListenToClusterChange()
         {
             var previousSnapshot = this.clusterMembershipService.CurrentSnapshot;
             // Update the list of known dead silos for lazy filtering for the first time
