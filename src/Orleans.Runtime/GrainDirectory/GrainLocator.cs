@@ -8,13 +8,14 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.GrainDirectory
 {
     /// <summary>
     /// Implementation of <see cref="IGrainLocator"/> that uses an <see cref="IGrainDirectory"/> store.
     /// </summary>
-    internal class GrainLocator : IGrainLocator, ILifecycleParticipant<ISiloLifecycle>
+    internal class GrainLocator : IGrainLocator, ILifecycleParticipant<ISiloLifecycle>, GrainLocator.ITestAccessor
     {
         private readonly IGrainDirectory grainDirectory;
         private readonly DhtGrainLocator inClusterGrainLocator;
@@ -24,6 +25,15 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IClusterMembershipService clusterMembershipService;
 
         private HashSet<SiloAddress> knownDeadSilos = new HashSet<SiloAddress>();
+
+        private Task listenToClusterChangeTask;
+
+        internal interface ITestAccessor
+        {
+            MembershipVersion LastMembershipVersion { get; set; }
+        }
+
+        MembershipVersion ITestAccessor.LastMembershipVersion { get; set; }
 
         public GrainLocator(
             IGrainDirectory grainDirectory,
@@ -110,6 +120,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (this.cache.LookUp(grainId, out var results))
             {
+
                 // IGrainDirectory only supports single activation
                 var result = results[0];
 
@@ -158,27 +169,29 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            Task onStart(CancellationToken ct)
+            Task OnStart(CancellationToken ct)
             {
-                ListenToClusterChange().Ignore();
+                this.listenToClusterChangeTask = ListenToClusterChange();
                 return Task.CompletedTask;
             };
-            Task onStop(CancellationToken ct)
+            async Task OnStop(CancellationToken ct)
             {
                 this.shutdownToken.Cancel();
-                return Task.CompletedTask;
+                if (listenToClusterChangeTask != default && !ct.IsCancellationRequested)
+                    await listenToClusterChangeTask.WithCancellation(ct);
             };
-            lifecycle.Subscribe(nameof(GrainLocator), ServiceLifecycleStage.RuntimeGrainServices, onStart, onStop);
+            lifecycle.Subscribe(nameof(GrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
         }
 
-        // Internal for test only. Do not call directly this method
-        internal async Task ListenToClusterChange()
+        private async Task ListenToClusterChange()
         {
             var previousSnapshot = this.clusterMembershipService.CurrentSnapshot;
             // Update the list of known dead silos for lazy filtering for the first time
             this.knownDeadSilos = new HashSet<SiloAddress>(previousSnapshot.Members.Values
                 .Where(m => m.Status == SiloStatus.Dead)
                 .Select(m => m.SiloAddress));
+
+            ((ITestAccessor)this).LastMembershipVersion = previousSnapshot.Version;
 
             var updates = this.clusterMembershipService.MembershipUpdates.WithCancellation(this.shutdownToken.Token);
             await foreach (var snapshot in updates)
@@ -189,17 +202,19 @@ namespace Orleans.Runtime.GrainDirectory
                     .Select(m => m.SiloAddress));
 
                 // Active filtering: detect silos that went down and try to clean proactively the directory
-                if (previousSnapshot != default)
-                {
-                    var changes = snapshot.CreateUpdate(previousSnapshot).Changes;
-                    var deadSilos = changes
-                        .Where(member => member.Status == SiloStatus.Dead)
-                        .Select(member => member.SiloAddress.ToParsableString())
-                        .ToList();
+                var changes = snapshot.CreateUpdate(previousSnapshot).Changes;
+                var deadSilos = changes
+                    .Where(member => member.Status == SiloStatus.Dead)
+                    .Select(member => member.SiloAddress.ToParsableString())
+                    .ToList();
 
-                    if (deadSilos.Count > 0)
-                        await this.grainDirectory.UnregisterSilos(deadSilos);
+                if (deadSilos.Count > 0)
+                {
+                    await this.grainDirectory.UnregisterSilos(deadSilos)
+                        .WithCancellation(this.shutdownToken.Token);
                 }
+
+                ((ITestAccessor)this).LastMembershipVersion = snapshot.Version;
             }
         }
     }
