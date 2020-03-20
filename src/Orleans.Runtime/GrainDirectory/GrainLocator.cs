@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -168,17 +169,18 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            Task onStart(CancellationToken ct)
+            Task OnStart(CancellationToken ct)
             {
                 this.listenToClusterChangeTask = ListenToClusterChange();
                 return Task.CompletedTask;
             };
-            async Task onStop(CancellationToken ct)
+            async Task OnStop(CancellationToken ct)
             {
                 this.shutdownToken.Cancel();
-                await listenToClusterChangeTask;
+                if (listenToClusterChangeTask != default && !ct.IsCancellationRequested)
+                    await listenToClusterChangeTask.WithCancellation(ct);
             };
-            lifecycle.Subscribe(nameof(GrainLocator), ServiceLifecycleStage.RuntimeGrainServices, onStart, onStop);
+            lifecycle.Subscribe(nameof(GrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
         }
 
         private async Task ListenToClusterChange()
@@ -207,7 +209,10 @@ namespace Orleans.Runtime.GrainDirectory
                     .ToList();
 
                 if (deadSilos.Count > 0)
-                    await this.grainDirectory.UnregisterSilos(deadSilos);
+                {
+                    await this.grainDirectory.UnregisterSilos(deadSilos)
+                        .WithCancellation(this.shutdownToken.Token);
+                }
 
                 ((ITestAccessor)this).LastMembershipVersion = snapshot.Version;
             }
