@@ -14,7 +14,7 @@ namespace Orleans.Runtime.GrainDirectory
     /// <summary>
     /// Implementation of <see cref="IGrainLocator"/> that uses an <see cref="IGrainDirectory"/> store.
     /// </summary>
-    internal class GrainLocator : IGrainLocator, ILifecycleParticipant<ISiloLifecycle>
+    internal class GrainLocator : IGrainLocator, ILifecycleParticipant<ISiloLifecycle>, GrainLocator.ITestAccessor
     {
         private readonly IGrainDirectory grainDirectory;
         private readonly DhtGrainLocator inClusterGrainLocator;
@@ -24,6 +24,13 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IClusterMembershipService clusterMembershipService;
 
         private HashSet<SiloAddress> knownDeadSilos = new HashSet<SiloAddress>();
+
+        internal interface ITestAccessor
+        {
+            MembershipVersion LastMembershipVersion { get; set; }
+        }
+
+        MembershipVersion ITestAccessor.LastMembershipVersion { get; set; }
 
         public GrainLocator(
             IGrainDirectory grainDirectory,
@@ -180,6 +187,8 @@ namespace Orleans.Runtime.GrainDirectory
                 .Where(m => m.Status == SiloStatus.Dead)
                 .Select(m => m.SiloAddress));
 
+            ((ITestAccessor)this).LastMembershipVersion = previousSnapshot.Version;
+
             var updates = this.clusterMembershipService.MembershipUpdates.WithCancellation(this.shutdownToken.Token);
             await foreach (var snapshot in updates)
             {
@@ -189,17 +198,16 @@ namespace Orleans.Runtime.GrainDirectory
                     .Select(m => m.SiloAddress));
 
                 // Active filtering: detect silos that went down and try to clean proactively the directory
-                if (previousSnapshot != default)
-                {
-                    var changes = snapshot.CreateUpdate(previousSnapshot).Changes;
-                    var deadSilos = changes
-                        .Where(member => member.Status == SiloStatus.Dead)
-                        .Select(member => member.SiloAddress.ToParsableString())
-                        .ToList();
+                var changes = snapshot.CreateUpdate(previousSnapshot).Changes;
+                var deadSilos = changes
+                    .Where(member => member.Status == SiloStatus.Dead)
+                    .Select(member => member.SiloAddress.ToParsableString())
+                    .ToList();
 
-                    if (deadSilos.Count > 0)
-                        await this.grainDirectory.UnregisterSilos(deadSilos);
-                }
+                if (deadSilos.Count > 0)
+                    await this.grainDirectory.UnregisterSilos(deadSilos);
+
+                ((ITestAccessor)this).LastMembershipVersion = snapshot.Version;
             }
         }
     }

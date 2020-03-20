@@ -95,6 +95,7 @@ namespace UnitTests.Directory
             this.mockMembershipService.UpdateSiloStatus(expectedAddr.Silo, SiloStatus.Active);
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
             this.grainLocator.ListenToClusterChange().Ignore();
+            await WaitUntilClusterChangePropagated();
 
             // First returns the outdated entry, then the new one
             this.grainDirectory.Register(expectedGrainAddr).Returns(outdatedGrainAddr, expectedGrainAddr);
@@ -141,6 +142,7 @@ namespace UnitTests.Directory
             // Setup membership service
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
             this.grainLocator.ListenToClusterChange().Ignore();
+            await WaitUntilClusterChangePropagated();
 
             this.grainDirectory.Lookup(outdatedGrainAddr.GrainId).Returns(outdatedGrainAddr);
 
@@ -162,6 +164,7 @@ namespace UnitTests.Directory
             // Setup membership service
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
             this.grainLocator.ListenToClusterChange().Ignore();
+            await WaitUntilClusterChangePropagated();
 
             this.grainDirectory.Lookup(outdatedGrainAddr.GrainId).Returns(outdatedGrainAddr);
 
@@ -184,6 +187,7 @@ namespace UnitTests.Directory
             this.mockMembershipService.UpdateSiloStatus(expectedAddr.Silo, SiloStatus.Active);
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Active);
             this.grainLocator.ListenToClusterChange().Ignore();
+            await WaitUntilClusterChangePropagated();
 
             // Register two entries
             this.grainDirectory.Register(expectedGrainAddr).Returns(expectedGrainAddr);
@@ -196,7 +200,7 @@ namespace UnitTests.Directory
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
 
             // Wait a bit for the update to be processed
-            await Task.Delay(200);
+            await WaitUntilClusterChangePropagated();
 
             // Cleanup function from grain directory should have been called
             await this.grainDirectory
@@ -235,6 +239,18 @@ namespace UnitTests.Directory
             var siloAddr = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), random.Next(0,2000));
 
             return ActivationAddress.NewActivationAddress(siloAddr, grainId);
+        }
+
+        private async Task WaitUntilClusterChangePropagated()
+        {
+            await Until(() => this.mockMembershipService.CurrentVersion == ((GrainLocator.ITestAccessor)this.grainLocator).LastMembershipVersion);
+        }
+
+        private static async Task Until(Func<bool> condition)
+        {
+            var maxTimeout = 40_000;
+            while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
+            Assert.True(maxTimeout > 0);
         }
     }
 }
