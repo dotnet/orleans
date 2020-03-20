@@ -24,6 +24,7 @@ namespace UnitTests.GrainInterfaces
     public interface IOutgoingMethodInterceptionGrain : IGrainWithIntegerKey
     {
         Task<Dictionary<string, object>> EchoViaOtherGrain(IMethodInterceptionGrain otherGrain, string message);
+        Task<string> ThrowIfGreaterThanZero(int value);
     }
 
     public interface IGenericMethodInterceptionGrain<in T> : IGrainWithIntegerKey, IMethodFromAnotherInterface
@@ -47,8 +48,8 @@ namespace UnitTests.GrainInterfaces
     }
 
     public interface IGrainCallFilterTestGrain : IGrainWithIntegerKey
-    { 
-        Task<string> CallWithBadInterceptors(bool early, bool mid, bool late);
+    {
+        Task<string> ThrowIfGreaterThanZero(int value);
         Task<string> GetRequestContext();
     }
 
