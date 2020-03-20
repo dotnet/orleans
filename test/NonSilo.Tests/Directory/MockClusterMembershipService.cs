@@ -19,6 +19,8 @@ namespace UnitTests.Directory
 
         ClusterMembershipSnapshot IClusterMembershipService.CurrentSnapshot => this.snapshot;
 
+        public MembershipVersion CurrentVersion => this.snapshot.Version;
+
         IAsyncEnumerable<ClusterMembershipSnapshot> IClusterMembershipService.MembershipUpdates => this.updates;
 
         public IClusterMembershipService Target => this;

@@ -5,6 +5,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using NSubstitute;
 using Orleans;
@@ -12,21 +13,29 @@ using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Utilities;
+using TestExtensions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.Directory
 {
     [TestCategory("BVT"), TestCategory("Directory")]
     public class GrainLocatorTests
     {
+        private readonly LoggerFactory loggerFactory;
+        private readonly SiloLifecycleSubject lifecycle;
+
         private readonly IGrainDirectory grainDirectory;
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly MockClusterMembershipService mockMembershipService;
 
         private readonly GrainLocator grainLocator;
 
-        public GrainLocatorTests()
+        public GrainLocatorTests(ITestOutputHelper output)
         {
+            this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(output) });
+            this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+
             this.grainDirectory = Substitute.For<IGrainDirectory>();
             this.localGrainDirectory = Substitute.For<ILocalGrainDirectory>();
             this.mockMembershipService = new MockClusterMembershipService();
@@ -35,6 +44,8 @@ namespace UnitTests.Directory
                 this.grainDirectory,
                 new DhtGrainLocator(this.localGrainDirectory),
                 this.mockMembershipService.Target);
+
+            this.grainLocator.Participate(this.lifecycle);
         }
 
         [Fact]
@@ -94,7 +105,8 @@ namespace UnitTests.Directory
             // Setup membership service
             this.mockMembershipService.UpdateSiloStatus(expectedAddr.Silo, SiloStatus.Active);
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
-            this.grainLocator.ListenToClusterChange().Ignore();
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
 
             // First returns the outdated entry, then the new one
             this.grainDirectory.Register(expectedGrainAddr).Returns(outdatedGrainAddr, expectedGrainAddr);
@@ -108,6 +120,8 @@ namespace UnitTests.Directory
             Assert.True(this.grainLocator.TryLocalLookup(expectedAddr.Grain, out var results));
             Assert.Single(results);
             Assert.Equal(expectedAddr, results[0]);
+
+            await this.lifecycle.OnStop();
         }
 
         [Fact]
@@ -140,7 +154,8 @@ namespace UnitTests.Directory
 
             // Setup membership service
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
-            this.grainLocator.ListenToClusterChange().Ignore();
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
 
             this.grainDirectory.Lookup(outdatedGrainAddr.GrainId).Returns(outdatedGrainAddr);
 
@@ -151,6 +166,8 @@ namespace UnitTests.Directory
             await this.grainDirectory.Received(1).Unregister(outdatedGrainAddr);
 
             Assert.False(this.grainLocator.TryLocalLookup(outdatedAddr.Grain, out var unused));
+
+            await this.lifecycle.OnStop();
         }
 
         [Fact]
@@ -161,7 +178,8 @@ namespace UnitTests.Directory
 
             // Setup membership service
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
-            this.grainLocator.ListenToClusterChange().Ignore();
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
 
             this.grainDirectory.Lookup(outdatedGrainAddr.GrainId).Returns(outdatedGrainAddr);
 
@@ -170,6 +188,8 @@ namespace UnitTests.Directory
             // Local lookup should never call the directory
             await this.grainDirectory.DidNotReceive().Lookup(outdatedGrainAddr.GrainId);
             await this.grainDirectory.DidNotReceive().Unregister(outdatedGrainAddr);
+
+            await this.lifecycle.OnStop();
         }
 
         [Fact]
@@ -183,7 +203,8 @@ namespace UnitTests.Directory
             // Setup membership service
             this.mockMembershipService.UpdateSiloStatus(expectedAddr.Silo, SiloStatus.Active);
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Active);
-            this.grainLocator.ListenToClusterChange().Ignore();
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
 
             // Register two entries
             this.grainDirectory.Register(expectedGrainAddr).Returns(expectedGrainAddr);
@@ -196,7 +217,7 @@ namespace UnitTests.Directory
             this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
 
             // Wait a bit for the update to be processed
-            await Task.Delay(200);
+            await WaitUntilClusterChangePropagated();
 
             // Cleanup function from grain directory should have been called
             await this.grainDirectory
@@ -210,6 +231,8 @@ namespace UnitTests.Directory
             var results = await this.grainLocator.Lookup(expectedAddr.Grain);
             Assert.Single(results);
             Assert.Equal(expectedAddr, results[0]);
+
+            await this.lifecycle.OnStop();
         }
 
         [Fact]
@@ -228,13 +251,26 @@ namespace UnitTests.Directory
             Assert.False(this.grainLocator.TryLocalLookup(expectedAddr.Grain, out var unused));
         }
 
+
+        private int generation = 0;
         private ActivationAddress GenerateActivationAddress()
         {
-            var random = new Random();
             var grainId = GrainId.GetGrainIdForTesting(Guid.NewGuid());
-            var siloAddr = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), random.Next(0,2000));
+            var siloAddr = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), ++generation);
 
             return ActivationAddress.NewActivationAddress(siloAddr, grainId);
+        }
+
+        private async Task WaitUntilClusterChangePropagated()
+        {
+            await Until(() => this.mockMembershipService.CurrentVersion == ((GrainLocator.ITestAccessor)this.grainLocator).LastMembershipVersion);
+        }
+
+        private static async Task Until(Func<bool> condition)
+        {
+            var maxTimeout = 40_000;
+            while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
+            Assert.True(maxTimeout > 0);
         }
     }
 }
