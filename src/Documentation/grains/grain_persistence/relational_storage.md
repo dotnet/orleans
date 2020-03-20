@@ -217,7 +217,7 @@ const string queryFromOrleansQueryTableWithSomeKey = "SELECT column1, column2 FR
 TExpected queryResult = SpecificQuery12InOrleans<TExpected>(query, Param1, Param2);
 ```
 
-These principles are also [included in the database scripts](https://github.com/dotnet/orleans/blob/master/src/OrleansSQLUtils/).
+These principles are also [included in the database scripts](../../clusters_and_clients/configuration_guide/adonet_configuration.md).
 
 ## Some ideas on applying customized scripts
 
