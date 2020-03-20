@@ -11,6 +11,8 @@ title: Client Configuration
 A client for connecting to a cluster of silos and sending requests to grains is configured programmatically via a `ClientBuilder` and a number of supplemental option classes.
 Like silo options, client option classes follow the [ASP.NET Options](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options).
 
+Add the [Microsoft.Orleans.Clustering.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.AzureStorage) nuget package to the client project. 
+
 There are several key aspects of client configuration:
 
 * Orleans clustering information
@@ -20,6 +22,8 @@ There are several key aspects of client configuration:
 Example of a client configuration:
 
 ``` csharp
+using Orleans.Hosting;
+
 var client = new ClientBuilder()
     // Clustering information
     .Configure<ClusterOptions>(options =>
