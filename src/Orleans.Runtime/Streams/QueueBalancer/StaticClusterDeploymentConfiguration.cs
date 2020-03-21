@@ -1,29 +1,18 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using Orleans.Runtime.Configuration;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     /// <summary>
     /// Deployment configuration that reads from orleans cluster configuration
     /// </summary>
-    internal class StaticClusterDeploymentConfiguration : IDeploymentConfiguration
+    public class StaticClusterDeploymentOptions : IDeploymentConfiguration
     {
-        private readonly ClusterConfiguration _clusterConfiguration;
+        public IList<string> SiloNames { get; set; } = new List<string>();
 
-        public StaticClusterDeploymentConfiguration(ClusterConfiguration clusterConfiguration)
+        IList<string> IDeploymentConfiguration.GetAllSiloNames()
         {
-            if (clusterConfiguration == null)
-            {
-                throw new ArgumentNullException("clusterConfiguration");
-            }
-            _clusterConfiguration = clusterConfiguration;
-        }
-
-        public IList<string> GetAllSiloNames()
-        {
-            return _clusterConfiguration.Overrides.Keys.ToList();
+            return this.SiloNames;
         }
     }
 }

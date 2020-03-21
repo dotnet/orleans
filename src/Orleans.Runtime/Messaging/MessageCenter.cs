@@ -1,42 +1,41 @@
 using System;
-using System.Net;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using Orleans.Messaging;
-using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
-using Orleans.Configuration;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using System.Threading.Channels;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class MessageCenter : ISiloMessageCenter, IDisposable
+    internal class MessageCenter : IMessageCenter, IDisposable
     {
-        private Gateway Gateway { get; set; }
-        private IncomingMessageAcceptor ima;
-        private readonly Logger log;
+        public Gateway Gateway { get; set; }
+        private readonly ILogger log;
         private Action<Message> rerouteHandler;
         internal Func<Message, bool> ShouldDrop;
+        private IHostedClient hostedClient;
+        private Action<Message> sniffIncomingMessageHandler;
 
-        // ReSharper disable NotAccessedField.Local
-        private IntValueStatistic sendQueueLengthCounter;
-        private IntValueStatistic receiveQueueLengthCounter;
-        // ReSharper restore NotAccessedField.Local
-
-        internal IOutboundMessageQueue OutboundQueue { get; set; }
-        internal IInboundMessageQueue InboundQueue { get; set; }
-        internal SocketManager SocketManager;
-        private readonly SerializationManager serializationManager;
+        internal OutboundMessageQueue OutboundQueue { get; set; }
         private readonly MessageFactory messageFactory;
         private readonly ILoggerFactory loggerFactory;
+        private readonly ConnectionManager senderManager;
+        private readonly MessagingTrace messagingTrace;
+        private SiloMessagingOptions messagingOptions;
+        private IncomingMessageHandler messageHandler;
+
         internal bool IsBlockingApplicationMessages { get; private set; }
-        internal ISiloPerformanceMetrics Metrics { get; private set; }
-        
-        public bool IsProxying { get { return Gateway != null; } }
+
+        public void SetHostedClient(IHostedClient client) => this.hostedClient = client;
+
+        public bool IsProxying => this.Gateway != null || this.hostedClient?.ClientId != null;
 
         public bool TryDeliverToProxy(Message msg)
         {
-            return msg.TargetGrain.IsClient && Gateway != null && Gateway.TryDeliverToProxy(msg);
+            if (msg.TargetGrain == null || !msg.TargetGrain.IsClient) return false;
+            if (this.Gateway != null && this.Gateway.TryDeliverToProxy(msg)) return true;
+            return this.hostedClient?.TryDispatchToClient(msg) ?? false;
         }
         
         // This is determined by the IMA but needed by the OMS, and so is kept here in the message center itself.
@@ -44,46 +43,38 @@ namespace Orleans.Runtime.Messaging
 
         public MessageCenter(
             ILocalSiloDetails siloDetails,
-            NodeConfiguration nodeConfig,
-            IOptions<SiloMessagingOptions> options,
-            SerializationManager serializationManager,
-            ISiloPerformanceMetrics metrics,
+            IOptions<SiloMessagingOptions> messagingOptions,
             MessageFactory messageFactory,
             Factory<MessageCenter, Gateway> gatewayFactory,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IOptions<StatisticsOptions> statisticsOptions,
+            ISiloStatusOracle siloStatusOracle,
+            ConnectionManager senderManager,
+            MessagingTrace messagingTrace)
         {
+            this.messagingOptions = messagingOptions.Value;
             this.loggerFactory = loggerFactory;
-            this.log = new LoggerWrapper<MessageCenter>(loggerFactory);
-            this.serializationManager = serializationManager;
+            this.senderManager = senderManager;
+            this.messagingTrace = messagingTrace;
+            this.log = loggerFactory.CreateLogger<MessageCenter>();
             this.messageFactory = messageFactory;
-            this.Initialize(siloDetails.SiloAddress.Endpoint, nodeConfig.Generation, options, metrics);
-            if (nodeConfig.IsGatewayNode)
+            this.MyAddress = siloDetails.SiloAddress;
+
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
+
+            OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager, siloStatusOracle, this.messagingTrace);
+
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Completed initialization.");
+
+            if (siloDetails.GatewayAddress != null)
             {
                 Gateway = gatewayFactory(this);
             }
         }
 
-        private void Initialize(IPEndPoint here, int generation, IOptions<SiloMessagingOptions> options, ISiloPerformanceMetrics metrics = null)
-        {
-            if(log.IsVerbose3) log.Verbose3("Starting initialization.");
-
-            SocketManager = new SocketManager(options, this.loggerFactory);
-            ima = new IncomingMessageAcceptor(this, here, SocketDirection.SiloToSilo, this.messageFactory, this.serializationManager, this.loggerFactory);
-            MyAddress = SiloAddress.New((IPEndPoint)ima.AcceptingSocket.LocalEndPoint, generation);
-            InboundQueue = new InboundMessageQueue(this.loggerFactory);
-            OutboundQueue = new OutboundMessageQueue(this, options, this.serializationManager, this.loggerFactory);
-            Metrics = metrics;
-            
-            sendQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_SEND_QUEUE_LENGTH, () => SendQueueLength);
-            receiveQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_RECEIVE_QUEUE_LENGTH, () => ReceiveQueueLength);
-
-            if (log.IsVerbose3) log.Verbose3("Completed initialization.");
-        }
-
         public void Start()
         {
             IsBlockingApplicationMessages = false;
-            ima.Start();
             OutboundQueue.Start();
         }
 
@@ -93,47 +84,39 @@ namespace Orleans.Runtime.Messaging
                 Gateway.Start(clientRegistrar);
         }
 
-        public void PrepareToStop()
+        private void WaitToRerouteAllQueuedMessages()
         {
+            DateTime maxWaitTime = DateTime.UtcNow + this.messagingOptions.ShutdownRerouteTimeout;
+            while (DateTime.UtcNow < maxWaitTime)
+            {
+                var applicationMessageQueueLength = this.OutboundQueue.GetApplicationMessageCount();
+                if (applicationMessageQueueLength == 0)
+                    break;
+                Thread.Sleep(100);
+            }
+            
         }
 
         public void Stop()
         {
             IsBlockingApplicationMessages = true;
-
-            try
-            {
-                ima.Stop();
-            }
-            catch (Exception exc)
-            {
-                log.Error(ErrorCode.Runtime_Error_100108, "Stop failed.", exc);
-            }
-
+            
             StopAcceptingClientMessages();
 
             try
             {
+                WaitToRerouteAllQueuedMessages();
                 OutboundQueue.Stop();
             }
             catch (Exception exc)
             {
                 log.Error(ErrorCode.Runtime_Error_100110, "Stop failed.", exc);
             }
-
-            try
-            {
-                SocketManager.Stop();
-            }
-            catch (Exception exc)
-            {
-                log.Error(ErrorCode.Runtime_Error_100111, "Stop failed.", exc);
-            }
         }
 
         public void StopAcceptingClientMessages()
         {
-            if (log.IsVerbose) log.Verbose("StopClientMessages");
+            if (log.IsEnabled(LogLevel.Debug)) log.Debug("StopClientMessages");
             if (Gateway == null) return;
 
             try
@@ -154,6 +137,21 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        public void OnReceivedMessage(Message message)
+        {
+            var handler = this.messageHandler;
+            if (handler is null)
+            {
+                ThrowNullMessageHandler();
+            }
+            else
+            {
+                handler.ReceiveMessage(message);
+            }
+
+            static void ThrowNullMessageHandler() => throw new InvalidOperationException("MessageCenter does not have a message handler set");
+        }
+
         public void RerouteMessage(Message message)
         {
             if (rerouteHandler != null)
@@ -166,11 +164,14 @@ namespace Orleans.Runtime.Messaging
         {
             set
             {
-                ima.SniffIncomingMessage = value;
-            }
-        }
+                if (this.sniffIncomingMessageHandler != null)
+                    throw new InvalidOperationException("IncomingMessageAcceptor SniffIncomingMessage already set");
 
-        public Func<SiloAddress, bool> SiloDeadOracle { get; set; }
+                this.sniffIncomingMessageHandler = value;
+            }
+
+            get => this.sniffIncomingMessageHandler;
+        }
 
         public void SendMessage(Message msg)
         {
@@ -179,13 +180,27 @@ namespace Orleans.Runtime.Messaging
                 && !Constants.SystemMembershipTableId.Equals(msg.TargetGrain))
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
+                this.messagingTrace.OnDropBlockedApplicationMessage(msg);
             }
             else
             {
-                if (msg.SendingSilo == null)
-                    msg.SendingSilo = MyAddress;
+                msg.SendingSilo ??= this.MyAddress;
                 OutboundQueue.SendMessage(msg);
             }
+        }
+
+        public bool TrySendLocal(Message message)
+        {
+            if (!message.TargetSilo.Matches(MyAddress))
+            {
+                return false;
+            }
+
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Message has been looped back to this silo: {0}", message);
+            MessagingStatisticsGroup.LocalMessagesSent.Increment();
+            this.OnReceivedMessage(message);
+
+            return true;
         }
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
@@ -194,30 +209,22 @@ namespace Orleans.Runtime.Messaging
             if (string.IsNullOrEmpty(reason)) reason = string.Format("Rejection from silo {0} - Unknown reason.", MyAddress);
             Message error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
             // rejection msgs are always originated in the local silo, they are never remote.
-            InboundQueue.PostMessage(error);
+            this.OnReceivedMessage(error);
         }
 
-        public Message WaitMessage(Message.Categories type, CancellationToken ct)
+        public void RegisterLocalMessageHandler(IncomingMessageHandler handler)
         {
-            return InboundQueue.WaitMessage(type);
+            this.messageHandler = handler;
         }
 
         public void Dispose()
         {
-            if (ima != null)
-            {
-                ima.Dispose();
-                ima = null;
-            }
-
-            OutboundQueue.Dispose();
+            OutboundQueue?.Dispose();
 
             GC.SuppressFinalize(this);
         }
 
-        public int SendQueueLength { get { return OutboundQueue.Count; } }
-
-        public int ReceiveQueueLength { get { return InboundQueue.Count; } }
+        public int SendQueueLength { get { return OutboundQueue.GetCount(); } }
 
         /// <summary>
         /// Indicates that application messages should be blocked from being sent or received.
@@ -229,7 +236,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         public void BlockApplicationMessages()
         {
-            if(log.IsVerbose) log.Verbose("BlockApplicationMessages");
+            if(log.IsEnabled(LogLevel.Debug)) log.Debug("BlockApplicationMessages");
             IsBlockingApplicationMessages = true;
         }
     }

@@ -9,6 +9,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 
 namespace Tester.StreamingTests
 {
@@ -17,7 +18,7 @@ namespace Tester.StreamingTests
         private readonly BaseTestClusterFixture fixture;
         protected Guid StreamId;
         protected string StreamNamespace;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         protected string streamProviderName;
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(30);
 

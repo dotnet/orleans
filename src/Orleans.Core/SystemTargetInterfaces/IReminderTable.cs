@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans
 {
@@ -14,7 +13,7 @@ namespace Orleans
     /// </summary>  
     public interface IReminderTable
     {
-        Task Init(GlobalConfiguration config);
+        Task Init();
 
         Task<ReminderTableData> ReadRows(GrainReference key);
 
@@ -46,9 +45,19 @@ namespace Orleans
     /// Reminder table interface for grain based implementation.
     /// </summary>
     [Unordered]
-    internal interface IReminderTableGrain : IGrainWithIntegerKey, IReminderTable
+    internal interface IReminderTableGrain : IGrainWithIntegerKey
     {
-        
+        Task<ReminderTableData> ReadRows(GrainReference key);
+
+        Task<ReminderTableData> ReadRows(uint begin, uint end);
+
+        Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName);
+
+        Task<string> UpsertRow(ReminderEntry entry);
+
+        Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag);
+
+        Task TestOnlyClearTable();
     }
 
     public class ReminderTableData

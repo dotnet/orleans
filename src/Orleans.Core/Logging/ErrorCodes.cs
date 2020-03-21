@@ -4,7 +4,7 @@ namespace Orleans
     /// <summary>
     /// The set of error types used by the Orleans runtime libraries for logging errors.
     /// </summary>
-    internal enum ErrorCode
+    public enum ErrorCode
     {
         Runtime = 100000,
         Runtime_Error_100001 = Runtime + 1,
@@ -338,7 +338,7 @@ namespace Orleans
         Runtime_Error_100329 = Runtime + 329,
         Runtime_Error_100330 = Runtime + 330,
         Runtime_Error_100331 = Runtime + 331,
-
+        
         SiloBase                        = Runtime + 400,
         SiloStarting                    = SiloBase + 1,
         SiloStarted                     = SiloBase + 2,
@@ -390,8 +390,10 @@ namespace Orleans
         SiloShutdownEventFailure        = SiloBase + 49,
         LifecycleStartFailure           = SiloBase + 50,
         LifecycleStopFailure            = SiloBase + 51,
+        SiloStartPerfMeasure            = SiloBase + 52,
+        LifecycleStagesReport           = SiloBase + 53,
 
-        CatalogBase                     = Runtime + 500,
+        CatalogBase = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,
         Catalog_UnregisterManyAsync     = CatalogBase + 2,
         Catalog_DestroyActivations       = CatalogBase + 3,
@@ -438,6 +440,7 @@ namespace Orleans
         Catalog_FinishGrainDeactivateAndCleanupStreams_Exception = CatalogBase + 44,
         Catalog_DeactivateAllActivations                = CatalogBase + 45,
         Catalog_ActivationCollector_BadState_3          = CatalogBase + 46,
+        Catalog_UnregisterAsync                         = CatalogBase + 47,
 
         MembershipBase                         = Runtime + 600,
         MembershipCantWriteLivenessDisabled    = Runtime_Error_100225, // Backward compatability
@@ -502,6 +505,9 @@ namespace Orleans
         MembershipUpdateIAmAliveFailure        = MembershipBase + 59,
         MembershipStartingIAmAliveTimer        = MembershipBase + 60,
         MembershipJoiningPreconditionFailure   = MembershipBase + 61,
+        MembershipCleanDeadEntriesFailure      = MembershipBase + 62,
+        MembershipJoining                      = MembershipBase + 63,
+        MembershipFailedToJoin                 = MembershipBase + 64,
 
         NSMembershipStarting                   = MembershipBase + 70,
         NSMembershipBecomeActive               = MembershipBase + 71,
@@ -550,74 +556,6 @@ namespace Orleans
         PerfCounterConnectError         = PerfCounterBase + 19,
         PerfCounterFailedToInitialize   = PerfCounterBase + 20,
         
-        AzureTableBase = Runtime + 800,
-        AzureTable_01 = AzureTableBase + 1,
-        AzureTable_02 = AzureTableBase + 2,
-        AzureTable_03 = AzureTableBase + 3,
-        AzureTable_04 = AzureTableBase + 4,
-        AzureTable_05 = AzureTableBase + 5,
-        AzureTable_06 = AzureTableBase + 6,
-        AzureTable_07 = AzureTableBase + 7,
-        AzureTable_08 = AzureTableBase + 8,
-        AzureTable_09 = AzureTableBase + 9,
-        AzureTable_10 = AzureTableBase + 10,
-        AzureTable_11 = AzureTableBase + 11,
-        AzureTable_12 = AzureTableBase + 12,
-        AzureTable_13 = AzureTableBase + 13,
-        AzureTable_14 = AzureTableBase + 14,
-        AzureTable_15 = AzureTableBase + 15,
-        AzureTable_16 = AzureTableBase + 16,
-        AzureTable_17 = AzureTableBase + 17,
-        AzureTable_18 = AzureTableBase + 18,
-        AzureTable_19 = AzureTableBase + 19,
-        AzureTable_20 = AzureTableBase + 20,
-        AzureTable_21 = AzureTableBase + 21,
-        AzureTable_22 = AzureTableBase + 22,
-        AzureTable_23 = AzureTableBase + 23,
-        AzureTable_24 = AzureTableBase + 24,
-        AzureTable_25 = AzureTableBase + 25,
-        AzureTable_26 = AzureTableBase + 26,
-        AzureTable_27 = AzureTableBase + 27,
-        AzureTable_28 = AzureTableBase + 28,
-        AzureTable_29 = AzureTableBase + 29,
-        AzureTable_30 = AzureTableBase + 30,
-        AzureTable_31 = AzureTableBase + 31,
-        AzureTable_32 = AzureTableBase + 32,
-        AzureTable_33 = AzureTableBase + 33,
-        AzureTable_34 = AzureTableBase + 34,
-        AzureTable_35 = AzureTableBase + 35,
-        AzureTable_36 = AzureTableBase + 36,
-        AzureTable_37 = AzureTableBase + 37,
-        // reminders related
-        AzureTable_38 = AzureTableBase + 38,
-        AzureTable_39 = AzureTableBase + 39,
-        AzureTable_40 = AzureTableBase + 40,
-        AzureTable_41 = AzureTableBase + 41,
-        AzureTable_42 = AzureTableBase + 42,
-        AzureTable_43 = AzureTableBase + 43,
-        AzureTable_44 = AzureTableBase + 44,
-        AzureTable_45 = AzureTableBase + 45,
-        AzureTable_46 = AzureTableBase + 46,
-        AzureTable_47 = AzureTableBase + 47,
-        AzureTable_48 = AzureTableBase + 48,
-        AzureTable_49 = AzureTableBase + 49,
-        // Azure storage provider related
-        AzureTable_DataNotFound                     = AzureTableBase + 50,
-        AzureTable_ReadingData                      = AzureTableBase + 51,
-        AzureTable_WritingData                      = AzureTableBase + 52,
-        AzureTable_Storage_Reading                  = AzureTableBase + 53,
-        AzureTable_Storage_Writing                  = AzureTableBase + 54,
-        AzureTable_Storage_DataRead                 = AzureTableBase + 55,
-        AzureTable_WriteError                       = AzureTableBase + 56,
-        AzureTable_DeleteError                      = AzureTableBase + 57,
-        AzureTable_InitProvider                     = AzureTableBase + 58,
-        AzureTable_ParamConnectionString            = AzureTableBase + 59,
-        AzureTable_60                               = AzureTableBase + 60,
-        AzureTable_61                               = AzureTableBase + 61,
-        AzureTable_62                               = AzureTableBase + 62,
-        AzureTableStorage_InitProvider              = AzureTableBase + 63,
-        AzureTable_ReadWrongReminder                = AzureTableBase + 64,
-        
         ProxyClientBase                             = Runtime + 900,
         ProxyClient_ReceiveError                    = Runtime_Error_100021, // Backward compatability
         ProxyClient_SerializationError              = Runtime_Error_100159, // Backward compatability
@@ -655,6 +593,7 @@ namespace Orleans
         ProxyClient_StartDone                       = ProxyClientBase + 29,
         ProxyClient_OGC_TargetNotFound_2            = ProxyClientBase + 30,
         ProxyClient_AppDomain_Unload                = ProxyClientBase + 31,
+        ProxyClient_GatewayUnknownStatus            = ProxyClientBase + 32,
 
         MessagingBase                           = Runtime + 1000,
         Messaging_IMA_DroppingConnection        = MessagingBase + 1,
@@ -685,7 +624,7 @@ namespace Orleans
         Messaging_IMA_ExceptionAccepting        = MessagingBase + 26,
         Messaging_IMA_BadBufferReceived         = MessagingBase + 27,
         Messaging_IMA_ActivationOverloaded      = MessagingBase + 28,
-        Messaging_Gateway_SerializationError    = MessagingBase + 29,
+        Messaging_SerializationError            = MessagingBase + 29,
         Messaging_UnableToDeserializeBody       = MessagingBase + 30,
         Messaging_Dispatcher_TryForward         = MessagingBase + 31,
         Messaging_Dispatcher_TryForwardFailed   = MessagingBase + 32,
@@ -694,6 +633,11 @@ namespace Orleans
         Messaging_Dispatcher_ReturnToOriginCluster    = MessagingBase + 35,
         MessagingAcceptAsyncSocketException     = MessagingBase + 36,
         Messaging_ExceptionReceiveAsync         = MessagingBase + 37,
+        Messaging_DroppingExpiredMessage        = MessagingBase + 38,
+        Messaging_DroppingBlockedMessage        = MessagingBase + 39,
+        Messaging_Inbound_Enqueue               = MessagingBase + 40,
+        Messaging_Inbound_Dequeue               = MessagingBase + 41,
+        Messaging_Dispatcher_Rejected           = MessagingBase + 42,
 
         DirectoryBase                           = Runtime + 1100,
         DirectoryBothPrimaryAndBackupForGrain   = DirectoryBase + 1,
@@ -713,12 +657,12 @@ namespace Orleans
         WaitCalledInsideGrain                   = SchedulerBase + 9,
         SchedulerStatus                         = SchedulerBase + 10,
         WaitCalledInServerCode                  = SchedulerBase + 11,
-        SchedulerTurnTooLong                    = SchedulerBase + 12,
+        ExecutorTurnTooLong                     = SchedulerBase + 12,
         SchedulerTooManyPendingItems            = SchedulerBase + 13,
         SchedulerTurnTooLong2                   = SchedulerBase + 14,
         SchedulerTurnTooLong3                   = SchedulerBase + 15,
         SchedulerWorkGroupShuttingDown          = SchedulerBase + 16,
-        SchedulerNotEnqueuWorkWhenShutdown      = SchedulerBase + 17,
+        SchedulerEnqueueWorkWhenShutdown        = SchedulerBase + 17,
         SchedulerNotExecuteWhenShutdown         = SchedulerBase + 18,
         SchedulerAppTurnsStopped_1              = SchedulerBase + 19,
         SchedulerWorkGroupStopping              = SchedulerBase + 20,
@@ -731,9 +675,10 @@ namespace Orleans
         SchedulerTaskExecuteIncomplete3         = SchedulerBase + 27,
         SchedulerTaskExecuteIncomplete4         = SchedulerBase + 28,
         SchedulerTaskWaitIncomplete             = SchedulerBase + 29,
-        SchedulerWorkerThreadExc                = SchedulerBase + 30,
+        ExecutorWorkerThreadExc                 = SchedulerBase + 30,
         SchedulerQueueWorkItemWrongContext      = SchedulerBase + 31,
         SchedulerAppTurnsStopped_2              = SchedulerBase + 32,
+        ExecutorProcessingError                 = SchedulerBase + 33,
 
         GatewayBase                             = Runtime + 1300,
         GatewayClientOpenedSocket               = GatewayBase + 1,
@@ -756,6 +701,8 @@ namespace Orleans
         ClientRegistrarFailedToUnregister       = GatewayBase + 18,
         ClientRegistrarTimerFailed              = GatewayBase + 19,
         GatewayAcceptor_WrongClusterId          = GatewayBase + 20,
+        GatewayManager_AllGatewaysDead          = GatewayBase + 21,
+        GatewayAcceptor_InvalidSize             = GatewayBase + 22,
 
         TimerBase                               = Runtime + 1400,
         TimerChangeError                        = PerfCounterTimerError, // Backward compatability
@@ -817,7 +764,6 @@ namespace Orleans
         IGC_SendRequest_NullContext             = DispatcherBase + 26,
         IGC_SniffIncomingMessage_Exc            = DispatcherBase + 27,
         Dispatcher_DetectedDeadlock             = DispatcherBase + 28,
-        Dispatcher_DroppingExpiredMessage       = DispatcherBase + 29,
         Dispatcher_ActivationOverloaded         = DispatcherBase + 30,
         IGC_SendResponseFailed                  = DispatcherBase + 31,
         IGC_SendExceptionResponseFailed         = DispatcherBase + 32,
@@ -902,7 +848,6 @@ namespace Orleans
         Watchdog_HealthCheckFailure             = WatchdogBase + 3,
 
         LoggerBase                              = Runtime + 2700,
-        Logger_MiniDumpCreated                  = Runtime_Error_100001, // Backward compatability
         Logger_ProcessCrashing                  = Runtime_Error_100002, // Backward compatability
         Logger_LogMessageTruncated              = LoggerBase + 1,
 
@@ -982,23 +927,7 @@ namespace Orleans
         Provider_ProviderNotControllable        = ProviderManagerBase + 16,
         Provider_CatalogNoLogConsistencyProvider       = ProviderManagerBase + 17,
         Provider_CatalogLogConsistencyProviderAllocated = ProviderManagerBase + 18,
-
-        AzureQueueBase = Runtime + 3200,
-        AzureQueue_01 = AzureQueueBase + 1,
-        AzureQueue_02 = AzureQueueBase + 2,
-        AzureQueue_03 = AzureQueueBase + 3,
-        AzureQueue_04 = AzureQueueBase + 4,
-        AzureQueue_05 = AzureQueueBase + 5,
-        AzureQueue_06 = AzureQueueBase + 6,
-        AzureQueue_07 = AzureQueueBase + 7,
-        AzureQueue_08 = AzureQueueBase + 8,
-        AzureQueue_09 = AzureQueueBase + 9,
-        AzureQueue_10 = AzureQueueBase + 10,
-        AzureQueue_11 = AzureQueueBase + 11,
-        AzureQueue_12 = AzureQueueBase + 12,
-        AzureQueue_13 = AzureQueueBase + 13,
-        AzureQueue_14 = AzureQueueBase + 14,
-        AzureQueue_15 = AzureQueueBase + 15,
+        Provider_ErrorFromClose                  = ProviderManagerBase + 19,
 
         PersistentStreamPullingAgentBase = Runtime + 3300,
         PersistentStreamPullingAgent_01 = PersistentStreamPullingAgentBase + 1,
@@ -1104,6 +1033,7 @@ namespace Orleans
 
         TypeManagerBase = Runtime + 4200,
         TypeManager_GetSiloGrainInterfaceMapError = TypeManagerBase + 1,
+        TypeManager_GetClusterGrainTypeResolverError = TypeManagerBase + 2,
 
         LogConsistencyBase = Runtime + 4300,
         LogConsistency_UserCodeException = LogConsistencyBase + 1,
@@ -1119,6 +1049,9 @@ namespace Orleans
         Transactions_SendingTMRequest = TransactionsBase + 1,
         Transactions_ReceivedTMResponse = TransactionsBase + 2,
         Transactions_TMError = TransactionsBase + 3,
+
+        OSBase = Runtime + 4600,
+        OS_InvalidOS = OSBase + 1
     }
 }
 // ReSharper restore InconsistentNaming

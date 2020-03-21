@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Versions.Compatibility;
 
 namespace Orleans.Runtime.Versions.Compatibility
@@ -15,17 +15,12 @@ namespace Orleans.Runtime.Versions.Compatibility
         public ICompatibilityDirector Default { get; private set; }
 
 
-        public CompatibilityDirectorManager(IServiceProvider serviceProvider, GlobalConfiguration configuration)
-            : this(serviceProvider, configuration.DefaultCompatibilityStrategy)
-        {
-        }
-
-        public CompatibilityDirectorManager(IServiceProvider serviceProvider, CompatibilityStrategy defaultCompatibilityStrategy)
+        public CompatibilityDirectorManager(IServiceProvider serviceProvider, IOptions<GrainVersioningOptions> options)
         {
             this.serviceProvider = serviceProvider;
-            this.strategyFromConfig = defaultCompatibilityStrategy;
+            this.strategyFromConfig = serviceProvider.GetRequiredServiceByName<CompatibilityStrategy>(options.Value.DefaultCompatibilityStrategy);
             this.compatibilityDirectors = new Dictionary<int, ICompatibilityDirector>();
-            Default = ResolveVersionDirector(serviceProvider, defaultCompatibilityStrategy);
+            Default = ResolveVersionDirector(serviceProvider, this.strategyFromConfig);
         }
 
         public ICompatibilityDirector GetDirector(int interfaceId)
@@ -58,8 +53,7 @@ namespace Orleans.Runtime.Versions.Compatibility
             CompatibilityStrategy compatibilityStrategy)
         {
             var strategyType = compatibilityStrategy.GetType();
-            var directorType = typeof(ICompatibilityDirector<>).MakeGenericType(strategyType);
-            return (ICompatibilityDirector) serviceProvider.GetRequiredService(directorType);
+            return serviceProvider.GetRequiredServiceByKey<Type,ICompatibilityDirector>(strategyType);
         }
     }
 }

@@ -18,11 +18,11 @@ namespace Orleans.Runtime.Placement
 
         public PlacementDirectorsManager(
             IServiceProvider services,
-            DefaultPlacementStrategy defaultPlacementStrategy,
+            PlacementStrategy defaultPlacementStrategy,
             ClientObserversPlacementDirector clientObserversPlacementDirector)
         {
             this.serviceProvider = services;
-            this.defaultPlacementStrategy = defaultPlacementStrategy.PlacementStrategy;
+            this.defaultPlacementStrategy = defaultPlacementStrategy;
             this.clientObserversPlacementDirector = clientObserversPlacementDirector;
             this.ResolveBuiltInStrategies();
             // TODO: Make default selector configurable
@@ -35,8 +35,7 @@ namespace Orleans.Runtime.Placement
             var strategyType = strategy.GetType();
             if (!this.directors.TryGetValue(strategyType, out result))
             {
-                var directorType = typeof(IPlacementDirector<>).MakeGenericType(strategyType);
-                result = (IPlacementDirector)this.serviceProvider.GetRequiredService(directorType);
+                result = this.serviceProvider.GetRequiredServiceByKey<Type, IPlacementDirector>(strategyType);
                 this.directors[strategyType] = result;
             }
 
@@ -49,8 +48,7 @@ namespace Orleans.Runtime.Placement
             var strategyType = strategy.GetType();
             if (!this.selectors.TryGetValue(strategyType, out result) && addIfDoesNotExist)
             {
-                var directorType = typeof(IActivationSelector<>).MakeGenericType(strategyType);
-                result = (IActivationSelector)this.serviceProvider.GetRequiredService(directorType);
+                result = this.serviceProvider.GetRequiredServiceByKey<Type, IActivationSelector>(strategyType);
                 this.selectors[strategyType] = result;
             }
 
@@ -111,10 +109,25 @@ namespace Orleans.Runtime.Placement
                 throw new InvalidOperationException("Client grains are not activated using the placement subsystem.");
 
             var director = ResolveDirector(strategy);
+            var siloAddress = await director.OnAddActivation(strategy, target, context);
+            var grainTypeName = context.GetGrainTypeName(target.GrainIdentity.TypeCode);
+
+            ActivationId activationId;
+            if (strategy.IsDeterministicActivationId)
+            {
+                // Use the grain id as the activation id.
+                activationId = ActivationId.GetActivationId(((GrainId)target.GrainIdentity).Key);
+            }
+            else
+            {
+                activationId = ActivationId.NewId();
+            }
+
             return PlacementResult.SpecifyCreation(
-                await director.OnAddActivation(strategy, target, context), 
-                strategy, 
-                context.GetGrainTypeName(target.GrainIdentity.TypeCode));
+                siloAddress,
+                activationId,
+                strategy,
+                grainTypeName);
         }
 
         private void ResolveBuiltInStrategies()

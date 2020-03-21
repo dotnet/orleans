@@ -1,17 +1,13 @@
 using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.Utilities;
 using TestExtensions;
+using Xunit;
 
 namespace UnitTests.Serialization
 {
-    using Orleans.Serialization;
-
-    using Xunit;
-
     [TestCategory("BVT"), TestCategory("Serialization")]
     public class ILBasedExceptionSerializerTests
     {
@@ -20,7 +16,9 @@ namespace UnitTests.Serialization
 
         public ILBasedExceptionSerializerTests()
         {
-            this.environment = SerializationTestEnvironment.Initialize(null, typeof(ILBasedSerializer).GetTypeInfo());
+#pragma warning disable CS0618 // Type or member is obsolete
+            this.environment = SerializationTestEnvironment.Initialize(null, typeof(ILBasedSerializer));
+#pragma warning restore CS0618 // Type or member is obsolete
         }
 
         /// <summary>
@@ -37,10 +35,7 @@ namespace UnitTests.Serialization
 
         private ILExceptionSerializerTestException TestExceptionSerialization(ILExceptionSerializerTestException expected)
         {
-            var writer = new SerializationContext(this.environment.SerializationManager)
-            {
-                StreamWriter = new BinaryTokenStreamWriter()
-            };
+            var writer = new BinaryTokenStreamWriter();
 
             // Deep copies should be reference-equal.
             Assert.Equal(
@@ -48,10 +43,10 @@ namespace UnitTests.Serialization
                 SerializationManager.DeepCopyInner(expected, new SerializationContext(this.environment.SerializationManager)),
                 ReferenceEqualsComparer.Instance);
 
-            this.environment.SerializationManager.Serialize(expected, writer.StreamWriter);
+            this.environment.SerializationManager.Serialize(expected, writer);
             var reader = new DeserializationContext(this.environment.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(writer.ToByteArray())
             };
 
             var actual = (ILExceptionSerializerTestException) this.environment.SerializationManager.Deserialize(null, reader.StreamReader);
@@ -98,15 +93,11 @@ namespace UnitTests.Serialization
             // Create a reference cycle.
             exception.SomeObject = expected;
 
-            var writer = new SerializationContext(this.environment.SerializationManager)
-            {
-                StreamWriter = new BinaryTokenStreamWriter()
-            };
-            
-            this.environment.SerializationManager.Serialize(expected, writer.StreamWriter);
+            var writer = new BinaryTokenStreamWriter();
+            this.environment.SerializationManager.Serialize(expected, writer);
             var reader = new DeserializationContext(this.environment.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(writer.ToByteArray())
             };
 
             var actual = (Outer)this.environment.SerializationManager.Deserialize(null, reader.StreamReader);
@@ -116,7 +107,7 @@ namespace UnitTests.Serialization
 
             // Check for referential equality in the fields which happened to be reference-equals.
             Assert.Equal(actual.Object.BaseField, actual.Object.OtherField, ReferenceEqualsComparer.Instance);
-            Assert.Equal(actual.Object, actual.Object.SomeObject, ReferenceEqualsComparer.Instance);
+            Assert.Equal(actual, actual.Object.SomeObject, ReferenceEqualsComparer.Instance);
             Assert.Equal(actual.SomeFunObject, actual.Object.OtherField, ReferenceEqualsComparer.Instance);
         }
 
@@ -154,12 +145,13 @@ namespace UnitTests.Serialization
             var expected = GetNewException();
 
             var knowsException = new ILBasedExceptionSerializer(this.serializerGenerator, new TypeSerializer(new CachedTypeResolver()));
-            
-            var writer = new SerializationContext(this.environment.SerializationManager)
+
+            var writer = new BinaryTokenStreamWriter();
+            var context = new SerializationContext(this.environment.SerializationManager)
             {
-                StreamWriter = new BinaryTokenStreamWriter()
+                StreamWriter = writer
             };
-            knowsException.Serialize(expected, writer, null);
+            knowsException.Serialize(expected, context, null);
 
             // Deep copies should be reference-equal.
             var copyContext = new SerializationContext(this.environment.SerializationManager);
@@ -168,7 +160,7 @@ namespace UnitTests.Serialization
             // Create a deserializer which doesn't know about the expected exception type.
             var reader = new DeserializationContext(this.environment.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(writer.ToByteArray())
             };
 
             // Ensure that the deserialized object has the fallback type.
@@ -178,18 +170,19 @@ namespace UnitTests.Serialization
 
             // Ensure that the original type name is preserved correctly.
             var actualDeserialized = (RemoteNonDeserializableException) untypedActual;
-            Assert.Equal(typeof(ILExceptionSerializerTestException).AssemblyQualifiedName, actualDeserialized.OriginalTypeName);
+            Assert.Equal(RuntimeTypeNameFormatter.Format(typeof(ILExceptionSerializerTestException)), actualDeserialized.OriginalTypeName);
 
             // Re-serialize the deserialized object using the serializer which does not have access to the original type.
-            writer = new SerializationContext(this.environment.SerializationManager)
+            writer = new BinaryTokenStreamWriter();
+            context = new SerializationContext(this.environment.SerializationManager)
             {
-                StreamWriter = new BinaryTokenStreamWriter()
+                StreamWriter = writer
             };
-            doesNotKnowException.Serialize(untypedActual, writer, null);
+            doesNotKnowException.Serialize(untypedActual, context, null);
 
             reader = new DeserializationContext(this.environment.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(writer.ToByteArray())
             };
 
             // Deserialize the round-tripped object and verify that it has the original type and all properties are
@@ -222,6 +215,7 @@ namespace UnitTests.Serialization
             public SomeFunObject BaseField { get; set; }
         }
 
+        [Serializable]
         private class ILExceptionSerializerTestException : BaseException
         {
             public string SubClassField { get; set; }

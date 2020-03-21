@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
 using System.Runtime.Serialization;
 
@@ -57,15 +57,37 @@ namespace Orleans.Transactions
     }
 
     /// <summary>
+    /// Signifies that transaction runtime is overloaded
+    /// </summary>
+    [Serializable]
+    public class OrleansTransactionOverloadException : OrleansTransactionException
+    {
+        public OrleansTransactionOverloadException()
+            : base("Transaction is overloaded on current silo, please try again later.")
+        {
+        }
+    }
+
+    /// <summary>
     /// Signifies that the runtime is unable to determine whether a transaction
     /// has committed.
     /// </summary>
     [Serializable]
     public class OrleansTransactionInDoubtException : OrleansTransactionException
     {
-        public long TransactionId { get; private set; }
+        public string TransactionId { get; private set; }
 
-        public OrleansTransactionInDoubtException(long transactionId) : base(string.Format("Transaction {0} is InDoubt", transactionId))
+        public OrleansTransactionInDoubtException(string transactionId) : base(string.Format("Transaction {0} is InDoubt", transactionId))
+        {
+            this.TransactionId = transactionId;
+        }
+
+        public OrleansTransactionInDoubtException(string transactionId, Exception exc) : base(string.Format("Transaction {0} is InDoubt", transactionId), exc)
+        {
+            this.TransactionId = transactionId;
+        }
+
+        public OrleansTransactionInDoubtException(string transactionId, string msg) : base(string.Format("Transaction {0} is InDoubt: {1}", transactionId, msg))
         {
             this.TransactionId = transactionId;
         }
@@ -73,7 +95,7 @@ namespace Orleans.Transactions
         public OrleansTransactionInDoubtException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            this.TransactionId = info.GetInt64(nameof(this.TransactionId));
+            this.TransactionId = info.GetString(nameof(this.TransactionId));
         }
 
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
@@ -89,28 +111,26 @@ namespace Orleans.Transactions
     [Serializable]
     public class OrleansTransactionAbortedException : OrleansTransactionException
     {
-        public long TransactionId { get; private set; }
-
-        public OrleansTransactionAbortedException(long transactionId) : base(string.Format("Transaction {0} Aborted", transactionId)) 
+        /// <summary>
+        /// The unique identifier of the aborted transaction.
+        /// </summary>
+        public string TransactionId { get; private set; }
+ 
+        public OrleansTransactionAbortedException(string transactionId, string msg) : base(msg)
         {
             this.TransactionId = transactionId;
         }
 
-        public OrleansTransactionAbortedException(long transactionId, Exception innerException) : 
-            base(string.Format("Transaction {0} Aborted because of an unhandled exception. See InnerException for details", transactionId), innerException)
+        public OrleansTransactionAbortedException(string transactionId, Exception innerException)
+            : base($"Transaction {transactionId} Aborted because of an unhandled exception in a grain method call. See InnerException for details.", innerException)
         {
-            this.TransactionId = transactionId;
-        }
-
-        public OrleansTransactionAbortedException(long transactionId, string msg) : base(msg) 
-        {
-            this.TransactionId = transactionId;
+            TransactionId = transactionId;
         }
 
         public OrleansTransactionAbortedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            this.TransactionId = info.GetInt64(nameof(this.TransactionId));
+            this.TransactionId = info.GetString(nameof(this.TransactionId));
         }
 
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
@@ -121,39 +141,28 @@ namespace Orleans.Transactions
     }
 
     /// <summary>
-    /// Signifies that the executing transaction has aborted because of optimistic concurrency control validation failure.
-    /// </summary>
-    [Serializable]
-    public class OrleansValidationFailedException : OrleansTransactionAbortedException
-    {
-        public OrleansValidationFailedException(long transactionId) : base(transactionId) 
-        { 
-        }
-
-        public OrleansValidationFailedException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-    }
-
-    /// <summary>
     /// Signifies that the executing transaction has aborted because a dependent transaction aborted.
     /// </summary>
     [Serializable]
-    public class OrleansCascadingAbortException : OrleansTransactionAbortedException
+    public class OrleansCascadingAbortException : OrleansTransactionTransientFailureException
     {
-        public long DependentTransactionId { get; private set; }
+        public string DependentTransactionId { get; private set; }
 
-        public OrleansCascadingAbortException(long transactionId, long dependentId)
+        public OrleansCascadingAbortException(string transactionId, string dependentId)
             : base(transactionId, string.Format("Transaction {0} aborted because its dependent transaction {1} aborted", transactionId, dependentId))
         {
             this.DependentTransactionId = dependentId;
         }
 
+        public OrleansCascadingAbortException(string transactionId)
+            : base(transactionId, string.Format("Transaction {0} aborted because a dependent transaction aborted", transactionId))
+        {
+        }
+
         public OrleansCascadingAbortException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            this.DependentTransactionId = info.GetInt64(nameof(this.DependentTransactionId));
+            this.DependentTransactionId = info.GetString(nameof(this.DependentTransactionId));
         }
 
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
@@ -169,7 +178,7 @@ namespace Orleans.Transactions
     [Serializable]
     public class OrleansOrphanCallException : OrleansTransactionAbortedException
     {
-        public OrleansOrphanCallException(long transactionId, int pendingCalls)
+        public OrleansOrphanCallException(string transactionId, int pendingCalls)
             : base(
                 transactionId,
                 $"Transaction {transactionId} aborted because method did not await all its outstanding calls ({pendingCalls})")
@@ -183,106 +192,17 @@ namespace Orleans.Transactions
     }
 
     /// <summary>
-    /// Signifies that the executing transaction has aborted because some of its participant grains did not prepare successfully.
-    /// </summary>
-    [Serializable]
-    public class OrleansPrepareFailedException : OrleansTransactionAbortedException
-    {
-        public OrleansPrepareFailedException(long transactionId)
-            : base(transactionId, string.Format("Transaction {0} aborted because Prepare phase did not succeed", transactionId))
-        {
-        }
-
-        public OrleansPrepareFailedException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-    }
-
-    /// <summary>
-    /// Signifies that the executing transaction has aborted because it did not complete within timeout period.
-    /// </summary>
-    [Serializable]
-    public class OrleansTransactionTimeoutException : OrleansTransactionAbortedException
-    {
-        public OrleansTransactionTimeoutException(long transactionId)
-            : base(transactionId, string.Format("Transaction {0} aborted because it exceeded timeout period", transactionId))
-        {
-        }
-
-        public OrleansTransactionTimeoutException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-    }
-
-    /// <summary>
-    /// Signifies that the executing transaction has aborted because it attempted to read or override a grain written by a transaction with higher Id.
-    /// </summary>
-    [Serializable]
-    public class OrleansTransactionWaitDieException : OrleansTransactionAbortedException
-    {
-        public OrleansTransactionWaitDieException(long transactionId)
-            : base(transactionId, string.Format("Transaction {0} aborted because of Wait-Die cycle prevention", transactionId))
-        {
-        }
-
-        public OrleansTransactionWaitDieException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-    }
-
-    /// <summary>
     /// Signifies that the executing read-only transaction has aborted because it attempted to write to a grain.
     /// </summary>
     [Serializable]
     public class OrleansReadOnlyViolatedException : OrleansTransactionAbortedException
     {
-        public OrleansReadOnlyViolatedException(long transactionId)
+        public OrleansReadOnlyViolatedException(string transactionId)
             : base(transactionId, string.Format("Transaction {0} aborted because it attempted to write a grain", transactionId))
         {
         }
 
         public OrleansReadOnlyViolatedException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-    }
-
-    /// <summary>
-    /// Signifies that the transaction aborted because the grain version required has been deleted.
-    /// </summary>
-    [Serializable]
-    public class OrleansTransactionVersionDeletedException : OrleansTransactionAbortedException
-    {
-        public OrleansTransactionVersionDeletedException(long transactionId)
-            : base(
-                transactionId,
-                string.Format(
-                    "Transaction {0} aborted because it required reading an old version of a grain that is no longer available",
-                    transactionId))
-        {
-        }
-
-        public OrleansTransactionVersionDeletedException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-    }
-
-    /// <summary>
-    /// Signifies that the transaction references a version of the state that is not yet stable.
-    /// </summary>
-    [Serializable]
-    public class OrleansTransactionUnstableVersionException : OrleansTransactionAbortedException
-    {
-        public OrleansTransactionUnstableVersionException(long transactionId)
-            : base(transactionId, $"Transaction {transactionId} references not yet stable data.")
-        {
-        }
-
-        public OrleansTransactionUnstableVersionException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
@@ -300,4 +220,77 @@ namespace Orleans.Transactions
         {
         }
     }
+
+    /// <summary>
+    /// Signifies that the executing transaction has aborted because its execution lock was broken
+    /// </summary>
+    [Serializable]
+    public class OrleansBrokenTransactionLockException : OrleansTransactionTransientFailureException
+    {
+        public OrleansBrokenTransactionLockException(string transactionId, string situation)
+            : base(transactionId, $"Transaction {transactionId} aborted because a broken lock was detected, {situation}")
+        {
+        }
+
+        public OrleansBrokenTransactionLockException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Signifies that the executing transaction has aborted because it could not upgrade some lock
+    /// </summary>
+    [Serializable]
+    public class OrleansTransactionLockUpgradeException : OrleansTransactionTransientFailureException
+    {
+        public OrleansTransactionLockUpgradeException(string transactionId) :
+            base(transactionId, $"Transaction {transactionId} Aborted because it could not upgrade a lock, because of a higher-priority conflicting transaction")
+        {
+        }
+
+        public OrleansTransactionLockUpgradeException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Signifies that the executing transaction has aborted because the TM did not receive all prepared messages in time
+    /// </summary>
+    [Serializable]
+    public class OrleansTransactionPrepareTimeoutException : OrleansTransactionTransientFailureException
+    {
+        public OrleansTransactionPrepareTimeoutException(string transactionId)
+            : base(transactionId, $"Transaction {transactionId} Aborted because the prepare phase did not complete within the timeout limit")
+        {
+        }
+
+        public OrleansTransactionPrepareTimeoutException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Signifies that the executing transaction has aborted because some possibly transient problem, such as internal
+    /// timeouts for locks or protocol responses, or speculation failures.
+    /// </summary>
+    [Serializable]
+    public class OrleansTransactionTransientFailureException : OrleansTransactionAbortedException
+    {
+        public OrleansTransactionTransientFailureException(string transactionId, string msg)
+            : base(transactionId, msg)
+        {
+        }
+
+        public OrleansTransactionTransientFailureException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+
+
+
 }

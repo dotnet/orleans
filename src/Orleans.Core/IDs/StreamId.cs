@@ -45,23 +45,15 @@ namespace Orleans.Streams
             return streamIdInternCache.Value.FindOrCreate(key, k => new StreamId(k));
         }
 
-        #region IComparable<StreamId> Members
-
         public int CompareTo(StreamId other)
         {
             return key.CompareTo(other.key);
         }
 
-        #endregion
-
-        #region IEquatable<StreamId> Members
-
         public bool Equals(StreamId other)
         {
             return other != null && key.Equals(other.key);
         }
-
-        #endregion
 
         public override bool Equals(object obj)
         {
@@ -106,8 +98,6 @@ namespace Orleans.Streams
                 String.Format("{0}{1}-{2}", Namespace != null ? (String.Format("{0}-", Namespace)) : "", Guid, ProviderName);
         }
 
-        #region ISerializable Members
-
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             // Use the AddValue method to specify serialized values.
@@ -125,7 +115,6 @@ namespace Orleans.Streams
             var nameSpace = (string) info.GetValue("Namespace", typeof(string));
             key = new StreamIdInternerKey(guid, providerName, nameSpace);
         }
-        #endregion
     }
 
     [Serializable]

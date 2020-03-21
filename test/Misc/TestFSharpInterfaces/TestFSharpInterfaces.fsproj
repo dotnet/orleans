@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>TestFSharpInterfaces</AssemblyName>
+    <RootNamespace>TestFSharpInterfaces</RootNamespace>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="IFSharpBaseInterface.fs" />
+    <Compile Include="IFSharpParameters.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
+    <PackageReference Include="FSharp.Core" Version="$(FSharpCoreVersion)" />
+  </ItemGroup>
+</Project>

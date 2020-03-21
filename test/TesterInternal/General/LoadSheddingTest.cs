@@ -1,8 +1,11 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
+using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -17,12 +20,23 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(1);
-                return new TestCluster(options);
+                builder.Options.InitialSilosCount = 1;
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
         }
+
+        internal class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.AddMemoryGrainStorage("MemoryStore")
+                    .AddMemoryGrainStorageAsDefault()
+                    .Configure<LoadSheddingOptions>(options => options.LoadSheddingEnabled = true);
+            }
+        }
+
         public LoadSheddingTest(Fixture fixture)
         {
             this.fixture = fixture;

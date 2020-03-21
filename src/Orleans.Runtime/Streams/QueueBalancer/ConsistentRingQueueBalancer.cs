@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
-using Orleans.Providers;
 
 namespace Orleans.Streams
 {
@@ -12,7 +12,13 @@ namespace Orleans.Streams
         private IConsistentRingStreamQueueMapper streamQueueMapper;
         private IRingRange myRange;
 
-        public ConsistentRingQueueBalancer(IStreamProviderRuntime streamProviderRuntime)
+        public static IStreamQueueBalancer Create(IServiceProvider services, string name)
+        {
+            return ActivatorUtilities.CreateInstance<ConsistentRingQueueBalancer>(services);
+        }
+
+        public ConsistentRingQueueBalancer(IStreamProviderRuntime streamProviderRuntime, IServiceProvider services, ILogger<ConsistentRingQueueBalancer> logger)
+            : base(services,  logger)
         {
             if (streamProviderRuntime == null)
             {
@@ -23,10 +29,7 @@ namespace Orleans.Streams
             ringProvider.SubscribeToRangeChangeEvents(this);
         }
 
-        public override Task Initialize(string strProviderName,
-            IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod,
-            IProviderConfiguration providerConfig)
+        public override Task Initialize(IStreamQueueMapper queueMapper)
         {
             if (queueMapper == null)
             {
@@ -37,28 +40,22 @@ namespace Orleans.Streams
                 throw new ArgumentException("queueMapper for ConsistentRingQueueBalancer should implement IConsistentRingStreamQueueMapper", "queueMapper");
             }
             streamQueueMapper = (IConsistentRingStreamQueueMapper)queueMapper;
-            return Task.CompletedTask;
+            return base.Initialize(queueMapper);
         }
 
         public Task RangeChangeNotification(IRingRange old, IRingRange now)
         {
             myRange = now;
-            List<IStreamQueueBalanceListener> queueBalanceListenersCopy;
-            lock (queueBalanceListeners)
-            {
-                queueBalanceListenersCopy = queueBalanceListeners.ToList();
-            }
-            var notificatioTasks = new List<Task>(queueBalanceListenersCopy.Count);
-            foreach (IStreamQueueBalanceListener listener in queueBalanceListenersCopy)
-            {
-                notificatioTasks.Add(listener.QueueDistributionChangeNotification());
-            }
-            return Task.WhenAll(notificatioTasks);
+            return base.NotifyListeners();
         }
 
         public override IEnumerable<QueueId> GetMyQueues()
         {
             return streamQueueMapper.GetQueuesForRange(myRange);
+        }
+
+        protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
+        {
         }
     }
 }

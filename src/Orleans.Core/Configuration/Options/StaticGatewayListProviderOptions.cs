@@ -1,8 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Text;
 
-namespace Orleans.Configuration.Options
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Options for Configure StaticGatewayListProvider
@@ -12,6 +11,6 @@ namespace Orleans.Configuration.Options
         /// <summary>
         /// Static gateways to use
         /// </summary>
-        public IList<Uri> Gateways { get; set; }
+        public List<Uri> Gateways { get; set; } = new List<Uri>();
     }
 }

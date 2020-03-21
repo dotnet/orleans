@@ -1,20 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class AdaptiveDirectoryCacheMaintainer<TValue> : AsynchAgent
+    internal class AdaptiveDirectoryCacheMaintainer : TaskSchedulerAgent
     {
         private static readonly TimeSpan SLEEP_TIME_BETWEEN_REFRESHES = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromMinutes(1); // this should be something like minTTL/4
 
-        private readonly AdaptiveGrainDirectoryCache<TValue> cache;
+        private readonly AdaptiveGrainDirectoryCache cache;
         private readonly LocalGrainDirectory router;
-        private readonly Func<List<ActivationAddress>, TValue> updateFunc;
         private readonly IInternalGrainFactory grainFactory;
 
         private long lastNumAccesses;       // for stats
@@ -22,23 +22,21 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal AdaptiveDirectoryCacheMaintainer(
             LocalGrainDirectory router,
-            AdaptiveGrainDirectoryCache<TValue> cache,
-            Func<List<ActivationAddress>, TValue> updateFunc,
+            AdaptiveGrainDirectoryCache cache,
             IInternalGrainFactory grainFactory,
             ILoggerFactory loggerFactory)
-            :base(loggerFactory)
+            :base(nameSuffix: null, loggerFactory)
         {
-            this.updateFunc = updateFunc;
             this.grainFactory = grainFactory;
             this.router = router;
             this.cache = cache;
-            
+
             lastNumAccesses = 0;
             lastNumHits = 0;
             OnFault = FaultBehavior.RestartOnFault;
         }
 
-        protected override void Run()
+        protected override async Task Run()
         {
             while (router.Running)
             {
@@ -69,7 +67,7 @@ namespace Orleans.Runtime.GrainDirectory
                     GrainId grain = pair.Key;
                     var entry = pair.Value;
 
-                    SiloAddress owner = router.CalculateTargetSilo(grain);
+                    SiloAddress owner = router.CalculateGrainDirectoryPartition(grain);
                     if (owner == null) // Null means there's no other silo and we're shutting down, so skip this entry
                     {
                         continue;
@@ -79,7 +77,7 @@ namespace Orleans.Runtime.GrainDirectory
                     {
                         // we found our owned entry in the cache -- it is not supposed to happen unless there were 
                         // changes in the membership
-                        Log.Warn(ErrorCode.Runtime_Error_100185, "Grain {0} owned by {1} was found in the cache of {1}", grain, owner, owner);
+                        Log.Warn(ErrorCode.Runtime_Error_100185, "Grain {grain} owned by {owner} was found in the cache of {owner}", grain, owner, owner);
                         cache.Remove(grain);
                         cnt1++;                             // for debug
                     }
@@ -117,7 +115,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                if (Log.IsVerbose2) Log.Verbose2("Silo {0} self-owned (and removed) {1}, kept {2}, removed {3} and tries to refresh {4} grains", router.MyAddress, cnt1, cnt2, cnt3, cnt4);
+                if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} self-owned (and removed) {1}, kept {2}, removed {3} and tries to refresh {4} grains", router.MyAddress, cnt1, cnt2, cnt3, cnt4);
 
                 // send batch requests
                 SendBatchCacheRefreshRequests(fetchInBatchList);
@@ -125,7 +123,7 @@ namespace Orleans.Runtime.GrainDirectory
                 ProduceStats();
 
                 // recheck every X seconds (Consider making it a configurable parameter)
-                Thread.Sleep(SLEEP_TIME_BETWEEN_REFRESHES);
+                await Task.Delay(SLEEP_TIME_BETWEEN_REFRESHES);
             }
         }
 
@@ -145,9 +143,9 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     var response = await validator.LookUpMany(cachedGrainAndETagList);
                     ProcessCacheRefreshResponse(capture, response);
-                }, router.CacheValidator.SchedulingContext).Ignore();
+                }, router.CacheValidator).Ignore();
 
-                if (Log.IsVerbose2) Log.Verbose2("Silo {0} is sending request to silo {1} with {2} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);                
+                if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} is sending request to silo {1} with {2} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);                
             }
         }
 
@@ -155,7 +153,7 @@ namespace Orleans.Runtime.GrainDirectory
             SiloAddress silo,
             IReadOnlyCollection<Tuple<GrainId, int, List<ActivationAddress>>> refreshResponse)
         {
-            if (Log.IsVerbose2) Log.Verbose2("Silo {0} received ProcessCacheRefreshResponse. #Response entries {1}.", router.MyAddress, refreshResponse.Count);
+            if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} received ProcessCacheRefreshResponse. #Response entries {1}.", router.MyAddress, refreshResponse.Count);
 
             int cnt1 = 0, cnt2 = 0, cnt3 = 0;
 
@@ -165,7 +163,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (tuple.Item3 != null)
                 {
                     // the server returned an updated entry
-                    var updated = updateFunc(tuple.Item3);
+                    var updated = tuple.Item3.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList().AsReadOnly();
                     cache.AddOrUpdate(tuple.Item1, updated, tuple.Item2);
                     cnt1++;
                 }
@@ -188,7 +186,7 @@ namespace Orleans.Runtime.GrainDirectory
                     cnt3++;
                 }
             }
-            if (Log.IsVerbose2) Log.Verbose2("Silo {0} processed refresh response from {1} with {2} updated, {3} removed, {4} unchanged grains", router.MyAddress, silo, cnt1, cnt2, cnt3);
+            if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} processed refresh response from {1} with {2} updated, {3} removed, {4} unchanged grains", router.MyAddress, silo, cnt1, cnt2, cnt3);
         }
 
 
@@ -205,7 +203,7 @@ namespace Orleans.Runtime.GrainDirectory
             foreach (GrainId grain in grains)
             {
                 // NOTE: should this be done with TryGet? Won't Get invoke the LRU getter function?
-                AdaptiveGrainDirectoryCache<TValue>.GrainDirectoryCacheEntry entry = cache.Get(grain);
+                AdaptiveGrainDirectoryCache.GrainDirectoryCacheEntry entry = cache.Get(grain);
 
                 if (entry != null)
                 {
@@ -215,7 +213,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // this may happen only if the LRU cache is full and decided to drop this grain
                     // while we try to refresh it
-                    Log.Warn(ErrorCode.Runtime_Error_100199, "Grain {0} disappeared from the cache during maintainance", grain);
+                    Log.Warn(ErrorCode.Runtime_Error_100199, "Grain {0} disappeared from the cache during maintenance", grain);
                 }
             }
 
@@ -233,7 +231,7 @@ namespace Orleans.Runtime.GrainDirectory
             long numAccesses = curNumAccesses - lastNumAccesses;
             long numHits = curNumHits - lastNumHits;
 
-            if (Log.IsVerbose2) Log.Verbose2("#accesses: {0}, hit-ratio: {1}%", numAccesses, (numHits / Math.Max(numAccesses, 0.00001)) * 100);
+            if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("#accesses: {0}, hit-ratio: {1}%", numAccesses, (numHits / Math.Max(numAccesses, 0.00001)) * 100);
 
             lastNumAccesses = curNumAccesses;
             lastNumHits = curNumHits;

@@ -1,7 +1,9 @@
-﻿
+
 using System;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -14,7 +16,7 @@ namespace Tester.StreamingTests
     public class ClientStreamTestRunner
     {
         private static readonly Func<Task<int>> DefaultDeliveryFailureCount = () => Task.FromResult(0); 
-        private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan _timeout = TimeSpan.FromMinutes(3);
 
         private readonly TestCluster testHost;
         public ClientStreamTestRunner(TestCluster testHost)
@@ -30,10 +32,10 @@ namespace Tester.StreamingTests
             await ProduceEventsFromClient(streamProviderName, streamGuid, streamNamespace, eventsProduced);
 
             // Hard kill client
-            testHost.KillClient();
-
+            await testHost.KillClientAsync();
+            
             // make sure dead client has had time to drop
-            await Task.Delay(testHost.ClusterConfiguration.Globals.ClientDropTimeout + TimeSpan.FromSeconds(5));
+            await Task.Delay(Constants.DEFAULT_CLIENT_DROP_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // initialize new client
             testHost.InitializeClient();
@@ -66,10 +68,10 @@ namespace Tester.StreamingTests
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(() => Task.FromResult(eventCount[0]), producer.GetNumberProduced, lastTry), _timeout);
 
             // Hard kill client
-            testHost.KillClient();
+            await testHost.KillClientAsync();
 
             // make sure dead client has had time to drop
-            await Task.Delay(testHost.ClusterConfiguration.Globals.ClientDropTimeout + TimeSpan.FromSeconds(5));
+            await Task.Delay(Constants.DEFAULT_CLIENT_DROP_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // initialize new client
             testHost.InitializeClient();

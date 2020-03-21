@@ -15,7 +15,6 @@ namespace Orleans.Runtime.ConsistentRing
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
     internal class ConsistentRingProvider :
-        MarshalByRefObject,
         IConsistentRingProvider, ISiloStatusListener // make the ring shutdown-able?
     {
         // internal, so that unit tests can access them
@@ -24,7 +23,7 @@ namespace Orleans.Runtime.ConsistentRing
         
         /// list of silo members sorted by the hash value of their address
         private readonly List<SiloAddress> membershipRingList;
-        private readonly Logger log;
+        private readonly ILogger log;
         private bool isRunning;
         private readonly int myKey;
         private readonly List<IRingRangeListener> statusListeners;
@@ -33,7 +32,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         public ConsistentRingProvider(SiloAddress siloAddr, ILoggerFactory loggerFactory)
         {
-            log = new LoggerWrapper<ConsistentRingProvider>(loggerFactory);
+            log = loggerFactory.CreateLogger<ConsistentRingProvider>();
             membershipRingList = new List<SiloAddress>();
             MyAddress = siloAddr;
             myKey = MyAddress.GetConsistentHashCode();
@@ -76,8 +75,6 @@ namespace Orleans.Runtime.ConsistentRing
         {
             return FindPredecessors(MyAddress, n);
         }
-
-        #region Handling the membership
 
         private void Start()
         {
@@ -170,7 +167,7 @@ namespace Orleans.Runtime.ConsistentRing
                 bool wasMyPred = ((myNewIndex == indexOfFailedSilo) || (myNewIndex == 0 && indexOfFailedSilo == membershipRingList.Count)); // no need for '- 1'
                 if (wasMyPred) // failed node was our predecessor
                 {
-                    if (log.IsVerbose) log.Verbose("Failed server was my pred? {0}, updated view {1}", wasMyPred, this.ToString());
+                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("Failed server was my pred? {0}, updated view {1}", wasMyPred, this.ToString());
 
                     IRingRange oldRange = MyRange;
                     if (membershipRingList.Count == 1) // i'm the only one left
@@ -241,8 +238,6 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
-        #region Notification related
-        
         public bool SubscribeToRangeChangeEvents(IRingRangeListener observer)
         {
             lock (statusListeners)
@@ -285,8 +280,6 @@ namespace Orleans.Runtime.ConsistentRing
             }
         }
 
-        #endregion
-
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
             // This silo's status has changed
@@ -309,7 +302,6 @@ namespace Orleans.Runtime.ConsistentRing
                 }
             }
         }
-        #endregion
 
         /// <summary>
         /// Finds the silo that owns the given hash value.
@@ -362,7 +354,7 @@ namespace Orleans.Runtime.ConsistentRing
                 }
             }
 
-            if (log.IsVerbose2) log.Verbose2("Silo {0} calculated ring partition owner silo {1} for key {2}: {3} --> {4}", MyAddress, siloAddress, hash, hash, siloAddress.GetConsistentHashCode());
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} calculated ring partition owner silo {1} for key {2}: {3} --> {4}", MyAddress, siloAddress, hash, hash, siloAddress.GetConsistentHashCode());
             return siloAddress;
         }
 

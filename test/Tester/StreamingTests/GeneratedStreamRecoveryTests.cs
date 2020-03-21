@@ -1,13 +1,13 @@
-﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Tester;
 using Tester.StreamingTests;
 using TestExtensions;
 using TestGrains;
@@ -18,39 +18,36 @@ namespace UnitTests.StreamingTests
 {
     public class GeneratedImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<GeneratedImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
-        private static readonly string StreamProviderTypeName = typeof(GeneratorStreamProvider).FullName;
+        private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
+        private const int TotalQueueCount = 4;
         private readonly Fixture fixture;
         private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
-
 
         public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
 
-            public readonly static GeneratorAdapterConfig AdapterConfig = new GeneratorAdapterConfig(StreamProviderName)
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                TotalQueueCount = 4,
-            };
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            }
 
-            protected override TestCluster CreateTestCluster()
+            private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                var options = new TestClusterOptions(2);
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                var settings = new Dictionary<string, string>();
-                // get initial settings from configs
-                AdapterConfig.WriteProperties(settings);
-
-                // add queue balancer setting
-                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
-
-                // add pub/sub settting
-                settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
-
-                // register stream provider
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
-
-                return new TestCluster(options);
+                public void Configure(ISiloBuilder hostBuilder)
+                {
+                    hostBuilder
+                         .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorage("MemoryStore")
+                        .AddPersistentStreams(StreamProviderName,
+                            GeneratorAdapterFactory.Create,
+                            b =>
+                            {
+                                b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                                b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount));
+                                b.UseDynamicClusterConfigDeploymentBalancer();
+                            });
+                }
             }
         }
 
@@ -68,7 +65,7 @@ namespace UnitTests.StreamingTests
             this.fixture.Logger.Info("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
             await runner.Recoverable100EventStreamsWithTransientErrors(GenerateEvents,
                 ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace,
-                Fixture.AdapterConfig.TotalQueueCount,
+                TotalQueueCount,
                 100);
         }
 
@@ -78,13 +75,13 @@ namespace UnitTests.StreamingTests
             this.fixture.Logger.Info("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
             await runner.Recoverable100EventStreamsWith1NonTransientError(GenerateEvents,
                 ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.StreamNamespace,
-                Fixture.AdapterConfig.TotalQueueCount,
+                TotalQueueCount,
                 100);
         }
 
         private async Task GenerateEvents(string streamNamespace, int streamCount, int eventsInStream)
         {
-            var generatorConfig = new SimpleGeneratorConfig
+            var generatorConfig = new SimpleGeneratorOptions
             {
                 StreamNamespace = streamNamespace,
                 EventsInStream = eventsInStream

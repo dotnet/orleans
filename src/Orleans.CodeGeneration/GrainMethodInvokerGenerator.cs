@@ -43,8 +43,7 @@ namespace Orleans.CodeGenerator
         {
             var baseTypes = new List<BaseTypeSyntax> { SF.SimpleBaseType(typeof(IGrainMethodInvoker).GetTypeSyntax()) };
 
-            var grainTypeInfo = grainType.GetTypeInfo();
-            var genericTypes = grainTypeInfo.IsGenericTypeDefinition
+            var genericTypes = grainType.IsGenericTypeDefinition
                                    ? grainType.GetGenericArguments()
                                          .Select(_ => SF.TypeParameter(_.ToString()))
                                          .ToArray()
@@ -72,7 +71,7 @@ namespace Orleans.CodeGenerator
             };
 
             // If this is an IGrainExtension, make the generated class implement IGrainExtensionMethodInvoker.
-            if (typeof(IGrainExtension).GetTypeInfo().IsAssignableFrom(grainTypeInfo))
+            if (typeof(IGrainExtension).IsAssignableFrom(grainType))
             {
                 baseTypes.Add(SF.SimpleBaseType(typeof(IGrainExtensionMethodInvoker).GetTypeSyntax()));
                 members.Add(GenerateExtensionInvokeMethod(grainType));
@@ -322,7 +321,21 @@ namespace Orleans.CodeGenerator
                     SF.ReturnStatement(SF.LiteralExpression(SyntaxKind.NullLiteralExpression))
                 };
             }
-            
+
+            if (method.ReturnType.IsGenericType
+                && method.ReturnType.GetGenericTypeDefinition().FullName == "System.Threading.Tasks.ValueTask`1")
+            {
+                var convertToTaskResult = SF.IdentifierName("AsTask");
+
+                // Converting ValueTask method result to Task since "Invoke" method should return Task.
+                // Temporary solution. Need to change when Orleans will be using ValueTask instead of Task.
+                grainMethodCall =
+                    SF.InvocationExpression(
+                        SF.MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+                            SF.ExpressionStatement(grainMethodCall).Expression, convertToTaskResult));
+            }
+
+
             return new StatementSyntax[]
             {
                 SF.ReturnStatement(SF.AwaitExpression(grainMethodCall))

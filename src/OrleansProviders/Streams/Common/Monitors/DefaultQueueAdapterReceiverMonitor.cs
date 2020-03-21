@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,7 +26,6 @@ namespace Orleans.Providers.Streams.Common
             this.LogProperties = new Dictionary<string, string>
             {
                 {"QueueId", dimensions.QueueId},
-                {"HostName", dimensions.NodeConfig.HostNameOrIPAddress }
             };
         }
         /// <summary>
@@ -64,7 +63,7 @@ namespace Orleans.Providers.Streams.Common
         public void TrackMessagesReceived(long count, DateTime? oldestMessageEnqueueTimeUtc, DateTime? newestMessageEnqueueTimeUtc)
         {
             var now = DateTime.UtcNow;
-            this.TelemetryProducer.TrackMetric("MessagesRecieved", count, this.LogProperties);
+            this.TelemetryProducer.TrackMetric("MessagesReceived", count, this.LogProperties);
             if (oldestMessageEnqueueTimeUtc.HasValue)
                 this.TelemetryProducer.TrackMetric("OldestMessageReadEnqueueTimeToNow", now - oldestMessageEnqueueTimeUtc.Value, this.LogProperties);
             if (newestMessageEnqueueTimeUtc.HasValue)

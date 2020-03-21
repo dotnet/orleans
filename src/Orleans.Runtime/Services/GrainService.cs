@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
@@ -17,9 +16,8 @@ namespace Orleans.Runtime
         private readonly IConsistentRingProvider ring;
         private readonly string typeName;
         private GrainServiceStatus status;
-
-        /// <summary>Logger instance to be used by grain service subclasses</summary>
-        protected Logger Logger { get; }
+        
+        private ILogger Logger;
         /// <summary>Token for signaling cancellation upon stopping of grain service</summary>
         protected CancellationTokenSource StoppedCancellationTokenSource { get; }
         /// <summary>Monotonically increasing serial number of the version of the ring range owned by the grain service instance</summary>
@@ -37,25 +35,25 @@ namespace Orleans.Runtime
             }
         }
 
-        /// <summary>Configuration of service </summary>
-        protected IGrainServiceConfiguration Config { get; private set; }
+        public GrainReference GetGrainReference() => GrainReference.FromGrainId(((ISystemTargetBase)this).GrainId, ((ISystemTargetBase)this).GrainReferenceRuntime, null, this.Silo);
 
-        /// <summary>Only to make Reflection happy</summary>
+        /// <summary>Only to make Reflection happy. Do not use it in your implementation</summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        [System.Diagnostics.DebuggerHidden]
         protected GrainService() : base(null, null, null)
         {
             throw new Exception("This should not be constructed by client code.");
         }
 
         /// <summary>Constructor to use for grain services</summary>
-        protected GrainService(IGrainIdentity grainId, Silo silo, IGrainServiceConfiguration config, ILoggerFactory loggerFactory) : base((GrainId)grainId, silo.SiloAddress, lowPriority: true, loggerFactory:loggerFactory)
+        protected GrainService(IGrainIdentity grainId, Silo silo, ILoggerFactory loggerFactory) : base((GrainId)grainId, silo.SiloAddress, lowPriority: true, loggerFactory:loggerFactory)
         {
             typeName = this.GetType().FullName;
-            Logger = new LoggerWrapper(typeName, loggerFactory);
+            Logger = loggerFactory.CreateLogger(typeName);
 
             scheduler = silo.LocalScheduler;
             ring = silo.RingProvider;
             StoppedCancellationTokenSource = new CancellationTokenSource();
-            Config = config;
         }
 
         /// <summary>Invoked upon initialization of the service</summary>
@@ -86,8 +84,15 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        /// <summary>Deferred part of initialization that executes after the service is already started (to speed up startup)</summary>
-        protected abstract Task StartInBackground();
+        /// <summary>
+        /// Deferred part of initialization that executes after the service is already started (to speed up startup).
+        /// Sets Status to Started.
+        /// </summary>
+        protected virtual Task StartInBackground()
+        {
+            Status = GrainServiceStatus.Started;
+            return Task.CompletedTask;
+        }
 
         /// <summary>Invoked when service is being stopped</summary>
         public virtual Task Stop()
@@ -103,10 +108,10 @@ namespace Orleans.Runtime
 
         void IRingRangeListener.RangeChangeNotification(IRingRange oldRange, IRingRange newRange, bool increased)
         {
-            scheduler.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this.SchedulingContext).Ignore();
+            scheduler.QueueTask(() => OnRangeChange(oldRange, newRange, increased), this).Ignore();
         }
 
-        /// <summary>Invoked when the ring range owned by the service instance changes because of a change in the clsuter state</summary>
+        /// <summary>Invoked when the ring range owned by the service instance changes because of a change in the cluster state</summary>
         public virtual Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
             Logger.Info(ErrorCode.RS_RangeChanged, "My range changed from {0} to {1} increased = {2}", oldRange, newRange, increased);

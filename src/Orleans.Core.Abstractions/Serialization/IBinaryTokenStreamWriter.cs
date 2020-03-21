@@ -7,17 +7,6 @@ namespace Orleans.Serialization
 {
     public interface IBinaryTokenStreamWriter
     {
-        /// <summary> Return the output stream as a set of <c>ArraySegment</c>. </summary>
-        /// <returns>Data from this stream, converted to output type.</returns>
-        List<ArraySegment<byte>> ToBytes();
-
-        /// <summary> Return the output stream as a <c>byte[]</c>. </summary>
-        /// <returns>Data from this stream, converted to output type.</returns>
-        byte[] ToByteArray();
-
-        /// <summary> Release any serialization buffers being used by this stream. </summary>
-        void ReleaseBuffers();
-
         /// <summary> Current write position in the stream. </summary>
         int CurrentOffset { get; }
 

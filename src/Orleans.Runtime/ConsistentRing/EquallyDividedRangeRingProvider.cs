@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-
+using Orleans.Internal;
 
 namespace Orleans.Runtime.ConsistentRing
 {
@@ -11,7 +11,7 @@ namespace Orleans.Runtime.ConsistentRing
     {
         private readonly IConsistentRingProvider ringProvider;
         private readonly List<IAsyncRingRangeListener> grainStatusListeners;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly int numSubRanges;
         private readonly int mySubRangeIndex;
         private IRingRange myRange;
@@ -26,7 +26,7 @@ namespace Orleans.Runtime.ConsistentRing
             this.mySubRangeIndex = mySubRangeIndex;
             grainStatusListeners = new List<IAsyncRingRangeListener>();
             ringProvider.SubscribeToRangeChangeEvents(this);
-            logger = new LoggerWrapper<EquallyDividedRangeRingProvider>(loggerFactory);
+            logger = loggerFactory.CreateLogger<EquallyDividedRangeRingProvider>();
         }
 
         public IRingRange GetMyRange()

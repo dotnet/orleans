@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Options for grain classes.

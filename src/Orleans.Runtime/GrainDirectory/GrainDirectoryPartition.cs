@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.GrainDirectory;
-using Orleans.Runtime.Configuration;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -30,7 +32,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
 
-        public bool OkToRemove(UnregistrationCause cause, GlobalConfiguration config)
+        public bool OkToRemove(UnregistrationCause cause, TimeSpan lazyDeregistrationDelay)
         {
             switch (cause)
             {
@@ -45,7 +47,7 @@ namespace Orleans.Runtime.GrainDirectory
                         if (RegistrationStatus == GrainDirectoryEntryStatus.Cached)
                             return true; // cache entries are always removed
 
-                        var delayparameter = config.DirectoryLazyDeregistrationDelay;
+                        var delayparameter = lazyDeregistrationDelay;
                         if (delayparameter <= TimeSpan.Zero)
                             return false; // no lazy deregistration
                         else
@@ -122,11 +124,11 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public bool RemoveActivation(ActivationId act, UnregistrationCause cause, GlobalConfiguration config, out IActivationInfo info, out bool wasRemoved)
+        public bool RemoveActivation(ActivationId act, UnregistrationCause cause, TimeSpan lazyDeregistrationDelay, out IActivationInfo info, out bool wasRemoved)
         {
             info = null;
             wasRemoved = false;
-            if (Instances.TryGetValue(act, out info) && info.OkToRemove(cause, config))
+            if (Instances.TryGetValue(act, out info) && info.OkToRemove(cause, lazyDeregistrationDelay))
             {
                 Instances.Remove(act);
                 wasRemoved = true;
@@ -213,11 +215,11 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         private Dictionary<GrainId, IGrainInfo> partitionData;
         private readonly object lockable;
-        private readonly Logger log;
+        private readonly ILogger log;
         private readonly ILoggerFactory loggerFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
-        private readonly GlobalConfiguration globalConfig;
         private readonly IInternalGrainFactory grainFactory;
+        private readonly IOptions<GrainDirectoryOptions> grainDirectoryOptions;
 
         [ThreadStatic]
         private static ActivationId[] activationIdsHolder;
@@ -227,13 +229,13 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal int Count { get { return partitionData.Count; } }
 
-        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, GlobalConfiguration globalConfig, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
+        public GrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, IOptions<GrainDirectoryOptions> grainDirectoryOptions, IInternalGrainFactory grainFactory, ILoggerFactory loggerFactory)
         {
             partitionData = new Dictionary<GrainId, IGrainInfo>();
             lockable = new object();
-            log = new LoggerWrapper<GrainDirectoryPartition>(loggerFactory);
+            log = loggerFactory.CreateLogger<GrainDirectoryPartition>();
             this.siloStatusOracle = siloStatusOracle;
-            this.globalConfig = globalConfig;
+            this.grainDirectoryOptions = grainDirectoryOptions;
             this.grainFactory = grainFactory;
             this.loggerFactory = loggerFactory;
         }
@@ -288,7 +290,7 @@ namespace Orleans.Runtime.GrainDirectory
                 grainInfo.AddActivation(activation, silo);
             }
 
-            if (log.IsVerbose3) log.Verbose3("Adding activation for grain {0}", grain.ToString());
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Adding activation for grain {0}", grain.ToString());
             return grainInfo.VersionTag;
         }
 
@@ -302,7 +304,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns>The registered ActivationAddress and version associated with this directory mapping</returns>
         internal virtual AddressAndTag AddSingleActivation(GrainId grain, ActivationId activation, SiloAddress silo, GrainDirectoryEntryStatus registrationStatus)
         {
-            if (log.IsVerbose3) log.Verbose3("Adding single activation for grain {0}{1}{2}", silo, grain, activation);
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Adding single activation for grain {0}{1}{2}", silo, grain, activation);
 
             AddressAndTag result = new AddressAndTag();
 
@@ -353,18 +355,17 @@ namespace Orleans.Runtime.GrainDirectory
             entry = null;
             lock (lockable)
             {
-                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, cause, globalConfig, out entry, out wasRemoved))
+                if (partitionData.ContainsKey(grain) && partitionData[grain].RemoveActivation(activation, cause, this.grainDirectoryOptions.Value.LazyDeregistrationDelay, out entry, out wasRemoved))
                     // if the last activation for the grain was removed, we remove the entire grain info 
                     partitionData.Remove(grain);
 
             }
-            if (log.IsVerbose3)
-                log.Verbose3("Removing activation for grain {0} cause={1} was_removed={2}", grain.ToString(), cause, wasRemoved);
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Removing activation for grain {0} cause={1} was_removed={2}", grain.ToString(), cause, wasRemoved);
         }
 
    
         /// <summary>
-        /// Removes the grain (and, effectively, all its activations) from the diretcory
+        /// Removes the grain (and, effectively, all its activations) from the directory
         /// </summary>
         /// <param name="grain"></param>
         internal void RemoveGrain(GrainId grain)
@@ -373,7 +374,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 partitionData.Remove(grain);
             }
-            if (log.IsVerbose3) log.Verbose3("Removing grain {0}", grain.ToString());
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Removing grain {0}", grain.ToString());
         }
 
         /// <summary>
@@ -495,22 +496,31 @@ namespace Orleans.Runtime.GrainDirectory
         /// This method is supposed to be used by handoff manager to update the partitions when the system view (set of live silos) changes.
         /// </summary>
         /// <param name="other"></param>
-        internal void Merge(GrainDirectoryPartition other)
+        /// <returns>Activations which must be deactivated.</returns>
+        internal Dictionary<SiloAddress, List<ActivationAddress>> Merge(GrainDirectoryPartition other)
         {
+            Dictionary<SiloAddress, List<ActivationAddress>> activationsToRemove = null;
             lock (lockable)
             {
                 foreach (var pair in other.partitionData)
                 {
                     if (partitionData.ContainsKey(pair.Key))
                     {
-                        if (log.IsVerbose) log.Verbose("While merging two disjoint partitions, same grain " + pair.Key + " was found in both partitions");
+                        if (log.IsEnabled(LogLevel.Debug)) log.Debug("While merging two disjoint partitions, same grain " + pair.Key + " was found in both partitions");
                         var activationsToDrop = partitionData[pair.Key].Merge(pair.Key, pair.Value);
                         if (activationsToDrop == null) continue;
 
+                        if (activationsToRemove == null) activationsToRemove = new Dictionary<SiloAddress, List<ActivationAddress>>();
                         foreach (var siloActivations in activationsToDrop)
                         {
-                            var remoteCatalog = grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, siloActivations.Key);
-                            remoteCatalog.DeleteActivations(siloActivations.Value).Ignore();
+                            if (activationsToRemove.TryGetValue(siloActivations.Key, out var activations))
+                            {
+                                activations.AddRange(siloActivations.Value);
+                            }
+                            else
+                            {
+                                activationsToRemove[siloActivations.Key] = siloActivations.Value;
+                            }
                         }
                     }
                     else
@@ -519,6 +529,8 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
             }
+
+            return activationsToRemove;
         }
 
         /// <summary>
@@ -527,11 +539,11 @@ namespace Orleans.Runtime.GrainDirectory
         /// This method is supposed to be used by handoff manager to update the partitions when the system view (set of live silos) changes.
         /// </summary>
         /// <param name="predicate">filter predicate (usually if the given grain is owned by particular silo)</param>
-        /// <param name="modifyOrigin">flag controling whether the source partition should be modified (i.e., the entries should be moved or just copied) </param>
+        /// <param name="modifyOrigin">flag controlling whether the source partition should be modified (i.e., the entries should be moved or just copied) </param>
         /// <returns>new grain directory partition containing entries satisfying the given predicate</returns>
         internal GrainDirectoryPartition Split(Predicate<GrainId> predicate, bool modifyOrigin)
         {
-            var newDirectory = new GrainDirectoryPartition(this.siloStatusOracle, this.globalConfig, this.grainFactory, this.loggerFactory);
+            var newDirectory = new GrainDirectoryPartition(this.siloStatusOracle, this.grainDirectoryOptions, this.grainFactory, this.loggerFactory);
 
             if (modifyOrigin)
             {
@@ -589,7 +601,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         /// <summary>
-        /// Sets the internal parition dictionary to the one given as input parameter.
+        /// Sets the internal partition dictionary to the one given as input parameter.
         /// This method is supposed to be used by handoff manager to update the old partition with a new partition.
         /// </summary>
         /// <param name="newPartitionData">new internal partition dictionary</param>

@@ -48,9 +48,7 @@ namespace Orleans.Runtime
         Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : IGrainExtension
             where TExtensionInterface : IGrainExtension;
-
-        IActivationData CurrentActivationData { get; }
-
+        
         void DeactivateOnIdle(ActivationId id);
 
         OrleansTaskScheduler Scheduler { get; }

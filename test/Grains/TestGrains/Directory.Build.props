@@ -1,0 +1,33 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
+
+  <Choose>
+    <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix)">
+      <ItemGroup>
+        <ProjectReference Include="..\..\..\src\OrleansProviders\OrleansProviders.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="$(OrleansProvidersVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansEventSourcingVersion) == $(VersionPrefix)">
+      <ItemGroup>
+        <ProjectReference Include="..\..\..\src\Orleans.EventSourcing\Orleans.EventSourcing.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.EventSourcing" Version="$(OrleansEventSourcingVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+</Project>

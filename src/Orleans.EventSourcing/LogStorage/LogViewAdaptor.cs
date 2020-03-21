@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.LogConsistency;
 using Orleans.Storage;
@@ -27,10 +28,10 @@ namespace Orleans.EventSourcing.LogStorage
         /// <summary>
         /// Initialize a StorageProviderLogViewAdaptor class
         /// </summary>
-        public LogViewAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host, TLogView initialState, IStorageProvider globalStorageProvider, string grainTypeName, ILogConsistencyProtocolServices services)
+        public LogViewAdaptor(ILogViewAdaptorHost<TLogView, TLogEntry> host, TLogView initialState, IGrainStorage globalGrainStorage, string grainTypeName, ILogConsistencyProtocolServices services)
             : base(host, initialState, services)
         {
-            this.globalStorageProvider = globalStorageProvider;
+            this.globalGrainStorage = globalGrainStorage;
             this.grainTypeName = grainTypeName;
         }
 
@@ -38,7 +39,7 @@ namespace Orleans.EventSourcing.LogStorage
         private const int maxEntriesInNotifications = 200;
 
 
-        IStorageProvider globalStorageProvider;
+        IGrainStorage globalGrainStorage;
         string grainTypeName;   
 
         // the object containing the entire log, as retrieved from / sent to storage
@@ -115,9 +116,9 @@ namespace Orleans.EventSourcing.LogStorage
                     // for manual testing
                     //await Task.Delay(5000);
 
-                    await globalStorageProvider.ReadStateAsync(grainTypeName, Services.GrainReference, GlobalLog);
+                    await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainReference, GlobalLog);
 
-                    Services.Log(Severity.Verbose, "read success {0}", GlobalLog);
+                    Services.Log(LogLevel.Debug, "read success {0}", GlobalLog);
 
                     UpdateConfirmedView();
 
@@ -130,7 +131,7 @@ namespace Orleans.EventSourcing.LogStorage
                     LastPrimaryIssue.Record(new ReadFromLogStorageFailed() { Exception = e }, Host, Services);
                 }
 
-                Services.Log(Severity.Verbose, "read failed {0}", LastPrimaryIssue);
+                Services.Log(LogLevel.Debug, "read failed {0}", LastPrimaryIssue);
 
                 await LastPrimaryIssue.DelayBeforeRetry();
             }
@@ -156,11 +157,11 @@ namespace Orleans.EventSourcing.LogStorage
                 // for manual testing
                 //await Task.Delay(5000);
 
-                await globalStorageProvider.WriteStateAsync(grainTypeName, Services.GrainReference, GlobalLog);
+                await globalGrainStorage.WriteStateAsync(grainTypeName, Services.GrainReference, GlobalLog);
 
                 batchsuccessfullywritten = true;
 
-                Services.Log(Severity.Verbose, "write ({0} updates) success {1}", updates.Length, GlobalLog);
+                Services.Log(LogLevel.Debug, "write ({0} updates) success {1}", updates.Length, GlobalLog);
 
                 UpdateConfirmedView();
 
@@ -173,7 +174,7 @@ namespace Orleans.EventSourcing.LogStorage
 
             if (!batchsuccessfullywritten)
             {
-                Services.Log(Severity.Verbose, "write apparently failed {0}", LastPrimaryIssue);
+                Services.Log(LogLevel.Debug, "write apparently failed {0}", LastPrimaryIssue);
 
                 while (true) // be stubborn until we can read what is there
                 {
@@ -182,9 +183,9 @@ namespace Orleans.EventSourcing.LogStorage
 
                     try
                     {
-                        await globalStorageProvider.ReadStateAsync(grainTypeName, Services.GrainReference, GlobalLog);
+                        await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainReference, GlobalLog);
 
-                        Services.Log(Severity.Verbose, "read success {0}", GlobalLog);
+                        Services.Log(LogLevel.Debug, "read success {0}", GlobalLog);
 
                         UpdateConfirmedView();
 
@@ -197,29 +198,18 @@ namespace Orleans.EventSourcing.LogStorage
                         LastPrimaryIssue.Record(new ReadFromLogStorageFailed() { Exception = e }, Host, Services);
                     }
 
-                    Services.Log(Severity.Verbose, "read failed {0}", LastPrimaryIssue);
+                    Services.Log(LogLevel.Debug, "read failed {0}", LastPrimaryIssue);
                 }
 
                 // check if last apparently failed write was in fact successful
 
                 if (writebit == GlobalLog.StateAndMetaData.GetBit(Services.MyClusterId))
                 {
-                    Services.Log(Severity.Verbose, "last write ({0} updates) was actually a success {1}", updates.Length, GlobalLog);
+                    Services.Log(LogLevel.Debug, "last write ({0} updates) was actually a success {1}", updates.Length, GlobalLog);
 
                     batchsuccessfullywritten = true;
                 }
             }
-
-
-            // broadcast notifications to all other clusters
-            if (batchsuccessfullywritten)
-                BroadcastNotification(new UpdateNotificationMessage()
-                   {
-                       Version = GlobalLog.StateAndMetaData.GlobalVersion,
-                       Updates = updates.Select(se => se.Entry).ToList(),
-                       Origin = Services.MyClusterId,
-                       ETag = GlobalLog.ETag
-                   });
 
             exit_operation("WriteAsync");
 
@@ -325,7 +315,7 @@ namespace Orleans.EventSourcing.LogStorage
             // discard notifications that are behind our already confirmed state
             while (notifications.Count > 0 && notifications.ElementAt(0).Key < GlobalLog.StateAndMetaData.GlobalVersion)
             {
-                Services.Log(Severity.Verbose, "discarding notification {0}", notifications.ElementAt(0).Value);
+                Services.Log(LogLevel.Debug, "discarding notification {0}", notifications.ElementAt(0).Value);
                 notifications.RemoveAt(0);
             }
 
@@ -345,17 +335,15 @@ namespace Orleans.EventSourcing.LogStorage
 
                 UpdateConfirmedView();
 
-                Services.Log(Severity.Verbose, "notification success ({0} updates) {1}", updateNotification.Updates.Count, GlobalLog);
+                Services.Log(LogLevel.Debug, "notification success ({0} updates) {1}", updateNotification.Updates.Count, GlobalLog);
             }
 
-            Services.Log(Severity.Verbose2, "unprocessed notifications in queue: {0}", notifications.Count);
+            Services.Log(LogLevel.Trace, "unprocessed notifications in queue: {0}", notifications.Count);
 
             base.ProcessNotifications();
          
         }
 
-
-        #region non-reentrancy assertions
 
 #if DEBUG
         bool operation_in_progress;
@@ -365,7 +353,7 @@ namespace Orleans.EventSourcing.LogStorage
         private void enter_operation(string name)
         {
 #if DEBUG
-            Services.Log(Severity.Verbose2, "/-- enter {0}", name);
+            Services.Log(LogLevel.Trace, "/-- enter {0}", name);
             Debug.Assert(!operation_in_progress);
             operation_in_progress = true;
 #endif
@@ -375,14 +363,10 @@ namespace Orleans.EventSourcing.LogStorage
         private void exit_operation(string name)
         {
 #if DEBUG
-            Services.Log(Severity.Verbose2, "\\-- exit {0}", name);
+            Services.Log(LogLevel.Trace, "\\-- exit {0}", name);
             Debug.Assert(operation_in_progress);
             operation_in_progress = false;
 #endif
         }
-
-       
-
-        #endregion
     }
 }

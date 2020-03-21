@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -8,8 +8,6 @@ using System.Reflection.Emit;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
@@ -19,6 +17,7 @@ using Orleans.Transactions;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Threading;
 using Orleans.Configuration;
 
 namespace Orleans.Runtime
@@ -26,78 +25,86 @@ namespace Orleans.Runtime
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
-    internal class InsideRuntimeClient : ISiloRuntimeClient
+    internal class InsideRuntimeClient : ISiloRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILogger logger;
-        private readonly Logger callbackDataLogger;
-        private readonly ILogger timerLogger;
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
-        private readonly Func<Message, bool> tryResendMessage;
-        private readonly Action<Message> unregisterCallback;
+        private readonly SharedCallbackData sharedCallbackData;
+        private readonly SharedCallbackData systemSharedCallbackData;
+        private SafeTimer callbackTimer;
 
         private ILocalGrainDirectory directory;
         private Catalog catalog;
         private Dispatcher dispatcher;
+        private List<IIncomingGrainCallFilter> grainCallFilters;
+        private SerializationManager serializationManager;
+        private IHostedClient hostedClient;
 
+        private IHostedClient HostedClient => this.hostedClient ?? (this.hostedClient = this.ServiceProvider.GetRequiredService<IHostedClient>());
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping = new InterfaceToImplementationMappingCache();
-        public TimeSpan ResponseTimeout { get; private set; }
         private readonly GrainTypeManager typeManager;
         private readonly MessageFactory messageFactory;
-        private readonly List<IGrainCallFilter> siloInterceptors;
-        private readonly Lazy<ITransactionAgent> transactionAgent;
+        private readonly ITransactionAgent transactionAgent;
         private IGrainReferenceRuntime grainReferenceRuntime;
-        private IGrainCancellationTokenRuntime cancellationTokenRuntime;
-        
+        private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
+        private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
+        private readonly MessagingTrace messagingTrace;
+        private readonly SchedulingOptions schedulingOptions;
+
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
-            ClusterConfiguration config,
             GrainTypeManager typeManager,
             TypeMetadataCache typeMetadataCache,
             OrleansTaskScheduler scheduler,
             IServiceProvider serviceProvider,
-            SerializationManager serializationManager,
             MessageFactory messageFactory,
-            IEnumerable<IGrainCallFilter> registeredInterceptors,
-            Factory<ITransactionAgent> transactionAgent,
+            ITransactionAgent transactionAgent,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> messagingOptions,
-            IGrainCancellationTokenRuntime cancellationTokenRuntime)
+            IGrainCancellationTokenRuntime cancellationTokenRuntime,
+            IOptions<SchedulingOptions> schedulerOptions,
+            ApplicationRequestsStatisticsGroup appRequestStatistics,
+            MessagingTrace messagingTrace)
         {
             this.ServiceProvider = serviceProvider;
-            this.SerializationManager = serializationManager;
-            MySilo = siloDetails.SiloAddress;
-            disposables = new List<IDisposable>();
-            callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
-            Config = config;
-            config.OnConfigChange("Globals/Message", () => ResponseTimeout = Config.Globals.ResponseTimeout);
+            this.MySilo = siloDetails.SiloAddress;
+            this.disposables = new List<IDisposable>();
+            this.callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.typeManager = typeManager;
             this.messageFactory = messageFactory;
-            this.transactionAgent = new Lazy<ITransactionAgent>(() => transactionAgent());
+            this.transactionAgent = transactionAgent;
             this.Scheduler = scheduler;
             this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
-            tryResendMessage = msg => this.Dispatcher.TryResendMessage(msg);
-            unregisterCallback = msg => UnRegisterCallback(msg.Id);
-            this.siloInterceptors = new List<IGrainCallFilter>(registeredInterceptors);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
-            this.invokeExceptionLogger =loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
+            this.invokeExceptionLogger = loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
             this.loggerFactory = loggerFactory;
             this.messagingOptions = messagingOptions.Value;
-            this.callbackDataLogger = new LoggerWrapper<CallbackData>(loggerFactory);
-            this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
             this.cancellationTokenRuntime = cancellationTokenRuntime;
+            this.appRequestStatistics = appRequestStatistics;
+            this.messagingTrace = messagingTrace;
+            this.schedulingOptions = schedulerOptions.Value;
+
+            this.sharedCallbackData = new SharedCallbackData(
+                msg => this.UnregisterCallback(msg.Id),
+                this.loggerFactory.CreateLogger<CallbackData>(),
+                this.messagingOptions,
+                this.appRequestStatistics,
+                this.messagingOptions.ResponseTimeout);
+
+            this.systemSharedCallbackData = new SharedCallbackData(
+                msg => this.UnregisterCallback(msg.Id),
+                this.loggerFactory.CreateLogger<CallbackData>(),
+                this.messagingOptions,
+                this.appRequestStatistics,
+                this.messagingOptions.SystemResponseTimeout);
         }
-        
+
         public IServiceProvider ServiceProvider { get; }
-
-        /// <inheritdoc />
-        public ClientInvokeCallback ClientInvokeCallback { get; set; }
-
-        public IStreamProviderManager CurrentStreamProviderManager { get; internal set; }
-
+        
         public IStreamProviderRuntime CurrentStreamProviderRuntime { get; internal set; }
 
         public OrleansTaskScheduler Scheduler { get; }
@@ -106,20 +113,17 @@ namespace Orleans.Runtime
 
         private SiloAddress MySilo { get; }
 
-        private ClusterConfiguration Config { get; }
-
         public GrainFactory ConcreteGrainFactory { get; }
-
-        public SerializationManager SerializationManager { get; }
-
+        
         private Catalog Catalog => this.catalog ?? (this.catalog = this.ServiceProvider.GetRequiredService<Catalog>());
 
         private ILocalGrainDirectory Directory
             => this.directory ?? (this.directory = this.ServiceProvider.GetRequiredService<ILocalGrainDirectory>());
 
-        private Dispatcher Dispatcher => this.dispatcher ?? (this.dispatcher = this.ServiceProvider.GetRequiredService<Dispatcher>());
+        private List<IIncomingGrainCallFilter> GrainCallFilters
+            => this.grainCallFilters ?? (this.grainCallFilters = new List<IIncomingGrainCallFilter>(this.ServiceProvider.GetServices<IIncomingGrainCallFilter>()));
 
-        #region Implementation of IRuntimeClient
+        private Dispatcher Dispatcher => this.dispatcher ?? (this.dispatcher = this.ServiceProvider.GetRequiredService<Dispatcher>());
 
         public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ?? (this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
 
@@ -127,64 +131,35 @@ namespace Orleans.Runtime
             GrainReference target,
             InvokeMethodRequest request,
             TaskCompletionSource<object> context,
-            Action<Message, TaskCompletionSource<object>> callback,
-            string debugContext,
             InvokeMethodOptions options,
-            string genericArguments = null)
+            string genericArguments)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
-        }
 
-        private void SendRequestMessage(
-            GrainReference target,
-            Message message,
-            TaskCompletionSource<object> context,
-            Action<Message, TaskCompletionSource<object>> callback,
-            string debugContext,
-            InvokeMethodOptions options,
-            string genericArguments = null)
-        {
             // fill in sender
             if (message.SendingSilo == null)
                 message.SendingSilo = MySilo;
             if (!String.IsNullOrEmpty(genericArguments))
                 message.GenericGrainType = genericArguments;
 
-            SchedulingContext schedulingContext = RuntimeContext.Current != null ?
-                RuntimeContext.Current.ActivationContext as SchedulingContext : null;
+            IGrainContext sendingActivation = RuntimeContext.CurrentGrainContext;
 
-            ActivationData sendingActivation = null;
-            if (schedulingContext == null)
+            if (sendingActivation == null)
             {
-                throw new InvalidOperationException(
-                    String.Format("Trying to send a message {0} on a silo not from within grain and not from within system target (RuntimeContext is not set to SchedulingContext) "
-                        + "RuntimeContext.Current={1} TaskScheduler.Current={2}",
-                        message,
-                        RuntimeContext.Current == null ? "null" : RuntimeContext.Current.ToString(),
-                        TaskScheduler.Current));
+                var clientAddress = this.HostedClient.ClientAddress;
+                message.SendingGrain = clientAddress.Grain;
+                message.SendingActivation = clientAddress.Activation;
             }
-            switch (schedulingContext.ContextType)
+            else
             {
-                case SchedulingContextType.SystemThread:
-                    throw new ArgumentException(
-                        String.Format("Trying to send a message {0} on a silo not from within grain and not from within system target (RuntimeContext is of SchedulingContextType.SystemThread type)", message), "context");
-
-                case SchedulingContextType.Activation:
-                    message.SendingActivation = schedulingContext.Activation.ActivationId;
-                    message.SendingGrain = schedulingContext.Activation.Grain;
-                    sendingActivation = schedulingContext.Activation;
-                    break;
-
-                case SchedulingContextType.SystemTarget:
-                    message.SendingActivation = schedulingContext.SystemTarget.ActivationId;
-                    message.SendingGrain = ((ISystemTargetBase)schedulingContext.SystemTarget).GrainId;
-                    break;
+                message.SendingActivation = sendingActivation.ActivationId;
+                message.SendingGrain = sendingActivation.GrainId;
             }
 
             // fill in destination
             var targetGrainId = target.GrainId;
             message.TargetGrain = targetGrainId;
+            SharedCallbackData sharedData;
             if (targetGrainId.IsSystemTarget)
             {
                 SiloAddress targetSilo = (target.SystemTargetSilo ?? MySilo);
@@ -192,36 +167,36 @@ namespace Orleans.Runtime
                 message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, targetSilo);
                 message.Category = targetGrainId.Equals(Constants.MembershipOracleId) ?
                     Message.Categories.Ping : Message.Categories.System;
+                sharedData = this.systemSharedCallbackData;
             }
+            else
+            {
+                sharedData = this.sharedCallbackData;
+            }
+
             if (target.IsObserverReference)
             {
                 message.TargetObserverId = target.ObserverId;
             }
 
-            if (debugContext != null)
-                message.DebugContext = debugContext;
-
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
-            if (context == null && !oneWay)
-                logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
+            if (context is null && !oneWay)
+            {
+                this.logger.Warn(ErrorCode.IGC_SendRequest_NullContext, "Null context {0}: {1}", message, Utils.GetStackTrace());
+            }
 
-            if (message.IsExpirableMessage(Config.Globals.DropExpiredMessages))
-                message.TimeToLive = ResponseTimeout;
+            if (message.IsExpirableMessage(this.messagingOptions.DropExpiredMessages))
+            {
+                message.TimeToLive = sharedData.ResponseTimeout;
+            }
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(
-                    callback,
-                    tryResendMessage,
-                    context,
-                    message,
-                    unregisterCallback,
-                    messagingOptions,
-                    this.callbackDataLogger,
-                    this.timerLogger);
+                var callbackData = new CallbackData(sharedData, context, message);
                 callbacks.TryAdd(message.Id, callbackData);
-                callbackData.StartTimer(ResponseTimeout);
             }
+
+            this.messagingTrace.OnSendRequest(message);
 
             if (targetGrainId.IsSystemTarget)
             {
@@ -234,12 +209,14 @@ namespace Orleans.Runtime
             }
         }
 
-        private void SendResponse(Message request, Response response)
+        public void SendResponse(Message request, Response response)
         {
+            OrleansInsideRuntimeClientEvent.Log.SendResponse(request);
+
             // Don't process messages that have already timed out
             if (request.IsExpired)
             {
-                request.DropExpiredMessage(MessagingStatisticsGroup.Phase.Respond);
+                this.messagingTrace.OnDropExpiredMessage(request, MessagingStatisticsGroup.Phase.Respond);
                 return;
             }
 
@@ -250,7 +227,7 @@ namespace Orleans.Runtime
         /// UnRegister a callback.
         /// </summary>
         /// <param name="id"></param>
-        private void UnRegisterCallback(CorrelationId id)
+        private void UnregisterCallback(CorrelationId id)
         {
             CallbackData ignore;
             callbacks.TryRemove(id, out ignore);
@@ -293,7 +270,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.IGC_SniffIncomingMessage_Exc, "SniffIncomingMessage has thrown exception. Ignoring.", exc);
+                this.logger.Warn(ErrorCode.IGC_SniffIncomingMessage_Exc, "SniffIncomingMessage has thrown exception. Ignoring.", exc);
             }
         }
 
@@ -304,20 +281,20 @@ namespace Orleans.Runtime
                 // Don't process messages that have already timed out
                 if (message.IsExpired)
                 {
-                    message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Invoke);
+                    this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Invoke);
                     return;
                 }
 
                 RequestContextExtensions.Import(message.RequestContextData);
-                if (Config.Globals.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
+                if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
-                    UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
+                    UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation));
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop
                     // in RuntimeClient.CreateMessage -> RequestContextExtensions.ExportToMessage(message);
                 }
 
                 bool startNewTransaction = false;
-                TransactionInfo transactionInfo = message.TransactionInfo;
+                ITransactionInfo transactionInfo = message.TransactionInfo;
 
                 if (message.IsTransactionRequired && transactionInfo == null)
                 {
@@ -325,7 +302,7 @@ namespace Orleans.Runtime
                     var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
 
                     // Start a new transaction
-                    transactionInfo = await this.transactionAgent.Value.StartTransaction(message.IsReadOnly, transactionTimeout);
+                    transactionInfo = await this.transactionAgent.StartTransaction(message.IsReadOnly, transactionTimeout);
                     startNewTransaction = true;
                 }
 
@@ -337,7 +314,7 @@ namespace Orleans.Runtime
                 object resultObject;
                 try
                 {
-                    var request = (InvokeMethodRequest) message.GetDeserializedBody(this.SerializationManager);
+                    var request = (InvokeMethodRequest) message.BodyObject;
                     if (request.Arguments != null)
                     {
                         CancellationSourcesExtension.RegisterCancellationTokens(target, request, this.loggerFactory, logger, this, this.cancellationTokenRuntime);
@@ -345,8 +322,9 @@ namespace Orleans.Runtime
 
                     var invoker = invokable.GetInvoker(typeManager, request.InterfaceId, message.GenericGrainType);
 
-                    if (invoker is IGrainExtensionMethodInvoker
-                        && !(target is IGrainExtension))
+                    if (invoker is IGrainExtensionMethodInvoker &&
+                        !(target is IGrainExtension) &&
+                        !TryInstallExtension(request.InterfaceId, invokable, message.GenericGrainType, ref invoker))
                     {
                         // We are trying the invoke a grain extension method on a grain 
                         // -- most likely reason is that the dynamic extension is not installed for this grain
@@ -359,35 +337,42 @@ namespace Orleans.Runtime
 #if DEBUG
                         extraDebugInfo = Utils.GetStackTrace();
 #endif
-                        logger.Warn(ErrorCode.Stream_ExtensionNotInstalled,
+                        this.logger.Warn(ErrorCode.Stream_ExtensionNotInstalled,
                             string.Format("{0} for message {1} {2}", error, message, extraDebugInfo), exc);
 
                         throw exc;
                     }
-                    
-                    var requestInvoker = new GrainMethodInvoker(target, request, invoker, siloInterceptors, interfaceToImplementationMapping);
+
+                    messagingTrace.OnInvokeMessage(message);
+                    var requestInvoker = new GrainMethodInvoker(target, request, invoker, GrainCallFilters, interfaceToImplementationMapping);
                     await requestInvoker.Invoke();
                     resultObject = requestInvoker.Result;
                 }
                 catch (Exception exc1)
                 {
-                    if (invokeExceptionLogger.IsEnabled(LogLevel.Debug) || message.Direction == Message.Directions.OneWay)
+                    if (message.Direction == Message.Directions.OneWay)
                     {
-                        invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message, exc1);
+                        this.invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
+                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(exc1), exc1);
+                    }
+                    else if (invokeExceptionLogger.IsEnabled(LogLevel.Debug))
+                    {
+                        this.invokeExceptionLogger.Debug(ErrorCode.GrainInvokeException,
+                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(exc1), exc1);
                     }
 
-                    transactionInfo = TransactionContext.GetTransactionInfo();
                     if (transactionInfo != null)
                     {
-                        // Must abort the transaction on exceptions
-                        transactionInfo.IsAborted = true;
+                        transactionInfo.ReconcilePending();
+                        
+                        // Record reason for abort, if not alread set
+                        transactionInfo.RecordException(exc1, serializationManager);
+
                         if (startNewTransaction)
                         {
-                            var abortException = (exc1 as OrleansTransactionAbortedException) ?? 
-                                new OrleansTransactionAbortedException(transactionInfo.TransactionId, exc1);
-                            this.transactionAgent.Value.Abort(transactionInfo, abortException);
-                            exc1 = abortException;
+                            exc1 = transactionInfo.MustAbort(serializationManager);
+                            await this.transactionAgent.Abort(transactionInfo);
+                            TransactionContext.Clear();
                         }
                     }
 
@@ -402,7 +387,7 @@ namespace Orleans.Runtime
                         var activation = (target as Grain)?.Data;
                         if (activation != null)
                         {
-                            invokeExceptionLogger.Info($"Deactivating {activation} due to inconsistent state.");
+                            this.invokeExceptionLogger.Info($"Deactivating {activation} due to inconsistent state.");
                             this.DeactivateOnIdle(activation.ActivationId);
                         }
                     }
@@ -414,70 +399,106 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                transactionInfo = TransactionContext.GetTransactionInfo();
-                if (transactionInfo != null && transactionInfo.ReconcilePending() > 0)
+                OrleansTransactionException transactionException = null;
+
+                if (transactionInfo != null)
                 {
-                    var abortException = new OrleansOrphanCallException(transactionInfo.TransactionId, transactionInfo.PendingCalls);
-                    // Can't exit before the transaction completes.
-                    TransactionContext.GetTransactionInfo().IsAborted = true;
-                    if (startNewTransaction)
+                    try
                     {
-                        this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
-                    }
- 
+                        transactionInfo.ReconcilePending();
+                        transactionException = transactionInfo.MustAbort(serializationManager);
 
-                    if (message.Direction != Message.Directions.OneWay)
+                        // This request started the transaction, so we try to commit before returning,
+                        // or if it must abort, tell participants that it aborted
+                        if (startNewTransaction)
+                        {
+                            try
+                            {
+                                if (transactionException == null)
+                                {
+                                    var status = await this.transactionAgent.Resolve(transactionInfo);
+                                    if (status != TransactionalStatus.Ok)
+                                    {
+                                        transactionException = status.ConvertToUserException(transactionInfo.Id);
+                                    }
+                                }
+                                else
+                                {
+                                    await this.transactionAgent.Abort(transactionInfo);
+                                }
+                            }
+                            finally
+                            {
+                                TransactionContext.Clear();
+                            }
+                        }
+                    }
+                    catch (Exception e)
                     {
-                        SafeSendExceptionResponse(message, abortException);
+                        // we should never hit this, but if we do, the following message will help us diagnose
+                        this.logger.LogError(e, "Error in transaction post-grain-method-invocation code");
+                        throw;
                     }
-
-                    return;
                 }
 
-                if (startNewTransaction)
+                if (message.Direction != Message.Directions.OneWay)
                 {
-                    // This request started the transaction, so we try to commit before returning.
-                    await this.transactionAgent.Value.Commit(transactionInfo);
+                    if (transactionException != null)
+                    {
+                        SafeSendExceptionResponse(message, transactionException);
+                    }
+                    else
+                    {
+                        SafeSendResponse(message, resultObject);
+                    }
                 }
-
-                if (message.Direction == Message.Directions.OneWay) return;
-
-                SafeSendResponse(message, resultObject);
+                return;
             }
             catch (Exception exc2)
             {
-                logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: " + message, exc2);
+                this.logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: " + message, exc2);
+
+                TransactionContext.Clear();
+
                 if (message.Direction != Message.Directions.OneWay)
                     SafeSendExceptionResponse(message, exc2);
-
-                if (exc2 is OrleansTransactionInDoubtException)
-                {
-                    // TODO: log an error message?
-                }
-                else if (TransactionContext.GetTransactionInfo() != null)
-                {
-                    // Must abort the transaction on exceptions
-                    TransactionContext.GetTransactionInfo().IsAborted = true;
-                    var abortException = (exc2 as OrleansTransactionAbortedException) ?? 
-                        new OrleansTransactionAbortedException(TransactionContext.GetTransactionInfo().TransactionId, exc2);
-                    this.transactionAgent.Value.Abort(TransactionContext.GetTransactionInfo(), abortException);
-                }
             }
             finally
             {
-                TransactionContext.Clear();
+                RequestContext.Clear();
             }
+        }
+
+        private bool TryInstallExtension(int interfaceId, IInvokable invokable, string genericGrainType, ref IGrainMethodInvoker invoker)
+        {
+            IGrainExtension extension = RuntimeContext.CurrentGrainContext is ActivationData activationData
+                ? activationData.ActivationServices.GetServiceByKey<int, IGrainExtension>(interfaceId)
+                : this.ServiceProvider.GetServiceByKey<int, IGrainExtension>(interfaceId);
+
+            if (extension == null)
+            {
+                return false;
+            }
+
+            if (!TryAddExtension(extension))
+            {
+                return false;
+            }
+
+            // Get the newly installed invoker for the grain extension.
+            invoker = invokable.GetInvoker(typeManager, interfaceId, genericGrainType);
+            return true;
         }
 
         private void SafeSendResponse(Message message, object resultObject)
         {
             try
             {
-                SendResponse(message, new Response(SerializationManager.DeepCopy(resultObject)));
+                SendResponse(message, new Response(this.serializationManager.DeepCopy(resultObject)));
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.IGC_SendResponseFailed,
+                this.logger.Warn(ErrorCode.IGC_SendResponseFailed,
                     "Exception trying to send a response: " + exc.Message, exc);
                 SendResponse(message, Response.ExceptionResponse(exc));
             }
@@ -500,7 +521,7 @@ namespace Orleans.Runtime
                 "PrepForRemoting",
                 typeof(Exception),
                 new[] { typeof(Exception) },
-                typeof(SerializationManager).GetTypeInfo().Module,
+                typeof(SerializationManager).Module,
                 true);
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);
@@ -525,20 +546,20 @@ namespace Orleans.Runtime
         {
             try
             {
-                var copiedException = PrepareForRemoting((Exception)SerializationManager.DeepCopy(ex));
+                var copiedException = PrepareForRemoting((Exception)this.serializationManager.DeepCopy(ex));
                 SendResponse(message, Response.ExceptionResponse(copiedException));
             }
             catch (Exception exc1)
             {
                 try
                 {
-                    logger.Warn(ErrorCode.IGC_SendExceptionResponseFailed,
+                    this.logger.Warn(ErrorCode.IGC_SendExceptionResponseFailed,
                         "Exception trying to send an exception response: " + exc1.Message, exc1);
                     SendResponse(message, Response.ExceptionResponse(exc1));
                 }
                 catch (Exception exc2)
                 {
-                    logger.Warn(ErrorCode.IGC_UnhandledExceptionInInvoke,
+                    this.logger.Warn(ErrorCode.IGC_UnhandledExceptionInInvoke,
                         "Exception trying to send an exception. Ignoring and not trying to send again. Exc: " + exc2.Message, exc2);
                 }
             }
@@ -564,17 +585,18 @@ namespace Orleans.Runtime
 
         public void ReceiveResponse(Message message)
         {
+            OrleansInsideRuntimeClientEvent.Log.ReceiveResponse(message);
             if (message.Result == Message.ResponseTypes.Rejection)
             {
-                if (!message.TargetSilo.Matches(this.CurrentSilo))
+                if (!message.TargetSilo.Matches(this.MySilo))
                 {
                     // gatewayed message - gateway back to sender
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
+                    if (logger.IsEnabled(LogLevel.Trace)) this.logger.Trace(ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {0}", message);
                     this.Dispatcher.Transport.SendMessage(message);
                     return;
                 }
 
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_HandleMsg, "HandleMessage {0}", message);
+                if (logger.IsEnabled(LogLevel.Debug)) this.logger.Debug(ErrorCode.Dispatcher_HandleMsg, "HandleMessage {0}", message);
                 switch (message.RejectionType)
                 {
                     case Message.RejectionTypes.DuplicateRequest:
@@ -595,15 +617,18 @@ namespace Orleans.Runtime
                         }
                         break;
 
+                    case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
+                        // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
+                        return;
                     default:
-                        logger.Error(ErrorCode.Dispatcher_InvalidEnum_RejectionType,
+                        this.logger.Error(ErrorCode.Dispatcher_InvalidEnum_RejectionType,
                             "Missing enum in switch: " + message.RejectionType);
                         break;
                 }
             }
 
             CallbackData callbackData;
-            bool found = callbacks.TryGetValue(message.Id, out callbackData);
+            bool found = callbacks.TryRemove(message.Id, out callbackData);
             if (found)
             {
                 if (message.TransactionInfo != null)
@@ -617,64 +642,39 @@ namespace Orleans.Runtime
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Dispatcher_NoCallbackForResp,
+                if (logger.IsEnabled(LogLevel.Debug)) this.logger.Debug(ErrorCode.Dispatcher_NoCallbackForResp,
                     "No callback for response message: " + message);
             }
         }
 
-        public string CurrentActivationIdentity
-        {
-            get
-            {
-                var currentActivation = this.GetCurrentActivationData();
-                return currentActivation.Address.ToString();
-            }
-        }
-
-        public IActivationData CurrentActivationData
-        {
-            get
-            {
-                if (RuntimeContext.Current == null) return null;
-
-                SchedulingContext context = RuntimeContext.Current.ActivationContext as SchedulingContext;
-                if (context != null && context.Activation != null)
-                {
-                    return context.Activation;
-                }
-                return null;
-            }
-        }
-
-        public SiloAddress CurrentSilo
-        {
-            get { return MySilo; }
-        }
-        
+        public string CurrentActivationIdentity => RuntimeContext.CurrentGrainContext?.Address.ToString() ?? this.HostedClient.ToString();
 
         public void Reset(bool cleanup)
         {
-            throw new InvalidOperationException();
         }
 
-        public TimeSpan GetResponseTimeout()
-        {
-            return ResponseTimeout;
-        }
+        /// <inheritdoc />
+        public TimeSpan GetResponseTimeout() => this.sharedCallbackData.ResponseTimeout;
 
-        public void SetResponseTimeout(TimeSpan timeout)
-        {
-            ResponseTimeout = timeout;
-        }
+        /// <inheritdoc />
+        public void SetResponseTimeout(TimeSpan timeout) => this.sharedCallbackData.ResponseTimeout = timeout;
 
         public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
+            if (RuntimeContext.CurrentGrainContext is null) return this.HostedClient.CreateObjectReference(obj, invoker);
             throw new InvalidOperationException("Cannot create a local object reference from a grain.");
         }
 
         public void DeleteObjectReference(IAddressable obj)
         {
-            throw new InvalidOperationException("Cannot delete a local object reference from a grain.");
+            if (RuntimeContext.CurrentGrainContext is null)
+            {
+                this.HostedClient.DeleteObjectReference(obj);
+            }
+            else
+            {
+                throw new InvalidOperationException("Cannot delete a local object reference from a grain.");
+            }
         }
 
         public void DeactivateOnIdle(ActivationId id)
@@ -686,9 +686,7 @@ namespace Orleans.Runtime
             Catalog.DeactivateActivationOnIdle(data);
         }
 
-        #endregion
-
-        internal void Stop()
+        private Task OnRuntimeInitializeStop(CancellationToken tc)
         {
             lock (disposables)
             {
@@ -696,23 +694,34 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        disposable.Dispose();
+                        disposable?.Dispose();
                     }
                     catch (Exception e)
                     {
-                        logger.Warn(ErrorCode.IGC_DisposeError, "Exception while disposing: " + e.Message, e);
+                        this.logger.Warn(ErrorCode.IGC_DisposeError, "Exception while disposing: " + e.Message, e);
                     }
                 }
             }
+            return Task.CompletedTask;
         }
 
-        internal void Start()
+        private Task OnRuntimeInitializeStart(CancellationToken tc)
         {
-            GrainTypeResolver = typeManager.GetTypeCodeMap();
+            var stopWatch = Stopwatch.StartNew();
+            this.serializationManager = this.ServiceProvider.GetRequiredService<SerializationManager>();
+            var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
+            var minTicks = Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
+            var period = TimeSpan.FromTicks(minTicks);
+            this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
+            this.disposables.Add(this.callbackTimer);
+
+            typeManager.Start();
+            stopWatch.Stop();
+            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
+            return Task.CompletedTask;
         }
 
-        public IGrainTypeResolver GrainTypeResolver { get; private set; }
-
+        public IGrainTypeResolver GrainTypeResolver => typeManager.GrainTypeResolver;
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {
@@ -727,23 +736,31 @@ namespace Orleans.Runtime
 
         public StreamDirectory GetStreamDirectory()
         {
-            var currentActivation = GetCurrentActivationData();
-            return currentActivation.GetStreamDirectory();
+            if (RuntimeContext.CurrentGrainContext is ActivationData activation)
+            {
+                return activation.GetStreamDirectory();
+            }
+
+            return this.HostedClient.StreamDirectory;
         }
 
         public Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : IGrainExtension
             where TExtensionInterface : IGrainExtension
         {
-            TExtension extension;
-            if (!TryGetExtensionHandler(out extension))
+            if (RuntimeContext.CurrentGrainContext is null)
+            {
+                return this.HostedClient.BindExtension<TExtension, TExtensionInterface>(newExtensionFunc);
+            }
+
+            if (!TryGetExtensionHandler(out TExtension extension))
             {
                 extension = newExtensionFunc();
                 if (!TryAddExtension(extension))
                     throw new OrleansException("Failed to register " + typeof(TExtension).Name);
             }
 
-            IAddressable currentGrain = this.CurrentActivationData.GrainInstance;
+            IAddressable currentGrain = RuntimeContext.CurrentGrainContext?.GrainInstance;
             var currentTypedGrain = currentGrain.AsReference<TExtensionInterface>();
 
             return Task.FromResult(Tuple.Create(extension, currentTypedGrain));
@@ -751,25 +768,24 @@ namespace Orleans.Runtime
 
         public bool TryAddExtension(IGrainExtension handler)
         {
-            var currentActivation = GetCurrentActivationData();
-            var invoker = TryGetExtensionInvoker(this.typeManager, handler.GetType());
-            if (invoker == null)
+            ExtensionInvoker extensionInvoker = GetCurrentExtensionInvoker();
+            var methodInvoker = TryGetExtensionMethodInvoker(this.typeManager, handler.GetType());
+            if (methodInvoker == null)
                 throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
 
-            return currentActivation.TryAddExtension(invoker, handler);
+            return extensionInvoker.TryAddExtension(methodInvoker, handler);
         }
 
         public void RemoveExtension(IGrainExtension handler)
         {
-            var currentActivation = GetCurrentActivationData();
-            currentActivation.RemoveExtension(handler);
+            GetCurrentExtensionInvoker().Remove(handler);
         }
 
         public bool TryGetExtensionHandler<TExtension>(out TExtension result) where TExtension : IGrainExtension
         {
-            var currentActivation = GetCurrentActivationData();
+            ExtensionInvoker invoker = GetCurrentExtensionInvoker();
             IGrainExtension untypedResult;
-            if (currentActivation.TryGetExtensionHandler(typeof(TExtension), out untypedResult))
+            if (invoker.TryGetExtensionHandler(typeof(TExtension), out untypedResult))
             {
                 result = (TExtension)untypedResult;
                 return true;
@@ -779,15 +795,17 @@ namespace Orleans.Runtime
             return false;
         }
 
-        private ActivationData GetCurrentActivationData()
+        private ExtensionInvoker GetCurrentExtensionInvoker()
         {
-            var activationData = this.CurrentActivationData;
-            if (activationData == null)
-                throw new InvalidOperationException("Attempting to GetCurrentActivationData when not in an activation scope");
-            return (ActivationData)activationData;
+            return RuntimeContext.CurrentGrainContext switch
+            {
+                SystemTarget systemTarget => systemTarget.ExtensionInvoker,
+                ActivationData activation => activation.ExtensionInvoker,
+                _ => throw new InvalidOperationException("Attempting to GetCurrentExtensionInvoker when not in an activation scope")
+            };
         }
 
-        internal static IGrainExtensionMethodInvoker TryGetExtensionInvoker(GrainTypeManager typeManager, Type handlerType)
+        internal static IGrainExtensionMethodInvoker TryGetExtensionMethodInvoker(GrainTypeManager typeManager, Type handlerType)
         {
             var interfaces = GrainInterfaceUtils.GetRemoteInterfaces(handlerType).Values;
             if (interfaces.Count != 1)
@@ -801,6 +819,23 @@ namespace Orleans.Runtime
             throw new ArgumentException(
                 $"Provider extension handler type {handlerType} was not found in the type manager",
                 nameof(handlerType));
+        }
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
+        }
+
+        private void OnCallbackExpiryTick(object state)
+        {
+            var currentStopwatchTicks = Stopwatch.GetTimestamp();
+            var responseTimeout = this.messagingOptions.ResponseTimeout;
+            foreach (var pair in callbacks)
+            {
+                var callback = pair.Value;
+                if (callback.IsCompleted) continue;
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(responseTimeout);
+            }
         }
     }
 }

@@ -1,8 +1,8 @@
-﻿using Orleans.Versions.Compatibility;
+using Orleans.Versions.Compatibility;
 
 namespace Orleans.Runtime.Versions.Compatibility
 {
-    internal class BackwardCompatilityDirector : ICompatibilityDirector<BackwardCompatible>
+    internal class BackwardCompatilityDirector : ICompatibilityDirector
     {
         public bool IsCompatible(ushort requestedVersion, ushort currentVersion)
         {

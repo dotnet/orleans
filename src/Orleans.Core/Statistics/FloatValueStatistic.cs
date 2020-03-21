@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace Orleans.Runtime
 {
-    internal class FloatValueStatistic : ICounter<float>
+    public class FloatValueStatistic : ICounter<float>
     {
         private static readonly Dictionary<string, FloatValueStatistic> registeredStatistics;
         private static readonly object lockable;
@@ -158,7 +158,9 @@ namespace Orleans.Runtime
 
         public void TrackMetric(ITelemetryProducer telemetryProducer)
         {
-            telemetryProducer.TrackMetric(currentName, GetCurrentValue());
+            var rawValue = GetCurrentValue();
+            var value = valueConverter?.Invoke(rawValue) ?? rawValue;
+            telemetryProducer.TrackMetric(currentName, value);
             // TODO: track delta, when we figure out how to calculate them accurately
         }
     }

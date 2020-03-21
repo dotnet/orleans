@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,7 +26,6 @@ namespace Orleans.Providers.Streams.Common
             this.LogProperties = new Dictionary<string, string>
             {
                 {"BlockPoolId", dimensions.BlockPoolId},
-                {"HostName", dimensions.NodeConfig.HostNameOrIPAddress }
             };
         }
         /// <inheritdoc />

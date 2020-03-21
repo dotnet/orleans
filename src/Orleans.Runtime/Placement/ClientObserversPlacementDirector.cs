@@ -1,5 +1,6 @@
 using Orleans.GrainDirectory;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Placement
@@ -16,7 +17,7 @@ namespace Orleans.Runtime.Placement
         {
             // no need to check if we can find an activation for this client in the cache or local directory partition
             // as TrySelectActivationSynchronously which checks for that should have been called before 
-            AddressesAndTag addresses;
+            List<ActivationAddress> addresses;
 
             // we need to look up the directory entry for this grain on a remote silo
             switch (target.Category)
@@ -24,16 +25,8 @@ namespace Orleans.Runtime.Placement
                 case UniqueKey.Category.Client:
                     {
                         addresses = await context.FullLookup(target);
-                        return ChooseRandomActivation(addresses.Addresses, context);
+                        return ChooseRandomActivation(addresses, context);
                     }
-
-                case UniqueKey.Category.GeoClient:
-                    {
-                        // we need to look up the activations in the remote cluster
-                        addresses = await context.LookupInCluster(target, target.Key.ClusterId);
-                        return ChooseRandomActivation(addresses.Addresses, context);
-                    }
-
                 default:
                     throw new InvalidOperationException("Unsupported client type. Grain " + target);
             }

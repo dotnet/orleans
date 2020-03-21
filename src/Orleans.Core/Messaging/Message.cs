@@ -2,18 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Orleans.CodeGeneration;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.Transactions;
 
 namespace Orleans.Runtime
 {
-    internal class Message : IOutgoingMessage
+    internal class Message
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
-
-        #region metadata
 
         [NonSerialized]
         private string _targetHistory;
@@ -22,10 +19,7 @@ namespace Orleans.Runtime
         private DateTime? _queuedTime;
 
         [NonSerialized]
-        private int? _retryCount;
-
-        [NonSerialized]
-        private int? _maxRetries;
+        private int _retryCount;
 
         public string TargetHistory
         {
@@ -33,36 +27,18 @@ namespace Orleans.Runtime
             set { _targetHistory = value; }
         }
 
-        
         public DateTime? QueuedTime
         {
             get { return _queuedTime; }
             set { _queuedTime = value; }
         }
 
-        public int? RetryCount
+        public int RetryCount
         {
             get { return _retryCount; }
             set { _retryCount = value; }
         }
-
-        public int? MaxRetries
-        {
-            get { return _maxRetries; }
-            set { _maxRetries = value; }
-        }
-
-        #endregion
-
-        /// <summary>
-        /// NOTE: The contents of bodyBytes should never be modified
-        /// </summary>
-        private List<ArraySegment<byte>> bodyBytes;
-
-        private List<ArraySegment<byte>> headerBytes;
-
-        private object bodyObject;
-
+        
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
@@ -99,6 +75,7 @@ namespace Orleans.Runtime
             DuplicateRequest,
             Unrecoverable,
             GatewayTooBusy,
+            CacheInvalidation
         }
 
         internal HeadersContainer Headers { get; set; } = new HeadersContainer();
@@ -151,12 +128,6 @@ namespace Orleans.Runtime
         {
             get { return Headers.Id; }
             set { Headers.Id = value; }
-        }
-
-        public int ResendCount
-        {
-            get { return Headers.ResendCount; }
-            set {  Headers.ResendCount = value; }
         }
 
         public int ForwardCount
@@ -247,6 +218,17 @@ namespace Orleans.Runtime
             }
         }
 
+        public CorrelationId CallChainId
+        {
+            get { return Headers.CallChainId; }
+            set { Headers.CallChainId = value; }
+        }
+        
+        public TraceContext TraceContext {
+            get { return Headers.TraceContext; }
+            set { Headers.TraceContext = value; }
+        }
+
         public ActivationAddress SendingAddress
         {
             get { return sendingAddress ?? (sendingAddress = ActivationAddress.GetAddress(SendingSilo, SendingGrain, SendingActivation)); }
@@ -308,19 +290,13 @@ namespace Orleans.Runtime
             if (id == null) return false;
 
             // don't set expiration for one way, system target and system grain messages.
-            return Direction != Directions.OneWay && !id.IsSystemTarget && !Constants.IsSystemGrain(id);
+            return Direction != Directions.OneWay && !id.IsSystemTarget;
         }
 
-        public TransactionInfo TransactionInfo
+        public ITransactionInfo TransactionInfo
         {
             get { return Headers.TransactionInfo; }
             set { Headers.TransactionInfo = value; }
-        }
-
-        public string DebugContext
-        {
-            get { return GetNotNullString(Headers.DebugContext); }
-            set { Headers.DebugContext = value; }
         }
 
         public List<ActivationAddress> CacheInvalidationHeader
@@ -328,6 +304,9 @@ namespace Orleans.Runtime
             get { return Headers.CacheInvalidationHeader; }
             set { Headers.CacheInvalidationHeader = value; }
         }
+
+        public bool HasCacheInvalidationHeader => this.CacheInvalidationHeader != null
+                                                  && this.CacheInvalidationHeader.Count > 0;
         
         internal void AddToCacheInvalidationHeader(ActivationAddress address)
         {
@@ -340,20 +319,7 @@ namespace Orleans.Runtime
             list.Add(address);
             CacheInvalidationHeader = list;
         }
-
-        // Resends are used by the sender, usualy due to en error to send or due to a transient rejection.
-        public bool MayResend(int maxResendCount)
-        {
-            return ResendCount < maxResendCount;
-        }
-
-        // Forwardings are used by the receiver, usualy when it cannot process the message and forwars it to another silo to perform the processing
-        // (got here due to outdated cache, silo is shutting down/overloaded, ...).
-        public bool MayForward(GlobalConfiguration config)
-        {
-            return ForwardCount < config.MaxForwardCount;
-        }
-
+        
         /// <summary>
         /// Set by sender's placement logic when NewPlacementRequested is true
         /// so that receiver knows desired grain type
@@ -391,76 +357,7 @@ namespace Orleans.Runtime
             set { Headers.RequestContextData = value; }
         }
 
-        public object GetDeserializedBody(SerializationManager serializationManager)
-        {
-            if (this.bodyObject != null) return this.bodyObject;
-            
-            try
-            {
-                this.bodyObject = DeserializeBody(serializationManager, this.bodyBytes);
-            }
-            finally
-            {
-                if (this.bodyBytes != null)
-                {
-                    BufferPool.GlobalPool.Release(bodyBytes);
-                    this.bodyBytes = null;
-                }
-            }
-
-            return this.bodyObject;
-        }
-
-        public object BodyObject
-        {
-            set
-            {
-                bodyObject = value;
-                if (bodyBytes == null) return;
-
-                BufferPool.GlobalPool.Release(bodyBytes);
-                bodyBytes = null;
-            }
-        }
-
-        private static object DeserializeBody(SerializationManager serializationManager, List<ArraySegment<byte>> bytes)
-        {
-            if (bytes == null)
-            {
-                return null;
-            }
-
-            var stream = new BinaryTokenStreamReader(bytes);
-            return serializationManager.Deserialize(stream);
-        }
-
-        public Message()
-        {
-            bodyObject = null;
-            bodyBytes = null;
-            headerBytes = null;
-        }
-        
-        /// <summary>
-        /// Clears the current body and sets the serialized body contents to the provided value.
-        /// </summary>
-        /// <param name="body">The serialized body contents.</param>
-        public void SetBodyBytes(List<ArraySegment<byte>> body)
-        {
-            // Dispose of the current body.
-            this.BodyObject = null;
-            this.bodyBytes = body;
-        }
-
-        /// <summary>
-        /// Deserializes the provided value into this instance's <see cref="BodyObject"/>.
-        /// </summary>
-        /// <param name="serializationManager">The serialization manager.</param>
-        /// <param name="body">The serialized body contents.</param>
-        public void DeserializeBodyObject(SerializationManager serializationManager, List<ArraySegment<byte>> body)
-        {
-            this.BodyObject = DeserializeBody(serializationManager, body);
-        }
+        public object BodyObject { get; set; }
 
         public void ClearTargetAddress()
         {
@@ -481,84 +378,11 @@ namespace Orleans.Runtime
         {
             return Equals(SendingSilo, other.SendingSilo) && Equals(Id, other.Id);
         }
-
-        #region Serialization
-
-        public List<ArraySegment<byte>> Serialize(SerializationManager serializationManager, out int headerLengthOut, out int bodyLengthOut)
-        {
-            var context = new SerializationContext(serializationManager)
-            {
-                StreamWriter = new BinaryTokenStreamWriter()
-            };
-            SerializationManager.SerializeMessageHeaders(Headers, context);
-
-            if (bodyBytes == null)
-            {
-                var bodyStream = new BinaryTokenStreamWriter();
-                serializationManager.Serialize(bodyObject, bodyStream);
-                // We don't bother to turn this into a byte array and save it in bodyBytes because Serialize only gets called on a message
-                // being sent off-box. In this case, the likelihood of needed to re-serialize is very low, and the cost of capturing the
-                // serialized bytes from the steam -- where they're a list of ArraySegment objects -- into an array of bytes is actually
-                // pretty high (an array allocation plus a bunch of copying).
-                bodyBytes = bodyStream.ToBytes();
-            }
-
-            if (headerBytes != null)
-            {
-                BufferPool.GlobalPool.Release(headerBytes);
-            }
-            headerBytes = context.StreamWriter.ToBytes();
-            int headerLength = context.StreamWriter.CurrentOffset;
-            int bodyLength = BufferLength(bodyBytes);
-
-            var bytes = new List<ArraySegment<byte>>();
-            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(headerLength)));
-            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(bodyLength)));
-           
-            bytes.AddRange(headerBytes);
-            bytes.AddRange(bodyBytes);
-
-            headerLengthOut = headerLength;
-            bodyLengthOut = bodyLength;
-            return bytes;
-        }
-
-
-        public void ReleaseBodyAndHeaderBuffers()
-        {
-            ReleaseHeadersOnly();
-            ReleaseBodyOnly();
-        }
-
-        public void ReleaseHeadersOnly()
-        {
-            if (headerBytes == null) return;
-
-            BufferPool.GlobalPool.Release(headerBytes);
-            headerBytes = null;
-        }
-
-        public void ReleaseBodyOnly()
-        {
-            if (bodyBytes == null) return;
-
-            BufferPool.GlobalPool.Release(bodyBytes);
-            bodyBytes = null;
-        }
-
-        #endregion
-
+                
         // For testing and logging/tracing
         public string ToLongString()
         {
             var sb = new StringBuilder();
-
-            string debugContex = DebugContext;
-            if (!string.IsNullOrEmpty(debugContex))
-            {
-                // if DebugContex is present, print it first.
-                sb.Append(debugContex).Append(".");
-            }
 
             AppendIfExists(HeadersContainer.Headers.CACHE_INVALIDATION_HEADER, sb, (m) => m.CacheInvalidationHeader);
             AppendIfExists(HeadersContainer.Headers.CATEGORY, sb, (m) => m.Category);
@@ -569,14 +393,13 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.CORRELATION_ID, sb, (m) => m.Id);
             AppendIfExists(HeadersContainer.Headers.ALWAYS_INTERLEAVE, sb, (m) => m.IsAlwaysInterleave);
             AppendIfExists(HeadersContainer.Headers.IS_NEW_PLACEMENT, sb, (m) => m.IsNewPlacement);
+            AppendIfExists(HeadersContainer.Headers.IS_RETURNED_FROM_REMOTE_CLUSTER, sb, (m) => m.IsReturnedFromRemoteCluster);
             AppendIfExists(HeadersContainer.Headers.READ_ONLY, sb, (m) => m.IsReadOnly);
             AppendIfExists(HeadersContainer.Headers.IS_UNORDERED, sb, (m) => m.IsUnordered);
-            AppendIfExists(HeadersContainer.Headers.IS_RETURNED_FROM_REMOTE_CLUSTER, sb, (m) => m.IsReturnedFromRemoteCluster);
             AppendIfExists(HeadersContainer.Headers.NEW_GRAIN_TYPE, sb, (m) => m.NewGrainType);
             AppendIfExists(HeadersContainer.Headers.REJECTION_INFO, sb, (m) => m.RejectionInfo);
             AppendIfExists(HeadersContainer.Headers.REJECTION_TYPE, sb, (m) => m.RejectionType);
             AppendIfExists(HeadersContainer.Headers.REQUEST_CONTEXT, sb, (m) => m.RequestContextData);
-            AppendIfExists(HeadersContainer.Headers.RESEND_COUNT, sb, (m) => m.ResendCount);
             AppendIfExists(HeadersContainer.Headers.RESULT, sb, (m) => m.Result);
             AppendIfExists(HeadersContainer.Headers.SENDING_ACTIVATION, sb, (m) => m.SendingActivation);
             AppendIfExists(HeadersContainer.Headers.SENDING_GRAIN, sb, (m) => m.SendingGrain);
@@ -584,6 +407,8 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.TARGET_ACTIVATION, sb, (m) => m.TargetActivation);
             AppendIfExists(HeadersContainer.Headers.TARGET_GRAIN, sb, (m) => m.TargetGrain);
             AppendIfExists(HeadersContainer.Headers.TARGET_OBSERVER, sb, (m) => m.TargetObserverId);
+            AppendIfExists(HeadersContainer.Headers.CALL_CHAIN_ID, sb, (m) => m.CallChainId);
+            AppendIfExists(HeadersContainer.Headers.TRACE_CONTEXT, sb, (m) => m.TraceContext);
             AppendIfExists(HeadersContainer.Headers.TARGET_SILO, sb, (m) => m.TargetSilo);
 
             return sb.ToString();
@@ -618,7 +443,7 @@ namespace Orleans.Runtime
                         break;
                 }
             }
-            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}{9}: {10}",
+            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}",
                 IsReadOnly ? "ReadOnly " : "", //0
                 IsAlwaysInterleave ? "IsAlwaysInterleave " : "", //1
                 IsNewPlacement ? "NewPlacement " : "", // 2
@@ -627,9 +452,7 @@ namespace Orleans.Runtime
                 String.Format("{0}{1}{2}", SendingSilo, SendingGrain, SendingActivation), //5
                 String.Format("{0}{1}{2}{3}", TargetSilo, TargetGrain, TargetActivation, TargetObserverId), //6
                 Id, //7
-                ResendCount > 0 ? "[ResendCount=" + ResendCount + "]" : "", //8
-                ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "", //9
-                DebugContext); //10
+                ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : ""); //8
         }
 
         internal void SetTargetPlacement(PlacementResult value)
@@ -669,12 +492,6 @@ namespace Orleans.Runtime
             return history.ToString();
         }
 
-        public bool IsSameDestination(IOutgoingMessage other)
-        {
-            var msg = (Message)other;
-            return msg != null && Object.Equals(TargetSilo, msg.TargetSilo);
-        }
-
         // For statistical measuring of time spent in queues.
         private ITimeInterval timeInterval;
 
@@ -710,12 +527,6 @@ namespace Orleans.Runtime
             };
         }
 
-        internal void DropExpiredMessage(MessagingStatisticsGroup.Phase phase)
-        {
-            MessagingStatisticsGroup.OnMessageExpired(phase);
-            ReleaseBodyAndHeaderBuffers();
-        }
-
         private static int BufferLength(List<ArraySegment<byte>> buffer)
         {
             var result = 0;
@@ -738,7 +549,7 @@ namespace Orleans.Runtime
                 CACHE_INVALIDATION_HEADER = 1 << 1,
                 CATEGORY = 1 << 2,
                 CORRELATION_ID = 1 << 3,
-                DEBUG_CONTEXT = 1 << 4,
+                DEBUG_CONTEXT = 1 << 4, // No longer used
                 DIRECTION = 1 << 5,
                 TIME_TO_LIVE = 1 << 6,
                 FORWARD_COUNT = 1 << 7,
@@ -748,7 +559,7 @@ namespace Orleans.Runtime
                 REJECTION_INFO = 1 << 11,
                 REJECTION_TYPE = 1 << 12,
                 READ_ONLY = 1 << 13,
-                RESEND_COUNT = 1 << 14,
+                RESEND_COUNT = 1 << 14, // Support removed. Value retained for backwards compatibility.
                 SENDING_ACTIVATION = 1 << 15,
                 SENDING_GRAIN = 1 <<16,
                 SENDING_SILO = 1 << 17,
@@ -767,6 +578,9 @@ namespace Orleans.Runtime
                 TRANSACTION_INFO = 1 << 27,
                 IS_TRANSACTION_REQUIRED = 1 << 28,
 
+                CALL_CHAIN_ID = 1 << 29,
+
+                TRACE_CONTEXT = 1 << 30
                 // Do not add over int.MaxValue of these.
             }
 
@@ -778,7 +592,6 @@ namespace Orleans.Runtime
             private bool _isReturnedFromRemoteCluster;
             private bool _isTransactionRequired;
             private CorrelationId _id;
-            private int _resendCount;
             private int _forwardCount;
             private SiloAddress _targetSilo;
             private GrainId _targetGrain;
@@ -790,20 +603,27 @@ namespace Orleans.Runtime
             private bool _isNewPlacement;
             private bool _isUsingIfaceVersion;
             private ResponseTypes _result;
-            private TransactionInfo _transactionInfo;
+            private ITransactionInfo _transactionInfo;
             private TimeSpan? _timeToLive;
-            private string _debugContext;
             private List<ActivationAddress> _cacheInvalidationHeader;
             private string _newGrainType;
             private string _genericGrainType;
             private RejectionTypes _rejectionType;
             private string _rejectionInfo;
             private Dictionary<string, object> _requestContextData;
+            private CorrelationId _callChainId;
             private readonly DateTime _localCreationTime;
+            private TraceContext traceContext;
 
             public HeadersContainer()
             {
                 _localCreationTime = DateTime.UtcNow;
+            }
+
+            public TraceContext TraceContext
+            {
+                get { return traceContext; }
+                set { traceContext = value; }
             }
 
             public Categories Category
@@ -875,15 +695,6 @@ namespace Orleans.Runtime
                 set
                 {
                     _id = value;
-                }
-            }
-
-            public int ResendCount
-            {
-                get { return _resendCount; }
-                set
-                {
-                    _resendCount = value;
                 }
             }
 
@@ -986,7 +797,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            public TransactionInfo TransactionInfo
+            public ITransactionInfo TransactionInfo
             {
                 get { return _transactionInfo; }
                 set
@@ -1004,16 +815,6 @@ namespace Orleans.Runtime
                 set
                 {
                     _timeToLive = value;
-                }
-            }
-
-
-            public string DebugContext
-            {
-                get { return _debugContext; }
-                set
-                {
-                    _debugContext = value;
                 }
             }
 
@@ -1078,6 +879,15 @@ namespace Orleans.Runtime
                 }
             }
 
+            public CorrelationId CallChainId
+            {
+                get { return _callChainId; }
+                set
+                {
+                    _callChainId = value;
+                }
+            }
+
             internal Headers GetHeadersMask()
             {
                 Headers headers = Headers.NONE;
@@ -1094,8 +904,6 @@ namespace Orleans.Runtime
 
                 headers = _id == null ? headers & ~Headers.CORRELATION_ID : headers | Headers.CORRELATION_ID;
 
-                if (_resendCount != default(int))
-                    headers = headers | Headers.RESEND_COUNT;
                 if(_forwardCount != default (int))
                     headers = headers | Headers.FORWARD_COUNT;
 
@@ -1107,16 +915,18 @@ namespace Orleans.Runtime
                 headers = _sendingGrain == null ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
                 headers = _sendingActivation == null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
                 headers = _isNewPlacement == default(bool) ? headers & ~Headers.IS_NEW_PLACEMENT : headers | Headers.IS_NEW_PLACEMENT;
+                headers = _isReturnedFromRemoteCluster == default(bool) ? headers & ~Headers.IS_RETURNED_FROM_REMOTE_CLUSTER : headers | Headers.IS_RETURNED_FROM_REMOTE_CLUSTER;
                 headers = _isUsingIfaceVersion == default(bool) ? headers & ~Headers.IS_USING_INTERFACE_VERSION : headers | Headers.IS_USING_INTERFACE_VERSION;
                 headers = _result == default(ResponseTypes)? headers & ~Headers.RESULT : headers | Headers.RESULT;
                 headers = _timeToLive == null ? headers & ~Headers.TIME_TO_LIVE : headers | Headers.TIME_TO_LIVE;
-                headers = string.IsNullOrEmpty(_debugContext) ? headers & ~Headers.DEBUG_CONTEXT : headers | Headers.DEBUG_CONTEXT;
                 headers = _cacheInvalidationHeader == null || _cacheInvalidationHeader.Count == 0 ? headers & ~Headers.CACHE_INVALIDATION_HEADER : headers | Headers.CACHE_INVALIDATION_HEADER;
                 headers = string.IsNullOrEmpty(_newGrainType) ? headers & ~Headers.NEW_GRAIN_TYPE : headers | Headers.NEW_GRAIN_TYPE;
                 headers = string.IsNullOrEmpty(GenericGrainType) ? headers & ~Headers.GENERIC_GRAIN_TYPE : headers | Headers.GENERIC_GRAIN_TYPE;
                 headers = _rejectionType == default(RejectionTypes) ? headers & ~Headers.REJECTION_TYPE : headers | Headers.REJECTION_TYPE;
                 headers = string.IsNullOrEmpty(_rejectionInfo) ? headers & ~Headers.REJECTION_INFO : headers | Headers.REJECTION_INFO;
                 headers = _requestContextData == null || _requestContextData.Count == 0 ? headers & ~Headers.REQUEST_CONTEXT : headers | Headers.REQUEST_CONTEXT;
+                headers = _callChainId == null ? headers & ~Headers.CALL_CHAIN_ID : headers | Headers.CALL_CHAIN_ID;
+                headers = traceContext == null? headers & ~Headers.TRACE_CONTEXT : headers | Headers.TRACE_CONTEXT;
                 headers = IsTransactionRequired ? headers | Headers.IS_TRANSACTION_REQUIRED : headers & ~Headers.IS_TRANSACTION_REQUIRED;
                 headers = _transactionInfo == null ? headers & ~Headers.TRANSACTION_INFO : headers | Headers.TRANSACTION_INFO;
                 return headers;
@@ -1132,6 +942,7 @@ namespace Orleans.Runtime
             public static void Serializer(object untypedInput, ISerializationContext context, Type expected)
             {
                 HeadersContainer input = (HeadersContainer)untypedInput;
+                var sm = context.GetSerializationManager();
                 var headers = input.GetHeadersMask();
                 var writer = context.StreamWriter;
                 writer.Write((int)headers);
@@ -1141,7 +952,7 @@ namespace Orleans.Runtime
                     writer.Write(input.CacheInvalidationHeader.Count);
                     for (int i = 0; i < count; i++)
                     {
-                        WriteObj(context, typeof(ActivationAddress), input.CacheInvalidationHeader[i]);
+                        WriteObj(sm, context, typeof(ActivationAddress), input.CacheInvalidationHeader[i]);
                     }
                 }
 
@@ -1149,9 +960,6 @@ namespace Orleans.Runtime
                 {
                     writer.Write((byte)input.Category);
                 }
-
-                if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
-                    writer.Write(input.DebugContext);
 
                 if ((headers & Headers.DIRECTION) != Headers.NONE)
                     writer.Write((byte)input.Direction.Value);
@@ -1173,6 +981,9 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
                     writer.Write(input.IsNewPlacement);
+
+                if ((headers & Headers.IS_RETURNED_FROM_REMOTE_CLUSTER) != Headers.NONE)
+                    writer.Write(input.IsReturnedFromRemoteCluster);
 
                 // Nothing to do with Headers.IS_USING_INTERFACE_VERSION since the value in
                 // the header is sufficient
@@ -1204,9 +1015,6 @@ namespace Orleans.Runtime
                     }
                 }
 
-                if ((headers & Headers.RESEND_COUNT) != Headers.NONE)
-                    writer.Write(input.ResendCount);
-
                 if ((headers & Headers.RESULT) != Headers.NONE)
                     writer.Write((byte)input.Result);
 
@@ -1237,7 +1045,12 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
                 {
-                    WriteObj(context, typeof(GuidId), input.TargetObserverId);
+                    WriteObj(sm, context, typeof(GuidId), input.TargetObserverId);
+                }
+
+                if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
+                {
+                    writer.Write(input.CallChainId);
                 }
 
                 if ((headers & Headers.TARGET_SILO) != Headers.NONE)
@@ -1246,12 +1059,18 @@ namespace Orleans.Runtime
                 }
 
                 if ((headers & Headers.TRANSACTION_INFO) != Headers.NONE)
-                    SerializationManager.SerializeInner(input.TransactionInfo, context, typeof(TransactionInfo));
+                    SerializationManager.SerializeInner(input.TransactionInfo, context, typeof(ITransactionInfo));
+
+                if ((headers & Headers.TRACE_CONTEXT) != Headers.NONE)
+                {
+                    SerializationManager.SerializeInner(input.traceContext, context, typeof(TraceContext));
+                }
             }
 
             [DeserializerMethod]
             public static object Deserializer(Type expected, IDeserializationContext context)
             {
+                var sm = context.GetSerializationManager();
                 var result = new HeadersContainer();
                 var reader = context.StreamReader;
                 context.RecordObject(result);
@@ -1265,7 +1084,7 @@ namespace Orleans.Runtime
                        var list = result.CacheInvalidationHeader = new List<ActivationAddress>(n);
                         for (int i = 0; i < n; i++)
                         {
-                            list.Add((ActivationAddress)ReadObj(typeof(ActivationAddress), context));
+                            list.Add((ActivationAddress)ReadObj(sm, typeof(ActivationAddress), context));
                         }
                     }
                 }
@@ -1274,7 +1093,7 @@ namespace Orleans.Runtime
                     result.Category = (Categories)reader.ReadByte();
 
                 if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
-                    result.DebugContext = reader.ReadString();
+                    _ = reader.ReadString();
 
                 if ((headers & Headers.DIRECTION) != Headers.NONE)
                     result.Direction = (Message.Directions)reader.ReadByte();
@@ -1289,13 +1108,16 @@ namespace Orleans.Runtime
                     result.GenericGrainType = reader.ReadString();
 
                 if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
-                    result.Id = (Orleans.Runtime.CorrelationId)ReadObj(typeof(Orleans.Runtime.CorrelationId), context);
+                    result.Id = (Orleans.Runtime.CorrelationId)ReadObj(sm, typeof(CorrelationId), context);
 
                 if ((headers & Headers.ALWAYS_INTERLEAVE) != Headers.NONE)
                     result.IsAlwaysInterleave = ReadBool(reader);
 
                 if ((headers & Headers.IS_NEW_PLACEMENT) != Headers.NONE)
                     result.IsNewPlacement = ReadBool(reader);
+
+                if ((headers & Headers.IS_RETURNED_FROM_REMOTE_CLUSTER) != Headers.NONE)
+                    result.IsReturnedFromRemoteCluster = ReadBool(reader);
 
                 if ((headers & Headers.IS_USING_INTERFACE_VERSION) != Headers.NONE)
                     result.IsUsingIfaceVersion = true;
@@ -1326,8 +1148,8 @@ namespace Orleans.Runtime
                     result.RequestContextData = requestData;
                 }
 
-                if ((headers & Headers.RESEND_COUNT) != Headers.NONE)
-                    result.ResendCount = reader.ReadInt();
+                // Read for backwards compatibility but ignore the value.
+                if ((headers & Headers.RESEND_COUNT) != Headers.NONE) reader.ReadInt();
 
                 if ((headers & Headers.RESULT) != Headers.NONE)
                     result.Result = (Orleans.Runtime.Message.ResponseTypes)reader.ReadByte();
@@ -1348,7 +1170,10 @@ namespace Orleans.Runtime
                     result.TargetGrain = reader.ReadGrainId();
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
-                    result.TargetObserverId = (Orleans.Runtime.GuidId)ReadObj(typeof(Orleans.Runtime.GuidId), context);
+                    result.TargetObserverId = (GuidId)ReadObj(sm, typeof(GuidId), context);
+
+                if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
+                    result.CallChainId = reader.ReadCorrelationId();
 
                 if ((headers & Headers.TARGET_SILO) != Headers.NONE)
                     result.TargetSilo = reader.ReadSiloAddress();
@@ -1356,7 +1181,10 @@ namespace Orleans.Runtime
                 result.IsTransactionRequired = (headers & Headers.IS_TRANSACTION_REQUIRED) != Headers.NONE;
 
                 if ((headers & Headers.TRANSACTION_INFO) != Headers.NONE)
-                    result.TransactionInfo = SerializationManager.DeserializeInner<TransactionInfo>(context);
+                    result.TransactionInfo = SerializationManager.DeserializeInner<ITransactionInfo>(context);
+
+                if ((headers & Headers.TRACE_CONTEXT) != Headers.NONE)
+                    result.TraceContext = SerializationManager.DeserializeInner<TraceContext>(context);
 
                 return result;
             }
@@ -1366,15 +1194,15 @@ namespace Orleans.Runtime
                 return stream.ReadByte() == (byte) SerializationTokenType.True;
             }
 
-            private static void WriteObj(ISerializationContext context, Type type, object input)
+            private static void WriteObj(SerializationManager sm, ISerializationContext context, Type type, object input)
             {
-                var ser = context.GetSerializationManager().GetSerializer(type);
+                var ser = sm.GetSerializer(type);
                 ser.Invoke(input, context, type);
             }
 
-            private static object ReadObj(Type t, IDeserializationContext context)
+            private static object ReadObj(SerializationManager sm, Type t, IDeserializationContext context)
             {
-                var des = context.GetSerializationManager().GetDeserializer(t);
+                var des = sm.GetDeserializer(t);
                 return des.Invoke(t, context);
             }
         }

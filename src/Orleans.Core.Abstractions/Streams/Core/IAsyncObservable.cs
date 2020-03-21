@@ -23,7 +23,7 @@ namespace Orleans.Streams
         /// <param name="observer">The asynchronous observer to subscribe.</param>
         /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.
         /// The consumer may unsubscribe by using this handle.
-        /// The subscription remains active for as long as it is not explicitely unsubscribed.
+        /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
         Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer);
 
@@ -34,10 +34,10 @@ namespace Orleans.Streams
         /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
         /// <param name="filterFunc">Filter to be applied for this subscription</param>
         /// <param name="filterData">Data object that will be passed in to the filterFunc.
-        /// This will usually contain any paramaters required by the filterFunc to make it's filtering decision.</param>
+        /// This will usually contain any parameters required by the filterFunc to make it's filtering decision.</param>
         /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.
         /// The consumer may unsubscribe by using this handle.
-        /// The subscription remains active for as long as it is not explicitely unsubscribed.
+        /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
         /// <exception cref="ArgumentException">Thrown if the supplied stream filter function is not suitable. 
         /// Usually this is because it is not a static method. </exception>

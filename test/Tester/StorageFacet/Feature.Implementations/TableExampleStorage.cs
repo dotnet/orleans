@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -34,7 +34,7 @@ namespace Tester.StorageFacet.Implementations
 
         public void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe(GrainLifecycleStage.SetupState, LoadState);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<TableExampleStorage<TState>>(this.Name), GrainLifecycleStage.SetupState, LoadState);
         }
 
         public void Configure(IExampleStorageConfig cfg)
@@ -62,7 +62,7 @@ namespace Tester.StorageFacet.Implementations
 
     public static class TableExampleStorageExtensions
     {
-        public static void UseTableExampleStorage(this ISiloHostBuilder builder, string name)
+        public static void UseTableExampleStorage(this ISiloBuilder builder, string name)
         {
             builder.ConfigureServices(services =>
             {

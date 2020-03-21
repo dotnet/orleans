@@ -25,30 +25,51 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly ILogger logger;
 
-        public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime providerUtilities, IStreamPubSub pubSub, ILoggerFactory loggerFactory, bool isRewindable)
+        public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime runtime, IStreamPubSub pubSub, ILogger logger, bool isRewindable)
         {
-            if (stream == null) throw new ArgumentNullException("stream");
-            if (providerUtilities == null) throw new ArgumentNullException("providerUtilities");
-            if (pubSub == null) throw new ArgumentNullException("pubSub");
+            if (stream == null) throw new ArgumentNullException(nameof(stream));
+            if (runtime == null) throw new ArgumentNullException(nameof(runtime));
+            if (pubSub == null) throw new ArgumentNullException(nameof(pubSub));
+            if (logger == null) throw new ArgumentNullException(nameof(logger));
 
-            logger = loggerFactory.CreateLogger(string.Format("<{0}>-{1}", typeof(StreamConsumer<T>).FullName, stream));
+            this.logger = logger;
             this.stream = stream;
             this.streamProviderName = streamProviderName;
-            providerRuntime = providerUtilities;
+            this.providerRuntime = runtime;
             this.pubSub = pubSub;
-            IsRewindable = isRewindable;
-            myExtension = null;
-            myGrainReference = null;
-            bindExtLock = new AsyncLock();
+            this.IsRewindable = isRewindable;
+            this.myExtension = null;
+            this.myGrainReference = null;
+            this.bindExtLock = new AsyncLock();
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
         {
-            return SubscribeAsync(observer, null);
+            return SubscribeAsyncImpl(observer, null, null);
         }
 
-        public async Task<StreamSubscriptionHandle<T>> SubscribeAsync(
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
             IAsyncObserver<T> observer,
+            StreamSequenceToken token,
+            StreamFilterPredicate filterFunc = null,
+            object filterData = null)
+        {
+            return SubscribeAsyncImpl(observer, null, token, filterFunc, filterData);
+        }
+
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver)
+        {
+            return SubscribeAsyncImpl(null, batchObserver, null);
+        }
+
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver, StreamSequenceToken token)
+        {
+            return SubscribeAsyncImpl(null, batchObserver, token);
+        }
+
+        private async Task<StreamSubscriptionHandle<T>> SubscribeAsyncImpl(
+            IAsyncObserver<T> observer,
+            IAsyncBatchObserver<T> batchObserver,
             StreamSequenceToken token,
             StreamFilterPredicate filterFunc = null,
             object filterData = null)
@@ -56,15 +77,17 @@ namespace Orleans.Streams
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
             if (observer is GrainReference)
-                throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", "observer");
+                throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", nameof(observer));
+            if (batchObserver is GrainReference)
+                throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", nameof(batchObserver));
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Subscribe Observer={0} Token={1}", observer, token);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Subscribe Token={Token}", token);
             await BindExtensionLazy();
 
             IStreamFilterPredicateWrapper filterWrapper = null;
             if (filterFunc != null)
                 filterWrapper = new FilterPredicateWrapperData(filterData, filterFunc);
-            
+
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Subscribe - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
                 pubSub, myGrainReference, token);
 
@@ -82,22 +105,40 @@ namespace Orleans.Streams
             // and undo it in the case of failure. 
             // There is no problem with that we call myExtension.SetObserver too early before the handle is registered in pub sub,
             // since this subscriptionId is unique (random Guid) and no one knows it anyway, unless successfully subscribed in the pubsub.
-            var subriptionHandle = myExtension.SetObserver(subscriptionId, stream, observer, token, filterWrapper);
+            var subriptionHandle = myExtension.SetObserver(subscriptionId, stream, observer, batchObserver, token, filterWrapper);
             try
             {
                 await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, filterWrapper);
                 return subriptionHandle;
-            } catch(Exception)
+            }
+            catch (Exception)
             {
                 // Undo the previous call myExtension.SetObserver.
                 myExtension.RemoveObserver(subscriptionId);
                 throw;
-            }            
+            }
         }
 
-        public async Task<StreamSubscriptionHandle<T>> ResumeAsync(
+        public Task<StreamSubscriptionHandle<T>> ResumeAsync(
             StreamSubscriptionHandle<T> handle,
             IAsyncObserver<T> observer,
+            StreamSequenceToken token = null)
+        {
+            return ResumeAsyncImpl(handle, observer, null, token);
+        }
+
+        public Task<StreamSubscriptionHandle<T>> ResumeAsync(
+            StreamSubscriptionHandle<T> handle,
+            IAsyncBatchObserver<T> batchObserver,
+            StreamSequenceToken token = null)
+        {
+            return ResumeAsyncImpl(handle, null, batchObserver, token);
+        }
+
+        private async Task<StreamSubscriptionHandle<T>> ResumeAsyncImpl(
+            StreamSubscriptionHandle<T> handle,
+            IAsyncObserver<T> observer,
+            IAsyncBatchObserver<T> batchObserver,
             StreamSequenceToken token = null)
         {
             StreamSubscriptionHandleImpl<T> oldHandleImpl = CheckHandleValidity(handle);
@@ -105,13 +146,13 @@ namespace Orleans.Streams
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resume Observer={0} Token={1}", observer, token);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resume Token={Token}", token);
             await BindExtensionLazy();
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resume - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
                 pubSub, myGrainReference, token);
 
-            StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, token, null);
+            StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, batchObserver, token, null);
 
             // On failure caller should be able to retry using the original handle, so invalidate old handle only if everything succeeded.  
             oldHandleImpl.Invalidate();

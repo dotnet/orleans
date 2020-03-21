@@ -1,8 +1,10 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
+using Orleans.Internal;
 using Orleans.Serialization;
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -10,29 +12,30 @@ namespace Orleans.Runtime
 {
     internal class GrainReferenceRuntime : IGrainReferenceRuntime
     {
-        private const bool USE_DEBUG_CONTEXT = true;
-        private const bool USE_DEBUG_CONTEXT_PARAMS = false;
-        private static ConcurrentDictionary<int, string> debugContexts = new ConcurrentDictionary<int, string>();
-
-        private readonly Action<Message, TaskCompletionSource<object>> responseCallbackDelegate;
+        private readonly Func<GrainReference, InvokeMethodRequest, InvokeMethodOptions, Task<object>> sendRequestDelegate;
         private readonly ILogger logger;
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly SerializationManager serializationManager;
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
+        private readonly IOutgoingGrainCallFilter[] filters;
+        private readonly InterfaceToImplementationMappingCache grainReferenceMethodCache;
 
         public GrainReferenceRuntime(
             ILogger<GrainReferenceRuntime> logger,
             IRuntimeClient runtimeClient,
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
             IInternalGrainFactory internalGrainFactory,
-            SerializationManager serializationManager)
+            SerializationManager serializationManager,
+            IEnumerable<IOutgoingGrainCallFilter> outgoingCallFilters)
         {
-            this.responseCallbackDelegate = this.ResponseCallback;
+            this.grainReferenceMethodCache = new InterfaceToImplementationMappingCache();
+            this.sendRequestDelegate = SendRequest;
             this.logger = logger;
             this.RuntimeClient = runtimeClient;
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.internalGrainFactory = internalGrainFactory;
             this.serializationManager = serializationManager;
+            this.filters = outgoingCallFilters.ToArray();
         }
 
         public IRuntimeClient RuntimeClient { get; private set; }
@@ -50,20 +53,19 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options, SiloAddress silo)
         {
-            object[] argsDeepCopy = null;
             if (arguments != null)
             {
                 CheckForGrainArguments(arguments);
                 SetGrainCancellationTokensTarget(arguments, reference);
-                argsDeepCopy = (object[])this.serializationManager.DeepCopy(arguments);
+                this.serializationManager.DeepCopyElementsInPlace(arguments);
             }
 
-            var request = new InvokeMethodRequest(reference.InterfaceId, reference.InterfaceVersion, methodId, argsDeepCopy);
+            var request = new InvokeMethodRequest(reference.InterfaceId, reference.InterfaceVersion, methodId, arguments);
 
             if (IsUnordered(reference))
                 options |= InvokeMethodOptions.Unordered;
 
-            Task<object> resultTask = InvokeMethod_Impl(reference, request, null, options);
+            Task<object> resultTask = InvokeMethod_Impl(reference, request, options);
 
             if (resultTask == null)
             {
@@ -75,144 +77,42 @@ namespace Orleans.Runtime
 
                 return Task.FromResult(default(T));
             }
-
+#if !NETCOREAPP
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
+#endif
             return resultTask.ToTypedTask<T>();
         }
 
         public TGrainInterface Convert<TGrainInterface>(IAddressable grain)
+            => this.internalGrainFactory.Cast<TGrainInterface>(grain);
+
+        public object Convert(IAddressable grain, Type interfaceType)
+            => this.internalGrainFactory.Cast(grain, interfaceType);
+
+        private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, InvokeMethodOptions options)
         {
-            return this.internalGrainFactory.Cast<TGrainInterface>(grain);
+            if (this.filters?.Length > 0)
+            {
+                return InvokeWithFilters(reference, request, options);
+            }
+            
+            return SendRequest(reference, request, options);
         }
 
-        private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        private Task<object> SendRequest(GrainReference reference, InvokeMethodRequest request, InvokeMethodOptions options)
         {
-            if (debugContext == null && USE_DEBUG_CONTEXT)
-            {
-                if (USE_DEBUG_CONTEXT_PARAMS)
-                {
-#pragma warning disable 162
-                    // This is normally unreachable code, but kept for debugging purposes
-                    debugContext = GetDebugContext(reference.InterfaceName, reference.GetMethodName(reference.InterfaceId, request.MethodId), request.Arguments);
-#pragma warning restore 162
-                }
-                else
-                {
-                    var hash = reference.InterfaceId ^ request.MethodId;
-                    if (!debugContexts.TryGetValue(hash, out debugContext))
-                    {
-                        debugContext = GetDebugContext(reference.InterfaceName, reference.GetMethodName(reference.InterfaceId, request.MethodId), request.Arguments);
-                        debugContexts[hash] = debugContext;
-                    }
-                }
-            }
+            bool isOneWayCall = (options & InvokeMethodOptions.OneWay) != 0;
 
-            // Call any registered client pre-call interceptor function.
-            CallClientInvokeCallback(reference, request);
-
-            bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
-
-            var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
-            this.RuntimeClient.SendRequest(reference, request, resolver, this.responseCallbackDelegate, debugContext, options, reference.GenericArguments);
+            var resolver = isOneWayCall ? null : new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            this.RuntimeClient.SendRequest(reference, request, resolver, options, reference.GenericArguments);
             return isOneWayCall ? null : resolver.Task;
         }
 
-        private void CallClientInvokeCallback(GrainReference reference, InvokeMethodRequest request)
+        private async Task<object> InvokeWithFilters(GrainReference reference, InvokeMethodRequest request, InvokeMethodOptions options)
         {
-            // Make callback to any registered client callback function, allowing opportunity for an application to set any additional RequestContext info, etc.
-            // Should we set some kind of callback-in-progress flag to detect and prevent any inappropriate callback loops on this GrainReference?
-            try
-            {
-                var callback = this.RuntimeClient.ClientInvokeCallback; // Take copy to avoid potential race conditions
-                if (callback == null) return;
-
-                // Call ClientInvokeCallback only for grain calls, not for system targets.
-                var grain = reference as IGrain;
-                if (grain != null)
-                {
-                    callback(request, grain);
-                }
-            }
-            catch (Exception exc)
-            {
-                logger.Warn(ErrorCode.ProxyClient_ClientInvokeCallback_Error,
-                    "Error while invoking ClientInvokeCallback function " + this.RuntimeClient?.ClientInvokeCallback,
-                    exc);
-                throw;
-            }
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private void ResponseCallback(Message message, TaskCompletionSource<object> context)
-        {
-            Response response;
-            if (message.Result != Message.ResponseTypes.Rejection)
-            {
-                try
-                {
-                    response = (Response)message.GetDeserializedBody(this.serializationManager);
-                }
-                catch (Exception exc)
-                {
-                    //  catch the Deserialize exception and break the promise with it.
-                    response = Response.ExceptionResponse(exc);
-                }
-            }
-            else
-            {
-                Exception rejection;
-                switch (message.RejectionType)
-                {
-                    case Message.RejectionTypes.GatewayTooBusy:
-                        rejection = new GatewayTooBusyException();
-                        break;
-                    case Message.RejectionTypes.DuplicateRequest:
-                        return; // Ignore duplicates
-
-                    default:
-                        rejection = message.GetDeserializedBody(this.serializationManager) as Exception;
-                        if (rejection == null)
-                        {
-                            if (string.IsNullOrEmpty(message.RejectionInfo))
-                            {
-                                message.RejectionInfo = "Unable to send request - no rejection info available";
-                            }
-                            rejection = new OrleansMessageRejectionException(message.RejectionInfo);
-                        }
-                        break;
-                }
-                response = Response.ExceptionResponse(rejection);
-            }
-
-            if (!response.ExceptionFlag)
-            {
-                context.TrySetResult(response.Data);
-            }
-            else
-            {
-                context.TrySetException(response.Exception);
-            }
-        }
-
-        private static String GetDebugContext(string interfaceName, string methodName, object[] arguments)
-        {
-            // String concatenation is approx 35% faster than string.Format here
-            //debugContext = String.Format("{0}:{1}()", interfaceName, methodName);
-            var debugContext = new StringBuilder();
-            debugContext.Append(interfaceName);
-            debugContext.Append(":");
-            debugContext.Append(methodName);
-            if (USE_DEBUG_CONTEXT_PARAMS && arguments != null && arguments.Length > 0)
-            {
-                debugContext.Append("(");
-                debugContext.Append(Utils.EnumerableToString(arguments));
-                debugContext.Append(")");
-            }
-            else
-            {
-                debugContext.Append("()");
-            }
-            return debugContext.ToString();
+            var invoker = new OutgoingCallInvoker(reference, request, options, this.sendRequestDelegate, this.grainReferenceMethodCache, this.filters);
+            await invoker.Invoke();
+            return invoker.Result;
         }
 
         private static void CheckForGrainArguments(object[] arguments)

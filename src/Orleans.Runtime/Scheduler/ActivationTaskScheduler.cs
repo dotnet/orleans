@@ -10,7 +10,7 @@ namespace Orleans.Runtime.Scheduler
     /// A single-concurrency, in-order task scheduler for per-activation work scheduling.
     /// </summary>
     [DebuggerDisplay("ActivationTaskScheduler-{myId} RunQueue={workerGroup.WorkItemCount}")]
-    internal class ActivationTaskScheduler : TaskScheduler, ITaskScheduler
+    internal class ActivationTaskScheduler : TaskScheduler
     {
         private readonly ILogger logger;
 
@@ -29,21 +29,16 @@ namespace Orleans.Runtime.Scheduler
 #if EXTRA_STATS
             turnsExecutedStatistic = CounterStatistic.FindOrCreate(name + ".TasksExecuted");
 #endif
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Created {0} with SchedulingContext={1}", this, workerGroup.SchedulingContext);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Created {0} with GrainContext={1}", this, workerGroup.GrainContext);
         }
-
-        #region TaskScheduler methods
 
         /// <summary>Gets an enumerable of the tasks currently scheduled on this scheduler.</summary>
         /// <returns>An enumerable of the tasks currently scheduled.</returns>
-        protected override IEnumerable<Task> GetScheduledTasks()
-        {
-            return new Task[0];
-        }
+        protected override IEnumerable<Task> GetScheduledTasks() => this.workerGroup.GetScheduledTasks();
 
         public void RunTask(Task task)
         {
-            RuntimeContext.SetExecutionContext(workerGroup.SchedulingContext, this);
+            RuntimeContext.SetExecutionContext(workerGroup.GrainContext);
             bool done = TryExecuteTask(task);
             if (!done)
                 logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete4, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
@@ -51,14 +46,6 @@ namespace Orleans.Runtime.Scheduler
             
             //  Consider adding ResetExecutionContext() or even better:
             //  Consider getting rid of ResetExecutionContext completely and just making sure we always call SetExecutionContext before TryExecuteTask.
-        }
-
-        internal void RunTaskOutsideContext(Task task)
-        {
-            bool done = TryExecuteTask(task);
-            if (!done)
-                logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete4, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
-                    task.Id, task.Status);
         }
 
         /// <summary>Queues a task to the scheduler.</summary>
@@ -81,11 +68,8 @@ namespace Orleans.Runtime.Scheduler
         /// <param name="taskWasPreviouslyQueued">A Boolean denoting whether or not task has previously been queued. If this parameter is True, then the task may have been previously queued (scheduled); if False, then the task is known not to have been queued, and this call is being made in order to execute the task inline without queuing it.</param>
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
         {
-            bool canExecuteInline = WorkerPoolThread.CurrentWorkerThread != null;
-
             RuntimeContext ctx = RuntimeContext.Current;
-            bool canExecuteInline2 = canExecuteInline && ctx != null && object.Equals(ctx.ActivationContext, workerGroup.SchedulingContext);
-            canExecuteInline = canExecuteInline2;
+            bool canExecuteInline = ctx != null && object.Equals(ctx.GrainContext, workerGroup.GrainContext);
 
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace))
@@ -127,8 +111,6 @@ namespace Orleans.Runtime.Scheduler
 #endif
             return done;
         }
-
-        #endregion TaskScheduler methods
 
         public override string ToString()
         {

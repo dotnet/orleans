@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -10,6 +11,7 @@ namespace Orleans.Streams
     {
         private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one stream: from Guid ConsumerId to StreamConsumerData
         private DateTime lastActivityTime;
+        public bool StreamRegistered { get; set; }
 
         public StreamConsumerCollection(DateTime now)
         {
@@ -25,7 +27,7 @@ namespace Orleans.Streams
             return consumerData;
         }
 
-        public bool RemoveConsumer(GuidId subscriptionId, Logger logger)
+        public bool RemoveConsumer(GuidId subscriptionId, ILogger logger)
         {
             StreamConsumerData consumer;
             if (!queueData.TryGetValue(subscriptionId, out consumer)) return false;
@@ -49,7 +51,7 @@ namespace Orleans.Streams
             return queueData.Values;
         }
 
-        public void DisposeAll(Logger logger)
+        public void DisposeAll(ILogger logger)
         {
             foreach (StreamConsumerData consumer in queueData.Values)
             {

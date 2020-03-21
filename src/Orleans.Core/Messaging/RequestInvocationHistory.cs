@@ -8,18 +8,16 @@ namespace Orleans.Runtime
     {
         public GrainId GrainId { get; private set; }
         public ActivationId ActivationId { get; private set; }
+
+        [Obsolete("Removed and unused. This member is retained only for serialization compatibility purposes.")]
         public string DebugContext { get; private set; }
 
-        public RequestInvocationHistory(GrainId grainId, ActivationId activationId, string debugContext)
+        public RequestInvocationHistory(GrainId grainId, ActivationId activationId)
         {
             this.GrainId = grainId;
             this.ActivationId = activationId;
-            DebugContext = debugContext;
         }
 
-        public override string ToString()
-        {
-            return String.Format("RequestInvocationHistory {0}:{1}:{2}", GrainId, ActivationId, DebugContext);
-        }
+        public override string ToString() => $"RequestInvocationHistory {GrainId}:{ActivationId}";
     }
 }

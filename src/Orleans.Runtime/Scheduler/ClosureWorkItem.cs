@@ -1,68 +1,107 @@
 using System;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Scheduler
 {
-    internal class ClosureWorkItem : WorkItemBase
+    internal class AsyncClosureWorkItem : WorkItemBase
     {
-        private readonly Action continuation;
-        private readonly Func<string> nameGetter;
+        private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>();
+        private readonly Func<Task> continuation;
+        private readonly string name;
 
-        public override string Name { get { return nameGetter==null ? "" : nameGetter(); } }
+        public override string Name => this.name ?? GetMethodName(this.continuation);
+        public Task Task => this.completion.Task;
 
-        public ClosureWorkItem(Action closure)
+        public AsyncClosureWorkItem(Func<Task> closure, string name, IGrainContext grainContext)
         {
-            continuation = closure;
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
-            {
-                SchedulerStatisticsGroup.OnClosureWorkItemsCreated();
-            }
-#endif
+            this.continuation = closure;
+            this.name = name;
+            this.GrainContext = grainContext;
         }
 
-        public ClosureWorkItem(Action closure, Func<string> getName)
+        public AsyncClosureWorkItem(Func<Task> closure, IGrainContext grainContext)
         {
-            continuation = closure;
-            nameGetter = getName;
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
-            {
-                SchedulerStatisticsGroup.OnClosureWorkItemsCreated();
-            }
-#endif
+            this.continuation = closure;
+            this.GrainContext = grainContext;
         }
 
-        #region IWorkItem Members
-
-        public override void Execute()
+        public override async void Execute()
         {
-#if TRACK_DETAILED_STATS
-            if (StatisticsCollector.CollectGlobalShedulerStats)
+            try
             {
-                SchedulerStatisticsGroup.OnClosureWorkItemsExecuted();
+                RuntimeContext.SetExecutionContext(this.GrainContext);
+                RequestContext.Clear();
+                await this.continuation();
+                this.completion.TrySetResult(true);
             }
-#endif
-            continuation();
+            catch (Exception exception)
+            {
+                this.completion.TrySetException(exception);
+            }
+            finally
+            {
+                RuntimeContext.ResetExecutionContext();
+            }
         }
 
-        public override WorkItemType ItemType { get { return WorkItemType.Closure; } }
+        public override WorkItemType ItemType => WorkItemType.Closure;
 
-        #endregion
-
-        public override string ToString()
+        public override IGrainContext GrainContext { get; }
+        
+        internal static string GetMethodName(Delegate action)
         {
-            var detailedName = string.Empty; 
-            if (nameGetter == null) // if NameGetter != null, base.ToString() will print its name.
-            {
-                var continuationMethodInfo = continuation.GetMethodInfo();
-                detailedName = string.Format(": {0}->{1}",
-                   (continuation.Target == null) ? "" : continuation.Target.ToString(),
-                   (continuationMethodInfo == null) ? "" : continuationMethodInfo.ToString());
-            }
-               
-
-            return string.Format("{0}{1}", base.ToString(), detailedName);
+            var continuationMethodInfo = action.GetMethodInfo();
+            return string.Format(
+                "{0}->{1}",
+                action.Target?.ToString() ?? string.Empty,
+                continuationMethodInfo == null ? string.Empty : continuationMethodInfo.ToString());
         }
+    }
+
+    internal class AsyncClosureWorkItem<T> : WorkItemBase
+    {
+        private readonly TaskCompletionSource<T> completion = new TaskCompletionSource<T>();
+        private readonly Func<Task<T>> continuation;
+        private readonly string name;
+
+        public override string Name => this.name ?? AsyncClosureWorkItem.GetMethodName(this.continuation);
+        public Task<T> Task => this.completion.Task;
+
+        public AsyncClosureWorkItem(Func<Task<T>> closure, string name, IGrainContext grainContext)
+        {
+            this.continuation = closure;
+            this.name = name;
+            this.GrainContext = grainContext;
+        }
+
+        public AsyncClosureWorkItem(Func<Task<T>> closure, IGrainContext grainContext)
+        {
+            this.continuation = closure;
+            this.GrainContext = grainContext;
+        }
+
+        public override async void Execute()
+        {
+            try
+            {
+                RuntimeContext.SetExecutionContext(this.GrainContext);
+                RequestContext.Clear();
+                var result = await this.continuation();
+                this.completion.TrySetResult(result);
+            }
+            catch (Exception exception)
+            {
+                this.completion.TrySetException(exception);
+            }
+            finally
+            {
+                RuntimeContext.ResetExecutionContext();
+            }
+        }
+
+        public override WorkItemType ItemType => WorkItemType.Closure;
+
+        public override IGrainContext GrainContext { get; }
     }
 }

@@ -1,6 +1,10 @@
-﻿
+
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -24,15 +28,28 @@ namespace Tester.StreamingTests
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions(1);
-            options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-            options.ClusterConfiguration.AddSimpleMessageStreamProvider(SMSStreamProviderName);
-            options.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
+            builder.Options.InitialSilosCount = 1;
+            builder.AddClientBuilderConfigurator<ClientConfiguretor>();
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
 
-            options.ClientConfiguration.AddSimpleMessageStreamProvider(SMSStreamProviderName);
-            return new TestCluster(options);
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.AddSimpleMessageStreamProvider(SMSStreamProviderName)
+                     .AddMemoryGrainStorage("PubSubStore")
+                     .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
+            }
+        }
+        public class ClientConfiguretor : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.AddSimpleMessageStreamProvider(SMSStreamProviderName);
+            }
         }
 
         [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]

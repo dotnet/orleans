@@ -1,18 +1,10 @@
-﻿using Orleans.TestingHost;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.EventSourcing.CustomStorage;
 using Orleans.Hosting;
-using TestExtensions;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime;
 using Orleans.Storage;
-using Orleans.TestingHost.Utils;
+using Orleans.TestingHost;
+using TestExtensions;
 
 namespace Tester.EventSourcingTests
 {
@@ -23,41 +15,28 @@ namespace Tester.EventSourcingTests
     /// </summary>
     public class EventSourcingClusterFixture : BaseTestClusterFixture
     {
-        protected override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions();
-
-            // we use a slowed-down memory storage provider
-            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-
-            options.ClusterConfiguration.AddFaultyMemoryStorageProvider("SlowMemoryStore", 10, 15);
-
-            // log consistency providers are used to configure journaled grains
-            options.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider("LogStorage");
-            options.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider("StateStorage");
-            
-            options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
-            return new TestCluster(options);
+            builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();
         }
 
-        private class TestSiloBuilderFactory : ISiloBuilderFactory
+        private class TestSiloConfigurator : ISiloConfigurator
         {
-            public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                return new SiloHostBuilder()
-                    .ConfigureSiloName(siloName)
-                    .UseConfiguration(clusterConfiguration)
-                    .ConfigureLogging(builder => ConfigureLogging(builder, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
-            }
-
-            private void ConfigureLogging(ILoggingBuilder builder, string filePath)
-            {
-                TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
-                builder.AddFilter(typeof(MemoryStorage).FullName, LogLevel.Debug);
-                builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Debug);
+                // we use a slowed-down memory storage provider
+                hostBuilder
+                    .AddLogStorageBasedLogConsistencyProvider("LogStorage")
+                    .AddStateStorageBasedLogConsistencyProvider("StateStorage")
+                    .ConfigureLogging(builder =>
+                    {
+                        builder.AddFilter(typeof(MemoryGrainStorage).FullName, LogLevel.Debug);
+                        builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Debug);
+                    })
+                    .AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("MemoryStore")
+                    .AddFaultInjectionMemoryStorage("SlowMemoryStore", options=>options.NumStorageGrains = 10, faultyOptions => faultyOptions.Latency = TimeSpan.FromMilliseconds(15));
             }
         }
-
     }
 }

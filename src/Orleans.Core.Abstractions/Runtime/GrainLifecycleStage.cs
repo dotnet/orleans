@@ -1,4 +1,4 @@
-﻿namespace Orleans.Runtime
+namespace Orleans.Runtime
 {
     /// <summary>
     /// Stages of a grains lifecycle.
@@ -7,16 +7,26 @@
     ///   stream cleanup should all eventually be triggered by the 
     ///   grain lifecycle.
     /// </summary>
-    public enum GrainLifecycleStage
+    public static class GrainLifecycleStage
     {
+        /// <summary>
+        /// First valid stage in grain's lifecycle
+        /// </summary>
+        public const int First = int.MinValue;
+
         /// <summary>
         /// Setup grain state prior to activation 
         /// </summary>
-        SetupState = 1<<10,  
+        public const int SetupState = 1000;
 
         /// <summary>
         /// Activate grain
         /// </summary>
-        Activate = SetupState + 1<<10,
+        public const int Activate = 2000;
+
+        /// <summary>
+        /// Last valid stage in grain's lifecycle
+        /// </summary>
+        public const int Last = int.MaxValue;
     }
 }

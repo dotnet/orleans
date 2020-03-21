@@ -1,9 +1,8 @@
-﻿using System;
+using System;
 using Orleans.Runtime;
 
 namespace Orleans.Placement
 {
-
     /// <summary>
     /// Base for all placement policy marker attributes.
     /// </summary>
@@ -16,7 +15,7 @@ namespace Orleans.Placement
         {
             if (placement == null) throw new ArgumentNullException(nameof(placement));
 
-            PlacementStrategy = placement;
+            this.PlacementStrategy = placement;
         }
     }
 

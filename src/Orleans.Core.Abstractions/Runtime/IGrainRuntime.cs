@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans.Core;
 using Orleans.Streams;
 using Orleans.Timers;
@@ -15,8 +15,8 @@ namespace Orleans.Runtime
         /// ServiceId's are intended to be long lived Id values for a particular service which will remain constant 
         /// even if the service is started / redeployed multiple times during its operations life.
         /// </summary>
-        /// <returns>ServiceID Guid for this service.</returns>
-        Guid ServiceId { get; }
+        /// <returns>ServiceId Guid for this service.</returns>
+        string ServiceId { get; }
 
         /// <summary>
         /// A unique identifier for the current silo.
@@ -34,13 +34,10 @@ namespace Orleans.Runtime
 
         IServiceProvider ServiceProvider { get; }
 
-        //TODO: Mark it as [Obsolete] after all runtime has migrated
-        Logger GetLogger(string loggerName);
-
         void DeactivateOnIdle(Grain grain);
 
         void DelayDeactivation(Grain grain, TimeSpan timeSpan);
 
-        IStorage<TGrainState> GetStorage<TGrainState>(Grain grain) where TGrainState : new();
+        IStorage<TGrainState> GetStorage<TGrainState>(Grain grain);
     }
 }

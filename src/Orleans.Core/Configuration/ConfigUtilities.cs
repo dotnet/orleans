@@ -1,9 +1,11 @@
+using Orleans.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime;
@@ -80,7 +82,7 @@ namespace Orleans.Runtime.Configuration
         internal static bool TryParsePropagateActivityId(XmlElement root, string nodeName, out bool propagateActivityId)
         {
             //set default value to make compiler happy, progateActivityId is only used when this method return true
-            propagateActivityId = Constants.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
+            propagateActivityId = MessagingOptions.DEFAULT_PROPAGATE_E2E_ACTIVITY_ID;
             if (root.HasAttribute("PropagateActivityId"))
             {
                 propagateActivityId = ParseBool(root.GetAttribute("PropagateActivityId"),
@@ -92,15 +94,6 @@ namespace Orleans.Runtime.Configuration
 
         internal static void ParseStatistics(IStatisticsConfiguration config, XmlElement root, string nodeName)
         {
-            if (root.HasAttribute("ProviderType"))
-            {
-                config.StatisticsProviderName = root.GetAttribute("ProviderType");
-            }
-            if (root.HasAttribute("MetricsTableWriteInterval"))
-            {
-                config.StatisticsMetricsTableWriteInterval = ParseTimeSpan(root.GetAttribute("MetricsTableWriteInterval"),
-                    "Invalid TimeSpan value for Statistics.MetricsTableWriteInterval attribute on Statistics element for " + nodeName);
-            }
             if (root.HasAttribute("PerfCounterWriteInterval"))
             {
                 config.StatisticsPerfCountersWriteInterval = ParseTimeSpan(root.GetAttribute("PerfCounterWriteInterval"),
@@ -110,11 +103,6 @@ namespace Orleans.Runtime.Configuration
             {
                 config.StatisticsLogWriteInterval = ParseTimeSpan(root.GetAttribute("LogWriteInterval"),
                     "Invalid TimeSpan value for Statistics.LogWriteInterval attribute on Statistics element for " + nodeName);
-            }
-            if (root.HasAttribute("WriteLogStatisticsToTable"))
-            {
-                config.StatisticsWriteLogStatisticsToTable = ParseBool(root.GetAttribute("WriteLogStatisticsToTable"),
-                    "Invalid bool value for Statistics.WriteLogStatisticsToTable attribute on Statistics element for " + nodeName);
             }
             if (root.HasAttribute("StatisticsCollectionLevel"))
             {
@@ -227,7 +215,7 @@ namespace Orleans.Runtime.Configuration
             return returnValue;
         }
 
-        internal static void ValidateSerializationProvider(TypeInfo type)
+        internal static void ValidateSerializationProvider(Type type)
         {
             if (type.IsClass == false)
             {
@@ -244,7 +232,7 @@ namespace Orleans.Runtime.Configuration
                 throw new FormatException(string.Format("The serialization provider type {0} is not public", type.FullName));
             }
 
-            if (type.IsGenericType && type.IsConstructedGenericType() == false)
+            if (type.IsGenericType && type.IsConstructedGenericType == false)
             {
                 throw new FormatException(string.Format("The serialization provider type {0} is generic and has a missing type parameter specification", type.FullName));
             }
@@ -346,30 +334,150 @@ namespace Orleans.Runtime.Configuration
                 family = ParseEnum<AddressFamily>(root.GetAttribute("PreferredFamily"),
                     "Invalid preferred addressing family for " + root.LocalName + " element");
             }
-            IPAddress addr = await ClusterConfiguration.ResolveIPAddress(root.GetAttribute("Address"), subnet, family);
+            IPAddress addr = await ResolveIPAddress(root.GetAttribute("Address"), subnet, family);
             int port = ParseInt(root.GetAttribute("Port"), "Invalid Port attribute for " + root.LocalName + " element");
             return new IPEndPoint(addr, port);
+        }
+
+        internal static async Task<IPAddress> ResolveIPAddress(string addrOrHost, byte[] subnet, AddressFamily family)
+        {
+            var loopback = family == AddressFamily.InterNetwork ? IPAddress.Loopback : IPAddress.IPv6Loopback;
+            IList<IPAddress> nodeIps;
+
+            // if the address is an empty string, just enumerate all ip addresses available
+            // on this node
+            if (string.IsNullOrEmpty(addrOrHost))
+            {
+                nodeIps = NetworkInterface.GetAllNetworkInterfaces()
+                            .Where(iface => iface.OperationalStatus == OperationalStatus.Up)
+                            .SelectMany(iface => iface.GetIPProperties().UnicastAddresses)
+                            .Select(addr => addr.Address)
+                            .Where(addr => addr.AddressFamily == family && !IPAddress.IsLoopback(addr))
+                            .ToList();
+            }
+            else
+            {
+                // Fix StreamFilteringTests_SMS tests
+                if (addrOrHost.Equals("loopback", StringComparison.OrdinalIgnoreCase))
+                {
+                    return loopback;
+                }
+
+                // check if addrOrHost is a valid IP address including loopback (127.0.0.0/8, ::1) and any (0.0.0.0/0, ::) addresses
+                IPAddress address;
+                if (IPAddress.TryParse(addrOrHost, out address))
+                {
+                    return address;
+                }
+
+                // Get IP address from DNS. If addrOrHost is localhost will 
+                // return loopback IPv4 address (or IPv4 and IPv6 addresses if OS is supported IPv6)
+                nodeIps = await Dns.GetHostAddressesAsync(addrOrHost);
+            }
+
+            var candidates = new List<IPAddress>();
+            foreach (var nodeIp in nodeIps.Where(x => x.AddressFamily == family))
+            {
+                // If the subnet does not match - we can't resolve this address.
+                // If subnet is not specified - pick smallest address deterministically.
+                if (subnet == null)
+                {
+                    candidates.Add(nodeIp);
+                }
+                else
+                {
+                    var ip = nodeIp;
+                    if (subnet.Select((b, i) => ip.GetAddressBytes()[i] == b).All(x => x))
+                    {
+                        candidates.Add(nodeIp);
+                    }
+                }
+            }
+            if (candidates.Count > 0)
+            {
+                return PickIPAddress(candidates);
+            }
+            var subnetStr = Utils.EnumerableToString(subnet, null, ".", false);
+            throw new ArgumentException("Hostname '" + addrOrHost + "' with subnet " + subnetStr + " and family " + family + " is not a valid IP address or DNS name");
+        }
+
+        internal static IPAddress PickIPAddress(IReadOnlyList<IPAddress> candidates)
+        {
+            IPAddress chosen = null;
+            foreach (IPAddress addr in candidates)
+            {
+                if (chosen == null)
+                {
+                    chosen = addr;
+                }
+                else
+                {
+                    if (CompareIPAddresses(addr, chosen)) // pick smallest address deterministically
+                        chosen = addr;
+                }
+            }
+            return chosen;
+        }
+
+        /// <summary>
+        /// Gets the address of the local server.
+        /// If there are multiple addresses in the correct family in the server's DNS record, the first will be returned.
+        /// </summary>
+        /// <returns>The server's IPv4 address.</returns>
+        internal static IPAddress GetLocalIPAddress(AddressFamily family = AddressFamily.InterNetwork, string interfaceName = null)
+        {
+            var loopback = (family == AddressFamily.InterNetwork) ? IPAddress.Loopback : IPAddress.IPv6Loopback;
+            // get list of all network interfaces
+            NetworkInterface[] netInterfaces = NetworkInterface.GetAllNetworkInterfaces();
+
+            var candidates = new List<IPAddress>();
+            // loop through interfaces
+            for (int i = 0; i < netInterfaces.Length; i++)
+            {
+                NetworkInterface netInterface = netInterfaces[i];
+
+                if (netInterface.OperationalStatus != OperationalStatus.Up)
+                {
+                    // Skip network interfaces that are not operational
+                    continue;
+                }
+                if (!string.IsNullOrWhiteSpace(interfaceName) &&
+                    !netInterface.Name.StartsWith(interfaceName, StringComparison.Ordinal)) continue;
+
+                bool isLoopbackInterface = (netInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback);
+                // get list of all unicast IPs from current interface
+                UnicastIPAddressInformationCollection ipAddresses = netInterface.GetIPProperties().UnicastAddresses;
+
+                // loop through IP address collection
+                foreach (UnicastIPAddressInformation ip in ipAddresses)
+                {
+                    if (ip.Address.AddressFamily == family) // Picking the first address of the requested family for now. Will need to revisit later
+                    {
+                        //don't pick loopback address, unless we were asked for a loopback interface
+                        if (!(isLoopbackInterface && ip.Address.Equals(loopback)))
+                        {
+                            candidates.Add(ip.Address); // collect all candidates.
+                        }
+                    }
+                }
+            }
+            if (candidates.Count > 0) return PickIPAddress(candidates);
+            throw new OrleansException("Failed to get a local IP address.");
         }
 
         internal static string IStatisticsConfigurationToString(IStatisticsConfiguration config)
         {
             var sb = new StringBuilder();
             sb.Append("   Statistics: ").AppendLine();
-            sb.Append("     MetricsTableWriteInterval: ").Append(config.StatisticsMetricsTableWriteInterval).AppendLine();
             sb.Append("     PerfCounterWriteInterval: ").Append(config.StatisticsPerfCountersWriteInterval).AppendLine();
             sb.Append("     LogWriteInterval: ").Append(config.StatisticsLogWriteInterval).AppendLine();
-            sb.Append("     WriteLogStatisticsToTable: ").Append(config.StatisticsWriteLogStatisticsToTable).AppendLine();
             sb.Append("     StatisticsCollectionLevel: ").Append(config.StatisticsCollectionLevel).AppendLine();
-#if TRACK_DETAILED_STATS
-            sb.Append("     TRACK_DETAILED_STATS: true").AppendLine();
-#endif
-            if (!string.IsNullOrEmpty(config.StatisticsProviderName))
-                sb.Append("     StatisticsProviderName:").Append(config.StatisticsProviderName).AppendLine();
+
             return sb.ToString();
         }
 
         /// <summary>
-        /// Prints the the DataConnectionString,
+        /// Prints the DataConnectionString,
         /// without disclosing any credential info
         /// such as the Azure Storage AccountKey, SqlServer password or AWS SecretKey.
         /// </summary>
@@ -385,8 +493,10 @@ namespace Orleans.Runtime.Configuration
                 "Password=",                                // SQL
                 "SecretKey=", "SessionToken=",              // DynamoDb
             };
-
+            var mark = "<--SNIP-->";
             if (String.IsNullOrEmpty(connectionString)) return "null";
+            //if connection string format doesn't contain any secretKey, then return just <--SNIP-->
+            if (!secretKeys.Any(key => connectionString.Contains(key))) return mark;
 
             string connectionInfo = connectionString;
 
@@ -396,7 +506,7 @@ namespace Orleans.Runtime.Configuration
                 int keyPos = connectionInfo.IndexOf(secretKey, StringComparison.OrdinalIgnoreCase);
                 if (keyPos >= 0)
                 {
-                    connectionInfo = connectionInfo.Remove(keyPos + secretKey.Length) + "<--SNIP-->";
+                    connectionInfo = connectionInfo.Remove(keyPos + secretKey.Length) + mark;
                 }
             }
 
@@ -427,7 +537,7 @@ namespace Orleans.Runtime.Configuration
         public static string FindConfigFile(bool isSilo)
         {
             // Add directory containing Orleans binaries to the search locations for config files
-            defaultConfigDirs[0] = Path.GetDirectoryName(typeof(ConfigUtilities).GetTypeInfo().Assembly.Location);
+            defaultConfigDirs[0] = Path.GetDirectoryName(typeof(ConfigUtilities).Assembly.Location);
 
             var notFound = new List<string>();
             foreach (string dir in defaultConfigDirs)
@@ -462,14 +572,32 @@ namespace Orleans.Runtime.Configuration
             sb.Append("   Orleans version: ").AppendLine(RuntimeVersion.Current);
             sb.Append("   .NET version: ").AppendLine(Environment.Version.ToString());
             sb.Append("   OS version: ").AppendLine(Environment.OSVersion.ToString());
-#if BUILD_FLAVOR_LEGACY
-            sb.Append("   App config file: ").AppendLine(AppDomain.CurrentDomain.SetupInformation.ConfigurationFile); 
-#endif
             sb.AppendFormat("   GC Type={0} GCLatencyMode={1}",
                               GCSettings.IsServerGC ? "Server" : "Client",
                               Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode))
                 .AppendLine();
             return sb.ToString();
+        }
+
+        // returns true if lhs is "less" (in some repeatable sense) than rhs
+        private static bool CompareIPAddresses(IPAddress lhs, IPAddress rhs)
+        {
+            byte[] lbytes = lhs.GetAddressBytes();
+            byte[] rbytes = rhs.GetAddressBytes();
+
+            if (lbytes.Length != rbytes.Length) return lbytes.Length < rbytes.Length;
+
+            // compare starting from most significant octet.
+            // 10.68.20.21 < 10.98.05.04
+            for (int i = 0; i < lbytes.Length; i++)
+            {
+                if (lbytes[i] != rbytes[i])
+                {
+                    return lbytes[i] < rbytes[i];
+                }
+            }
+            // They're equal
+            return false;
         }
     }
 }

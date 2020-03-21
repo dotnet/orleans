@@ -1,15 +1,13 @@
-
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using Tester;
 using TestExtensions;
 using TestGrainInterfaces;
 using TestGrains;
@@ -20,6 +18,7 @@ namespace UnitTests.StreamingTests
 {
     public class StreamGeneratorProviderTests : OrleansTestingBase, IClassFixture<StreamGeneratorProviderTests.Fixture>
     {
+        private const int TotalQueueCount = 4;
         private readonly Fixture fixture;
 
         public class Fixture : BaseTestClusterFixture
@@ -27,35 +26,35 @@ namespace UnitTests.StreamingTests
             public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
             public const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
 
-            public readonly static SimpleGeneratorConfig GeneratorConfig = new SimpleGeneratorConfig
+            public readonly static SimpleGeneratorOptions GeneratorConfig = new SimpleGeneratorOptions
             {
                 StreamNamespace = StreamNamespace,
                 EventsInStream = 100
             };
 
-            public readonly static GeneratorAdapterConfig AdapterConfig = new GeneratorAdapterConfig(StreamProviderName)
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                TotalQueueCount = 4,
-                GeneratorConfigType = GeneratorConfig.GetType()
-            };
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            }
 
-            protected override TestCluster CreateTestCluster()
+            private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                var options = new TestClusterOptions(2);
-                var settings = new Dictionary<string, string>();
-                // get initial settings from configs
-                AdapterConfig.WriteProperties(settings);
-                GeneratorConfig.WriteProperties(settings);
+                public void Configure(ISiloBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(StreamProviderName, (s, n) => GeneratorConfig))
+                        .AddPersistentStreams(
+                            StreamProviderName,
+                            GeneratorAdapterFactory.Create,
+                            b =>
+                            {
+                                b.ConfigurePullingAgent(ob => ob.Configure(options => { options.BatchContainerBatchSize = 10; }));
+                                b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount));
+                                b.UseDynamicClusterConfigDeploymentBalancer();
+                                b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                            });
 
-                // add queue balancer setting
-                settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName);
-
-                // add pub/sub settting
-                settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
-
-                // register stream provider
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
-                return new TestCluster(options);
+                }
             }
         }
 
@@ -66,7 +65,7 @@ namespace UnitTests.StreamingTests
 
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ValidateGeneratedStreamsTest()
         {
             this.fixture.Logger.Info("************************ ValidateGeneratedStreamsTest *********************************");
@@ -81,13 +80,13 @@ namespace UnitTests.StreamingTests
             if (assertIsTrue)
             {
                 // one stream per queue
-                Assert.Equal(Fixture.AdapterConfig.TotalQueueCount, report.Count);
+                Assert.Equal(TotalQueueCount, report.Count);
                 foreach (int eventsPerStream in report.Values)
                 {
                     Assert.Equal(Fixture.GeneratorConfig.EventsInStream, eventsPerStream);
                 }
             }
-            else if (Fixture.AdapterConfig.TotalQueueCount != report.Count ||
+            else if (TotalQueueCount != report.Count ||
                      report.Values.Any(count => count != Fixture.GeneratorConfig.EventsInStream))
             {
                 return false;

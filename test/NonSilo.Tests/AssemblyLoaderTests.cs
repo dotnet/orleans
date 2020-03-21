@@ -4,8 +4,11 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Orleans;
+using Orleans.ApplicationParts;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Storage;
 using Orleans.TestingHost.Utils;
 using Xunit;
 
@@ -17,30 +20,18 @@ namespace UnitTests
 
         private readonly ILoggerFactory defaultLoggerFactory;
 
-        private readonly Logger logger;
+        private readonly ILogger logger;
 
         public AssemblyLoaderTests()
         {
             this.defaultLoggerFactory =
                 TestingUtils.CreateDefaultLoggerFactory("AssemblyLoaderTests.log");
-            this.logger = new LoggerWrapper<AssemblyLoaderTests>(defaultLoggerFactory);
+            this.logger = defaultLoggerFactory.CreateLogger<AssemblyLoaderTests>();
         }
 
         public void Dispose()
         {
             this.defaultLoggerFactory.Dispose();
-        }
-
-        [Fact, TestCategory("AssemblyLoader"), TestCategory("BVT"), TestCategory("Functional")]
-        public void AssemblyLoaderShouldDiscoverAssemblyLoaderTestAssembly()
-        {
-            logger.Info("AssemblyLoaderTests.ClientShouldDiscoverDummyStreamProviderAssembly");
-
-            var exclusionList = NewExclusionList();
-            var loader = NewAssemblyLoader(exclusionList);
-
-            var t = typeof(Orleans.Providers.IMemoryMessageBodySerializer);
-            DiscoverAssemblies(loader, exclusionList);
         }
 
         [Fact, TestCategory("AssemblyLoader"), TestCategory("Functional")]

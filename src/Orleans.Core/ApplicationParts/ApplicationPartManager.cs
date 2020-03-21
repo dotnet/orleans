@@ -7,37 +7,29 @@ namespace Orleans.ApplicationParts
     /// <summary>
     /// Manages the parts and features of an Orleans application.
     /// </summary>
-    public class ApplicationPartManager
+    public class ApplicationPartManager : IApplicationPartManager
     {
         private readonly List<IApplicationPart> applicationParts = new List<IApplicationPart>();
         private readonly List<IApplicationFeatureProvider> featureProviders = new List<IApplicationFeatureProvider>();
 
-        /// <summary>
-        /// Gets the list of <see cref="IApplicationFeatureProvider"/>s.
-        /// </summary>
+        /// <inheritdoc />
         public IReadOnlyList<IApplicationFeatureProvider> FeatureProviders => this.featureProviders;
 
-        /// <summary>
-        /// Gets the list of <see cref="IApplicationPart"/>s.
-        /// </summary>
+        /// <inheritdoc />
         public IReadOnlyList<IApplicationPart> ApplicationParts => this.applicationParts;
 
-        /// <summary>
-        /// Adds an application part.
-        /// </summary>
-        /// <param name="part">The application part.</param>
-        public void AddApplicationPart(IApplicationPart part)
+        /// <inheritdoc />
+        public IApplicationPartManager AddApplicationPart(IApplicationPart part)
         {
             if (!this.applicationParts.Contains(part)) this.applicationParts.Add(part);
+            return this;
         }
 
-        /// <summary>
-        /// Adds a feature provider.
-        /// </summary>
-        /// <param name="featureProvider">The feature provider.</param>
-        public void AddFeatureProvider(IApplicationFeatureProvider featureProvider)
+        /// <inheritdoc />
+        public IApplicationPartManager AddFeatureProvider(IApplicationFeatureProvider featureProvider)
         {
             if (!this.featureProviders.Contains(featureProvider)) this.featureProviders.Add(featureProvider);
+            return this;
         }
 
         /// <summary>

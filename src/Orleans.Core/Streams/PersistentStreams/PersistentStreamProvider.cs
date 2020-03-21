@@ -1,7 +1,10 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -9,15 +12,6 @@ using Orleans.Streams.Core;
 
 namespace Orleans.Providers.Streams.Common
 {
-    [Serializable]
-    public enum PersistentStreamProviderState
-    {
-        None,
-        Initialized,
-        AgentsStarted,
-        AgentsStopped,
-    }
-
     [Serializable]
     public enum PersistentStreamProviderCommand
     {
@@ -35,83 +29,63 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Persistent stream provider that uses an adapter for persistence
     /// </summary>
-    /// <typeparam name="TAdapterFactory"></typeparam>
-    public class PersistentStreamProvider<TAdapterFactory> : IInternalStreamProvider, IControllable, IStreamSubscriptionManagerRetriever
-        where TAdapterFactory : IQueueAdapterFactory, new()
+    public class PersistentStreamProvider : IStreamProvider, IInternalStreamProvider, IControllable, IStreamSubscriptionManagerRetriever, ILifecycleParticipant<ILifecycleObservable>
     {
-        private Logger                  logger;
+        private readonly ILogger logger;
+        private readonly IStreamProviderRuntime runtime;
+        private readonly SerializationManager serializationManager;
+        private readonly IRuntimeClient runtimeClient;
+        private readonly ProviderStateManager stateManager = new ProviderStateManager();
         private IQueueAdapterFactory    adapterFactory;
-        private IStreamProviderRuntime  providerRuntime;
         private IQueueAdapter           queueAdapter;
         private IPersistentStreamPullingManager pullingAgentManager;
-        private PersistentStreamProviderConfig myConfig;
-        internal const string StartupStatePropertyName = "StartupState";
-        internal const PersistentStreamProviderState StartupStateDefaultValue = PersistentStreamProviderState.AgentsStarted;
-        private PersistentStreamProviderState startupState;
-        private readonly ProviderStateManager stateManager = new ProviderStateManager();
-        private SerializationManager serializationManager;
-        private IRuntimeClient runtimeClient;
         private IStreamSubscriptionManager streamSubscriptionManager;
-        private IProviderConfiguration providerConfig;
+        private readonly StreamPubSubOptions pubsubOptions;
+        private readonly StreamLifecycleOptions lifeCycleOptions;
         public string Name { get; private set; }
-        private ILoggerFactory loggerFactory;
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
-        public async Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
+        public PersistentStreamProvider(string name, StreamPubSubOptions pubsubOptions, StreamLifecycleOptions lifeCycleOptions, IProviderRuntime runtime, SerializationManager serializationManager, ILogger<PersistentStreamProvider> logger)
         {
-            if(!stateManager.PresetState(ProviderState.Initialized)) return;
-            if (String.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
-            if (providerUtilitiesManager == null) throw new ArgumentNullException("providerUtilitiesManager");
-            if (config == null) throw new ArgumentNullException("config");
-            
-            Name = name;
-            providerRuntime = (IStreamProviderRuntime)providerUtilitiesManager;
-            logger = providerRuntime.GetLogger(this.GetType().Name);
-            adapterFactory = new TAdapterFactory();
-            adapterFactory.Init(config, Name, providerRuntime.ServiceProvider);
-            queueAdapter = await adapterFactory.CreateAdapter();
-            this.loggerFactory = providerUtilitiesManager.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            myConfig = new PersistentStreamProviderConfig(config);
-            this.providerConfig = config;
-            this.serializationManager = this.providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
-			this.runtimeClient = this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>();
-            if (this.myConfig.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
-                || this.myConfig.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
-            {
-                this.streamSubscriptionManager = this.providerRuntime.ServiceProvider
-                    .GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
-            }
-            string startup;
-            if (config.Properties.TryGetValue(StartupStatePropertyName, out startup))
-            {
-                if(!Enum.TryParse(startup, true, out startupState))
-                    throw new ArgumentException(
-                        String.Format("Unsupported value '{0}' for configuration parameter {1} of stream provider {2}.", startup, StartupStatePropertyName, config.Name));
-            }
-            else
-                startupState = StartupStateDefaultValue;
-            logger.Info("Initialized PersistentStreamProvider<{0}> with name {1}, Adapter {2} and config {3}, {4} = {5}.",
-                typeof(TAdapterFactory).Name, 
-                Name, 
-                queueAdapter.Name,
-                myConfig,
-                StartupStatePropertyName, startupState);
-            stateManager.CommitState();
+            if (String.IsNullOrEmpty(name)) throw new ArgumentNullException(nameof(name));
+            if (runtime == null) throw new ArgumentNullException(nameof(runtime));
+            this.pubsubOptions = pubsubOptions ?? throw new ArgumentNullException(nameof(pubsubOptions));
+            this.Name = name;
+            this.lifeCycleOptions = lifeCycleOptions ?? throw new ArgumentNullException(nameof(lifeCycleOptions));
+            this.runtime = runtime.ServiceProvider.GetRequiredService<IStreamProviderRuntime>();
+            this.runtimeClient = runtime.ServiceProvider.GetRequiredService<IRuntimeClient>();
+            this.serializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public async Task Start()
+        private async Task Init(CancellationToken token) 
         {
-            if (!stateManager.PresetState(ProviderState.Started)) return;
-            if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
-                queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
+            if(!this.stateManager.PresetState(ProviderState.Initialized)) return;
+            this.adapterFactory = this.runtime.ServiceProvider.GetRequiredServiceByName<IQueueAdapterFactory>(this.Name);
+            this.queueAdapter = await adapterFactory.CreateAdapter();
+
+            if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
+                || this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
-                var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
+                this.streamSubscriptionManager = this.runtime.ServiceProvider
+                    .GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+            }
+            this.stateManager.CommitState();
+        }
+
+        private async Task Start(CancellationToken token)
+        {
+            if (!this.stateManager.PresetState(ProviderState.Started)) return;
+            if (this.queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
+                this.queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
+            {
+                var siloRuntime = this.runtime as ISiloSideStreamProviderRuntime;
                 if (siloRuntime != null)
                 {
-                    pullingAgentManager = await siloRuntime.InitializePullingAgents(Name, adapterFactory, queueAdapter, myConfig, this.providerConfig);
+                    this.pullingAgentManager = await siloRuntime.InitializePullingAgents(this.Name, this.adapterFactory, this.queueAdapter);
 
                     // TODO: No support yet for DeliveryDisabled, only Stopped and Started
-                    if (startupState == PersistentStreamProviderState.AgentsStarted)
+                    if (this.lifeCycleOptions.StartupState == StreamLifecycleOptions.RunState.AgentsStarted)
                         await pullingAgentManager.StartAgents();
                 }
             }
@@ -123,21 +97,23 @@ namespace Orleans.Providers.Streams.Common
             return this.streamSubscriptionManager;
         }
 
-        public async Task Close()
+        private async Task Close(CancellationToken token)
         {
             if (!stateManager.PresetState(ProviderState.Closed)) return;
-            var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
-            if (siloRuntime != null)
+            
+            var manager = this.pullingAgentManager;
+            if (manager != null)
             {
-                await pullingAgentManager.Stop();
+                await manager.Stop();
             }
+
             stateManager.CommitState();
         }
 
         public IAsyncStream<T> GetStream<T>(Guid id, string streamNamespace)
         {
             var streamId = StreamId.GetStreamId(id, Name, streamNamespace);
-            return providerRuntime.GetStreamDirectory().GetOrAddStream<T>(
+            return this.runtime.GetStreamDirectory().GetOrAddStream<T>(
                 streamId, () => new StreamImpl<T>(streamId, this, IsRewindable, this.runtimeClient));
         }
 
@@ -147,7 +123,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 throw new InvalidOperationException($"Stream provider {queueAdapter.Name} is ReadOnly.");
             }
-            return new PersistentStreamProducer<T>((StreamImpl<T>)stream, providerRuntime, queueAdapter, IsRewindable, this.serializationManager);
+            return new PersistentStreamProducer<T>((StreamImpl<T>)stream, this.runtime, queueAdapter, IsRewindable, this.serializationManager);
         }
 
         IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)
@@ -157,7 +133,7 @@ namespace Orleans.Providers.Streams.Common
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(myConfig.PubSubType), this.loggerFactory, IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.runtime.PubSub(this.pubsubOptions.PubSubType), this.logger, IsRewindable);
         }
 
         public Task<object> ExecuteCommand(int command, object arg)
@@ -181,9 +157,28 @@ namespace Orleans.Providers.Streams.Common
                 return pullingAgentManager.ExecuteCommand((PersistentStreamProviderCommand)command, arg);
             }
 
-            logger.Warn(0, String.Format("Got command {0} with arg {1}, but PullingAgentManager is not initialized yet. Ignoring the command.", 
-                (PersistentStreamProviderCommand)command, arg != null ? arg.ToString() : "null"));
+            logger.Warn(0, $"Got command {(PersistentStreamProviderCommand)command} with arg {arg}, but PullingAgentManager is not initialized yet. Ignoring the command.");
             throw new ArgumentException("PullingAgentManager is not initialized yet.");
+        }
+
+        public void Participate(ILifecycleObservable lifecycle)
+        {
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.lifeCycleOptions.InitStage, Init);
+            lifecycle.Subscribe(OptionFormattingUtilities.Name<PersistentStreamProvider>(this.Name), this.lifeCycleOptions.StartStage, Start, Close);
+        }
+
+        public static IStreamProvider Create(IServiceProvider services, string name)
+        {
+            var pubsubOptions = services.GetRequiredService<IOptionsMonitor<StreamPubSubOptions>>().Get(name);
+            var initOptions = services.GetRequiredService<IOptionsMonitor<StreamLifecycleOptions>>().Get(name);
+            return ActivatorUtilities.CreateInstance<PersistentStreamProvider>(services, name, pubsubOptions, initOptions);
+        }
+
+        public static ILifecycleParticipant<TLifecycle> ParticipateIn<TLifecycle>(IServiceProvider serviceProvider, string name)
+            where TLifecycle : ILifecycleObservable
+        {
+            var provider = (PersistentStreamProvider)serviceProvider.GetRequiredServiceByName<IStreamProvider>(name);
+            return provider.ParticipateIn<TLifecycle>();
         }
     }
 }

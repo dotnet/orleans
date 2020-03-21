@@ -1,143 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Net;
-using System.Threading.Tasks;
-using Orleans.Core;
-using Orleans.Runtime.Configuration;
 
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Core;
+using Orleans.Statistics;
 
 namespace Orleans.Runtime
 {
-    public interface ICorePerformanceMetrics
-    {
-        /// <summary>
-        /// CPU utilization
-        /// </summary>
-        float CpuUsage { get; }
-
-        /// <summary>
-        /// Amount of memory available to processes running on the machine
-        /// </summary>
-        long AvailablePhysicalMemory { get; }
-
-        /// <summary>
-        /// Current memory usage
-        /// </summary>
-        long MemoryUsage { get; }
-
-        /// <summary>
-        /// Amount of physical memory on the machine
-        /// </summary>
-        long TotalPhysicalMemory { get; }
-
-        /// <summary>
-        /// the current size of the send queue (number of messages waiting to be sent). 
-        /// Only captures remote messages to other silos (not including messages to the clients).
-        /// </summary>
-        int SendQueueLength { get; }
-
-        /// <summary>
-        /// the current size of the receive queue (number of messages that arrived to this silo and 
-        /// are waiting to be dispatched). Captures both remote and local messages from other silos 
-        /// as well as from the clients.
-        /// </summary>
-        int ReceiveQueueLength { get; }
-
-        /// <summary>
-        /// total number of remote messages sent to other silos as well as to the clients.
-        /// </summary>
-        long SentMessages { get; }
-
-        /// <summary>
-        /// total number of remote received messages, from other silos as well as from the clients.
-        /// </summary>
-        long ReceivedMessages { get; }
-    }
-
-    /// <summary>
-    /// A small set of per-silo important key performance metrics
-    /// </summary>
-    public interface ISiloPerformanceMetrics : ICorePerformanceMetrics
-    {   
-        /// <summary>
-        /// the current size of the receive queue (number of messages that arrived to this silo and 
-        /// are waiting to be dispatched). Captures both remote and local messages from other silos 
-        /// as well as from the clients.
-        /// </summary>
-        long RequestQueueLength { get; }
-
-        /// <summary>
-        /// number of activations on this silo
-        /// </summary>
-        int ActivationCount { get; }
-
-        /// <summary>
-        /// Number of activations on this silo that were used in the last 10 minutes 
-        /// (Note: this number may currently not be accurate if different age limits 
-        /// are used for different grain types).
-        /// </summary>
-        int RecentlyUsedActivationCount { get; }
-
-        /// <summary>
-        /// Number of currently connected clients
-        /// </summary>
-        long ClientCount { get; }
-
-        /// <summary>
-        /// whether this silo is currently overloaded and is in the load shedding mode.
-        /// </summary>
-        bool IsOverloaded { get; } 
-
-        void LatchIsOverload(bool overloaded); // For testing only
-        void UnlatchIsOverloaded(); // For testing only
-        void LatchCpuUsage(float value); // For testing only
-        void UnlatchCpuUsage(); // For testing only
-    }
-
-    /// <summary>
-    /// A small set of per-Orleans-client important key performance metrics.
-    /// </summary>
-    public interface IClientPerformanceMetrics : ICorePerformanceMetrics
-    {
-        /// <summary>
-        /// number of gateways that this client is currently connected to.
-        /// </summary>
-        long ConnectedGatewayCount { get; }
-    }
-
-    public interface ISiloMetricsDataPublisher
-    {
-        Task Init(string deploymentId, string storageConnectionString, SiloAddress siloAddress, string siloName, IPEndPoint gateway, string hostName);
-        Task ReportMetrics(ISiloPerformanceMetrics metricsData);
-    }
-
-    public interface IConfigurableSiloMetricsDataPublisher : ISiloMetricsDataPublisher
-    {
-        void AddConfiguration(string deploymentId, bool isSilo, string siloName, SiloAddress address, System.Net.IPEndPoint gateway, string hostName);
-    }
-
-    public interface IClientMetricsDataPublisher
-    {
-        Task Init(ClientConfiguration config, IPAddress address, string clientId);
-        Task ReportMetrics(IClientPerformanceMetrics metricsData);
-    }
-
-    public interface IConfigurableClientMetricsDataPublisher : IClientMetricsDataPublisher
-    {
-        void AddConfiguration(string deploymentId, string hostName, string clientId, System.Net.IPAddress address);
-    }
-
-    public interface IStatisticsPublisher
-    {
-        Task ReportStats(List<ICounter> statsCounters);
-        Task Init(bool isSilo, string storageConnectionString, string deploymentId, string address, string siloName, string hostName);
-    }
-
-    public interface IConfigurableStatisticsPublisher : IStatisticsPublisher
-    {
-        void AddConfiguration(string deploymentId, bool isSilo, string siloName, SiloAddress address, System.Net.IPEndPoint gateway, string hostName);
-    }
-
     /// <summary>
     /// Snapshot of current runtime statistics for a silo
     /// </summary>
@@ -155,11 +25,6 @@ namespace Orleans.Runtime
         public int RecentlyUsedActivationCount { get; internal set; }
 
         /// <summary>
-        /// The size of the request queue.
-        /// </summary>
-        public long RequestQueueLength { get; internal set; }
-
-        /// <summary>
         /// The size of the sending queue.
         /// </summary>
         public int SendQueueLength { get; internal set; }
@@ -172,22 +37,22 @@ namespace Orleans.Runtime
         /// <summary>
         /// The CPU utilization.
         /// </summary>
-        public float CpuUsage { get; internal set; }
+        public float? CpuUsage { get; internal set; }
 
         /// <summary>
         /// The amount of memory available in the silo [bytes].
         /// </summary>
-        public float AvailableMemory { get; internal set; }
+        public float? AvailableMemory { get; internal set; }
 
         /// <summary>
         /// The used memory size.
         /// </summary>
-        public long MemoryUsage { get; internal set; }
+        public long? MemoryUsage { get; internal set; }
 
         /// <summary>
         /// The total physical memory available [bytes].
         /// </summary>
-        public long TotalPhysicalMemory { get; internal set; }
+        public long? TotalPhysicalMemory { get; internal set; }
 
         /// <summary>
         /// Is this silo overloaded.
@@ -211,31 +76,43 @@ namespace Orleans.Runtime
 
         internal SiloRuntimeStatistics() { }
 
-        internal SiloRuntimeStatistics(ISiloPerformanceMetrics metrics, DateTime dateTime)
+        internal SiloRuntimeStatistics(
+            IMessageCenter messageCenter,
+            int activationCount,
+            int recentlyUsedActivationCount,
+            IAppEnvironmentStatistics appEnvironmentStatistics,
+            IHostEnvironmentStatistics hostEnvironmentStatistics,
+            IOptions<LoadSheddingOptions> loadSheddingOptions,
+            DateTime dateTime)
         {
-            ActivationCount = metrics.ActivationCount;
-            RecentlyUsedActivationCount = metrics.RecentlyUsedActivationCount;
-            RequestQueueLength = metrics.RequestQueueLength;
-            SendQueueLength = metrics.SendQueueLength;
-            ReceiveQueueLength = metrics.ReceiveQueueLength;
-            CpuUsage = metrics.CpuUsage;
-            AvailableMemory = metrics.AvailablePhysicalMemory;
-            MemoryUsage = metrics.MemoryUsage;
-            IsOverloaded = metrics.IsOverloaded;
-            ClientCount = metrics.ClientCount;
-            TotalPhysicalMemory = metrics.TotalPhysicalMemory;
-            ReceivedMessages = metrics.ReceivedMessages;
-            SentMessages = metrics.SentMessages;
+            ActivationCount = activationCount;
+            RecentlyUsedActivationCount = recentlyUsedActivationCount;
+            SendQueueLength = messageCenter.SendQueueLength;
+            CpuUsage = hostEnvironmentStatistics.CpuUsage;
+            AvailableMemory = hostEnvironmentStatistics.AvailableMemory;
+            MemoryUsage = appEnvironmentStatistics.MemoryUsage;
+            IsOverloaded = loadSheddingOptions.Value.LoadSheddingEnabled && this.CpuUsage > loadSheddingOptions.Value.LoadSheddingLimit;
+            ClientCount = MessagingStatisticsGroup.ConnectedClientCount.GetCurrentValue();
+            TotalPhysicalMemory = hostEnvironmentStatistics.TotalPhysicalMemory;
+            ReceivedMessages = MessagingStatisticsGroup.MessagesReceived.GetCurrentValue();
+            SentMessages = MessagingStatisticsGroup.MessagesSentTotal.GetCurrentValue();
             DateTime = dateTime;
         }
 
         public override string ToString()
         {
-            return String.Format("SiloRuntimeStatistics: ActivationCount={0} RecentlyUsedActivationCount={11} RequestQueueLength={1} SendQueueLength={2} " +
-                                 "ReceiveQueueLength={3} CpuUsage={4} AvailableMemory={5} MemoryUsage={6} IsOverloaded={7} " +
-                                 "ClientCount={8} TotalPhysicalMemory={9} DateTime={10}", ActivationCount, RequestQueueLength,
-                                 SendQueueLength, ReceiveQueueLength, CpuUsage, AvailableMemory, MemoryUsage, IsOverloaded,
-                                 ClientCount, TotalPhysicalMemory, DateTime, RecentlyUsedActivationCount);
+            return
+                "SiloRuntimeStatistics: "
+                + $"ActivationCount={ActivationCount} " 
+                + $"RecentlyUsedActivationCount={RecentlyUsedActivationCount} "
+                + $"SendQueueLength={SendQueueLength} "
+                + $"CpuUsage={CpuUsage} "
+                + $"AvailableMemory={AvailableMemory} "
+                + $"MemoryUsage={MemoryUsage} "
+                + $"IsOverloaded={IsOverloaded} "
+                + $"ClientCount={ClientCount} "
+                + $"TotalPhysicalMemory={TotalPhysicalMemory} "
+                + $"DateTime={DateTime}";
         }
     }
 
@@ -256,7 +133,7 @@ namespace Orleans.Runtime
         public int GrainCount { get; set; }
 
         /// <summary>
-        /// Number of activation of a agrain of this type.
+        /// Number of activation of a grain of this type.
         /// </summary>
         public int ActivationCount { get; set; }
 
@@ -266,7 +143,7 @@ namespace Orleans.Runtime
         public int SiloCount { get; set; }
 
         /// <summary>
-        /// Returns the string representatio of this GrainStatistic.
+        /// Returns the string representation of this GrainStatistic.
         /// </summary>
         public override string ToString()
         {
@@ -296,7 +173,7 @@ namespace Orleans.Runtime
         public int ActivationCount { get; set; }
 
         /// <summary>
-        /// Returns the string representatio of this SimpleGrainStatistic.
+        /// Returns the string representation of this SimpleGrainStatistic.
         /// </summary>
         public override string ToString()
         {

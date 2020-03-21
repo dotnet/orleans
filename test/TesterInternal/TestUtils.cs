@@ -22,13 +22,13 @@ namespace UnitTests.TestHelper
             return dbFile;
         }
 
-        public static string GetSqlConnectionString()
+        public static string GetAdoNetConnectionString()
         {
             string dbFileName = @"TestDb.mdf";
-            return GetSqlConnectionString(new DirectoryInfo(@".\Data"), dbFileName);
+            return GetAdoNetConnectionString(new DirectoryInfo(@".\Data"), dbFileName);
         }
 
-        private static string GetSqlConnectionString(DirectoryInfo dbDir, string dbFileName)
+        private static string GetAdoNetConnectionString(DirectoryInfo dbDir, string dbFileName)
         {
             FileInfo dbFile = GetDbFileLocation(dbDir, dbFileName);
 
@@ -78,7 +78,9 @@ namespace UnitTests.TestHelper
         /// <param name="siloHandle">The target silo that should provide this information from it's cache</param>
         internal static Task<DetailedGrainReport> GetDetailedGrainReport(IInternalGrainFactory grainFactory, GrainId grainId, SiloHandle siloHandle)
         {
-            var siloControl = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, siloHandle.ProxyAddress);
+            // Use the siloAddress here, not the gateway address, since we may be targeting a silo on which we are not 
+            // connected to the gateway
+            var siloControl = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, siloHandle.SiloAddress);
             return siloControl.GetDetailedGrainReport(grainId);
         }
     }

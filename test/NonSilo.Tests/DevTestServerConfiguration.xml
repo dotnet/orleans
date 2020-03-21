@@ -1,13 +1,13 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <OrleansConfiguration xmlns="urn:orleans">
   <Globals>
-    <SystemStore SystemStoreType="SqlServer"
+    <SystemStore SystemStoreType="AdoNet"
                  DataConnectionString="connection string"/>
     <StorageProviders>
       <Provider Type="Orleans.Storage.MemoryStorage" Name="MemoryStore"  />
     </StorageProviders>
     <StatisticsProviders>
-      <Provider Type="Orleans.Providers.SqlServer.SqlStatisticsPublisher" Name="SQL" ConnectionString="connection string" />
+      <Provider Type="Orleans.Providers.AdoNet.AdoNetStatisticsPublisher" Name="SQL" ConnectionString="connection string" />
     </StatisticsProviders>
   </Globals>
   <Defaults>

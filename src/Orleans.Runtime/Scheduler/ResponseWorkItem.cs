@@ -13,21 +13,27 @@ namespace Orleans.Runtime.Scheduler
             response = m;
         }
 
-        #region IWorkItem Members
-
         public override WorkItemType ItemType { get { return WorkItemType.Response; } }
 
         public override string Name
         {
-            get { return String.Format("ResponseWorkItem:Id={0},Type={1} {2}", response.Id, response.Result, response.DebugContext); }
+            get { return $"ResponseWorkItem:Id={response.Id},Type={response.Result}"; }
         }
+
+        public override IGrainContext GrainContext => this.target;
 
         public override void Execute()
         {
-            target.HandleResponse(response);
+            try
+            {
+                RuntimeContext.SetExecutionContext(this.target);
+                target.HandleResponse(response);
+            }
+            finally
+            {
+                RuntimeContext.ResetExecutionContext();
+            }
         }
-
-        #endregion
 
         public override string ToString()
         {

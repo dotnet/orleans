@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans;
 using TestExtensions;
 using TestGrainInterfaces;
@@ -17,14 +17,14 @@ namespace DefaultCluster.Tests
             return GrainFactory.GetGrain<T>(GetRandomGrainId());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task DoSomethingGrainEmptyTest()
         {
             IDoSomethingEmptyGrain doSomething = GetHierarchyGrain<IDoSomethingEmptyGrain>();
             Assert.Equal("DoSomethingEmptyGrain", await doSomething.DoIt());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task DoSomethingGrainEmptyWithMoreTest()
         {
             IDoSomethingEmptyWithMoreGrain doSomething = GetHierarchyGrain<IDoSomethingEmptyWithMoreGrain>();
@@ -32,7 +32,7 @@ namespace DefaultCluster.Tests
             Assert.Equal("DoSomethingEmptyWithMoreGrain", await doSomething.DoMore());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task DoSomethingWithMoreEmptyGrainTest()
         {
             IDoSomethingWithMoreEmptyGrain doSomething = GetHierarchyGrain<IDoSomethingWithMoreEmptyGrain>();
@@ -40,7 +40,7 @@ namespace DefaultCluster.Tests
             Assert.Equal("DoSomethingWithMoreEmptyGrain", await doSomething.DoMore());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task DoSomethingWithMoreGrainTest()
         {
             IDoSomethingWithMoreGrain doSomething = GetHierarchyGrain<IDoSomethingWithMoreGrain>();
@@ -48,7 +48,7 @@ namespace DefaultCluster.Tests
             Assert.Equal("DoSomethingWithMoreGrain", await doSomething.DoThat());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task DoSomethingCombinedGrainTest()
         {
             IDoSomethingCombinedGrain doSomething = GetHierarchyGrain<IDoSomethingCombinedGrain>();
@@ -57,7 +57,7 @@ namespace DefaultCluster.Tests
             Assert.Equal("DoSomethingCombinedGrain", await doSomething.DoThat());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task DoSomethingValidateSingleGrainTest()
         {
             var doSomethingEmptyGrain = GetHierarchyGrain<IDoSomethingEmptyGrain>();

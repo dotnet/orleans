@@ -1,6 +1,8 @@
 using System;
+using System.Buffers.Text;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Orleans.Runtime
@@ -22,7 +24,8 @@ namespace Orleans.Runtime
             Grain = 3,
             Client = 4,
             KeyExtGrain = 6,
-            GeoClient = 7,
+            // 7 was GeoClient 
+            KeyExtSystemTarget = 8,
         }
 
         public UInt64 N0 { get; private set; }
@@ -49,23 +52,16 @@ namespace Orleans.Runtime
         }
 
         public bool IsSystemTargetKey
-        {
-            get { return IdCategory == Category.SystemTarget; }
-        }
+            => IsSystemTarget(IdCategory);
 
-        public bool IsSystemGrainKey
-        {
-            get { return IdCategory == Category.SystemGrain; }
-        }
+        private static bool IsSystemTarget(Category category)
+            => category == Category.SystemTarget || category == Category.KeyExtSystemTarget;
 
-        public bool HasKeyExt
-        {
-            get {
-                var category = IdCategory;
-                return category == Category.KeyExtGrain       
-                    || category == Category.GeoClient; // geo clients use the KeyExt string to specify the cluster id
-            }
-        }
+        public bool HasKeyExt => IsKeyExt(IdCategory);
+
+        private static bool IsKeyExt(Category category)
+            => category == Category.KeyExtGrain
+                        || category == Category.KeyExtSystemTarget;
 
         internal static readonly UniqueKey Empty =
             new UniqueKey
@@ -76,9 +72,9 @@ namespace Orleans.Runtime
                 KeyExt = null
             };
 
-        internal static UniqueKey Parse(string input)
+        internal static UniqueKey Parse(ReadOnlySpan<char> input)
         {
-            var trimmed = input.Trim();
+            var trimmed = input.Trim().ToString();
 
             // first, for convenience we attempt to parse the string using GUID syntax. this is needed by unit
             // tests but i don't know if it's needed for production.
@@ -111,7 +107,7 @@ namespace Orleans.Runtime
 
         private static UniqueKey NewKey(ulong n0, ulong n1, Category category, long typeData, string keyExt)
         {
-            if (category != Category.KeyExtGrain && category != Category.GeoClient && keyExt != null)
+            if (!IsKeyExt(category) && keyExt != null)
                 throw new ArgumentException("Only key extended grains can specify a non-null key extension.");
 
             var typeCodeData = ((ulong)category << 56) + ((ulong)typeData & 0x00FFFFFFFFFFFFFF);
@@ -162,6 +158,11 @@ namespace Orleans.Runtime
             return NewKey(0, n1, Category.SystemTarget, typeData, null);
         }
 
+        public static UniqueKey NewGrainServiceKey(string key, long typeData)
+        {
+            return NewKey(0, 0, Category.KeyExtSystemTarget, typeData, key);
+        }
+
         internal static UniqueKey NewKey(ulong n0, ulong n1, ulong typeCodeData, string keyExt)
         {
             ValidateKeyExt(keyExt, typeCodeData);
@@ -183,7 +184,7 @@ namespace Orleans.Runtime
 
         private static void ThrowIfIsSystemTargetKey(Category category)
         {
-            if (category == Category.SystemTarget)
+            if (IsSystemTarget(category))
                 throw new ArgumentException(
                     "This overload of NewKey cannot be used to construct an instance of UniqueKey containing a SystemTarget id.");
         }
@@ -223,16 +224,6 @@ namespace Orleans.Runtime
             ThrowIfHasKeyExt("UniqueKey.PrimaryKeyToGuid");
             string unused;
             return PrimaryKeyToGuid(out unused);
-        }
-
-        public string ClusterId
-        {
-            get
-            {
-                if (IdCategory != Category.GeoClient)
-                    throw new InvalidOperationException("ClusterId is only defined for geo clients");
-                return this.KeyExt;
-            }
         }
 
         public override bool Equals(object o)
@@ -292,47 +283,42 @@ namespace Orleans.Runtime
             // ReSharper restore NonReadonlyFieldInGetHashCode
         }
 
-        internal byte[] ToByteArray()
+        /// <summary>
+        /// If KeyExt not exists, returns following structure
+        /// |8 bytes|8 bytes|8 bytes|4 bytes| - total 28 bytes.
+        /// If KeyExt exists, adds additional KeyExt bytes length
+        /// </summary>
+        /// <returns></returns>
+        internal ReadOnlySpan<byte> ToByteArray()
         {
-            byte[] bytes, extBytes = null;
-            var tmpArray = new ulong[1];
+            var extBytes = this.KeyExt != null ? Encoding.UTF8.GetBytes(KeyExt) : null;
+            var extBytesLength = extBytes?.Length ?? 0;
+            var sizeWithoutExtBytes = sizeof(ulong) * 3 + sizeof(int);
+
+            var spanBytes = new byte[sizeWithoutExtBytes + extBytesLength].AsSpan();
+
             var offset = 0;
-            if (this.KeyExt != null)
-            {
-                extBytes = Encoding.UTF8.GetBytes(KeyExt);
-                // N0 + N1 + TypeCodeData + length(KeyExt in bytes) + KeyExt in bytes
-                bytes = new byte[sizeof(ulong) * 3 + sizeof(int) + extBytes.Length];
-            }
-            else
-            {
-                // N0 + N1 + TypeCodeData + length(-1)
-                bytes = new byte[sizeof(ulong) * 3 + sizeof(int)];
-            }
-            // Copy N0
-            tmpArray[0] = this.N0;
-            Buffer.BlockCopy(tmpArray, 0, bytes, offset, sizeof(ulong));
-            offset += sizeof(ulong);
-            // Copy N1
-            tmpArray[0] = this.N1;
-            Buffer.BlockCopy(tmpArray, 0, bytes, offset, sizeof(ulong));
-            offset += sizeof(ulong);
-            // Copy TypeCodeData
-            tmpArray[0] = this.TypeCodeData;
-            Buffer.BlockCopy(tmpArray, 0, bytes, offset, sizeof(ulong));
-            offset += sizeof(ulong);
+            var ulongBytes = MemoryMarshal.Cast<byte, ulong>(spanBytes.Slice(offset, sizeof(ulong) * 3));
+
+            ulongBytes[0] = this.N0;
+            ulongBytes[1] = this.N1;
+            ulongBytes[2] = this.TypeCodeData;
+
+            offset += sizeof(ulong) * 3;
+
             // Copy KeyExt
             if (extBytes != null)
             {
-                Buffer.BlockCopy(new[] {extBytes.Length}, 0, bytes, offset, sizeof(int));
+                MemoryMarshal.Cast<byte, int>(spanBytes.Slice(offset, sizeof(int)))[0] = extBytesLength;
                 offset += sizeof(int);
-                Buffer.BlockCopy(extBytes, 0, bytes, offset, extBytes.Length);
+                extBytes.CopyTo(spanBytes.Slice(offset, extBytesLength));
             }
             else
             {
-                Buffer.BlockCopy(new[] {-1}, 0, bytes, offset, sizeof(int));
+                MemoryMarshal.Cast<byte, int>(spanBytes.Slice(offset, sizeof(int)))[0] = -1;
             }
 
-            return bytes;
+            return spanBytes;
         }
 
         private Guid ConvertToGuid()
@@ -359,7 +345,7 @@ namespace Orleans.Runtime
         private static void ValidateKeyExt(string keyExt, UInt64 typeCodeData)
         {
             Category category = GetCategory(typeCodeData);
-            if (category == Category.KeyExtGrain)
+            if (category == Category.KeyExtGrain || category == Category.KeyExtSystemTarget)
             {
                 if (string.IsNullOrWhiteSpace(keyExt))
                 {
@@ -374,13 +360,9 @@ namespace Orleans.Runtime
                     }
                 }
             }
-            else if (category != Category.GeoClient && null != keyExt)
-            {
-                throw new ArgumentException("Extended key field is not null in non-extended UniqueIdentifier.");
-            }
         }
 
-        private static Category GetCategory(UInt64 typeCodeData)
+        internal static Category GetCategory(UInt64 typeCodeData)
         {
             return (Category)((typeCodeData >> 56) & 0xFF);
         }

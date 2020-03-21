@@ -1,5 +1,5 @@
 using System;
-using Newtonsoft.Json;
+using System.Runtime.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -7,7 +7,7 @@ namespace Orleans.Runtime
     internal abstract class UniqueIdentifier : IEquatable<UniqueIdentifier>, IComparable<UniqueIdentifier>
     {
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
-        [JsonProperty]
+        [DataMember]
         protected readonly internal UniqueKey Key;
 
         protected UniqueIdentifier()
@@ -42,22 +42,14 @@ namespace Orleans.Runtime
             return checked((uint)key);
         }
 
-        #region IEquatable<UniqueIdentifier> Members
-
         public virtual bool Equals(UniqueIdentifier other)
         {
             return other != null && GetType() == other.GetType() && Key.Equals(other.Key);
         }
 
-        #endregion
-
-        #region IComparable<UniqueIdentifier> Members
-
         public int CompareTo(UniqueIdentifier other)
         {
             return Key.CompareTo(other.Key);
         }
-
-        #endregion
     }
 }

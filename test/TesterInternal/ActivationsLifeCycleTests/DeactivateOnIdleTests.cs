@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,9 +11,15 @@ using UnitTests.TestHelper;
 using Xunit;
 using Xunit.Abstractions;
 using System.Linq;
+using Orleans.Internal;
+using Orleans.Hosting;
+using Orleans.Configuration;
+using Microsoft.Extensions.Configuration;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
+
+
     [TestCategory("ActivationCollector")]
     public class DeactivateOnIdleTests : OrleansTestingBase, IDisposable
     {
@@ -25,20 +31,28 @@ namespace UnitTests.ActivationsLifeCycleTests
             this.output = output;
         }
 
-        private void Initialize(TestClusterOptions options = null)
+        private void Initialize(TestClusterBuilder builder = null)
         {
-            if (options == null)
+            if (builder == null)
             {
-                options = new TestClusterOptions(1);
+                builder = new TestClusterBuilder(1);
             }
-            testCluster = new TestCluster(options);
+
+            testCluster = builder.Build();
             testCluster.Deploy();
         }
         
         public void Dispose()
         {
-            testCluster?.StopAllSilos();
-            testCluster = null;
+            try
+            {
+                testCluster?.StopAllSilos();
+            }
+            finally
+            {
+                testCluster?.Dispose();
+                testCluster = null;
+            }
         }
 
         [Fact, TestCategory("Functional")]
@@ -181,14 +195,31 @@ namespace UnitTests.ActivationsLifeCycleTests
             await DeactivateOnIdle_NonExistentActivation_Runner(1);
         }
 
+        public class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<StaticGatewayListProviderOptions>(options => { options.Gateways = options.Gateways.Take(1).ToList(); });
+            }
+        }
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                var cfg = hostBuilder.GetConfiguration();
+                var maxForwardCount = int.Parse(cfg["MaxForwardCount"]);
+                hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = maxForwardCount);
+            }
+        }
+
         private async Task DeactivateOnIdle_NonExistentActivation_Runner(int forwardCount)
         {
-            var options = new TestClusterOptions(2);
-            options.ClusterConfiguration.Globals.MaxForwardCount = forwardCount;
-            options.ClusterConfiguration.Defaults.Generation = 13;
-            // For this test we only want to talk to the primary
-            options.ClientConfiguration.Gateways.RemoveAt(1);
-            Initialize(options);
+            var builder = new TestClusterBuilder(2);
+            builder.AddClientBuilderConfigurator<ClientConfigurator>();
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            builder.Properties["MaxForwardCount"] = forwardCount.ToString();
+            Initialize(builder);
 
             ICollectionTestGrain grain = await PickGrainInNonPrimary();
 
@@ -252,27 +283,33 @@ namespace UnitTests.ActivationsLifeCycleTests
         public async Task MissingActivation_WithoutDirectoryLazyDeregistration_MultiSilo()
         {
             var directoryLazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
-            var options = new TestClusterOptions(2);
-            // Disable retries in this case, to make test more predictable.
-            options.ClusterConfiguration.Globals.MaxForwardCount = 0;
-            options.ClientConfiguration.Gateways.RemoveAt(1);
-            Initialize(options);
+            var builder = new TestClusterBuilder(2);
+            builder.AddSiloBuilderConfigurator<NoForwardingSiloConfigurator>();
+            Initialize(builder);
             for (int i = 0; i < 10; i++)
             {
                 await MissingActivation_Runner(i, directoryLazyDeregistrationDelay);
             }
         }
 
+        public class NoForwardingSiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                // Disable retries in this case, to make test more predictable.
+                hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = 0);
+            }
+        }
+
         [Fact, TestCategory("Functional")]
         public async Task MissingActivation_WithDirectoryLazyDeregistration_SingleSilo()
         {
-            var directoryLazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000);
             var lazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000);
-            var options = new TestClusterOptions(1);
-            options.ClusterConfiguration.Globals.DirectoryLazyDeregistrationDelay = directoryLazyDeregistrationDelay;
-            // Disable retries in this case, to make test more predictable.
-            options.ClusterConfiguration.Globals.MaxForwardCount = 0;
-            Initialize(options);
+            var builder = new TestClusterBuilder(1);
+            builder.AddSiloBuilderConfigurator<NoForwardingSiloConfigurator>();
+            builder.AddSiloBuilderConfigurator<LazyDeregistrationDelaySiloConfigurator>();
+
+            Initialize(builder);
 
             for (int i = 0; i < 10; i++)
             {
@@ -280,15 +317,24 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
+        public class LazyDeregistrationDelaySiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.Configure<GrainDirectoryOptions>(options => options.LazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000));
+            }
+        }
+
         [Fact(Skip = "Needs investigation"), TestCategory("Functional")]
         public async Task MissingActivation_WithoutDirectoryLazyDeregistration_MultiSilo_SecondaryFirst()
         {
             var lazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
-            var options = new TestClusterOptions(2);
-            // Disable retries in this case, to make test more predictable.
-            options.ClusterConfiguration.Globals.MaxForwardCount = 0;
-            options.ClientConfiguration.Gateways.RemoveAt(1);
-            Initialize(options);
+            var builder = new TestClusterBuilder(2);
+            builder.Properties["MaxForwardCount"] = "0";
+            builder.AddClientBuilderConfigurator<ClientConfigurator>();
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+
+            Initialize(builder);
 
             await MissingActivation_Runner(1, lazyDeregistrationDelay, true);
         }

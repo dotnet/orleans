@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  api:
+    image: api
+    build:
+      context: .
+      dockerfile: API/Dockerfile
+  silo:
+    image: silo
+    build:
+      context: .
+      dockerfile: Silo/Dockerfile

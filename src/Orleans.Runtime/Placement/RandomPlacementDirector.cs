@@ -2,27 +2,27 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class RandomPlacementDirector : IPlacementDirector<RandomPlacement>, IActivationSelector<RandomPlacement>
+    internal class RandomPlacementDirector : IPlacementDirector, IActivationSelector
     {
         private readonly SafeRandom random = new SafeRandom();
 
         public virtual async Task<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
-            List<ActivationAddress> places = (await context.FullLookup(target)).Addresses;
+            var places = (await context.FullLookup(target));
             return ChooseRandomActivation(places, context);
         }
 
         public bool TrySelectActivationSynchronously(
             PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult)
         {
-            AddressesAndTag addressesAndTag;
-            if (context.FastLookup(target, out addressesAndTag))
+            if (context.FastLookup(target, out var addresses))
             {
-                placementResult = ChooseRandomActivation(addressesAndTag.Addresses, context);
+                placementResult = ChooseRandomActivation(addresses, context);
                 return true;
             }
 

@@ -1,4 +1,5 @@
-using System.Threading;
+using System;
+using System.Threading.Channels;
 
 namespace Orleans.Runtime
 {
@@ -7,17 +8,13 @@ namespace Orleans.Runtime
         SiloAddress MyAddress { get; }
 
         void Start();
-
-        void PrepareToStop();
-
+        
         void Stop();
 
         void SendMessage(Message msg);
 
-        Message WaitMessage(Message.Categories type, CancellationToken ct);
+        void OnReceivedMessage(Message message);
 
         int SendQueueLength { get; }
-
-        int ReceiveQueueLength { get; }
     }
 }

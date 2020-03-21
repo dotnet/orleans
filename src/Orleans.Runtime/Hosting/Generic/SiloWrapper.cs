@@ -1,6 +1,8 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans.Hosting
@@ -8,12 +10,17 @@ namespace Orleans.Hosting
     internal class SiloWrapper : ISiloHost
     {
         private readonly Silo silo;
+        private readonly SiloApplicationLifetime applicationLifetime;
+        private bool isDisposing;
 
         public SiloWrapper(Silo silo, IServiceProvider services)
         {
             this.Services = services;
             this.silo = silo;
             this.Stopped = silo.SiloTerminated;
+
+            // It is fine for this field to be null in the case that the silo is not the host.
+            this.applicationLifetime = services.GetService<IHostApplicationLifetime>() as SiloApplicationLifetime;
         }
 
         /// <inheritdoc />
@@ -25,33 +32,32 @@ namespace Orleans.Hosting
         /// <inheritdoc />
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                this.silo.Start();
-            }
-
-            // Await to avoid compiler warnings.
-            await Task.CompletedTask;
+            await this.silo.StartAsync(cancellationToken).ConfigureAwait(false);
+            this.applicationLifetime?.NotifyStarted();
         }
 
         /// <inheritdoc />
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            if (cancellationToken.IsCancellationRequested)
+            try
             {
-                this.silo.Stop();
+                this.applicationLifetime?.StopApplication();
+                await silo.StopAsync(cancellationToken);
             }
-            else
+            finally
             {
-                this.silo.Shutdown();
+                this.applicationLifetime?.NotifyStopped();
             }
-
-            await this.Stopped;
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
-            (this.Services as IDisposable)?.Dispose();
+            if (!isDisposing)
+            {
+                this.isDisposing = true;
+                (this.Services as IDisposable)?.Dispose();
+            }
         }
     }
 }

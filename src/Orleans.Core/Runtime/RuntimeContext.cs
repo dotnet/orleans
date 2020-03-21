@@ -1,60 +1,32 @@
 using System;
-using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime
 {
     internal class RuntimeContext
     {
-        public TaskScheduler Scheduler { get; private set; }
-        public ISchedulingContext ActivationContext { get; private set; }
+        public IGrainContext GrainContext { get; private set; }
 
         [ThreadStatic]
         private static RuntimeContext context;
-        public static RuntimeContext Current 
-        { 
-            get { return context; } 
-        }
 
-        internal static ISchedulingContext CurrentActivationContext
+        public static RuntimeContext Current => context;
+
+        internal static IGrainContext CurrentGrainContext { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => context?.GrainContext; }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void SetExecutionContext(IGrainContext shedContext)
         {
-            get { return RuntimeContext.Current != null ? RuntimeContext.Current.ActivationContext : null; }
+            context ??= new RuntimeContext();
+            context.GrainContext = shedContext;
         }
 
-        internal static void InitializeThread(TaskScheduler scheduler)
-        {
-            // There seems to be an implicit coupling of threads and contexts here that may be fragile. 
-            // E.g. if InitializeThread() is mistakenly called on a wrong thread, would that thread be considered a worker pool thread from that point on? 
-            // Is there a better/safer way to identify worker threads? 
-            if (context != null && scheduler != null)
-            {
-                throw new InvalidOperationException("RuntimeContext.Current has already been initialized for this thread.");
-            }
-            context = new RuntimeContext {Scheduler = scheduler};
-        }
-
-        internal static void InitializeMainThread()
-        {
-            context = new RuntimeContext {Scheduler = null};
-        }
-
-        internal static void SetExecutionContext(ISchedulingContext shedContext, TaskScheduler scheduler)
-        {
-            if (context == null) throw new InvalidOperationException("SetExecutionContext called on unexpected non-WorkerPool thread");
-            context.ActivationContext = shedContext;
-            context.Scheduler = scheduler;
-        }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void ResetExecutionContext()
         {
-            context.ActivationContext = null;
-            context.Scheduler = null;
+            context.GrainContext = null;
         }
 
-        public override string ToString()
-        {
-            return String.Format("RuntimeContext: ActivationContext={0}, Scheduler={1}", 
-                ActivationContext != null ? ActivationContext.ToString() : "null",
-                Scheduler != null ? Scheduler.ToString() : "null");
-        }
+        public override string ToString() => $"RuntimeContext: GrainContext={GrainContext?.ToString() ?? "null"}";
     }
 }

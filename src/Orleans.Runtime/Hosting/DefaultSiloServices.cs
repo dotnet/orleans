@@ -1,8 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
-using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.Configuration.Validators;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
@@ -10,8 +9,8 @@ using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.LogConsistency;
 using Orleans.Runtime.MembershipService;
+using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
-using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.ReminderService;
@@ -20,6 +19,7 @@ using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
 using Orleans.Serialization;
+using Orleans.Statistics;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 using Orleans.Timers;
@@ -28,39 +28,55 @@ using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Runtime.Storage;
 using Orleans.Transactions;
 using Orleans.LogConsistency;
-using Orleans.Storage;
 using Microsoft.Extensions.Logging;
 using Orleans.ApplicationParts;
 using Orleans.Runtime.Utilities;
 using System;
-using Orleans.Metadata;
+using System.Reflection;
+using System.Linq;
+using Microsoft.Extensions.Options;
+using Orleans.Timers.Internal;
+using Microsoft.AspNetCore.Connections;
+using Orleans.Networking.Shared;
+using Orleans.Configuration.Internal;
 
 namespace Orleans.Hosting
 {
     internal static class DefaultSiloServices
     {
-        internal static void AddDefaultServices(HostBuilderContext context, IServiceCollection services)
+        internal static void AddDefaultServices(IApplicationPartManager applicationPartManager, IServiceCollection services)
         {
             services.AddOptions();
 
-            // Register system services.
-            services.TryAddSingleton<ISiloHost, SiloWrapper>();
+            services.AddTransient<IConfigurationValidator, EndpointOptionsValidator>();
 
+            // Options logging
+            services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
+            services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
+
+            // Register system services.
+            services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
+            services.TryAddSingleton<ISiloHost, SiloWrapper>();
+            services.TryAddTransient<ILifecycleSubject, LifecycleSubject>();
+            services.TryAddSingleton<SiloLifecycleSubject>();
+            services.TryAddFromExisting<ISiloLifecycleSubject, SiloLifecycleSubject>();
+            services.TryAddFromExisting<ISiloLifecycle, SiloLifecycleSubject>();
+            services.AddSingleton<SiloOptionsLogger>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloOptionsLogger>();
             services.PostConfigure<SiloMessagingOptions>(options =>
             {
                 //
                 // Assign environment specific defaults post configuration if user did not configured otherwise.
                 //
 
-                if (options.SiloSenderQueues==0)
+                if (options.SiloSenderQueues == 0)
                 {
                     options.SiloSenderQueues = Environment.ProcessorCount;
                 }
 
-                if (options.GatewaySenderQueues==0)
+                if (options.GatewaySenderQueues == 0)
                 {
                     options.GatewaySenderQueues = Environment.ProcessorCount;
                 }
@@ -68,42 +84,25 @@ namespace Orleans.Hosting
             services.TryAddSingleton<TelemetryManager>();
             services.TryAddFromExisting<ITelemetryProducer, TelemetryManager>();
 
+            services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
+            services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
+            services.TryAddSingleton<SiloStatisticsManager>();
+            services.TryAddFromExisting<IStatisticsManager, SiloStatisticsManager>();
+            services.TryAddSingleton<ApplicationRequestsStatisticsGroup>();
+            services.TryAddSingleton<StageAnalysisStatisticsGroup>();
+            services.TryAddSingleton<SchedulerStatisticsGroup>();
+            services.TryAddSingleton<SerializationStatisticsGroup>();
+            services.TryAddSingleton<OverloadDetector>();
+
             // queue balancer contructing related
-            services.TryAddTransient<StaticClusterConfigDeploymentBalancer>();
-            services.TryAddTransient<DynamicClusterConfigDeploymentBalancer>();
-            services.TryAddTransient<ClusterConfigDeploymentLeaseBasedBalancer>();
-            services.TryAddTransient<ConsistentRingQueueBalancer>();
-            services.TryAddTransient(typeof(IStreamSubscriptionObserver<>), typeof(StreamSubscriptionObserverProxy<>));
+            services.TryAddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
 
-            services.TryAddSingleton<ProviderManagerSystemTarget>();
-            services.TryAddSingleton<SiloUnobservedExceptionsHandler>();
-            services.TryAddSingleton<StatisticsProviderManager>();
-            services.AddFromExisting<IProviderManager, StatisticsProviderManager>();
+            services.TryAddSingleton<FallbackSystemTarget>();
+            services.TryAddSingleton<LifecycleSchedulingSystemTarget>();
 
-            // storage providers
-            services.TryAddSingleton<StorageProviderManager>();
-            services.AddFromExisting<IProviderManager, StorageProviderManager>();
-            services.TryAddFromExisting<IKeyedServiceCollection<string, IStorageProvider>, StorageProviderManager>(); // as named services
-            services.TryAddSingleton<IStorageProvider>(sp => sp.GetRequiredService<StorageProviderManager>().GetDefaultProvider()); // default
-
-            // log concistency providers
-            services.TryAddSingleton<LogConsistencyProviderManager>();
-            services.AddFromExisting<IProviderManager, LogConsistencyProviderManager>();
-            services.TryAddFromExisting<IKeyedServiceCollection<string, ILogConsistencyProvider>, LogConsistencyProviderManager>(); // as named services
-            services.TryAddSingleton<ILogConsistencyProvider>(sp => sp.GetRequiredService<LogConsistencyProviderManager>().GetDefaultProvider()); // default
-
-            services.TryAddSingleton<BootstrapProviderManager>();
-            services.AddFromExisting<IProviderManager, BootstrapProviderManager>();
-            services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.AddLogging();
-            //temporary change until runtime moved away from Logger
-            services.TryAddSingleton(typeof(LoggerWrapper<>));
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
-            services.TryAddSingleton<StreamProviderManager>();
-            services.AddFromExisting<IStreamProviderManager, StreamProviderManager>();
-            services.TryAddFromExisting<IKeyedServiceCollection<string, IStreamProvider>, StreamProviderManager>(); // as named services
-            services.AddFromExisting<IProviderManager, IStreamProviderManager>();
             services.TryAddSingleton<GrainRuntime>();
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
@@ -115,74 +114,124 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
             services.TryAddSingleton<TypeMetadataCache>();
             services.TryAddSingleton<ActivationDirectory>();
+            services.TryAddSingleton<ActivationCollector>();
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
-            services.TryAddSingleton(sp => sp.GetRequiredService<LocalGrainDirectory>().GsiActivationMaintainer);
-            services.TryAddSingleton<SiloStatisticsManager>();
-            services.TryAddSingleton<ISiloPerformanceMetrics>(sp => sp.GetRequiredService<SiloStatisticsManager>().MetricsTable);
-            services.TryAddFromExisting<ICorePerformanceMetrics, ISiloPerformanceMetrics>();
+            services.AddSingleton<DhtGrainLocator>();
+            if (services.FirstOrDefault(service => service.ServiceType == typeof(IGrainDirectory)) != null)
+            {
+                services.AddSingleton<IGrainLocator, GrainLocator>();
+                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainLocator>();
+            }
+            else
+            {
+                services.AddFromExisting<IGrainLocator, DhtGrainLocator>();
+            }
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
-            services.TryAddFromExisting<ISiloMessageCenter, MessageCenter>();
             services.TryAddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);
             services.TryAddSingleton<Dispatcher>(sp => sp.GetRequiredService<Catalog>().Dispatcher);
             services.TryAddSingleton<InsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
-            services.TryAddSingleton<MultiClusterGossipChannelFactory>();
-            services.TryAddSingleton<MultiClusterOracle>();
-            services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();
-            services.TryAddFromExisting<IMultiClusterOracle, MultiClusterOracle>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
+            services.TryAddSingleton<IGrainServiceFactory, GrainServiceFactory>();
+
+            services.TryAddSingleton<IFatalErrorHandler, FatalErrorHandler>();
+
             services.TryAddSingleton<DeploymentLoadPublisher>();
-            services.TryAddSingleton<MembershipOracle>();
-            services.TryAddFromExisting<IMembershipOracle, MembershipOracle>();
-            services.TryAddFromExisting<ISiloStatusOracle, MembershipOracle>();
-            services.TryAddSingleton<MembershipTableFactory>();
-            services.TryAddSingleton<ReminderTableFactory>();
-            services.TryAddSingleton<IReminderTable>(sp => sp.GetRequiredService<ReminderTableFactory>().Create());
-            services.TryAddSingleton<LocalReminderServiceFactory>();
+
+            services.TryAddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
+            services.TryAddSingleton<MembershipTableManager>();
+            services.AddFromExisting<IHealthCheckParticipant, MembershipTableManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
+            services.TryAddSingleton<MembershipSystemTarget>();
+            services.AddFromExisting<IMembershipService, MembershipSystemTarget>();
+            services.TryAddSingleton<IMembershipGossiper, MembershipGossiper>();
+            services.TryAddSingleton<IRemoteSiloProber, RemoteSiloProber>();
+            services.TryAddSingleton<SiloStatusOracle>();
+            services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracle>();
+            services.AddSingleton<ClusterHealthMonitor>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor>();
+            services.AddFromExisting<IHealthCheckParticipant, ClusterHealthMonitor>();
+            services.AddSingleton<MembershipAgent>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipAgent>();
+            services.AddFromExisting<IHealthCheckParticipant, MembershipAgent>();
+            services.AddSingleton<MembershipTableCleanupAgent>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableCleanupAgent>();
+            services.AddFromExisting<IHealthCheckParticipant, MembershipTableCleanupAgent>();
+            services.AddSingleton<SiloStatusListenerManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloStatusListenerManager>();
+            services.AddSingleton<ClusterMembershipService>();
+            services.TryAddFromExisting<IClusterMembershipService, ClusterMembershipService>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterMembershipService>();
+
             services.TryAddSingleton<ClientObserverRegistrar>();
+            services.TryAddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();
             services.TryAddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
             services.TryAddSingleton<ImplicitStreamSubscriberTable>();
             services.TryAddSingleton<MessageFactory>();
 
-            services.TryAddSingleton<IGrainRegistrar<GlobalSingleInstanceRegistration>, GlobalSingleInstanceRegistrar>();
-            services.TryAddSingleton<IGrainRegistrar<ClusterLocalRegistration>, ClusterLocalRegistrar>();
-            services.TryAddSingleton<RegistrarManager>();
-            services.TryAddSingleton<Factory<Grain, IMultiClusterRegistrationStrategy, ILogConsistencyProtocolServices>>(FactoryUtility.Create<Grain, IMultiClusterRegistrationStrategy, ProtocolServices>);
+            services.TryAddSingleton<Factory<Grain, ILogConsistencyProtocolServices>>(FactoryUtility.Create<Grain, ProtocolServices>);
             services.TryAddSingleton(FactoryUtility.Create<GrainDirectoryPartition>);
 
             // Placement
+            services.AddSingleton<IConfigurationValidator, ActivationCountBasedPlacementOptionsValidator>();
             services.TryAddSingleton<PlacementDirectorsManager>();
-            services.TryAddSingleton<IPlacementDirector<RandomPlacement>, RandomPlacementDirector>();
-            services.TryAddSingleton<IActivationSelector<RandomPlacement>, RandomPlacementDirector>();
-            services.TryAddSingleton<IPlacementDirector<PreferLocalPlacement>, PreferLocalPlacementDirector>();
-            services.TryAddSingleton<IPlacementDirector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
-            services.TryAddSingleton<IActivationSelector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
-            services.TryAddSingleton<IPlacementDirector<ActivationCountBasedPlacement>, ActivationCountPlacementDirector>();
-            services.TryAddSingleton<IPlacementDirector<HashBasedPlacement>, HashBasedPlacementDirector>();
-            services.TryAddSingleton<DefaultPlacementStrategy>();
             services.TryAddSingleton<ClientObserversPlacementDirector>();
 
-            // Versions
+            // Configure the default placement strategy.
+            services.TryAddSingleton<PlacementStrategy, RandomPlacement>();
+
+            // Placement directors
+            services.AddPlacementDirector<RandomPlacement, RandomPlacementDirector>();
+            services.AddPlacementDirector<PreferLocalPlacement, PreferLocalPlacementDirector>();
+            services.AddPlacementDirector<StatelessWorkerPlacement, StatelessWorkerDirector>();
+            services.Replace(new ServiceDescriptor(typeof(StatelessWorkerPlacement), sp => new StatelessWorkerPlacement(), ServiceLifetime.Singleton));
+            services.AddPlacementDirector<ActivationCountBasedPlacement, ActivationCountPlacementDirector>();
+            services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
+
+            // Activation selectors
+            services.AddSingletonKeyedService<Type, IActivationSelector, RandomPlacementDirector>(typeof(RandomPlacement));
+            services.AddSingletonKeyedService<Type, IActivationSelector, StatelessWorkerDirector>(typeof(StatelessWorkerPlacement));
+
+            // Versioning
             services.TryAddSingleton<VersionSelectorManager>();
-            services.TryAddSingleton<IVersionSelector<MinimumVersion>, MinimumVersionSelector>();
-            services.TryAddSingleton<IVersionSelector<LatestVersion>, LatestVersionSelector>();
-            services.TryAddSingleton<IVersionSelector<AllCompatibleVersions>, AllCompatibleVersionsSelector>();
-            services.TryAddSingleton<CompatibilityDirectorManager>();
-            services.TryAddSingleton<ICompatibilityDirector<BackwardCompatible>, BackwardCompatilityDirector>();
-            services.TryAddSingleton<ICompatibilityDirector<AllVersionsCompatible>, AllVersionsCompatibilityDirector>();
-            services.TryAddSingleton<ICompatibilityDirector<StrictVersionCompatible>, StrictVersionCompatibilityDirector>();
             services.TryAddSingleton<CachedVersionSelectorManager>();
-            services.TryAddSingleton<IVersionStore, GrainVersionStore>();
+            // Version selector strategy
+            if (!services.Any(x => x.ServiceType == typeof(IVersionStore)))
+            {
+                services.TryAddSingleton<GrainVersionStore>();
+                services.AddFromExisting<IVersionStore, GrainVersionStore>();
+            }
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainVersionStore>();
+            services.AddSingletonNamedService<VersionSelectorStrategy, AllCompatibleVersions>(nameof(AllCompatibleVersions));
+            services.AddSingletonNamedService<VersionSelectorStrategy, LatestVersion>(nameof(LatestVersion));
+            services.AddSingletonNamedService<VersionSelectorStrategy, MinimumVersion>(nameof(MinimumVersion));
+            // Versions selectors
+            services.AddSingletonKeyedService<Type, IVersionSelector, MinimumVersionSelector>(typeof(MinimumVersion));
+            services.AddSingletonKeyedService<Type, IVersionSelector, LatestVersionSelector>(typeof(LatestVersion));
+            services.AddSingletonKeyedService<Type, IVersionSelector, AllCompatibleVersionsSelector>(typeof(AllCompatibleVersions));
+
+            // Compatibility
+            services.TryAddSingleton<CompatibilityDirectorManager>();
+            // Compatability strategy
+            services.AddSingletonNamedService<CompatibilityStrategy, AllVersionsCompatible>(nameof(AllVersionsCompatible));
+            services.AddSingletonNamedService<CompatibilityStrategy, BackwardCompatible>(nameof(BackwardCompatible));
+            services.AddSingletonNamedService<CompatibilityStrategy, StrictVersionCompatible>(nameof(StrictVersionCompatible));
+            // Compatability directors
+            services.AddSingletonKeyedService<Type, ICompatibilityDirector, BackwardCompatilityDirector>(typeof(BackwardCompatible));
+            services.AddSingletonKeyedService<Type, ICompatibilityDirector, AllVersionsCompatibilityDirector>(typeof(AllVersionsCompatible));
+            services.AddSingletonKeyedService<Type, ICompatibilityDirector, StrictVersionCompatibilityDirector>(typeof(StrictVersionCompatible));
 
             services.TryAddSingleton<Factory<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
 
             // Grain activation
             services.TryAddSingleton<Catalog>();
+            services.AddFromExisting<IHealthCheckParticipant, Catalog>();
             services.TryAddSingleton<GrainCreator>();
             services.TryAddSingleton<IGrainActivator, DefaultGrainActivator>();
             services.TryAddScoped<ActivationData.GrainActivationContextFactory>();
@@ -192,12 +241,13 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IConsistentRingProvider>(
                 sp =>
                 {
-                    var globalConfig = sp.GetRequiredService<GlobalConfiguration>();
+                    // TODO: make this not sux - jbragg
+                    var consistentRingOptions = sp.GetRequiredService<IOptions<ConsistentRingOptions>>().Value;
                     var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
                     var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-                    if (globalConfig.UseVirtualBucketsConsistentRing)
+                    if (consistentRingOptions.UseVirtualBucketsConsistentRing)
                     {
-                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, globalConfig.NumVirtualBucketsConsistentRing);
+                        return new VirtualBucketsRingProvider(siloDetails.SiloAddress, loggerFactory, consistentRingOptions.NumVirtualBucketsConsistentRing);
                     }
 
                     return new ConsistentRingProvider(siloDetails.SiloAddress, loggerFactory);
@@ -206,24 +256,124 @@ namespace Orleans.Hosting
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
             // Serialization
-            services.TryAddSingleton<SerializationManager>();
+            services.TryAddSingleton<SerializationManager>(sp=>ActivatorUtilities.CreateInstance<SerializationManager>(sp,
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.LargeMessageWarningThreshold));
             services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
-            
+            services.TryAddSingleton<IFieldUtils, FieldUtils>();
+            services.AddSingleton<BinaryFormatterSerializer>();
+            services.AddSingleton<BinaryFormatterISerializableSerializer>();
+            services.AddFromExisting<IKeyedSerializer, BinaryFormatterISerializableSerializer>();
+#pragma warning disable CS0618 // Type or member is obsolete
+            services.AddSingleton<ILBasedSerializer>();
+            services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
+#pragma warning restore CS0618 // Type or member is obsolete
+
             // Transactions
-            services.TryAddSingleton<ITransactionAgent, TransactionAgent>();
-            services.TryAddSingleton<Factory<ITransactionAgent>>(sp => () => sp.GetRequiredService<ITransactionAgent>());
-            services.TryAddSingleton<ITransactionManagerService, DisabledTransactionManagerService>();
+            services.TryAddSingleton<ITransactionAgent, DisabledTransactionAgent>();
 
             // Application Parts
-            var applicationPartManager = context.GetApplicationPartManager();
-            services.TryAddSingleton<ApplicationPartManager>(applicationPartManager);
-            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) {IsFrameworkAssembly = true});
-            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) {IsFrameworkAssembly = true});
+            services.TryAddSingleton<IApplicationPartManager>(applicationPartManager);
+            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) { IsFrameworkAssembly = true });
+            applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) { IsFrameworkAssembly = true });
             applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainInterfaceFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
-            services.TryAddTransient<IConfigurationValidator, ApplicationPartValidator>();
+            services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
+
+            //Add default option formatter if none is configured, for options which are required to be configured
+            services.ConfigureFormatter<SiloOptions>();
+            services.ConfigureFormatter<SchedulingOptions>();
+            services.ConfigureFormatter<PerformanceTuningOptions>();
+            services.ConfigureFormatter<SerializationProviderOptions>();
+            services.ConfigureFormatter<ConnectionOptions>();
+            services.ConfigureFormatter<SiloMessagingOptions>();
+            services.ConfigureFormatter<TypeManagementOptions>();
+            services.ConfigureFormatter<ClusterMembershipOptions>();
+            services.ConfigureFormatter<GrainDirectoryOptions>();
+            services.ConfigureFormatter<ActivationCountBasedPlacementOptions>();
+            services.ConfigureFormatter<GrainCollectionOptions>();
+            services.ConfigureFormatter<GrainVersioningOptions>();
+            services.ConfigureFormatter<ConsistentRingOptions>();
+            services.ConfigureFormatter<StatisticsOptions>();
+            services.ConfigureFormatter<TelemetryOptions>();
+            services.ConfigureFormatter<LoadSheddingOptions>();
+            services.ConfigureFormatter<EndpointOptions>();
+            services.ConfigureFormatter<ClusterOptions>();
+
+            // This validator needs to construct the IMembershipOracle and the IMembershipTable
+            // so move it in the end so other validator are called first
+            services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
+            services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
+            services.AddTransient<IConfigurationValidator, DevelopmentClusterMembershipOptionsValidator>();
+
+            // Enable hosted client.
+            services.TryAddSingleton<HostedClient>();
+            services.TryAddFromExisting<IHostedClient, HostedClient>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, HostedClient>();
+            services.TryAddSingleton<InvokableObjectManager>();
+            services.TryAddSingleton<InternalClusterClient>();
+            services.TryAddFromExisting<IInternalClusterClient, InternalClusterClient>();
+            services.TryAddFromExisting<IClusterClient, InternalClusterClient>();
+
+            // Enable collection specific Age limits
+            services.AddOptions<GrainCollectionOptions>()
+                .Configure<IApplicationPartManager>((options, parts) =>
+                {
+                    var grainClasses = new GrainClassFeature();
+                    parts.PopulateFeature(grainClasses);
+
+                    foreach (var grainClass in grainClasses.Classes)
+                    {
+                        var attr = grainClass.ClassType.GetCustomAttribute<CollectionAgeLimitAttribute>();
+                        if (attr != null)
+                        {
+                            var className = TypeUtils.GetFullName(grainClass.ClassType);
+                            options.ClassSpecificCollectionAge[className] = attr.Amount;
+                        }
+                    }
+                });
+
+            // Validate all CollectionAgeLimit values for the right configuration.
+            services.AddTransient<IConfigurationValidator, GrainCollectionOptionsValidator>();
+
+            services.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
+
+            services.TryAddSingleton<ITimerManager, TimerManagerImpl>();
+
+            // persistent state facet support
+            services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
+            services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
+
+            // Networking
+            services.TryAddSingleton<ConnectionCommon>();
+            services.TryAddSingleton<ConnectionManager>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, ConnectionManagerLifecycleAdapter<ISiloLifecycle>>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionMaintainer>();
+
+            services.AddSingletonKeyedService<object, IConnectionFactory>(
+                SiloConnectionFactory.ServicesKey,
+                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
+            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(
+                SiloConnectionListener.ServicesKey,
+                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
+            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(
+                GatewayConnectionListener.ServicesKey,
+                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
+
+            services.TryAddTransient<IMessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(sp,
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize,
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize));
+            services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
+            services.AddSingleton<NetworkingTrace>();
+            services.AddSingleton<RuntimeMessagingTrace>();
+            services.AddFromExisting<MessagingTrace, RuntimeMessagingTrace>();
+
+            // Use Orleans server.
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
+            services.AddSingleton<SocketSchedulers>();
+            services.AddSingleton<SharedMemoryPool>();
         }
     }
 }

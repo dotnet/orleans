@@ -1,9 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
-using Orleans.TestingHost.Utils;
+using Orleans.Internal;
 using UnitTests.GrainInterfaces;
 using Xunit;
 

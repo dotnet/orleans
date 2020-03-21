@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.ConsistentRing;
+using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 
 namespace Orleans.Runtime.Services
@@ -38,7 +39,7 @@ namespace Orleans.Runtime.Services
         {
             get
             {
-                // Currently we only support a single GrainService per Silo, hence we pass Zero here instead of partitioning.
+                // Currently we only support a single GrainService per Silo, hence we pass zero here instead of partitioning.
                 var grainId = GrainId.GetGrainServiceGrainId(0, grainTypeCode);
 
                 var destination = MapGrainReferenceToSiloRing(CallingGrainReference);
@@ -48,17 +49,11 @@ namespace Orleans.Runtime.Services
                 return grainService;
             }
         }
-        
+
         /// <summary>
         /// Resolves the Grain Reference invoking this request.
         /// </summary>
-        protected GrainReference CallingGrainReference
-        {
-            get
-            {
-                return runtimeClient.CurrentActivationData.GrainReference;
-            }
-        }
+        protected GrainReference CallingGrainReference => RuntimeContext.CurrentGrainContext?.GrainReference;
 
         /// <summary>
         /// Moved from InsideRuntimeClient.cs

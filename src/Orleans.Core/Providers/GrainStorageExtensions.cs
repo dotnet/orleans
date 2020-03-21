@@ -10,21 +10,36 @@ namespace Orleans.Storage
     public static class GrainStorageExtensions
     {
         /// <summary>
+        /// Acquire the storage provider associated with the grain type.
+        /// </summary>
+        /// <returns></returns>
+        public static IGrainStorage GetGrainStorage(this Grain grain, IServiceProvider services) 
+            => GetGrainStorage(grain.GetType(), services);
+
+        /// <summary>
         /// Aquire the storage provider associated with the grain type.
         /// </summary>
         /// <returns></returns>
-        public static IStorageProvider GetStorageProvider(this Grain grain, IServiceProvider services)
+        public static IGrainStorage GetGrainStorage(this Type grainType, IServiceProvider services)
         {
-            StorageProviderAttribute attr = grain.GetType().GetTypeInfo().GetCustomAttributes<StorageProviderAttribute>(true).FirstOrDefault();
-            IStorageProvider storageProvider = attr != null
-                ? services.GetServiceByName<IStorageProvider>(attr.ProviderName)
-                : services.GetService<IStorageProvider>();
+            var attr = grainType.GetCustomAttributes<StorageProviderAttribute>(true).FirstOrDefault();
+            IGrainStorage storageProvider = attr != null
+                ? services.GetServiceByName<IGrainStorage>(attr.ProviderName)
+                : services.GetService<IGrainStorage>();
             if (storageProvider == null)
             {
-                var errMsg = string.Format("No storage providers found loading grain type {0}", grain.GetType().FullName);
-                throw new BadProviderConfigException(errMsg);
+                ThrowMissingProviderException(grainType, attr?.ProviderName);
             }
             return storageProvider;
+        }
+
+        private static void ThrowMissingProviderException(Type grainType, string name)
+        {
+            var grainTypeName = grainType.GetParseableName(TypeFormattingOptions.LogFormat);
+            var errMsg = string.IsNullOrEmpty(name)
+                ? $"No default storage provider found loading grain type {grainTypeName}."
+                : $"No storage provider named \"{name}\" found loading grain type {grainTypeName}.";
+            throw new BadGrainStorageConfigException(errMsg);
         }
     }
 }

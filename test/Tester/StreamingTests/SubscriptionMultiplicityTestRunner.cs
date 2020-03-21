@@ -2,7 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -16,7 +17,7 @@ namespace UnitTests.StreamingTests
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
         private readonly string streamProviderName;
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly TestCluster testCluster;
 
         public SubscriptionMultiplicityTestRunner(string streamProviderName, TestCluster testCluster)
@@ -26,7 +27,7 @@ namespace UnitTests.StreamingTests
                 throw new ArgumentNullException("streamProviderName");
             }
             this.streamProviderName = streamProviderName;
-            this.logger = testCluster.Client.Logger;
+            this.logger = testCluster.Client.ServiceProvider.GetRequiredService<ILogger<SubscriptionMultiplicityTestRunner>>();
             this.testCluster = testCluster;
         }
 
@@ -252,7 +253,7 @@ namespace UnitTests.StreamingTests
             }
 
             // unsubscribe from the rest of the subscriptions
-            expectedSubscriptions.ForEach( async h => await consumer.StopConsuming(h));
+            await Task.WhenAll(expectedSubscriptions.Select(h => consumer.StopConsuming(h)));
 
             // query actuall subscriptions again
             actualSubscriptions = await consumer.GetAllSubscriptions(streamGuid, streamNamespace, streamProviderName);
@@ -311,7 +312,7 @@ namespace UnitTests.StreamingTests
             var producer = this.testCluster.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             int eventCount = 0;
 
-            var provider = this.testCluster.StreamProviderManager.GetStreamProvider(streamProviderName);
+            var provider = this.testCluster.Client.ServiceProvider.GetServiceByName<IStreamProvider>(streamProviderName);
             var stream = provider.GetStream<int>(streamGuid, streamNamespace);
             var handle = await stream.SubscribeAsync((e,t) =>
             {

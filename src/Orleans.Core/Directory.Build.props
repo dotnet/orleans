@@ -1,0 +1,29 @@
+<Project>
+  <PropertyGroup>
+    <_ParentDirectoryBuildPropsPath Condition="'$(_DirectoryBuildPropsFile)' != ''">$([System.IO.Path]::Combine('..', '$(_DirectoryBuildPropsFile)'))</_ParentDirectoryBuildPropsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
+
+  <PropertyGroup Condition="$(OrleansCoreVersion)!=$(VersionPrefix)">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <Choose>
+    <When Condition="$(OrleansCoreAbstractionsVersion) == $(VersionPrefix) AND $(OrleansCoreAbstractionsVersion) == $(OrleansCoreVersion)">
+      <ItemGroup>
+        <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="$(OrleansCoreAbstractionsVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+</Project>

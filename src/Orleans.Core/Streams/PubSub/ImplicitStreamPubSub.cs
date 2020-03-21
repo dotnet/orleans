@@ -26,7 +26,7 @@ namespace Orleans.Streams
         public Task<ISet<PubSubSubscriptionState>> RegisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer)
         {
             ISet<PubSubSubscriptionState> result = new HashSet<PubSubSubscriptionState>();
-            if (String.IsNullOrWhiteSpace(streamId.Namespace)) return Task.FromResult(result);
+            if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.Namespace)) return Task.FromResult(result);
 
             IDictionary<Guid, IStreamConsumerExtension> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId, this.grainFactory);
             foreach (var kvp in implicitSubscriptions)
@@ -72,6 +72,9 @@ namespace Orleans.Streams
 
         public Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null)
         {
+            if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.Namespace))
+                return Task.FromResult(new List<StreamSubscription>());
+
             if (streamConsumer != null)
             {
                 var subscriptionId = CreateSubscriptionId(streamId, streamConsumer);

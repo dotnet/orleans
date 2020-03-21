@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -16,6 +17,17 @@ namespace Orleans.Runtime
 
         public IEnumerable<ITelemetryConsumer> TelemetryConsumers => this.consumers;
 
+        public TelemetryManager(IServiceProvider serviceProvider, IOptions<TelemetryOptions> options)
+        {
+            var newConsumers = new List<ITelemetryConsumer>(options.Value.Consumers.Count);
+            foreach (var consumerType in options.Value.Consumers)
+            {
+                var consumer = GetTelemetryConsumer(serviceProvider, consumerType);
+                newConsumers.Add(consumer);
+            }
+            this.AddConsumers(newConsumers);
+        }
+
         public void AddConsumers(IEnumerable<ITelemetryConsumer> newConsumers)
         {
             this.consumers = new List<ITelemetryConsumer>(this.consumers.Union(newConsumers));
@@ -23,34 +35,14 @@ namespace Orleans.Runtime
             this.traceTelemetryConsumers = this.consumers.OfType<ITraceTelemetryConsumer>().ToList();
         }
 
-        public void AddFromConfiguration(IServiceProvider serviceProvider, TelemetryConfiguration configuration)
-        {
-            if (serviceProvider == null) throw new ArgumentNullException(nameof(serviceProvider));
-
-            if (configuration?.Consumers?.Count > 0)
-            {
-                var newConsumers = new List<ITelemetryConsumer>(configuration.Consumers.Count);
-                foreach (var consumerConfig in configuration.Consumers)
-                {
-                    var consumer = GetTelemetryConsumer(serviceProvider, consumerConfig.ConsumerType, consumerConfig.Properties);
-                    newConsumers.Add(consumer);
-                }
-
-                this.AddConsumers(newConsumers);
-            }
-        }
-
-        private static ITelemetryConsumer GetTelemetryConsumer(IServiceProvider serviceProvider, Type consumerType, IReadOnlyDictionary<string, object> activationProperies)
+        private static ITelemetryConsumer GetTelemetryConsumer(IServiceProvider serviceProvider, Type consumerType)
         {
             ITelemetryConsumer consumer = null;
-            if ((activationProperies?.Count ?? 0) == 0)
-            {
-                // first check whether it is registered in the container already
-                consumer = (ITelemetryConsumer) serviceProvider.GetService(consumerType);
-            }
+            // first check whether it is registered in the container already
+            consumer = (ITelemetryConsumer)serviceProvider.GetService(consumerType);
             if (consumer == null)
             {
-                consumer = (ITelemetryConsumer) ActivatorUtilities.CreateInstance(serviceProvider, consumerType, activationProperies?.Values?.ToArray() ?? new object[0]);
+                consumer = (ITelemetryConsumer)ActivatorUtilities.CreateInstance(serviceProvider, consumerType);
             }
 
             return consumer;
@@ -224,7 +216,6 @@ namespace Orleans.Runtime
             }
         }
 
-        #region IDisposable Support
         private bool disposedValue = false; // To detect redundant calls
 
         protected virtual void Dispose(bool disposing)
@@ -254,6 +245,5 @@ namespace Orleans.Runtime
             // TODO: uncomment the following line if the finalizer is overridden above.
             // GC.SuppressFinalize(this);
         }
-        #endregion
     }
 }

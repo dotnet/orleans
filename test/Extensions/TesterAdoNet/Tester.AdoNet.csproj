@@ -1,0 +1,121 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Tester.AdoNet</RootNamespace>
+    <AssemblyName>Tester.AdoNet</AssemblyName>
+    <DefineConstants>$(DefineConstants);TESTER_SQLUTILS</DefineConstants>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="1.1.0" />
+    <PackageReference Include="MySqlConnector" Version="0.61.0" />
+    <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
+    <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
+    <PackageReference Include="System.Data.SqlClient" Version="$(SystemDataSqlClientVersion)" />
+    <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
+    <PackageReference Include="Microsoft.Data.SQLite" Version="$(MicrosoftDataSQLiteVersion)" />
+    <PackageReference Include="Npgsql" Version="$(NpgsqlVersion)" />
+    <PackageReference Include="MySql.Data" Version="$(MySqlDataVersion)" />
+    <PackageReference Include="System.Security.Permissions" Version="$(SystemSecurityPermissionsVersion)" />
+    <PackageReference Include="System.Security.Cryptography.Cng" Version="$(SystemSecurityCryptographyVersion)" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="$(SystemConfigurationConfigurationManagerVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\AdoNetInvariants.cs" Link="Storage\AdoNetInvariants.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\DbConnectionFactory.cs" Link="Storage\DbConnectionFactory.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\DbExtensions.cs" Link="Storage\DbExtensions.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\DbConstantsStore.cs" Link="Storage\DbConstantsStore.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\DbStoredQueries.cs" Link="Storage\DbStoredQueries.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\ICommandInterceptor.cs" Link="Storage\ICommandInterceptor.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\IRelationalStorage.cs" Link="Storage\IRelationalStorage.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\NoOpDatabaseCommandInterceptor.cs" Link="Storage\NoOpDatabaseCommandInterceptor.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\OracleDatabaseCommandInterceptor.cs" Link="Storage\OracleDatabaseCommandInterceptor.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\OrleansRelationalDownloadStream.cs" Link="Storage\OrleansRelationalDownloadStream.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\RelationalOrleansQueries.cs" Link="Storage\RelationalOrleansQueries.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\RelationalStorage.cs" Link="Storage\RelationalStorage.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\RelationalStorageExtensions.cs" Link="Storage\RelationalStorageExtensions.cs" />
+    <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\AdoNetFormatProvider.cs" Link="Storage\AdoNetFormatProvider.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\Orleans.Reminders.AdoNet.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Misc\TestInterfaces\TestInterfaces.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="Data\TestDb.mdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Tester.AdoNet.xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="$(SourceRoot)src\AdoNet\Shared\MySQL-Main.sql" Link="MySQL-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Shared\Oracle-Main.sql" Link="Oracle-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Shared\PostgreSQL-Main.sql" Link="PostgreSQL-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Shared\SQLServer-Main.sql" Link="SQLServer-Main.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\MySQL-Clustering.sql" Link="MySQL-Clustering.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\Oracle-Clustering.sql" Link="Oracle-Clustering.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\PostgreSQL-Clustering.sql" Link="PostgreSQL-Clustering.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\SQLServer-Clustering.sql" Link="SQLServer-Clustering.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\MySQL-Persistence.sql" Link="MySQL-Persistence.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\Oracle-Persistence.sql" Link="Oracle-Persistence.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\PostgreSQL-Persistence.sql" Link="PostgreSQL-Persistence.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\SQLServer-Persistence.sql" Link="SQLServer-Persistence.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\MySQL-Reminders.sql" Link="MySQL-Reminders.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\Oracle-Reminders.sql" Link="Oracle-Reminders.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\PostgreSQL-Reminders.sql" Link="PostgreSQL-Reminders.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\SQLServer-Reminders.sql" Link="SQLServer-Reminders.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Storage\" />
+  </ItemGroup>
+
+</Project>

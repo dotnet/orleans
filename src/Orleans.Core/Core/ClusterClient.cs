@@ -1,10 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams;
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime;
+using Orleans.Streams;
+using Microsoft.Extensions.Hosting;
+using Orleans.Hosting;
 
 namespace Orleans
 {
@@ -13,10 +19,11 @@ namespace Orleans
     /// </summary>
     internal class ClusterClient : IInternalClusterClient
     {
-        private readonly OutsideRuntimeClient runtimeClient;
+        private readonly IRuntimeClient runtimeClient;
+        private readonly ClusterClientLifecycle clusterClientLifecycle;
         private readonly AsyncLock initLock = new AsyncLock();
+        private readonly ClientApplicationLifetime applicationLifetime;
         private LifecycleState state = LifecycleState.Created;
-        private readonly LoggerWrapper appLogger;
 
         private enum LifecycleState
         {
@@ -32,15 +39,34 @@ namespace Orleans
         /// Initializes a new instance of the <see cref="ClusterClient"/> class.
         /// </summary>
         /// <param name="runtimeClient">The runtime client.</param>
-        /// <param name="configuration">The client configuration.</param>
         /// <param name="loggerFactory">Logger factory used to create loggers</param>
-        public ClusterClient(OutsideRuntimeClient runtimeClient, ClientConfiguration configuration, ILoggerFactory loggerFactory)
+        /// <param name="clientMessagingOptions">Messaging parameters</param>
+        public ClusterClient(IRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
         {
-            this.Configuration = configuration;
             this.runtimeClient = runtimeClient;
+            this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
+
             //set PropagateActivityId flag from node cofnig
-            RequestContext.PropagateActivityId = configuration.PropagateActivityId;
-            this.appLogger = new LoggerWrapper("Application", loggerFactory);
+            RequestContext.PropagateActivityId |= clientMessagingOptions.Value.PropagateActivityId;
+
+            // register all lifecycle participants
+            IEnumerable<ILifecycleParticipant<IClusterClientLifecycle>> lifecycleParticipants = this.ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();
+            foreach (ILifecycleParticipant<IClusterClientLifecycle> participant in lifecycleParticipants)
+            {
+                participant?.Participate(clusterClientLifecycle);
+            }
+
+            // register all named lifecycle participants
+            IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>> namedLifecycleParticipantCollections = this.ServiceProvider.GetService<IKeyedServiceCollection<string, ILifecycleParticipant<IClusterClientLifecycle>>>();
+            foreach (ILifecycleParticipant<IClusterClientLifecycle> participant in namedLifecycleParticipantCollections
+                ?.GetServices(this.ServiceProvider)
+                ?.Select(s => s?.GetService(this.ServiceProvider)))
+            {
+                participant?.Participate(clusterClientLifecycle);
+            }
+
+            // It is fine for this field to be null in the case that the client is not the host.
+            this.applicationLifetime = runtimeClient.ServiceProvider.GetService<IHostApplicationLifetime>() as ClientApplicationLifetime;
         }
 
         /// <inheritdoc />
@@ -50,20 +76,7 @@ namespace Orleans
         public IGrainFactory GrainFactory => this.InternalGrainFactory;
 
         /// <inheritdoc />
-        public Logger Logger
-        {
-            get
-            {
-                this.ThrowIfDisposedOrNotInitialized();
-                return this.appLogger;
-            }
-        }
-
-        /// <inheritdoc />
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
-        
-        /// <inheritdoc />
-        public ClientConfiguration Configuration { get; }
 
         /// <inheritdoc />
         IStreamProviderRuntime IInternalClusterClient.StreamProviderRuntime => this.runtimeClient.CurrentStreamProviderRuntime;
@@ -85,13 +98,6 @@ namespace Orleans
                                     this.state == LifecycleState.Disposing;
 
         /// <inheritdoc />
-        public IEnumerable<IStreamProvider> GetStreamProviders()
-        {
-            this.ThrowIfDisposedOrNotInitialized();
-            return this.runtimeClient.CurrentStreamProviderManager.GetStreamProviders();
-        }
-
-        /// <inheritdoc />
         public IStreamProvider GetStreamProvider(string name)
         {
             this.ThrowIfDisposedOrNotInitialized();
@@ -100,11 +106,11 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(name));
             }
 
-            return this.runtimeClient.CurrentStreamProviderManager.GetProvider(name) as IStreamProvider;
+            return this.runtimeClient.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(name);
         }
-        
+
         /// <inheritdoc />
-        public async Task Connect()
+        public async Task Connect(Func<Exception, Task<bool>> retryFilter = null)
         {
             this.ThrowIfDisposedOrAlreadyInitialized();
             using (await this.initLock.LockAsync().ConfigureAwait(false))
@@ -116,35 +122,41 @@ namespace Orleans
                 }
                 
                 this.state = LifecycleState.Starting;
-                await this.runtimeClient.Start().ConfigureAwait(false);
+                if (this.runtimeClient is OutsideRuntimeClient orc) await orc.Start(retryFilter).ConfigureAwait(false);
+                await this.clusterClientLifecycle.OnStart().ConfigureAwait(false);
                 this.state = LifecycleState.Started;
             }
+
+            this.applicationLifetime?.NotifyStarted();
         }
 
         /// <inheritdoc />
         public Task Close() => this.Stop(gracefully: true);
 
         /// <inheritdoc />
-        public void Abort()
-        {
-            this.Stop(gracefully: false).GetAwaiter().GetResult();
-        }
+        public Task AbortAsync() => this.Stop(gracefully: false);
 
         private async Task Stop(bool gracefully)
         {
             if (this.IsDisposing) return;
+            this.applicationLifetime?.StopApplication();
             using (await this.initLock.LockAsync().ConfigureAwait(false))
             {
                 if (this.state == LifecycleState.Disposed) return;
                 try
                 {
                     this.state = LifecycleState.Disposing;
-                    if (gracefully)
+                    CancellationToken canceled = CancellationToken.None;
+                    if (!gracefully)
                     {
-                        Utils.SafeExecute(() => this.runtimeClient.Disconnect());
+                        var cts = new CancellationTokenSource();
+                        cts.Cancel();
+                        canceled = cts.Token;
                     }
 
-                    Utils.SafeExecute(() => this.runtimeClient.Reset(gracefully));
+                    await this.clusterClientLifecycle.OnStop(canceled);
+
+                    Utils.SafeExecute(() => (this.runtimeClient as OutsideRuntimeClient)?.Reset(gracefully));
                     this.Dispose(true);
                 }
                 finally
@@ -153,10 +165,12 @@ namespace Orleans
                     if (this.state == LifecycleState.Disposing) this.state = LifecycleState.Invalid;
                 }
             }
+
+            this.applicationLifetime?.NotifyStopped();
         }
 
         /// <inheritdoc />
-        void IDisposable.Dispose() => this.Abort();
+        void IDisposable.Dispose() => this.AbortAsync().GetAwaiter().GetResult();
 
         /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null)
@@ -232,12 +246,6 @@ namespace Orleans
         }
 
         /// <inheritdoc />
-        object IInternalGrainFactory.Cast(IAddressable grain, Type interfaceType)
-        {
-            return this.InternalGrainFactory.Cast(grain, interfaceType);
-        }
-
-        /// <inheritdoc />
         TGrainInterface IInternalGrainFactory.GetGrain<TGrainInterface>(GrainId grainId)
         {
             return this.InternalGrainFactory.GetGrain<TGrainInterface>(grainId);
@@ -254,17 +262,15 @@ namespace Orleans
         {
             if (disposing)
             {
-                Utils.SafeExecute(() => this.runtimeClient.Dispose());
+                Utils.SafeExecute(() => (this.runtimeClient as OutsideRuntimeClient)?.Dispose());
                 this.state = LifecycleState.Disposed;
             }
-
-            GC.SuppressFinalize(this);
         }
 
         private void ThrowIfDisposedOrNotInitialized()
         {
             this.ThrowIfDisposed();
-            if (!this.IsInitialized) throw new InvalidOperationException("Client is not initialized.");
+            if (!this.IsInitialized) throw new InvalidOperationException($"Client is not initialized. Current client state is {this.state}.");
         }
 
         private void ThrowIfDisposedOrAlreadyInitialized()
@@ -280,5 +286,49 @@ namespace Orleans
                     nameof(ClusterClient),
                     $"Client has been disposed either by a call to {nameof(Dispose)} or because it has been stopped.");
         }
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, Guid grainPrimaryKey) where TGrainInterface : IGrain
+            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainInterfaceType, grainPrimaryKey);
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, long grainPrimaryKey) where TGrainInterface : IGrain
+            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainInterfaceType, grainPrimaryKey);
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, string grainPrimaryKey) where TGrainInterface : IGrain
+            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainInterfaceType, grainPrimaryKey);
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, Guid grainPrimaryKey, string keyExtension) where TGrainInterface : IGrain
+            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainInterfaceType, grainPrimaryKey, keyExtension);
+
+        /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(Type grainInterfaceType, long grainPrimaryKey, string keyExtension) where TGrainInterface : IGrain
+            => this.InternalGrainFactory.GetGrain<TGrainInterface>(grainInterfaceType, grainPrimaryKey, keyExtension);
+
+        /// <inheritdoc />
+        public IGrain GetGrain(Type grainInterfaceType, string grainPrimaryKey)
+            => this.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey);
+
+        /// <inheritdoc />
+        public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey)
+            => this.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey);
+
+        /// <inheritdoc />
+        public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey)
+            => this.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey);
+
+        /// <inheritdoc />
+        public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey, string keyExtension)
+            => this.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey, keyExtension);
+
+        /// <inheritdoc />
+        public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey, string keyExtension)
+            => this.InternalGrainFactory.GetGrain(grainInterfaceType, grainPrimaryKey, keyExtension);
+
+        /// <inheritdoc />
+        public object Cast(IAddressable grain, Type outputGrainInterfaceType)
+            => this.InternalGrainFactory.Cast(grain, outputGrainInterfaceType);
     }
 }

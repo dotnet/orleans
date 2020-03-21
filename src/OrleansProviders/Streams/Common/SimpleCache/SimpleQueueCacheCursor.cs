@@ -16,10 +16,13 @@ namespace Orleans.Providers.Streams.Common
         private readonly ILogger logger;
         private IBatchContainer current; // this is a pointer to the current element in the cache. It is what will be returned by GetCurrent().
 
-        // This is a pointer to the NEXT element in the cache.
-        // After the cursor is first created it should be called MoveNext before the call to GetCurrent().
-        // After MoveNext returns, the current points to the current element that will be returned by GetCurrent()
-        // and Element will point to the next element (since MoveNext actualy advanced it to the next).
+        // This is also a pointer to the current element in the cache. It differs from current, in
+        // that current is just the batch, and is null before the first call to MoveNext after
+        // construction. (Or after refreshing if we had previously run out of batches). Upon MoveNext
+        // being called in that situation, current gets set to the batch included in Element. That is
+        // needed to implement the Enumerator pattern properly, since in that pattern MoveNext gets called
+        // before the first access of (Get)Current.
+
         internal LinkedListNode<SimpleQueueCacheItem> Element { get; private set; }
         internal StreamSequenceToken SequenceToken { get; private set; }
 
@@ -54,7 +57,7 @@ namespace Orleans.Providers.Streams.Common
             this.streamIdentity = streamIdentity;
             this.logger = logger;
             current = null;
-            SimpleQueueCache.Log(logger, "SimpleQueueCacheCursor New Cursor for {0}, {1}", streamIdentity.Guid, streamIdentity.Namespace);
+            SimpleQueueCache.Log(logger, "SimpleQueueCacheCursor New Cursor for {Guid}, {NameSpace}", streamIdentity.Guid, streamIdentity.Namespace);
         }
 
         /// <summary>
@@ -68,7 +71,7 @@ namespace Orleans.Providers.Streams.Common
         /// </returns>
         public virtual IBatchContainer GetCurrent(out Exception exception)
         {
-            SimpleQueueCache.Log(logger, "SimpleQueueCacheCursor.GetCurrent: {0}", current);
+            SimpleQueueCache.Log(logger, "SimpleQueueCacheCursor.GetCurrent: {Current}", current);
 
             exception = null;
             return current;
@@ -77,22 +80,28 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Move to next message in the stream.
         /// If it returns false, there are no more messages.  The enumerator is still
-        ///  valid howerver and can be called again when more data has come in on this
+        ///  valid however and can be called again when more data has come in on this
         ///  stream.
         /// </summary>
         /// <returns></returns>
         public virtual bool MoveNext()
         {
+            if (current == null && IsSet && IsInStream(Element.Value.Batch))
+            {
+                current = Element.Value.Batch;
+                return true;
+            }
+
             IBatchContainer next;
             while (cache.TryGetNextMessage(this, out next))
             {
                 if(IsInStream(next))
                     break;
             }
+            current = next;
             if (!IsInStream(next))
                 return false;
 
-            current = next;
             return true;
         }
 
@@ -126,8 +135,6 @@ namespace Orleans.Providers.Streams.Common
                     string.Equals(batchContainer.StreamNamespace, streamIdentity.Namespace);
         }
 
-        #region IDisposable Members
-
         /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
         /// </summary>
@@ -145,10 +152,9 @@ namespace Orleans.Providers.Streams.Common
             if (disposing)
             {
                 cache.UnsetCursor(this, null);
+                current = null;
             }
         }
-
-        #endregion
 
         /// <summary>
         /// Convert object to string

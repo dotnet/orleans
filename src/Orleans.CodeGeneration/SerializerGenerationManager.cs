@@ -16,8 +16,6 @@ namespace Orleans.CodeGenerator
     /// </summary>
     internal class SerializerGenerationManager
     {
-        private readonly SerializationManager serializationManager;
-
         /// <summary>
         /// The logger.
         /// </summary>
@@ -34,15 +32,35 @@ namespace Orleans.CodeGenerator
         private readonly HashSet<Type> processedTypes;
 
         /// <summary>
+        /// The set of types which are known to have existing serializers.
+        /// </summary>
+        private readonly HashSet<Type> typesToIgnore;
+
+        /// <summary>
         /// Initializes members of the <see cref="SerializerGenerationManager"/> class.
         /// </summary>
-        internal SerializerGenerationManager(SerializationManager serializationManager, ILoggerFactory loggerFactory)
+        internal SerializerGenerationManager(IEnumerable<Type> typesToIgnore, ILoggerFactory loggerFactory)
         {
-            this.serializationManager = serializationManager;
+            this.typesToIgnore = new HashSet<Type>(typesToIgnore);
             typesToProcess = new HashSet<Type>();
             processedTypes = new HashSet<Type>();
 
             log = loggerFactory.CreateLogger<SerializerGenerationManager>();
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="type"/> is serializable, false otherwise.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>true if <paramref name="type"/> is serializable, false otherwise.</returns>
+        private bool HasSerializer(Type type)
+        {
+            if (this.typesToIgnore.Contains(type)) return true;
+            if (type.IsOrleansPrimitive()) return true;
+            if (!type.IsGenericType) return false;
+            var genericTypeDefinition = type.GetGenericTypeDefinition();
+            return this.typesToIgnore.Contains(genericTypeDefinition) &&
+                   type.GetGenericArguments().All(arg => this.HasSerializer(arg));
         }
 
         internal bool IsTypeRecorded(Type type)
@@ -50,27 +68,31 @@ namespace Orleans.CodeGenerator
             return this.typesToProcess.Contains(type) || this.processedTypes.Contains(type);
         }
 
-        internal bool RecordTypeToGenerate(Type t, Assembly targetAssembly)
+        internal bool IsTypeIgnored(Type type)
+        {
+            return this.typesToIgnore.Contains(type);
+        }
+
+        internal bool RecordType(Type t, Assembly targetAssembly, string logContext)
         {
             if (!TypeUtilities.IsAccessibleFromAssembly(t, targetAssembly))
             {
                 return false;
             }
 
-            var typeInfo = t.GetTypeInfo();
+            if (t.IsGenericParameter || processedTypes.Contains(t) || typesToProcess.Contains(t)
+                || typesToIgnore.Contains(t)
+                || typeof (Exception).IsAssignableFrom(t)
+                || typeof (Delegate).IsAssignableFrom(t)
+                || typeof (Task<>).IsAssignableFrom(t)) return false;
 
-            if (typeInfo.IsGenericParameter || processedTypes.Contains(t) || typesToProcess.Contains(t)
-                || typeof (Exception).GetTypeInfo().IsAssignableFrom(t)
-                || typeof (Delegate).GetTypeInfo().IsAssignableFrom(t)
-                || typeof (Task<>).GetTypeInfo().IsAssignableFrom(t)) return false;
-
-            if (typeInfo.IsArray)
+            if (t.IsArray)
             {
-                RecordTypeToGenerate(typeInfo.GetElementType(), targetAssembly);
+                RecordType(t.GetElementType(), targetAssembly, logContext);
                 return false;
             }
 
-            if (typeInfo.IsNestedFamily || typeInfo.IsNestedPrivate)
+            if (t.IsNestedFamily || t.IsNestedPrivate)
             {
                 log.Warn(
                     ErrorCode.CodeGenIgnoringTypes,
@@ -81,29 +103,33 @@ namespace Orleans.CodeGenerator
 
             if (t.IsConstructedGenericType)
             {
-                var args = typeInfo.GetGenericArguments();
+                var args = t.GetGenericArguments();
                 foreach (var arg in args)
                 {
-                    RecordTypeToGenerate(arg, targetAssembly);
+                    if (log.IsEnabled(LogLevel.Trace)) logContext = "generic argument of type " + t.GetLogFormat();
+                    RecordType(arg, targetAssembly, logContext);
                 }
             }
 
-            if (typeInfo.IsInterface || typeInfo.IsAbstract || t == typeof (object) || t == typeof (void)
+            if (t.IsInterface || t.IsAbstract || t == typeof (object) || t == typeof (void)
                 || GrainInterfaceUtils.IsTaskType(t)) return false;
 
             if (t.IsConstructedGenericType)
             {
-                return RecordTypeToGenerate(typeInfo.GetGenericTypeDefinition(), targetAssembly);
+                return RecordType(t.GetGenericTypeDefinition(), targetAssembly, logContext);
             }
 
-            if (typeInfo.IsOrleansPrimitive() || this.serializationManager.HasSerializer(t) ||
-                typeof(IAddressable).GetTypeInfo().IsAssignableFrom(t)) return false;
+            if (t.IsOrleansPrimitive() || this.HasSerializer(t) ||
+                typeof(IAddressable).IsAssignableFrom(t)) return false;
 
-            if (typeInfo.Namespace != null && (typeInfo.Namespace.Equals("System") || typeInfo.Namespace.StartsWith("System.")))
+            if (t.Namespace != null && (t.Namespace.Equals("System") || t.Namespace.StartsWith("System.")))
             {
-                var message = "System type " + t.Name + " may require a custom serializer for optimal performance. "
-                              + "If you use arguments of this type a lot, consider submitting a pull request to https://github.com/dotnet/orleans/ to add a custom serializer for it.";
-                log.Debug(ErrorCode.CodeGenSystemTypeRequiresSerializer, message);
+                if (log.IsEnabled(LogLevel.Debug))
+                {
+                    var message = $"System type {t.Name} may require a custom serializer for optimal performance. " +
+                                  "If you use arguments of this type a lot, consider submitting a pull request to https://github.com/dotnet/orleans/ to add a custom serializer for it.";
+                    log.Debug(ErrorCode.CodeGenSystemTypeRequiresSerializer, message);
+                }
                 return false;
             }
 
@@ -119,7 +145,21 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
-            typesToProcess.Add(t);
+            // Do not generate serializers for classes which require the use of serialization hooks.
+            // Instead, a fallback serializer which supports those hooks can be used.
+            if (DotNetSerializableUtilities.HasSerializationHookAttributes(t)) return false;
+
+            if (!typesToProcess.Add(t)) return true;
+
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace($"Will generate serializer for type {t.GetLogFormat()} encountered from {logContext}");
+
+            var interfaces = t.GetInterfaces().Where(x => x.IsConstructedGenericType);
+            if (log.IsEnabled(LogLevel.Trace)) logContext = "generic argument of implemented interface on type " + t.GetLogFormat();
+            foreach (var arg in interfaces.SelectMany(v => v.GetGenericArguments()))
+            {
+                RecordType(arg, targetAssembly, logContext);
+            }
+
             return true;
         }
 

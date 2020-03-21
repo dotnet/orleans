@@ -8,20 +8,17 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);1591</NoWarn>
-    <!-- Needed for tests to force the generation of binding redirects -->
-    <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
+    <NoWarn>$(NoWarn);FS2003;1591</NoWarn>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
 
   <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->
   <PropertyGroup>
-    <TargetFramework>$(TestProjectTargetFramework)</TargetFramework>
+    <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">netcoreapp3.1;net461</TestTargetFrameworks>
   </PropertyGroup>
 
-  <!-- To make CodeLens and Test Explorer happy, we're generating full symbols -->
   <PropertyGroup>
-    <DebugType>full</DebugType>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <!-- Needed for to not to have failed tests because wrong binding redirects were generated for older packages -->
@@ -29,7 +26,8 @@
     <PackageReference Include="System.Net.Http" Version="$(SystemNetHttpVersion)" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(BuildingInsideVisualStudio)' == 'true' ">
-    <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
+  <!-- All .NET Framework projects should link to the reference assemblies package so that .NET Targeting Packs are not needed -->
+  <ItemGroup Condition="$(TargetFramework.StartsWith('net')) and !$(TargetFramework.StartsWith('netcore')) and !$(TargetFramework.StartsWith('netstandard'))" >
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="All" Version="$(MicrosoftNETFrameworkReferenceAssembliesVersion)" />
   </ItemGroup>
 </Project>

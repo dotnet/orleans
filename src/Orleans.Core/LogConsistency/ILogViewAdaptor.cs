@@ -1,4 +1,4 @@
-﻿using Orleans.MultiCluster;
+using Orleans.MultiCluster;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +10,7 @@ namespace Orleans.LogConsistency
     /// <summary>
     /// A log view adaptor is the storage interface for <see cref="LogConsistentGrain{T}"/>, whose state is defined as a log view. 
     ///<para>
-    /// There is one adaptor per grain, which is installed by <see cref="ILogConsistencyProvider"/> when the grain is activated.
+    /// There is one adaptor per grain, which is installed by <see cref="ILogViewAdaptorFactory"/> when the grain is activated.
     ///</para>
     /// </summary>
     /// <typeparam name="TLogView"> Type for the log view </typeparam>
@@ -29,12 +29,6 @@ namespace Orleans.LogConsistency
 
         /// <summary>Called during deactivation, right after the user-defined <see cref="Grain.OnDeactivateAsync"/>.</summary>
         Task PostOnDeactivate();
-
-        /// <summary>Called when a grain receives a message from a remote instance.</summary>
-        Task<ILogConsistencyProtocolMessage> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payload);
-
-        /// <summary>Called after the silo receives a new multi-cluster configuration.</summary>
-        Task OnMultiClusterConfigurationChange(MultiClusterConfiguration next);
     }
 
     /// <summary>

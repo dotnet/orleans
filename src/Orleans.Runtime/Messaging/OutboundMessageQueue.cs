@@ -1,54 +1,44 @@
 using System;
-using System.Linq;
-using System.Threading;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
-using Orleans.Configuration;
-using Microsoft.Extensions.Options;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Messaging
 {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1711:IdentifiersShouldNotHaveIncorrectSuffix")]
-    internal sealed class OutboundMessageQueue : IOutboundMessageQueue
+    internal sealed class OutboundMessageQueue : IDisposable
     {
-        private readonly Lazy<SiloMessageSender>[] senders;
-        private readonly SiloMessageSender pingSender;
-        private readonly SiloMessageSender systemSender;
         private readonly MessageCenter messageCenter;
-        private readonly Logger logger;
+        private readonly ConnectionManager connectionManager;
+        private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly MessagingTrace messagingTrace;
+        private readonly ILogger logger;
         private bool stopped;
 
-        public int Count
+        public int GetCount()
         {
-            get
-            {
-                int n = senders.Where(sender => sender.IsValueCreated).Sum(sender => sender.Value.Count);
-                n += systemSender.Count + pingSender.Count;
-                return n;
-            }
+            int n = GetApplicationMessageCount();
+            return n; // TODO
+        }
+
+        public int GetApplicationMessageCount()
+        {
+            return 0; // TODO
         }
 
         internal const string QUEUED_TIME_METADATA = "QueuedTime";
 
-        internal OutboundMessageQueue(MessageCenter mc, IOptions<SiloMessagingOptions> options, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+        internal OutboundMessageQueue(
+            MessageCenter mc,
+            ILogger<OutboundMessageQueue> logger,
+            ConnectionManager senderManager,
+            ISiloStatusOracle siloStatusOracle,
+            MessagingTrace messagingTrace)
         {
             messageCenter = mc;
-            pingSender = new SiloMessageSender("PingSender", messageCenter, serializationManager, loggerFactory);
-            systemSender = new SiloMessageSender("SystemSender", messageCenter, serializationManager, loggerFactory);
-            senders = new Lazy<SiloMessageSender>[options.Value.SiloSenderQueues];
-
-            for (int i = 0; i < senders.Length; i++)
-            {
-                int capture = i;
-                senders[capture] = new Lazy<SiloMessageSender>(() =>
-                {
-                    var sender = new SiloMessageSender("AppMsgsSender_" + capture, messageCenter, serializationManager, loggerFactory);
-                    sender.Start();
-                    return sender;
-                }, LazyThreadSafetyMode.ExecutionAndPublication);
-            }
-            logger = new LoggerWrapper<OutboundMessageQueue>(loggerFactory);
+            this.connectionManager = senderManager;
+            this.siloStatusOracle = siloStatusOracle;
+            this.messagingTrace = messagingTrace;
+            this.logger = logger;
             stopped = false;
         }
 
@@ -65,7 +55,7 @@ namespace Orleans.Runtime.Messaging
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {
-                msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Send);
+                this.messagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Send);
                 return;
             }
 
@@ -87,14 +77,8 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            // Shortcut messages to this silo
-            if (msg.TargetSilo.Equals(messageCenter.MyAddress))
-            {
-                if (logger.IsVerbose3) logger.Verbose3("Message has been looped back to this silo: {0}", msg);
-                MessagingStatisticsGroup.LocalMessagesSent.Increment();
-                messageCenter.InboundQueue.PostMessage(msg);
-            }
-            else
+            messagingTrace.OnSendMessage(msg);
+            if (!messageCenter.TrySendLocal(msg))
             {
                 if (stopped)
                 {
@@ -103,29 +87,53 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 // check for simulation of lost messages
-                if(messageCenter?.ShouldDrop?.Invoke(msg) == true)
+                if (messageCenter.ShouldDrop?.Invoke(msg) == true)
                 {
                     logger.Info(ErrorCode.Messaging_SimulatedMessageLoss, "Message blocked by test");
                     messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message blocked by test");
                     return;
                 }
 
-                // Prioritize system messages
-                switch (msg.Category)
+                if (this.siloStatusOracle.IsDeadSilo(msg.TargetSilo))
                 {
-                    case Message.Categories.Ping:
-                        pingSender.QueueRequest(msg);
-                        break;
+                    MessagingStatisticsGroup.OnFailedSentMessage(msg);
+                    var reason = $"Target {msg.TargetSilo.ToLongString()} silo is known to be dead";
 
-                    case Message.Categories.System:
-                        systemSender.QueueRequest(msg);
-                        break;
-
-                    default:
+                    if (logger.IsEnabled(LogLevel.Debug))
                     {
-                        int index = Math.Abs(msg.TargetSilo.GetConsistentHashCode()) % senders.Length;
-                        senders[index].Value.QueueRequest(msg);
-                        break;
+                        logger.LogDebug(
+                          (int)ErrorCode.MessagingSendingRejection,
+                          "Silo {siloAddress} is rejecting message: {message}. Reason = {reason}",
+                          messageCenter.MyAddress,
+                          msg,
+                          reason);
+                    }
+
+                    this.messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, reason);
+                    return;
+                }
+
+                var senderTask = this.connectionManager.GetConnection(msg.TargetSilo);
+                if (senderTask.IsCompletedSuccessfully)
+                {
+                    var sender = senderTask.Result;
+                    sender.Send(msg);
+                }
+                else
+                {
+                    _ = SendAsync(senderTask, msg);
+
+                    async Task SendAsync(ValueTask<Connection> c, Message m)
+                    {
+                        try
+                        {
+                            var sender = await c;
+                            sender.Send(m);
+                        }
+                        catch (Exception exception)
+                        {
+                            this.messageCenter.SendRejection(m, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
+                        }
                     }
                 }
             }
@@ -133,39 +141,19 @@ namespace Orleans.Runtime.Messaging
 
         public void Start()
         {
-            pingSender.Start();
-            systemSender.Start();
             stopped = false;
         }
 
         public void Stop()
         {
             stopped = true;
-            foreach (var sender in senders)
-            {
-                if (sender.IsValueCreated)
-                    sender.Value.Stop();                
-            }
-            systemSender.Stop();
-            pingSender.Stop();
         }
-
-        #region IDisposable Members
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA1816:CallGCSuppressFinalizeCorrectly")]
         public void Dispose()
         {
             stopped = true;
-            foreach (var sender in senders)
-            {
-                sender.Value.Stop();
-                sender.Value.Dispose();
-            }
-            systemSender.Stop();
-            pingSender.Stop();
             GC.SuppressFinalize(this);
         }
-
-        #endregion
     }
 }

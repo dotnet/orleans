@@ -1,24 +1,19 @@
-﻿using System;
-using System.IO;
+using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans;
-using Orleans.Hosting;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using UnitTests.GrainInterfaces;
-using Orleans.TestingHost;
+using Microsoft.Extensions.Options;
 using Xunit;
+using Orleans.Hosting;
+using Orleans.TestingHost;
+using UnitTests.GrainInterfaces;
 using TestExtensions;
 using Tester;
-using Microsoft.Extensions.Logging;
-using Orleans.EventSourcing.CustomStorage;
-using Orleans.TestingHost.Utils;
+
+using Orleans.Configuration;
 
 namespace Tests.GeoClusterTests
 {
-    [TestCategory("GeoCluster")]
+    [TestCategory("GeoCluster"), TestCategory("Functional")]
     public class BasicLogTestGrainTests : IClassFixture<BasicLogTestGrainTests.Fixture>
     {
         private readonly Fixture fixture;
@@ -26,46 +21,35 @@ namespace Tests.GeoClusterTests
 
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(1);
-
-                options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-                options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-                options.ClusterConfiguration.AddAzureTableStorageProvider("AzureStore");
-
-                options.ClusterConfiguration.AddAzureTableStorageProvider();
-                options.ClusterConfiguration.AddStateStorageBasedLogConsistencyProvider();
-                options.ClusterConfiguration.AddLogStorageBasedLogConsistencyProvider();
-                options.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStorage");
-
-                options.ClusterConfiguration.AddCustomStorageInterfaceBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
-
-                options.UseSiloBuilderFactory<TestSiloBuilderFactory>();
-
-                return new TestCluster(options);
+                builder.Options.InitialSilosCount = 1;
+                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }
 
-            private class TestSiloBuilderFactory : ISiloBuilderFactory
+            private class SiloBuilderConfigurator : ISiloConfigurator
             {
-                public ISiloHostBuilder CreateSiloBuilder(string siloName, ClusterConfiguration clusterConfiguration)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
-                    return new SiloHostBuilder()
-                        .ConfigureSiloName(siloName)
-                        .UseConfiguration(clusterConfiguration)
-                        .ConfigureServices(services => ConfigureLogging(services, TestingUtils.CreateTraceFileName(siloName, clusterConfiguration.Globals.DeploymentId)));
-                }
-
-                private void ConfigureLogging(IServiceCollection services, string filePath)
-                {
-                    services.AddLogging(builder =>
-                    {
-                        TestingUtils.ConfigureDefaultLoggingBuilder(builder, filePath);
-                        builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Trace);
-                    });
+                    hostBuilder
+                        .AddStateStorageBasedLogConsistencyProvider()
+                        .AddLogStorageBasedLogConsistencyProvider()
+                        .AddCustomStorageBasedLogConsistencyProvider("CustomStorage")
+                        .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A")
+                        .AddAzureTableGrainStorageAsDefault(builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }))
+                        .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
+                        {
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }))
+                        .AddMemoryGrainStorageAsDefault()
+                        .AddMemoryGrainStorage("MemoryStore"); 
                 }
             }
         }
+        
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;
@@ -97,11 +81,6 @@ namespace Tests.GeoClusterTests
         public async Task CustomStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainCustomStorage");
-        }
-        [SkippableFact]
-        public async Task GsiStorage()
-        {
-            await DoBasicLogTestGrainTest("TestGrains.GsiLogTestGrain");
         }
 
         private int GetRandom()

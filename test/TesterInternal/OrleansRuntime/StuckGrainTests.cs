@@ -1,11 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.TestingHost;
-using Tester;
+using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -21,15 +20,24 @@ namespace UnitTests.StuckGrainTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                GlobalConfiguration.ENFORCE_MINIMUM_REQUIREMENT_FOR_AGE_LIMIT = false;
-                var options = new TestClusterOptions(1);
-                options.ClusterConfiguration.Globals.Application.SetDefaultCollectionAgeLimit(TimeSpan.FromSeconds(3));
-                options.ClusterConfiguration.Globals.MaxRequestProcessingTime = TimeSpan.FromSeconds(3);
-                options.ClusterConfiguration.Globals.CollectionQuantum = TimeSpan.FromSeconds(1);
+                builder.Options.InitialSilosCount = 1;
+                builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
+            }
 
-                return new TestCluster(options);
+            private class SiloHostConfigurator : ISiloConfigurator
+            {
+                public void Configure(ISiloBuilder hostBuilder)
+                {
+                    hostBuilder.Configure<GrainCollectionOptions>(options =>
+                    {
+                        options.CollectionAge = TimeSpan.FromSeconds(3);
+                        options.CollectionQuantum = TimeSpan.FromSeconds(1);
+                    });
+
+                    hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxRequestProcessingTime = TimeSpan.FromSeconds(3));
+                }
             }
         }
 

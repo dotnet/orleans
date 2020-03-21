@@ -33,7 +33,7 @@ namespace Orleans.CodeGeneration
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public sealed class KnownTypeAttribute : ConsiderForCodeGenerationAttribute
     {
-        /// <summary>Initializes a new instance of <see cref="KnownAssemblyAttribute"/>.</summary>
+        /// <summary>Initializes a new instance of <see cref="KnownTypeAttribute"/>.</summary>
         /// <param name="type">The type that the generator should generate code for</param>
         public KnownTypeAttribute(Type type) : base(type){}
     }
@@ -48,5 +48,13 @@ namespace Orleans.CodeGeneration
         /// <summary>Initializes a new instance of <see cref="GenerateSerializerAttribute"/>.</summary>
         /// <param name="type">The type that the generator should generate code for</param>
         public GenerateSerializerAttribute(Type type) : base(type, true){ }
+    }
+
+    /// <summary>
+    /// Indicates that this type and all subtypes are to be considered as [Serializable].
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
+    public sealed class KnownBaseTypeAttribute : Attribute
+    {
     }
 }

@@ -12,7 +12,7 @@ namespace Orleans.Runtime
         SiloAddress SiloAddress { get; }
         DateTime TimeCreated { get; }
         GrainDirectoryEntryStatus RegistrationStatus { get; set; }
-        bool OkToRemove(UnregistrationCause cause, GlobalConfiguration config);
+        bool OkToRemove(UnregistrationCause cause, TimeSpan lazyDeregistrationDelay);
     }
 
     internal interface IGrainInfo
@@ -22,7 +22,7 @@ namespace Orleans.Runtime
         bool SingleInstance { get; }
         bool AddActivation(ActivationId act, SiloAddress silo);
         ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, GrainDirectoryEntryStatus registrationStatus);
-        bool RemoveActivation(ActivationId act, UnregistrationCause cause, GlobalConfiguration config, out IActivationInfo entry, out bool wasRemoved);
+        bool RemoveActivation(ActivationId act, UnregistrationCause cause, TimeSpan lazyDeregistrationDelay, out IActivationInfo entry, out bool wasRemoved);
 
         /// <summary>
         /// Merges two grain directory infos, returning a map of activations which must be deactivated, grouped by silo.
@@ -38,7 +38,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Per-silo system interface for managing the distributed, partitioned grain-silo-activation directory.
     /// </summary>
-    internal interface IRemoteGrainDirectory : ISystemTarget, IGrainDirectory
+    internal interface IRemoteGrainDirectory : ISystemTarget, IDhtGrainDirectory
     {        
         /// <summary>
         /// Records a bunch of new grain activations.
@@ -61,7 +61,7 @@ namespace Orleans.Runtime
         Task<List<Tuple<GrainId, int, List<ActivationAddress>>>> LookUpMany(List<Tuple<GrainId, int>> grainAndETagList);
 
         /// <summary>
-        /// Handoffs the the directory partition from source silo to the destination silo.
+        /// Handoffs the directory partition from source silo to the destination silo.
         /// </summary>
         /// <param name="source">The address of the owner of the partition.</param>
         /// <param name="partition">The (full or partial) copy of the directory partition to be Haded off.</param>
@@ -76,5 +76,13 @@ namespace Orleans.Runtime
         /// <param name="source">The address of the owner of the partition.</param>
         /// <returns></returns>
         Task RemoveHandoffPartition(SiloAddress source);
+
+        /// <summary>
+        /// Registers activations from a split partition with this directory.
+        /// </summary>
+        /// <param name="singleActivations">The single-activation registrations from the split partition.</param>
+        /// <param name="multiActivations">The multiple-activation registrations from the split partition.</param>
+        /// <returns></returns>
+        Task AcceptSplitPartition(List<ActivationAddress> singleActivations, List<ActivationAddress> multiActivations);
     }
 }

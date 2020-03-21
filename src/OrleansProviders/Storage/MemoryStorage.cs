@@ -1,18 +1,16 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Providers;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Storage.Internal;
 
 namespace Orleans.Storage
 {
+
     /// <summary>
     /// This is a simple in-memory grain implementation of a storage provider.
     /// </summary>
@@ -32,90 +30,45 @@ namespace Orleans.Storage
     ///   &lt;/StorageProviders>
     /// </code>
     /// </example>
-    [DebuggerDisplay("MemoryStore:{Name}")]
-    public class MemoryStorage : IStorageProvider
+    [DebuggerDisplay("MemoryStore:{" + nameof(name) + "}")]
+    public class MemoryGrainStorage : IGrainStorage, IDisposable
     {
-        /// <summary>
-        /// Default number of queue storage grains.
-        /// </summary>
-        public const int NumStorageGrainsDefaultValue = 10;
-        /// <summary>
-        /// Config string name for number of queue storage grains.
-        /// </summary>
-        public const string NumStorageGrainsPropertyName = "NumStorageGrains";
-        private int numStorageGrains;
         private const string STATE_STORE_NAME = "MemoryStorage";
         private Lazy<IMemoryStorageGrain>[] storageGrains;
-        private ILogger logger;
-        /// <summary> Name of this storage provider instance. </summary>
-        /// <see cref="IProvider.Name"/>
-        public string Name { get; private set; }
+        private readonly ILogger logger;
 
-        /// <summary> Logger used by this storage provider instance. </summary>
-        /// <see cref="IStorageProvider.Log"/>
-        public Logger Log { get; private set; }
+        /// <summary> Name of this storage provider instance. </summary>
+        private readonly string name;
 
         /// <summary> Default constructor. </summary>
-        public MemoryStorage()
-            : this(NumStorageGrainsDefaultValue)
+        public MemoryGrainStorage(string name, MemoryGrainStorageOptions options, ILoggerFactory loggerFactory, IGrainFactory grainFactory)
         {
-        }
+            this.name = name;
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}");
 
-        /// <summary> Constructor - use the specificed number of store grains. </summary>
-        /// <param name="numStoreGrains">Number of store grains to use.</param>
-        protected MemoryStorage(int numStoreGrains)
-        {
-            numStorageGrains = numStoreGrains;
-        }
+            //Init
+            logger.LogInformation("Init: Name={Name} NumStorageGrains={NumStorageGrains}", name, options.NumStorageGrains);
 
-        #region IStorageProvider methods
-
-        /// <summary> Initialization function for this storage provider. </summary>
-        /// <see cref="IProvider.Init"/>
-        public virtual Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            Name = name;
-            var loggerName = $"{this.GetType().FullName}.{Name}";
-            var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            this.logger = loggerFactory.CreateLogger(loggerName);
-            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
-
-            string numStorageGrainsStr;
-            if (config.Properties.TryGetValue(NumStorageGrainsPropertyName, out numStorageGrainsStr))
-                numStorageGrains = Int32.Parse(numStorageGrainsStr);
-            
-            logger.Info("Init: Name={0} NumStorageGrains={1}", Name, numStorageGrains);
-
-            storageGrains = new Lazy<IMemoryStorageGrain>[numStorageGrains];
-            for (int i = 0; i < numStorageGrains; i++)
+            storageGrains = new Lazy<IMemoryStorageGrain>[options.NumStorageGrains];
+            for (int i = 0; i < storageGrains.Length; i++)
             {
                 int idx = i; // Capture variable to avoid modified closure error
-                storageGrains[idx] = new Lazy<IMemoryStorageGrain>(() => providerRuntime.GrainFactory.GetGrain<IMemoryStorageGrain>(idx));
+                storageGrains[idx] = new Lazy<IMemoryStorageGrain>(() => grainFactory.GetGrain<IMemoryStorageGrain>(idx));
             }
-            return Task.CompletedTask;
-        }
-
-        /// <summary> Shutdown function for this storage provider. </summary>
-        public virtual Task Close()
-        {
-            for (int i = 0; i < numStorageGrains; i++)
-                storageGrains[i] = null;
-            
-            return Task.CompletedTask;
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.ReadStateAsync"/>
+        /// <see cref="IGrainStorage.ReadStateAsync"/>
         public virtual async Task ReadStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
+            var keys = MakeKeys(grainType, grainReference);
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Read Keys={0}", StorageProviderUtils.PrintKeys(keys));
-            
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Read Keys={Keys}", StorageProviderUtils.PrintKeys(keys));
+
             string id = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(id);
             var state = await storageGrain.ReadStateAsync(STATE_STORE_NAME, id);
-            if (state != null && state.State != null)
+            if (state != null)
             {
                 grainState.ETag = state.ETag;
                 grainState.State = state.State;
@@ -123,12 +76,12 @@ namespace Orleans.Storage
         }
 
         /// <summary> Write state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.WriteStateAsync"/>
+        /// <see cref="IGrainStorage.WriteStateAsync"/>
         public virtual async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
+            var keys = MakeKeys(grainType, grainReference);
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Write {0} ", StorageProviderUtils.PrintOneWrite(keys, grainState.State, grainState.ETag));
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Write {Write} ", StorageProviderUtils.PrintOneWrite(keys, grainState.State, grainState.ETag));
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
@@ -141,11 +94,11 @@ namespace Orleans.Storage
         }
 
         /// <summary> Delete / Clear state data function for this storage provider. </summary>
-        /// <see cref="IStorageProvider.ClearStateAsync"/>
+        /// <see cref="IGrainStorage.ClearStateAsync"/>
         public virtual async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-            IList<Tuple<string, string>> keys = MakeKeys(grainType, grainReference).ToList();
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Delete Keys={0} Etag={1}", StorageProviderUtils.PrintKeys(keys), grainState.ETag);
+            var keys = MakeKeys(grainType, grainReference);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Delete Keys={Keys} Etag={Etag}", StorageProviderUtils.PrintKeys(keys), grainState.ETag);
             string key = HierarchicalKeyStore.MakeStoreKey(keys);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
@@ -159,9 +112,7 @@ namespace Orleans.Storage
             }
         }
 
-        #endregion
-
-        private static IEnumerable<Tuple<string, string>> MakeKeys(string grainType, GrainReference grain)
+        private static Tuple<string, string>[] MakeKeys(string grainType, GrainReference grain)
         {
             return new[]
             {
@@ -172,66 +123,23 @@ namespace Orleans.Storage
 
         private IMemoryStorageGrain GetStorageGrain(string id)
         {
-            int idx = StorageProviderUtils.PositiveHash(id.GetHashCode(), numStorageGrains);
+            int idx = StorageProviderUtils.PositiveHash(id.GetHashCode(), this.storageGrains.Length);
             IMemoryStorageGrain storageGrain = storageGrains[idx].Value;
             return storageGrain;
         }
 
-        internal static Func<IDictionary<string, object>, bool> GetComparer<T>(string rangeParamName, T fromValue, T toValue) where T : IComparable
+        public void Dispose() => storageGrains = null;
+    }
+
+    /// <summary>
+    /// Factory for creating MemoryGrainStorage
+    /// </summary>
+    public class MemoryGrainStorageFactory
+    {
+        public static IGrainStorage Create(IServiceProvider services, string name)
         {
-            Comparer comparer = Comparer.DefaultInvariant;
-            bool sameRange = comparer.Compare(fromValue, toValue) == 0; // FromValue == ToValue
-            bool insideRange = comparer.Compare(fromValue, toValue) < 0; // FromValue < ToValue
-            Func<IDictionary<string, object>, bool> compareClause;
-            if (sameRange)
-            {
-                compareClause = data =>
-                {
-                    if (data == null || data.Count <= 0) return false;
-
-                    if (!data.ContainsKey(rangeParamName))
-                    {
-                        var error = string.Format("Cannot find column '{0}' for range query from {1} to {2} in Data={3}",
-                            rangeParamName, fromValue, toValue, StorageProviderUtils.PrintData(data));
-                        throw new KeyNotFoundException(error);
-                    }
-                    T obj = (T) data[rangeParamName];
-                    return comparer.Compare(obj, fromValue) == 0;
-                };
-            }
-            else if (insideRange)
-            {
-                compareClause = data =>
-                {
-                    if (data == null || data.Count <= 0) return false;
-
-                    if (!data.ContainsKey(rangeParamName))
-                    {
-                        var error = string.Format("Cannot find column '{0}' for range query from {1} to {2} in Data={3}",
-                            rangeParamName, fromValue, toValue, StorageProviderUtils.PrintData(data));
-                        throw new KeyNotFoundException(error);
-                    }
-                    T obj = (T) data[rangeParamName];
-                    return comparer.Compare(obj, fromValue) >= 0 && comparer.Compare(obj, toValue) <= 0;
-                };
-            }
-            else
-            {
-                compareClause = data =>
-                {
-                    if (data == null || data.Count <= 0) return false;
-
-                    if (!data.ContainsKey(rangeParamName))
-                    {
-                        var error = string.Format("Cannot find column '{0}' for range query from {1} to {2} in Data={3}",
-                            rangeParamName, fromValue, toValue, StorageProviderUtils.PrintData(data));
-                        throw new KeyNotFoundException(error);
-                    }
-                    T obj = (T) data[rangeParamName];
-                    return comparer.Compare(obj, fromValue) >= 0 || comparer.Compare(obj, toValue) <= 0;
-                };
-            }
-            return compareClause;
+            return ActivatorUtilities.CreateInstance<MemoryGrainStorage>(services,
+                services.GetRequiredService<IOptionsMonitor<MemoryGrainStorageOptions>>().Get(name), name);
         }
     }
 }

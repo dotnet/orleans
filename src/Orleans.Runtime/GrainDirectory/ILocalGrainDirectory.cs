@@ -5,7 +5,7 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    interface ILocalGrainDirectory : IGrainDirectory
+    internal interface ILocalGrainDirectory : IDhtGrainDirectory
     {
         /// <summary>
         /// Starts the local portion of the directory service.
@@ -16,12 +16,10 @@ namespace Orleans.Runtime.GrainDirectory
         /// Stops the local portion of the directory service.
         /// </summary>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1716:IdentifiersShouldNotMatchKeywords", MessageId = "Stop")]
-        void Stop(bool doOnStopHandoff);
+        Task Stop(bool doOnStopHandoff);
 
         RemoteGrainDirectory RemoteGrainDirectory { get; }
         RemoteGrainDirectory CacheValidator { get; }
-        ClusterGrainDirectory RemoteClusterGrainDirectory { get; }
-        Task StopPreparationCompletion { get; }  // Will be resolved when this directory is prepared to stop
 
         /// <summary>
         /// Removes the record for an non-existing activation from the directory service.
@@ -49,22 +47,13 @@ namespace Orleans.Runtime.GrainDirectory
         bool LocalLookup(GrainId grain, out AddressesAndTag addresses);
 
         /// <summary>
-        /// Fetches complete directory information for a grain in an explicitly named cluster.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="grain">The ID of the grain to look up.</param>
-        /// <param name="clusterId">The cluster in which to look up the grain</param>
-        /// <returns>A list of all known activations of the grain, and the e-tag.</returns>
-        Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId);
-
-        /// <summary>
         /// Invalidates cache entry for the given activation address.
         /// This method is intended to be called whenever a directory client tries to access 
         /// an activation returned from the previous directory lookup and gets a reject from the target silo 
-        /// notifiying him that the activation does not exist.
+        /// notifying him that the activation does not exist.
         /// </summary>
         /// <param name="activation">The address of the activation that needs to be invalidated in the directory cache for the given grain.</param>
-        /// <param name="invalidateDirectoryAlso">If true, on owner, invalidates directory entry that point to activatiosn in remote clusters as well</param>
+        /// <param name="invalidateDirectoryAlso">If true, on owner, invalidates directory entry that point to activations in remote clusters as well</param>
         void InvalidateCacheEntry(ActivationAddress activation, bool invalidateDirectoryAlso = false);
 
         /// <summary>
@@ -77,25 +66,6 @@ namespace Orleans.Runtime.GrainDirectory
         SiloAddress GetPrimaryForGrain(GrainId grain);
 
         /// <summary>
-        /// For testing purposes only.
-        /// Returns the silos that this silo thinks hold copied directory information for
-        /// the provided grain ID.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <returns></returns>
-        List<SiloAddress> GetSilosHoldingDirectoryInformationForGrain(GrainId grain);
-
-        /// <summary>
-        /// For testing purposes only.
-        /// Returns the directory information held by another silo for the provided grain ID.
-        /// The result will be null if no information is held.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <param name="isPrimary"></param>
-        /// <returns></returns>
-        List<ActivationAddress> GetLocalDataForGrain(GrainId grain, out bool isPrimary);
-
-        /// <summary>
         /// Returns the directory information held in a local directory partition for the provided grain ID.
         /// The result will be null if no information is held.
         /// </summary>
@@ -104,8 +74,8 @@ namespace Orleans.Runtime.GrainDirectory
         AddressesAndTag GetLocalDirectoryData(GrainId grain);
 
         /// <summary>
-        /// For testing and troubleshhoting purposes only.
-        /// Returns the directory information held in a local directory cacche for the provided grain ID.
+        /// For testing and troubleshooting purposes only.
+        /// Returns the directory information held in a local directory cache for the provided grain ID.
         /// The result will be null if no information is held.
         /// </summary>
         /// <param name="grain"></param>
@@ -118,11 +88,6 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="silo">the address of the silo</param>
         /// <returns>true if the silo is known to be part of this cluster</returns>
         bool IsSiloInCluster(SiloAddress silo);
-
-        /// <summary>
-        /// The id of this cluster
-        /// </summary>
-        string ClusterId { get; }
 
         /// <summary>
         /// Sets the callback to <see cref="Catalog"/> which is called when a silo is removed from membership.

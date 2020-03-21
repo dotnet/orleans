@@ -1,7 +1,7 @@
-﻿using System;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.TestHooks;
 
 namespace Orleans.TestingHost
 {
@@ -10,8 +10,11 @@ namespace Orleans.TestingHost
     /// </summary>
     public abstract class SiloHandle : IDisposable
     {
-        /// <summary> Get or set configuration of the silo </summary>
-        public NodeConfiguration NodeConfiguration { get; set; }
+        /// <summary> Get or set configuration of the cluster </summary>
+        public TestClusterOptions ClusterOptions { get; set; }
+
+        /// <summary> Gets or sets the instance number within the cluster.</summary>
+        public short InstanceNumber { get; set; }
 
         /// <summary> Get or set the name of the silo </summary>
         public string Name { get; set; }
@@ -19,29 +22,19 @@ namespace Orleans.TestingHost
         /// <summary>Get or set the address of the silo</summary>
         public SiloAddress SiloAddress { get; set; }
 
-        /// <summary>Get the proxy address of the silo</summary>
-        public SiloAddress ProxyAddress => SiloAddress.New(this.NodeConfiguration.ProxyGatewayEndpoint, 0);
+        ///// <summary>Get the proxy address of the silo</summary>
+        public SiloAddress GatewayAddress { get; set; }
 
         /// <summary>Gets whether the remote silo is expected to be active</summary>
         public abstract bool IsActive { get; }
 
-        /// <summary>Gets or sets the silo type </summary>
-        public Silo.SiloType Type { get; set; }
-
         /// <summary>Stop the remote silo</summary>
         /// <param name="stopGracefully">Specifies whether the silo should be stopped gracefully or abruptly.</param>
-        public abstract void StopSilo(bool stopGracefully);
+        public abstract Task StopSiloAsync(bool stopGracefully);
 
-        /// <summary>Gets the Silo test hook that uses AppDomain remoting
-        /// (NOTE: this will be removed really soon, and was migrated here temporarily. It does not respect the abstraction
-        /// as this only works with AppDomains for now, but we'll be removing TestHooks with AppDomains entirely)</summary>
-        internal AppDomainTestHooks AppDomainTestHook { get; set; }
-
-        /// <summary> A string that represents the current SiloHandle </summary>
-        public override string ToString()
-        {
-            return $"(SiloHandle endpoint={SiloAddress.Endpoint} gatewayport={NodeConfiguration.ProxyGatewayEndpoint?.Port})";
-        }
+        /// <summary>Stop the remote silo. This method cannot be use with AppDomain</summary>
+        /// <param name="ct">Specifies the cancellation token to use for the shutdown sequence</param>
+        public abstract Task StopSiloAsync(CancellationToken ct);
 
         /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
         public void Dispose()
@@ -59,7 +52,7 @@ namespace Orleans.TestingHost
             // Concrete SiloHandle implementations can do have their own cleanup functionality
             if (disposing)
             {
-                StopSilo(true);
+                StopSiloAsync(true).GetAwaiter().GetResult();
             }
         }
 
@@ -67,6 +60,11 @@ namespace Orleans.TestingHost
         ~SiloHandle()
         {
             Dispose(false);
+        }
+
+        public override string ToString()
+        {
+            return SiloAddress.ToString();
         }
     }
 }

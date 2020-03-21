@@ -1,10 +1,34 @@
 param(
-    [string[]] $assemblies,
-    [string] $testFilter,
-    [string] $outDir)
+    [string[]] $directories,
+    [string] $testFilter = $null,
+    [string] $dotnet)
 
-$maxDegreeOfParallelism = 4
+$maxDegreeOfParallelism = [math]::min($env:NUMBER_OF_PROCESSORS, 4)
+Write-Host "Max Job Parallelism = $maxDegreeOfParallelism"
+
 $failed = $false
+
+if( 
+    [Console]::InputEncoding -is [Text.UTF8Encoding] -and 
+    [Console]::InputEncoding.GetPreamble().Length -ne 0 
+) { 
+    Write-Host Setting [Console]::InputEncoding
+    [Console]::InputEncoding = New-Object Text.UTF8Encoding $false 
+} 
+else 
+{
+    Write-Host Not changing [Console]::InputEncoding
+}
+
+if ([string]::IsNullOrWhiteSpace($testFilter)) {
+    $testFilter = $env:TEST_FILTERS;
+}
+
+if ([string]::IsNullOrWhiteSpace($testFilter)) {
+    $testFilter = "Category=BVT|Category=SlowBVT";
+}
+
+Write-Host "Test filters: `"$testFilter`"";
 
 function Receive-CompletedJobs {
     $succeeded = $true
@@ -21,23 +45,27 @@ function Receive-CompletedJobs {
     return $succeeded
 }
 
-# If there is multiple xunit packages installed, take the latest one
-$xunitRunner = Get-ChildItem packages -Directory -Filter "xunit.runner.console.*" | 
-                ForEach-Object { Get-ChildItem $_.FullName -Recurse -File -Filter "xunit.console.exe" } | 
-                Sort-Object -Property VersionInfo | 
-                Select-Object -Last 1
-
 $ExecuteCmd =
 {
-    param($cmd)
-    Invoke-Expression $cmd
-    if ($LASTEXITCODE -ne 0)
+    param([string] $dotnet1, [string] $args1, [string] $path)
+
+    Set-Location -Path $path
+
+    $cmdline = "& `"" + $dotnet1 + "`" " + $args1
+
+    Invoke-Expression $cmdline;
+    $cmdExitCode = $LASTEXITCODE;
+    if ($cmdExitCode -ne 0)
     {
-        Throw "Error when running tests"
+        Throw "Error when running tests. Command: `"$cmdline`". Exit Code: $cmdExitCode"
+    }
+    else
+    {
+        Write-Host "Tests completed. Command: `"$cmdline`""
     }
 }
 
-foreach ($a in $assemblies)
+foreach ($d in $directories)
 {
     $running = @(Get-Job | Where-Object { $_.State -eq 'Running' })
     if ($running.Count -ge $maxDegreeOfParallelism) {
@@ -45,12 +73,14 @@ foreach ($a in $assemblies)
     }
 
     if (-not (Receive-CompletedJobs)) { $failed = $true }
-	
-    $xmlName = 'xUnit-Results-' + [System.IO.Path]::GetFileNameWithoutExtension($a) + '.xml'
-    $outXml = $(Join-Path $outDir $xmlName)
-    $cmdLine = $xunitRunner.FullName + ' ' + $a + ' ' + $testFilter + ' -xml ' + $outXml + ' -parallel none -noshadow -verbose' 
-    Write-Host $cmdLine
-    Start-Job $ExecuteCmd -ArgumentList $cmdLine -Name $([System.IO.Path]::GetFileNameWithoutExtension($a)) | Out-Null
+    
+    if (-not $testFilter.StartsWith('"')) { $testFilter = "`"$testFilter"; }
+    if (-not $testFilter.EndsWith('"')) { $testFilter = "$testFilter`""; }
+
+    $jobName = $([System.IO.Path]::GetFileName($d))
+    $cmdLine = 'test --no-build --configuration "' + $env:BuildConfiguration + '" --filter ' + $testFilter + ' --logger "trx" -- -parallel none -noshadow'
+    Write-Host $jobName $dotnet $cmdLine
+    Start-Job $ExecuteCmd -ArgumentList @($dotnet, $cmdLine, $d) -Name $jobName | Out-Null
     Write-Host ''
 }
 

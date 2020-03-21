@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.OrleansTelemetryConsumers.AI</PackageId>
+    <Title>Microsoft Orleans Telemetry Consumer - Microsoft Azure Application Insights</Title>
+    <Description>Microsoft Azure Application Insights implementation of Orleans Telemetry API.</Description>
+    <PackageTags>$(PackageTags) Azure ApplicationInsights</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.TelemetryConsumers.AI</AssemblyName>
+    <RootNamespace>OrleansTelemetryConsumers.AI</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="$(MicrosoftApplicationInsightsVersion)" />
+  </ItemGroup>
+
+</Project>

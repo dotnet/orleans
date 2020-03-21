@@ -21,7 +21,7 @@ namespace UnitTests.StorageTests
         Memory,
         Mock,
         File,
-        Sql
+        AdoNet
     }
     
     [Collection(TestEnvironmentFixture.DefaultCollection)]

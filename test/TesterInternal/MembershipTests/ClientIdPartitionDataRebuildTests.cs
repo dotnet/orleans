@@ -1,9 +1,12 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
@@ -61,7 +64,7 @@ namespace UnitTests.MembershipTests
             await observer.WaitForNotification(10, 0, TimeSpan.FromSeconds(10));
 
             // Kill the silo that hold directory client entry
-            this.hostedCluster.SecondarySilos[0].StopSilo(stopGracefully: false);
+            await this.hostedCluster.SecondarySilos[0].StopSiloAsync(stopGracefully: false);
             await Task.Delay(5000);
 
             // Second notification should work since the directory was "rebuilt" when
@@ -79,7 +82,7 @@ namespace UnitTests.MembershipTests
 
             // Launch a long task and kill the silo that hold directory client entry
             var promise = grain.DoLongAction(TimeSpan.FromSeconds(10), "LongAction");
-            this.hostedCluster.SecondarySilos[0].StopSilo(stopGracefully: false);
+            await this.hostedCluster.SecondarySilos[0].StopSiloAsync(stopGracefully: false);
 
             // It should work since the directory was "rebuilt" when
             // silos in cluster detected the dead one
@@ -106,7 +109,7 @@ namespace UnitTests.MembershipTests
                     break;
                 }
                 clientId = null;
-                this.hostedCluster.KillClient();
+                await this.hostedCluster.KillClientAsync();
             }
             Assert.NotNull(clientId);
 
@@ -129,22 +132,48 @@ namespace UnitTests.MembershipTests
 
         private void CreateAndDeployTestCluster()
         {
-            var options = new TestClusterOptions(3);
+            var builder = new TestClusterBuilder(3);
 
-            options.ClusterConfiguration.Globals.NumMissedProbesLimit = 1;
-            options.ClusterConfiguration.Globals.ProbeTimeout = TimeSpan.FromMilliseconds(500);
-            options.ClusterConfiguration.Globals.NumVotesForDeathDeclaration = 1;
-            options.ClusterConfiguration.Globals.CacheSize = 0;
-
-            // use only Primary as the gateway
-            options.ClientConfiguration.Gateways = options.ClientConfiguration.Gateways.Take(1).ToList();
-            this.hostedCluster = new TestCluster(options);
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            builder.AddClientBuilderConfigurator<ClientConfigurator>();
+            this.hostedCluster = builder.Build();
             this.hostedCluster.Deploy();
+        }
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.Configure<ClusterMembershipOptions>(options =>
+                {
+                    options.NumMissedProbesLimit = 1;
+                    options.ProbeTimeout = TimeSpan.FromMilliseconds(500);
+                    options.NumVotesForDeathDeclaration = 1;
+                });
+
+                hostBuilder.Configure<GrainDirectoryOptions>(options => options.CacheSize = 0);
+            }
+        }
+
+        public class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 0);
+            }
         }
 
         public void Dispose()
         {
-            this.hostedCluster?.StopAllSilos();
+            try
+            {
+                hostedCluster?.StopAllSilos();
+            }
+            finally
+            {
+                hostedCluster?.Dispose();
+                hostedCluster = null;
+            }
         }
     }
 }

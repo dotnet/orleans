@@ -2,20 +2,17 @@ using System;
 using System.Threading.Tasks;
 
 using Orleans.Concurrency;
-using Orleans.Providers;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.Providers
 {
     internal class SiloProviderRuntime : ISiloSideStreamProviderRuntime
     {
-        private readonly SiloInitializationParameters siloDetails;
-        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activationDirectory;
         private readonly IConsistentRingProvider consistentRingProvider;
@@ -24,53 +21,39 @@ namespace Orleans.Runtime.Providers
         private readonly IStreamPubSub implictPubSub;
         private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private readonly ILoggerFactory loggerFactory;
-
+        private readonly ILocalSiloDetails siloDetails;
+        private readonly ILogger logger;
         public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
 
-        public Guid ServiceId { get; }
-        public string SiloIdentity { get; }
-
         public SiloProviderRuntime(
-            SiloInitializationParameters siloDetails,
-            GlobalConfiguration config,
             IConsistentRingProvider consistentRingProvider,
             ISiloRuntimeClient runtimeClient,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
-            ISiloStatusOracle siloStatusOracle,
             OrleansTaskScheduler scheduler,
             ActivationDirectory activationDirectory,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            ILocalSiloDetails siloDetails)
         {
             this.loggerFactory = loggerFactory;
             this.siloDetails = siloDetails;
-            this.siloStatusOracle = siloStatusOracle;
             this.scheduler = scheduler;
             this.activationDirectory = activationDirectory;
             this.consistentRingProvider = consistentRingProvider;
             this.runtimeClient = runtimeClient;
-            this.ServiceId = config.ServiceId;
-            this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
-
+            this.logger = this.loggerFactory.CreateLogger<SiloProviderRuntime>();
             this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
             var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
             this.implictPubSub = tmp;
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
         }
 
-        public Logger GetLogger(string loggerName)
-        {
-            return new LoggerWrapper(loggerName, this.loggerFactory);
-        }
-
-        public SiloAddress ExecutingSiloAddress => this.siloStatusOracle.SiloAddress;
-
         public void RegisterSystemTarget(ISystemTarget target)
         {
             var systemTarget = target as SystemTarget;
             if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
             systemTarget.RuntimeClient = this.runtimeClient;
-            scheduler.RegisterWorkContext(systemTarget.SchedulingContext);
+            scheduler.RegisterWorkContext(systemTarget);
             activationDirectory.RecordNewSystemTarget(systemTarget);
         }
 
@@ -79,7 +62,7 @@ namespace Orleans.Runtime.Providers
             var systemTarget = target as SystemTarget;
             if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
             activationDirectory.RemoveSystemTarget(systemTarget);
-            scheduler.UnregisterWorkContext(systemTarget.SchedulingContext);
+            scheduler.UnregisterWorkContext(systemTarget);
         }
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
@@ -105,13 +88,22 @@ namespace Orleans.Runtime.Providers
         public async Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,
-            IQueueAdapter queueAdapter,
-            PersistentStreamProviderConfig config,
-            IProviderConfiguration providerConfig)
+            IQueueAdapter queueAdapter)
         {
-            IStreamQueueBalancer queueBalancer = CreateQueueBalancer(config, streamProviderName);
+            IStreamQueueBalancer queueBalancer = CreateQueueBalancer(streamProviderName);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config, providerConfig, this.loggerFactory);
+            var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
+            var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
+            var manager = new PersistentStreamPullingManager(
+                managerId,
+                streamProviderName,
+                this,
+                this.PubSub(pubsubOptions.PubSubType),
+                adapterFactory,
+                queueBalancer,
+                pullingAgentOptions,
+                this.loggerFactory,
+                this.siloDetails.SiloAddress);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
@@ -120,21 +112,19 @@ namespace Orleans.Runtime.Providers
             return pullingAgentManager;
         }
 
-        private IStreamQueueBalancer CreateQueueBalancer(PersistentStreamProviderConfig config, string streamProviderName)
+        private IStreamQueueBalancer CreateQueueBalancer(string streamProviderName)
         {
-            //default type is ConsistentRingBalancer
-            if (config.BalancerType == null)
-                config.BalancerType = StreamQueueBalancerType.ConsistentRingBalancer;
             try
             {
-                var balancer = this.ServiceProvider.GetRequiredService(config.BalancerType) as IStreamQueueBalancer;
+                var balancer = this.ServiceProvider.GetServiceByName<IStreamQueueBalancer>(streamProviderName)??this.ServiceProvider.GetService<IStreamQueueBalancer>();
                 if (balancer == null)
-                    throw new ArgumentOutOfRangeException("balancerType", $"Configured BalancerType isn't a type which implements IStreamQueueBalancer. BalancerType: {config.BalancerType}, StreamProvider: {streamProviderName}");
+                    throw new ArgumentOutOfRangeException("balancerType", $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}.Please configure your stream provider with a queue balancer.");
+                this.logger.LogInformation($"Successfully created queue balancer of type {balancer.GetType()} for stream provider {streamProviderName}");
                 return balancer;
             }
             catch (Exception e)
             {
-                string error = $"Unsupported balancerType for stream provider. BalancerType: {config.BalancerType}, StreamProvider: {streamProviderName}, Exception: {e}";
+                string error = $"Cannot create stream queue balancer for StreamProvider: {streamProviderName}, Exception: {e}. Please configure your stream provider with a queue balancer.";
                 throw new ArgumentOutOfRangeException("balancerType", error);
             }
         }
@@ -145,14 +135,6 @@ namespace Orleans.Runtime.Providers
         /// <inheritdoc />
         public StreamDirectory GetStreamDirectory()
         {
-            if (runtimeClient.CurrentActivationData == null)
-            {
-                throw new InvalidOperationException(
-                    String.Format("Trying to get a Stream or send a stream message on a silo not from within grain and not from within system target (CurrentActivationData is null) "
-                        + "RuntimeContext.Current={0} TaskScheduler.Current={1}",
-                        RuntimeContext.Current == null ? "null" : RuntimeContext.Current.ToString(),
-                        TaskScheduler.Current));
-            }
             return runtimeClient.GetStreamDirectory();
         }
 

@@ -27,7 +27,7 @@ namespace Orleans.Providers.Streams.Common
     }
 
     /// <summary>
-    /// Utility class to support pooled objects by allowing them to track the pook they came from and return to it when disposed
+    /// Utility class to support pooled objects by allowing them to track the pool they came from and return to it when disposed
     /// </summary>
     /// <typeparam name="T"></typeparam>
     public abstract class PooledResource<T> : IDisposable

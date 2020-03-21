@@ -1,373 +1,443 @@
-﻿using Orleans.LeaseProviders;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Providers;
+using Orleans.LeaseProviders;
+using Orleans.Runtime;
+using Orleans.Configuration;
+using Orleans.Timers;
+using System.Diagnostics;
+using System.Reflection.Metadata;
+using Orleans.Internal;
 
 namespace Orleans.Streams
 {
     /// <summary>
-    /// IResourceSelector selects a centain amount of resource from a resource list
+    /// LeaseBasedQueueBalancer. This balancer supports queue balancing in cluster auto-scale scenarios,
+    /// unexpected server failure scenarios, and tries to support ideal distribution as much as possible. 
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    internal interface IResourceSelector<T>
+    public class LeaseBasedQueueBalancer : QueueBalancerBase, IStreamQueueBalancer
     {
-        /// <summary>
-        /// Try to select certain count of resources from resource list, which doesn't overlap with existing selection
-        /// </summary>
-        /// <param name="newSelectionCount"></param>
-        /// <param name="existingSelection"></param>
-        /// <returns></returns>
-        List<T> NextSelection(int newSelectionCount, List<T> existingSelection);
-    }
-
-    /// <summary>
-    /// Selector using round robin algorithm
-    /// </summary>
-    /// <typeparam name="T"></typeparam>
-    internal class RoundRobinSelector<T> : IResourceSelector<T>
-    {
-        private ReadOnlyCollection<T> resources;
-        private int lastSelection;
-        public RoundRobinSelector(ReadOnlyCollection<T> resources)
-        {
-            this.resources = resources;
-            this.lastSelection = new Random().Next(this.resources.Count);
-        }
-
-        /// <summary>
-        /// Try to select certain count of resources from resource list, which doesn't overlap with existing resources
-        /// </summary>
-        /// <param name="newSelectionCount"></param>
-        /// <param name="existingSelection"></param>
-        /// <returns></returns>
-        public List<T> NextSelection(int newSelectionCount, List<T> existingSelection)
-        {
-            var selection = new List<T>(newSelectionCount);
-            while (selection.Count < newSelectionCount)
-            {
-                this.lastSelection = (++this.lastSelection) % (this.resources.Count - 1);
-                if(!existingSelection.Contains(this.resources[this.lastSelection]))
-                    selection.Add(this.resources[this.lastSelection]);
-            }
-            return selection;
-        }
-    }
-
-    /// <summary>
-    /// Stream queue balancer that uses the cluster configuration to determine deployment information for load balancing.  
-    /// This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
-    /// </summary>
-    public class ClusterConfigDeploymentLeaseBasedBalancer : LeaseBasedQueueBalancer
-    {
-        public ClusterConfigDeploymentLeaseBasedBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle,
-            ClusterConfiguration clusterConfiguration, ILoggerFactory loggerFactory)
-            : base(serviceProvider, siloStatusOracle, new StaticClusterDeploymentConfiguration(clusterConfiguration), loggerFactory)
-        { }
-    }
-
-    /// <summary>
-    /// Config for LeaseBasedQueueBalancer. User need to add this config to its stream provder's IProviderConfiguration in order to use LeaseBasedQueueBalancer in the stream provider
-    /// </summary>
-    public class LeaseBasedQueueBalancerConfig
-    {
-        /// <summary>
-        /// LeaseProviderType
-        /// </summary>
-        public Type LeaseProviderType { get; set; }
-        /// <summary>
-        /// LeaseProviderTypeName
-        /// </summary>
-        public const string LeaseProviderTypeName = nameof(LeaseProviderType);
-        /// <summary>
-        /// LeaseLength
-        /// </summary>
-        public TimeSpan LeaseLength { get; set; } = TimeSpan.FromSeconds(60);
-        /// <summary>
-        /// LeaseLengthName
-        /// </summary>
-        public const string LeaseLengthName = nameof(LeaseLengthName);
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        public LeaseBasedQueueBalancerConfig()
-        { }
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="providerConfig"></param>
-        public LeaseBasedQueueBalancerConfig(IProviderConfiguration providerConfig)
-        {
-            string leaseLength;
-            if (providerConfig.Properties.TryGetValue(LeaseLengthName, out leaseLength))
-            {
-                this.LeaseLength = ConfigUtilities.ParseTimeSpan(leaseLength,
-                    "Invalid time value for the " + LeaseLengthName + " property in the provider config values.");
-            }
-
-            this.LeaseProviderType = providerConfig.GetTypeProperty(LeaseProviderTypeName, null);
-            if (this.LeaseProviderType == null)
-                throw new ArgumentOutOfRangeException(LeaseProviderTypeName, "LeaseProviderType not set");
-        }
-
-        /// <summary>
-        /// Write properties to IProviderConfiguration's property bag
-        /// </summary>
-        /// <param name="properties"></param>
-        public void WriterProperties(Dictionary<string, string> properties)
-        {
-            properties[LeaseLengthName] = ConfigUtilities.ToParseableTimeSpan(this.LeaseLength);
-            if (this.LeaseProviderType != null)
-                properties[LeaseProviderTypeName] = this.LeaseProviderType.AssemblyQualifiedName;
-            else
-                throw new ArgumentOutOfRangeException(LeaseProviderTypeName, "LeaseProviderType not set");
-        }
-    }
-    /// <summary>
-    /// LeaseBasedQueueBalancer. This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
-    /// as much as possible. 
-    /// </summary>
-    public class LeaseBasedQueueBalancer : QueueBalancerBase, IStreamQueueBalancer, IDisposable
-    {
-        /// <summary>
-        /// Lease category for LeaseBasedQueueBalancer
-        /// </summary>
-        public const string LeaseCategory = "QueueBalancer";
         private class AcquiredQueue 
         {
+            public int LeaseOrder { get; set; }
             public QueueId QueueId { get; set; }
             public AcquiredLease AcquiredLease { get; set; }
-            public AcquiredQueue(QueueId queueId, AcquiredLease lease)
+            public AcquiredQueue(int order, QueueId queueId, AcquiredLease lease)
             {
+                this.LeaseOrder = order;
                 this.QueueId = queueId;
                 this.AcquiredLease = lease;
             }
         }
-        private ILeaseProvider leaseProvider;
-        private IDeploymentConfiguration deploymentConfig;
-        private readonly ISiloStatusOracle siloStatusOracle;
+
+        private readonly LeaseBasedQueueBalancerOptions options;
+        private readonly ILeaseProvider leaseProvider;
+        private readonly ITimerRegistry timerRegistry;
+        private readonly AsyncSerialExecutor executor;
         private ReadOnlyCollection<QueueId> allQueues;
         private List<AcquiredQueue> myQueues;
-        private TimeSpan siloMaturityPeriod;
-        private bool isStarting;
-        private TimeSpan leaseLength;
-        private AsyncTaskSafeTimer renewLeaseTimer;
-        private AsyncTaskSafeTimer tryAcquireMaximumLeaseTimer;
+        private IDisposable leaseMaintenanceTimer;
+        private IDisposable leaseAquisitionTimer;
         private IResourceSelector<QueueId> queueSelector;
-        private int minimumResponsibilty;
-        private int maximumRespobsibility;
-        private IServiceProvider serviceProvider;
-        private ILogger logger;
-        private ILoggerFactory loggerFactory;
+        private int responsibility;
+        private int leaseOrder;
+
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="serviceProvider"></param>
-        /// <param name="siloStatusOracle"></param>
-        /// <param name="deploymentConfig"></param>
-        /// <param name="loggerFactory"></param>
-        public LeaseBasedQueueBalancer(IServiceProvider serviceProvider, ISiloStatusOracle siloStatusOracle, IDeploymentConfiguration deploymentConfig, ILoggerFactory loggerFactory)
+        public LeaseBasedQueueBalancer(string name, LeaseBasedQueueBalancerOptions options, ILeaseProvider leaseProvider, ITimerRegistry timerRegistry, IServiceProvider services, ILoggerFactory loggerFactory)
+            : base(services, loggerFactory.CreateLogger($"{nameof(LeaseBasedQueueBalancer)}-{name}"))
         {
-            this.serviceProvider = serviceProvider;
-            this.deploymentConfig = deploymentConfig;
-            this.siloStatusOracle = siloStatusOracle;
+            this.options = options;
+            this.leaseProvider = leaseProvider;
+            this.timerRegistry = timerRegistry;
+            this.executor = new AsyncSerialExecutor();
             this.myQueues = new List<AcquiredQueue>();
-            this.isStarting = true;
-            this.loggerFactory = loggerFactory;
-            this.logger = loggerFactory.CreateLogger<LeaseBasedQueueBalancer>();
+        }
+
+        public static IStreamQueueBalancer Create(IServiceProvider services, string name)
+        {
+            var options = services.GetOptionsByName<LeaseBasedQueueBalancerOptions>(name);
+            var leaseProvider = services.GetServiceByName<ILeaseProvider>(name)
+                ?? services.GetRequiredService<ILeaseProvider>();
+            return ActivatorUtilities.CreateInstance<LeaseBasedQueueBalancer>(services, name, options, leaseProvider);
         }
 
         /// <inheritdoc/>
-        public override Task Initialize(string strProviderName, IStreamQueueMapper queueMapper, TimeSpan siloMaturityPeriod, IProviderConfiguration providerConfig)
+        public override Task Initialize(IStreamQueueMapper queueMapper)
         {
+            if (base.Cancellation.IsCancellationRequested) throw new InvalidOperationException("Cannot initialize a terminated balancer.");
             if (queueMapper == null)
             {
                 throw new ArgumentNullException("queueMapper");
             }
-            var balancerConfig = new LeaseBasedQueueBalancerConfig(providerConfig);
-            this.leaseProvider = this.serviceProvider.GetRequiredService(balancerConfig.LeaseProviderType) as ILeaseProvider;
-            this.leaseLength = balancerConfig.LeaseLength;
             this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
-            this.siloMaturityPeriod = siloMaturityPeriod;
-            NotifyAfterStart().Ignore();
-            //make lease renew frequency to be every half of lease time, to avoid renew failing due to timing issues, race condition or clock difference. 
-            var timerLogger = this.loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
-            this.renewLeaseTimer = new AsyncTaskSafeTimer(timerLogger, this.MaintainAndBalanceQueues, null, this.siloMaturityPeriod, this.leaseLength.Divide(2));
-            //try to acquire maximum leases every leaseLength 
-            this.tryAcquireMaximumLeaseTimer = new AsyncTaskSafeTimer(timerLogger, this.AcquireLeaseToMeetMaxResponsibilty, null, this.siloMaturityPeriod, this.leaseLength);
+
             //Selector default to round robin selector now, but we can make a further change to make selector configurable if needed.  Selector algorithm could 
             //be affecting queue balancing stablization time in cluster initializing and auto-scaling
-            this.queueSelector = new RoundRobinSelector<QueueId>(this.allQueues);
-            return MaintainAndBalanceQueues(null);
+            this.queueSelector = new RoundRobinSelector<QueueId>(this.allQueues, new Random(this.GetHashCode()));
+            return base.Initialize(queueMapper);
+        }
+
+        /// <inheritdoc/>
+        public override async Task Shutdown()
+        {
+            if (base.Cancellation.IsCancellationRequested) return;
+            this.myQueues.Clear();
+            this.responsibility = 0;
+            this.leaseMaintenanceTimer?.Dispose();
+            this.leaseMaintenanceTimer = null;
+            this.leaseAquisitionTimer?.Dispose();
+            this.leaseAquisitionTimer = null;
+            await base.Shutdown();
+            //release all owned leases
+            await this.executor.AddNext(this.ReleaseLeasesToMeetResponsibility);
         }
 
         /// <inheritdoc/>
         public override IEnumerable<QueueId> GetMyQueues()
         {
+            if (base.Cancellation.IsCancellationRequested) throw new InvalidOperationException("Cannot aquire queues from a terminated balancer.");
             return this.myQueues.Select(queue => queue.QueueId);
         }
 
-        private async Task MaintainAndBalanceQueues(object state)
+        private async Task MaintainLeases(object state)
         {
-            CalculateResponsibility();
+            try
+            {
+                await this.executor.AddNext(this.MaintainLeases);
+            }
+            catch (Exception ex)
+            {
+                this.Logger.LogError(ex, "Maintaining leases failed");
+            }
+        }
+
+        private async Task MaintainLeases()
+        {
+            if (base.Cancellation.IsCancellationRequested) return;
             var oldQueues = new HashSet<QueueId>(this.myQueues.Select(queue => queue.QueueId));
-            // step 1: renew existing leases 
-            await this.RenewLeases();
-            // step 2: if after renewing leases, myQueues count doesn't fall in [minimumResponsibility, maximumResponsibilty] range, act accordingly
-            if (this.myQueues.Count < this.minimumResponsibilty)
+            try
             {
-                await this.AcquireLeasesToMeetMinResponsibility();
+                bool allLeasesRenewed = await this.RenewLeases();
+                // if we lost some leases during renew after leaseAquisitionTimer stopped, restart it
+                if (!allLeasesRenewed &&
+                    this.leaseAquisitionTimer == null &&
+                    !base.Cancellation.IsCancellationRequested)
+                {
+                    this.leaseAquisitionTimer = this.timerRegistry.RegisterTimer(null, this.AcquireLeasesToMeetResponsibility, null, TimeSpan.Zero, this.options.LeaseAquisitionPeriod);
+                }
             }
-            else if (this.myQueues.Count > this.maximumRespobsibility)
+            finally
             {
-                await this.ReleaseLeasesToMeetResponsibility();
+                await this.NotifyOnChange(oldQueues);
             }
-            var newQueues = new HashSet<QueueId>(this.myQueues.Select(queue=> queue.QueueId));
-            //if queue changed, notify listeners
-            if (!oldQueues.SetEquals(newQueues))
-                await NotifyListeners();
+        }
+
+        private async Task AcquireLeasesToMeetResponsibility(object state)
+        {
+            try
+            {
+                await this.executor.AddNext(this.AcquireLeasesToMeetResponsibility);
+            }
+            catch (Exception ex)
+            {
+                this.Logger.LogError(ex, "Acquiring min leases failed");
+            }
+        }
+
+        private async Task AcquireLeasesToMeetResponsibility()
+        {
+            if (base.Cancellation.IsCancellationRequested) return;
+            var oldQueues = new HashSet<QueueId>(this.myQueues.Select(queue => queue.QueueId));
+            try
+            {
+                if (this.myQueues.Count < this.responsibility)
+                {
+                    await this.AcquireLeasesToMeetExpectation(this.responsibility, this.options.LeaseLength.Divide(10));
+                }
+                else if (this.myQueues.Count > this.responsibility)
+                {
+                    await this.ReleaseLeasesToMeetResponsibility();
+                }
+            }
+            finally
+            {
+                await this.NotifyOnChange(oldQueues);
+                if (this.myQueues.Count == this.responsibility)
+                {
+                    this.leaseAquisitionTimer?.Dispose();
+                    this.leaseAquisitionTimer = null;
+                }
+            }
         }
 
         private async Task ReleaseLeasesToMeetResponsibility()
         {
-            var queueCountToRelease = this.myQueues.Count - this.maximumRespobsibility;
+            if (base.Cancellation.IsCancellationRequested) return;
+            if (this.Logger.IsEnabled(LogLevel.Trace))
+            {
+                this.Logger.LogTrace("ReleaseLeasesToMeetResponsibility. QueueCount: {QueueCount}, Responsibility: {Responsibility}", this.myQueues.Count, this.responsibility);
+            }
+            var queueCountToRelease = this.myQueues.Count - this.responsibility;
             if (queueCountToRelease <= 0)
                 return;
-            var queuesToGiveUp = this.myQueues.GetRange(0, queueCountToRelease);
-            await this.leaseProvider.Release(LeaseCategory, queuesToGiveUp.Select(queue => queue.AcquiredLease).ToArray());
+            // Remove oldest acquired queues first, this provides max recovery time for the queues
+            //  being moved.
+            // TODO: Consider making this behavior configurable/plugable - jbragg
+            AcquiredLease[] queuesToGiveUp = this.myQueues
+                .OrderBy(queue => queue.LeaseOrder)
+                .Take(queueCountToRelease)
+                .Select(queue => queue.AcquiredLease)
+                .ToArray();
+            // Remove queues from list even if release fails, since we can let the lease expire
+            // TODO: mark for removal instead so we don't renew, and only remove leases that have not expired. - jbragg
+            for(int index = this.myQueues.Count-1; index >= 0; index--)
+            {
+                if(queuesToGiveUp.Contains(this.myQueues[index].AcquiredLease))
+                {
+                    this.myQueues.RemoveAt(index);
+                }
+            }
+            await this.leaseProvider.Release(this.options.LeaseCategory, queuesToGiveUp);
             //remove queuesToGiveUp from myQueue list after the balancer released the leases on them
-            this.myQueues.RemoveRange(0, queueCountToRelease);
-            this.logger.Info($"ReleaseLeasesToMeetResponsibility: released {queueCountToRelease} queues, current queue Count: {this.myQueues.Count}");
+            this.Logger.LogInformation("Released leases for {QueueCount} queues", queueCountToRelease);
+            this.Logger.LogInformation("Holding leases for {QueueCount} of an expected {MinQueueCount} queues.", this.myQueues.Count, this.responsibility);
         }
 
-        private Task AcquireLeaseToMeetMaxResponsibilty(object state)
+        private async Task AcquireLeasesToMeetExpectation(int expectedTotalLeaseCount, TimeSpan timeout)
         {
-            return AcquireLeasesToMeetExpectation(this.maximumRespobsibility);
-        }
+            if (base.Cancellation.IsCancellationRequested) return;
+            if (this.Logger.IsEnabled(LogLevel.Trace))
+            {
+                this.Logger.LogTrace("AcquireLeasesToMeetExpectation. QueueCount: {QueueCount}, ExpectedTotalLeaseCount: {ExpectedTotalLeaseCount}", this.myQueues.Count, expectedTotalLeaseCount);
+            }
 
-        private Task AcquireLeasesToMeetMinResponsibility()
-        {
-            return AcquireLeasesToMeetExpectation(this.minimumResponsibilty);
-        }
+            var leasesToAquire = expectedTotalLeaseCount - this.myQueues.Count;
+            if (leasesToAquire <= 0) return;
 
-        private async Task AcquireLeasesToMeetExpectation(int expectedTotalLeaseCount)
-        {
-            int maxAttempts = 5;
-            int attempts = 0;
-            int leasesToAquire = expectedTotalLeaseCount - this.myQueues.Count;
-            this.logger.Info($"AcquireLeasesToMeetExpectation : Try to acquire {leasesToAquire} queues");
-            while (attempts ++ <= maxAttempts && leasesToAquire > 0)
+            // tracks how many remaining possible leases there are.
+            var possibleLeaseCount = this.queueSelector.Count - this.myQueues.Count;
+            if (this.Logger.IsEnabled(LogLevel.Debug))
+            {
+                this.Logger.LogDebug("Holding leased for {QueueCount} queues.  Trying to acquire {AquireQueueCount} queues to reach {TargetQueueCount} of a possible {PossibleLeaseCount}", this.myQueues.Count, leasesToAquire, expectedTotalLeaseCount, possibleLeaseCount);
+            }
+
+            ValueStopwatch sw = ValueStopwatch.StartNew();
+            // try to acquire leases until we have no more to aquire or no more possible
+            while (!base.Cancellation.IsCancellationRequested && leasesToAquire > 0 && possibleLeaseCount > 0)
             {
                 //select new queues to acquire
-                var expectedQueues = this.queueSelector.NextSelection(leasesToAquire, this.myQueues.Select(queue=>queue.QueueId).ToList()).ToList();
-                var leaseRequests = expectedQueues.Select(queue => new LeaseRequest() {
-                    ResourceKey = queue.ToString(),
-                    Duration = this.leaseLength
-                });
-                var results = await this.leaseProvider.Acquire(LeaseCategory, leaseRequests.ToArray());
+                List<QueueId> expectedQueues = this.queueSelector.NextSelection(leasesToAquire, this.myQueues.Select(queue=>queue.QueueId).ToList());
+                // build lease request from each queue
+                LeaseRequest[] leaseRequests = expectedQueues
+                    .Select(queue => new LeaseRequest() {
+                        ResourceKey = queue.ToString(),
+                        Duration = this.options.LeaseLength
+                    })
+                    .ToArray();
+
+                AcquireLeaseResult[] results = await this.leaseProvider.Acquire(this.options.LeaseCategory, leaseRequests);
                 //add successfully acquired queue to myQueues list
-                for (int i = 0; i < results.Length; i++)
+                for (var i = 0; i < results.Length; i++)
                 {
-                    if (results[i].StatusCode == ResponseCode.OK)
+                    AcquireLeaseResult result = results[i];
+                    switch (result.StatusCode)
                     {
-                        this.myQueues.Add(new AcquiredQueue(expectedQueues[i], results[i].AcquiredLease));
+                        case ResponseCode.OK:
+                            {
+                                this.myQueues.Add(new AcquiredQueue(this.leaseOrder++, expectedQueues[i], result.AcquiredLease));
+                                break;
+                            }
+                        case ResponseCode.TransientFailure:
+                            {
+                                this.Logger.LogWarning(result.FailureException, "Failed to acquire lease {LeaseKey} due to transient error.", result.AcquiredLease.ResourceKey);
+                                break;
+                            }
+                        // this is expected much of the time
+                        case ResponseCode.LeaseNotAvailable:
+                            {
+                                if (this.Logger.IsEnabled(LogLevel.Debug))
+                                {
+                                    this.Logger.LogDebug(result.FailureException, "Failed to acquire lease {LeaseKey} due to {Reason}.", result.AcquiredLease.ResourceKey, result.StatusCode);
+                                }
+                                break;
+                            }
+                        // An acquire call should not return this code, so log as error
+                        case ResponseCode.InvalidToken:
+                            {
+                                this.Logger.LogError(result.FailureException, "Failed to aquire acquire {LeaseKey} unexpected invalid token.", result.AcquiredLease.ResourceKey);
+                                break;
+                            }
+                        default:
+                            {
+                                this.Logger.LogError(result.FailureException, "Unexpected response to acquire request of lease {LeaseKey}.  StatusCode {StatusCode}.", result.AcquiredLease.ResourceKey, result.StatusCode);
+                                break;
+                            }
                     }
                 }
-                //if reached expectedTotalLeaseCount
-                if (this.myQueues.Count >= expectedTotalLeaseCount)
+                possibleLeaseCount -= expectedQueues.Count;
+                leasesToAquire = expectedTotalLeaseCount - this.myQueues.Count;
+                if (this.Logger.IsEnabled(LogLevel.Debug))
                 {
+                    this.Logger.LogDebug("Holding leased for {QueueCount} queues.  Trying to acquire {AquireQueueCount} queues to reach {TargetQueueCount} of a possible {PossibleLeaseCount} lease", this.myQueues.Count, leasesToAquire, expectedTotalLeaseCount, possibleLeaseCount);
+                }
+                if (sw.Elapsed > timeout)
+                {
+                    // blown our alotted time, try again next period
                     break;
                 }
             }
 
-            this.logger.Info($"AcquireLeasesToMeetExpectation: finished. Now own {this.myQueues.Count} queues. Used attemps : {attempts}, Current minimumReponsibility : {this.minimumResponsibilty}, current maximumResponsibility : {this.maximumRespobsibility}");
+            this.Logger.LogInformation("Holding leases for {QueueCount} of an expected {MinQueueCount} queues.", this.myQueues.Count, this.responsibility);
         }
-        
-        private async Task RenewLeases()
+
+        /// <summary>
+        /// Renew leases
+        /// </summary>
+        /// <returns>bool - false if we failed to renew all leases</returns>
+        private async Task<bool> RenewLeases()
         {
-            var results = await this.leaseProvider.Renew(LeaseCategory, this.myQueues.Select(queue => queue.AcquiredLease).ToArray());
-            var updatedQueues = new List<AcquiredQueue>();
-            //update myQueues list with successfully renewed leases
-            for (int i = 0; i < results.Count(); i++)
+            bool allRenewed = true;
+            if (base.Cancellation.IsCancellationRequested) return false;
+            if (this.Logger.IsEnabled(LogLevel.Trace))
             {
-                var result = results[i];
-                if (result.StatusCode == ResponseCode.OK)
+                this.Logger.LogTrace("RenewLeases. QueueCount: {QueueCount}", this.myQueues.Count);
+            }
+            if (this.myQueues.Count <= 0)
+                return allRenewed;
+            var results = await this.leaseProvider.Renew(this.options.LeaseCategory, this.myQueues.Select(queue => queue.AcquiredLease).ToArray());
+            //update myQueues list with successfully renewed leases
+            for (var i = 0; i < results.Count(); i++)
+            {
+                AcquireLeaseResult result = results[i];
+                switch (result.StatusCode)
                 {
-                    updatedQueues.Add(new AcquiredQueue(this.myQueues[i].QueueId, result.AcquiredLease));
+                    case ResponseCode.OK:
+                        {
+                            this.myQueues[i].AcquiredLease = result.AcquiredLease;
+                            break;
+                        }
+                    case ResponseCode.TransientFailure:
+                        {
+                            this.myQueues.RemoveAt(i);
+                            allRenewed &= false;
+                            this.Logger.LogWarning(result.FailureException, "Failed to renew lease {LeaseKey} due to transient error.", result.AcquiredLease.ResourceKey);
+                            break;
+                        }
+                    // these can occure if lease has expired and/or someone else has taken it
+                    case ResponseCode.InvalidToken:
+                    case ResponseCode.LeaseNotAvailable:
+                        {
+                            this.myQueues.RemoveAt(i);
+                            allRenewed &= false;
+                            this.Logger.LogWarning(result.FailureException, "Failed to renew lease {LeaseKey} due to {Reason}.", result.AcquiredLease.ResourceKey, result.StatusCode);
+                            break;
+                        }
+                    default:
+                        {
+                            this.myQueues.RemoveAt(i);
+                            allRenewed &= false;
+                            this.Logger.LogError(result.FailureException, "Unexpected response to renew of lease {LeaseKey}.  StatusCode {StatusCode}.", result.AcquiredLease.ResourceKey, result.StatusCode);
+                            break;
+                        }
                 }
             }
-            this.myQueues.Clear();
-            this.myQueues = updatedQueues;
-            this.logger.Info($"RenewLeases: finished, currently own queues : {this.myQueues.Count}, current minimumResponsibilty : {this.minimumResponsibilty}, current maximunResponsibilty : {this.maximumRespobsibility}");
+            this.Logger.LogInformation("Renewed leases for {QueueCount} queues.", this.myQueues.Count);
+            return allRenewed;
         }
 
-        private void CalculateResponsibility()
+        private Task NotifyOnChange(HashSet<QueueId> oldQueues)
         {
-            int activeBuckets = 0;
-            if (isStarting)
+            if (base.Cancellation.IsCancellationRequested) return Task.CompletedTask;
+            var newQueues = new HashSet<QueueId>(this.myQueues.Select(queue => queue.QueueId));
+            //if queue changed, notify listeners
+            return !oldQueues.SetEquals(newQueues)
+                ? this.NotifyListeners()
+                : Task.CompletedTask;
+        }
+
+        protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
+        {
+            if (base.Cancellation.IsCancellationRequested) return;
+            this.ScheduleUpdateResponsibilities(activeSilos).Ignore();
+        }
+
+        private async Task ScheduleUpdateResponsibilities(HashSet<SiloAddress> activeSilos)
+        {
+            if (base.Cancellation.IsCancellationRequested) return;
+            try
             {
-                activeBuckets = this.deploymentConfig.GetAllSiloNames().Count;
+                await this.executor.AddNext(() => UpdateResponsibilities(activeSilos));
             }
-            else
+            catch (Exception ex)
             {
-                activeBuckets = GetActiveSiloCount(this.siloStatusOracle);
+                this.Logger.LogError(ex, "Updating Responsibilities");
             }
-            this.minimumResponsibilty = this.allQueues.Count / activeBuckets;
-            //if allQueues count is divisible by active bukets, then every bucket should take the same count of queues, otherwise, there should be one bucket take 1 more queue
-            if (this.allQueues.Count % activeBuckets == 0)
-                this.maximumRespobsibility = this.minimumResponsibilty;
-            else this.maximumRespobsibility = this.minimumResponsibilty + 1;
         }
 
-
-        private static int GetActiveSiloCount(ISiloStatusOracle siloStatusOracle)
+        /// <summary>
+        /// Checks to see if this balancer should be greedy, which means it attempts to grab one
+        ///   more queue than the non-greedy balancers.
+        /// </summary>
+        /// <param name="overflow">number of free queues, assuming all balancers meet their minimum responsibilities</param>
+        /// <param name="activeSilos">number of active silos hosting queues</param>
+        /// <returns>bool - true indicates that the balancer should try to acquire one
+        ///   more queue than the non-greedy balancers</returns>
+        private bool AmGreedy(int overflow, HashSet<SiloAddress> activeSilos)
         {
-            return siloStatusOracle.GetApproximateSiloStatuses(true).Count;
+            // If using multiple stream providers, this will select the same silos to be greedy for
+            //   all providers, aggravating inbalance as stream provider count increases.
+            // TODO: consider making this behavior configurable/plugable - jbragg
+            // TODO: use heap? - jbragg
+            return activeSilos.OrderBy(silo => silo)
+                              .Take(overflow)
+                              .ToList()
+                              .Contains(base.SiloAddress);
         }
 
-        private async Task NotifyAfterStart()
+        private async Task UpdateResponsibilities(HashSet<SiloAddress> activeSilos)
         {
-            await Task.Delay(siloMaturityPeriod);
-            this.isStarting = false;
-            await NotifyListeners();
-        }
-
-        private Task NotifyListeners()
-        {
-            List<IStreamQueueBalanceListener> queueBalanceListenersCopy;
-            lock (queueBalanceListeners)
+            if (base.Cancellation.IsCancellationRequested) return;
+            var activeSiloCount = Math.Max(1, activeSilos.Count);
+            this.responsibility = this.allQueues.Count / activeSiloCount;
+            var overflow = this.allQueues.Count % activeSiloCount;
+            if(overflow != 0 && this.AmGreedy(overflow, activeSilos))
             {
-                queueBalanceListenersCopy = queueBalanceListeners.ToList(); // make copy
+                this.responsibility++;
             }
-            var notificatioTasks = new List<Task>(queueBalanceListenersCopy.Count);
-            foreach (IStreamQueueBalanceListener listener in queueBalanceListenersCopy)
-            {
-                notificatioTasks.Add(listener.QueueDistributionChangeNotification());
-            }
-            return Task.WhenAll(notificatioTasks);
-        }
 
-        /// <inheritdoc/>
-        public void Dispose()
-        {
-            this.renewLeaseTimer?.Dispose();
-            this.renewLeaseTimer = null;
-            this.tryAcquireMaximumLeaseTimer?.Dispose();
-            this.tryAcquireMaximumLeaseTimer = null;
-            //release all owned leases
-            this.maximumRespobsibility = 0;
-            this.minimumResponsibilty = 0;
-            this.ReleaseLeasesToMeetResponsibility().Ignore();
+            if (this.Logger.IsEnabled(LogLevel.Debug))
+            {
+                this.Logger.LogDebug("Updating Responsibilities for {QueueCount} queue over {SiloCount} silos. Need {MinQueueCount} queues, have {MyQueueCount}",
+                    this.allQueues.Count, activeSiloCount, this.responsibility, this.myQueues.Count);
+            }
+
+            if (this.myQueues.Count < this.responsibility && this.leaseAquisitionTimer == null)
+            {
+                this.leaseAquisitionTimer = this.timerRegistry.RegisterTimer(
+                    null,
+                    this.AcquireLeasesToMeetResponsibility,
+                    null,
+                    this.options.LeaseAquisitionPeriod,
+                    this.options.LeaseAquisitionPeriod);
+            }
+
+            if (this.leaseMaintenanceTimer == null)
+            {
+                this.leaseMaintenanceTimer = this.timerRegistry.RegisterTimer(
+                    null,
+                    this.MaintainLeases,
+                    null,
+                    this.options.LeaseRenewPeriod,
+                    this.options.LeaseRenewPeriod);
+            }
+
+            await this.AcquireLeasesToMeetResponsibility();
         }
     }
 }

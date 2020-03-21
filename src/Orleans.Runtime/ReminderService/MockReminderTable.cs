@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.Configuration;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -10,12 +10,12 @@ namespace Orleans.Runtime.ReminderService
         private const string MOCK_E_TAG = "MockETag";
         private readonly TimeSpan delay;
 
-        public MockReminderTable(TimeSpan delay)
+        public MockReminderTable(IOptions<MockReminderTableOptions> options)
         {
-            this.delay = delay;
+            this.delay = options.Value.OperationDelay;
         }
 
-        public Task Init(GlobalConfiguration config)
+        public Task Init()
         {
             return Task.CompletedTask;
         }

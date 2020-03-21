@@ -1,10 +1,9 @@
 using System.Runtime.CompilerServices;
-using Orleans.CodeGeneration;
 
-[assembly: InternalsVisibleTo("UnitTests")]
+// Disable XUnit concurrency limit
+[assembly: Xunit.CollectionBehavior(MaxParallelThreads = -1)]
+
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
-[assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("GoogleUtils.Tests")]
-[assembly: InternalsVisibleTo("UnitTestGrains")]
-[assembly: SkipCodeGeneration]

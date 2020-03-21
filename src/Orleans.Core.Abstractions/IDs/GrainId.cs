@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using Orleans.Core;
-using Orleans.Core.Abstractions.Internal;
 
 namespace Orleans.Runtime
 {
@@ -14,15 +13,15 @@ namespace Orleans.Runtime
 
         private static Interner<UniqueKey, GrainId> grainIdInternCache;
 
-        public UniqueKey.Category Category { get { return Key.IdCategory; } }
+        public UniqueKey.Category Category => Key.IdCategory;
 
-        public bool IsSystemTarget { get { return Key.IsSystemTargetKey; } }
+        public bool IsSystemTarget => Key.IsSystemTargetKey; 
 
-        public bool IsGrain { get { return Category == UniqueKey.Category.Grain || Category == UniqueKey.Category.KeyExtGrain; } }
+        public bool IsGrain => Category == UniqueKey.Category.Grain || Category == UniqueKey.Category.KeyExtGrain; 
 
-        public bool IsClient { get { return Category == UniqueKey.Category.Client || Category == UniqueKey.Category.GeoClient; } }
+        public bool IsClient => Category == UniqueKey.Category.Client; 
 
-        private GrainId(UniqueKey key)
+        internal GrainId(UniqueKey key)
             : base(key)
         {
         }
@@ -32,15 +31,14 @@ namespace Orleans.Runtime
             return FindOrCreateGrainId(UniqueKey.NewKey(Guid.NewGuid(), UniqueKey.Category.Grain));
         }
 
-        public static GrainId NewClientId(string clusterId = null)
+        public static GrainId NewClientId()
         {
-            return NewClientId(Guid.NewGuid(), clusterId);
+            return NewClientId(Guid.NewGuid());
         }
 
-        internal static GrainId NewClientId(Guid id, string clusterId = null)
+        internal static GrainId NewClientId(Guid id)
         {
-            return FindOrCreateGrainId(UniqueKey.NewKey(id,
-                clusterId == null ? UniqueKey.Category.Client : UniqueKey.Category.GeoClient, 0, clusterId));
+            return FindOrCreateGrainId(UniqueKey.NewKey(id, UniqueKey.Category.Client, 0));
         }
 
         internal static GrainId GetGrainId(UniqueKey key)
@@ -93,6 +91,11 @@ namespace Orleans.Runtime
         internal static GrainId GetGrainServiceGrainId(short id, int typeData)
         {
             return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(id, typeData));
+        }
+
+        internal static GrainId GetGrainServiceGrainId(int typeData, string systemGrainId)
+        {
+            return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(systemGrainId, typeData));
         }
 
         public Guid PrimaryKey
@@ -164,14 +167,10 @@ namespace Orleans.Runtime
             return grainIdInternCache.FindOrCreate(key, k => new GrainId(k));
         }
 
-        #region IEquatable<GrainId> Members
-
         public bool Equals(GrainId other)
         {
             return other != null && Key.Equals(other.Key);
         }
-
-        #endregion
 
         public override bool Equals(UniqueIdentifier obj)
         {
@@ -215,13 +214,7 @@ namespace Orleans.Runtime
         // same as ToString, just full primary key and type code
         private string ToStringImpl(bool detailed)
         {
-            string name = string.Empty;
-#if ABSTRACTIONS_TODO
-            if (Constants.TryGetSystemGrainName(this, out name))
-            {
-                return name;
-            }
-#endif
+            // TODO Get name of system/target grain + name of the grain type
 
             var keyString = Key.ToString();
             // this should grab the least-significant half of n1, suffixing it with the key extension.
@@ -241,25 +234,18 @@ namespace Orleans.Runtime
                 case UniqueKey.Category.KeyExtGrain:
                     var typeString = TypeCode.ToString("X");
                     if (!detailed) typeString = typeString.Substring(Math.Max(0, typeString.Length - 8));
-                    fullString = String.Format("*grn/{0}/{1}", typeString, idString);
+                    fullString = $"*grn/{typeString}/{idString}";
                     break;
                 case UniqueKey.Category.Client:
-                    fullString = "*cli/" + idString;
-                    break;
-                case UniqueKey.Category.GeoClient:
-                    fullString = string.Format("*gcl/{0}/{1}", Key.KeyExt, idString);
+                    fullString = $"*cli/{idString}";
                     break;
                 case UniqueKey.Category.SystemTarget:
-#if ABSTRACTIONS_TODO
-                    string explicitName = Constants.SystemTargetName(this);
-                    if (TypeCode != 0)
-                    {
-                        var typeStr = TypeCode.ToString("X");
-                        return String.Format("{0}/{1}/{2}", explicitName, typeStr, idString);
-                    }
-                    fullString = explicitName;
+                case UniqueKey.Category.KeyExtSystemTarget:
+                    fullString = $"*stg/{Key.N1}/{idString}";
                     break;
-#endif
+                case UniqueKey.Category.SystemGrain:
+                    fullString = $"*sgn/{Key.PrimaryKeyToGuid()}/{idString}";
+                    break;
                 default:
                     fullString = "???/" + idString;
                     break;
@@ -309,15 +295,48 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// Return this GrainId in a standard components form, suitable for later use with the <see cref="FromKeyInfo"/> method.
+        /// </summary>
+        /// <returns>GrainId in a standard components form.</returns>
+        internal (ulong, ulong, ulong, string) ToKeyInfo()
+        {
+            return (Key.N0, Key.N1, Key.TypeCodeData, Key.KeyExt);
+        }
+
+        /// <summary>
         /// Create a new GrainId object by parsing string in a standard form returned from <c>ToParsableString</c> method.
         /// </summary>
         /// <param name="grainId">String containing the GrainId info to be parsed.</param>
         /// <returns>New GrainId object created from the input data.</returns>
         internal static GrainId FromParsableString(string grainId)
         {
+            return FromParsableString(grainId.AsSpan());
+        }
+
+        /// <summary>
+        /// Create a new GrainId object by parsing string in a standard form returned from <c>ToParsableString</c> method.
+        /// </summary>
+        /// <param name="grainId">String containing the GrainId info to be parsed.</param>
+        /// <returns>New GrainId object created from the input data.</returns>
+        internal static GrainId FromParsableString(ReadOnlySpan<char> grainId)
+        {
             // NOTE: This function must be the "inverse" of ToParsableString, and data must round-trip reliably.
 
             var key = UniqueKey.Parse(grainId);
+            return FindOrCreateGrainId(key);
+        }
+
+        /// <summary>
+        /// Create a new GrainId object by parsing components returned form <see cref="ToKeyInfo"/>.
+        /// </summary>
+        /// <param name="grainId">Components containing the GrainId to be parsed.</param>
+        /// <returns>New GrainId object created from the input data.</returns>
+        internal static GrainId FromKeyInfo((ulong, ulong, ulong, string) grainId)
+        {
+            // NOTE: This function must be the "inverse" of ToKeyInfo, and data must round-trip reliably.
+
+            var (n0, n1, typeCodeData, keyExt) = grainId;
+            var key = UniqueKey.NewKey(n0, n1, typeCodeData, keyExt);
             return FindOrCreateGrainId(key);
         }
     }

@@ -22,7 +22,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// The name of these code generators.
         /// </summary>
-        private const string CodeGeneratorName = "Orleans-CodeGenerator";
+        public const string ToolName = "Orleans-CodeGenerator";
 
         /// <summary>
         /// The prefix for class names.
@@ -45,15 +45,7 @@ namespace Orleans.CodeGenerator
                                 .AddArgumentListArguments(
                                     SF.AttributeArgument(asm.GetName().FullName.GetLiteralExpression()))).ToArray())
                     .WithTarget(SF.AttributeTargetSpecifier(SF.Token(SyntaxKind.AssemblyKeyword)));
-            var generatedCodeAttribute =
-                SF.AttributeList()
-                    .AddAttributes(
-                        SF.Attribute(typeof(GeneratedCodeAttribute).GetNameSyntax())
-                            .AddArgumentListArguments(
-                                SF.AttributeArgument("Orleans-CodeGenerator".GetLiteralExpression()),
-                                SF.AttributeArgument(RuntimeVersion.FileVersion.GetLiteralExpression())))
-                    .WithTarget(SF.AttributeTargetSpecifier(SF.Token(SyntaxKind.AssemblyKeyword)));
-            return generatedSyntax.Syntax.AddAttributeLists(generatedCodeAttribute, codeGenTargetAttributes);
+            return generatedSyntax.Syntax.AddAttributeLists(codeGenTargetAttributes);
         }
 
         internal static AttributeSyntax GetGeneratedCodeAttributeSyntax()
@@ -61,7 +53,7 @@ namespace Orleans.CodeGenerator
             return
                 SF.Attribute(typeof(GeneratedCodeAttribute).GetNameSyntax())
                     .AddArgumentListArguments(
-                        SF.AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
+                        SF.AttributeArgument(ToolName.GetLiteralExpression()),
                         SF.AttributeArgument(CodeGeneratorVersion.GetLiteralExpression()));
         }
 

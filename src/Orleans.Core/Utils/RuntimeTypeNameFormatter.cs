@@ -1,20 +1,20 @@
-﻿using System;
+using System;
 using System.Reflection;
 using System.Text;
 
 namespace Orleans.Utilities
 {
     /// <summary>
-    /// Utility methods for formatting <see cref="Type"/> and <see cref="TypeInfo"/> instances in a way which can be parsed by
+    /// Utility methods for formatting <see cref="Type"/> instances in a way which can be parsed by
     /// <see cref="Type.GetType(string)"/>.
     /// </summary>
     public static class RuntimeTypeNameFormatter
     {
-        private static readonly Assembly SystemAssembly = typeof(int).GetTypeInfo().Assembly;
+        private static readonly Assembly SystemAssembly = typeof(int).Assembly;
         private static readonly char[] SimpleNameTerminators = { '`', '*', '[', '&' };
 
-        private static readonly CachedReadConcurrentDictionary<TypeInfo, string> Cache =
-            new CachedReadConcurrentDictionary<TypeInfo, string>();
+        private static readonly CachedReadConcurrentDictionary<Type, string> Cache =
+            new CachedReadConcurrentDictionary<Type, string>();
 
         /// <summary>
         /// Returns a <see cref="string"/> form of <paramref name="type"/> which can be parsed by <see cref="Type.GetType(string)"/>.
@@ -23,16 +23,7 @@ namespace Orleans.Utilities
         /// <returns>
         /// A <see cref="string"/> form of <paramref name="type"/> which can be parsed by <see cref="Type.GetType(string)"/>.
         /// </returns>
-        public static string Format(Type type) => Format(type?.GetTypeInfo());
-
-        /// <summary>
-        /// Returns a <see cref="string"/> form of <paramref name="type"/> which can be parsed by <see cref="Type.GetType(string)"/>.
-        /// </summary>
-        /// <param name="type">The type to format.</param>
-        /// <returns>
-        /// A <see cref="string"/> form of <paramref name="type"/> which can be parsed by <see cref="Type.GetType(string)"/>.
-        /// </returns>
-        public static string Format(TypeInfo type)
+        public static string Format(Type type)
         {
             if (type == null) throw new ArgumentNullException(nameof(type));
 
@@ -41,7 +32,7 @@ namespace Orleans.Utilities
                 string FormatType(Type t)
                 {
                     var builder = new StringBuilder();
-                    Format(builder, t.GetTypeInfo(), isElementType: false);
+                    Format(builder, t, isElementType: false);
                     return builder.ToString();
                 }
 
@@ -51,13 +42,13 @@ namespace Orleans.Utilities
             return result;
         }
 
-        private static void Format(StringBuilder builder, TypeInfo type, bool isElementType)
+        private static void Format(StringBuilder builder, Type type, bool isElementType)
         {
             // Arrays, pointers, and by-ref types are all element types and need to be formatted with their own adornments.
             if (type.HasElementType)
             {
                 // Format the element type.
-                Format(builder, type.GetElementType().GetTypeInfo(), isElementType: true);
+                Format(builder, type.GetElementType(), isElementType: true);
 
                 // Format this type's adornments to the element type.
                 AddArrayRank(builder, type);
@@ -76,19 +67,19 @@ namespace Orleans.Utilities
             if (!isElementType) AddAssembly(builder, type);
         }
 
-        private static void AddNamespace(StringBuilder builder, TypeInfo type)
+        private static void AddNamespace(StringBuilder builder, Type type)
         {
             if (string.IsNullOrWhiteSpace(type.Namespace)) return;
             builder.Append(type.Namespace);
             builder.Append('.');
         }
 
-        private static void AddClassName(StringBuilder builder, TypeInfo type)
+        private static void AddClassName(StringBuilder builder, Type type)
         {
             // Format the declaring type.
             if (type.IsNested)
             {
-                AddClassName(builder, type.DeclaringType.GetTypeInfo());
+                AddClassName(builder, type.DeclaringType);
                 builder.Append('+');
             }
 
@@ -100,18 +91,18 @@ namespace Orleans.Utilities
             AddGenericArity(builder, type);
         }
 
-        private static void AddGenericParameters(StringBuilder builder, TypeInfo type)
+        private static void AddGenericParameters(StringBuilder builder, Type type)
         {
             // Generic type definitions (eg, List<> without parameters) and non-generic types do not include any
             // parameters in their formatting.
-            if (!type.AsType().IsConstructedGenericType) return;
+            if (!type.IsConstructedGenericType) return;
 
             var args = type.GetGenericArguments();
             builder.Append('[');
             for (var i = 0; i < args.Length; i++)
             {
                 builder.Append('[');
-                Format(builder, args[i].GetTypeInfo(), isElementType: false);
+                Format(builder, args[i], isElementType: false);
                 builder.Append(']');
                 if (i + 1 < args.Length) builder.Append(',');
             }
@@ -119,13 +110,13 @@ namespace Orleans.Utilities
             builder.Append(']');
         }
 
-        private static void AddGenericArity(StringBuilder builder, TypeInfo type)
+        private static void AddGenericArity(StringBuilder builder, Type type)
         {
             if (!type.IsGenericType) return;
 
             // The arity is the number of generic parameters minus the number of generic parameters in the declaring types.
             var baseTypeParameterCount =
-                type.IsNested ? type.DeclaringType.GetTypeInfo().GetGenericArguments().Length : 0;
+                type.IsNested ? type.DeclaringType.GetGenericArguments().Length : 0;
             var arity = type.GetGenericArguments().Length - baseTypeParameterCount;
 
             // If all of the generic parameters are in the declaring types then this type has no parameters of its own.
@@ -135,19 +126,19 @@ namespace Orleans.Utilities
             builder.Append(arity);
         }
 
-        private static void AddPointerSymbol(StringBuilder builder, TypeInfo type)
+        private static void AddPointerSymbol(StringBuilder builder, Type type)
         {
             if (!type.IsPointer) return;
             builder.Append('*');
         }
 
-        private static void AddByRefSymbol(StringBuilder builder, TypeInfo type)
+        private static void AddByRefSymbol(StringBuilder builder, Type type)
         {
             if (!type.IsByRef) return;
             builder.Append('&');
         }
 
-        private static void AddArrayRank(StringBuilder builder, TypeInfo type)
+        private static void AddArrayRank(StringBuilder builder, Type type)
         {
             if (!type.IsArray) return;
             builder.Append('[');
@@ -155,7 +146,7 @@ namespace Orleans.Utilities
             builder.Append(']');
         }
 
-        private static void AddAssembly(StringBuilder builder, TypeInfo type)
+        private static void AddAssembly(StringBuilder builder, Type type)
         {
             // Do not include the assembly name for the system assembly.
             if (SystemAssembly.Equals(type.Assembly)) return;

@@ -3,6 +3,7 @@
     <PackageId>Microsoft.Orleans.OrleansProviders</PackageId>
     <Title>Microsoft Orleans Providers</Title>
     <Description>Library of built-in persistence and stream providers included in Microsoft Orleans.</Description>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -11,8 +12,4 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
-    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
-  </ItemGroup>
 </Project>

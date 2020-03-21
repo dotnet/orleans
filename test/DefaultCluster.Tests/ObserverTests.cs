@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
@@ -17,7 +18,7 @@ namespace DefaultCluster.Tests.General
     {
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
         private int callbackCounter;
-        private readonly bool[] callbacksRecieved = new bool[2];
+        private readonly bool[] callbacksReceived = new bool[2];
 
         // we keep the observer objects as instance variables to prevent them from
         // being garbage collected permaturely (the runtime stores them as weak references).
@@ -31,8 +32,8 @@ namespace DefaultCluster.Tests.General
         private void TestInitialize()
         {
             callbackCounter = 0;
-            callbacksRecieved[0] = false;
-            callbacksRecieved[1] = false;
+            callbacksReceived[0] = false;
+            callbacksReceived[1] = false;
 
             observer1 = null;
             observer2 = null;
@@ -43,7 +44,7 @@ namespace DefaultCluster.Tests.General
             return this.GrainFactory.GetGrain<ISimpleObserverableGrain>(GetRandomGrainId());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task ObserverTest_SimpleNotification()
         {
             TestInitialize();
@@ -61,7 +62,7 @@ namespace DefaultCluster.Tests.General
             await this.GrainFactory.DeleteObjectReference<ISimpleGrainObserver>(reference);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task ObserverTest_SimpleNotification_GeneratedFactory()
         {
             TestInitialize();
@@ -85,20 +86,20 @@ namespace DefaultCluster.Tests.General
             this.Logger.Info("Invoking ObserverTest_SimpleNotification_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
 
             if (a == 3 && b == 0)
-                callbacksRecieved[0] = true;
+                callbacksReceived[0] = true;
             else if (a == 3 && b == 2)
-                callbacksRecieved[1] = true;
+                callbacksReceived[1] = true;
             else
                 throw new ArgumentOutOfRangeException("Unexpected callback with values: a=" + a + ",b=" + b);
 
             if (callbackCounter == 1)
             {
                 // Allow for callbacks occurring in any order
-                Assert.True(callbacksRecieved[0] || callbacksRecieved[1]);
+                Assert.True(callbacksReceived[0] || callbacksReceived[1]);
             }
             else if (callbackCounter == 2)
             {
-                Assert.True(callbacksRecieved[0] && callbacksRecieved[1]);
+                Assert.True(callbacksReceived[0] && callbacksReceived[1]);
                 result.Done = true;
             }
             else
@@ -189,7 +190,7 @@ namespace DefaultCluster.Tests.General
         }
 
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task ObserverTest_Unsubscribe()
         {
             TestInitialize();
@@ -214,7 +215,7 @@ namespace DefaultCluster.Tests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task ObserverTest_DoubleSubscriptionDifferentReferences()
         {
             TestInitialize();
@@ -278,7 +279,7 @@ namespace DefaultCluster.Tests.General
             result.Continue = true;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task ObserverTest_SubscriberMustBeGrainReference()
         {
             TestInitialize();
@@ -295,29 +296,49 @@ namespace DefaultCluster.Tests.General
             });
         }
 
+        [Fact, TestCategory("BVT")]
+        public async Task ObserverTest_CreateObjectReference_ThrowsForInvalidArgumentTypes()
+        {
+            TestInitialize();
+
+            // Attempt to create an object reference to a Grain class.
+            await Assert.ThrowsAsync<ArgumentException>(() => this.Client.CreateObjectReference<ISimpleGrainObserver>(new DummyObserverGrain()));
+
+            // Attempt to create an object reference to an existing GrainReference.
+            var observer = new DummyObserver();
+            var reference = await this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
+            await Assert.ThrowsAsync<ArgumentException>(() => this.Client.CreateObjectReference<ISimpleGrainObserver>(reference));
+        }
+
+        private class DummyObserverGrain : Grain, ISimpleGrainObserver
+        {
+            public void StateChanged(int a, int b) { }
+        }
+
+        private class DummyObserver : ISimpleGrainObserver
+        {
+            public void StateChanged(int a, int b) { }
+        }
+
         internal class SimpleGrainObserver : ISimpleGrainObserver
         {
             readonly Action<int, int, AsyncResultHandle> action;
             readonly AsyncResultHandle result;
 
-            private readonly Logger logger;
+            private readonly ILogger logger;
 
-            public SimpleGrainObserver(Action<int, int, AsyncResultHandle> action, AsyncResultHandle result, Logger logger)
+            public SimpleGrainObserver(Action<int, int, AsyncResultHandle> action, AsyncResultHandle result, ILogger logger)
             {
                 this.action = action;
                 this.result = result;
                 this.logger = logger;
             }
 
-            #region ISimpleGrainObserver Members
-
             public void StateChanged(int a, int b)
             {
-                this.logger.Verbose("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
+                this.logger.Debug("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
                 action?.Invoke(a, b, result);
             }
-
-            #endregion
         }
     }
 }

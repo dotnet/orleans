@@ -1,9 +1,9 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -19,12 +19,17 @@ namespace UnitTests.ConcurrencyTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions();
-                options.ClusterConfiguration.ApplyToAllNodes(n => n.MaxActiveThreads = 2);
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            }
+        }
 
-                return new TestCluster(options);
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.Configure<SchedulingOptions>(options => options.MaxActiveThreads = 2);
             }
         }
 

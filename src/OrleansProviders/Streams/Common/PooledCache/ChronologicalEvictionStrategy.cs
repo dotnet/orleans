@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -8,9 +8,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Eviction strategy that evicts data based off of age.
     /// </summary>
-    /// <typeparam name="TCachedMessage"></typeparam>
-    public abstract class ChronologicalEvictionStrategy<TCachedMessage> : IEvictionStrategy<TCachedMessage>
-        where TCachedMessage : struct
+    public class ChronologicalEvictionStrategy : IEvictionStrategy
     {
         private readonly ILogger logger;
         private readonly TimePurgePredicate timePurge;
@@ -31,7 +29,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="timePurage"></param>
         /// <param name="cacheMonitor"></param>
         /// <param name="monitorWriteInterval">"Interval to write periodic statistics.  Only triggered for active caches.</param>
-        protected ChronologicalEvictionStrategy(ILogger logger, TimePurgePredicate timePurage, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
+        public ChronologicalEvictionStrategy(ILogger logger, TimePurgePredicate timePurage, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
         {
             if (logger == null) throw new ArgumentException(nameof(logger));
             if (timePurage == null) throw new ArgumentException(nameof(timePurage));
@@ -54,36 +52,15 @@ namespace Orleans.Providers.Streams.Common
             this.cacheMonitor.ReportCacheSize(this.cacheSizeInByte);
         }
 
-        /// <summary>
-        /// Get block pool block id for message
-        /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <returns></returns>
-        protected abstract object GetBlockId(TCachedMessage? cachedMessage);
-
-        /// <summary>
-        /// Get message enqueue time
-        /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <returns></returns>
-        protected abstract DateTime GetEnqueueTimeUtc(ref TCachedMessage cachedMessage);
-
-        /// <summary>
-        /// Get message dequeue time
-        /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <returns></returns>
-        protected abstract DateTime GetDequeueTimeUtc(ref TCachedMessage cachedMessage);
-
         /// <inheritdoc />
-        public IPurgeObservable<TCachedMessage> PurgeObservable { private get; set; }
+        public IPurgeObservable PurgeObservable { private get; set; }
 
         /// <summary>
         /// Called with the newest item in the cache and last item purged after a cache purge has run.
         /// For ordered reliable queues we shouldn't need to notify on every purged event, only on the last event 
         ///   of every set of events that get purged.
         /// </summary>
-        public Action<TCachedMessage?, TCachedMessage?> OnPurged { get; set; }
+        public Action<CachedMessage?, CachedMessage?> OnPurged { get; set; }
 
         /// <inheritdoc />
         public void OnBlockAllocated(FixedSizeBuffer newBlock)
@@ -113,8 +90,8 @@ namespace Orleans.Providers.Streams.Common
             if (this.PurgeObservable.IsEmpty)
                 return;
             int itemsPurged = 0;
-            TCachedMessage neweswtMessageInCache = this.PurgeObservable.Newest.Value;
-            TCachedMessage? lastMessagePurged = null;
+            CachedMessage neweswtMessageInCache = this.PurgeObservable.Newest.Value;
+            CachedMessage? lastMessagePurged = null;
             while (!this.PurgeObservable.IsEmpty)
             {
                 var oldestMessageInCache = this.PurgeObservable.Oldest.Value;
@@ -137,14 +114,14 @@ namespace Orleans.Providers.Streams.Common
             ReportPurge(this.logger, this.PurgeObservable, itemsPurged);
         }
 
-        private void FreePurgedBuffers(TCachedMessage? lastMessagePurged, TCachedMessage? oldestMessageInCache)
+        private void FreePurgedBuffers(CachedMessage? lastMessagePurged, CachedMessage? oldestMessageInCache)
         {
             if (this.inUseBuffers.Count <= 0 || !lastMessagePurged.HasValue)
                 return;
             int memoryReleasedInByte = 0;
-            object IdOfLastPurgedBufferId = GetBlockId(lastMessagePurged);
+            object IdOfLastPurgedBufferId = lastMessagePurged?.Segment.Array;
             // IdOfLastBufferInCache will be null if cache is empty after purge
-            object IdOfLastBufferInCacheId = GetBlockId(oldestMessageInCache);
+            object IdOfLastBufferInCacheId = oldestMessageInCache?.Segment.Array;
             //all buffers older than LastPurgedBuffer should be purged 
             while (this.inUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
             {
@@ -169,11 +146,11 @@ namespace Orleans.Providers.Streams.Common
         }
 
         // Given a purge cached message, indicates whether it should be purged from the cache
-        private bool ShouldPurge(ref TCachedMessage cachedMessage, ref TCachedMessage newestCachedMessage, DateTime nowUtc)
+        private bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, DateTime nowUtc)
         {
-            TimeSpan timeInCache = nowUtc - GetDequeueTimeUtc(ref cachedMessage);
+            TimeSpan timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
             // age of message relative to the most recent event in the cache.
-            TimeSpan relativeAge = GetEnqueueTimeUtc(ref newestCachedMessage) - GetEnqueueTimeUtc(ref cachedMessage);
+            TimeSpan relativeAge =  newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
 
             return timePurge.ShouldPurgFromTime(timeInCache, relativeAge);
         }
@@ -184,7 +161,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="logger"></param>
         /// <param name="purgeObservable"></param>
         /// <param name="itemsPurged"></param>
-        private static void ReportPurge(ILogger logger, IPurgeObservable<TCachedMessage> purgeObservable, int itemsPurged)
+        private static void ReportPurge(ILogger logger, IPurgeObservable purgeObservable, int itemsPurged)
         {
             if (!logger.IsEnabled(LogLevel.Debug))
                 return;
@@ -192,9 +169,9 @@ namespace Orleans.Providers.Streams.Common
             var itemCountBeforePurge = itemCountAfterPurge + itemsPurged;
             if (itemCountAfterPurge == 0)
             {
-                logger.Debug("BlockPurged: cache empty");
+                logger.LogDebug("BlockPurged: cache empty");
             }
-            logger.Debug($"BlockPurged: PurgeCount: {itemCountBeforePurge - itemCountAfterPurge}, CacheSize: {itemCountAfterPurge}");
+            logger.LogDebug("BlockPurged: PurgeCount: {PurgeCount}, CacheSize: {ItemCountAfterPurge}", itemCountBeforePurge - itemCountAfterPurge, itemCountAfterPurge);
         }
     }
 }

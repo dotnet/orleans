@@ -1,11 +1,11 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans;
-using Orleans.Providers.Streams.AzureQueue;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester;
 using TestExtensions;
@@ -16,21 +16,27 @@ namespace UnitTests.StreamingTests
     public class PullingAgentManagementTests : OrleansTestingBase, IClassFixture<PullingAgentManagementTests.Fixture>
     {
         private readonly Fixture fixture;
-
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            }
 
-                options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
+            private class MySiloBuilderConfigurator : ISiloConfigurator
+            {
+                public void Configure(ISiloBuilder hostBuilder)
+                {
+                    hostBuilder
+                    .AddAzureQueueStreams(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, b=>
+                        b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
+                           {
+                               options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                               options.QueueNames = Enumerable.Range(0, 8).Select(num => $"{dep.Value.ClusterId}-{num}").ToList();
+                           })));
 
-                // register stream providers
-                // options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, false);
-                // options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME, false);
-
-                options.ClusterConfiguration.AddAzureQueueStreamProvider(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
-                return new TestCluster(options);
+                    hostBuilder.AddMemoryGrainStorage("PubSubStore");
+                }
             }
 
             protected override void CheckPreconditionsOrThrow()
@@ -42,7 +48,7 @@ namespace UnitTests.StreamingTests
 
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
 #pragma warning disable 618
-        private readonly string adapterType = typeof(AzureQueueStreamProvider).FullName;
+        private readonly string adapterType = typeof(PersistentStreamProvider).FullName;
 #pragma warning restore 618
 
         public PullingAgentManagementTests(Fixture fixture)
@@ -56,21 +62,21 @@ namespace UnitTests.StreamingTests
         {
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);;
 
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
+            await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStarted);
 
             await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StartAgents);
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
+            await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStarted);
 
             await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StopAgents);
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStopped);
+            await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStopped);
 
 
             await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.StartAgents);
-            await ValidateAgentsState(PersistentStreamProviderState.AgentsStarted);
+            await ValidateAgentsState(StreamLifecycleOptions.RunState.AgentsStarted);
 
         }
 
-        private async Task ValidateAgentsState(PersistentStreamProviderState expectedState)
+        private async Task ValidateAgentsState(StreamLifecycleOptions.RunState expectedState)
         {
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
 
@@ -78,7 +84,7 @@ namespace UnitTests.StreamingTests
             Assert.Equal(2, states.Length);
             foreach (var state in states)
             {
-                PersistentStreamProviderState providerState;
+                StreamLifecycleOptions.RunState providerState;
                 Enum.TryParse(state.ToString(), out providerState);
                 Assert.Equal(expectedState, providerState);
             }
@@ -86,9 +92,9 @@ namespace UnitTests.StreamingTests
             var numAgents = await mgmt.SendControlCommandToProvider(adapterType, adapterName, (int)PersistentStreamProviderCommand.GetNumberRunningAgents);
             Assert.Equal(2, numAgents.Length);
             int totalNumAgents = numAgents.Select(Convert.ToInt32).Sum();
-            if (expectedState == PersistentStreamProviderState.AgentsStarted)
+            if (expectedState == StreamLifecycleOptions.RunState.AgentsStarted)
             {
-                Assert.Equal(AzureQueueAdapterConstants.NumQueuesDefaultValue, totalNumAgents);
+                Assert.Equal(HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES, totalNumAgents);
             }
             else
             {

@@ -72,7 +72,7 @@ namespace Orleans.Providers
         /// Constructor
         /// </summary>
         /// <param name="events">Events that are part of this message</param>
-        /// <param name="contex">Context in which this messsage was sent</param>
+        /// <param name="contex">Context in which this message was sent</param>
         public MemoryMessageBody(IEnumerable<object> events, Dictionary<string, object> contex)
         {
             if (events == null) throw new ArgumentNullException(nameof(events));

@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -25,14 +26,18 @@ namespace UnitTests.General
             output.WriteLine("GrainPlacementTests - constructor");
         }
 
-        public override TestCluster CreateTestCluster()
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            var options = new TestClusterOptions();
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
 
-            options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
-            options.ClusterConfiguration.AddMemoryStorageProvider("Default");
-
-            return new TestCluster(options);
+        private class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.AddMemoryGrainStorage("MemoryStore")
+                    .AddMemoryGrainStorageAsDefault();
+            }
         }
 
 
@@ -190,11 +195,9 @@ namespace UnitTests.General
 
             foreach (SiloHandle silo in HostedCluster.GetActiveSilos())
             {
-                NodeConfiguration siloNodeConfiguration = silo.NodeConfiguration;
-                Assert.NotNull(siloNodeConfiguration);
                 output.WriteLine(
                     "Silo {0} : Address = {1} Proxy gateway: {2}",
-                    siloNodeConfiguration.SiloName, siloNodeConfiguration.Endpoint, siloNodeConfiguration.ProxyGatewayEndpoint);
+                    silo.Name, silo.SiloAddress, silo.GatewayAddress);
             }
 
             IPEndPoint targetSilo;
@@ -226,7 +229,7 @@ namespace UnitTests.General
 
             SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => s.SiloAddress.Endpoint.Equals(expected));
             output.WriteLine("Killing silo {0} hosting locally placed grain", siloToKill);
-            HostedCluster.StopSilo(siloToKill);
+            await HostedCluster.StopSiloAsync(siloToKill);
 
             IPEndPoint newActual = await grain.GetEndpoint();
             output.WriteLine("PreferLocalPlacement grain was recreated on silo {0}", newActual);
@@ -245,11 +248,9 @@ namespace UnitTests.General
 
             foreach (SiloHandle silo in HostedCluster.GetActiveSilos())
             {
-                NodeConfiguration siloNodeConfiguration = silo.NodeConfiguration;
-                Assert.NotNull(siloNodeConfiguration);
                 output.WriteLine(
                     "Silo {0} : Address = {1} Proxy gateway: {2}",
-                    siloNodeConfiguration.SiloName, siloNodeConfiguration.Endpoint, siloNodeConfiguration.ProxyGatewayEndpoint);
+                    silo.Name, silo.SiloAddress, silo.GatewayAddress);
             }
 
             IPEndPoint targetSilo;
@@ -281,7 +282,7 @@ namespace UnitTests.General
 
             SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => !s.SiloAddress.Endpoint.Equals(expected));
             output.WriteLine("Killing other silo {0} not hosting locally placed grain", siloToKill);
-            HostedCluster.StopSilo(siloToKill);
+            await HostedCluster.StopSiloAsync(siloToKill);
 
             IPEndPoint newActual = await grain.GetEndpoint();
             output.WriteLine("PreferLocalPlacement grain is now located on silo {0}", newActual);

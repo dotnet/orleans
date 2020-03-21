@@ -1,72 +1,49 @@
 using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.Streams.Core;
-using Microsoft.Extensions.Logging;
+using Orleans.Serialization;
+using Orleans.Configuration;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
-    public class SimpleMessageStreamProvider : IInternalStreamProvider, IStreamSubscriptionManagerRetriever
+    public class SimpleMessageStreamProvider : IInternalStreamProvider, IStreamProvider, IStreamSubscriptionManagerRetriever
     {
         public string                       Name { get; private set; }
 
-        private Logger                      logger;
+        private ILogger                      logger;
         private IStreamProviderRuntime      providerRuntime;
-        private bool                        fireAndForgetDelivery;
-        private bool                        optimizeForImmutableData;
-        private StreamPubSubType            pubSubType;
-        private ProviderStateManager        stateManager = new ProviderStateManager();
         private IRuntimeClient              runtimeClient;
         private IStreamSubscriptionManager  streamSubscriptionManager;
         private ILoggerFactory              loggerFactory;
-        internal const string                STREAM_PUBSUB_TYPE = "PubSubType";
-        internal const string                FIRE_AND_FORGET_DELIVERY = "FireAndForgetDelivery";
-        internal const string                OPTIMIZE_FOR_IMMUTABLE_DATA = "OptimizeForImmutableData";
-        internal const StreamPubSubType      DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
-        internal const bool DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY = false;
-        internal const bool DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA = true;
+        private SerializationManager        serializationManager;
+        private SimpleMessageStreamProviderOptions options;
         public bool IsRewindable { get { return false; } }
 
-        public Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
+        public SimpleMessageStreamProvider(string name, SimpleMessageStreamProviderOptions options,
+            ILoggerFactory loggerFactory, IProviderRuntime providerRuntime, SerializationManager serializationManager)
         {
-            if (!stateManager.PresetState(ProviderState.Initialized)) return Task.CompletedTask;
+            this.loggerFactory = loggerFactory;
             this.Name = name;
-            providerRuntime = (IStreamProviderRuntime) providerUtilitiesManager;
-            this.runtimeClient = this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>();
-            fireAndForgetDelivery = config.GetBoolProperty(FIRE_AND_FORGET_DELIVERY, DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY);
-            optimizeForImmutableData = config.GetBoolProperty(OPTIMIZE_FOR_IMMUTABLE_DATA, DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA);
-            
-            string pubSubTypeString;
-            pubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
-                ? DEFAULT_STREAM_PUBSUB_TYPE
-                : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
-            if (pubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
-                || pubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}");
+            this.options = options;
+            this.providerRuntime = providerRuntime as IStreamProviderRuntime;
+            this.runtimeClient = providerRuntime.ServiceProvider.GetService<IRuntimeClient>();
+            this.serializationManager = serializationManager;
+            if (this.options.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit
+                || this.options.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
             {
                 this.streamSubscriptionManager = this.providerRuntime.ServiceProvider
-                    .GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+                    .GetService<IStreamSubscriptionManagerAdmin>()
+                    .GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
             }
-
-            logger = providerRuntime.GetLogger(this.GetType().Name);
-            logger.Info("Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
-                "and PubSubType: {3}", Name, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);
-            stateManager.CommitState();
-            this.loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            return Task.CompletedTask;
-        }
-
-        public Task Start()
-        {
-            if (stateManager.PresetState(ProviderState.Started)) stateManager.CommitState();
-            return Task.CompletedTask;
-        }
-
-        public Task Close()
-        {
-            if (stateManager.PresetState(ProviderState.Closed)) stateManager.CommitState();
-            return Task.CompletedTask;
+            logger.Info(
+                "Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
+                "and PubSubType: {3}", Name, this.options.FireAndForgetDelivery, this.options.OptimizeForImmutableData,
+                this.options.PubSubType);
         }
 
         public IStreamSubscriptionManager GetStreamSubscriptionManager()
@@ -85,8 +62,8 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
             return new SimpleMessageStreamProducer<T>((StreamImpl<T>)stream, Name, providerRuntime,
-                fireAndForgetDelivery, optimizeForImmutableData, providerRuntime.PubSub(pubSubType), IsRewindable,
-                this.runtimeClient.SerializationManager, this.loggerFactory);
+                this.options.FireAndForgetDelivery, this.options.OptimizeForImmutableData, providerRuntime.PubSub(this.options.PubSubType), IsRewindable,
+                this.serializationManager, this.loggerFactory);
         }
 
         IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)
@@ -97,7 +74,13 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
             return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime,
-                providerRuntime.PubSub(pubSubType), this.loggerFactory, IsRewindable);
+                providerRuntime.PubSub(this.options.PubSubType), this.logger, IsRewindable);
+        }
+
+        public static IStreamProvider Create(IServiceProvider services, string name)
+        {
+            return ActivatorUtilities.CreateInstance<SimpleMessageStreamProvider>(services, name,
+                services.GetRequiredService<IOptionsMonitor<SimpleMessageStreamProviderOptions>>().Get(name));
         }
     }
 }

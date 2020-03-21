@@ -1,4 +1,4 @@
-﻿namespace Orleans.Serialization
+namespace Orleans.Serialization
 {
     using System;
     using System.Collections.Concurrent;
@@ -8,7 +8,8 @@
     /// <summary>
     /// Fallback serializer to be used when other serializers are unavailable.
     /// </summary>
-    public class ILBasedSerializer : IExternalSerializer
+    [Obsolete("Obsolete in favor of other serializers.")]
+    public class ILBasedSerializer : IKeyedSerializer
     {
         private static readonly Type ExceptionType = typeof(Exception);
         private static readonly Type TypeType = typeof(Type);
@@ -80,7 +81,7 @@
         /// <param name="t">The type of the item to be serialized</param>
         /// <returns>A value indicating whether the item can be serialized.</returns>
         public bool IsSupportedType(Type t)
-            => this.serializers.ContainsKey(t) || ILSerializerGenerator.IsSupportedType(t.GetTypeInfo());
+            => this.serializers.ContainsKey(t) || ILSerializerGenerator.IsSupportedType(t);
 
         /// <inheritdoc />
         public object DeepCopy(object source, ICopyContext context)
@@ -151,7 +152,7 @@
 
         private SerializerBundle GenerateSerializer(Type type)
         {
-            if (type.GetTypeInfo().IsGenericTypeDefinition) return this.thisSerializer;
+            if (type.IsGenericTypeDefinition) return this.thisSerializer;
 
             if (TypeType.IsAssignableFrom(type))
             {
@@ -186,5 +187,8 @@
                 this.Methods = methods;
             }
         }
+
+        /// <inheritdoc />
+        KeyedSerializerId IKeyedSerializer.SerializerId => KeyedSerializerId.ILBasedSerializer;
     }
 }

@@ -23,7 +23,7 @@ namespace Orleans.Runtime
         /// </summary>
         private readonly Dictionary<Type, Type> grainToReferenceMapping = new Dictionary<Type, Type>();
 
-        public TypeMetadataCache(ApplicationPartManager applicationPartManager)
+        public TypeMetadataCache(IApplicationPartManager applicationPartManager)
         {
             var grainInterfaceFeature = applicationPartManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
             foreach (var grain in grainInterfaceFeature.Interfaces)
@@ -35,9 +35,8 @@ namespace Orleans.Runtime
 
         public Type GetGrainReferenceType(Type interfaceType)
         {
-            var typeInfo = interfaceType.GetTypeInfo();
             var genericInterfaceType = interfaceType.IsConstructedGenericType
-                                           ? typeInfo.GetGenericTypeDefinition()
+                                           ? interfaceType.GetGenericTypeDefinition()
                                            : interfaceType;
 
             if (!typeof(IAddressable).IsAssignableFrom(interfaceType))
@@ -56,7 +55,7 @@ namespace Orleans.Runtime
 
             if (interfaceType.IsConstructedGenericType)
             {
-                grainReferenceType = grainReferenceType.MakeGenericType(typeInfo.GenericTypeArguments);
+                grainReferenceType = grainReferenceType.MakeGenericType(interfaceType.GenericTypeArguments);
             }
 
             if (!typeof(IAddressable).IsAssignableFrom(grainReferenceType))
@@ -71,9 +70,8 @@ namespace Orleans.Runtime
 
         public Type GetGrainMethodInvokerType(Type interfaceType)
         {
-            var typeInfo = interfaceType.GetTypeInfo();
             var genericInterfaceType = interfaceType.IsConstructedGenericType
-                                           ? typeInfo.GetGenericTypeDefinition()
+                                           ? interfaceType.GetGenericTypeDefinition()
                                            : interfaceType;
 
             // Try to find the correct IGrainMethodInvoker type for this interface.
@@ -86,7 +84,7 @@ namespace Orleans.Runtime
 
             if (interfaceType.IsConstructedGenericType)
             {
-                invokerType = invokerType.MakeGenericType(typeInfo.GenericTypeArguments);
+                invokerType = invokerType.MakeGenericType(interfaceType.GenericTypeArguments);
             }
 
             return invokerType;

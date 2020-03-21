@@ -4,7 +4,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -22,19 +23,15 @@ namespace Orleans.Runtime
         private static readonly List<ActivationData> nothing = new List<ActivationData> { Capacity = 0 };
         private readonly ILogger logger;
 
-        public ActivationCollector(ClusterConfiguration config, ILoggerFactory loggerFactory)
+        public ActivationCollector(IOptions<GrainCollectionOptions> options, ILogger<ActivationCollector> logger)
         {
-            if (TimeSpan.Zero == config.Globals.CollectionQuantum)
-            {
-                throw new ArgumentException("Globals.CollectionQuantum cannot be zero.", "config");
-            }
-
-            quantum = config.Globals.CollectionQuantum;
-            shortestAgeLimit = config.Globals.Application.ShortestCollectionAgeLimit;
+            quantum = options.Value.CollectionQuantum;
+            shortestAgeLimit = TimeSpan.FromTicks(options.Value.ClassSpecificCollectionAge.Values
+                .Aggregate(options.Value.CollectionAge.Ticks, (a,v) => Math.Min(a,v.Ticks)));
             buckets = new ConcurrentDictionary<DateTime, Bucket>();
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
             nextTicketLock = new object();
-            logger = loggerFactory.CreateLogger<ActivationCollector>();
+            this.logger = logger;
         }
 
         public TimeSpan Quantum { get { return quantum; } }
@@ -55,12 +52,6 @@ namespace Orleans.Runtime
         // Return the number of activations that were used (touched) in the last recencyPeriod.
         public int GetNumRecentlyUsed(TimeSpan recencyPeriod)
         {
-            if (TimeSpan.Zero == shortestAgeLimit)
-            {
-                // Collection has been disabled for some types.
-                return ApproximateCount;
-            }
-
             var now = DateTime.UtcNow;
             int sum = 0;
             foreach (var bucket in buckets)
@@ -88,11 +79,6 @@ namespace Orleans.Runtime
                 }
 
                 TimeSpan timeout = item.CollectionAgeLimit;
-                if (TimeSpan.Zero == timeout)
-                {
-                    // either the CollectionAgeLimit hasn't been initialized (will be rectified later) or it's been disabled.
-                    return;
-                }
 
                 DateTime ticket = MakeTicketFromTimeSpan(timeout);
             
@@ -366,10 +352,10 @@ namespace Orleans.Runtime
         private DateTime MakeTicketFromDateTime(DateTime timestamp)
         {
             // round the timestamp to the next quantum. e.g. if the quantum is 1 minute and the timestamp is 3:45:22, then the ticket will be 3:46. note that TimeStamp.Ticks and DateTime.Ticks both return a long.
-            DateTime ticket = new DateTime(((timestamp.Ticks - 1) / quantum.Ticks + 1) * quantum.Ticks);
+            DateTime ticket = new DateTime(((timestamp.Ticks - 1) / quantum.Ticks + 1) * quantum.Ticks, DateTimeKind.Utc);
             if (ticket < nextTicket)
             {
-                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - quantum.Ticks + 1)));
+                throw new ArgumentException(string.Format("The earliest collection that can be scheduled from now is for {0}", new DateTime(nextTicket.Ticks - quantum.Ticks + 1, DateTimeKind.Utc)));
             }
             return ticket;
         }

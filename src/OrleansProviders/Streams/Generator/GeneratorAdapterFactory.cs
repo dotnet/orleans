@@ -3,14 +3,15 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Orleans.Runtime.Configuration;
-using System.Diagnostics;
-using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 
 namespace Orleans.Providers.Streams.Generator
 {
@@ -35,20 +36,19 @@ namespace Orleans.Providers.Streams.Generator
         /// <summary>
         /// Configuration property name for generator configuration type
         /// </summary>
-        public const string GeneratorConfigTypeName = "StreamGeneratorConfigType";
-        private IServiceProvider serviceProvider;
-        private GeneratorAdapterConfig adapterConfig;
+        private readonly HashRingStreamQueueMapperOptions queueMapperOptions;
+        private readonly StreamStatisticOptions statisticOptions;
+        private readonly IServiceProvider serviceProvider;
+        private readonly SerializationManager serializationManager;
+        private readonly ITelemetryProducer telemetryProducer;
+        private readonly ILoggerFactory loggerFactory;
+        private readonly ILogger<GeneratorAdapterFactory> logger;
         private IStreamGeneratorConfig generatorConfig;
         private IStreamQueueMapper streamQueueMapper;
         private IStreamFailureHandler streamFailureHandler;
         private ConcurrentDictionary<QueueId, Receiver> receivers;
         private IObjectPool<FixedSizeBuffer> bufferPool;
-        private SerializationManager serializationManager;
-        private ITelemetryProducer telemetryProducer;
         private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
-        private MonitorAggregationDimensions sharedDimensions;
-        private ILoggerFactory loggerFactory;
-        private string providerName;
         /// <summary>
         /// Determines whether this is a rewindable stream adapter - supports subscribing from previous point in time.
         /// </summary>
@@ -60,6 +60,11 @@ namespace Orleans.Providers.Streams.Generator
         /// </summary>
         /// <returns>The direction in which this adapter provides data.</returns>
         public StreamProviderDirection Direction => StreamProviderDirection.ReadOnly;
+
+        /// <summary>
+        /// Name of the adapter. From IQueueAdapter.
+        /// </summary>
+        public string Name { get; }
 
         /// <summary>
         /// Create a cache monitor to report cache related metrics
@@ -79,38 +84,35 @@ namespace Orleans.Providers.Streams.Generator
         /// </summary>
         protected Func<ReceiverMonitorDimensions, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
 
+        public GeneratorAdapterFactory(string providerName, HashRingStreamQueueMapperOptions queueMapperOptions, StreamStatisticOptions statisticOptions, IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+        {
+            this.Name = providerName;
+            this.queueMapperOptions = queueMapperOptions ?? throw new ArgumentNullException(nameof(queueMapperOptions));
+            this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
+            this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+            this.serializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
+            this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
+            this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+            this.logger = loggerFactory.CreateLogger<GeneratorAdapterFactory>();
+        }
+
         /// <summary>
         /// Initialize the factory
         /// </summary>
-        /// <param name="providerConfig"></param>
-        /// <param name="providerName"></param>
-        /// <param name="svcProvider"></param>
-        public void Init(IProviderConfiguration providerConfig, string providerName,  IServiceProvider svcProvider)
+        public void Init()
         {
-            this.loggerFactory = svcProvider.GetRequiredService<ILoggerFactory>();
-            serviceProvider = svcProvider;
-            this.providerName = providerName;
-            receivers = new ConcurrentDictionary<QueueId, Receiver>();
-            adapterConfig = new GeneratorAdapterConfig(providerName);
-            adapterConfig.PopulateFromProviderConfig(providerConfig);
-            this.serializationManager = svcProvider.GetRequiredService<SerializationManager>();
-            this.telemetryProducer = svcProvider.GetService<ITelemetryProducer>();
+            this.receivers = new ConcurrentDictionary<QueueId, Receiver>();
             if (CacheMonitorFactory == null)
                 this.CacheMonitorFactory = (dimensions, telemetryProducer) => new DefaultCacheMonitor(dimensions, telemetryProducer);
             if (this.BlockPoolMonitorFactory == null)
                 this.BlockPoolMonitorFactory = (dimensions, telemetryProducer) => new DefaultBlockPoolMonitor(dimensions, telemetryProducer);
             if (this.ReceiverMonitorFactory == null)
                 this.ReceiverMonitorFactory = (dimensions, telemetryProducer) => new DefaultQueueAdapterReceiverMonitor(dimensions, telemetryProducer);
-            if (adapterConfig.GeneratorConfigType != null)
+            generatorConfig = this.serviceProvider.GetServiceByName<IStreamGeneratorConfig>(this.Name);
+            if(generatorConfig == null)
             {
-                generatorConfig = (IStreamGeneratorConfig)(serviceProvider?.GetService(adapterConfig.GeneratorConfigType) ?? Activator.CreateInstance(adapterConfig.GeneratorConfigType));
-                if (generatorConfig == null)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(providerConfig), "GeneratorConfigType not valid.");
-                }
-                generatorConfig.PopulateFromProviderConfig(providerConfig);
+                this.logger.LogInformation("No generator configuration found for stream provider {StreamProvider}.  Inactive until provided with configuration by command.", this.Name);
             }
-            this.sharedDimensions = new MonitorAggregationDimensions(serviceProvider.GetService<GlobalConfiguration>(), serviceProvider.GetService<NodeConfiguration>());
         }
 
         private void CreateBufferPoolIfNotCreatedYet()
@@ -118,10 +120,10 @@ namespace Orleans.Providers.Streams.Generator
             if (this.bufferPool == null)
             {
                 // 1 meg block size pool
-                this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions(this.sharedDimensions, $"BlockPool-{Guid.NewGuid()}");
+                this.blockPoolMonitorDimensions = new BlockPoolMonitorDimensions($"BlockPool-{Guid.NewGuid()}");
                 var oneMb = 1 << 20;
                 var objectPoolMonitor = new ObjectPoolMonitorBridge(this.BlockPoolMonitorFactory(blockPoolMonitorDimensions, this.telemetryProducer), oneMb);
-                this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
+                this.bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(oneMb), objectPoolMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
             }
         }
 
@@ -149,7 +151,7 @@ namespace Orleans.Providers.Streams.Generator
         /// <returns></returns>
         public IStreamQueueMapper GetStreamQueueMapper()
         {
-            return streamQueueMapper ?? (streamQueueMapper = new HashRingBasedStreamQueueMapper(adapterConfig.TotalQueueCount, adapterConfig.StreamProviderName));
+            return streamQueueMapper ?? (streamQueueMapper = new HashRingBasedStreamQueueMapper(this.queueMapperOptions, this.Name));
         }
 
         /// <summary>
@@ -161,11 +163,6 @@ namespace Orleans.Providers.Streams.Generator
         {
             return Task.FromResult(streamFailureHandler ?? (streamFailureHandler = new NoOpStreamDeliveryFailureHandler()));
         }
-
-        /// <summary>
-        /// Name of the adapter. Primarily for logging purposes
-        /// </summary>
-        public string Name => adapterConfig.StreamProviderName;
 
         /// <summary>
         /// Stores a batch of messages
@@ -184,16 +181,16 @@ namespace Orleans.Providers.Streams.Generator
         }
 
         /// <summary>
-        /// Creates a quere receiver for the specificed queueId
+        /// Creates a queue receiver for the specified queueId
         /// </summary>
         /// <param name="queueId"></param>
         /// <returns></returns>
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            var dimensions = new ReceiverMonitorDimensions(this.sharedDimensions, queueId.ToString());
+            var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
             var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
             Receiver receiver = receivers.GetOrAdd(queueId, qid => new Receiver(receiverMonitor));
-            SetGeneratorOnReciever(receiver);
+            SetGeneratorOnReceiver(receiver);
             return receiver;
         }
 
@@ -214,10 +211,10 @@ namespace Orleans.Providers.Streams.Generator
                 throw new ArgumentOutOfRangeException("arg", "Arg must by of type IStreamGeneratorConfig");
             }
 
-            // update generator on recievers
+            // update generator on receivers
             foreach (Receiver receiver in receivers.Values)
             {
-                SetGeneratorOnReciever(receiver);
+                SetGeneratorOnReceiver(receiver);
             }
 
             return Task.FromResult<object>(true);
@@ -246,7 +243,7 @@ namespace Orleans.Providers.Streams.Generator
                 var watch = Stopwatch.StartNew();
                 await Task.Delay(random.Next(1,MaxDelayMs));
                 List<IBatchContainer> batches;
-                if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, out batches))
+                if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, maxCount, out batches))
                 {
                     return new List<IBatchContainer>();
                 }
@@ -273,7 +270,7 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
-        private void SetGeneratorOnReciever(Receiver receiver)
+        private void SetGeneratorOnReceiver(Receiver receiver)
         {
             // if we don't have generator configuration, don't set generator
             if (generatorConfig == null)
@@ -298,10 +295,19 @@ namespace Orleans.Providers.Streams.Generator
         {
             //move block pool creation from init method to here, to avoid unnecessary block pool creation when stream provider is initialized in client side.
             CreateBufferPoolIfNotCreatedYet();
-            var dimensions = new CacheMonitorDimensions(this.sharedDimensions, queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId);
+            var dimensions = new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId);
             var cacheMonitor = this.CacheMonitorFactory(dimensions, this.telemetryProducer);
-            return new GeneratorPooledCache(bufferPool, this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.providerName}.{queueId}"), serializationManager, 
-                cacheMonitor, this.adapterConfig.StatisticMonitorWriteInterval);
+            return new GeneratorPooledCache(bufferPool, this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.Name}.{queueId}"), serializationManager, 
+                cacheMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
+        }
+
+        public static GeneratorAdapterFactory Create(IServiceProvider services, string name)
+        {
+            var queueMapperOptions = services.GetOptionsByName<HashRingStreamQueueMapperOptions>(name);
+            var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
+            var factory = ActivatorUtilities.CreateInstance<GeneratorAdapterFactory>(services, name, queueMapperOptions, statisticOptions);
+            factory.Init();
+            return factory;
         }
     }
 }

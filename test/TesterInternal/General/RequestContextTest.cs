@@ -1,12 +1,14 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.Remoting.Messaging;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
@@ -26,12 +28,27 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(initialSilosCount: 1);
-                options.ClusterConfiguration.ApplyToAllNodes(n => n.PropagateActivityId = true);
-                options.ClientConfiguration.PropagateActivityId = true;
-                return new TestCluster(options);
+                builder.Options.InitialSilosCount = 1;
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+                builder.AddClientBuilderConfigurator<ClientConfigurator>();
+            }
+        }
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.Configure<SiloMessagingOptions>(options => options.PropagateActivityId = true);
+            }
+        }
+
+        public class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<SiloMessagingOptions>(options => options.PropagateActivityId = true);
             }
         }
 
@@ -63,7 +80,7 @@ namespace UnitTests.General
             Assert.Equal(activityId,  result);  // "E2E ActivityId not propagated correctly"
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("RequestContext")]
+        [Fact, TestCategory("BVT"), TestCategory("RequestContext")]
         public async Task RequestContext_LegacyActivityId_Simple()
         {
             Guid activityId = Guid.NewGuid();
@@ -332,106 +349,6 @@ namespace UnitTests.General
             Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly after #2"
             RequestContext.Clear();
         }
-
-        [Fact(Skip = "Silo setting update of PropagateActivityId is not correctly implemented")]
-        [TestCategory("Functional"), TestCategory("RequestContext")]
-        public async Task RequestContext_ActivityId_CM_DynamicChange_Server()
-        {
-            Guid activityId = Guid.NewGuid();
-            Guid activityId2 = Guid.NewGuid();
-
-            const string PropagateActivityIdConfigKey = @"/OrleansConfiguration/Defaults/Tracing/@PropagateActivityId";
-            var changeConfig = new Dictionary<string, string>();
-
-            IManagementGrain mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-
-            IRequestContextTestGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextTestGrain>(GetRandomGrainId());
-
-            RequestContextTestUtils.SetActivityId(activityId);
-            Guid result = await grain.E2EActivityId();
-            Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly"
-            RequestContext.Clear();
-
-            changeConfig[PropagateActivityIdConfigKey] = Boolean.FalseString;
-            output.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
-            await mgmtGrain.UpdateConfiguration(null, changeConfig, null);
-
-            RequestContextTestUtils.SetActivityId(activityId2);
-            result = await grain.E2EActivityId();
-            Assert.NotEqual(activityId2, result);  // "E2E ActivityId #2 should not have been propagated"
-            Assert.Equal(Guid.Empty,  result);  // "E2E ActivityId #2 should not have been propagated"
-            RequestContext.Clear();
-
-            changeConfig[PropagateActivityIdConfigKey] = Boolean.TrueString;
-            output.WriteLine("Set {0}={1}", PropagateActivityIdConfigKey, changeConfig[PropagateActivityIdConfigKey]);
-            await mgmtGrain.UpdateConfiguration(null, changeConfig, null);
-
-            RequestContextTestUtils.SetActivityId(activityId2);
-            result = await grain.E2EActivityId();
-            Assert.Equal(activityId2,  result);  // "E2E ActivityId #2 should have been propagated"
-            RequestContext.Clear();
-
-            RequestContextTestUtils.SetActivityId(activityId);
-            result = await grain.E2EActivityId();
-            Assert.Equal(activityId,  result);  // "E2E ActivityId #1 not propagated correctly after #2"
-            RequestContext.Clear();
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
-        public async Task ClientInvokeCallback_CountCallbacks()
-        {
-            TestClientInvokeCallback callback = new TestClientInvokeCallback(output, Guid.Empty);
-            this.runtimeClient.ClientInvokeCallback = callback.OnInvoke;
-            IRequestContextProxyGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
-
-            RequestContextTestUtils.SetActivityId(Guid.Empty);
-            Guid activityId = await grain.E2EActivityId();
-            Assert.Equal(Guid.Empty,  activityId);  // "E2EActivityId Call#1"
-            Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks"
-
-            this.runtimeClient.ClientInvokeCallback = null;
-            activityId = await grain.E2EActivityId();
-            Assert.Equal(Guid.Empty,  activityId);  // "E2EActivityId Call#2"
-            Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks - should be unchanged"
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
-        public async Task ClientInvokeCallback_SetActivityId()
-        {
-            Guid setActivityId = Guid.NewGuid();
-            Guid activityId2 = Guid.NewGuid();
-
-            RequestContextTestUtils.SetActivityId(activityId2);
-            TestClientInvokeCallback callback = new TestClientInvokeCallback(output, setActivityId);
-            this.runtimeClient.ClientInvokeCallback = callback.OnInvoke;
-            IRequestContextProxyGrain grain = this.fixture.GrainFactory.GetGrain<IRequestContextProxyGrain>(GetRandomGrainId());
-
-            Guid activityId = await grain.E2EActivityId();
-            Assert.Equal(setActivityId,  activityId);  // "E2EActivityId Call#1"
-            Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks"
-
-            RequestContextTestUtils.SetActivityId(Guid.Empty);
-            RequestContext.Clear(); // Need this to clear out any old ActivityId value cached in RequestContext. Code optimization in RequestContext does not unset entry if Trace.CorrelationManager.ActivityId == Guid.Empty [which is the "normal" case]
-            this.runtimeClient.ClientInvokeCallback = null;
-
-            activityId = await grain.E2EActivityId();
-            Assert.Equal(Guid.Empty,  activityId);  // "E2EActivityId Call#2 == Zero"
-            Assert.Equal(1,  callback.TotalCalls);  // "Number of callbacks - should be unchanged"
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
-        public async Task ClientInvokeCallback_GrainObserver()
-        {
-            TestClientInvokeCallback callback = new TestClientInvokeCallback(output, Guid.Empty);
-            this.runtimeClient.ClientInvokeCallback = callback.OnInvoke;
-            RequestContextGrainObserver observer = new RequestContextGrainObserver(output, null, null);
-            // CreateObjectReference will result in system target call to IClientObserverRegistrar.
-            // We want to make sure this does not invoke ClientInvokeCallback.
-            ISimpleGrainObserver reference = await this.fixture.GrainFactory.CreateObjectReference<ISimpleGrainObserver>(observer);
-
-            GC.KeepAlive(observer);
-            Assert.Equal(0,  callback.TotalCalls);  // "Number of callbacks"
-        }
     }
 
     internal class RequestContextGrainObserver : ISimpleGrainObserver
@@ -503,6 +420,8 @@ namespace UnitTests.General
     {
         private readonly ITestOutputHelper output;
 
+        private AsyncLocal<int> threadId = new AsyncLocal<int>();
+
         public Halo_CallContextTests(ITestOutputHelper output)
         {
             this.output = output;
@@ -526,8 +445,8 @@ namespace UnitTests.General
 
         private async Task ContextTester(int i)
         {
-            CallContext.LogicalSetData("threadId", i);
-            int contextId = (int)(CallContext.LogicalGetData("threadId") ?? -1);
+            threadId.Value = i;
+            int contextId = threadId.Value;
             output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
             await FrameworkContextVerification(i).ConfigureAwait(false);
         }
@@ -537,7 +456,7 @@ namespace UnitTests.General
             for (int i = 0; i < 10; i++)
             {
                 await Task.Delay(10);
-                int contextId = (int)(CallContext.LogicalGetData("threadId") ?? -1);
+                int contextId = threadId.Value;
                 output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
                 Assert.Equal(id, contextId);
             }

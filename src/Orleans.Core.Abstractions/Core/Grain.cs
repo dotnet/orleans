@@ -19,11 +19,9 @@ namespace Orleans
         // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
         // The better solution is to refactor this interface and make it injectable through the constructor.
         internal IActivationData Data;
-
         public GrainReference GrainReference { get { return Data.GrainReference; } }
 
         internal IGrainRuntime Runtime { get; set; }
-
         /// <summary>
         /// Gets an object which can be used to access other grains. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
         /// </summary>
@@ -37,7 +35,7 @@ namespace Orleans
         /// </summary>
         protected IServiceProvider ServiceProvider 
         {
-            get { return Data.ServiceProvider ?? Runtime?.ServiceProvider; }
+            get { return Data?.ServiceProvider ?? Runtime?.ServiceProvider; }
         }
 
         internal IGrainIdentity Identity;
@@ -106,14 +104,17 @@ namespace Orleans
         /// will be logged, but will not prevent the next timer tick from being queued.
         /// </para>
         /// </remarks>
-        /// <param name="asyncCallback">Callback function to be invoked when timr ticks.</param>
+        /// <param name="asyncCallback">Callback function to be invoked when timer ticks.</param>
         /// <param name="state">State object that will be passed as argument when calling the asyncCallback.</param>
         /// <param name="dueTime">Due time for first timer tick.</param>
         /// <param name="period">Period of subsequent timer ticks.</param>
         /// <returns>Handle for this Timer.</returns>
         /// <seealso cref="IDisposable"/>
-        protected virtual IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        protected IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
+            if (asyncCallback == null) 
+                throw new ArgumentNullException(nameof(asyncCallback));
+
             EnsureRuntime();
             return Runtime.TimerRegistry.RegisterTimer(this, asyncCallback, state, dueTime, period);
         }
@@ -127,14 +128,14 @@ namespace Orleans
         /// </summary>
         /// <param name="reminderName">Name of this reminder</param>
         /// <param name="dueTime">Due time for this reminder</param>
-        /// <param name="period">Frequence period for this reminder</param>
+        /// <param name="period">Frequency period for this reminder</param>
         /// <returns>Promise for Reminder handle.</returns>
-        protected virtual Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
+        protected Task<IGrainReminder> RegisterOrUpdateReminder(string reminderName, TimeSpan dueTime, TimeSpan period)
         {
+            if (string.IsNullOrWhiteSpace(reminderName))
+                throw new ArgumentNullException(nameof(reminderName));
             if (!(this is IRemindable))
-            {
-                throw new InvalidOperationException(string.Format("Grain {0} is not 'IRemindable'. A grain should implement IRemindable to use the persistent reminder service", IdentityString));
-            }
+                throw new InvalidOperationException($"Grain {IdentityString} is not 'IRemindable'. A grain should implement IRemindable to use the persistent reminder service");
 
             EnsureRuntime();
             return Runtime.ReminderRegistry.RegisterOrUpdateReminder(reminderName, dueTime, period);
@@ -145,8 +146,11 @@ namespace Orleans
         /// </summary>
         /// <param name="reminder">Reminder to unregister.</param>
         /// <returns>Completion promise for this operation.</returns>
-        protected virtual Task UnregisterReminder(IGrainReminder reminder)
+        protected Task UnregisterReminder(IGrainReminder reminder)
         {
+            if (reminder == null)
+                throw new ArgumentNullException(nameof(reminder));
+
             EnsureRuntime();
             return Runtime.ReminderRegistry.UnregisterReminder(reminder);
         }
@@ -156,8 +160,11 @@ namespace Orleans
         /// </summary>
         /// <param name="reminderName">Reminder to return</param>
         /// <returns>Promise for Reminder handle.</returns>
-        protected virtual Task<IGrainReminder> GetReminder(string reminderName)
+        protected Task<IGrainReminder> GetReminder(string reminderName)
         {
+            if (string.IsNullOrWhiteSpace(reminderName))
+                throw new ArgumentNullException(nameof(reminderName));
+
             EnsureRuntime();
             return Runtime.ReminderRegistry.GetReminder(reminderName);
         }
@@ -166,18 +173,19 @@ namespace Orleans
         /// Returns a list of all reminders registered by the grain.
         /// </summary>
         /// <returns>Promise for list of Reminders registered for this grain.</returns>
-        protected virtual Task<List<IGrainReminder>> GetReminders()
+        protected Task<List<IGrainReminder>> GetReminders()
         {
             EnsureRuntime();
             return Runtime.ReminderRegistry.GetReminders();
         }
 
-        protected virtual IStreamProvider GetStreamProvider(string name)
+        protected IStreamProvider GetStreamProvider(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentNullException("name");
+                throw new ArgumentNullException(nameof(name));
+                
             EnsureRuntime();
-            return this.ServiceProvider.GetServiceByName<IStreamProvider>(name);
+            return this.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(name);
         }
 
         /// <summary>
@@ -185,7 +193,7 @@ namespace Orleans
         /// This call will mark this activation of the current grain to be deactivated and removed at the end of the current method.
         /// The next call to this grain will result in a different activation to be used, which typical means a new activation will be created automatically by the runtime.
         /// </summary>
-        protected virtual void DeactivateOnIdle()
+        protected void DeactivateOnIdle()
         {
             EnsureRuntime();
             Runtime.DeactivateOnIdle(this);
@@ -198,7 +206,7 @@ namespace Orleans
         /// DeactivateOnIdle method would undo / override any current “keep alive” setting, 
         /// making this grain immediately available for deactivation.
         /// </summary>
-        protected virtual void DelayDeactivation(TimeSpan timeSpan)
+        protected void DelayDeactivation(TimeSpan timeSpan)
         {
             EnsureRuntime();
             Runtime.DelayDeactivation(this, timeSpan);
@@ -215,31 +223,11 @@ namespace Orleans
         }
 
         /// <summary>
-        /// This method is called at the begining of the process of deactivating a grain.
+        /// This method is called at the beginning of the process of deactivating a grain.
         /// </summary>
         public virtual Task OnDeactivateAsync()
         {
             return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Returns a logger object that this grain's code can use for tracing.
-        /// </summary>
-        /// <returns>Name of the logger to use.</returns>
-        protected virtual Logger GetLogger(string loggerName)
-        {
-            EnsureRuntime();
-            return Runtime.GetLogger(loggerName);
-        }
-
-        /// <summary>
-        /// Returns a logger object that this grain's code can use for tracing.
-        /// The name of the logger will be derived from the grain class name.
-        /// </summary>
-        /// <returns>A logger for this grain.</returns>
-        protected Logger GetLogger()
-        {
-            return GetLogger(GetType().Name);
         }
 
         private void EnsureRuntime()
@@ -252,7 +240,7 @@ namespace Orleans
 
         public virtual void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe(GrainLifecycleStage.Activate, ct => OnActivateAsync(), ct => OnDeactivateAsync());
+            lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.Activate, ct => OnActivateAsync(), ct => OnDeactivateAsync());
         }
     }
 
@@ -260,7 +248,7 @@ namespace Orleans
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain where TGrainState : new()
+    public class Grain<TGrainState> : Grain
     {
         private IStorage<TGrainState> storage;
 
@@ -314,29 +302,15 @@ namespace Orleans
         public override void Participate(IGrainLifecycle lifecycle)
         {
             base.Participate(lifecycle);
-            lifecycle.Subscribe(GrainLifecycleStage.SetupState, OnSetupState);
+            lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
         }
 
-        private async Task OnSetupState(CancellationToken ct)
+        private Task OnSetupState(CancellationToken ct)
         {
             if (ct.IsCancellationRequested)
-                return;
+                return Task.CompletedTask;
             this.storage = this.Runtime.GetStorage<TGrainState>(this);
-            Stopwatch sw = Stopwatch.StartNew();
-            try
-            {
-                await this.ReadStateAsync();
-                sw.Stop();
-                // TODO: find a way to reenable StorageStatisticsGroup here
-                //StorageStatisticsGroup.OnStorageActivate(grainTypeName, sw.Elapsed);
-            }
-            catch (Exception)
-            {
-                sw.Stop();
-                // TODO: find a way to reenable StorageStatisticsGroup here
-                //StorageStatisticsGroup.OnStorageActivateError(grainTypeName);
-                throw;
-            }
+            return this.ReadStateAsync();
         }
     }
 }

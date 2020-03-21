@@ -2,15 +2,11 @@ namespace Orleans.Serialization
 {
     internal enum SerializationTokenType : byte
     {
-        #region Special values
-
         Null = 0,
         Reference = 1,      // Followed by uint byte offset from stream start of referred-to object
         Fallback = 2,       // .NET-serialized; followed by a ushort length and the serialized bytes
         True = 3,
         False = 4,
-        
-        #endregion
 
         // Type definers
 
@@ -53,6 +49,7 @@ namespace Orleans.Serialization
         SpecifiedType = 97, // Followed by the type token, possibly plus generic arguments, or NamedType and the type name
         NamedType = 98,     // Followed by the type name as a string
         ExpectedType = 99,  // Indicates that the type can be deduced and is what can be deduced
+        KeyedSerializer = 100, // Followed by a byte identifying which serializer is being used.
 
         // Generic types and collections
         Tuple = 200,        // Add the count of items to this, followed by that many generic types, then the items

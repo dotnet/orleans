@@ -1,4 +1,4 @@
-﻿using Xunit;
+using Xunit;
 using Xunit.Abstractions;
 using Orleans.Runtime.Development;
 using Orleans.TestingHost;
@@ -7,7 +7,7 @@ using TestExtensions.Runners;
 
 namespace DefaultCluster.Tests
 {
-    [TestCategory("BVT"), TestCategory("Functional"), TestCategory("Lease")]
+    [TestCategory("BVT"), TestCategory("Lease")]
     public class GoldenPathInMemoryLeaseProviderTests : GoldenPathLeaseProviderTestRunner, IClassFixture<GoldenPathInMemoryLeaseProviderTests.Fixture>
     {
         public GoldenPathInMemoryLeaseProviderTests(Fixture fixture, ITestOutputHelper output)
@@ -17,11 +17,6 @@ namespace DefaultCluster.Tests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
-            {
-                var options = new TestClusterOptions();
-                return new TestCluster(options);
-            }
         }
     }
 }

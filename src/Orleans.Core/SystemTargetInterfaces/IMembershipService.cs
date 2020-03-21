@@ -11,12 +11,20 @@ namespace Orleans.Runtime
         /// <param name="updatedSilo">Silo to update about</param>
         /// <param name="status">Status of the silo</param>
         /// <returns></returns>
+        /// TODO REMOVE in a next version
         Task SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status);
+
+        /// <summary>
+        /// Receive notifications about a change in the membership table
+        /// </summary>
+        /// <param name="snapshot">Snapshot of the membership table</param>
+        /// <returns></returns>
+        Task MembershipChangeNotification(MembershipTableSnapshot snapshot);
 
         /// <summary>
         /// Ping request from another silo that probes the liveness of the recipient silo.
         /// </summary>
-        /// <param name="pingNumber">A unique sequence number for ping message, to facilitate testijng and debugging.</param>
+        /// <param name="pingNumber">A unique sequence number for ping message, to facilitate testing and debugging.</param>
         Task Ping(int pingNumber);
     }
 }

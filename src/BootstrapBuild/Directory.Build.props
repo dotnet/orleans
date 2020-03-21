@@ -4,10 +4,4 @@
   </PropertyGroup>
 
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
-
-  <PropertyGroup>
-    <IsPackable>false</IsPackable>
-    <DefineConstants>$(DefineConstants);EXCLUDE_CODEGEN</DefineConstants>
-    <OrleansCodeGenPrecompile>true</OrleansCodeGenPrecompile>
-  </PropertyGroup>
 </Project>

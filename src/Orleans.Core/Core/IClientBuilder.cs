@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans
 {
@@ -24,20 +24,32 @@ namespace Orleans
         IClusterClient Build();
 
         /// <summary>
-        /// Adds a service configuration delegate to the configuration pipeline.
+        /// Set up the configuration for the builder itself. This will be used to initialize the <see cref="IHostingEnvironment"/>
+        /// for use later in the build process. This can be called multiple times and the results will be additive.
         /// </summary>
-        /// <param name="configureServices">The service configuration delegate.</param>
-        /// <returns>The builder.</returns>
-        IClientBuilder ConfigureServices(Action<IServiceCollection> configureServices);
+        /// <param name="configureDelegate">The delegate for configuring the <see cref="IConfigurationBuilder"/> that will be used
+        /// to construct the <see cref="IConfiguration"/> for the host.</param>
+        /// <returns>The same instance of the host builder for chaining.</returns>
+        IClientBuilder ConfigureHostConfiguration(Action<IConfigurationBuilder> configureDelegate);
 
         /// <summary>
-        /// Specified the configuration to use for this client.
+        /// Sets up the configuration for the remainder of the build process and application. This can be called multiple times and
+        /// the results will be additive. The results will be available at <see cref="HostBuilderContext.Configuration"/> for
+        /// subsequent operations./>.
         /// </summary>
-        /// <param name="configuration">The configuration.</param>
-        /// <remarks>This method may only be called once per builder instance.</remarks>
-        /// <returns>The builder.</returns>
-        IClientBuilder UseConfiguration(ClientConfiguration configuration);
+        /// <param name="configureDelegate">The delegate for configuring the <see cref="IConfigurationBuilder"/> that will be used
+        /// to construct the <see cref="IConfiguration"/> for the application.</param>
+        /// <returns>The same instance of the host builder for chaining.</returns>
+        IClientBuilder ConfigureAppConfiguration(Action<HostBuilderContext, IConfigurationBuilder> configureDelegate);
 
+        /// <summary>
+        /// Adds services to the container. This can be called multiple times and the results will be additive.
+        /// </summary>
+        /// <param name="configureDelegate">The delegate for configuring the <see cref="IServiceCollection"/> that will be used
+        /// to construct the <see cref="IServiceProvider"/>.</param>
+        /// <returns>The same instance of the host builder for chaining.</returns>
+        IClientBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate);
+        
         /// <summary>
         /// Specifies how the <see cref="IServiceProvider"/> for this client is configured. 
         /// </summary>

@@ -1,15 +1,13 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
 using Xunit;
 using Xunit.Abstractions;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using TestExtensions;
 
 namespace UnitTests.LivenessTests
@@ -22,7 +20,7 @@ namespace UnitTests.LivenessTests
         {
             public Fixture()
             {
-                BufferPool.InitGlobalBufferPool(Options.Create(new SiloMessagingOptions()));
+                BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
             }
         }
 
@@ -115,7 +113,9 @@ namespace UnitTests.LivenessTests
 
         private Dictionary<SiloAddress, List<int>> GetQueueHistogram(Dictionary<SiloAddress, List<IRingRangeInternal>> siloRanges, int totalNumQueues)
         {
-            HashRingBasedStreamQueueMapper queueMapper = new HashRingBasedStreamQueueMapper(totalNumQueues, "AzureQueues");
+            var options = new HashRingStreamQueueMapperOptions();
+            options.TotalQueueCount = totalNumQueues;
+            HashRingBasedStreamQueueMapper queueMapper = new HashRingBasedStreamQueueMapper(options, "AzureQueues");
             var allQueues = queueMapper.GetAllQueues();
 
             Dictionary<SiloAddress, List<int>> queueHistogram = new Dictionary<SiloAddress, List<int>>();

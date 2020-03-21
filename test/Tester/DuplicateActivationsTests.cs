@@ -1,9 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Threading.Tasks;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -17,14 +16,21 @@ namespace UnitTests.CatalogTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                options.ClusterConfiguration.Globals.ResponseTimeout = TimeSpan.FromMinutes(1);
-                options.ClusterConfiguration.ApplyToAllNodes(nodeConfig => nodeConfig.MaxActiveThreads = 1);
-                return new TestCluster(options);
+                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
         }
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.Configure<SiloMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromMinutes(1));
+                hostBuilder.Configure<SchedulingOptions>(options => options.MaxActiveThreads = 1);
+            }
+        }
+
 
         public DuplicateActivationsTests(Fixture fixture)
         {

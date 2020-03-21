@@ -1,4 +1,4 @@
-﻿using Orleans.CodeGeneration;
+using Orleans.CodeGeneration;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
@@ -13,6 +13,10 @@ namespace NonSilo.Tests.General
             var methodId = GrainInterfaceUtils.ComputeMethodId(
                 typeof(IMethodInterceptionGrain).GetMethod(nameof(IMethodInterceptionGrain.One)));
             Assert.Equal(14142, methodId);
+
+            methodId = GrainInterfaceUtils.ComputeMethodId(
+                typeof(IMethodInterceptionGrain).GetMethod(nameof(IMethodInterceptionGrain.Echo)));
+            Assert.Equal(-14142, methodId);
         }
 
         [Fact]
@@ -20,6 +24,9 @@ namespace NonSilo.Tests.General
         {
             var interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(typeof(IMethodInterceptionGrain));
             Assert.Equal(6548972, interfaceId);
+
+            interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(typeof(IOutgoingMethodInterceptionGrain));
+            Assert.Equal(-6548972, interfaceId);
         }
     }
 }

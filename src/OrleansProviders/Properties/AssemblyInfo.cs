@@ -5,11 +5,10 @@ using Orleans.Providers.Streams.Generator;
 
 [assembly: InternalsVisibleTo("NonSilo.Tests")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
-[assembly: InternalsVisibleTo("Tester.SQLUtils")]
+[assembly: InternalsVisibleTo("Tester.AdoNet")]
 [assembly: InternalsVisibleTo("TesterInternal")]
 [assembly: InternalsVisibleTo("TestExtensions")]
-[assembly: InternalsVisibleTo("UnitTestGrains")]
-[assembly: InternalsVisibleTo("UnitTests")]
+[assembly: InternalsVisibleTo("DefaultCluster.Tests")]
 
 [assembly: KnownAssembly(typeof(EventSequenceTokenV2), TreatTypesAsSerializable = true)]
 

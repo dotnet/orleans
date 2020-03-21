@@ -1,12 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Hosting;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Tester;
 using Tester.TestStreamProviders.Controllable;
 using TestExtensions;
 using Xunit;
@@ -18,18 +18,27 @@ namespace UnitTests.StreamingTests
         public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProviderName = "ControllableTestStreamProvider";
-            public readonly string StreamProviderTypeName = typeof(ControllableTestStreamProvider).FullName;
+            public readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
 
-            protected override TestCluster CreateTestCluster()
+            protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                var options = new TestClusterOptions(2);
-                var settings = new Dictionary<string, string>
-                    {
-                        {PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.AssemblyQualifiedName},
-                        {PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString()}
-                    };
-                options.ClusterConfiguration.Globals.RegisterStreamProvider<ControllableTestStreamProvider>(StreamProviderName, settings);
-                return new TestCluster(options);
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            }
+
+            private class MySiloBuilderConfigurator : ISiloConfigurator
+            {
+                public void Configure(ISiloBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddPersistentStreams(
+                            StreamProviderName,
+                            ControllableTestAdapterFactory.Create,
+                            b=>
+                            {
+                                b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                                b.UseDynamicClusterConfigDeploymentBalancer();
+                            });
+                }
             }
         }
 

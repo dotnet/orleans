@@ -1,16 +1,69 @@
-﻿using System;
+using System;
 using System.Linq;
+using System.Net;
 using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
+using Orleans.Configuration;
+using Orleans.Configuration.Internal;
+using Orleans.Configuration.Validators;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Statistics;
 using TestGrainInterfaces;
+using UnitTests.DtosRefOrleans;
+using UnitTests.Grains;
 using Xunit;
 
 namespace NonSilo.Tests
 {
+    public class NoOpMembershipTable : IMembershipTable
+    {
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteMembershipTableEntries(string clusterId)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task InitializeMembershipTable(bool tryInitTableVersion)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+        {
+            return Task.FromResult(true);
+        }
+
+        public Task<MembershipTableData> ReadAll()
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<MembershipTableData> ReadRow(SiloAddress key)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task UpdateIAmAlive(MembershipEntry entry)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+        {
+            return Task.FromResult(true);
+        }
+    }
+
     /// <summary>
     /// Tests for <see cref="SiloHostBuilder"/>.
     /// </summary>
@@ -18,21 +71,74 @@ namespace NonSilo.Tests
     [TestCategory("SiloHostBuilder")]
     public class SiloHostBuilderTests
     {
+        [Fact]
+        public void SiloBuilderTest()
+        {
+            var host = new HostBuilder()
+                .UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+                        .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
+                })
+                .UseDefaultServiceProvider((context, options) =>
+                {
+                    options.ValidateScopes = true;
+                    options.ValidateOnBuild = true;
+                })
+                .Build();
+
+            var clusterClient = host.Services.GetRequiredService<IClusterClient>();
+        }
+
         /// <summary>
-        /// Tests that the silo builder will fail if no assemblies are configured.
+        /// Tests that a silo cannot be created without specifying a ClusterId and a ServiceId.
         /// </summary>
         [Fact]
-        public void SiloHostBuilder_AssembliesTest()
+        public void SiloHostBuilder_ClusterOptionsTest()
         {
-            var builder = SiloHostBuilder.CreateDefault();
-            Assert.Throws<OrleansConfigurationException>(() => builder.Build());
+            Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .Build());
 
-            // Adding an application assembly causes the 
-            builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).AddApplicationPart(typeof(IAccountGrain).Assembly);
+            Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
+                .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .Build());
+
+            Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
+                .Configure<ClusterOptions>(options => options.ServiceId = "someServiceId")
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .Build());
+
+            var builder = new SiloHostBuilder()
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .Configure<ClusterOptions>(options => { options.ClusterId = "someClusterId"; options.ServiceId = "someServiceId"; })
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (var silo = builder.Build())
             {
                 Assert.NotNull(silo);
             }
+        }
+
+        /// <summary>
+        /// Grain's CollectionAgeLimit must be > 0 minutes.
+        /// </summary>
+        [Fact]
+        public void SiloHostBuilder_GrainCollectionOptionsForZeroSecondsAgeLimitTest()
+        {
+            Assert.Throws<OrleansConfigurationException>(() => new SiloHostBuilder()
+                .Configure<ClusterOptions>(options => { options.ClusterId = "GrainCollectionClusterId"; options.ServiceId = "GrainCollectionServiceId"; })
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .Configure<GrainCollectionOptions>(options => options
+                            .ClassSpecificCollectionAge
+                            .Add(typeof(CollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain).FullName, TimeSpan.Zero))
+               .Build());
         }
 
         /// <summary>
@@ -41,7 +147,11 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_NoSpecifiedConfigurationTest()
         {
-            var builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
+            var builder = new SiloHostBuilder()
+                .ConfigureDefaults()
+                .UseLocalhostClustering()
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (var silo = builder.Build())
             {
                 Assert.NotNull(silo);
@@ -54,31 +164,13 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_DoubleBuildTest()
         {
-            var builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
+            var builder = new SiloHostBuilder().ConfigureDefaults()
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
             using (builder.Build())
             {
                 Assert.Throws<InvalidOperationException>(() => builder.Build());
             }
-        }
-
-        /// <summary>
-        /// Tests that configuration cannot be specified twice.
-        /// </summary>
-        [Fact]
-        public void SiloHostBuilder_DoubleSpecifyConfigurationTest()
-        {
-            var builder = SiloHostBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators).UseConfiguration(new ClusterConfiguration()).UseConfiguration(new ClusterConfiguration());
-            Assert.Throws<InvalidOperationException>(() => builder.Build());
-        }
-
-        /// <summary>
-        /// Tests that a silo can be created without specifying configuration.
-        /// </summary>
-        [Fact]
-        public void SiloHostBuilder_NullConfigurationTest()
-        {
-            var builder = SiloHostBuilder.CreateDefault().ConfigureServices(RemoveConfigValidators);
-            Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
         }
 
         /// <summary>
@@ -87,7 +179,11 @@ namespace NonSilo.Tests
         [Fact]
         public void SiloHostBuilder_ServiceProviderTest()
         {
-            var builder = SiloHostBuilder.CreateDefault().UseConfiguration(new ClusterConfiguration()).ConfigureServices(RemoveConfigValidators);
+            var builder = new SiloHostBuilder()
+                .ConfigureDefaults()
+                .UseLocalhostClustering()
+                .ConfigureServices(RemoveConfigValidatorsAndSetAddress)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>());
 
             Assert.Throws<ArgumentNullException>(() => builder.ConfigureServices(null));
 
@@ -96,18 +192,18 @@ namespace NonSilo.Tests
             var one = new MyService { Id = 1 };
             builder.ConfigureServices(
                 services =>
-                {
-                    Interlocked.CompareExchange(ref registeredFirst[0], 1, 0);
-                    services.AddSingleton(one);
-                });
+                    {
+                        Interlocked.CompareExchange(ref registeredFirst[0], 1, 0);
+                        services.AddSingleton(one);
+                    });
 
             var two = new MyService { Id = 2 };
             builder.ConfigureServices(
                 services =>
-                {
-                    Interlocked.CompareExchange(ref registeredFirst[0], 2, 0);
-                    services.AddSingleton(two);
-                });
+                    {
+                        Interlocked.CompareExchange(ref registeredFirst[0], 2, 0);
+                        services.AddSingleton(two);
+                    });
 
             using (var silo = builder.Build())
             {
@@ -127,10 +223,146 @@ namespace NonSilo.Tests
             }
         }
 
-        private static void RemoveConfigValidators(IServiceCollection services)
+        /// <summary>
+        /// Ensures <see cref="LoadSheddingValidator"/> passes when LoadSheddingEnabled is false.
+        /// </summary>
+        [Fact]
+        public void SiloHostBuilder_LoadSheddingValidatorPassesWhenLoadSheddingDisabled()
+        {
+            var builder = new SiloHostBuilder().ConfigureDefaults()
+                    .UseLocalhostClustering()
+                    .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+                    .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                    .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                    .Configure<LoadSheddingOptions>(options =>
+                    {
+                        options.LoadSheddingEnabled = false;
+                        options.LoadSheddingLimit = 95;
+                    })
+                    .ConfigureServices(svcCollection =>
+                    {
+                        svcCollection.AddSingleton<FakeHostEnvironmentStatistics>();
+                        svcCollection.AddFromExisting<IHostEnvironmentStatistics, FakeHostEnvironmentStatistics>();
+                        svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
+                    });
+
+            using (var host = builder.Build())
+            {
+                Assert.NotNull(host);
+            }
+        }
+
+        /// <summary>
+        /// Ensures <see cref="LoadSheddingValidator"/> fails when LoadSheddingLimit greater than 100.
+        /// </summary>
+        [Fact]
+        public void SiloHostBuilder_LoadSheddingValidatorAbove100ShouldFail()
+        {
+            Assert.Throws<OrleansConfigurationException>(() =>
+                    new SiloHostBuilder()
+                        .ConfigureDefaults()
+                        .UseLocalhostClustering()
+                        .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+                        .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                        .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                        .Configure<LoadSheddingOptions>(options =>
+                        {
+                            options.LoadSheddingEnabled = true;
+                            options.LoadSheddingLimit = 101;
+                        })
+                        .ConfigureServices(svcCollection =>
+                        {
+                            svcCollection.AddSingleton<FakeHostEnvironmentStatistics>();
+                            svcCollection.AddFromExisting<IHostEnvironmentStatistics, FakeHostEnvironmentStatistics>();
+                            svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
+                        })
+                        .Build());
+        }
+
+        /// <summary>
+        /// Ensures <see cref="LoadSheddingValidator"/> fails validation when invalid/no instance of
+        /// <see cref="IHostEnvironmentStatistics"/> is registered using otherwise valid <see cref="LoadSheddingOptions"/>.
+        /// </summary>
+        [Fact]
+        public void SiloHostBuilder_LoadSheddingValidatorFailsWithNoRegisteredHostEnvironmentStatistics()
+        {
+            Assert.Throws<OrleansConfigurationException>(() =>
+                new SiloHostBuilder()
+                    .ConfigureDefaults()
+                    .UseLocalhostClustering()
+                    .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+                    .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                    .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                    .Configure<LoadSheddingOptions>(options =>
+                    {
+                        options.LoadSheddingEnabled = true;
+                        options.LoadSheddingLimit = 95;
+                    }).ConfigureServices(svcCollection =>
+                    {
+                        svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
+                    })
+                    .Build()); 
+        }
+
+        /// <summary>
+        /// The <see cref="LoadSheddingValidator"/> should pass validation with appropriate values.
+        /// </summary>
+        [Fact]
+        public void SiloHostBuilder_LoadSheddingValidatorPasses()
+        {
+            var builder = new SiloHostBuilder()
+                .ConfigureDefaults()
+                .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .Configure<LoadSheddingOptions>(options =>
+                {
+                    options.LoadSheddingEnabled = true;
+                    options.LoadSheddingLimit = 95;
+                })
+                .ConfigureServices(svcCollection =>
+                {
+                    svcCollection.AddSingleton<FakeHostEnvironmentStatistics>();
+                    svcCollection.AddFromExisting<IHostEnvironmentStatistics, FakeHostEnvironmentStatistics>();
+                    svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
+                });
+
+            using (var host = builder.Build())
+            {
+                Assert.NotNull(host);
+            }
+        }
+
+        [Fact]
+        public async Task SiloBuilderThrowsDuringStartupIfNoGrainsAdded()
+        {
+            var host = new HostBuilder()
+                .UseOrleans(siloBuilder =>
+                {
+                    // Add only an assembly with generated serializers but no grain interfaces or grain classes
+                    siloBuilder.UseLocalhostClustering()
+                    .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ClassReferencingOrleansTypeDto).Assembly));
+                }).Build();
+
+            await Assert.ThrowsAsync<OrleansConfigurationException>(() => host.StartAsync());
+        }
+
+        private static void RemoveConfigValidatorsAndSetAddress(IServiceCollection services)
         {
             var validators = services.Where(descriptor => descriptor.ServiceType == typeof(IConfigurationValidator)).ToList();
             foreach (var validator in validators) services.Remove(validator);
+            // Configure endpoints because validator is set just before Build()
+            services.Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
+        }
+
+        private class FakeHostEnvironmentStatistics : IHostEnvironmentStatistics
+        {
+            public long? TotalPhysicalMemory => 0;
+
+            public float? CpuUsage => 0;
+
+            public long? AvailableMemory => 0;
         }
 
         private class MyService

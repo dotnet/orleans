@@ -4,23 +4,25 @@ namespace Orleans.Streams
 {
     /// <summary>
     /// Handle representing stream sequence number/token.
-    /// Consumer may subsribe to the stream while specifying the start of the subsription sequence token.
-    /// That means that the stream infarstructure will deliver stream events starting from this sequence token.
+    /// Consumer may subscribe to the stream while specifying the start of the subscription sequence token.
+    /// That means that the stream infrastructure will deliver stream events starting from this sequence token.
     /// </summary>
     [Serializable]
     public abstract class StreamSequenceToken : IEquatable<StreamSequenceToken>, IComparable<StreamSequenceToken>
     {
-        #region IEquatable<StreamSequenceToken> Members
+        /// <summary>
+        /// Number of event batches in stream prior to this event batch
+        /// </summary>
+        public abstract long SequenceNumber { get; protected set;  }
+
+        /// <summary>
+        /// Number of events in batch prior to this event
+        /// </summary>
+        public abstract int EventIndex { get; protected set; }
 
         public abstract bool Equals(StreamSequenceToken other);
 
-        #endregion
-
-        #region IComparable<StreamSequenceToken> Members
-
         public abstract int CompareTo(StreamSequenceToken other);
-
-        #endregion
     }
 
     public static class StreamSequenceTokenUtilities

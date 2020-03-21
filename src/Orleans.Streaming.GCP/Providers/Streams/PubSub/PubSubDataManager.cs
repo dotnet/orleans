@@ -30,17 +30,17 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly ILogger _logger;
 
-        public PubSubDataManager(ILoggerFactory loggerFactory, string projectId, string topicId, string subscriptionId, string deploymentId, TimeSpan? deadline = null, string customEndpoint = "")
+        public PubSubDataManager(ILoggerFactory loggerFactory, string projectId, string topicId, string subscriptionId, string serviceId, TimeSpan? deadline = null, string customEndpoint = "")
         {
-            if (string.IsNullOrWhiteSpace(deploymentId)) throw new ArgumentNullException(nameof(deploymentId));
+            if (string.IsNullOrWhiteSpace(serviceId)) throw new ArgumentNullException(nameof(serviceId));
             if (string.IsNullOrWhiteSpace(projectId)) throw new ArgumentNullException(nameof(projectId));
             if (string.IsNullOrWhiteSpace(topicId)) throw new ArgumentNullException(nameof(topicId));
             if (string.IsNullOrWhiteSpace(subscriptionId)) throw new ArgumentNullException(nameof(subscriptionId));
 
             _logger = loggerFactory.CreateLogger<PubSubDataManager>();
             _deadline = deadline;
-            topicId = $"{topicId}-{deploymentId}";
-            subscriptionId = $"{projectId}-{deploymentId}";
+            topicId = $"{topicId}-{serviceId}";
+            subscriptionId = $"{projectId}-{serviceId}";
             TopicName = new TopicName(projectId, topicId);
             SubscriptionName = new SubscriptionName(projectId, subscriptionId);
 

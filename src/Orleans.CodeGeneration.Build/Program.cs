@@ -1,8 +1,12 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.CodeGeneration
 {
@@ -45,7 +49,20 @@ namespace Orleans.CodeGeneration
 
                     if (arg.StartsWith("/"))
                     {
-                        if (arg.StartsWith("/reference:") || arg.StartsWith("/r:"))
+                        if (arg.StartsWith("/waitForDebugger"))
+                        {
+                            var i = 0;
+                            while (!Debugger.IsAttached)
+                            {
+                                if (i++ % 50 == 0)
+                                {
+                                    Console.WriteLine("Waiting for debugger to attach.");
+                                }
+
+                                Thread.Sleep(100);
+                            }
+                        }
+                        else if (arg.StartsWith("/reference:") || arg.StartsWith("/r:"))
                         {
                             // list of references passed from from project file. separator =';'
                             string refstr = arg.Substring(arg.IndexOf(':') + 1);
@@ -67,6 +84,18 @@ namespace Orleans.CodeGeneration
                             var outfile = arg.Substring(arg.IndexOf(':') + 1);
                             AssertWellFormed(outfile);
                             options.OutputFileName = outfile;
+                        }
+                        else if (arg.StartsWith("/loglevel:"))
+                        {
+                            var levelString = arg.Substring(arg.IndexOf(':') + 1);
+                            if (!Enum.TryParse(ignoreCase: true, value: levelString, result: out LogLevel level))
+                            {
+                                var validValues = string.Join(", ", Enum.GetNames(typeof(LogLevel)).Select(v => v.ToString()));
+                                Console.WriteLine($"ERROR: \"{levelString}\" is not a valid log level. Valid values are {validValues}");
+                                return 1;
+                            }
+
+                            options.LogLevel = level;
                         }
                     }
                     else
@@ -104,6 +133,7 @@ namespace Orleans.CodeGeneration
                 }
 
                 // STEP 5 : Finally call code generation
+                var stopWatch = Stopwatch.StartNew();
                 if (referencesOrleans)
                 {
                     if (!CodeGenerator.GenerateCode(options))
@@ -116,7 +146,8 @@ namespace Orleans.CodeGeneration
                     Console.WriteLine("ERROR: Orleans-CodeGen - the input assembly does not reference Orleans and therefore code can not be generated.");
                     return -2;
                 }
-
+                stopWatch.Stop();
+                Console.WriteLine($"Build time code generation for assembly {options.InputAssembly} took {stopWatch.ElapsedMilliseconds} milliseconds");
                 // DONE!
                 return 0;
             }

@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-
+using Orleans.Internal;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class StatelessWorkerDirector : IPlacementDirector<StatelessWorkerPlacement>, IActivationSelector<StatelessWorkerPlacement>
+    internal class StatelessWorkerDirector : IPlacementDirector, IActivationSelector
     {
         private static readonly SafeRandom random = new SafeRandom();
 
@@ -25,7 +25,22 @@ namespace Orleans.Runtime.Placement
 
         public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            return Task.FromResult(context.LocalSilo);
+            var compatibleSilos = context.GetCompatibleSilos(target);
+
+            // If the current silo is not shutting down, place locally if we are compatible
+            if (!context.LocalSiloStatus.IsTerminating())
+            {
+                foreach (var silo in compatibleSilos)
+                {
+                    if (silo.Equals(context.LocalSilo))
+                    {
+                        return Task.FromResult(context.LocalSilo);
+                    }
+                }
+            }
+
+            // otherwise, place somewhere else
+            return Task.FromResult(compatibleSilos[random.Next(compatibleSilos.Count)]);
         }
 
         private PlacementResult SelectActivationCore(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
@@ -37,6 +52,9 @@ namespace Orleans.Runtime.Placement
             // If all are busy and the number of local activations reached or exceeded MaxLocal, it randomly returns one of them.
             // Otherwise, it requests creation of a new activation.
             List<ActivationData> local;
+
+            if (context.LocalSiloStatus.IsTerminating())
+                return null;
 
             if (!context.LocalLookup(target, out local) || local.Count == 0)
                 return null;
@@ -63,7 +81,7 @@ namespace Orleans.Runtime.Placement
 
         internal static ActivationData PickRandom(List<ActivationData> local)
         {
-             return local[local.Count == 1 ? 0 : random.Next(local.Count)];
+            return local[local.Count == 1 ? 0 : random.Next(local.Count)];
         }
     }
 }

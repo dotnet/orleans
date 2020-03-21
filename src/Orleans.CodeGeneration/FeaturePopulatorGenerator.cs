@@ -16,11 +16,7 @@ namespace Orleans.CodeGenerator
         private const string NamespaceName = "OrleansGeneratedCode";
         private const string ClassSuffix = "FeaturePopulator";
 
-        public static (List<AttributeListSyntax>, List<MemberDeclarationSyntax>) GenerateSyntax(
-            Assembly targetAssembly,
-            List<GrainInterfaceDescription> grainInterfaces,
-            List<GrainClassDescription> grainClasses,
-            SerializationTypeDescriptions typeDescriptions)
+        public static (List<AttributeListSyntax>, List<MemberDeclarationSyntax>) GenerateSyntax(Assembly targetAssembly, FeatureDescriptions features)
         {
             var attributes = new List<AttributeListSyntax>();
             var members = new List<MemberDeclarationSyntax>();
@@ -33,7 +29,7 @@ namespace Orleans.CodeGenerator
                                     SF.SimpleBaseType(typeof(IFeaturePopulator<GrainClassFeature>).GetTypeSyntax()),
                                     SF.SimpleBaseType(typeof(IFeaturePopulator<SerializerFeature>).GetTypeSyntax()))
                                 .AddModifiers(SF.Token(SyntaxKind.InternalKeyword), SF.Token(SyntaxKind.SealedKeyword))
-                                .AddMembers(GeneratePopulateMethod(grainInterfaces), GeneratePopulateMethod(grainClasses), GeneratePopulateMethod(typeDescriptions))
+                                .AddMembers(GeneratePopulateMethod(features.GrainInterfaces), GeneratePopulateMethod(features.GrainClasses), GeneratePopulateMethod(features.Serializers))
                                 .AddAttributeLists(SF.AttributeList(SF.SingletonSeparatedList(CodeGeneratorCommon.GetGeneratedCodeAttributeSyntax())));
 
             var namespaceSyntax = SF.NamespaceDeclaration(NamespaceName.ToIdentifierName()).AddMembers(classSyntax);
@@ -107,7 +103,7 @@ namespace Orleans.CodeGenerator
             var featureParameter = interfaceMethod.GetParameters()[0].Name.ToIdentifierName();
             var bodyStatements = new List<StatementSyntax>();
 
-            var addSerializerTypeMethod = TypeUtils.Method((SerializerFeature _) => _.AddSerializerType(default(Type), default(Type)));
+            var addSerializerTypeMethod = TypeUtils.Method((SerializerFeature _) => _.AddSerializerType(default(Type), default(Type), true));
             foreach (var serializerType in typeDescriptions.SerializerTypes)
             {
                 bodyStatements.Add(

@@ -1,17 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Orleans;
+﻿
 using Orleans.LogConsistency;
-using Orleans.Runtime;
 using Orleans.Storage;
-using System.Threading;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Orleans.Providers;
 
 namespace Orleans.EventSourcing.StateStorage
 {
@@ -23,15 +12,8 @@ namespace Orleans.EventSourcing.StateStorage
     /// metadata (the log position, and write flags) are stored in the primary. 
     /// </para>
     /// </summary>
-    public class LogConsistencyProvider : ILogConsistencyProvider
+    public class LogConsistencyProvider : ILogViewAdaptorFactory
     {
-        private ILogger logger;
-        /// <inheritdoc/>
-        public string Name { get; private set; }
-
-        /// <inheritdoc/>
-        public Logger Log { get; private set; }
-
         /// <inheritdoc/>
         public bool UsesStorageProvider
         {
@@ -42,34 +24,6 @@ namespace Orleans.EventSourcing.StateStorage
         }
 
         /// <summary>
-        /// Init method
-        /// </summary>
-        /// <param name="name">Consistency provider name</param>
-        /// <param name="providerRuntime">Provider runtime</param>
-        /// <param name="config">Provider config</param>
-        public Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            Name = name;
-
-            var loggerName = $"{this.GetType().FullName}.{Name}";
-            var loggerFactory = providerRuntime.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            this.logger = loggerFactory.CreateLogger(loggerName);
-            Log = new LoggerWrapper(logger, loggerName, loggerFactory);
-
-            logger.Info("Init");
-
-            return Task.CompletedTask;
-        }
-      
-        /// <summary>
-        /// Close method
-        /// </summary>
-        public Task Close()
-        {
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
         /// Make log view adaptor 
         /// </summary>
         /// <typeparam name="TView">The type of the view</typeparam>
@@ -77,15 +31,13 @@ namespace Orleans.EventSourcing.StateStorage
         /// <param name="hostGrain">The grain that is hosting this adaptor</param>
         /// <param name="initialState">The initial state for this view</param>
         /// <param name="grainTypeName">The type name of the grain</param>
-        /// <param name="storageProvider">Storage provider</param>
+        /// <param name="grainStorage">Storage provider</param>
         /// <param name="services">Runtime services for multi-cluster coherence protocols</param>
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IStorageProvider storageProvider, ILogConsistencyProtocolServices services) 
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IGrainStorage grainStorage, ILogConsistencyProtocolServices services) 
             where TView : class, new()
             where TEntry : class
         {
-            return new LogViewAdaptor<TView,TEntry>(hostGrain, initialState, storageProvider, grainTypeName, services);
+            return new LogViewAdaptor<TView,TEntry>(hostGrain, initialState, grainStorage, grainTypeName, services);
         }
-
     }
-
 }

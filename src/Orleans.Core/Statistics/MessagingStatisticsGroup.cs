@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using Orleans.Messaging;
 
 namespace Orleans.Runtime
@@ -11,14 +12,14 @@ namespace Orleans.Runtime
             private readonly AverageValueStatistic averageBatchSize;
             private readonly HistogramValueStatistic batchSizeBytesHistogram;
 
-            internal PerSocketDirectionStats(bool sendOrReceive, SocketDirection direction)
+            internal PerSocketDirectionStats(bool sendOrReceive, ConnectionDirection direction)
             {
                 StatisticNameFormat batchSizeStatName = sendOrReceive ? StatisticNames.MESSAGING_SENT_BATCH_SIZE_PER_SOCKET_DIRECTION : StatisticNames.MESSAGING_RECEIVED_BATCH_SIZE_PER_SOCKET_DIRECTION;
                 StatisticNameFormat batchHistogramStatName = sendOrReceive ? StatisticNames.MESSAGING_SENT_BATCH_SIZE_BYTES_HISTOGRAM_PER_SOCKET_DIRECTION : StatisticNames.MESSAGING_RECEIVED_BATCH_SIZE_BYTES_HISTOGRAM_PER_SOCKET_DIRECTION;
 
-                averageBatchSize = AverageValueStatistic.FindOrCreate(new StatisticName(batchSizeStatName, Enum.GetName(typeof(SocketDirection), direction)));
+                averageBatchSize = AverageValueStatistic.FindOrCreate(new StatisticName(batchSizeStatName, Enum.GetName(typeof(ConnectionDirection), direction)));
                 batchSizeBytesHistogram = ExponentialHistogramValueStatistic.Create_ExponentialHistogram(
-                    new StatisticName(batchHistogramStatName, Enum.GetName(typeof(SocketDirection), direction)), 
+                    new StatisticName(batchHistogramStatName, Enum.GetName(typeof(ConnectionDirection), direction)), 
                     NUM_MSG_SIZE_HISTOGRAM_CATEGORIES);
             }
 
@@ -78,16 +79,13 @@ namespace Orleans.Runtime
         private static HistogramValueStatistic receiveMsgSizeHistogram;
         private const int NUM_MSG_SIZE_HISTOGRAM_CATEGORIES = 31;
 
-        internal static void Init(bool silo)
+        internal static void Init()
         {
-            if (silo)
-            {
-                LocalMessagesSent = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_SENT_LOCALMESSAGES);
-                ConnectedClientCount = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_CONNECTED_CLIENTS, false);
-            }
+            LocalMessagesSent = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_SENT_LOCALMESSAGES);
+            ConnectedClientCount = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_CONNECTED_CLIENTS, false);
 
             MessagesSentTotal = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_SENT_MESSAGES_TOTAL);
-            MessagesSentPerDirection = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            MessagesSentPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
                 MessagesSentPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
@@ -95,7 +93,7 @@ namespace Orleans.Runtime
             }
 
             MessagesReceived = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_RECEIVED_MESSAGES_TOTAL);
-            MessagesReceivedPerDirection = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            MessagesReceivedPerDirection ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
                 MessagesReceivedPerDirection[(int)direction] = CounterStatistic.FindOrCreate(
@@ -106,11 +104,11 @@ namespace Orleans.Runtime
             totalBytesReceived = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_RECEIVED_BYTES_TOTAL);
             HeaderBytesSent = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_SENT_BYTES_HEADER);
             headerBytesReceived = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_RECEIVED_BYTES_HEADER);
-            FailedSentMessages = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
-            DroppedSentMessages = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
-            RejectedMessages = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            FailedSentMessages ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            DroppedSentMessages ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            RejectedMessages ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
 
-            ReroutedMessages = new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
+            ReroutedMessages ??= new CounterStatistic[Enum.GetValues(typeof(Message.Directions)).Length];
             foreach (var direction in Enum.GetValues(typeof(Message.Directions)))
             {
                 ReroutedMessages[(int)direction] = CounterStatistic.FindOrCreate(
@@ -126,20 +124,17 @@ namespace Orleans.Runtime
             expiredAtInvokeCounter = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_EXPIRED_ATINVOKE);
             expiredAtRespondCounter = CounterStatistic.FindOrCreate(StatisticNames.MESSAGING_EXPIRED_ATRESPOND);
 
-            perSocketDirectionStatsSend = new PerSocketDirectionStats[Enum.GetValues(typeof(SocketDirection)).Length];
-            perSocketDirectionStatsReceive = new PerSocketDirectionStats[Enum.GetValues(typeof(SocketDirection)).Length];
-            if (silo)
-            {
-                perSocketDirectionStatsSend[(int)SocketDirection.SiloToSilo] = new PerSocketDirectionStats(true, SocketDirection.SiloToSilo);
-                perSocketDirectionStatsSend[(int)SocketDirection.GatewayToClient] = new PerSocketDirectionStats(true, SocketDirection.GatewayToClient);
-                perSocketDirectionStatsReceive[(int)SocketDirection.SiloToSilo] = new PerSocketDirectionStats(false, SocketDirection.SiloToSilo);
-                perSocketDirectionStatsReceive[(int)SocketDirection.GatewayToClient] = new PerSocketDirectionStats(false, SocketDirection.GatewayToClient);
-            }
-            else
-            {
-                perSocketDirectionStatsSend[(int)SocketDirection.ClientToGateway] = new PerSocketDirectionStats(true, SocketDirection.ClientToGateway);
-                perSocketDirectionStatsReceive[(int)SocketDirection.ClientToGateway] = new PerSocketDirectionStats(false, SocketDirection.ClientToGateway);
-            }
+            perSocketDirectionStatsSend ??= new PerSocketDirectionStats[Enum.GetValues(typeof(ConnectionDirection)).Length];
+            perSocketDirectionStatsReceive ??= new PerSocketDirectionStats[Enum.GetValues(typeof(ConnectionDirection)).Length];
+
+            perSocketDirectionStatsSend[(int)ConnectionDirection.SiloToSilo] = new PerSocketDirectionStats(true, ConnectionDirection.SiloToSilo);
+            perSocketDirectionStatsReceive[(int)ConnectionDirection.SiloToSilo] = new PerSocketDirectionStats(false, ConnectionDirection.SiloToSilo);
+
+            perSocketDirectionStatsSend[(int)ConnectionDirection.GatewayToClient] = new PerSocketDirectionStats(true, ConnectionDirection.GatewayToClient);
+            perSocketDirectionStatsReceive[(int)ConnectionDirection.GatewayToClient] = new PerSocketDirectionStats(false, ConnectionDirection.GatewayToClient);
+
+            perSocketDirectionStatsSend[(int)ConnectionDirection.ClientToGateway] = new PerSocketDirectionStats(true, ConnectionDirection.ClientToGateway);
+            perSocketDirectionStatsReceive[(int)ConnectionDirection.ClientToGateway] = new PerSocketDirectionStats(false, ConnectionDirection.ClientToGateway);
 
             perSiloSendCounters = new ConcurrentDictionary<string, CounterStatistic>();
             perSiloReceiveCounters = new ConcurrentDictionary<string, CounterStatistic>();
@@ -149,30 +144,23 @@ namespace Orleans.Runtime
             perSiloPingReplyMissedCounters = new ConcurrentDictionary<string, CounterStatistic>();
         }
 
-        internal static void OnMessageSend(SiloAddress targetSilo, Message.Directions direction, int numTotalBytes, int headerBytes, SocketDirection socketDirection)
+        internal static CounterStatistic GetMessageSendCounter(SiloAddress remoteSilo)
         {
-            if (numTotalBytes < 0)
-                throw new ArgumentException(String.Format("OnMessageSend(numTotalBytes={0})", numTotalBytes), "numTotalBytes");
-            OnMessageSend_Impl(targetSilo, direction, numTotalBytes, headerBytes, 1);
+            if (remoteSilo is null) return null;
+            return FindCounter(perSiloSendCounters, new StatisticName(StatisticNames.MESSAGING_SENT_MESSAGES_PER_SILO, (remoteSilo != null ? remoteSilo.ToString() : "Null")), CounterStorage.LogOnly);
         }
 
-        internal static void OnMessageBatchSend(SiloAddress targetSilo, Message.Directions direction, int numTotalBytes, int headerBytes, SocketDirection socketDirection, int numMsgsInBatch)
+        internal static void OnMessageSend(CounterStatistic messageSendCounter, Message msg, int numTotalBytes, int headerBytes, ConnectionDirection connectionDirection)
         {
-            if (numTotalBytes < 0)
-                throw new ArgumentException(String.Format("OnMessageBatchSend(numTotalBytes={0})", numTotalBytes), "numTotalBytes");
-            OnMessageSend_Impl(targetSilo, direction, numTotalBytes, headerBytes, numMsgsInBatch);
-            perSocketDirectionStatsSend[(int)socketDirection].OnMessage(numMsgsInBatch, numTotalBytes);
-        }
-
-        private static void OnMessageSend_Impl(SiloAddress targetSilo, Message.Directions direction, int numTotalBytes, int headerBytes, int numMsgsInBatch)
-        {
-            MessagesSentTotal.IncrementBy(numMsgsInBatch);
-            MessagesSentPerDirection[(int)direction].IncrementBy(numMsgsInBatch);
+            Debug.Assert(numTotalBytes >= 0, $"OnMessageSend(numTotalBytes={numTotalBytes})");
+            MessagesSentTotal.Increment();
+            MessagesSentPerDirection[(int)msg.Direction].Increment();
 
             TotalBytesSent.IncrementBy(numTotalBytes);
             HeaderBytesSent.IncrementBy(headerBytes);
             sentMsgSizeHistogram.AddData(numTotalBytes);
-            FindCounter(perSiloSendCounters, new StatisticName(StatisticNames.MESSAGING_SENT_MESSAGES_PER_SILO, (targetSilo != null ? targetSilo.ToString() : "Null")), CounterStorage.LogOnly).IncrementBy(numMsgsInBatch);
+            messageSendCounter?.Increment();
+            perSocketDirectionStatsSend[(int)connectionDirection].OnMessage(1, numTotalBytes);
         }
 
         private static CounterStatistic FindCounter(ConcurrentDictionary<string, CounterStatistic> counters, StatisticName name, CounterStorage storage)
@@ -187,20 +175,21 @@ namespace Orleans.Runtime
             return stat;
         }
 
-        internal static void OnMessageReceive(Message msg, int headerBytes, int bodyBytes)
+        internal static CounterStatistic GetMessageReceivedCounter(SiloAddress remoteSilo)
+        {
+            SiloAddress addr = remoteSilo;
+            return FindCounter(perSiloReceiveCounters, new StatisticName(StatisticNames.MESSAGING_RECEIVED_MESSAGES_PER_SILO, (addr != null ? addr.ToString() : "Null")), CounterStorage.LogOnly);
+        }
+
+        internal static void OnMessageReceive(CounterStatistic messageReceivedCounter, Message msg, int numTotalBytes, int headerBytes, ConnectionDirection connectionDirection)
         {
             MessagesReceived.Increment();
             MessagesReceivedPerDirection[(int)msg.Direction].Increment();
-            totalBytesReceived.IncrementBy(headerBytes + bodyBytes);
+            totalBytesReceived.IncrementBy(numTotalBytes);
             headerBytesReceived.IncrementBy(headerBytes);
-            receiveMsgSizeHistogram.AddData(headerBytes + bodyBytes);
-            SiloAddress addr = msg.SendingSilo;
-            FindCounter(perSiloReceiveCounters, new StatisticName(StatisticNames.MESSAGING_RECEIVED_MESSAGES_PER_SILO, (addr != null ? addr.ToString() : "Null")), CounterStorage.LogOnly).Increment();
-        }
-
-        internal static void OnMessageBatchReceive(SocketDirection socketDirection, int numMsgsInBatch, int totalBytes)
-        {
-            perSocketDirectionStatsReceive[(int)socketDirection].OnMessage(numMsgsInBatch, totalBytes);
+            receiveMsgSizeHistogram.AddData(numTotalBytes);
+            messageReceivedCounter?.Increment();
+            perSocketDirectionStatsReceive[(int)connectionDirection].OnMessage(1, numTotalBytes);
         }
 
         internal static void OnMessageExpired(Phase phase)

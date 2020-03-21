@@ -1,15 +1,7 @@
-﻿using Orleans;
-using Orleans.Core;
-using Orleans.Placement;
-using Orleans.Providers;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Services;
+using Orleans;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Tester.StreamingTests
@@ -17,25 +9,25 @@ namespace Tester.StreamingTests
     //Dumb queue balancer only acquire leases once, never renew it, just for testing
     public class LeaseBasedQueueBalancerForTest : IStreamQueueBalancer
     {
-        private ILeaseManagerGrain leaseManagerGrain;
-        private IGrainFactory grainFactory;
-        private string id;
+        private readonly string id;
+        private readonly ILeaseManagerGrain leaseManagerGrain;
         private List<QueueId> ownedQueues;
 
-        public LeaseBasedQueueBalancerForTest(IGrainFactory grainFactory)
+        public LeaseBasedQueueBalancerForTest(string name, IGrainFactory grainFactory)
         {
-            this.grainFactory = grainFactory;
+            this.leaseManagerGrain = grainFactory.GetGrain<ILeaseManagerGrain>(name);
+            this.id = $"{name}-{Guid.NewGuid()}";
         }
 
-        public async Task Initialize(string strProviderName,
-            IStreamQueueMapper queueMapper,
-            TimeSpan siloMaturityPeriod,
-            IProviderConfiguration providerConfig)
+        public async Task Initialize(IStreamQueueMapper queueMapper)
         {
-            this.leaseManagerGrain = this.grainFactory.GetGrain<ILeaseManagerGrain>(strProviderName);
             await this.leaseManagerGrain.SetQueuesAsLeases(queueMapper.GetAllQueues());
-            this.id = $"{strProviderName}-{Guid.NewGuid()}";
             await GetInitialLease();
+        }
+
+        public Task Shutdown()
+        {
+            return Task.CompletedTask;
         }
 
         public IEnumerable<QueueId> GetMyQueues()
@@ -71,6 +63,4 @@ namespace Tester.StreamingTests
             return true;
         }
     }
-
-
 }

@@ -13,13 +13,12 @@ namespace Orleans.Runtime.ConsistentRing
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
     internal class VirtualBucketsRingProvider :
-        MarshalByRefObject,
         IConsistentRingProvider, ISiloStatusListener
     {
         private readonly List<IRingRangeListener> statusListeners;
         private readonly SortedDictionary<uint, SiloAddress> bucketsMap;
         private List<Tuple<uint, SiloAddress>> sortedBucketsList; // flattened sorted bucket list for fast lock-free calculation of CalculateTargetSilo
-        private readonly Logger logger;
+        private readonly ILogger logger;
         private readonly SiloAddress myAddress;
         private readonly int numBucketsPerSilo;
         private readonly object lockable;
@@ -33,7 +32,7 @@ namespace Orleans.Runtime.ConsistentRing
             if (numBucketsPerSilo <= 0 )
                 throw new IndexOutOfRangeException("numBucketsPerSilo is out of the range. numBucketsPerSilo = " + numBucketsPerSilo);
 
-            logger = new LoggerWrapper<VirtualBucketsRingProvider>(loggerFactory);
+            logger = loggerFactory.CreateLogger<VirtualBucketsRingProvider>();
                         
             statusListeners = new List<IRingRangeListener>();
             bucketsMap = new SortedDictionary<uint, SiloAddress>();
@@ -288,7 +287,7 @@ namespace Orleans.Runtime.ConsistentRing
                     s = snapshotBucketsList.Count > 1 ? snapshotBucketsList[1] : null;
                 }
             }
-            if (logger.IsVerbose2) logger.Verbose2("Calculated ring partition owner silo {0} for key {1}: {2} --> {3}", s.Item2, hash, hash, s.Item1);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Calculated ring partition owner silo {0} for key {1}: {2} --> {3}", s.Item2, hash, hash, s.Item1);
             return s.Item2;
         }
     }

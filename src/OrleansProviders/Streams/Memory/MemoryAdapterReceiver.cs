@@ -57,7 +57,7 @@ namespace Orleans.Providers
             }
             catch (Exception exc)
             {
-                logger.Error((int)ProviderErrorCode.MemoryStreamProviderBase_GetQueueMessagesAsync, "Exception thrown in MemoryAdapterFactory.GetQueueMessagesAsync.", exc);
+                logger.LogError((int)ProviderErrorCode.MemoryStreamProviderBase_GetQueueMessagesAsync, exc, "Exception thrown in MemoryAdapterFactory.GetQueueMessagesAsync.");
                 watch.Stop();
                 this.receiverMonitor?.TrackRead(true, watch.Elapsed, exc);
                 throw;
