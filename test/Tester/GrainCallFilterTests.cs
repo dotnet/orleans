@@ -51,7 +51,7 @@ namespace UnitTests.General
                             if (ctx.InterfaceMethod?.Name == "Echo")
                             {
                                 // Concatenate the input to itself.
-                                var orig = (string) ctx.Arguments[0];
+                                var orig = (string)ctx.Arguments[0];
                                 ctx.Arguments[0] = orig + orig;
                             }
 
@@ -67,23 +67,50 @@ namespace UnitTests.General
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
-                    clientBuilder.AddOutgoingGrainCallFilter(async ctx =>
+                    clientBuilder
+                        .AddOutgoingGrainCallFilter(RetryCertainCalls)
+                        .AddOutgoingGrainCallFilter(async ctx =>
+                        {
+                            if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain)
+                                && ctx.InterfaceMethod?.Name == nameof(IOutgoingMethodInterceptionGrain.EchoViaOtherGrain))
+                            {
+                                ctx.Arguments[1] = ((string)ctx.Arguments[1]).ToUpperInvariant();
+                            }
+
+                            await ctx.Invoke();
+
+                            if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain)
+                                && ctx.InterfaceMethod?.Name == nameof(IOutgoingMethodInterceptionGrain.EchoViaOtherGrain))
+                            {
+                                var result = (Dictionary<string, object>)ctx.Result;
+                                result["orig"] = result["result"];
+                                result["result"] = "intercepted!";
+                            }
+                        })
+                        .AddSimpleMessageStreamProvider("SMSProvider");
+
+                    static async Task RetryCertainCalls(IOutgoingGrainCallContext ctx)
                     {
-                        if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain))
-                        {
-                            ctx.Arguments[1] = ((string) ctx.Arguments[1]).ToUpperInvariant();
-                        }
+                        var attemptsRemaining = 2;
 
-                        await ctx.Invoke();
-
-                        if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain))
+                        while (attemptsRemaining > 0)
                         {
-                            var result = (Dictionary<string, object>) ctx.Result;
-                            result["orig"] = result["result"];
-                            result["result"] = "intercepted!";
+                            try
+                            {
+                                await ctx.Invoke();
+                                return;
+                            }
+                            catch (ArgumentOutOfRangeException) when (attemptsRemaining > 1 && ctx.Grain is IOutgoingMethodInterceptionGrain)
+                            {
+                                if (string.Equals(ctx.InterfaceMethod?.Name, nameof(IOutgoingMethodInterceptionGrain.ThrowIfGreaterThanZero)) && ctx.Arguments[0] is int value)
+                                {
+                                    ctx.Arguments[0] = value - 1;
+                                }
+
+                                --attemptsRemaining;
+                            }
                         }
-                    })
-                    .AddSimpleMessageStreamProvider("SMSProvider");
+                    }
                 }
             }
         }
@@ -178,19 +205,31 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests that some invalid usages of invoker interceptors are denied.
+        /// Tests that an incoming call filter can retry calls.
         /// </summary>
         [Fact]
-        public async Task GrainCallFilter_Incoming_InvalidOrder_Test()
+        public async Task GrainCallFilter_Incoming_Retry_Test()
         {
             var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(0);
 
-            var result = await grain.CallWithBadInterceptors(false, false, false);
-            Assert.Equal("I will not misbehave!", result);
+            var result = await grain.ThrowIfGreaterThanZero(1);
+            Assert.Equal("Thanks for nothing", result);
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() => grain.CallWithBadInterceptors(true, false, false));
-            await Assert.ThrowsAsync<InvalidOperationException>(() => grain.CallWithBadInterceptors(false, false, true));
-            await Assert.ThrowsAsync<InvalidOperationException>(() => grain.CallWithBadInterceptors(false, true, false));
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => grain.ThrowIfGreaterThanZero(2));
+        }
+
+        /// <summary>
+        /// Tests that an ougoing call filter can retry calls.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_Outgoing_Retry_Test()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IOutgoingMethodInterceptionGrain>(0);
+
+            var result = await grain.ThrowIfGreaterThanZero(1);
+            Assert.Equal("Thanks for nothing", result);
+
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => grain.ThrowIfGreaterThanZero(2));
         }
 
         /// <summary>

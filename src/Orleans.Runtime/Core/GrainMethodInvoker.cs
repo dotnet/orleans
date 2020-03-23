@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -60,36 +60,43 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public async Task Invoke()
         {
-            // Execute each stage in the pipeline. Each successive call to this method will invoke the next stage.
-            // Stages which are not implemented (eg, because the user has not specified an interceptor) are skipped.
-            var numFilters = filters.Count;
-            if (stage < numFilters)
+            try
             {
-                // Call each of the specified interceptors.
-                var systemWideFilter = this.filters[stage];
-                stage++;
-                await systemWideFilter.Invoke(this);
-                return;
-            }
-
-            if (stage == numFilters)
-            {
-                stage++;
-
-                // Grain-level invoker, if present.
-                if (this.Grain is IIncomingGrainCallFilter grainClassLevelFilter)
+                // Execute each stage in the pipeline. Each successive call to this method will invoke the next stage.
+                // Stages which are not implemented (eg, because the user has not specified an interceptor) are skipped.
+                var numFilters = filters.Count;
+                if (stage < numFilters)
                 {
-                    await grainClassLevelFilter.Invoke(this);
+                    // Call each of the specified interceptors.
+                    var systemWideFilter = this.filters[stage];
+                    stage++;
+                    await systemWideFilter.Invoke(this);
+                    return;
+                }
+
+                if (stage == numFilters)
+                {
+                    stage++;
+
+                    // Grain-level invoker, if present.
+                    if (this.Grain is IIncomingGrainCallFilter grainClassLevelFilter)
+                    {
+                        await grainClassLevelFilter.Invoke(this);
+                        return;
+                    }
+                }
+
+                if (stage == numFilters + 1)
+                {
+                    // Finally call the root-level invoker.
+                    stage++;
+                    this.Result = await rootInvoker.Invoke(this.Grain, this.request);
                     return;
                 }
             }
-
-            if (stage == numFilters + 1)
+            finally
             {
-                // Finally call the root-level invoker.
-                stage++;
-                this.Result = await rootInvoker.Invoke(this.Grain, this.request);
-                return;
+                stage--;
             }
 
             // If this method has been called more than the expected number of times, that is invalid.
