@@ -24,14 +24,14 @@ namespace Orleans.Runtime.MembershipService
 
         public MembershipTableData Read(SiloAddress key)
         {
-            return siloTable.ContainsKey(key) ? 
-                new MembershipTableData((Tuple<MembershipEntry, string>)this.serializationManager.DeepCopy(siloTable[key]), tableVersion) 
+            return siloTable.TryGetValue(key, out var data) ?
+                new MembershipTableData((Tuple<MembershipEntry, string>)this.serializationManager.DeepCopy(data), tableVersion)
                 : new MembershipTableData(tableVersion);
         }
 
         public MembershipTableData ReadAll()
         {
-            return new MembershipTableData(siloTable.Values.Select(tuple => 
+            return new MembershipTableData(siloTable.Values.Select(tuple =>
                 new Tuple<MembershipEntry, string>((MembershipEntry)this.serializationManager.DeepCopy(tuple.Item1), tuple.Item2)).ToList(), tableVersion);
         }
 
@@ -46,7 +46,7 @@ namespace Orleans.Runtime.MembershipService
             siloTable.TryGetValue(entry.SiloAddress, out data);
             if (data != null) return false;
             if (!tableVersion.VersionEtag.Equals(version.VersionEtag)) return false;
-            
+
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
                 entry, lastETagCounter++.ToString(CultureInfo.InvariantCulture));
             tableVersion = new TableVersion(version.Version, NewETag());
@@ -59,7 +59,7 @@ namespace Orleans.Runtime.MembershipService
             siloTable.TryGetValue(entry.SiloAddress, out data);
             if (data == null) return false;
             if (!data.Item2.Equals(etag) || !tableVersion.VersionEtag.Equals(version.VersionEtag)) return false;
-            
+
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
                 entry, lastETagCounter++.ToString(CultureInfo.InvariantCulture));
             tableVersion = new TableVersion(version.Version, NewETag());

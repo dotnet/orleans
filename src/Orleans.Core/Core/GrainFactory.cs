@@ -267,8 +267,7 @@ namespace Orleans
 
             lock (this.typedSystemTargetReferenceCache)
             {
-                if (this.typedSystemTargetReferenceCache.ContainsKey(key)) cache = this.typedSystemTargetReferenceCache[key];
-                else
+                if (!this.typedSystemTargetReferenceCache.TryGetValue(key, out cache))
                 {
                     cache = new Dictionary<SiloAddress, ISystemTarget>();
                     this.typedSystemTargetReferenceCache[key] = cache;
@@ -278,11 +277,7 @@ namespace Orleans
             ISystemTarget reference;
             lock (cache)
             {
-                if (cache.ContainsKey(destination))
-                {
-                    reference = cache[destination];
-                }
-                else
+                if (!cache.TryGetValue(destination, out reference))
                 {
                     reference = this.Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, this.GrainReferenceRuntime, null, destination));
                     cache[destination] = reference; // Store for next time

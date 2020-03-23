@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using Orleans.CodeGeneration;
-using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
 {
@@ -25,8 +22,8 @@ namespace Orleans.Runtime
 
         private readonly bool localTestMode;
         private readonly HashSet<string> loadedGrainAsemblies;
-		
-		private readonly PlacementStrategy defaultPlacementStrategy;
+
+        private readonly PlacementStrategy defaultPlacementStrategy;
 
         internal IEnumerable<GrainClassData> SupportedGrainClassData
         {
@@ -48,7 +45,7 @@ namespace Orleans.Runtime
             unordered = new HashSet<int>();
             this.localTestMode = localTestMode;
             this.defaultPlacementStrategy = defaultPlacementStrategy;
-            if(localTestMode) // if we are running in test mode, we'll build a list of loaded grain assemblies to help with troubleshooting deployment issue
+            if (localTestMode) // if we are running in test mode, we'll build a list of loaded grain assemblies to help with troubleshooting deployment issue
                 loadedGrainAsemblies = new HashSet<string>();
         }
 
@@ -156,14 +153,6 @@ namespace Orleans.Runtime
             return grainInterfaceData;
         }
 
-        internal Dictionary<string, string> GetPrimaryImplementations()
-        {
-            lock (this)
-            {
-                return new Dictionary<string, string>(primaryImplementations);
-            }
-        }
-
         internal bool TryGetPrimaryImplementation(string grainInterface, out string grainClass)
         {
             lock (this)
@@ -178,10 +167,9 @@ namespace Orleans.Runtime
             {
                 iface = null;
 
-                if (!table.ContainsKey(interfaceId))
+                if (!table.TryGetValue(interfaceId, out var interfaceData))
                     return false;
 
-                var interfaceData = table[interfaceId];
                 iface = interfaceData.Interface;
                 return true;
             }
@@ -198,10 +186,9 @@ namespace Orleans.Runtime
             {
                 grainClass = null;
                 placement = this.defaultPlacementStrategy;
-                if (!implementationIndex.ContainsKey(typeCode))
+                if (!implementationIndex.TryGetValue(typeCode, out var implementation))
                     return false;
 
-                var implementation = implementationIndex[typeCode];
                 grainClass = implementation.GetClassName(genericArguments);
                 placement = placementStrategiesIndex[typeCode];
                 return true;
@@ -214,7 +201,7 @@ namespace Orleans.Runtime
             {
                 return interfaceType.GetGenericTypeDefinition().AssemblyQualifiedName;
             }
-            else 
+            else
             {
                 return TypeUtils.GetTemplatedName(
                             TypeUtils.GetFullName(interfaceType),

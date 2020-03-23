@@ -45,9 +45,10 @@ namespace Orleans.Streams
 
             // record all already active silos as already mature. 
             // Even if they are not yet, they will be mature by the time I mature myself (after I become !isStarting).
-            foreach (var silo in siloStatusOracle.GetApproximateSiloStatuses(true).Keys.Where(s => !s.Equals(siloStatusOracle.SiloAddress)))
+            foreach (var silo in siloStatusOracle.GetApproximateSiloStatuses(true).Keys)
             {
-                immatureSilos[silo] = false;     // record as mature
+                if (!silo.Equals(siloStatusOracle.SiloAddress))
+                    immatureSilos[silo] = false;     // record as mature
             }
         }
 
@@ -163,10 +164,9 @@ namespace Orleans.Streams
         {
             List<Task> tasks = new List<Task>();
             // look at all currently active silos not including myself
-            foreach (var silo in activeSilos.Where(s => !s.Equals(siloStatusOracle.SiloAddress)))
+            foreach (var silo in activeSilos)
             {
-                bool ignore;
-                if (!immatureSilos.TryGetValue(silo, out ignore))
+                if (!silo.Equals(siloStatusOracle.SiloAddress) && !immatureSilos.ContainsKey(silo))
                 {
                     tasks.Add(RecordImmatureSilo(silo));
                 }

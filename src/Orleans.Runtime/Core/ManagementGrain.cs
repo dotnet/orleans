@@ -4,9 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.MultiCluster;
 using Orleans.Runtime.MembershipService;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
@@ -28,7 +25,7 @@ namespace Orleans.Runtime.Management
         public ManagementGrain(
             IInternalGrainFactory internalGrainFactory,
             ISiloStatusOracle siloStatusOracle,
-            GrainTypeManager grainTypeManager, 
+            GrainTypeManager grainTypeManager,
             IVersionStore versionStore,
             ILogger<ManagementGrain> logger,
             MembershipTableManager membershipTableManager)
@@ -77,7 +74,7 @@ namespace Orleans.Runtime.Management
         {
             var silos = GetSiloAddresses(siloAddresses);
             logger.Info("Forcing garbage collection on {0}", Utils.EnumerableToString(silos));
-            List<Task> actionPromises = PerformPerSiloAction(silos,
+            var actionPromises = Array.ConvertAll(silos,
                 s => GetSiloControlReference(s).ForceGarbageCollection());
             return Task.WhenAll(actionPromises);
         }
@@ -100,12 +97,12 @@ namespace Orleans.Runtime.Management
         {
             var silos = GetSiloAddresses(siloAddresses);
             logger.Info("Forcing runtime statistics collection on {0}", Utils.EnumerableToString(silos));
-            List<Task> actionPromises = PerformPerSiloAction(
+            var actionPromises = Array.ConvertAll(
                 silos,
                 s => GetSiloControlReference(s).ForceRuntimeStatisticsCollection());
             return Task.WhenAll(actionPromises);
         }
-        
+
         public Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] siloAddresses)
         {
             var silos = GetSiloAddresses(siloAddresses);
@@ -113,7 +110,7 @@ namespace Orleans.Runtime.Management
             var promises = new List<Task<SiloRuntimeStatistics>>();
             foreach (SiloAddress siloAddress in silos)
                 promises.Add(GetSiloControlReference(siloAddress).GetRuntimeStatistics());
-            
+
             return Task.WhenAll(promises);
         }
 
@@ -121,10 +118,10 @@ namespace Orleans.Runtime.Management
         {
             var all = GetSiloAddresses(hostsIds).Select(s =>
                 GetSiloControlReference(s).GetSimpleGrainStatistics()).ToList();
-            await Task.WhenAll(all);
-            return all.SelectMany(s => s.Result).ToArray();
+            var res = await Task.WhenAll(all);
+            return res.SelectMany(s => s).ToArray();
         }
-        
+
         public async Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
             Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
@@ -142,8 +139,8 @@ namespace Orleans.Runtime.Management
 
             var all = GetSiloAddresses(hostsIds).Select(s =>
               GetSiloControlReference(s).GetDetailedGrainStatistics(types)).ToList();
-            await Task.WhenAll(all);
-            return all.SelectMany(s => s.Result).ToArray();
+            var res = await Task.WhenAll(all);
+            return res.SelectMany(s => s).ToArray();
         }
 
         public async Task<int> GetGrainActivationCount(GrainReference grainReference)
@@ -153,12 +150,12 @@ namespace Orleans.Runtime.Management
             var tasks = new List<Task<DetailedGrainReport>>();
             foreach (var silo in hostsIds)
                 tasks.Add(GetSiloControlReference(silo).GetDetailedGrainReport(grainReference.GrainId));
-            
-            await Task.WhenAll(tasks);
-            return tasks.Select(s => s.Result).Select(r => r.LocalActivations.Count).Sum();
+
+            var res = await Task.WhenAll(tasks);
+            return res.Sum(r => r.LocalActivations.Count);
         }
 
-        public async Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null)
+        public async Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds = null)
         {
             if (hostsIds == null)
             {
@@ -166,37 +163,37 @@ namespace Orleans.Runtime.Management
                 SiloAddress[] silos = hosts.Keys.ToArray();
             }
             var all = GetSiloAddresses(hostsIds).Select(s => GetSiloControlReference(s).GetGrainTypeList()).ToArray();
-            await Task.WhenAll(all);
-            return all.SelectMany(s => s.Result).Distinct().ToArray();
+            var res = await Task.WhenAll(all);
+            return res.SelectMany(s => s).Distinct().ToArray();
 
         }
 
-        public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
+        public Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
         {
-            await SetStrategy(
+            return SetStrategy(
                 store => store.SetCompatibilityStrategy(strategy),
                 siloControl => siloControl.SetCompatibilityStrategy(strategy));
         }
 
-        public async Task SetSelectorStrategy(VersionSelectorStrategy strategy)
+        public Task SetSelectorStrategy(VersionSelectorStrategy strategy)
         {
-            await SetStrategy(
+            return SetStrategy(
                 store => store.SetSelectorStrategy(strategy),
                 siloControl => siloControl.SetSelectorStrategy(strategy));
         }
 
-        public async Task SetCompatibilityStrategy(int interfaceId, CompatibilityStrategy strategy)
+        public Task SetCompatibilityStrategy(int interfaceId, CompatibilityStrategy strategy)
         {
             CheckIfIsExistingInterface(interfaceId);
-            await SetStrategy(
+            return SetStrategy(
                 store => store.SetCompatibilityStrategy(interfaceId, strategy),
                 siloControl => siloControl.SetCompatibilityStrategy(interfaceId, strategy));
         }
 
-        public async Task SetSelectorStrategy(int interfaceId, VersionSelectorStrategy strategy)
+        public Task SetSelectorStrategy(int interfaceId, VersionSelectorStrategy strategy)
         {
             CheckIfIsExistingInterface(interfaceId);
-            await SetStrategy(
+            return SetStrategy(
                 store => store.SetSelectorStrategy(interfaceId, strategy),
                 siloControl => siloControl.SetSelectorStrategy(interfaceId, strategy));
         }
@@ -209,12 +206,8 @@ namespace Orleans.Runtime.Management
             foreach (var silo in silos)
                 tasks.Add(GetSiloControlReference(silo).GetActivationCount());
 
-            await Task.WhenAll(tasks);
-            int sum = 0;
-            foreach (Task<int> task in tasks)
-                sum += task.Result;
-
-            return sum;
+            var res = await Task.WhenAll(tasks);
+            return res.Sum();
         }
 
         public Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg)
@@ -237,7 +230,7 @@ namespace Orleans.Runtime.Management
         {
             await storeFunc(versionStore);
             var silos = GetSiloAddresses(null);
-            var actionPromises = PerformPerSiloAction(
+            var actionPromises = Array.ConvertAll(
                 silos,
                 s => applyFunc(GetSiloControlReference(s)));
             try
@@ -255,7 +248,7 @@ namespace Orleans.Runtime.Management
         {
             var silos = await GetHosts(true);
 
-            if(logger.IsEnabled(LogLevel.Debug))
+            if (logger.IsEnabled(LogLevel.Debug))
             {
                 logger.Debug("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
             }
@@ -274,25 +267,6 @@ namespace Orleans.Runtime.Management
 
             return this.siloStatusOracle
                        .GetApproximateSiloStatuses(true).Select(s => s.Key).ToArray();
-        }
-
-        /// <summary>
-        /// Perform an action for each silo.
-        /// </summary>
-        /// <remarks>
-        /// Because SiloControl contains a reference to a system target, each method call using that reference 
-        /// will get routed either locally or remotely to the appropriate silo instance auto-magically.
-        /// </remarks>
-        /// <param name="siloAddresses">List of silos to perform the action for</param>
-        /// <param name="perSiloAction">The action function to be performed for each silo</param>
-        /// <returns>Array containing one Task for each silo the action was performed for</returns>
-        private List<Task> PerformPerSiloAction(SiloAddress[] siloAddresses, Func<SiloAddress, Task> perSiloAction)
-        {
-            var requestsToSilos = new List<Task>();
-            foreach (SiloAddress siloAddress in siloAddresses)
-                requestsToSilos.Add( perSiloAction(siloAddress) );
-            
-            return requestsToSilos;
         }
 
         private static void AddXPathValue(XmlNode xml, IEnumerable<string> path, string value)
