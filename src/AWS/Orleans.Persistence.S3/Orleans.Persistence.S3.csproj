@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.S3</PackageId>
+    <Title>Microsoft Orleans Persistence S3</Title>
+    <Description>Microsoft Orleans persistence providers for AWS S3</Description>
+    <PackageTags>$(PackageTags) AWS S3</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Persistence.S3</AssemblyName>
+    <RootNamespace>Orleans.Persistence.S3</RootNamespace>
+    <DefineConstants>$(DefineConstants);PERSISTENCE_S3</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" Version="3.3.110.38" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>
