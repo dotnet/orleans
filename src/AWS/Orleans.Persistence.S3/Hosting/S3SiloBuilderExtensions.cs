@@ -23,7 +23,7 @@ namespace Orleans.Persistence.S3.Hosting
         /// <summary>
         /// Configure silo to use AWS S3 storage for grain storage.
         /// </summary>
-        public static ISiloHostBuilder AddS3GrainStorageAsDefault(this ISiloHostBuilder builder, string name, Action<S3StorageOptions> configureOptions) => builder.ConfigureServices(services => services.AddS3GrainStorage(name, configureOptions));
+        public static ISiloHostBuilder AddS3GrainStorage(this ISiloHostBuilder builder, string name, Action<S3StorageOptions> configureOptions) => builder.ConfigureServices(services => services.AddS3GrainStorage(name, configureOptions));
 
         /// <summary>
         /// Configure silo to use AWS S3 storage as the default grain storage.
