@@ -83,7 +83,7 @@ namespace Orleans.Persistence.S3.Hosting
             services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             return services
                 .AddSingletonNamedService<IGrainStorage>(name, (s, n) => ActivatorUtilities.CreateInstance<S3GrainStorage>(s, name, s.GetOptionsByName<S3StorageOptions>(name)))
-                .AddSingletonNamedService(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+                ;
         }
     }
 }

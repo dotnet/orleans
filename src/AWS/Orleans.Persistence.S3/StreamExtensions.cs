@@ -5,7 +5,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.Persistence.S3 {
+namespace Orleans.Persistence.S3
+{
     internal static class StreamExtensions
     {
         public static ArraySegment<byte> AsArraySegment(this MemoryStream mem)
@@ -28,9 +29,9 @@ namespace Orleans.Persistence.S3 {
 
         public static ArraySegment<byte> MergeToSingleSegment(this IReadOnlyList<ArraySegment<byte>> segments)
         {
-            if (segments.Count == 1)
-            {
-                return segments[0];
+            switch( segments.Count ) {
+                case 0: return default(ArraySegment<byte>);
+                case 1: return segments[0];
             }
 
             var size = segments.Sum(x => x.Count);
@@ -46,30 +47,5 @@ namespace Orleans.Persistence.S3 {
         }
 
         public static MemoryStream AsMemoryStream(this ArraySegment<byte> bytes, bool writable = false) => new MemoryStream(bytes.Array, bytes.Offset, bytes.Count, writable, true);
-
-
-        public static async Task<IReadOnlyList<ArraySegment<byte>>> ReadSegmentsAsync(this Stream stream)
-        {
-            var result = new List<ArraySegment<byte>>();
-            const int bufferSize = 8192;
-            while (true)
-            {
-                var buffer = new byte[bufferSize];
-                var bytesRead = await stream
-                    .ReadAsync(buffer, 0, buffer.Length)
-                    .ConfigureAwait(false);
-                if (bytesRead > 0)
-                {
-                    result.Add(new ArraySegment<byte>(buffer, 0, bytesRead));
-                }
-
-                if (bytesRead < bufferSize)
-                {
-                    break;
-                }
-            }
-
-            return result;
-        }
     }
 }

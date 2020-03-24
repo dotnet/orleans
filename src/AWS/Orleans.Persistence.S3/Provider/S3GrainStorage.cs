@@ -1,7 +1,5 @@
 using System;
 using System.Net;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Amazon.S3;
 using Amazon.S3.Model;
@@ -13,7 +11,7 @@ using Orleans.Storage;
 
 namespace Orleans.Persistence.S3.Provider
 {
-    public class S3GrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver
+    public class S3GrainStorage : IGrainStorage
     {
         private readonly string name;
         private readonly S3StorageOptions options;
@@ -120,9 +118,5 @@ namespace Orleans.Persistence.S3.Provider
                 // Ignore not found errors
             }
         }
-
-        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe<S3GrainStorage>(this.options.InitStage, this);
-        public Task OnStart(CancellationToken ct) => Task.CompletedTask;
-        public Task OnStop(CancellationToken ct) => Task.CompletedTask;
     }
 }
