@@ -7,7 +7,7 @@ namespace Orleans.Runtime
 {
     internal class MessagingTrace : DiagnosticListener, ILogger
     {
-        public const string Category = "Microsoft.Orleans.Messaging";
+        public const string Category = "Orleans.Messaging";
 
         public const string CreateMessageEventName = Category + ".CreateMessage";
         public const string SendMessageEventName = Category + ".Outbound.Send";
