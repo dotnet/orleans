@@ -52,7 +52,7 @@ namespace Orleans.Runtime.Messaging
 
                 await ConnectionPreamble.Write(
                     this.Context,
-                    this.messageCenter.ClientId,
+                    this.messageCenter.ClientId.GrainId,
                     this.connectionOptions.ProtocolVersion,
                     siloAddress: null);
 

@@ -51,7 +51,7 @@ namespace Orleans.Messaging
         internal static readonly TimeSpan MINIMUM_INTERCONNECT_DELAY = TimeSpan.FromMilliseconds(100);   // wait one tenth of a second between connect attempts
         internal const int CONNECT_RETRY_COUNT = 2;                                                      // Retry twice before giving up on a gateway server
 
-        internal GrainId ClientId { get; private set; }
+        internal ClientGrainId ClientId { get; private set; }
         public IRuntimeClient RuntimeClient { get; }
         internal bool Running { get; private set; }
 
@@ -77,7 +77,7 @@ namespace Orleans.Messaging
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             IPAddress localAddress,
             int gen,
-            GrainId clientId,
+            ClientGrainId clientId,
             SerializationManager serializationManager,
             IRuntimeClient runtimeClient,
             MessageFactory messageFactory,

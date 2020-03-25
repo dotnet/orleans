@@ -37,6 +37,7 @@ namespace Orleans.Runtime
         /// A span representation of <see cref="ClientPrefix" />.
         /// </summary>
         public static readonly ReadOnlyMemory<byte> ClientPrefixBytes = Encoding.UTF8.GetBytes(ClientPrefix);
+        public static readonly GrainType ClientGrainType = GrainType.Create(ClientPrefix);
 
         /// <summary>
         /// The prefix for legacy grains.
@@ -51,7 +52,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns <see langword="true"/> if the type is a client, <see langword="false"/> if not.
         /// </summary>
-        private static bool IsClient(this in GrainType type) => type.AsSpan().StartsWith(ClientPrefixBytes.Span);
+        internal static bool IsClient(this in GrainType type) => type.AsSpan().StartsWith(ClientPrefixBytes.Span);
 
         /// <summary>
         /// Returns <see langword="true"/> if the type is a system target, <see langword="false"/> if not.

@@ -112,14 +112,14 @@ namespace Orleans.Runtime.Messaging
                     this.myAddress);
             }
 
-            if (grainId.Equals(Constants.SiloDirectConnectionId))
+            if (!ClientGrainId.TryParse(grainId, out var clientId))
             {
-                throw new InvalidOperationException($"Unexpected direct silo connection on proxy endpoint from {siloAddress?.ToString() ?? "unknown silo"}");
+                throw new InvalidOperationException($"Unexpected connection id {grainId} on proxy endpoint from {siloAddress?.ToString() ?? "unknown silo"}");
             }
 
             try
             {
-                this.gateway.RecordOpenedConnection(this, grainId);
+                this.gateway.RecordOpenedConnection(this, clientId);
                 await base.RunInternal();
             }
             finally

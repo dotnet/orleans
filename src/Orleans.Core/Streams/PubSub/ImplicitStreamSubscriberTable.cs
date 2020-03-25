@@ -101,7 +101,7 @@ namespace Orleans.Streams
         /// <returns>true if the grain id describes an implicit subscriber of the stream described by the stream id.</returns>
         internal bool IsImplicitSubscriber(GrainId grainId, StreamId streamId)
         {
-            return HasImplicitSubscription(streamId.Namespace, ((LegacyGrainId)grainId).TypeCode);
+            return grainId.IsLegacyGrain() && HasImplicitSubscription(streamId.Namespace, ((LegacyGrainId)grainId).TypeCode);
         }
 
         /// <summary>
