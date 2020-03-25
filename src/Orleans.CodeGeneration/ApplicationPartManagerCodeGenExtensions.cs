@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -45,7 +45,7 @@ namespace Orleans.Hosting
             var codeGenerator = new RoslynCodeGenerator(tempPartManager, loggerFactory);
             var generatedAssembly = codeGenerator.GenerateAndLoadForAssemblies(manager.Assemblies);
             stopWatch.Stop();
-            var logger = loggerFactory.CreateLogger("RuntimeCodeGen");
+            var logger = loggerFactory.CreateLogger("Orleans.CodeGenerator.RuntimeCodeGen");
             logger?.LogInformation(0, $"Runtime code generation for assemblies {String.Join(",", manager.Assemblies.ToStrings())} took {stopWatch.ElapsedMilliseconds} milliseconds");
             return manager.AddApplicationPart(generatedAssembly);
         }

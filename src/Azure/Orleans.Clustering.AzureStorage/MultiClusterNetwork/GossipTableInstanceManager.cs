@@ -119,7 +119,7 @@ namespace Orleans.Runtime.MultiClusterNetwork
             GlobalServiceId = globalServiceId;
             this.logger = loggerFactory.CreateLogger<GossipTableInstanceManager>();
             storage = new AzureTableDataManager<GossipTableEntry>(
-                INSTANCE_TABLE_NAME, storageConnectionString, loggerFactory);
+                INSTANCE_TABLE_NAME, storageConnectionString, loggerFactory.CreateLogger<AzureTableDataManager<GossipTableEntry>>());
         }
 
         public static async Task<GossipTableInstanceManager> GetManager(string globalServiceId, string storageConnectionString, ILoggerFactory loggerFactory)

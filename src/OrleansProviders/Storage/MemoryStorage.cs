@@ -48,11 +48,11 @@ namespace Orleans.Storage
         private readonly string name;
 
         /// <summary> Default constructor. </summary>
-        public MemoryGrainStorage(string name, MemoryGrainStorageOptions options, ILoggerFactory loggerFactory, IGrainFactory grainFactory)
+        public MemoryGrainStorage(string name, MemoryGrainStorageOptions options, ILogger<MemoryGrainStorage> logger, IGrainFactory grainFactory)
         {
             this.options = options;
             this.name = name;
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}");
+            this.logger = logger;
             this.grainFactory = grainFactory;
 
             //Init

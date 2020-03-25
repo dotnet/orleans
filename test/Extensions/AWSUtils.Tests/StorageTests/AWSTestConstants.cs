@@ -18,7 +18,7 @@ namespace AWSUtils.Tests.StorageTests
                 DynamoDBStorage storage;
                 try
                 {
-                    storage = new DynamoDBStorage(NullLoggerFactory.Instance, Service);
+                    storage = new DynamoDBStorage(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), Service);
                 }
                 catch (AmazonServiceException)
                 {

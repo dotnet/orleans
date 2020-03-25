@@ -24,9 +24,8 @@ namespace Orleans.Transactions
         private readonly ITransactionDataCopier<TState> copier;
         private readonly Dictionary<Type,object> copiers;
         private readonly IGrainRuntime grainRuntime;
-        private readonly ILoggerFactory loggerFactory;
+        private readonly ILogger logger;
         private readonly ActivationLifetime activationLifetime;
-        private ILogger logger;
         private ParticipantId participantId;
         private TransactionQueue<TState> queue;
 
@@ -39,13 +38,13 @@ namespace Orleans.Transactions
             IGrainActivationContext context, 
             ITransactionDataCopier<TState> copier,
             IGrainRuntime grainRuntime,
-            ILoggerFactory loggerFactory)
+            ILogger<TransactionalState<TState>> logger)
         {
             this.config = transactionalStateConfiguration;
             this.context = context;
             this.copier = copier;
             this.grainRuntime = grainRuntime;
-            this.loggerFactory = loggerFactory;
+            this.logger = logger;
             this.copiers = new Dictionary<Type, object>();
             this.copiers.Add(typeof(TState), copier);
             this.activationLifetime = new ActivationLifetime(this.context);
@@ -202,8 +201,6 @@ namespace Orleans.Transactions
             if (ct.IsCancellationRequested) return;
 
             this.participantId = new ParticipantId(this.config.StateName, this.context.GrainInstance.GrainReference, this.config.SupportedRoles);
-
-            this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.context.GrainIdentity.IdentityString}");
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
             ITransactionalStateStorage<TState> storage = storageFactory.Create<TState>(this.config.StorageName, this.config.StateName);

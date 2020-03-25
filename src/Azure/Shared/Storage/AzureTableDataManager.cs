@@ -55,10 +55,10 @@ namespace Orleans.Transactions.AzureStorage
         /// </summary>
         /// <param name="tableName">Name of the table to be connected to.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
-        /// <param name="loggerFactory">Logger factory to use.</param>
-        public AzureTableDataManager(string tableName, string storageConnectionString, ILoggerFactory loggerFactory)
+        /// <param name="logger">Logger to use.</param>
+        public AzureTableDataManager(string tableName, string storageConnectionString, ILogger logger)
         {
-            Logger = loggerFactory.CreateLogger<AzureTableDataManager<T>>();
+            Logger = logger;
             TableName = tableName;
             ConnectionString = storageConnectionString;
 

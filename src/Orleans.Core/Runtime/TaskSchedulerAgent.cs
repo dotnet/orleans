@@ -24,8 +24,6 @@ namespace Orleans.Runtime
         protected CancellationTokenSource Cts;
         protected object Lockable;
         protected ILogger Log;
-        protected ILoggerFactory loggerFactory;
-        protected readonly string type;
         protected FaultBehavior OnFault;
         protected bool disposed;
 
@@ -37,24 +35,23 @@ namespace Orleans.Runtime
             Cts = new CancellationTokenSource();
             var thisType = GetType();
 
-            type = thisType.Namespace + "." + thisType.Name;
-            if (type.StartsWith("Orleans.", StringComparison.Ordinal))
+            var typeName = thisType.Namespace + "." + thisType.Name;
+            if (typeName.StartsWith("Orleans.", StringComparison.Ordinal))
             {
-                type = type.Substring(8);
+                typeName = typeName.Substring(8);
             }
             if (!string.IsNullOrEmpty(nameSuffix))
             {
-                Name = type + "/" + nameSuffix;
+                Name = typeName + "/" + nameSuffix;
             }
             else
             {
-                Name = type;
+                Name = typeName;
             }
 
             Lockable = new object();
             OnFault = FaultBehavior.IgnoreFault;
 
-            this.loggerFactory = loggerFactory;
             this.Log = loggerFactory.CreateLogger(Name);
         }
 

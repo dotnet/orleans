@@ -48,7 +48,7 @@ namespace Orleans.Storage
         public MemoryGrainStorageWithLatency(string name, MemoryStorageWithLatencyOptions options,
             ILoggerFactory loggerFactory, IGrainFactory grainFactory)
         {
-            this.baseGranStorage = new MemoryGrainStorage(name, options, loggerFactory, grainFactory);
+            this.baseGranStorage = new MemoryGrainStorage(name, options, loggerFactory.CreateLogger<MemoryGrainStorage>(), grainFactory);
             this.options = options;
         }
 

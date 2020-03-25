@@ -26,7 +26,7 @@ namespace Orleans.Runtime.GrainDirectory
             IInternalGrainFactory grainFactory,
             ExecutorService executorService,
             ILoggerFactory loggerFactory)
-            :base(executorService, loggerFactory)
+            : base(executorService, loggerFactory)
         {
             this.grainFactory = grainFactory;
             this.router = router;

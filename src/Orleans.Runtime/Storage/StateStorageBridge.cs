@@ -43,7 +43,7 @@ namespace Orleans.Core
             if (store == null) throw new ArgumentNullException(nameof(store));
             if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
 
-            this.logger = loggerFactory.CreateLogger(store.GetType().FullName);
+            this.logger = loggerFactory.CreateLogger(store.GetType());
             this.name = name;
             this.grainRef = grainRef;
             this.store = store;
