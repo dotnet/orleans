@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
@@ -13,7 +13,7 @@ namespace Orleans.Runtime
 
         public IAsyncTimer Create(TimeSpan period, string name)
         {
-            var log = this.loggerFactory.CreateLogger($"{nameof(AsyncTimer)}-{name}");
+            var log = this.loggerFactory.CreateLogger($"{typeof(AsyncTimer).FullName}.{name}");
             return new AsyncTimer(period, log);
         }
     }

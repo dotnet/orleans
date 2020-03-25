@@ -32,7 +32,6 @@ namespace Orleans.Storage
         private readonly SerializationManager serializationManager;
         private readonly IGrainFactory grainFactory;
         private readonly ITypeResolver typeResolver;
-        private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
 
         private GrainStateTableDataManager tableDataManager;
@@ -49,8 +48,14 @@ namespace Orleans.Storage
         private string name;
 
         /// <summary> Default constructor </summary>
-        public AzureTableGrainStorage(string name, AzureTableStorageOptions options, IOptions<ClusterOptions> clusterOptions, SerializationManager serializationManager,
-            IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory)
+        public AzureTableGrainStorage(
+            string name,
+            AzureTableStorageOptions options,
+            IOptions<ClusterOptions> clusterOptions,
+            SerializationManager serializationManager,
+            IGrainFactory grainFactory,
+            ITypeResolver typeResolver,
+            ILogger<AzureTableGrainStorage> logger)
         {
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
@@ -58,9 +63,7 @@ namespace Orleans.Storage
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
             this.typeResolver = typeResolver;
-            this.loggerFactory = loggerFactory;
-            var loggerName = $"{typeof(AzureTableGrainStorageFactory).FullName}.{name}";
-            this.logger = this.loggerFactory.CreateLogger(loggerName);
+            this.logger = logger;
         }
 
         /// <summary> Read state data function for this storage provider. </summary>
@@ -397,11 +400,11 @@ namespace Orleans.Storage
             private readonly AzureTableDataManager<DynamicTableEntity> tableManager;
             private readonly ILogger logger;
 
-            public GrainStateTableDataManager(string tableName, string storageConnectionString, ILoggerFactory loggerFactory)
+            public GrainStateTableDataManager(string tableName, string storageConnectionString, ILogger logger)
             {
-                this.logger = loggerFactory.CreateLogger<GrainStateTableDataManager>();
+                this.logger = logger;
                 TableName = tableName;
-                tableManager = new AzureTableDataManager<DynamicTableEntity>(tableName, storageConnectionString, loggerFactory);
+                tableManager = new AzureTableDataManager<DynamicTableEntity>(tableName, storageConnectionString, logger);
             }
 
             public Task InitTableAsync()
@@ -477,7 +480,7 @@ namespace Orleans.Storage
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, $"AzureTableGrainStorage {name} is using DataConnectionString: {ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)}");
                 this.JsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
                 this.options.ConfigureJsonSerializerSettings?.Invoke(this.JsonSettings);
-                this.tableDataManager = new GrainStateTableDataManager(this.options.TableName, this.options.ConnectionString, this.loggerFactory);
+                this.tableDataManager = new GrainStateTableDataManager(this.options.TableName, this.options.ConnectionString, this.logger);
                 await this.tableDataManager.InitTableAsync();
                 stopWatch.Stop();
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"Initializing provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");

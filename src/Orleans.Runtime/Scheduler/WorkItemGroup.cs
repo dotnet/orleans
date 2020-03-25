@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Scheduler
         private readonly ILogger log;
         private readonly OrleansTaskScheduler masterScheduler;
         private WorkGroupStatus state;
-        private readonly Object lockable;
+        private readonly object lockable;
         private readonly Queue<Task> workItems;
 
         private long totalItemsEnQueued;    // equals total items queued, + 1
@@ -119,7 +119,8 @@ namespace Orleans.Runtime.Scheduler
         internal WorkItemGroup(
             OrleansTaskScheduler sched,
             IGrainContext grainContext,
-            ILoggerFactory loggerFactory,
+            ILogger<WorkItemGroup> logger,
+            ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
             CancellationToken ct,
             SchedulerStatisticsGroup schedulerStatistics,
             IOptions<StatisticsOptions> statisticsOptions)
@@ -130,13 +131,13 @@ namespace Orleans.Runtime.Scheduler
             this.schedulerStatistics = schedulerStatistics;
             state = WorkGroupStatus.Waiting;
             workItems = new Queue<Task>();
-            lockable = new Object();
+            lockable = new object();
             totalItemsEnQueued = 0;
             totalItemsProcessed = 0;
             totalQueuingDelay = TimeSpan.Zero;
             quantumExpirations = 0;
-            TaskScheduler = new ActivationTaskScheduler(this, loggerFactory);
-            log = IsSystemPriority ? loggerFactory.CreateLogger($"{this.GetType().Namespace} {Name}.{this.GetType().Name}") : loggerFactory.CreateLogger<WorkItemGroup>();
+            TaskScheduler = new ActivationTaskScheduler(this, activationTaskSchedulerLogger);
+            log = logger;
 
             if (schedulerStatistics.CollectShedulerQueuesStats)
             {

@@ -16,13 +16,13 @@ namespace Orleans.Runtime.Scheduler
         private static readonly Action<IWorkItem> ExecuteWorkItemAction = workItem => workItem.Execute();
         private static readonly WaitCallback ExecuteWorkItemCallback = obj => ((IWorkItem)obj).Execute();
         private readonly ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
         private readonly SchedulerStatisticsGroup schedulerStatistics;
         private readonly IOptions<StatisticsOptions> statisticsOptions;
         private readonly ConcurrentDictionary<IGrainContext, WorkItemGroup> workgroupDirectory;
-        private bool applicationTurnsStopped;
-
+        private readonly ILogger<WorkItemGroup> workItemGroupLogger;
+        private readonly ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger;
         private readonly CancellationTokenSource cancellationTokenSource;
+        private bool applicationTurnsStopped;
         
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
 
@@ -35,11 +35,12 @@ namespace Orleans.Runtime.Scheduler
             SchedulerStatisticsGroup schedulerStatistics,
             IOptions<StatisticsOptions> statisticsOptions)
         {
-            this.loggerFactory = loggerFactory;
             this.schedulerStatistics = schedulerStatistics;
             this.statisticsOptions = statisticsOptions;
             this.logger = loggerFactory.CreateLogger<OrleansTaskScheduler>();
-            cancellationTokenSource = new CancellationTokenSource();
+            this.workItemGroupLogger = loggerFactory.CreateLogger<WorkItemGroup>();
+            this.activationTaskSchedulerLogger = loggerFactory.CreateLogger<ActivationTaskScheduler>();
+            this.cancellationTokenSource = new CancellationTokenSource();
             this.SchedulingOptions = options.Value;
             applicationTurnsStopped = false;
             TurnWarningLengthThreshold = options.Value.TurnWarningLengthThreshold;
@@ -233,7 +234,8 @@ namespace Orleans.Runtime.Scheduler
             var wg = new WorkItemGroup(
                 this,
                 context,
-                this.loggerFactory,
+                this.workItemGroupLogger,
+                this.activationTaskSchedulerLogger,
                 this.cancellationTokenSource.Token,
                 this.schedulerStatistics,
                 this.statisticsOptions);
