@@ -35,7 +35,6 @@ namespace Orleans.Storage
 
         private readonly DynamoDBStorageOptions options;
         private readonly SerializationManager serializationManager;
-        private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
         private readonly IGrainFactory grainFactory;
         private readonly ITypeResolver typeResolver;
@@ -47,13 +46,16 @@ namespace Orleans.Storage
         /// <summary>
         /// Default Constructor
         /// </summary>
-        public DynamoDBGrainStorage(string name, DynamoDBStorageOptions options, SerializationManager serializationManager,
-            IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory)
+        public DynamoDBGrainStorage(
+            string name,
+            DynamoDBStorageOptions options,
+            SerializationManager serializationManager,
+            IGrainFactory grainFactory,
+            ITypeResolver typeResolver,
+            ILogger<DynamoDBGrainStorage> logger)
         {
             this.name = name;
-            this.loggerFactory = loggerFactory;
-            var loggerName = $"{typeof(DynamoDBGrainStorage).FullName}.{name}";
-            this.logger = loggerFactory.CreateLogger(loggerName);
+            this.logger = logger;
             this.options = options;
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
@@ -82,7 +84,7 @@ namespace Orleans.Storage
 
                 this.logger.LogInformation((int)ErrorCode.StorageProviderBase, $"AWS DynamoDB Grain Storage {this.name} is initializing: {initMsg}");
 
-                this.storage = new DynamoDBStorage(this.loggerFactory, this.options.Service, this.options.AccessKey, this.options.SecretKey,
+                this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
                  this.options.ReadCapacityUnits, this.options.WriteCapacityUnits, this.options.UseProvisionedThroughput);
 
                 await storage.InitializeTable(this.options.TableName,

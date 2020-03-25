@@ -1,4 +1,4 @@
-﻿using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using System;
 using System.Collections.Generic;
@@ -88,7 +88,7 @@ namespace AWSUtils.Tests.StorageTests
         public const string INSTANCE_TABLE_NAME = "UnitTestDDBTableData";
 
         public UnitTestDynamoDBStorage()
-            : base(NullLoggerFactory.Instance, AWSTestConstants.Service)
+            : base(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), AWSTestConstants.Service)
         {
             if (AWSTestConstants.IsDynamoDbAvailable)
             {

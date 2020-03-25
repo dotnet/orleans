@@ -48,7 +48,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
             this.clusterId = clusterId;
             ShouldFaultSubsriptionOnError = faultOnFailure;
             this.createEntity = createEntity ?? DefaultCreateEntity;
-            dataManager = new AzureTableDataManager<TEntity>(tableName, storageConnectionString, loggerFactory);
+            dataManager = new AzureTableDataManager<TEntity>(tableName, storageConnectionString, loggerFactory.CreateLogger<AzureTableDataManager<TEntity>>());
         }
 
         /// <summary>
