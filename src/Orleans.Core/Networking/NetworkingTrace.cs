@@ -9,9 +9,9 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly ILogger log;
 
-        public NetworkingTrace(ILoggerFactory loggerFactory) : base("Microsoft.Orleans.Networking")
+        public NetworkingTrace(ILoggerFactory loggerFactory) : base("Orleans.Networking")
         {
-            this.log = loggerFactory.CreateLogger("Microsoft.Orleans.Networking");
+            this.log = loggerFactory.CreateLogger("Orleans.Networking");
         }
 
         public IDisposable BeginScope<TState>(TState state)
