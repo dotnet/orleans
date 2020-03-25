@@ -58,17 +58,23 @@ namespace Orleans.Serialization
         /// </summary>
         public IBinaryTokenStreamWriter StreamWriter { get; set; }
 
-        private readonly Dictionary<object, Record> processedObjects;
+        private Dictionary<object, Record> processedObjects;
 
-        public SerializationContext(SerializationManager serializationManager) : 
-            base(serializationManager)
+        public SerializationContext(SerializationManager serializationManager) : base(serializationManager)
         {
-            processedObjects = new Dictionary<object, Record>(ReferenceEqualsComparer.Instance);
+            this.Reset();
         }
 
         internal void Reset()
         {
-            processedObjects.Clear();
+            if (this.processedObjects is null || this.processedObjects.Count > this.MaxSustainedSerializationContextCapacity)
+            {
+                processedObjects = new Dictionary<object, Record>(ReferenceEqualsComparer.Instance);
+            }
+            else
+            {
+                processedObjects.Clear();
+            }
         }
 
         /// <summary>
