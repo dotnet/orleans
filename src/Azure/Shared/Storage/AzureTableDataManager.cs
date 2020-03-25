@@ -48,9 +48,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <summary> Connection string for the Azure storage account used to host this table. </summary>
         protected string ConnectionString { get; set; }
 
-        private CloudTable tableReference;
+        public CloudTable Table { get; private set; }
 
-        public CloudTable Table => tableReference;
+        private TimeSpan tableCreationTimeout;
+        private TimeSpan tableOperationTimeout;
 
         /// <summary>
         /// Constructor
@@ -58,13 +59,17 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="tableName">Name of the table to be connected to.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         /// <param name="loggerFactory">Logger factory to use.</param>
-        public AzureTableDataManager(string tableName, string storageConnectionString, ILoggerFactory loggerFactory)
+        /// <param name="tableCreationTimeout">Optional parameter to configure the timeout for table creation</param>
+        /// <param name="tableOperationTimeout">Optional parameter to configure the timeout for table operations</param>
+        public AzureTableDataManager(string tableName, string storageConnectionString, ILoggerFactory loggerFactory, TimeSpan tableCreationTimeout = default, TimeSpan tableOperationTimeout = default)
         {
-            Logger = loggerFactory.CreateLogger<AzureTableDataManager<T>>();
-            TableName = tableName;
-            ConnectionString = storageConnectionString;
+            this.Logger = loggerFactory.CreateLogger<AzureTableDataManager<T>>();
+            this.TableName = tableName;
+            this.ConnectionString = storageConnectionString;
 
             AzureTableUtils.ValidateTableName(tableName);
+            this.tableCreationTimeout = (tableCreationTimeout == default) ? AzureTableDefaultPolicies.TableCreationTimeout : tableCreationTimeout;
+            this.tableOperationTimeout = (tableOperationTimeout == default) ? AzureTableDefaultPolicies.TableOperationTimeout : tableOperationTimeout;
         }
 
         /// <summary>
@@ -86,7 +91,13 @@ namespace Orleans.GrainDirectory.AzureStorage
                 Logger.Info((int)Utilities.ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
 
                 CloudTableClient tableOperationsClient = GetCloudTableOperationsClient();
-                tableReference = tableOperationsClient.GetTableReference(TableName);
+                Table = tableOperationsClient.GetTableReference(TableName);
+            }
+            catch (TimeoutException te)
+            {
+                var errorMsg = $"Unable to create or connect to the Azure table in {this.tableCreationTimeout}";
+                this.Logger.Error((int)Utilities.ErrorCode.AzureTable_TableNotCreated, errorMsg, te);
+                throw new OrleansException(errorMsg, te);
             }
             catch (Exception exc)
             {
@@ -166,7 +177,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 try
                 {
                     // Presumably FromAsync(BeginExecute, EndExecute) has a slightly better performance then CreateIfNotExistsAsync.
-                    var opResult = await tableReference.ExecuteAsync(TableOperation.Insert(data));
+                    var opResult = await Table.ExecuteAsync(TableOperation.Insert(data));
 
 
                     return opResult.Etag;
@@ -202,7 +213,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     // svc.AttachTo(TableName, data, null);
                     // svc.UpdateObject(data);
                     // SaveChangesOptions.ReplaceOnUpdate,
-                    var opResult = await tableReference.ExecuteAsync(TableOperation.InsertOrReplace(data));
+                    var opResult = await Table.ExecuteAsync(TableOperation.InsertOrReplace(data));
                     return opResult.Etag;
                 }
                 catch (Exception exc)
@@ -233,7 +244,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    var opResult = await tableReference.ExecuteAsync(TableOperation.Insert(data));
+                    var opResult = await Table.ExecuteAsync(TableOperation.Insert(data));
                     return (true, opResult.Etag);
                 }
                 catch (StorageException storageException) when (storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.Conflict)
@@ -277,7 +288,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
                     data.ETag = eTag;
                     // Merge requires an ETag (which may be the '*' wildcard).
-                    var opResult = await tableReference.ExecuteAsync(TableOperation.Merge(data));
+                    var opResult = await Table.ExecuteAsync(TableOperation.Merge(data));
                     return opResult.Etag;
                 }
                 catch (Exception exc)
@@ -311,7 +322,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 try
                 {
                     data.ETag = dataEtag;
-                    var opResult = await tableReference.ExecuteAsync(TableOperation.Replace(data));
+                    var opResult = await Table.ExecuteAsync(TableOperation.Replace(data));
 
                     //The ETag of data is needed in further operations.
                     return opResult.Etag;
@@ -347,7 +358,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
                 try
                 {
-                    await tableReference.ExecuteAsync(TableOperation.Delete(data));
+                    await Table.ExecuteAsync(TableOperation.Delete(data));
 
                 }
                 catch (Exception exc)
@@ -382,7 +393,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 {
                     string queryString = TableQueryFilterBuilder.MatchPartitionKeyAndRowKeyFilter(partitionKey, rowKey);
                     var query = new TableQuery<T>().Where(queryString);
-                    TableQuerySegment<T> segment = await tableReference.ExecuteQuerySegmentedAsync(query, null);
+                    TableQuerySegment<T> segment = await Table.ExecuteQuerySegmentedAsync(query, null);
                     retrievedResult = segment.Results.SingleOrDefault();
                 }
                 catch (StorageException exception)
@@ -465,7 +476,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
                 try
                 {
-                    await tableReference.ExecuteBatchAsync(entityBatch);
+                    await Table.ExecuteBatchAsync(entityBatch);
                 }
                 catch (Exception exc)
                 {
@@ -505,7 +516,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                         //ExecuteSegmentedAsync not supported in "WindowsAzure.Storage": "7.2.1" yet
                         while (querySegment == null || querySegment.ContinuationToken != null)
                         {
-                            querySegment = await tableReference.ExecuteQuerySegmentedAsync(cloudTableQuery, querySegment?.ContinuationToken);
+                            querySegment = await Table.ExecuteQuerySegmentedAsync(cloudTableQuery, querySegment?.ContinuationToken);
                             list.AddRange(querySegment);
                         }
 
@@ -519,7 +530,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                         counter => executeQueryHandleContinuations(),
                         AzureTableDefaultPolicies.MaxTableOperationRetries,
                         (exc, counter) => AzureTableUtils.AnalyzeReadException(exc.GetBaseException(), counter, TableName, Logger),
-                        AzureTableDefaultPolicies.TableOperationTimeout,
+                        this.tableOperationTimeout,
                         backoff);
 #else
                     List<T> results = await executeQueryHandleContinuations();
@@ -588,7 +599,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 try
                 {
                     // http://msdn.microsoft.com/en-us/library/hh452241.aspx
-                    await tableReference.ExecuteBatchAsync(entityBatch);
+                    await Table.ExecuteBatchAsync(entityBatch);
                 }
                 catch (Exception exc)
                 {
@@ -629,7 +640,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     data2.ETag = data2Etag;
                     entityBatch.Add(TableOperation.Replace(data2));
 
-                    var opResults = await tableReference.ExecuteBatchAsync(entityBatch);
+                    var opResults = await Table.ExecuteBatchAsync(entityBatch);
 
                     //The batch results are returned in order of execution,
                     //see reference at https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.table.cloudtable.executebatch.aspx.
@@ -679,7 +690,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                         entityBatch.Add(TableOperation.Replace(data2));
                     }
 
-                    var opResults = await tableReference.ExecuteBatchAsync(entityBatch);
+                    var opResults = await Table.ExecuteBatchAsync(entityBatch);
 
 
                     //The batch results are returned in order of execution,
@@ -708,7 +719,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 CloudStorageAccount storageAccount = AzureTableUtils.GetCloudStorageAccount(ConnectionString);
                 CloudTableClient operationsClient = storageAccount.CreateCloudTableClient();
                 operationsClient.DefaultRequestOptions.RetryPolicy = AzureTableDefaultPolicies.TableOperationRetryPolicy;
-                operationsClient.DefaultRequestOptions.ServerTimeout = AzureTableDefaultPolicies.TableOperationTimeout;
+                operationsClient.DefaultRequestOptions.ServerTimeout = this.tableOperationTimeout;
                 // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
                 operationsClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
                 return operationsClient;
@@ -727,7 +738,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 CloudStorageAccount storageAccount = AzureTableUtils.GetCloudStorageAccount(ConnectionString);
                 CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
                 creationClient.DefaultRequestOptions.RetryPolicy = AzureTableDefaultPolicies.TableCreationRetryPolicy;
-                creationClient.DefaultRequestOptions.ServerTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+                creationClient.DefaultRequestOptions.ServerTimeout = this.tableCreationTimeout;
                 // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
                 creationClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
                 return creationClient;
@@ -760,7 +771,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         private void CheckAlertSlowAccess(DateTime startOperation, string operation)
         {
             var timeSpan = DateTime.UtcNow - startOperation;
-            if (timeSpan > AzureTableDefaultPolicies.TableOperationTimeout)
+            if (timeSpan > this.tableOperationTimeout)
             {
                 Logger.Warn((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {0} for {1}, which took {2}.", TableName, operation, timeSpan);
             }

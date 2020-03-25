@@ -33,7 +33,12 @@ namespace Orleans.Runtime.ReminderService
         public async Task Init()
         {
             this.remTableManager = await RemindersTableManager.GetManager(
-                this.clusterOptions.ServiceId, this.clusterOptions.ClusterId, this.storageOptions.ConnectionString, this.storageOptions.TableName, this.loggerFactory);
+                this.clusterOptions.ServiceId, this.clusterOptions.ClusterId,
+                this.storageOptions.ConnectionString,
+                this.storageOptions.TableName,
+                this.loggerFactory,
+                this.storageOptions.CreationTimeout,
+                this.storageOptions.OperationTimeout);
         }
 
         private ReminderTableData ConvertFromTableEntryList(IEnumerable<Tuple<ReminderTableEntry, string>> entries)

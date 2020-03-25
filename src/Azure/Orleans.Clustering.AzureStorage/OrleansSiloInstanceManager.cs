@@ -25,36 +25,40 @@ namespace Orleans.AzureUtils
         private readonly AzureTableDataManager<SiloInstanceTableEntry> storage;
         private readonly ILogger logger;
 
-        internal static TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-
         public string DeploymentId { get; private set; }
 
-        private OrleansSiloInstanceManager(string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
+        private OrleansSiloInstanceManager(
+            string clusterId,
+            string storageConnectionString,
+            string tableName,
+            ILoggerFactory loggerFactory,
+            TimeSpan tableCreationTimeout = default,
+            TimeSpan tableOperationTimeout = default)
         {
             DeploymentId = clusterId;
             TableName = tableName;
             logger = loggerFactory.CreateLogger<OrleansSiloInstanceManager>();
             storage = new AzureTableDataManager<SiloInstanceTableEntry>(
-                tableName, storageConnectionString, loggerFactory);
+                tableName, storageConnectionString, loggerFactory, tableCreationTimeout, tableOperationTimeout);
         }
 
-        public static async Task<OrleansSiloInstanceManager> GetManager(string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
+        public static async Task<OrleansSiloInstanceManager> GetManager(
+            string clusterId,
+            string storageConnectionString,
+            string tableName,
+            ILoggerFactory loggerFactory,
+            TimeSpan tableCreationTimeout = default,
+            TimeSpan tableOperationTimeout = default)
         {
-            var instance = new OrleansSiloInstanceManager(clusterId, storageConnectionString, tableName, loggerFactory);
+            tableCreationTimeout = (tableCreationTimeout == default) ? AzureTableDefaultPolicies.TableCreationTimeout : tableCreationTimeout;
+            var instance = new OrleansSiloInstanceManager(clusterId, storageConnectionString, tableName, loggerFactory, tableCreationTimeout, tableOperationTimeout);
             try
             {
-                await instance.storage.InitTableAsync()
-                    .WithTimeout(initTimeout);
-            }
-            catch (TimeoutException te)
-            {
-                string errorMsg = String.Format("Unable to create or connect to the Azure table in {0}", initTimeout);
-                instance.logger.Error((int)TableStorageErrorCode.AzureTable_32, errorMsg, te);
-                throw new OrleansException(errorMsg, te);
+                await instance.storage.InitTableAsync();
             }
             catch (Exception ex)
             {
-                string errorMsg = String.Format("Exception trying to create or connect to the Azure table: {0}", ex.Message);
+                string errorMsg = string.Format("Exception trying to create or connect to the Azure table: {0}", ex.Message);
                 instance.logger.Error((int)TableStorageErrorCode.AzureTable_33, errorMsg, ex);
                 throw new OrleansException(errorMsg, ex);
             }

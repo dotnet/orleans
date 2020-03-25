@@ -73,22 +73,15 @@ namespace Orleans.Runtime.ReminderService
         public string ServiceId { get; private set; }
         public string ClusterId { get; private set; }
 
-        private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-
-        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
+        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory,
+            TimeSpan tableCreationTimeout = default,
+            TimeSpan tableOperationTimeout = default)
         {
-            var singleton = new RemindersTableManager(serviceId, clusterId, storageConnectionString, tableName, loggerFactory);
+            var singleton = new RemindersTableManager(serviceId, clusterId, storageConnectionString, tableName, loggerFactory, tableCreationTimeout, tableOperationTimeout);
             try
             {
                 singleton.Logger.Info("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
-                await singleton.InitTableAsync()
-                    .WithTimeout(initTimeout);
-            }
-            catch (TimeoutException te)
-            {
-                string errorMsg = $"Unable to create or connect to the Azure table in {initTimeout}";
-                singleton.Logger.Error((int)AzureReminderErrorCode.AzureTable_38, errorMsg, te);
-                throw new OrleansException(errorMsg, te);
+                await singleton.InitTableAsync();
             }
             catch (Exception ex)
             {
@@ -99,7 +92,14 @@ namespace Orleans.Runtime.ReminderService
             return singleton;
         }
 
-        private RemindersTableManager(string serviceId, string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
+        private RemindersTableManager(
+            string serviceId,
+            string clusterId,
+            string storageConnectionString,
+            string tableName,
+            ILoggerFactory loggerFactory,
+            TimeSpan tableCreationTimeout = default,
+            TimeSpan tableOperationTimeout = default)
             : base(tableName, storageConnectionString, loggerFactory)
         {
             ClusterId = clusterId;

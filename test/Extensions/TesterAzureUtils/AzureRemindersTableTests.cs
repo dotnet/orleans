@@ -37,7 +37,6 @@ namespace UnitTests.RemindersTest
         public override void Dispose()
         {
             // Reset init timeout after tests
-            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
             base.Dispose();
         }
 
