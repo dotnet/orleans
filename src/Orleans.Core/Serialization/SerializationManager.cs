@@ -1,28 +1,23 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Linq;
-using System.Net;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
 using System.Text;
-using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Metadata;
+using Orleans.Runtime;
 using Orleans.Utilities;
-using System.Buffers;
 
 namespace Orleans.Serialization
 {
@@ -48,7 +43,7 @@ namespace Orleans.Serialization
 
         private readonly IExternalSerializer fallbackSerializer;
         private readonly ILogger logger;
-        
+
         // Semi-constants: type handles for simple types
         private static readonly RuntimeTypeHandle shortTypeHandle = typeof(short).TypeHandle;
         private static readonly RuntimeTypeHandle intTypeHandle = typeof(int).TypeHandle;
@@ -64,7 +59,7 @@ namespace Orleans.Serialization
         private static readonly RuntimeTypeHandle boolTypeHandle = typeof(bool).TypeHandle;
         private static readonly RuntimeTypeHandle objectTypeHandle = typeof(object).TypeHandle;
         private static readonly RuntimeTypeHandle byteArrayTypeHandle = typeof(byte[]).TypeHandle;
-        
+
         internal int LargeObjectSizeThreshold { get; }
 
         private readonly IServiceProvider serviceProvider;
@@ -104,7 +99,7 @@ namespace Orleans.Serialization
             this.SerializationProviderOptions = serializationProviderOptions.Value;
 
             fallbackSerializer = GetFallbackSerializer(serviceProvider, SerializationProviderOptions.FallbackSerializationProvider);
-            
+
             RegisterSerializationProviders(SerializationProviderOptions.SerializationProviders);
         }
 
@@ -175,7 +170,7 @@ namespace Orleans.Serialization
                 return null;
 
             // If the type lacks a Serializer attribute then it's a self-serializing type and all serialization methods must be static
-            if (!serializerType.GetCustomAttributes(typeof(SerializerAttribute), true).Any())
+            if (!serializerType.IsDefined(typeof(SerializerAttribute), true))
                 return null;
 
             var constructors = serializerType.GetConstructors();
@@ -415,7 +410,7 @@ namespace Orleans.Serialization
                     type.Name,
                     serializerType.Assembly.GetName().Name);
         }
-        
+
         /// <summary>
         /// Registers <see cref="GrainReference"/> serializers for the provided <paramref name="type"/>.
         /// </summary>
@@ -493,12 +488,12 @@ namespace Orleans.Serialization
 
             var concreteSerializerType = genericSerializerType.MakeGenericType(concreteType.GetGenericArguments());
             var typeAlreadyRegistered = false;
-            
+
             lock (registeredTypes)
             {
                 typeAlreadyRegistered = registeredTypes.Contains(concreteSerializerType);
             }
-            
+
             if (typeAlreadyRegistered)
             {
                 return new SerializerMethods(
@@ -525,15 +520,15 @@ namespace Orleans.Serialization
             deserializer = null;
             foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
             {
-                if (method.GetCustomAttributes(typeof(CopierMethodAttribute), true).Any())
+                if (method.IsDefined(typeof(CopierMethodAttribute), true))
                 {
                     copier = method;
                 }
-                else if (method.GetCustomAttributes(typeof(SerializerMethodAttribute), true).Any())
+                else if (method.IsDefined(typeof(SerializerMethodAttribute), true))
                 {
                     serializer = method;
                 }
-                else if (method.GetCustomAttributes(typeof(DeserializerMethodAttribute), true).Any())
+                else if (method.IsDefined(typeof(DeserializerMethodAttribute), true))
                 {
                     deserializer = method;
                 }
@@ -576,7 +571,7 @@ namespace Orleans.Serialization
         public object DeepCopy(object original)
         {
             var context = new SerializationContext(this);
-            
+
             Stopwatch timer = null;
             if (this.serializationStatistics.CollectSerializationStats)
             {
@@ -593,7 +588,7 @@ namespace Orleans.Serialization
                 timer.Stop();
                 context.SerializationManager.serializationStatistics.CopyTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
-            
+
             return copy;
         }
 
@@ -610,7 +605,7 @@ namespace Orleans.Serialization
             }
 
             for (var i = 0; i < args.Length; i++) args[i] = DeepCopyInner(args[i], context);
-            
+
             if (timer != null)
             {
                 timer.Stop();
@@ -1549,7 +1544,7 @@ namespace Orleans.Serialization
 
             return headers;
         }
-        
+
         private bool TryLookupExternalSerializer(Type t, out IExternalSerializer serializer)
         {
             // essentially a no-op if there are no external serializers registered
@@ -1581,7 +1576,7 @@ namespace Orleans.Serialization
                 // we need to register the type, otherwise exceptions are thrown about types not being found
                 Register(t, serializer.DeepCopy, serializer.Serialize, serializer.Deserialize, true);
             }
-   
+
             return serializer != null;
         }
 
@@ -1743,7 +1738,7 @@ namespace Orleans.Serialization
                 var baseType = ResolveTypeName(baseName + typeArgs.Count);
                 return baseType.MakeGenericType(typeArgs.ToArray<Type>());
             }
-            
+
             throw new TypeAccessException("Type string \"" + typeName + "\" cannot be resolved.");
         }
 
