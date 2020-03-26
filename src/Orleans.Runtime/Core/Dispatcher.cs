@@ -408,7 +408,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (targetActivation.Grain.IsLegacyGrain() && message.IsUsingInterfaceVersions)
+                if (targetActivation.GrainId.IsLegacyGrain() && message.IsUsingInterfaceVersions)
                 {
                     var request = (InvokeMethodRequest)message.BodyObject;
                     var compatibilityDirector = compatibilityDirectorManager.GetDirector(request.InterfaceId);

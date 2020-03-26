@@ -490,10 +490,9 @@ namespace UnitTests.General
 
             try
             {
-                output.WriteLine("OnInvoke called for Grain={0} PrimaryKey={1} GrainId={2} with {3} arguments",
+                output.WriteLine("OnInvoke called for Grain={0} PrimaryKey={1} with {2} arguments",
                     grain.GetType().FullName,
-                    ((LegacyGrainId)((GrainReference)grain).GrainId).GetPrimaryKeyLong(),
-                    ((GrainReference)grain).GrainId,
+                    grain.GetGrainIdentity(),
                     request.Arguments != null ? request.Arguments.Length : 0);
             }
             catch (Exception exc)

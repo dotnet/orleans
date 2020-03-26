@@ -40,7 +40,7 @@ namespace Orleans
             get { return Data?.ServiceProvider ?? Runtime?.ServiceProvider; }
         }
 
-        internal GrainId Identity;
+        internal GrainId GrainId;
 
         /// <summary>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of Grain) do not have to add a constructor.
@@ -57,7 +57,7 @@ namespace Orleans
         /// </summary>
         protected Grain(GrainId identity, IGrainRuntime runtime)
         {
-            Identity = identity;
+            GrainId = identity;
             Runtime = runtime;
         }
 
@@ -65,7 +65,7 @@ namespace Orleans
         /// <summary>
         /// String representation of grain's SiloIdentity including type and primary key.
         /// </summary>
-        public string IdentityString => this.Identity.ToString();
+        public string IdentityString => this.GrainId.ToString();
 
         /// <summary>
         /// A unique identifier for the current silo.

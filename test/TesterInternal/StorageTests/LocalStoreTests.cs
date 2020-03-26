@@ -183,7 +183,7 @@ namespace UnitTests.StorageTests
             IList<Tuple<string, string>> keys = new[]
             {
                 Tuple.Create("GrainType", name),
-                Tuple.Create("GrainId", ((LegacyGrainId)reference.GrainId).GetPrimaryKey().ToString("N"))
+                Tuple.Create("GrainId", reference.GrainId.ToString())
             }.ToList();
             store.WriteRow(keys, AsDictionary(state), grainState.ETag);
             TimeSpan writeTime = sw.Elapsed;
@@ -203,7 +203,7 @@ namespace UnitTests.StorageTests
             var keys = new[]
             {
                 Tuple.Create("GrainType", grainTypeName),
-                Tuple.Create("GrainId", ((LegacyGrainId)grain.GrainId).GetPrimaryKey().ToString("N"))
+                Tuple.Create("GrainId", grain.GrainId.ToString())
             };
             return keys.ToList();
         }

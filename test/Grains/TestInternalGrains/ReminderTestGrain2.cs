@@ -47,7 +47,7 @@ namespace UnitTests.Grains
             this.sequence = new Dictionary<string, long>();
             this.period = GetDefaultPeriod(this.logger);
             this.logger.Info("OnActivateAsync.");
-            this.filePrefix = "g" + this.Identity.ToString().Replace('/', '_') + "_";
+            this.filePrefix = "g" + this.GrainId.ToString().Replace('/', '_') + "_";
             return GetMissingReminders();
         }
 
@@ -240,7 +240,7 @@ namespace UnitTests.Grains
             this.sequence = new Dictionary<string, long>();
             this.period = ReminderTestGrain2.GetDefaultPeriod(this.logger);
             this.logger.Info("OnActivateAsync.");
-            this.filePrefix = "gc" + ((LegacyGrainId)this.Identity).PrimaryKey + "_";
+            this.filePrefix = "gc" + this.GrainId.Key + "_";
             await GetMissingReminders();
         }
 
@@ -253,7 +253,7 @@ namespace UnitTests.Grains
         public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? p = null, bool validate = false)
         {
             TimeSpan usePeriod = p ?? this.period;
-            this.logger.Info("Starting reminder {0} for {1}", reminderName, this.Identity);
+            this.logger.Info("Starting reminder {0} for {1}", reminderName, this.GrainId);
             IGrainReminder r = null;
             if (validate)
                 r = await RegisterOrUpdateReminder(reminderName, /*TimeSpan.FromSeconds(3)*/usePeriod - TimeSpan.FromSeconds(2), usePeriod);

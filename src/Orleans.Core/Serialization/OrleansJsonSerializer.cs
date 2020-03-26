@@ -194,15 +194,17 @@ namespace Orleans.Serialization
         {
             GrainId id = (GrainId)value;
             writer.WriteStartObject();
-            writer.WritePropertyName("GrainId");
-            writer.WriteValue(((LegacyGrainId)id).ToParsableString());
+            writer.WritePropertyName("Type");
+            writer.WriteValue(id.Type.ToStringUtf8());
+            writer.WritePropertyName("Key");
+            writer.WriteValue(id.Key.ToStringUtf8());
             writer.WriteEndObject();
         }
 
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
-            GrainId grainId = LegacyGrainId.FromParsableString(jo["GrainId"].ToObject<string>());
+            GrainId grainId = GrainId.Create(jo["Type"].ToObject<string>(), jo["Key"].ToObject<string>());
             return grainId;
         }
     }

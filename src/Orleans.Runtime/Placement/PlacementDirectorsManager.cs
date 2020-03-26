@@ -109,7 +109,7 @@ namespace Orleans.Runtime.Placement
 
             var director = ResolveDirector(strategy);
             var siloAddress = await director.OnAddActivation(strategy, target, context);
-            var grainTypeName = context.GetGrainTypeName(((LegacyGrainId)target.GrainIdentity).TypeCode);
+            var grainTypeName = context.GetGrainTypeName(LegacyGrainId.FromGrainId(target.GrainIdentity).TypeCode);
 
             ActivationId activationId;
             if (strategy.IsDeterministicActivationId)

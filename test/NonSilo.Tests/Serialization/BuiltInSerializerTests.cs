@@ -784,7 +784,6 @@ namespace UnitTests.Serialization
 
             var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
             Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
-            Assert.Equal(((LegacyGrainId)grainId).GetPrimaryKey(), ((LegacyGrainId)grainRef.GrainId).GetPrimaryKey()); //PK different after copy
             Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
         }
 
@@ -801,7 +800,6 @@ namespace UnitTests.Serialization
             var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
             Assert.True(grainRef.IsBound);
             Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
-            Assert.Equal(((LegacyGrainId)grainId).GetPrimaryKey(), ((LegacyGrainId)grainRef.GrainId).GetPrimaryKey()); //PK different after copy
             Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
         }
         

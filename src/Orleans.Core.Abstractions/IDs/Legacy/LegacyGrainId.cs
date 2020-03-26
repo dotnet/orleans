@@ -8,7 +8,7 @@ using Orleans.Core;
 namespace Orleans.Runtime
 {
     [Serializable]
-    public class LegacyGrainId : IEquatable<LegacyGrainId>, IComparable<LegacyGrainId>, IGrainIdentity
+    public class LegacyGrainId : IEquatable<LegacyGrainId>, IComparable<LegacyGrainId>
     {
         private static readonly object lockable = new object();
         private const int INTERN_CACHE_INITIAL_SIZE = InternerConstants.SIZE_LARGE;

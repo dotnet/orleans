@@ -101,7 +101,7 @@ namespace Orleans.Streams
         /// <returns>true if the grain id describes an implicit subscriber of the stream described by the stream id.</returns>
         internal bool IsImplicitSubscriber(GrainId grainId, StreamId streamId)
         {
-            return grainId.IsLegacyGrain() && HasImplicitSubscription(streamId.Namespace, ((LegacyGrainId)grainId).TypeCode);
+            return grainId.IsLegacyGrain() && HasImplicitSubscription(streamId.Namespace, LegacyGrainId.FromGrainId(grainId).TypeCode);
         }
 
         /// <summary>
@@ -116,7 +116,7 @@ namespace Orleans.Streams
         {
             subscriptionId = Guid.Empty;
 
-            if (!HasImplicitSubscription(streamId.Namespace, ((LegacyGrainId)grainId).TypeCode))
+            if (!HasImplicitSubscription(streamId.Namespace, LegacyGrainId.FromGrainId(grainId).TypeCode))
             {
                 return false;
             }
@@ -136,7 +136,7 @@ namespace Orleans.Streams
         private Guid MakeSubscriptionGuid(GrainId grainId, StreamId streamId)
         {
             // first int in guid is grain type code
-            int grainIdTypeCode = ((LegacyGrainId)grainId).TypeCode;
+            int grainIdTypeCode = LegacyGrainId.FromGrainId(grainId).TypeCode;
 
             return MakeSubscriptionGuid(grainIdTypeCode, streamId);
         }

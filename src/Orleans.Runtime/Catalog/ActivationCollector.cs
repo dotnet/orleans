@@ -319,7 +319,7 @@ namespace Orleans.Runtime
                 condemned.Add(activation);
             }
 
-            this.Debug_OnDecideToCollectActivation?.Invoke(activation.Grain);
+            this.Debug_OnDecideToCollectActivation?.Invoke(activation.GrainId);
         }
 
         private static void ThrowIfTicketIsInvalid(DateTime ticket, TimeSpan quantum)

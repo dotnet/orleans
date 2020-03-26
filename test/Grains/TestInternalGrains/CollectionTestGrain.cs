@@ -26,7 +26,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
-                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", Identity, Data.ActivationId, RuntimeIdentity));
+                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, Data.ActivationId, RuntimeIdentity));
             logger.Info("OnActivateAsync.");
             activated = DateTime.UtcNow;
             counter = 0;
@@ -120,7 +120,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>()
-                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", Identity, Data.ActivationId, RuntimeIdentity));
+                .CreateLogger(string.Format("CollectionTestGrain {0} {1} on {2}.", GrainId, Data.ActivationId, RuntimeIdentity));
             logger.Info("OnActivateAsync.");
             counter = 0;
             return Task.CompletedTask;

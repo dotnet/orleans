@@ -22,7 +22,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="IdSpan"/> instance from the provided value.
         /// </summary>
-        public IdSpan(byte[] value)
+        internal IdSpan(byte[] value)
         {
             _value = value;
             _hashCode = GetHashCode(value);

@@ -27,14 +27,14 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
-        public GrainId(byte[] type, byte[] key) : this(new GrainType(type), new IdSpan(key))
+        internal GrainId(byte[] type, byte[] key) : this(new GrainType(type), new IdSpan(key))
         {
         }
 
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
-        public GrainId(GrainType type, byte[] key) : this(type, new IdSpan(key))
+        internal GrainId(GrainType type, byte[] key) : this(type, new IdSpan(key))
         {
         }
 

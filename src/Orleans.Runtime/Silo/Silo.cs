@@ -759,7 +759,7 @@ namespace Orleans.Runtime
                     if (workItemGroup == null)
                     {
                         sb.AppendFormat("Activation with no work item group!! Grain {0}, activation {1}.",
-                            activationData.Grain,
+                            activationData.GrainId,
                             activationData.ActivationId);
                         sb.AppendLine();
                         return;
