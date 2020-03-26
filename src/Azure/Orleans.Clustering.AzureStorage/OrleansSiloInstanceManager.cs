@@ -9,6 +9,7 @@ using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using Orleans.Clustering.AzureStorage;
 using Orleans.Clustering.AzureStorage.Utilities;
+using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
 
@@ -29,29 +30,22 @@ namespace Orleans.AzureUtils
 
         private OrleansSiloInstanceManager(
             string clusterId,
-            string storageConnectionString,
-            string tableName,
             ILoggerFactory loggerFactory,
-            TimeSpan tableCreationTimeout = default,
-            TimeSpan tableOperationTimeout = default)
+            AzureStorageOperationOptions options)
         {
             DeploymentId = clusterId;
-            TableName = tableName;
+            TableName = options.TableName;
             logger = loggerFactory.CreateLogger<OrleansSiloInstanceManager>();
             storage = new AzureTableDataManager<SiloInstanceTableEntry>(
-                tableName, storageConnectionString, loggerFactory, tableCreationTimeout, tableOperationTimeout);
+                options.TableName, options.ConnectionString, loggerFactory, options.CreationTimeout, options.OperationTimeout);
         }
 
         public static async Task<OrleansSiloInstanceManager> GetManager(
             string clusterId,
-            string storageConnectionString,
-            string tableName,
             ILoggerFactory loggerFactory,
-            TimeSpan tableCreationTimeout = default,
-            TimeSpan tableOperationTimeout = default)
+            AzureStorageOperationOptions options)
         {
-            tableCreationTimeout = (tableCreationTimeout == default) ? AzureTableDefaultPolicies.TableCreationTimeout : tableCreationTimeout;
-            var instance = new OrleansSiloInstanceManager(clusterId, storageConnectionString, tableName, loggerFactory, tableCreationTimeout, tableOperationTimeout);
+            var instance = new OrleansSiloInstanceManager(clusterId, loggerFactory, options);
             try
             {
                 await instance.storage.InitTableAsync();

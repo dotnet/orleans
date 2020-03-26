@@ -1,3 +1,6 @@
+using System;
+using System.ComponentModel;
+
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
 #elif ORLEANS_PERSISTENCE
@@ -20,8 +23,20 @@ namespace Orleans.GrainDirectory.AzureStorage
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 {
-    public class AzureStorageGatewayOptions : AzureStorageOperationOptions
+    public abstract class AzureStorageOperationOptions
     {
-        
+        public TimeSpan CreationTimeout { get; set; } = AzureTableDefaultPolicies.TableCreationTimeout;
+        public TimeSpan OperationTimeout { get; set; } = AzureTableDefaultPolicies.TableOperationTimeout;
+        /// <summary>
+        /// Connection string for Azure Storage
+        /// </summary>
+        [RedactConnectionString]
+        public string ConnectionString { get; set; }
+
+        /// <summary>
+        /// Table name for Azure Storage
+        /// </summary>
+        [DefaultValue("OrleansSiloInstances")]
+        public virtual string TableName { get; set; }
     }
 }

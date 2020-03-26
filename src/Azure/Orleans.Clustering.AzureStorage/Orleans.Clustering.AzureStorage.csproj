@@ -19,7 +19,7 @@
     <Compile Include="..\Shared\Storage\AzureTableDefaultPolicies.cs" Link="Storage\AzureTableDefaultPolicies.cs" />
     <Compile Include="..\Shared\Storage\AzureTableUtils.cs" Link="Storage\AzureTableUtils.cs" />
     <Compile Include="..\Shared\Utilities\ErrorCode.cs" Link="Utilities\ErrorCode.cs" />
-    <Compile Include="..\Shared\Storage\AzureStorageOptions.cs" Link="Storage\AzureStorageOptions.cs" />
+    <Compile Include="..\Shared\Storage\AzureStorageOperationOptions.cs" Link="Storage\AzureStorageOperationOptions.cs" />
   </ItemGroup>
 
   <ItemGroup>

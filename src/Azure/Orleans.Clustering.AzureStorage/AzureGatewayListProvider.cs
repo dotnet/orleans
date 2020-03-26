@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Clustering.AzureStorage;
 using Orleans.Configuration;
 using Orleans.Messaging;
 
@@ -27,11 +28,8 @@ namespace Orleans.AzureUtils
         {
             this.siloInstanceManager = await OrleansSiloInstanceManager.GetManager(
                 this.clusterId,
-                this.options.ConnectionString,
-                this.options.TableName,
                 this.loggerFactory,
-                this.options.CreationTimeout,
-                this.options.OperationTimeout);
+                this.options);
         }
         // no caching
         public Task<IList<Uri>> GetGateways()

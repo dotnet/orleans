@@ -41,11 +41,8 @@ namespace Orleans.Runtime.MembershipService
 
             this.tableManager = await OrleansSiloInstanceManager.GetManager(
                 this.clusterId,
-                this.options.ConnectionString,
-                this.options.TableName,
                 this.loggerFactory,
-                this.options.CreationTimeout,
-                this.options.OperationTimeout);
+                this.options);
 
             // even if I am not the one who created the table,
             // try to insert an initial table version if it is not already there,

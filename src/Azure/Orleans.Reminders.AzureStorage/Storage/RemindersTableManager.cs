@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Reminders.AzureStorage;
 using Orleans.Internal;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -73,11 +74,9 @@ namespace Orleans.Runtime.ReminderService
         public string ServiceId { get; private set; }
         public string ClusterId { get; private set; }
 
-        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory,
-            TimeSpan tableCreationTimeout = default,
-            TimeSpan tableOperationTimeout = default)
+        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, ILoggerFactory loggerFactory, AzureStorageOperationOptions options)
         {
-            var singleton = new RemindersTableManager(serviceId, clusterId, storageConnectionString, tableName, loggerFactory, tableCreationTimeout, tableOperationTimeout);
+            var singleton = new RemindersTableManager(serviceId, clusterId, options.ConnectionString, options.TableName, loggerFactory, options.CreationTimeout, options.OperationTimeout);
             try
             {
                 singleton.Logger.Info("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
@@ -100,7 +99,7 @@ namespace Orleans.Runtime.ReminderService
             ILoggerFactory loggerFactory,
             TimeSpan tableCreationTimeout = default,
             TimeSpan tableOperationTimeout = default)
-            : base(tableName, storageConnectionString, loggerFactory)
+            : base(tableName, storageConnectionString, loggerFactory, tableCreationTimeout, tableOperationTimeout)
         {
             ClusterId = clusterId;
             ServiceId = serviceId;
