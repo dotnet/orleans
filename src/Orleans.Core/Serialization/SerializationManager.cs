@@ -101,12 +101,14 @@ namespace Orleans.Serialization
             deserializers = new Dictionary<Type, Deserializer>();
             grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
 
-            var options = serializationProviderOptions.Value;
+            this.SerializationProviderOptions = serializationProviderOptions.Value;
 
-            fallbackSerializer = GetFallbackSerializer(serviceProvider, options.FallbackSerializationProvider);
+            fallbackSerializer = GetFallbackSerializer(serviceProvider, SerializationProviderOptions.FallbackSerializationProvider);
             
-            RegisterSerializationProviders(options.SerializationProviders);
+            RegisterSerializationProviders(SerializationProviderOptions.SerializationProviders);
         }
+
+        internal SerializationProviderOptions SerializationProviderOptions { get; }
 
         public void RegisterSerializers(IApplicationPartManager applicationPartManager)
         {
