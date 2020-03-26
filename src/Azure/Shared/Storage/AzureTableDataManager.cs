@@ -58,14 +58,14 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="tableName">Name of the table to be connected to.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
-        /// <param name="loggerFactory">Logger factory to use.</param>
+        /// <param name="logger">Logger to use.</param>
         /// <param name="tableCreationTimeout">Optional parameter to configure the timeout for table creation</param>
         /// <param name="tableOperationTimeout">Optional parameter to configure the timeout for table operations</param>
-        public AzureTableDataManager(string tableName, string storageConnectionString, ILoggerFactory loggerFactory, TimeSpan tableCreationTimeout = default, TimeSpan tableOperationTimeout = default)
+        public AzureTableDataManager(string tableName, string storageConnectionString, ILogger logger, TimeSpan tableCreationTimeout = default, TimeSpan tableOperationTimeout = default)
         {
-            this.Logger = loggerFactory.CreateLogger<AzureTableDataManager<T>>();
-            this.TableName = tableName;
-            this.ConnectionString = storageConnectionString;
+            Logger = logger;
+            TableName = tableName;
+            ConnectionString = storageConnectionString;
 
             AzureTableUtils.ValidateTableName(tableName);
             this.tableCreationTimeout = (tableCreationTimeout == default) ? AzureTableDefaultPolicies.TableCreationTimeout : tableCreationTimeout;

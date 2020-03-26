@@ -90,7 +90,7 @@ namespace Orleans.Runtime.ReminderService
             }
             return singleton;
         }
-
+        
         private RemindersTableManager(
             string serviceId,
             string clusterId,
@@ -99,7 +99,7 @@ namespace Orleans.Runtime.ReminderService
             ILoggerFactory loggerFactory,
             TimeSpan tableCreationTimeout = default,
             TimeSpan tableOperationTimeout = default)
-            : base(tableName, storageConnectionString, loggerFactory, tableCreationTimeout, tableOperationTimeout)
+            : base(tableName, storageConnectionString, loggerFactory.CreateLogger<RemindersTableManager>(), tableCreationTimeout, tableOperationTimeout)
         {
             ClusterId = clusterId;
             ServiceId = serviceId;

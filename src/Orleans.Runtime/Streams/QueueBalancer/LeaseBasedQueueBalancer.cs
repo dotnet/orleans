@@ -50,7 +50,7 @@ namespace Orleans.Streams
         /// Constructor
         /// </summary>
         public LeaseBasedQueueBalancer(string name, LeaseBasedQueueBalancerOptions options, ILeaseProvider leaseProvider, ITimerRegistry timerRegistry, IServiceProvider services, ILoggerFactory loggerFactory)
-            : base(services, loggerFactory.CreateLogger($"{nameof(LeaseBasedQueueBalancer)}-{name}"))
+            : base(services, loggerFactory.CreateLogger($"{typeof(LeaseBasedQueueBalancer).FullName}.{name}"))
         {
             this.options = options;
             this.leaseProvider = leaseProvider;

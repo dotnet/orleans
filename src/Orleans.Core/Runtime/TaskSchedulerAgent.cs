@@ -24,40 +24,27 @@ namespace Orleans.Runtime
         protected CancellationTokenSource Cts;
         protected object Lockable;
         protected ILogger Log;
-        protected ILoggerFactory loggerFactory;
-        protected readonly string type;
         protected FaultBehavior OnFault;
         protected bool disposed;
 
         public AgentState State { get; private set; }
         internal string Name { get; private set; }
 
-        protected TaskSchedulerAgent(ILoggerFactory loggerFactory) : this(null, loggerFactory) { }
-
-        protected TaskSchedulerAgent(string nameSuffix, ILoggerFactory loggerFactory)
+        protected TaskSchedulerAgent(ILoggerFactory loggerFactory)
         {
             Cts = new CancellationTokenSource();
-            var thisType = GetType();
 
-            type = thisType.Namespace + "." + thisType.Name;
-            if (type.StartsWith("Orleans.", StringComparison.Ordinal))
+            this.Log = loggerFactory.CreateLogger(this.GetType());
+            var typeName = GetType().FullName;
+            if (typeName.StartsWith("Orleans.", StringComparison.Ordinal))
             {
-                type = type.Substring(8);
+                typeName = typeName.Substring(8);
             }
-            if (!string.IsNullOrEmpty(nameSuffix))
-            {
-                Name = type + "/" + nameSuffix;
-            }
-            else
-            {
-                Name = type;
-            }
+
+            Name = typeName;
 
             Lockable = new object();
             OnFault = FaultBehavior.IgnoreFault;
-
-            this.loggerFactory = loggerFactory;
-            this.Log = loggerFactory.CreateLogger(Name);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]

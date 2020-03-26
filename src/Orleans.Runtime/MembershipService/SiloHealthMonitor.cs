@@ -41,7 +41,7 @@ namespace Orleans.Runtime.MembershipService
             this.stopping = this.stoppingCancellation.Token.WhenCancelled();
             this.SiloAddress = siloAddress;
             this.prober = remoteSiloProber;
-            this.log = loggerFactory.CreateLogger($"{nameof(SiloHealthMonitor)}/{this.SiloAddress}");
+            this.log = loggerFactory.CreateLogger<SiloHealthMonitor>();
         }
 
         internal interface ITestAccessor

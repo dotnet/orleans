@@ -37,7 +37,11 @@ namespace Orleans.AzureUtils
             TableName = options.TableName;
             logger = loggerFactory.CreateLogger<OrleansSiloInstanceManager>();
             storage = new AzureTableDataManager<SiloInstanceTableEntry>(
-                options.TableName, options.ConnectionString, loggerFactory, options.CreationTimeout, options.OperationTimeout);
+                options.TableName,
+                options.ConnectionString,
+                loggerFactory.CreateLogger<AzureTableDataManager<SiloInstanceTableEntry>>(),
+                options.CreationTimeout,
+                options.OperationTimeout);
         }
 
         public static async Task<OrleansSiloInstanceManager> GetManager(
