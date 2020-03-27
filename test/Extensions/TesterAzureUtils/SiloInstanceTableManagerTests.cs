@@ -129,7 +129,7 @@ namespace Tester.AzureUtils
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
             bool didInsert = await manager.TryCreateTableVersionEntryAsync()
-                .WithTimeout(Orleans.Clustering.AzureStorage.AzureTableDefaultPolicies.TableOperationTimeout);
+                .WithTimeout(new Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions().OperationTimeout);
 
             Assert.True(didInsert, "Did insert");
         }

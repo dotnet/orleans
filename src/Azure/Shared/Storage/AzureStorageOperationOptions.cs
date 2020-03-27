@@ -25,8 +25,11 @@ namespace Orleans.GrainDirectory.AzureStorage
 {
     public abstract class AzureStorageOperationOptions
     {
-        public TimeSpan CreationTimeout { get; set; } = AzureTableDefaultPolicies.TableCreationTimeout;
-        public TimeSpan OperationTimeout { get; set; } = AzureTableDefaultPolicies.TableOperationTimeout;
+        /// <summary>
+        /// Azure Storage Policy Options
+        /// </summary>
+        public AzureStoragePolicyOptions StoragePolicyOptions { get; set; }
+        
         /// <summary>
         /// Connection string for Azure Storage
         /// </summary>
@@ -36,7 +39,6 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <summary>
         /// Table name for Azure Storage
         /// </summary>
-        [DefaultValue("OrleansSiloInstances")]
-        public virtual string TableName { get; set; }
+        public abstract string TableName { get; set; }
     }
 }

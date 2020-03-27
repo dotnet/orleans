@@ -76,7 +76,7 @@ namespace Orleans.Runtime.ReminderService
 
         public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, ILoggerFactory loggerFactory, AzureStorageOperationOptions options)
         {
-            var singleton = new RemindersTableManager(serviceId, clusterId, options.ConnectionString, options.TableName, loggerFactory, options.CreationTimeout, options.OperationTimeout);
+            var singleton = new RemindersTableManager(serviceId, clusterId, options.ConnectionString, options.TableName, loggerFactory, options.StoragePolicyOptions);
             try
             {
                 singleton.Logger.Info("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
@@ -97,9 +97,8 @@ namespace Orleans.Runtime.ReminderService
             string storageConnectionString,
             string tableName,
             ILoggerFactory loggerFactory,
-            TimeSpan tableCreationTimeout = default,
-            TimeSpan tableOperationTimeout = default)
-            : base(tableName, storageConnectionString, loggerFactory.CreateLogger<RemindersTableManager>(), tableCreationTimeout, tableOperationTimeout)
+            AzureStoragePolicyOptions storagePolicyOptions = default)
+            : base(tableName, storageConnectionString, loggerFactory.CreateLogger<RemindersTableManager>(), storagePolicyOptions)
         {
             ClusterId = clusterId;
             ServiceId = serviceId;
@@ -235,7 +234,7 @@ namespace Orleans.Runtime.ReminderService
 
                 foreach (var entriesPerPartition in groupedByHash.Values)
                 {
-                    foreach (var batch in entriesPerPartition.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                    foreach (var batch in entriesPerPartition.BatchIEnumerable(this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS))
                     {
                         tasks.Add(DeleteTableEntriesAsync(batch));
                     }

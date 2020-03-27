@@ -11,8 +11,6 @@ using Tester;
 using TestExtensions;
 using Xunit;
 using Orleans.Reminders.AzureStorage;
-using Orleans.Clustering.AzureStorage;
-using AzureTableDefaultPolicies = Orleans.Clustering.AzureStorage.AzureTableDefaultPolicies;
 
 namespace UnitTests.RemindersTest
 {

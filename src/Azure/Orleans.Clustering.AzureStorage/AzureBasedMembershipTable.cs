@@ -36,7 +36,6 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            AzureTableDefaultPolicies.MaxBusyRetries = options.MaxStorageBusyRetries;
             LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureTableUtils.PrintStorageException);
 
             this.tableManager = await OrleansSiloInstanceManager.GetManager(

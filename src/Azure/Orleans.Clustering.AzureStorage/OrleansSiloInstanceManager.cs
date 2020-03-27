@@ -9,7 +9,6 @@ using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using Orleans.Clustering.AzureStorage;
 using Orleans.Clustering.AzureStorage.Utilities;
-using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
 
@@ -25,6 +24,7 @@ namespace Orleans.AzureUtils
 
         private readonly AzureTableDataManager<SiloInstanceTableEntry> storage;
         private readonly ILogger logger;
+        private readonly AzureStoragePolicyOptions storagePolicyOptions;
 
         public string DeploymentId { get; private set; }
 
@@ -40,8 +40,8 @@ namespace Orleans.AzureUtils
                 options.TableName,
                 options.ConnectionString,
                 loggerFactory.CreateLogger<AzureTableDataManager<SiloInstanceTableEntry>>(),
-                options.CreationTimeout,
-                options.OperationTimeout);
+                options.StoragePolicyOptions);
+            this.storagePolicyOptions = options.StoragePolicyOptions;
         }
 
         public static async Task<OrleansSiloInstanceManager> GetManager(
@@ -78,24 +78,21 @@ namespace Orleans.AzureUtils
         {
             entry.Status = INSTANCE_STATUS_CREATED;
             logger.Info(ErrorCode.Runtime_Error_100270, "Registering silo instance: {0}", entry.ToString());
-            storage.UpsertTableEntryAsync(entry)
-                .WaitWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
+            Task.WaitAll(new Task[] { storage.UpsertTableEntryAsync(entry) });
         }
 
         public void UnregisterSiloInstance(SiloInstanceTableEntry entry)
         {
             entry.Status = INSTANCE_STATUS_DEAD;
             logger.Info(ErrorCode.Runtime_Error_100271, "Unregistering silo instance: {0}", entry.ToString());
-            storage.UpsertTableEntryAsync(entry)
-                .WaitWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
+            Task.WaitAll(new Task[] { storage.UpsertTableEntryAsync(entry) });
         }
 
         public void ActivateSiloInstance(SiloInstanceTableEntry entry)
         {
             logger.Info(ErrorCode.Runtime_Error_100272, "Activating silo instance: {0}", entry.ToString());
             entry.Status = INSTANCE_STATUS_ACTIVE;
-            storage.UpsertTableEntryAsync(entry)
-                .WaitWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
+            Task.WaitAll(new Task[] { storage.UpsertTableEntryAsync(entry) });
         }
 
         public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
@@ -136,8 +133,7 @@ namespace Orleans.AzureUtils
                     INSTANCE_STATUS_ACTIVE);
                 string filterOnProxyPort = TableQuery.GenerateFilterCondition(nameof(SiloInstanceTableEntry.ProxyPort), QueryComparisons.NotEqual, zeroPort);
                 string query = TableQuery.CombineFilters(filterOnPartitionKey, TableOperators.And, TableQuery.CombineFilters(filterOnStatus, TableOperators.And, filterOnProxyPort));
-                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query)
-                                    .WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
+                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query);
 
                 List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
 
@@ -210,14 +206,14 @@ namespace Orleans.AzureUtils
 
         private async Task DeleteEntriesBatch(List<Tuple<SiloInstanceTableEntry, string>> entriesList)
         {
-            if (entriesList.Count <= AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+            if (entriesList.Count <= this.storagePolicyOptions.MAX_BULK_UPDATE_ROWS)
             {
                 await storage.DeleteTableEntriesAsync(entriesList);
             }
             else
             {
                 var tasks = new List<Task>();
-                foreach (var batch in entriesList.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                foreach (var batch in entriesList.BatchIEnumerable(this.storagePolicyOptions.MAX_BULK_UPDATE_ROWS))
                 {
                     tasks.Add(storage.DeleteTableEntriesAsync(batch));
                 }

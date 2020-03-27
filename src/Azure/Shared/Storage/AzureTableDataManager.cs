@@ -50,8 +50,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public CloudTable Table { get; private set; }
 
-        private TimeSpan tableCreationTimeout;
-        private TimeSpan tableOperationTimeout;
+        public AzureStoragePolicyOptions StoragePolicyOptions;
 
         /// <summary>
         /// Constructor
@@ -59,17 +58,15 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="tableName">Name of the table to be connected to.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         /// <param name="logger">Logger to use.</param>
-        /// <param name="tableCreationTimeout">Optional parameter to configure the timeout for table creation</param>
-        /// <param name="tableOperationTimeout">Optional parameter to configure the timeout for table operations</param>
-        public AzureTableDataManager(string tableName, string storageConnectionString, ILogger logger, TimeSpan tableCreationTimeout = default, TimeSpan tableOperationTimeout = default)
+        /// <param name="storagePolicyOptions">Optional Storage Policy Configuration.</param>
+        public AzureTableDataManager(string tableName, string storageConnectionString, ILogger logger, AzureStoragePolicyOptions storagePolicyOptions = default)
         {
             Logger = logger;
             TableName = tableName;
             ConnectionString = storageConnectionString;
 
             AzureTableUtils.ValidateTableName(tableName);
-            this.tableCreationTimeout = (tableCreationTimeout == default) ? AzureTableDefaultPolicies.TableCreationTimeout : tableCreationTimeout;
-            this.tableOperationTimeout = (tableOperationTimeout == default) ? AzureTableDefaultPolicies.TableOperationTimeout : tableOperationTimeout;
+            this.StoragePolicyOptions ??= storagePolicyOptions;
         }
 
         /// <summary>
@@ -95,7 +92,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
             catch (TimeoutException te)
             {
-                var errorMsg = $"Unable to create or connect to the Azure table in {this.tableCreationTimeout}";
+                var errorMsg = $"Unable to create or connect to the Azure table in {this.StoragePolicyOptions.CreationTimeout}";
                 this.Logger.Error((int)Utilities.ErrorCode.AzureTable_TableNotCreated, errorMsg, te);
                 throw new OrleansException(errorMsg, te);
             }
@@ -150,7 +147,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             IEnumerable<Tuple<T,string>> items = await ReadAllTableEntriesAsync();
             IEnumerable<Task> work = items.GroupBy(item => item.Item1.PartitionKey)
-                                          .SelectMany(partition => partition.ToBatch(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                                          .SelectMany(partition => partition.ToBatch(this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS))
                                           .Select(batch => DeleteTableEntriesAsync(batch.ToList()));
             await Task.WhenAll(work);
         }
@@ -449,10 +446,10 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             if (collection == null) throw new ArgumentNullException("collection");
 
-            if (collection.Count > AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+            if (collection.Count > this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS)
             {
                 throw new ArgumentOutOfRangeException("collection", collection.Count,
-                        "Too many rows for bulk delete - max " + AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS);
+                        "Too many rows for bulk delete - max " + this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS);
             }
 
             if (collection.Count == 0)
@@ -524,13 +521,13 @@ namespace Orleans.GrainDirectory.AzureStorage
                     };
 
 #if !ORLEANS_TRANSACTIONS
-                    IBackoffProvider backoff = new FixedBackoff(AzureTableDefaultPolicies.PauseBetweenTableOperationRetries);
+                    IBackoffProvider backoff = new FixedBackoff(this.StoragePolicyOptions.PauseBetweenOperationRetries);
 
                     List<T> results = await AsyncExecutorWithRetries.ExecuteWithRetries(
                         counter => executeQueryHandleContinuations(),
-                        AzureTableDefaultPolicies.MaxTableOperationRetries,
+                        this.StoragePolicyOptions.MaxOperationRetries,
                         (exc, counter) => AzureTableUtils.AnalyzeReadException(exc.GetBaseException(), counter, TableName, Logger),
-                        this.tableOperationTimeout,
+                        this.StoragePolicyOptions.OperationTimeout,
                         backoff);
 #else
                     List<T> results = await executeQueryHandleContinuations();
@@ -566,10 +563,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "BulkInsertTableEntries";
             if (collection == null) throw new ArgumentNullException("collection");
-            if (collection.Count > AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+            if (collection.Count > this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS)
             {
                 throw new ArgumentOutOfRangeException("collection", collection.Count,
-                        "Too many rows for bulk update - max " + AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS);
+                        "Too many rows for bulk update - max " + this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS);
             }
 
             if (collection.Count == 0)
@@ -718,8 +715,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 CloudStorageAccount storageAccount = AzureTableUtils.GetCloudStorageAccount(ConnectionString);
                 CloudTableClient operationsClient = storageAccount.CreateCloudTableClient();
-                operationsClient.DefaultRequestOptions.RetryPolicy = AzureTableDefaultPolicies.TableOperationRetryPolicy;
-                operationsClient.DefaultRequestOptions.MaximumExecutionTime = this.tableOperationTimeout;
+                operationsClient.DefaultRequestOptions.RetryPolicy = this.StoragePolicyOptions.OperationRetryPolicy;
+                operationsClient.DefaultRequestOptions.MaximumExecutionTime = this.StoragePolicyOptions.OperationTimeout;
                 // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
                 operationsClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
                 return operationsClient;
@@ -737,8 +734,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 CloudStorageAccount storageAccount = AzureTableUtils.GetCloudStorageAccount(ConnectionString);
                 CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
-                creationClient.DefaultRequestOptions.RetryPolicy = AzureTableDefaultPolicies.TableCreationRetryPolicy;
-                creationClient.DefaultRequestOptions.MaximumExecutionTime = this.tableCreationTimeout;
+                creationClient.DefaultRequestOptions.RetryPolicy = this.StoragePolicyOptions.CreationRetryPolicy;
+                creationClient.DefaultRequestOptions.MaximumExecutionTime = this.StoragePolicyOptions.CreationTimeout;
                 // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
                 creationClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
                 return creationClient;
@@ -771,7 +768,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         private void CheckAlertSlowAccess(DateTime startOperation, string operation)
         {
             var timeSpan = DateTime.UtcNow - startOperation;
-            if (timeSpan > this.tableOperationTimeout)
+            if (timeSpan > this.StoragePolicyOptions.OperationTimeout)
             {
                 Logger.Warn((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {0} for {1}, which took {2}.", TableName, operation, timeSpan);
             }
