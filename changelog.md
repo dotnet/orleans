@@ -7,6 +7,21 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.1.4] (changes since 3.1.3)
+
+- Non-breaking improvements
+  - Reduce port clashes in TestCluster (#6399, #6413)
+  - Use the overload of ConcurrentDictionary.GetOrAdd that takes a method (#6409)
+  - Ignore not found exception when clearing azure queues (#6419)
+  - MembershipTableCleanupAgent: dispose timer if cleanup is unsupported (#6415)
+  - Allow grain call filters to retry calls (#6414)
+  - Avoid most cases of loggers with non-static category names (#6430)
+  - Free SerializationContext and DeserializationContext between calls (#6433)
+
+- Non-breaking bug fixes
+  - Reminders period overflow issue in ADO.NET Reminders Table (#6390)
+  - Read only the body segment from EventData (#6412)
+
 ### [3.1.3] (changes since 3.1.2)
 
 - Breaking changes (for rolling upgrades from 3.1.0 and 3.1.2 running on .NET Core 3.1)
