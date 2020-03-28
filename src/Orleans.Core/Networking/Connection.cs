@@ -39,6 +39,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ChannelWriter<Message> outgoingMessageWriter;
         private readonly object lockObj = new object();
         private readonly List<Message> inflight = new List<Message>(4);
+        private readonly Dictionary<CorrelationId, Message> outstandingRequests = new Dictionary<CorrelationId, Message>();
 
         protected Connection(
             ConnectionContext connection,
@@ -231,6 +232,12 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     MessagingStatisticsGroup.OnMessageReceive(this.MessageReceivedCounter, message, bodyLength + headerLength, headerLength, this.ConnectionDirection);
+
+                                    if (message.Category == Message.Categories.Application && message.Direction == Message.Directions.Response)
+                                    {
+                                        this.outstandingRequests.Remove(message.Id);
+                                    }
+
 #if NETCOREAPP
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(message, this);
@@ -323,6 +330,14 @@ namespace Orleans.Runtime.Messaging
                         break;
                     }
 
+                    foreach (var msg in inflight)
+                    {
+                        if (msg.Category == Message.Categories.Application && msg.Direction == Message.Directions.Request)
+                        {
+                            outstandingRequests.Add(msg.Id, msg);
+                        }
+                    }
+
                     inflight.Clear();
                 }
             }
@@ -360,6 +375,13 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 this.inflight.Clear();
+
+                foreach (var message in this.outstandingRequests)
+                {
+                    this.OnSendMessageFailure(message.Value, "Connection terminated");
+                }
+
+                this.outstandingRequests.Clear();
             }
 
             var i = 0;
