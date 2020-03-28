@@ -1,9 +1,9 @@
-﻿using System.Threading.Tasks;
-using Orleans;
+using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace UnitTests.GrainInterfaces
 {
-    public interface IClientAddressableTestClientObject : IGrainWithIntegerKey
+    public interface IClientAddressableTestClientObject : IAddressable
     {
         Task<string> OnHappyPath(string message);
         Task OnSadPath(string message);
