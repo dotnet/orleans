@@ -29,13 +29,17 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="context">The <see cref="IGrainActivationContext"/> for the executing action.</param>
         /// <returns>The newly created grain.</returns>
-        public Grain CreateGrainInstance(IGrainActivationContext context)
+        public IGrain CreateGrainInstance(IGrainActivationContext context)
         {
-            var grain = (Grain)grainActivator.Create(context);
+            var grain = (IGrain)grainActivator.Create(context);
 
-            // Inject runtime hooks into grain instance
-            grain.Runtime = this.grainRuntime.Value;
-            grain.Identity = context.GrainIdentity;
+            if (grain is Grain grainBase)
+            {
+                // Inject runtime hooks into grain instance
+                grainBase.Runtime = this.grainRuntime.Value;
+                grainBase.Identity = context.GrainIdentity;
+            }
+            // TODO: consider making Identity mockable for POCOs. (Runtime will inherently be mockable via Manual DI)
 
             // wire up to lifecycle
             var participant = grain as ILifecycleParticipant<IGrainLifecycle>;

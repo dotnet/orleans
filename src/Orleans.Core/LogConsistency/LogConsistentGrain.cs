@@ -65,7 +65,7 @@ namespace Orleans.LogConsistency
         {
             if (ct.IsCancellationRequested) return Task.CompletedTask;
             IGrainActivationContext activationContext = this.ServiceProvider.GetRequiredService<IGrainActivationContext>();
-            Factory<Grain, ILogConsistencyProtocolServices> protocolServicesFactory = this.ServiceProvider.GetRequiredService<Factory<Grain, ILogConsistencyProtocolServices>>();
+            Factory<IGrain, ILogConsistencyProtocolServices> protocolServicesFactory = this.ServiceProvider.GetRequiredService<Factory<IGrain, ILogConsistencyProtocolServices>>();
             ILogViewAdaptorFactory consistencyProvider = SetupLogConsistencyProvider(activationContext);
             IGrainStorage grainStorage = consistencyProvider.UsesStorageProvider ? this.GetGrainStorage(this.ServiceProvider) : null;
             InstallLogViewAdaptor(protocolServicesFactory, consistencyProvider, grainStorage);
@@ -83,7 +83,7 @@ namespace Orleans.LogConsistency
         }
 
         private void InstallLogViewAdaptor(
-            Factory<Grain, ILogConsistencyProtocolServices> protocolServicesFactory,
+            Factory<IGrain, ILogConsistencyProtocolServices> protocolServicesFactory,
             ILogViewAdaptorFactory factory,
             IGrainStorage grainStorage)
         {

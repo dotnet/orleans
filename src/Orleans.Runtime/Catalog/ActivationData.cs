@@ -116,7 +116,7 @@ namespace Orleans.Runtime
 
         internal Type GrainInstanceType => GrainTypeData?.Type;
 
-        internal void SetGrainInstance(Grain grainInstance)
+        internal void SetGrainInstance(IGrain grainInstance)
         {
             GrainInstance = grainInstance;
         }
@@ -180,7 +180,7 @@ namespace Orleans.Runtime
 
         public GrainTypeData GrainTypeData { get; private set; }
 
-        public Grain GrainInstance { get; private set; }
+        public IGrain GrainInstance { get; private set; }
 
         IAddressable IGrainContext.GrainInstance => this.GrainInstance;
 

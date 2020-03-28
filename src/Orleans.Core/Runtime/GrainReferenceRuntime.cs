@@ -118,7 +118,7 @@ namespace Orleans.Runtime
         private static void CheckForGrainArguments(object[] arguments)
         {
             foreach (var argument in arguments)
-                if (argument is Grain)
+                if (argument is IGrain && !(argument is GrainReference))
                     throw new ArgumentException(String.Format("Cannot pass a grain object {0} as an argument to a method. Pass this.AsReference<GrainInterface>() instead.", argument.GetType().FullName));
         }
 

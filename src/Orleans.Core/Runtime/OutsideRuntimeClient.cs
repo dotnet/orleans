@@ -469,7 +469,7 @@ namespace Orleans
             if (obj is GrainReference)
                 throw new ArgumentException("Argument obj is already a grain reference.", nameof(obj));
 
-            if (obj is Grain)
+            if (obj is IGrain)
                 throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
             GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId(), this.GrainReferenceRuntime);

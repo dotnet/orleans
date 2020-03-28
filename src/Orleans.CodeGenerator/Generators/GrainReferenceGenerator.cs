@@ -269,7 +269,11 @@ namespace Orleans.CodeGenerator.Generators
                 {
                     return
                         ConditionalExpression(
-                            BinaryExpression(SyntaxKind.IsExpression, identifier, wellKnownTypes.Grain.ToTypeSyntax()),
+                            BinaryExpression(SyntaxKind.LogicalAndExpression,
+                                BinaryExpression(SyntaxKind.IsExpression, identifier, wellKnownTypes.Grain.ToTypeSyntax()),
+                                PrefixUnaryExpression(SyntaxKind.LogicalNotExpression,
+                                    ParenthesizedExpression(
+                                        BinaryExpression(SyntaxKind.IsExpression, identifier, wellKnownTypes.GrainReference.ToTypeSyntax())))),
                             InvocationExpression(identifier.Member("AsReference".ToGenericName().AddTypeArgumentListArguments(arg.Type.ToTypeSyntax()))),
                             identifier);
                 }

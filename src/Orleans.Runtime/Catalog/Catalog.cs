@@ -707,13 +707,14 @@ namespace Orleans.Runtime
             {
                 data.SetupContext(grainTypeData, this.serviceProvider);
 
-                Grain grain = grainCreator.CreateGrainInstance(data);
+                IGrain grain = grainCreator.CreateGrainInstance(data);
                 
                 //if grain implements IStreamSubscriptionObserver, then install stream consumer extension on it
                 if(grain is IStreamSubscriptionObserver)
                     InstallStreamConsumerExtension(data, grain as IStreamSubscriptionObserver);
 
-                grain.Data = data;
+                ActivationDataLookup.AssociateActivationData(grain, data);
+
                 data.SetGrainInstance(grain);
             }
             
@@ -1019,7 +1020,7 @@ namespace Orleans.Runtime
                 // step 4 - UnregisterMessageTarget and OnFinishedGrainDeactivate
                 foreach (var activationData in list)
                 {
-                    Grain grainInstance = activationData.GrainInstance;
+                    IGrain grainInstance = activationData.GrainInstance;
                     try
                     {
                         lock (activationData)

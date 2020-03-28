@@ -16,10 +16,11 @@ namespace Orleans.Timers
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
         }
 
-        public IDisposable RegisterTimer(Grain grain, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
+        public IDisposable RegisterTimer(IGrain grain, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            var timer = GrainTimer.FromTaskCallback(this.scheduler, this.timerLogger, asyncCallback, state, dueTime, period, activationData: grain?.Data);
-            grain?.Data.OnTimerCreated(timer);
+            if (grain is GrainReference) throw new ArgumentException("Passing a GrainReference as an argument. This method requires a grain implementation", nameof(grain));
+            var timer = GrainTimer.FromTaskCallback(this.scheduler, this.timerLogger, asyncCallback, state, dueTime, period, activationData: grain?.GetActivationData());
+            grain?.GetActivationData().OnTimerCreated(timer);
             timer.Start();
             return timer;
         }

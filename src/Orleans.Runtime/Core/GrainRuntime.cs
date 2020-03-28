@@ -82,23 +82,26 @@ namespace Orleans.Runtime
             }
         }
 
-        public void DeactivateOnIdle(Grain grain)
+        public void DeactivateOnIdle(IGrain grain)
         {
+            if (grain is GrainReference) throw new ArgumentException("Passing a GrainReference as an argument. This method requires a grain implementation", nameof(grain));
             CheckRuntimeContext();
-            this.runtimeClient.DeactivateOnIdle(grain.Data.ActivationId);
+            this.runtimeClient.DeactivateOnIdle(grain.GetActivationData().ActivationId);
         }
 
-        public void DelayDeactivation(Grain grain, TimeSpan timeSpan)
+        public void DelayDeactivation(IGrain grain, TimeSpan timeSpan)
         {
+            if (grain is GrainReference) throw new ArgumentException("Passing a GrainReference as an argument. This method requires a grain implementation", nameof(grain));
             CheckRuntimeContext();
-            grain.Data.DelayDeactivation(timeSpan);
+            grain.GetActivationData().DelayDeactivation(timeSpan);
         }
 
-        public IStorage<TGrainState> GetStorage<TGrainState>(Grain grain)
+        public IStorage<TGrainState> GetStorage<TGrainState>(IGrain grain)
         {
+            if (grain is GrainReference) throw new ArgumentException("Passing a GrainReference as an argument. This method requires a grain implementation", nameof(grain));
             IGrainStorage grainStorage = grain.GetGrainStorage(ServiceProvider);
             string grainTypeName = grain.GetType().FullName;
-            return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, grainStorage, this.loggerFactory);
+            return new StateStorageBridge<TGrainState>(grainTypeName, grain.AsWeaklyTypedReference(), grainStorage, this.loggerFactory);
         }
 
         public static void CheckRuntimeContext()

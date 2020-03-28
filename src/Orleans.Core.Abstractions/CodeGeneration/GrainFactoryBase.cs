@@ -12,7 +12,7 @@ namespace Orleans.CodeGeneration
     public static class GrainFactoryBase
     {
         /// <summary>
-        /// Check that a grain observer parameter is of the correct underlying concurrent type -- either extending from <c>GrainRefereence</c> or <c>Grain</c>
+        /// Check that a grain observer parameter is of the correct underlying concurrent type -- either extending from <c>GrainRefereence</c> or <c>IGrain</c>
         /// </summary>
         /// <param name="grainObserver">Grain observer parameter to be checked.</param>
         /// <exception cref="ArgumentNullException">If grainObserver is <c>null</c></exception>
@@ -23,13 +23,13 @@ namespace Orleans.CodeGeneration
             {
                 throw new ArgumentNullException("grainObserver", "IGrainObserver parameters cannot be null");
             }
-            if (grainObserver is GrainReference || grainObserver is Grain)
+            if (grainObserver is GrainReference || grainObserver is IGrain)
             {
                 // OK
             }
             else
             {
-                string errMsg = string.Format("IGrainObserver parameters must be GrainReference or Grain and cannot be type {0}. Did you forget to CreateObjectReference?", grainObserver.GetType());
+                string errMsg = string.Format("IGrainObserver parameters must be GrainReference or IGrain and cannot be type {0}. Did you forget to CreateObjectReference?", grainObserver.GetType());
                 throw new NotSupportedException(errMsg);
             }
         }

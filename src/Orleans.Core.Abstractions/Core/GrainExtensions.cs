@@ -13,7 +13,7 @@ namespace Orleans
     {
         private const string WRONG_GRAIN_ERROR_MSG = "Passing a half baked grain as an argument. It is possible that you instantiated a grain class explicitly, as a regular object and not via Orleans runtime or via proper test mocking";
 
-        internal static GrainReference AsWeaklyTypedReference(this IAddressable grain)
+        public static GrainReference AsWeaklyTypedReference(this IAddressable grain)
         {
             ThrowIfNullGrain(grain);
 
@@ -21,12 +21,12 @@ namespace Orleans
             var reference = grain as GrainReference;
             if (reference != null) return reference;
 
-            var grainBase = grain as Grain;
-            if (grainBase != null)
+            if (grain is IGrain grainImpl)
             {
-                if (grainBase.Data?.GrainReference is GrainReference grainRef)
+                var activationData = grainImpl.GetActivationData();
+                if (activationData.GrainReference != null)
                 {
-                    return grainRef;
+                    return activationData.GrainReference;
                 }
                 else
                 {
@@ -99,14 +99,14 @@ namespace Orleans
                 return reference.GrainId;
             }
 
-            var grainBase = grain as Grain;
-            if (grainBase != null)
+            if (grain is IGrain grainImpl)
             {
-                if (grainBase.Data == null || grainBase.Data.GrainId == null)
+                var activationData = grainImpl.GetActivationData();
+                if (activationData?.GrainId == null)
                 {
                     throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
                 }
-                return grainBase.Data.GrainId;
+                return activationData.GrainId;
             }
 
             throw new ArgumentException(String.Format("GetGrainId has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
@@ -132,6 +132,14 @@ namespace Orleans
                     throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
                 }
                 return grainReference.GrainId;
+            }
+
+            if (grain is IGrain pocoGrain)
+            {
+                // We need to keep the previous `Grain` case, as Identity can be mocked for those.
+                // TODO: Enable mocking for Identity for poco grains.
+                var activationData = pocoGrain.GetActivationData();
+                return activationData?.GrainId ?? throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
             }
 
             throw new ArgumentException(String.Format("GetGrainIdentity has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");

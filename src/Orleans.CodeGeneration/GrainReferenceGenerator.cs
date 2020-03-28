@@ -336,7 +336,11 @@ namespace Orleans.CodeGenerator
             {
                 return
                     SF.ConditionalExpression(
-                        SF.BinaryExpression(SyntaxKind.IsExpression, argIdentifier, typeof(Grain).GetTypeSyntax()),
+                        SF.BinaryExpression(SyntaxKind.LogicalAndExpression,
+                            SF.BinaryExpression(SyntaxKind.IsExpression, argIdentifier, typeof(IGrain).GetTypeSyntax()),
+                            SF.PrefixUnaryExpression(SyntaxKind.LogicalNotExpression,
+                                SF.ParenthesizedExpression(
+                                    SF.BinaryExpression(SyntaxKind.IsExpression, argIdentifier, typeof(GrainReference).GetTypeSyntax())))),
                         SF.InvocationExpression(argIdentifier.Member("AsReference", arg.ParameterType)),
                         argIdentifier);
             }

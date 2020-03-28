@@ -92,7 +92,7 @@ namespace Orleans.Runtime
             {
                 if (ct.IsCancellationRequested)
                     return Task.CompletedTask;
-                this.storage = new StateStorageBridge<TState>(this.fullStateName, context.GrainInstance.GrainReference, this.storageProvider, context.ActivationServices.GetService<ILoggerFactory>());
+                this.storage = new StateStorageBridge<TState>(this.fullStateName, context.GrainInstance.AsWeaklyTypedReference(), this.storageProvider, context.ActivationServices.GetService<ILoggerFactory>());
                 return this.ReadStateAsync();
             }
         }
