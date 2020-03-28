@@ -1,11 +1,11 @@
-﻿
+
 using System.Threading.Tasks;
 using Orleans;
 using TestGrainInterfaces;
 
 namespace TestGrains
 {
-    public class DoSomethingEmptyGrain : Grain, IDoSomethingEmptyGrain
+    public class DoSomethingEmptyGrain : IDoSomethingEmptyGrain
     {
         private int A;
 
@@ -32,7 +32,7 @@ namespace TestGrains
         }
     }
 
-    public class DoSomethingEmptyWithMoreGrain : Grain, IDoSomethingEmptyWithMoreGrain
+    public class DoSomethingEmptyWithMoreGrain : IDoSomethingEmptyWithMoreGrain
     {
         private int A;
 
@@ -64,7 +64,7 @@ namespace TestGrains
         }
     }
 
-    public class DoSomethingWithMoreGrain : Grain, IDoSomethingWithMoreGrain
+    public class DoSomethingWithMoreGrain : IDoSomethingWithMoreGrain
     {
         private int A;
         private int B;
@@ -115,7 +115,7 @@ namespace TestGrains
 
     }
 
-    public class DoSomethingWithMoreEmptyGrain : Grain, IDoSomethingWithMoreEmptyGrain
+    public class DoSomethingWithMoreEmptyGrain : IDoSomethingWithMoreEmptyGrain
     {
         private int A;
 
@@ -149,7 +149,7 @@ namespace TestGrains
 
 
 
-    public class DoSomethingCombinedGrain : Grain, IDoSomethingCombinedGrain
+    public class DoSomethingCombinedGrain : IDoSomethingCombinedGrain
     {
         private int A;
         private int B;
