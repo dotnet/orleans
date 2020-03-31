@@ -14,6 +14,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.TestingHost.Utils;
 using Orleans.Internal;
+using Orleans.Reminders.AzureStorage;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable

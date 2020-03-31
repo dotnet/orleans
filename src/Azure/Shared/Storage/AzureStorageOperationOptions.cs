@@ -1,6 +1,7 @@
-#if ORLEANS_CLUSTERING
+using System;
 using System.ComponentModel;
 
+#if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
 #elif ORLEANS_PERSISTENCE
 namespace Orleans.Persistence.AzureStorage
@@ -22,17 +23,22 @@ namespace Orleans.GrainDirectory.AzureStorage
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 {
-    /// <summary>
-    /// Specify options used for AzureTableBasedMembership
-    /// </summary>
-    public class AzureStorageClusteringOptions : AzureStorageOperationOptions
+    public abstract class AzureStorageOperationOptions
     {
         /// <summary>
-        /// Retry count for Azure Table operations.
+        /// Azure Storage Policy Options
         /// </summary>
-        public int MaxStorageBusyRetries { get; set; }
+        public AzureStoragePolicyOptions StoragePolicyOptions { get; set; }
+        
+        /// <summary>
+        /// Connection string for Azure Storage
+        /// </summary>
+        [RedactConnectionString]
+        public string ConnectionString { get; set; }
 
-        [DefaultValue("OrleansSiloInstances")]
-        public override string TableName { get; set; }
+        /// <summary>
+        /// Table name for Azure Storage
+        /// </summary>
+        public abstract string TableName { get; set; }
     }
 }

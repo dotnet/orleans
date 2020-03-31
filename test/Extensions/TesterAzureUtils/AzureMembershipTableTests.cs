@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.AzureUtils;
+using Orleans.Clustering.AzureStorage;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.MembershipService;
