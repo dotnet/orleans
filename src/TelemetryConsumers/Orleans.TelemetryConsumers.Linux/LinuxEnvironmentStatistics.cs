@@ -150,7 +150,8 @@ namespace Orleans.Statistics
 
             var cpuNumbers = cpuNumberStrings.Select(long.Parse).ToArray();
             var idleTime = cpuNumbers[3];
-            var totalTime = cpuNumbers.Sum();
+            var iowait = cpuNumbers[4]; // Iowait is not real cpu time
+            var totalTime = cpuNumbers.Sum() - iowait;
 
             if (i > 0)
             {
