@@ -64,7 +64,7 @@ In a production system can emerge the need of tuning over the default configurat
 
 ### Example
 
-We assume a system with this characteristics:
+Assuming a system with this characteristics:
 
 * 100 streams,
 * 10 queues,
@@ -80,7 +80,7 @@ Hence **20 streams/queue** (10 streams/queue x 2 as safety factor) is probably r
 
 * Messages/minute: This means each queue will be expected to process up to **1200 messages/minute** (60 messages x 20 streams).
 
-The we can determine the visibility time to use:
+Then we can determine the visibility time to use:
 
 * Visibility time: The cache time (1 minute) is configured to hold 1 minute of messages (so 1200 messages, as we calculated messages/minute above).
 We assumed that each message takes 30 ms to process, then we can expect messages to spend up to 36 seconds in the cache (0.030 sec x 1200 msg = 36 sec), so the visibility time - doubled for safety - would need be over 72 seconds (36 sec of time in cache x 2).
