@@ -90,11 +90,11 @@ namespace Tester.AzureUtils
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public void SiloInstanceTable_Op_UnregisterSiloInstance()
+        public async Task SiloInstanceTable_Op_UnregisterSiloInstance()
         {
             RegisterSiloInstance();
 
-            manager.UnregisterSiloInstance(myEntry);
+            await manager.UnregisterSiloInstance(myEntry);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -105,7 +105,7 @@ namespace Tester.AzureUtils
             this.generation = 0;
             RegisterSiloInstance();
             // and mark it as dead
-            manager.UnregisterSiloInstance(myEntry);
+            await manager.UnregisterSiloInstance(myEntry);
 
             // Create new active entries
             for (int i = 1; i < 5; i++)
@@ -160,7 +160,7 @@ namespace Tester.AzureUtils
         {
             RegisterSiloInstance();
 
-            manager.ActivateSiloInstance(myEntry);
+            await manager.ActivateSiloInstance(myEntry);
 
             var data = await FindSiloEntry(siloAddress);
             Assert.NotNull(data); // Data returned should not be null
@@ -181,7 +181,7 @@ namespace Tester.AzureUtils
         {
             RegisterSiloInstance();
 
-            manager.UnregisterSiloInstance(myEntry);
+            await manager.UnregisterSiloInstance(myEntry);
 
             var data = await FindSiloEntry(siloAddress);
             SiloInstanceTableEntry siloEntry = data.Item1;

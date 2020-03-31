@@ -81,18 +81,18 @@ namespace Orleans.AzureUtils
             Task.WaitAll(new Task[] { storage.UpsertTableEntryAsync(entry) });
         }
 
-        public void UnregisterSiloInstance(SiloInstanceTableEntry entry)
+        public Task<string> UnregisterSiloInstance(SiloInstanceTableEntry entry)
         {
             entry.Status = INSTANCE_STATUS_DEAD;
             logger.Info(ErrorCode.Runtime_Error_100271, "Unregistering silo instance: {0}", entry.ToString());
-            Task.WaitAll(new Task[] { storage.UpsertTableEntryAsync(entry) });
+            return storage.UpsertTableEntryAsync(entry);
         }
 
-        public void ActivateSiloInstance(SiloInstanceTableEntry entry)
+        public Task<string> ActivateSiloInstance(SiloInstanceTableEntry entry)
         {
             logger.Info(ErrorCode.Runtime_Error_100272, "Activating silo instance: {0}", entry.ToString());
             entry.Status = INSTANCE_STATUS_ACTIVE;
-            Task.WaitAll(new Task[] { storage.UpsertTableEntryAsync(entry) });
+            return storage.UpsertTableEntryAsync(entry);
         }
 
         public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
