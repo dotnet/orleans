@@ -68,7 +68,7 @@ You will also probably need to add `using` statements.
 
 `Microsoft.Orleans.Core.Abstractions` is needed everywhere. It included in both `Microsoft.Orleans.Server` and `Microsoft.Orleans.Client`.
 
-`Microsoft.Orleans.CodeGenerator.MSBuild` automatically generates code that is needed to make calls to grains across machine boundaries. So it needed in both `GrainInterfaces` and `Grains` projects.
+`Microsoft.Orleans.CodeGenerator.MSBuild` automatically generates code that is needed to make calls to grains across machine boundaries. So it is needed in both `GrainInterfaces` and `Grains` projects.
 
 ## Define a Grain Interface
 
@@ -116,7 +116,7 @@ namespace OrleansBasics
 
 ### Create the Silo – Program.cs
 
-At this step, we add code to inialize a server that will host and run our grains - a silo.
+At this step, we add code to initialize a server that will host and run our grains - a silo.
 We will use the development clustering provider here, so that we can run everything locally, without a dependency on external storage systems. You can find more information about that in the [Local Development Configuration](http://dotnet.github.io/orleans/Documentation/clusters_and_clients/configuration_guide/local_development_configuration.html) page of the Orleans documentation.
 We will run a cluster with a single silo in it.
 
