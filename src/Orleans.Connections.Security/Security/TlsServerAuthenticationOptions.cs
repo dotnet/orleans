@@ -1,15 +1,22 @@
+using System.Collections.Generic;
+using System.Net.Security;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
+
 namespace Orleans.Connections.Security
 {
-    using System.Net.Security;
-    using System.Security.Authentication;
-    using System.Security.Cryptography.X509Certificates;
-
     public delegate X509Certificate ServerCertificateSelectionCallback(object sender, string hostName);
 
     public class TlsServerAuthenticationOptions
     {
 #if NETCOREAPP
-        internal SslServerAuthenticationOptions Value { get; } = new SslServerAuthenticationOptions();
+        internal SslServerAuthenticationOptions Value { get; } = new SslServerAuthenticationOptions
+        {
+            ApplicationProtocols = new List<SslApplicationProtocol>
+            {
+                OrleansApplicationProtocol.Orleans1
+            }
+        };
 
         public X509Certificate ServerCertificate
         {

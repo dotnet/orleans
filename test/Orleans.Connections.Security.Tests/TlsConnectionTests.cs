@@ -1,18 +1,12 @@
 using System;
-using System.Collections.Generic;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Orleans;
-using Orleans.Connections.Security;
-using Orleans.Connections.Security.Tests;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using Xunit;
 
-namespace NetCore.Tests
+namespace Orleans.Connections.Security.Tests
 {
     [Trait("Category", "BVT")]
     public class TlsConnectionTests
