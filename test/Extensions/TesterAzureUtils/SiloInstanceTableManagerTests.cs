@@ -13,7 +13,6 @@ using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Internal;
-using Orleans.Clustering.AzureStorage;
 
 namespace Tester.AzureUtils
 {
@@ -52,10 +51,7 @@ namespace Tester.AzureUtils
             output.WriteLine("ClusterId={0} Generation={1}", this.clusterId, generation);
 
             output.WriteLine("Initializing SiloInstanceManager");
-            manager = OrleansSiloInstanceManager.GetManager(
-                this.clusterId,
-                fixture.LoggerFactory,
-                new AzureStorageClusteringOptions { ConnectionString = TestDefaultConfiguration.DataConnectionString, TableName = new AzureStorageClusteringOptions().TableName })
+            manager = OrleansSiloInstanceManager.GetManager(this.clusterId, TestDefaultConfiguration.DataConnectionString, AzureStorageClusteringOptions.DEFAULT_TABLE_NAME, fixture.LoggerFactory)
                 .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
         }
 
@@ -90,11 +86,11 @@ namespace Tester.AzureUtils
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public async Task SiloInstanceTable_Op_UnregisterSiloInstance()
+        public void SiloInstanceTable_Op_UnregisterSiloInstance()
         {
             RegisterSiloInstance();
 
-            await manager.UnregisterSiloInstance(myEntry);
+            manager.UnregisterSiloInstance(myEntry);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -105,7 +101,7 @@ namespace Tester.AzureUtils
             this.generation = 0;
             RegisterSiloInstance();
             // and mark it as dead
-            await manager.UnregisterSiloInstance(myEntry);
+            manager.UnregisterSiloInstance(myEntry);
 
             // Create new active entries
             for (int i = 1; i < 5; i++)
@@ -129,7 +125,7 @@ namespace Tester.AzureUtils
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
             bool didInsert = await manager.TryCreateTableVersionEntryAsync()
-                .WithTimeout(new Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions().OperationTimeout);
+                .WithTimeout(Orleans.Clustering.AzureStorage.AzureTableDefaultPolicies.TableOperationTimeout);
 
             Assert.True(didInsert, "Did insert");
         }
@@ -160,7 +156,7 @@ namespace Tester.AzureUtils
         {
             RegisterSiloInstance();
 
-            await manager.ActivateSiloInstance(myEntry);
+            manager.ActivateSiloInstance(myEntry);
 
             var data = await FindSiloEntry(siloAddress);
             Assert.NotNull(data); // Data returned should not be null
@@ -181,7 +177,7 @@ namespace Tester.AzureUtils
         {
             RegisterSiloInstance();
 
-            await manager.UnregisterSiloInstance(myEntry);
+            manager.UnregisterSiloInstance(myEntry);
 
             var data = await FindSiloEntry(siloAddress);
             SiloInstanceTableEntry siloEntry = data.Item1;
