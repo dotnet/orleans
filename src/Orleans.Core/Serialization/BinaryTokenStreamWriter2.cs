@@ -102,7 +102,7 @@ namespace Orleans.Serialization
             writers[typeof(IPEndPoint)] = (stream, obj) => { stream.Write(SerializationTokenType.IpEndPoint); stream.Write((IPEndPoint)obj); };
             writers[typeof(CorrelationId)] = (stream, obj) => { stream.Write(SerializationTokenType.CorrelationId); stream.Write((CorrelationId)obj); };
         }
-        
+
         public BinaryTokenStreamWriter2(TBufferWriter output)
         {
             this.PartialReset(output);
@@ -197,12 +197,12 @@ namespace Orleans.Serialization
         {
             this.Write(Convert.ToInt16(c));
         }
-        
+
         public void Write(bool b)
         {
             this.Write((byte)(b ? SerializationTokenType.True : SerializationTokenType.False));
         }
-        
+
         public void WriteNull()
         {
             this.Write((byte)SerializationTokenType.Null);
@@ -250,7 +250,7 @@ namespace Orleans.Serialization
             this.Write(typeKey.Length);
             this.Write(typeKey);
         }
-                
+
         public void Write(byte[] b, int offset, int count)
         {
             if (count <= 0)
@@ -258,24 +258,22 @@ namespace Orleans.Serialization
                 return;
             }
 
-            if ((offset == 0) && (count == b.Length))
+            if (offset == 0 && count == b.Length)
             {
                 this.Write(b);
             }
             else
             {
-                var temp = new byte[count];
-                Buffer.BlockCopy(b, offset, temp, 0, count);
-                this.Write(temp);
+                this.Write(new ArraySegment<byte>(b, offset, count));
             }
         }
-        
+
         public void Write(IPEndPoint ep)
         {
             this.Write(ep.Address);
             this.Write(ep.Port);
         }
-        
+
         public void Write(IPAddress ip)
         {
             if (ip.AddressFamily == AddressFamily.InterNetwork)
@@ -284,7 +282,7 @@ namespace Orleans.Serialization
                 {
                     this.Write((byte)0);
                 }
-                
+
                 this.Write(ip.GetAddressBytes()); // IPv4 -- 4 bytes
             }
             else
@@ -292,13 +290,13 @@ namespace Orleans.Serialization
                 this.Write(ip.GetAddressBytes()); // IPv6 -- 16 bytes
             }
         }
-        
+
         public void Write(SiloAddress addr)
         {
             this.Write(addr.Endpoint);
             this.Write(addr.Generation);
         }
-        
+
         public void Write(TimeSpan ts)
         {
             this.Write(ts.Ticks);

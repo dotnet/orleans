@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using Orleans.Concurrency;
 using ProtoBuf;
@@ -40,6 +41,26 @@ namespace Orleans.Serialization.ProtobufNet
             return cacheItem.IsImmutable ? source : ProtoBuf.Serializer.DeepClone(source);
         }
 
+        private sealed class WriteAdapter : Stream
+        {
+            private readonly IBinaryTokenStreamWriter writer;
+            public WriteAdapter(IBinaryTokenStreamWriter writer) {
+                this.writer = writer;
+            }
+
+            public override void Write(byte[] buffer, int offset, int count) => this.writer.Write(buffer, offset, count);
+
+            public override int Read(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotImplementedException();
+            public override void Flush() => throw new NotImplementedException();
+            public override void SetLength(long value) => throw new NotImplementedException();
+            public override bool CanRead => false;
+            public override bool CanSeek => false;
+            public override bool CanWrite => true;
+            public override long Length => throw new NotImplementedException();
+            public override long Position { get => throw new NotImplementedException(); set=> throw new NotImplementedException(); }
+        }
+
         /// <inheritdoc />
         public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
@@ -48,32 +69,36 @@ namespace Orleans.Serialization.ProtobufNet
                 throw new ArgumentNullException(nameof(context));
             }
 
-            if (item == null)
+            ProtoBuf.Serializer.Serialize(new WriteAdapter(context.StreamWriter), item);
+        }
+
+        private sealed class ReadAdapter : Stream
+        {
+            private readonly IBinaryTokenStreamReader reader;
+
+            public ReadAdapter(IBinaryTokenStreamReader reader)
             {
-                // Special handling for null value. 
-                // Since in this ProtobufSerializer we are usually writing the data lengh as 4 bytes
-                // we also have to write the Null object as 4 bytes lengh of zero.
-                context.StreamWriter.Write(0);
-                return;
+                this.reader = reader;
             }
-            
-            using (var stream = new MemoryStream())
+
+
+            public override int Read(byte[] buffer, int offset, int count)
             {
-                ProtoBuf.Serializer.Serialize(stream, item);
-                // The way we write the data is potentially in-efficinet, 
-                // since we are first writing to ProtoBuff's internal CodedOutputStream
-                // and then take its internal byte[] and write it into out own BinaryTokenStreamWriter.
-                // Writing byte[] to BinaryTokenStreamWriter may sometimes copy the byte[] and sometimes just append ass ArraySegment without copy.
-                // In the former case it will be a secodnd copy.
-                // It would be more effecient to write directly into BinaryTokenStreamWriter
-                // but protobuff does not currently support writing directly into a given arbitary stream
-                // (it does support System.IO.Steam but BinaryTokenStreamWriter is not compatible with System.IO.Steam).
-                // Alternatively, we could force to always append to BinaryTokenStreamWriter, but that could create a lot of small ArraySegments.
-                // The plan is to ask the ProtoBuff team to add support for some "InputStream" interface, like Bond does.
-                byte[] outBytes = stream.ToArray();
-                context.StreamWriter.Write(outBytes.Length);
-                context.StreamWriter.Write(outBytes);
+                var remaining = (int)(this.reader.Length - this.reader.CurrentPosition);
+                var readCount = Math.Min(count, remaining);
+                this.reader.ReadByteArray(buffer, offset, readCount);
+                return readCount;
             }
+
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotImplementedException();
+            public override void Flush() => throw new NotImplementedException();
+            public override void SetLength(long value) => throw new NotImplementedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => throw new NotImplementedException();
+            public override long Position { get => throw new NotImplementedException(); set=> throw new NotImplementedException(); }
         }
 
         /// <inheritdoc />
@@ -89,17 +114,7 @@ namespace Orleans.Serialization.ProtobufNet
                 throw new ArgumentNullException(nameof(context));
             }
 
-            var reader = context.StreamReader;
-            int length = reader.ReadInt();
-            byte[] data = reader.ReadBytes(length);
-
-            object message = null;
-            using (var stream = new MemoryStream(data))
-            {
-                message = ProtoBuf.Serializer.Deserialize(expectedType, stream);
-            }
-
-            return message;
+            return ProtoBuf.Serializer.Deserialize(expectedType, new ReadAdapter(context.StreamReader));
         }
     }
 }
