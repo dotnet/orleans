@@ -11,6 +11,8 @@ using Tester;
 using TestExtensions;
 using Xunit;
 using Orleans.Reminders.AzureStorage;
+using Orleans.Clustering.AzureStorage;
+using AzureTableDefaultPolicies = Orleans.Clustering.AzureStorage.AzureTableDefaultPolicies;
 
 namespace UnitTests.RemindersTest
 {
@@ -35,6 +37,7 @@ namespace UnitTests.RemindersTest
         public override void Dispose()
         {
             // Reset init timeout after tests
+            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
             base.Dispose();
         }
 

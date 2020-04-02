@@ -9,6 +9,7 @@ using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.GrainDirectory.AzureStorage.Utilities;
 using Orleans.Runtime;
 
 namespace Orleans.GrainDirectory.AzureStorage
@@ -54,8 +55,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             this.tableDataManager = new AzureTableDataManager<GrainDirectoryEntity>(
                 tableName: directoryOptions.Value.TableName,
                 storageConnectionString: directoryOptions.Value.ConnectionString,
-                loggerFactory.CreateLogger<AzureTableDataManager<GrainDirectoryEntity>>(),
-                storagePolicyOptions: directoryOptions.Value.StoragePolicyOptions);
+                loggerFactory.CreateLogger<AzureTableDataManager<GrainDirectoryEntity>>());
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
@@ -93,14 +93,14 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public async Task UnregisterMany(List<GrainAddress> addresses)
         {
-            if (addresses.Count <= this.tableDataManager.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS)
+            if (addresses.Count <= AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
             {
                 await UnregisterManyBlock(addresses);
             }
             else
             {
                 var tasks = new List<Task>();
-                foreach (var subList in addresses.BatchIEnumerable(this.tableDataManager.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS))
+                foreach (var subList in addresses.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
                 {
                     tasks.Add(UnregisterManyBlock(subList));
                 }

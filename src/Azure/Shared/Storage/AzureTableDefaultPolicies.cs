@@ -34,7 +34,7 @@ namespace Orleans.GrainDirectory.AzureStorage
     /// <remarks>
     /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constraints this class needs to have public visibility.
     /// </remarks>
-    public static class AzureTableDefaultPolicies
+    internal static class AzureTableDefaultPolicies
     {
         public static int MaxTableCreationRetries { get; private set; }
         public static int MaxTableOperationRetries { get; private set; }

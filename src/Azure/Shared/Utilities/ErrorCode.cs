@@ -49,6 +49,5 @@ namespace Orleans.GrainDirectory.AzureStorage.Utilities
         AzureTable_37 = AzureTableBase + 37,
         // Azure storage provider related
         AzureTable_DataNotFound = AzureTableBase + 50,
-        AzureTable_TableNotCreated = AzureTableBase + 51,
     }
 }
