@@ -69,6 +69,15 @@ namespace Orleans.Serialization.ProtobufNet
                 throw new ArgumentNullException(nameof(context));
             }
 
+            // Length is not needed but some old serialized data still may
+            // have the length stamped, so we need to read and write it still.
+            if (item == null)
+            {
+                context.StreamWriter.Write(0);
+                return;
+            }
+
+            context.StreamWriter.Write(-1); // -1 should trigger an error in old deserializer
             ProtoBuf.Serializer.Serialize(new WriteAdapter(context.StreamWriter), item);
         }
 
@@ -112,6 +121,14 @@ namespace Orleans.Serialization.ProtobufNet
             if (context == null)
             {
                 throw new ArgumentNullException(nameof(context));
+            }
+
+            // Length is not needed but some old serialized data still may
+            // have the length stamped, so we need to read and write it still.
+            var length = context.StreamReader.ReadInt();
+            if (length == 0)
+            {
+                return null;
             }
 
             return ProtoBuf.Serializer.Deserialize(expectedType, new ReadAdapter(context.StreamReader));
