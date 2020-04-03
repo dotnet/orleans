@@ -264,7 +264,7 @@ namespace Orleans.Serialization
             }
             else
             {
-                this.Write(new ArraySegment<byte>(b, offset, count));
+                this.Write(new ReadOnlySpan<byte>(b, offset, count));
             }
         }
 
