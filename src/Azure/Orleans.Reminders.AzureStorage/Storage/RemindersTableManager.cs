@@ -108,7 +108,7 @@ namespace Orleans.Runtime.ReminderService
             string storageConnectionString,
             string tableName,
             ILoggerFactory loggerFactory,
-            AzureStoragePolicyOptions storagePolicyOptions = default)
+            AzureStoragePolicyOptions storagePolicyOptions)
             : base(tableName, storageConnectionString, loggerFactory.CreateLogger<RemindersTableManager>(), storagePolicyOptions)
         {
             ClusterId = clusterId;
@@ -242,7 +242,7 @@ namespace Orleans.Runtime.ReminderService
 
             foreach (var entriesPerPartition in groupedByHash.Values)
             {
-                    foreach (var batch in entriesPerPartition.BatchIEnumerable(this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS))
+                    foreach (var batch in entriesPerPartition.BatchIEnumerable(this.StoragePolicyOptions.MaxBulkUpdateRows))
                 {
                     tasks.Add(DeleteTableEntriesAsync(batch));
                 }

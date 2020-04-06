@@ -82,11 +82,11 @@ namespace Tester.AzureUtils
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public void SiloInstanceTable_Op_ActivateSiloInstance()
+        public async Task SiloInstanceTable_Op_ActivateSiloInstance()
         {
             RegisterSiloInstance();
 
-            manager.ActivateSiloInstance(myEntry);
+            await manager.ActivateSiloInstance(myEntry);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -196,16 +196,16 @@ namespace Tester.AzureUtils
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public void SiloInstanceTable_FindAllGatewayProxyEndpoints()
+        public async Task SiloInstanceTable_FindAllGatewayProxyEndpoints()
         {
             RegisterSiloInstance();
 
-            var gateways = manager.FindAllGatewayProxyEndpoints().GetResult();
+            var gateways = await manager.FindAllGatewayProxyEndpoints();
             Assert.Equal(0,  gateways.Count);  // "Number of gateways before Silo.Activate"
 
-            manager.ActivateSiloInstance(myEntry);
+            await manager.ActivateSiloInstance(myEntry);
 
-            gateways = manager.FindAllGatewayProxyEndpoints().GetResult();
+            gateways = await manager.FindAllGatewayProxyEndpoints();
             Assert.Equal(1,  gateways.Count);  // "Number of gateways after Silo.Activate"
 
             Uri myGateway = gateways.First();

@@ -48,7 +48,6 @@ namespace Tester.AzureUtils.Persistence
                 hostBuilder.UseAzureStorageClustering(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    options.MaxStorageBusyRetries = 3;
                 });
             }
         }

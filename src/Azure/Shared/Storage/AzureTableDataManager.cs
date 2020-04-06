@@ -40,17 +40,18 @@ namespace Orleans.GrainDirectory.AzureStorage
     internal class AzureTableDataManager<T> where T : class, ITableEntity, new()
     {
         /// <summary> Name of the table this instance is managing. </summary>
-        public string TableName { get; private set; }
+        public string TableName { get; }
 
         /// <summary> Logger for this table manager instance. </summary>
-        protected internal ILogger Logger { get; private set; }
+        protected internal ILogger Logger { get; }
 
         /// <summary> Connection string for the Azure storage account used to host this table. </summary>
         protected string ConnectionString { get; set; }
 
+        public AzureStoragePolicyOptions StoragePolicyOptions { get; }
+
         public CloudTable Table { get; private set; }
 
-        public AzureStoragePolicyOptions StoragePolicyOptions;
 
         /// <summary>
         /// Constructor
@@ -59,14 +60,14 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         /// <param name="logger">Logger to use.</param>
         /// <param name="storagePolicyOptions">Optional Storage Policy Configuration.</param>
-        public AzureTableDataManager(string tableName, string storageConnectionString, ILogger logger, AzureStoragePolicyOptions storagePolicyOptions = default)
+        public AzureTableDataManager(string tableName, string storageConnectionString, ILogger logger, AzureStoragePolicyOptions storagePolicyOptions)
         {
-            Logger = logger;
-            TableName = tableName;
-            ConnectionString = storageConnectionString;
+            Logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            TableName = tableName ?? throw new ArgumentNullException(nameof(tableName));
+            ConnectionString = storageConnectionString ?? throw new ArgumentNullException(nameof(storageConnectionString));
+            this.StoragePolicyOptions = storagePolicyOptions ?? throw new ArgumentNullException(nameof(storagePolicyOptions));
 
             AzureTableUtils.ValidateTableName(tableName);
-            this.StoragePolicyOptions ??= storagePolicyOptions;
         }
 
         /// <summary>
@@ -147,7 +148,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             IEnumerable<Tuple<T,string>> items = await ReadAllTableEntriesAsync();
             IEnumerable<Task> work = items.GroupBy(item => item.Item1.PartitionKey)
-                                          .SelectMany(partition => partition.ToBatch(this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS))
+                                          .SelectMany(partition => partition.ToBatch(this.StoragePolicyOptions.MaxBulkUpdateRows))
                                           .Select(batch => DeleteTableEntriesAsync(batch.ToList()));
             await Task.WhenAll(work);
         }
@@ -446,10 +447,10 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             if (collection == null) throw new ArgumentNullException("collection");
 
-            if (collection.Count > this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS)
+            if (collection.Count > this.StoragePolicyOptions.MaxBulkUpdateRows)
             {
                 throw new ArgumentOutOfRangeException("collection", collection.Count,
-                        "Too many rows for bulk delete - max " + this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS);
+                        "Too many rows for bulk delete - max " + this.StoragePolicyOptions.MaxBulkUpdateRows);
             }
 
             if (collection.Count == 0)
@@ -563,10 +564,10 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             const string operation = "BulkInsertTableEntries";
             if (collection == null) throw new ArgumentNullException("collection");
-            if (collection.Count > this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS)
+            if (collection.Count > this.StoragePolicyOptions.MaxBulkUpdateRows)
             {
                 throw new ArgumentOutOfRangeException("collection", collection.Count,
-                        "Too many rows for bulk update - max " + this.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS);
+                        "Too many rows for bulk update - max " + this.StoragePolicyOptions.MaxBulkUpdateRows);
             }
 
             if (collection.Count == 0)

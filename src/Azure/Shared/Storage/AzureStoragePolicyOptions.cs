@@ -26,49 +26,53 @@ namespace Orleans.GrainDirectory.AzureStorage
 {
     public class AzureStoragePolicyOptions
     {
-        public int MAX_BULK_UPDATE_ROWS { get; set; }
-        public int MaxCreationRetries { get; set; }
-        public int MaxOperationRetries { get; set; }
-        public int MaxBusyRetries { get; set; }
+        private TimeSpan? creationTimeout;
+        private TimeSpan? operationTimeout;
+        private IRetryPolicy creationRetryPolicy;
+        private IRetryPolicy operaionRetryPolicy;
 
-        public TimeSpan PauseBetweenCreationRetries { get; set; }
+        public int MaxBulkUpdateRows { get; set; } = 100;
+        public int MaxCreationRetries { get; set; } = 60;
+        public int MaxOperationRetries { get; set; } = 5;
 
-        public TimeSpan PauseBetweenOperationRetries { get; set; }
+        public TimeSpan PauseBetweenCreationRetries { get; set; } = Debugger.IsAttached ? TimeSpan.FromSeconds(100) : TimeSpan.FromSeconds(1);
 
-        public TimeSpan PauseBetweenBusyRetries { get; set; }
+        public TimeSpan PauseBetweenOperationRetries { get; set; } = Debugger.IsAttached ? TimeSpan.FromSeconds(10) : TimeSpan.FromMilliseconds(100);
 
-        public TimeSpan CreationTimeout { get; set; }
-        public TimeSpan OperationTimeout { get; set; }
-        public TimeSpan BusyRetriesTimeout { get; set; }
-
-        public IRetryPolicy CreationRetryPolicy { get; set; }
-        public IRetryPolicy OperationRetryPolicy { get; set; }
-        
-        public AzureStoragePolicyOptions()
+        public TimeSpan CreationTimeout
         {
-        	this.MAX_BULK_UPDATE_ROWS = 100;
-            this.MaxCreationRetries = 60;
-			this.MaxOperationRetries = 5;
-			this.MaxBusyRetries = 120;
-
-			this.PauseBetweenCreationRetries = (!Debugger.IsAttached)
-					? TimeSpan.FromSeconds(1)
-					: TimeSpan.FromSeconds(100);
-
-			this.PauseBetweenOperationRetries = (!Debugger.IsAttached)
-					? TimeSpan.FromMilliseconds(100)
-					: TimeSpan.FromSeconds(10);
-
-			this.PauseBetweenBusyRetries = (!Debugger.IsAttached)
-					? TimeSpan.FromMilliseconds(500)
-					: TimeSpan.FromSeconds(5);
-
-			this.CreationTimeout = TimeSpan.FromMilliseconds(this.PauseBetweenCreationRetries.TotalMilliseconds * this.MaxCreationRetries * 3);
-			this.OperationTimeout = TimeSpan.FromMilliseconds(this.PauseBetweenOperationRetries.TotalMilliseconds * this.MaxOperationRetries * 6);
-			this.BusyRetriesTimeout = TimeSpan.FromMilliseconds(this.PauseBetweenBusyRetries.TotalMilliseconds * this.MaxBusyRetries);
-			this.CreationRetryPolicy = new LinearRetry(this.PauseBetweenCreationRetries, this.MaxCreationRetries);
-			this.OperationRetryPolicy = new LinearRetry(this.PauseBetweenOperationRetries, this.MaxOperationRetries);    
+            get => this.creationTimeout ?? TimeSpan.FromMilliseconds(this.PauseBetweenCreationRetries.TotalMilliseconds * this.MaxCreationRetries * 3);
+            set => SetIfValidTimeout(ref this.creationTimeout, value, nameof(CreationTimeout));
         }
-    
+
+        public TimeSpan OperationTimeout
+        {
+            get => this.operationTimeout ?? TimeSpan.FromMilliseconds(this.PauseBetweenOperationRetries.TotalMilliseconds * this.MaxOperationRetries * 6);
+            set => SetIfValidTimeout(ref this.operationTimeout, value, nameof(OperationTimeout));
+        }
+
+        public IRetryPolicy CreationRetryPolicy
+        {
+            get => this.creationRetryPolicy ??= new LinearRetry(this.PauseBetweenCreationRetries, this.MaxCreationRetries);
+            set => this.creationRetryPolicy = value ?? throw new ArgumentNullException(nameof(CreationRetryPolicy));
+        }
+
+        public IRetryPolicy OperationRetryPolicy
+        {
+            get => this.operaionRetryPolicy ??= new LinearRetry(this.PauseBetweenOperationRetries, this.MaxOperationRetries);
+            set => this.operaionRetryPolicy = value ?? throw new ArgumentNullException(nameof(OperationRetryPolicy));
+        }
+
+        private static void SetIfValidTimeout(ref TimeSpan? field, TimeSpan value, string propertyName)
+        {
+            if (value > TimeSpan.Zero || value.Equals(TimeSpan.FromMilliseconds(-1)))
+            {
+                field = value;
+            }
+            else
+            {
+                throw new ArgumentNullException(propertyName);
+            }
+        }
     }
 }

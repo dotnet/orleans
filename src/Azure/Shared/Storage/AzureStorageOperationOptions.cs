@@ -1,6 +1,3 @@
-using System;
-using System.ComponentModel;
-
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
 #elif ORLEANS_PERSISTENCE
@@ -28,7 +25,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <summary>
         /// Azure Storage Policy Options
         /// </summary>
-        public AzureStoragePolicyOptions StoragePolicyOptions { get; set; }
+        public AzureStoragePolicyOptions StoragePolicyOptions { get; } = new AzureStoragePolicyOptions();
         
         /// <summary>
         /// Connection string for Azure Storage

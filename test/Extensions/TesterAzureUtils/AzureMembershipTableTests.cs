@@ -38,7 +38,6 @@ namespace Tester.AzureUtils
             TestUtils.CheckForAzureStorage();
             var options = new AzureStorageClusteringOptions()
             {
-                MaxStorageBusyRetries = 3,
                 ConnectionString = this.connectionString,
             };
             return new AzureBasedMembershipTable(loggerFactory, Options.Create(options), this.clusterOptions);

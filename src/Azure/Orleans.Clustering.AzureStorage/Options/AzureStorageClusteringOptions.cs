@@ -1,6 +1,4 @@
 #if ORLEANS_CLUSTERING
-using System.ComponentModel;
-
 namespace Orleans.Clustering.AzureStorage
 #elif ORLEANS_PERSISTENCE
 namespace Orleans.Persistence.AzureStorage
@@ -27,12 +25,7 @@ namespace Orleans.GrainDirectory.AzureStorage
     /// </summary>
     public class AzureStorageClusteringOptions : AzureStorageOperationOptions
     {
-        /// <summary>
-        /// Retry count for Azure Table operations.
-        /// </summary>
-        public int MaxStorageBusyRetries { get; set; }
-
-        [DefaultValue("OrleansSiloInstances")]
-        public override string TableName { get; set; }
+        public override string TableName { get; set; } = DEFAULT_TABLE_NAME;
+        public const string DEFAULT_TABLE_NAME = "OrleansSiloInstances";
     }
 }

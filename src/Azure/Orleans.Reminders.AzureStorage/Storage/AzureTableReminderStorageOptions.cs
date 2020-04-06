@@ -1,5 +1,3 @@
-using System.ComponentModel;
-
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
 #elif ORLEANS_PERSISTENCE
@@ -28,7 +26,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <summary>
         /// Table name for Azure Storage
         /// </summary>
-        [DefaultValue("OrleansReminders")]
-        public override string TableName { get; set; }
+        public override string TableName { get; set; } = DEFAULT_TABLE_NAME;
+        public const string DEFAULT_TABLE_NAME = "OrleansReminders";
     }
 }

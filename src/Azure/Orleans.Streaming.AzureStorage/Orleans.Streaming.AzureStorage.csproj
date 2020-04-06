@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Streaming.AzureStorage</PackageId>
     <Title>Microsoft Orleans Streaming Azure Storage</Title>
@@ -11,7 +11,7 @@
     <AssemblyName>Orleans.Streaming.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.Streaming.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <DefineConstants>TRACE;ORLEANS_STREAMING,ORLEANS_PERSISTENCE</DefineConstants>
+    <DefineConstants>$(DefineConstants);ORLEANS_STREAMING</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

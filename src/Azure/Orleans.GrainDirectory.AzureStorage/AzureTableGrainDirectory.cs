@@ -93,14 +93,14 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public async Task UnregisterMany(List<GrainAddress> addresses)
         {
-            if (addresses.Count <= this.tableDataManager.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS)
+            if (addresses.Count <= this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows)
             {
                 await UnregisterManyBlock(addresses);
             }
             else
             {
                 var tasks = new List<Task>();
-                foreach (var subList in addresses.BatchIEnumerable(this.tableDataManager.StoragePolicyOptions.MAX_BULK_UPDATE_ROWS))
+                foreach (var subList in addresses.BatchIEnumerable(this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows))
                 {
                     tasks.Add(UnregisterManyBlock(subList));
                 }
