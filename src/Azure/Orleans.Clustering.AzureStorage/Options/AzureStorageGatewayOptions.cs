@@ -1,16 +1,10 @@
-namespace Orleans.Configuration
-{
-    public class AzureStorageGatewayOptions
-    {
-        /// <summary>
-        /// Connection string for Azure Storage
-        /// </summary>
-        [RedactConnectionString]
-        public string ConnectionString { get; set; }
+using System.ComponentModel;
 
-        /// <summary>
-        /// Table name for Azure Storage
-        /// </summary>
-        public string TableName { get; set; } = AzureStorageClusteringOptions.DEFAULT_TABLE_NAME;
+namespace Orleans.Clustering.AzureStorage
+{
+    public class AzureStorageGatewayOptions : AzureStorageOperationOptions
+    {
+        [DefaultValue("OrleansGateway")]
+        public override string TableName { get; set; }
     }
 }

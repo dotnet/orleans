@@ -19,6 +19,7 @@ using Orleans.Internal;
 using TestExtensions;
 using TestExtensions.Runners;
 using UnitTests.GrainInterfaces;
+using AzureStoragePolicyOptions = Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -247,13 +248,13 @@ namespace Tester.AzureUtils.Persistence
                 promises.Add(promise);
                 if ((i % BatchSize) == 0 && i > 0)
                 {
-                    Task.WaitAll(promises.ToArray(), AzureTableDefaultPolicies.TableCreationTimeout);
+                    Task.WaitAll(promises.ToArray(), new AzureStoragePolicyOptions().CreationTimeout);
                     promises.Clear();
                     //output.WriteLine("{0} has done {1} iterations  in {2} at {3} RPS",
                     //                  testName, i, sw.Elapsed, i / sw.Elapsed.TotalSeconds);
                 }
             }
-            Task.WaitAll(promises.ToArray(), AzureTableDefaultPolicies.TableCreationTimeout);
+            Task.WaitAll(promises.ToArray(), new AzureStoragePolicyOptions().CreationTimeout);
             sw.Stop();
             output.WriteLine("{0} completed. Did {1} iterations in {2} at {3} RPS",
                               testName, n, sw.Elapsed, n / sw.Elapsed.TotalSeconds);

@@ -53,7 +53,7 @@ namespace Tester.AzureUtils
         public UnitTestAzureTableDataManager(string storageConnectionString, ILoggerFactory loggerFactory)
             : base(INSTANCE_TABLE_NAME, storageConnectionString, loggerFactory.CreateLogger<UnitTestAzureTableDataManager>())
         {
-            InitTableAsync().WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Wait();
+            InitTableAsync().WithTimeout(new AzureStoragePolicyOptions().CreationTimeout).Wait();
         }
     }
 }
