@@ -29,8 +29,6 @@ namespace Orleans
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager localObjects;
-
-        private ClientMessageCenter transport;
         private bool disposing;
 
         private ClientProviderRuntime clientProviderRuntime;
@@ -51,7 +49,6 @@ namespace Orleans
 
         private MessageFactory messageFactory;
         private IPAddress localAddress;
-        private IGatewayListProvider gatewayListProvider;
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<StatisticsOptions> statisticsOptions;
         private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
@@ -77,7 +74,7 @@ namespace Orleans
 
         public IGrainReferenceRuntime GrainReferenceRuntime { get; private set; }
 
-        internal ClientMessageCenter MessageCenter => this.transport;
+        internal ClientMessageCenter MessageCenter { get; private set; }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
@@ -165,8 +162,6 @@ namespace Orleans
                     throw new InvalidOperationException("TestOnlyThrowExceptionDuringInit");
                 }
 
-                this.gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
-
                 var statisticsLevel = statisticsOptions.Value.CollectionLevel;
                 if (statisticsLevel.CollectThreadTimeTrackingStats())
                 {
@@ -185,7 +180,7 @@ namespace Orleans
 
         private async Task StreamingInitialize()
         {
-            var implicitSubscriberTable = await transport.GetImplicitStreamSubscriberTable(this.InternalGrainFactory);
+            var implicitSubscriberTable = await MessageCenter.GetImplicitStreamSubscriberTable(this.InternalGrainFactory);
             clientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
         }
 
@@ -201,36 +196,17 @@ namespace Orleans
         // used for testing to (carefully!) allow two clients in the same process
         private async Task StartInternal(Func<Exception, Task<bool>> retryFilter)
         {
-            // Initialize the gateway list provider, since information from the cluster is required to successfully
-            // initialize subsequent services.
-            var initializedGatewayProvider = new[] {false};
-            await ExecuteWithRetries(async () =>
-                {
-                    if (!initializedGatewayProvider[0])
-                    {
-                        await this.gatewayListProvider.InitializeGatewayListProvider();
-                        initializedGatewayProvider[0] = true;
-                    }
-
-                    var gateways = await this.gatewayListProvider.GetGateways();
-                    if (gateways.Count == 0)
-                    {
-                        var gatewayProviderType = this.gatewayListProvider.GetType().GetParseableName();
-                        var err = $"Could not find any gateway in {gatewayProviderType}. Orleans client cannot initialize.";
-                        logger.Error(ErrorCode.GatewayManager_NoGateways, err);
-                        throw new SiloUnavailableException(err);
-                    }
-                },
-                retryFilter);
+            var gatewayManager = this.ServiceProvider.GetRequiredService<GatewayManager>();
+            await ExecuteWithRetries(async () => await gatewayManager.StartAsync(CancellationToken.None), retryFilter);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
-            transport = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
-            transport.RegisterLocalMessageHandler(this.HandleMessage);
-            transport.Start();
-            CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, clientId);
+            MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
+            MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
+            MessageCenter.Start();
+            CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, clientId);
 
             await ExecuteWithRetries(
-                async () => this.GrainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory),
+                async () => this.GrainTypeResolver = await MessageCenter.GetGrainTypeResolver(this.InternalGrainFactory),
                 retryFilter);
 
             this.typeMapRefreshTimer = new AsyncTaskSafeTimer(
@@ -240,7 +216,7 @@ namespace Orleans
                 this.typeMapRefreshInterval,
                 this.typeMapRefreshInterval);
 
-            ClientStatistics.Start(transport, clientId);
+            ClientStatistics.Start(MessageCenter, clientId);
             
             await ExecuteWithRetries(StreamingInitialize, retryFilter);
 
@@ -266,7 +242,7 @@ namespace Orleans
         {
             try
             {
-                GrainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory);
+                GrainTypeResolver = await MessageCenter.GetGrainTypeResolver(this.InternalGrainFactory);
             }
             catch(Exception ex)
             {
@@ -301,7 +277,7 @@ namespace Orleans
             OrleansOutsideRuntimeClientEvent.Log.SendResponse(message);
             message.BodyObject = response;
 
-            transport.SendMessage(message);
+            MessageCenter.SendMessage(message);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
@@ -351,7 +327,7 @@ namespace Orleans
             }
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Send {0}", message);
-            transport.SendMessage(message);
+            MessageCenter.SendMessage(message);
         }
 
         public void ReceiveResponse(Message response)
@@ -421,9 +397,9 @@ namespace Orleans
 
             Utils.SafeExecute(() =>
                 {
-                    if (transport != null)
+                    if (MessageCenter != null)
                     {
-                        transport.Stop();
+                        MessageCenter.Stop();
                     }
                 }, logger, "Client.Stop-Transport");
             Utils.SafeExecute(() =>
@@ -510,7 +486,7 @@ namespace Orleans
                 }
             });
             
-            Utils.SafeExecute(() => transport?.Dispose());
+            Utils.SafeExecute(() => MessageCenter?.Dispose());
             if (ClientStatistics != null)
             {
                 Utils.SafeExecute(() => ClientStatistics.Dispose());
