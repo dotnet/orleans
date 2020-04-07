@@ -25,8 +25,14 @@ namespace Orleans.Runtime.ReminderService
 
         public static string ConstructRowKey(GrainReference grainRef, string reminderName)
         {
-            var key = String.Format("{0}-{1}", grainRef.ToKeyString(), reminderName); //grainRef.ToString(), reminderName);
+            var key = string.Format("{0}-{1}", grainRef.ToKeyString(), reminderName);
             return AzureTableUtils.SanitizeTableProperty(key);
+        }
+
+        public static (string LowerBound, string UpperBound) ConstructRowKeyBounds(GrainReference grainRef)
+        {
+            var baseKey = AzureTableUtils.SanitizeTableProperty(grainRef.ToKeyString());
+            return (baseKey + '-', baseKey + (char)('-' + 1));
         }
 
         public static string ConstructPartitionKey(string serviceId, GrainReference grainRef)
@@ -47,6 +53,11 @@ namespace Orleans.Runtime.ReminderService
             return AzureTableUtils.SanitizeTableProperty($"{serviceId}_{number:X8}");
         }
 
+        public static (string LowerBound, string UpperBound) ConstructPartitionKeyBounds(string serviceId)
+        {
+            var baseKey = AzureTableUtils.SanitizeTableProperty(serviceId);
+            return (baseKey + '_', baseKey + (char)('_' + 1));
+        }
 
         public override string ToString()
         {
@@ -111,12 +122,11 @@ namespace Orleans.Runtime.ReminderService
             // TODO: Determine whether or not a single query could be used here while avoiding a table scan
             string sBegin = ReminderTableEntry.ConstructPartitionKey(ServiceId, begin);
             string sEnd = ReminderTableEntry.ConstructPartitionKey(ServiceId, end);
-            string serviceIdStr = ServiceId;
+            var (partitionKeyLowerBound, partitionKeyUpperBound) = ReminderTableEntry.ConstructPartitionKeyBounds(ServiceId);
             string filterOnServiceIdStr = TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.GreaterThan, serviceIdStr + '_'),
+                    TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.GreaterThan, partitionKeyLowerBound),
                     TableOperators.And,
-                    TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.LessThanOrEqual,
-                        serviceIdStr + (char)('_' + 1)));
+                    TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.LessThan, partitionKeyUpperBound));
             if (begin < end)
             {
                 string filterBetweenBeginAndEnd = TableQuery.CombineFilters(
@@ -137,9 +147,13 @@ namespace Orleans.Runtime.ReminderService
 
             // (begin > end)
             string queryOnSBegin = TableQuery.CombineFilters(
-                filterOnServiceIdStr, TableOperators.And, TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.GreaterThan, sBegin));
+                filterOnServiceIdStr,
+                TableOperators.And,
+                TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.GreaterThan, sBegin));
             string queryOnSEnd = TableQuery.CombineFilters(
-                filterOnServiceIdStr, TableOperators.And, TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.LessThanOrEqual, sEnd));
+                filterOnServiceIdStr,
+                TableOperators.And,
+                TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.LessThanOrEqual, sEnd));
 
             var resultsOnSBeginQuery = ReadTableEntriesAndEtagsAsync(queryOnSBegin);
             var resultsOnSEndQuery = ReadTableEntriesAndEtagsAsync(queryOnSEnd);
@@ -150,11 +164,11 @@ namespace Orleans.Runtime.ReminderService
         internal async Task<List<Tuple<ReminderTableEntry, string>>> FindReminderEntries(GrainReference grainRef)
         {
             var partitionKey = ReminderTableEntry.ConstructPartitionKey(ServiceId, grainRef);
+            var (rowKeyLowerBound, rowKeyUpperBound) = ReminderTableEntry.ConstructRowKeyBounds(grainRef);
             string filter = TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.RowKey), QueryComparisons.GreaterThan, grainRef.ToKeyString() + '-'),
+                    TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.RowKey), QueryComparisons.GreaterThan, rowKeyLowerBound),
                     TableOperators.And,
-                    TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.RowKey), QueryComparisons.LessThanOrEqual,
-                       grainRef.ToKeyString() + (char)('-' + 1)));
+                    TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.RowKey), QueryComparisons.LessThan, rowKeyUpperBound));
             string query =
                 TableQuery.CombineFilters(
                     TableQuery.GenerateFilterCondition(nameof(ReminderTableEntry.PartitionKey), QueryComparisons.Equal, partitionKey),
@@ -219,31 +233,24 @@ namespace Orleans.Runtime.ReminderService
 
         internal async Task DeleteTableEntries()
         {
-            if (ServiceId.Equals(Guid.Empty) && ClusterId == null)
-            {
-                await DeleteTableAsync();
-            }
-            else
-            {
-                List<Tuple<ReminderTableEntry, string>> entries = await FindAllReminderEntries();
-                // return manager.DeleteTableEntries(entries); // this doesnt work as entries can be across partitions, which is not allowed
-                // group by grain hashcode so each query goes to different partition
-                var tasks = new List<Task>();
-                var groupedByHash = entries
-                    .Where(tuple => tuple.Item1.ServiceId.Equals(ServiceId))
-                    .Where(tuple => tuple.Item1.DeploymentId.Equals(ClusterId))  // delete only entries that belong to our DeploymentId.
-                    .GroupBy(x => x.Item1.GrainRefConsistentHash).ToDictionary(g => g.Key, g => g.ToList());
+            List<Tuple<ReminderTableEntry, string>> entries = await FindAllReminderEntries();
+            // return manager.DeleteTableEntries(entries); // this doesnt work as entries can be across partitions, which is not allowed
+            // group by grain hashcode so each query goes to different partition
+            var tasks = new List<Task>();
+            var groupedByHash = entries
+                .Where(tuple => tuple.Item1.ServiceId.Equals(ServiceId))
+                .Where(tuple => tuple.Item1.DeploymentId.Equals(ClusterId))  // delete only entries that belong to our DeploymentId.
+                .GroupBy(x => x.Item1.GrainRefConsistentHash).ToDictionary(g => g.Key, g => g.ToList());
 
-                foreach (var entriesPerPartition in groupedByHash.Values)
+            foreach (var entriesPerPartition in groupedByHash.Values)
+            {
+                foreach (var batch in entriesPerPartition.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
                 {
-                    foreach (var batch in entriesPerPartition.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
-                    {
-                        tasks.Add(DeleteTableEntriesAsync(batch));
-                    }
+                    tasks.Add(DeleteTableEntriesAsync(batch));
                 }
-
-                await Task.WhenAll(tasks);
             }
+
+            await Task.WhenAll(tasks);
         }
     }
 }

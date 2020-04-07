@@ -34,11 +34,12 @@ namespace UnitTests.RemindersTest
             filters.AddFilter("Storage", LogLevel.Trace);
             return filters;
         }
-        public override void Dispose()
+
+        public override Task DisposeAsync()
         {
             // Reset init timeout after tests
             OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-            base.Dispose();
+            return base.DisposeAsync();
         }
 
         protected override IReminderTable CreateRemindersTable()

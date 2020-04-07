@@ -17,7 +17,7 @@ using Orleans.Internal;
 namespace UnitTests.RemindersTest
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public abstract class ReminderTableTestsBase : IDisposable, IClassFixture<ConnectionStringFixture>
+    public abstract class ReminderTableTestsBase : IAsyncLifetime, IClassFixture<ConnectionStringFixture>
     {
         protected readonly TestEnvironmentFixture ClusterFixture;
         private readonly ILogger logger;
@@ -37,22 +37,25 @@ namespace UnitTests.RemindersTest
             loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType()}.log", filters);
             this.ClusterFixture = clusterFixture;
             logger = loggerFactory.CreateLogger<ReminderTableTestsBase>();
-            var serviceId = Guid.NewGuid().ToString();
-            var clusterId = "test-" + serviceId;
+            var serviceId = Guid.NewGuid().ToString() + "/foo";
+            var clusterId = "test-" + serviceId + "/foo2";
 
             logger.Info("ClusterId={0}", clusterId);
             this.clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = serviceId });
-            
-            var rmndr = CreateRemindersTable();
-            rmndr.Init().WithTimeout(TimeSpan.FromMinutes(1)).Wait();
-            remindersTable = rmndr;
+
+            this.remindersTable = this.CreateRemindersTable();
         }
 
-        public virtual void Dispose()
+        public virtual async Task InitializeAsync()
+        {
+            await this.remindersTable.Init().WithTimeout(TimeSpan.FromMinutes(1));
+        }
+
+        public virtual async Task DisposeAsync()
         {
             if (remindersTable != null && SiloInstanceTableTestConstants.DeleteEntriesAfterTest)
             {
-                remindersTable.TestOnlyClearTable().Wait();
+                await remindersTable.TestOnlyClearTable();
             }
         }
 
@@ -82,7 +85,7 @@ namespace UnitTests.RemindersTest
 
         protected async Task ReminderSimple()
         {
-            var reminder = CreateReminder(MakeTestGrainReference(), "0");
+            var reminder = CreateReminder(MakeTestGrainReference(), "foo/bar\\#b_a_z?");
             await remindersTable.UpsertRow(reminder);
 
             var readReminder = await remindersTable.ReadRow(reminder.GrainRef, reminder.ReminderName);
@@ -165,7 +168,7 @@ namespace UnitTests.RemindersTest
 
         private GrainReference MakeTestGrainReference()
         {
-            GrainId regularGrainId = GrainId.GetGrainIdForTesting(Guid.NewGuid());
+            GrainId regularGrainId = GrainId.GetGrainId(12345,Guid.NewGuid(), "foo/bar\\#baz?");
             GrainReference grainRef = this.ClusterFixture.InternalGrainFactory.GetGrain(regularGrainId);
             return grainRef;
         }
