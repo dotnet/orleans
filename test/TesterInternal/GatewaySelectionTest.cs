@@ -13,6 +13,7 @@ using Orleans.Runtime;
 using Orleans.Internal;
 using Xunit;
 using Xunit.Abstractions;
+using System.Threading;
 
 namespace UnitTests.MessageCenterTests
 {
@@ -34,13 +35,13 @@ namespace UnitTests.MessageCenterTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Gateway")]
-        public void GatewaySelection()
+        public async Task GatewaySelection()
         {
             var listProvider = new TestListProvider(gatewayAddressUris);
-            Test_GatewaySelection(listProvider);
+            await Test_GatewaySelection(listProvider);
         }
 
-        protected void Test_GatewaySelection(IGatewayListProvider listProvider)
+        protected async Task Test_GatewaySelection(IGatewayListProvider listProvider)
         {
             IList<Uri> gatewayUris = listProvider.GetGateways().GetResult();
             Assert.True(gatewayUris.Count > 0, $"Found some gateways. Data = {Utils.EnumerableToString(gatewayUris)}");
@@ -51,6 +52,7 @@ namespace UnitTests.MessageCenterTests
             }).ToList();
 
             var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), listProvider, NullLoggerFactory.Instance, null);
+            await gatewayManager.StartAsync(CancellationToken.None);
 
             var counts = new int[4];
 
