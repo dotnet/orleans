@@ -45,8 +45,7 @@ namespace Orleans
             // Get the grain reference constructor.
             var constructor =
                 grainReferenceType.GetConstructors(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
-                                  .Where(IsGrainReferenceCopyConstructor)
-                                  .FirstOrDefault();
+                                  .FirstOrDefault(IsGrainReferenceCopyConstructor);
 
             if (constructor == null)
             {
