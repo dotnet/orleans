@@ -580,7 +580,7 @@ namespace Orleans.Runtime
                         attrib => attribType.IsAssignableFrom(attrib.AttributeType));
             }
 
-            return type.GetCustomAttributes(attribType, true).Any();
+            return type.IsDefined(attribType, true);
         }
 
         /// <summary>

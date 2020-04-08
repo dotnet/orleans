@@ -125,9 +125,8 @@ namespace Orleans.Runtime.ConsistentRing
                 List<uint> hashes = silo.GetUniformHashCodes(numBucketsPerSilo);
                 foreach (var hash in hashes)
                 {
-                    if (bucketsMap.ContainsKey(hash))
+                    if (bucketsMap.TryGetValue(hash, out var other))
                     {
-                        var other = bucketsMap[hash];
                         // If two silos conflict, take the lesser of the two (usually the older one; that is, the lower epoch)
                         if (silo.CompareTo(other) > 0) continue;
                     }

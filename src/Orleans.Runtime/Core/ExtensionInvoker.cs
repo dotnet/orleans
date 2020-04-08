@@ -48,10 +48,10 @@ namespace Orleans.Runtime
         {
             int interfaceId = 0;
 
-            foreach (int iface in extensionMap.Keys)
-                if (extensionMap[iface].Item1 == extension)
+            foreach (var kv in extensionMap)
+                if (kv.Value.Item1 == extension)
                 {
-                    interfaceId = iface;
+                    interfaceId = kv.Key;
                     break;
                 }
 
@@ -90,12 +90,12 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public Task<object> Invoke(IAddressable grain, InvokeMethodRequest request)
         {
-            if (extensionMap == null || !extensionMap.ContainsKey(request.InterfaceId))
+            if (extensionMap == null || !extensionMap.TryGetValue(request.InterfaceId, out var value))
                 throw new InvalidOperationException(
                     String.Format("Extension invoker invoked with an unknown interface ID:{0}.", request.InterfaceId));
 
-            var invoker = extensionMap[request.InterfaceId].Item2;
-            var extension = extensionMap[request.InterfaceId].Item1;
+            var invoker = value.Item2;
+            var extension = value.Item1;
             return invoker.Invoke(extension, request);
         }
 
@@ -124,8 +124,7 @@ namespace Orleans.Runtime
         /// </returns>
         public bool TryGetExtension(int interfaceId, out IGrainExtension extension)
         {
-            Tuple<IGrainExtension, IGrainExtensionMethodInvoker> value;
-            if (extensionMap != null && extensionMap.TryGetValue(interfaceId, out value))
+            if (extensionMap != null && extensionMap.TryGetValue(interfaceId, out var value))
             {
                 extension = value.Item1;
             }

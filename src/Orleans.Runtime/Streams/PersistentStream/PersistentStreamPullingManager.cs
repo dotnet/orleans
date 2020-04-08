@@ -213,8 +213,10 @@ namespace Orleans.Streams
             // First create them and store in local queuesToAgentsMap.
             // Only after that Initialize them all.
             var agents = new List<PersistentStreamPullingAgent>();
-            foreach (var queueId in myQueues.Where(queueId => !queuesToAgentsMap.ContainsKey(queueId)))
+            foreach (var queueId in myQueues)
             {
+                if (queuesToAgentsMap.ContainsKey(queueId))
+                    continue;
                 try
                 {
                     var agentId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE);

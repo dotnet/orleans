@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 
@@ -173,14 +171,6 @@ namespace Orleans.Runtime
             return grainInterfaceData;
         }
 
-        internal Dictionary<string, string> GetPrimaryImplementations()
-        {
-            lock (this)
-            {
-                return new Dictionary<string, string>(primaryImplementations);
-            }
-        }
-
         internal bool TryGetPrimaryImplementation(string grainInterface, out string grainClass)
         {
             lock (this)
@@ -195,10 +185,9 @@ namespace Orleans.Runtime
             {
                 iface = null;
 
-                if (!table.ContainsKey(interfaceId))
+                if (!table.TryGetValue(interfaceId, out var interfaceData))
                     return false;
 
-                var interfaceData = table[interfaceId];
                 iface = interfaceData.Interface;
                 return true;
             }
@@ -215,10 +204,9 @@ namespace Orleans.Runtime
             {
                 grainClass = null;
                 placement = this.defaultPlacementStrategy;
-                if (!implementationIndex.ContainsKey(typeCode))
+                if (!implementationIndex.TryGetValue(typeCode, out var implementation))
                     return false;
 
-                var implementation = implementationIndex[typeCode];
                 grainClass = implementation.GetClassName(genericArguments);
                 placement = placementStrategiesIndex[typeCode];
                 return true;

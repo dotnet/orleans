@@ -2,17 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Text;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
-using Orleans.GrainDirectory;
 using Orleans.Metadata;
-using Orleans.Runtime.Placement;
 using Orleans.Serialization;
 using Orleans.Utilities;
 
@@ -70,11 +66,6 @@ namespace Orleans.Runtime
             CrashUtils.GrainTypes = this.grainTypes.Keys.ToList();
         }
 
-        public Dictionary<string, string> GetGrainInterfaceToClassMap()
-        {
-            return grainInterfaceMap.GetPrimaryImplementations();
-        }
-
         internal bool TryGetPrimaryImplementation(string grainInterface, out string grainClass)
         {
             return grainInterfaceMap.TryGetPrimaryImplementation(grainInterface, out grainClass);
@@ -92,8 +83,8 @@ namespace Orleans.Runtime
 
                     if (grainInterfaceMap.TryGetPrimaryImplementation(className, out grainType))
                         return grainTypes[grainType];
-                    if (grainTypes.ContainsKey(className))
-                        return grainTypes[className];
+                    if (grainTypes.TryGetValue(className, out var data))
+                        return data;
 
                     if (TypeUtils.IsGenericClass(className))
                     {
@@ -101,13 +92,13 @@ namespace Orleans.Runtime
                         if (grainInterfaceMap.TryGetPrimaryImplementation(templateName, out grainType))
                             templateName = grainType;
 
-                        if (grainTypes.ContainsKey(templateName))
+                        if (grainTypes.TryGetValue(templateName, out var template))
                         {
                             // Found the generic template class
                             try
                             {
                                 // Instantiate the specific type from generic template
-                                var genericGrainTypeData = (GenericGrainTypeData)grainTypes[templateName];
+                                var genericGrainTypeData = (GenericGrainTypeData)template;
                                 Type[] typeArgs = TypeUtils.GenericTypeArgsFromClassName(className);
                                 var concreteTypeData = genericGrainTypeData.MakeGenericType(typeArgs);
 
