@@ -41,11 +41,11 @@ namespace Orleans.Runtime
             {
                 lock (this)
                 {
-                    if (genericClassNames.ContainsKey(typeArguments))
-                        return genericClassNames[typeArguments];
-
-                    var className = String.Format("{0}[{1}]", GrainClass, typeArguments);
-                    genericClassNames.Add(typeArguments, className);
+                    if (!genericClassNames.TryGetValue(typeArguments, out var className))
+                    {
+                        className = String.Format("{0}[{1}]", GrainClass, typeArguments);
+                        genericClassNames.Add(typeArguments, className);
+                    }
                     return className;
                 }
 

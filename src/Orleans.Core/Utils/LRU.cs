@@ -92,11 +92,7 @@ namespace Orleans.Runtime
             cache.AddOrUpdate(key, result, (k, o) => result);
         }
 
-        public bool ContainsKey(TKey key)
-        {
-            TimestampedValue ignore;
-            return cache.TryGetValue(key, out ignore);
-        }
+        public bool ContainsKey(TKey key) => cache.ContainsKey(key);
 
         public bool RemoveKey(TKey key, out TValue value)
         {
