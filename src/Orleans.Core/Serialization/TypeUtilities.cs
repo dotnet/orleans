@@ -59,7 +59,7 @@ namespace Orleans.Serialization
             if (t.IsPrimitive || t.IsEnum)
                 return true;
 
-            if (t.GetCustomAttributes(typeof(ImmutableAttribute), false).Length != 0)
+            if (t.IsDefined(typeof(ImmutableAttribute), false))
                 return true;
 
             if (t.IsConstructedGenericType)

@@ -26,9 +26,9 @@ namespace Orleans.Runtime
         public GrainTypeData(Type type)
         {
             Type = type;
-            this.IsReentrant = type.GetCustomAttributes(typeof (ReentrantAttribute), true).Any();
+            this.IsReentrant = type.IsDefined(typeof(ReentrantAttribute), true);
             // TODO: shouldn't this use GrainInterfaceUtils.IsStatelessWorker?
-            this.IsStatelessWorker = type.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any();
+            this.IsStatelessWorker = type.IsDefined(typeof(StatelessWorkerAttribute), true);
             this.GrainClass = TypeUtils.GetFullName(type);
             RemoteInterfaceTypes = GetRemoteInterfaces(type);
             this.MayInterleave = GetMayInterleavePredicate(type) ?? (_ => false);
@@ -107,14 +107,15 @@ namespace Orleans.Runtime
         /// <returns></returns>
         private static Func<InvokeMethodRequest, bool> GetMayInterleavePredicate(Type grainType)
         {
-            if (!grainType.GetCustomAttributes<MayInterleaveAttribute>().Any())
+            var attribute = grainType.GetCustomAttribute<MayInterleaveAttribute>();
+            if (attribute is null)
                 return null;
 
-            if (grainType.GetCustomAttributes(typeof(ReentrantAttribute), true).Any())
+            if (grainType.IsDefined(typeof(ReentrantAttribute), true))
                 throw new InvalidOperationException(
                     $"Class {grainType.FullName} is already marked with Reentrant attribute");
 
-            var callbackMethodName = grainType.GetCustomAttribute<MayInterleaveAttribute>().CallbackMethodName;
+            var callbackMethodName = attribute.CallbackMethodName;
             var method = grainType.GetMethod(callbackMethodName, BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
             if (method == null)
                 throw new InvalidOperationException(

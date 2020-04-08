@@ -1346,7 +1346,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                var result = SiloStatusOracle.GetApproximateSiloStatuses(true).Select(s => s.Key).ToList();
+                var result = SiloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToList();
                 if (result.Count > 0) return result;
 
                 logger.Warn(ErrorCode.Catalog_GetApproximateSiloStatuses, "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty");

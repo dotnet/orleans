@@ -149,8 +149,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception)
                 {
-                    if (cache.ContainsKey(key))
-                        cache.Remove(key);
+                    cache.Remove(key);
                     throw;
                 }
             }

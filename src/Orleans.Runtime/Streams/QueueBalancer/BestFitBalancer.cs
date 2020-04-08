@@ -87,21 +87,15 @@ namespace Orleans.Streams
             {
                 return newDistribution;
             }
-            
-            // setup ideal distribution for active buckets
-            foreach (TBucket bucket in idealDistribution.Keys.Where(activeBucketsSet.Contains))
-            {
-                newDistribution.Add(bucket, idealDistribution[bucket]);
-            }
 
-            // get list of inactive buckets
-            List<TBucket> inactiveBuckets = idealDistribution.Keys.Where(bucket => !activeBucketsSet.Contains(bucket)).ToList();
-
-            // build list of all resources that need redistributed from inactive buckets
+            // setup ideal distribution for active buckets and build list of all resources that need redistributed from inactive buckets
             var resourcesToRedistribute = new List<TResource>();
-            foreach (TBucket inactiveBucket in inactiveBuckets)
+            foreach (var kv in idealDistribution)
             {
-                resourcesToRedistribute.AddRange(idealDistribution[inactiveBucket]);
+                if (activeBucketsSet.Contains(kv.Key))
+                    newDistribution.Add(kv.Key, kv.Value);
+                else
+                    resourcesToRedistribute.AddRange(kv.Value);
             }
 
             // redistribute remaining resources across the resource lists of the active buckets, resource lists with the fewest reasources first
