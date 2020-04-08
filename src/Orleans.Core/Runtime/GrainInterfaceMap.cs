@@ -22,8 +22,8 @@ namespace Orleans.Runtime
 
         private readonly bool localTestMode;
         private readonly HashSet<string> loadedGrainAsemblies;
-
-        private readonly PlacementStrategy defaultPlacementStrategy;
+		
+		private readonly PlacementStrategy defaultPlacementStrategy;
 
         internal IEnumerable<GrainClassData> SupportedGrainClassData
         {
@@ -45,7 +45,7 @@ namespace Orleans.Runtime
             unordered = new HashSet<int>();
             this.localTestMode = localTestMode;
             this.defaultPlacementStrategy = defaultPlacementStrategy;
-            if (localTestMode) // if we are running in test mode, we'll build a list of loaded grain assemblies to help with troubleshooting deployment issue
+            if(localTestMode) // if we are running in test mode, we'll build a list of loaded grain assemblies to help with troubleshooting deployment issue
                 loadedGrainAsemblies = new HashSet<string>();
         }
 
@@ -201,7 +201,7 @@ namespace Orleans.Runtime
             {
                 return interfaceType.GetGenericTypeDefinition().AssemblyQualifiedName;
             }
-            else
+            else 
             {
                 return TypeUtils.GetTemplatedName(
                             TypeUtils.GetFullName(interfaceType),

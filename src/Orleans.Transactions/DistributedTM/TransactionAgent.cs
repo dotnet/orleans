@@ -208,7 +208,7 @@ namespace Orleans.Transactions
             return status;
         }
 
-        public Task Abort(ITransactionInfo info)
+        public async Task Abort(ITransactionInfo info)
         {
             this.statistics.TrackTransactionFailed();
             var transactionInfo = (TransactionInfo)info;
@@ -219,7 +219,7 @@ namespace Orleans.Transactions
                 logger.Trace($"abort {transactionInfo} {string.Join(",", participants.Select(p => p.ToString()))}");
 
             // send one-way abort messages to release the locks and roll back any updates
-            return Task.WhenAll(participants.Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
+            await Task.WhenAll(participants.Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
                  .Abort(p.Name, transactionInfo.TransactionId)));
         }
 

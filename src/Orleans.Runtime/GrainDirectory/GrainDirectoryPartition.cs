@@ -152,7 +152,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 VersionTag = rand.Next();
             }
-
+            
             if (SingleInstance && (Instances.Count > 0))
             {
                 // Grain is supposed to be in single activation mode, but we have two activations!!
@@ -363,7 +363,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Removing activation for grain {0} cause={1} was_removed={2}", grain.ToString(), cause, wasRemoved);
         }
 
-
+   
         /// <summary>
         /// Removes the grain (and, effectively, all its activations) from the directory
         /// </summary>

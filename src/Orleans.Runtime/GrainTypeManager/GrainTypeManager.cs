@@ -23,7 +23,7 @@ namespace Orleans.Runtime
         private readonly Dictionary<string, GrainTypeData> grainTypes;
         private readonly Dictionary<int, InvokerData> invokers;
         private readonly SerializationManager serializationManager;
-        private readonly PlacementStrategy defaultPlacementStrategy;
+		private readonly PlacementStrategy defaultPlacementStrategy;
         private Dictionary<int, Dictionary<ushort, List<SiloAddress>>> supportedSilosByInterface;
 
         internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo => this.grainInterfaceMapsBySilo;
@@ -155,7 +155,7 @@ namespace Orleans.Runtime
                     .ToList();
                 result[version] = silosWithCorrectVersion;
             }
-
+            
             return result;
         }
 
@@ -295,7 +295,7 @@ namespace Orleans.Runtime
             {
                 // We need to sort this so the list of silos returned will
                 // be the same accross all silos in the cluster
-                silos.Sort();
+                silos.Sort(); 
             }
             ClusterGrainInterfaceMap = newClusterGrainInterfaceMap;
             GrainTypeResolver = ClusterGrainInterfaceMap.GetGrainTypeResolver();

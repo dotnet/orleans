@@ -66,7 +66,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return;
             }
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending {0} items to my {1}: (ring status is {2})",
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending {0} items to my {1}: (ring status is {2})", 
                 batchUpdate.Count, silosHoldingMyPartitionCopy.ToStrings(), localDirectory.RingStatusToString());
 
             var tasks = new List<Task>();

@@ -38,18 +38,16 @@ namespace Orleans.Streams
         {
             this.siloStatusOracle = siloStatusOracle ?? throw new ArgumentNullException(nameof(siloStatusOracle));
             this.deploymentConfig = deploymentConfig ?? throw new ArgumentNullException(nameof(deploymentConfig));
-            immatureSilos = new ConcurrentDictionary<SiloAddress, bool>();
             this.options = options;
 
             isStarting = true;
 
             // record all already active silos as already mature. 
             // Even if they are not yet, they will be mature by the time I mature myself (after I become !isStarting).
-            foreach (var silo in siloStatusOracle.GetApproximateSiloStatuses(true).Keys)
-            {
-                if (!silo.Equals(siloStatusOracle.SiloAddress))
-                    immatureSilos[silo] = false;     // record as mature
-            }
+            immatureSilos = new ConcurrentDictionary<SiloAddress, bool>(
+                from s in siloStatusOracle.GetApproximateSiloStatuses(true).Keys
+                where !s.Equals(siloStatusOracle.SiloAddress)
+                select new KeyValuePair<SiloAddress, bool>(s, false));
         }
 
         public static IStreamQueueBalancer Create(IServiceProvider services, string name, IDeploymentConfiguration deploymentConfiguration)

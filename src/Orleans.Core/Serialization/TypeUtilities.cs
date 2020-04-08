@@ -195,7 +195,7 @@ namespace Orleans.Serialization
                 return "unknown";
             }
         }
-
+        
         /// <summary>
         /// Returns <see langword="true"/> if a type is accessible from C# code from the specified assembly, and <see langword="false"/> otherwise.
         /// </summary>
