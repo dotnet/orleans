@@ -1,20 +1,17 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
+using Orleans.Streaming.EventHubs;
 using System;
 
 namespace Orleans.Configuration
 {
-    public class AzureTableStreamCheckpointerOptions
+    public class AzureTableStreamCheckpointerOptions : AzureStorageOperationOptions
     {
-        /// <summary>
-        /// Azure table storage connections string.
-        /// </summary>
-        [RedactConnectionString]
-        public string ConnectionString { get; set; }
         /// <summary>
         /// Azure table name.
         /// </summary>
-        public string TableName { get; set; } = DEFAULT_TABLE_NAME;
+        public override string TableName { get; set; } = DEFAULT_TABLE_NAME;
         public const string DEFAULT_TABLE_NAME = "Checkpoint";
+
         /// <summary>
         /// Interval to write checkpoints.  Prevents spamming storage.
         /// </summary>

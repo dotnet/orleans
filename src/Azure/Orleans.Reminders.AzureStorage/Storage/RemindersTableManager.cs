@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Reminders.AzureStorage;
 using Orleans.Internal;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.ReminderService
 {
@@ -84,22 +85,13 @@ namespace Orleans.Runtime.ReminderService
         public string ServiceId { get; private set; }
         public string ClusterId { get; private set; }
 
-        private static readonly TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-
-        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
+        public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, ILoggerFactory loggerFactory, AzureStorageOperationOptions options)
         {
-            var singleton = new RemindersTableManager(serviceId, clusterId, storageConnectionString, tableName, loggerFactory);
+            var singleton = new RemindersTableManager(serviceId, clusterId, options.ConnectionString, options.TableName, loggerFactory, options.StoragePolicyOptions);
             try
             {
                 singleton.Logger.Info("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
-                await singleton.InitTableAsync()
-                    .WithTimeout(initTimeout);
-            }
-            catch (TimeoutException te)
-            {
-                string errorMsg = $"Unable to create or connect to the Azure table in {initTimeout}";
-                singleton.Logger.Error((int)AzureReminderErrorCode.AzureTable_38, errorMsg, te);
-                throw new OrleansException(errorMsg, te);
+                await singleton.InitTableAsync();
             }
             catch (Exception ex)
             {
@@ -109,9 +101,15 @@ namespace Orleans.Runtime.ReminderService
             }
             return singleton;
         }
-
-        private RemindersTableManager(string serviceId, string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
-            : base(tableName, storageConnectionString, loggerFactory.CreateLogger<RemindersTableManager>())
+        
+        private RemindersTableManager(
+            string serviceId,
+            string clusterId,
+            string storageConnectionString,
+            string tableName,
+            ILoggerFactory loggerFactory,
+            AzureStoragePolicyOptions storagePolicyOptions)
+            : base(tableName, storageConnectionString, loggerFactory.CreateLogger<RemindersTableManager>(), storagePolicyOptions)
         {
             ClusterId = clusterId;
             ServiceId = serviceId;
@@ -244,7 +242,7 @@ namespace Orleans.Runtime.ReminderService
 
             foreach (var entriesPerPartition in groupedByHash.Values)
             {
-                foreach (var batch in entriesPerPartition.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                    foreach (var batch in entriesPerPartition.BatchIEnumerable(this.StoragePolicyOptions.MaxBulkUpdateRows))
                 {
                     tasks.Add(DeleteTableEntriesAsync(batch));
                 }

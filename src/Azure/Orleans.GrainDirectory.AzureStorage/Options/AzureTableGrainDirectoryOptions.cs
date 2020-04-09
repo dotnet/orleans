@@ -6,18 +6,12 @@ using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
-    public class AzureTableGrainDirectoryOptions
+    public class AzureTableGrainDirectoryOptions : AzureStorageOperationOptions
     {
-        /// <summary>
-        /// Connection string for Azure Storage
-        /// </summary>
-        [RedactConnectionString]
-        public string ConnectionString { get; set; }
-
         /// <summary>
         /// Table name for Azure Storage
         /// </summary>
-        public string TableName { get; set; } = DEFAULT_TABLE_NAME;
+        public override string TableName { get; set; } = DEFAULT_TABLE_NAME;
         public const string DEFAULT_TABLE_NAME = "GrainDirectory";
     }
 
