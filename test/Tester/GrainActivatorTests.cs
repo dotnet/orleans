@@ -72,6 +72,7 @@ namespace UnitTests.General
         {
             public const string HardcodedValue = "Hardcoded Test Value";
             private int numberOfReleasedInstances;
+
             public HardcodedGrainActivator(IServiceProvider service) : base(service)
             {
             }

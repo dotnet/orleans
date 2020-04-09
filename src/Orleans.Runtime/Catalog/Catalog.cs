@@ -85,7 +85,6 @@ namespace Orleans.Runtime
         private IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private int collectionNumber;
-        private int destroyActivationsNumber;
         private IAsyncTimer gcTimer;
         private Task gcTimerTask;
         private readonly string localSiloName;
@@ -137,7 +136,6 @@ namespace Orleans.Runtime
             this.loggerFactory = loggerFactory;
             this.GrainTypeManager = typeManager;
             this.collectionNumber = 0;
-            this.destroyActivationsNumber = 0;
             this.grainCreator = grainCreator;
             this.serializationManager = serializationManager;
             this.versionSelectorManager = versionSelectorManager;
@@ -746,18 +744,24 @@ namespace Orleans.Runtime
             return data != null;
         }
 
-        private Task DeactivateActivationsFromCollector(List<ActivationData> list)
+        private async Task DeactivateActivationsFromCollector(List<ActivationData> list)
         {
+            var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+            var taskCompletionSourceList = new TaskCompletionSource<object>[list.Count];
             logger.Info(ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {0} to promptly Destroy.", list.Count);
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
-            foreach (var activation in list)
+            for (var i = 0; i < list.Count; i++)
             {
-                lock (activation)
+                var activationData = list[i];
+                var tcs = taskCompletionSourceList[i] = new TaskCompletionSource<object>();
+                lock (activationData)
                 {
-                    activation.PrepareForDeactivation(); // Don't accept any new messages
+                    // Continue deactivation when ready
+                    activationData.AddOnInactive(() => DestroyActivationAsync(activationData, tcs, cts.Token));
                 }
             }
-            return DestroyActivations(list);
+
+            await Task.WhenAll(taskCompletionSourceList.Select(tcs => tcs.Task)).WithCancellation(cts.Token);
         }
 
         // To be called fro within Activation context.
@@ -782,6 +786,7 @@ namespace Orleans.Runtime
 
         private void DeactivateActivationImpl(ActivationData data, StatisticName statisticName)
         {
+            var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
             bool promptly = false;
             bool alreadBeingDestroyed = false;
             lock (data)
@@ -797,7 +802,7 @@ namespace Orleans.Runtime
                     }
                     else // busy, so destroy later.
                     {
-                        data.AddOnInactive(() => DestroyActivationVoid(data));
+                        data.AddOnInactive(() => DestroyActivationAsync(data, null, cts.Token));
                     }
                 }
                 else if (data.State == ActivationState.Create)
@@ -823,7 +828,67 @@ namespace Orleans.Runtime
             CounterStatistic.FindOrCreate(statisticName).Increment();
             if (promptly)
             {
-                DestroyActivationVoid(data); // Don't await or Ignore, since we are in this activation context and it may have alraedy been destroyed!
+                DestroyActivationAsync(data, null, cts.Token); // Don't await or Ignore, since we are in this activation context and it may have alraedy been destroyed!
+            }
+        }
+
+        internal async Task DeactivateActivation(ActivationData activationData)
+        {
+            TaskCompletionSource<object> tcs;
+            var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+
+            lock (activationData)
+            {
+                if (activationData.State != ActivationState.Valid)
+                    return; // Nothing to do
+
+                tcs = new TaskCompletionSource<object>();
+
+                // Don't accept any new messages
+                activationData.PrepareForDeactivation(); 
+                this.activationCollector.TryCancelCollection(activationData);
+
+                // Continue deactivation when ready
+                activationData.AddOnInactive(() => DestroyActivationAsync(activationData, tcs, cts.Token));
+            }
+
+            await tcs.Task.WithCancellation(cts.Token);
+        }
+
+        private async void DestroyActivationAsync(ActivationData activationData, TaskCompletionSource<object> tcs, CancellationToken ct)
+        {
+            try
+            {
+                // Wait timers and call OnDeactivateAsync()
+                await activationData.WaitForAllTimersToFinish();
+                await this.scheduler.RunOrQueueTask(() => CallGrainDeactivateAndCleanupStreams(activationData, ct), activationData);
+                // Unregister from directory
+                await this.grainLocator.Unregister(activationData.Address, UnregistrationCause.Force);
+            }
+            catch (Exception ex)
+            {
+                this.logger.Warn(ErrorCode.Catalog_DeactivateActivation_Exception, $"Exception when trying to deactivation {activationData}", ex);
+            }
+            finally
+            {
+                lock (activationData)
+                {
+                    activationData.SetState(ActivationState.Invalid);
+                }
+                // Capture grainInstance since UnregisterMessageTarget will set it to null...
+                var grainInstance = activationData.GrainInstance;
+                UnregisterMessageTarget(activationData);
+                RerouteAllQueuedMessages(activationData, null, "Finished Destroy Activation");
+                if (grainInstance != null)
+                {
+                    lock (activationData)
+                    {
+                        grainCreator.Release(activationData, grainInstance);
+                    }
+                }
+
+                activationData.Dispose();
+                tcs?.SetResult(null);
             }
         }
 
@@ -839,60 +904,8 @@ namespace Orleans.Runtime
             if (list == null || list.Count == 0) return;
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("DeactivateActivations: {0} activations.", list.Count);
-            List<ActivationData> destroyNow = null;
-            List<MultiTaskCompletionSource> destroyLater = null;
-            int alreadyBeingDestroyed = 0;
-            foreach (var d in list)
-            {
-                var activationData = d; // capture
-                lock (activationData)
-                {
-                    if (activationData.State == ActivationState.Valid)
-                    {
-                        // Change the ActivationData state here, since we're about to give up the lock.
-                        activationData.PrepareForDeactivation(); // Don't accept any new messages
-                        this.activationCollector.TryCancelCollection(activationData);
-                        if (!activationData.IsCurrentlyExecuting)
-                        {
-                            if (destroyNow == null)
-                            {
-                                destroyNow = new List<ActivationData>();
-                            }
-                            destroyNow.Add(activationData);
-                        }
-                        else // busy, so destroy later.
-                        {
-                            if (destroyLater == null)
-                            {
-                                destroyLater = new List<MultiTaskCompletionSource>();
-                            }
-                            var tcs = new MultiTaskCompletionSource(1);
-                            destroyLater.Add(tcs);
-                            activationData.AddOnInactive(() => DestroyActivationAsync(activationData, tcs));
-                        }
-                    }
-                    else
-                    {
-                        alreadyBeingDestroyed++;
-                    }
-                }
-            }
 
-            int numDestroyNow = destroyNow == null ? 0 : destroyNow.Count;
-            int numDestroyLater = destroyLater == null ? 0 : destroyLater.Count;
-            logger.Info(ErrorCode.Catalog_ShutdownActivations_3,
-                "DeactivateActivations: total {0} to shutdown, out of them {1} promptly, {2} later when become idle and {3} are already being destroyed or invalid.",
-                list.Count, numDestroyNow, numDestroyLater, alreadyBeingDestroyed);
-            CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DIRECT_SHUTDOWN).IncrementBy(list.Count);
-
-            if (destroyNow != null && destroyNow.Count > 0)
-            {
-                await DestroyActivations(destroyNow);
-            }
-            if (destroyLater != null && destroyLater.Count > 0)
-            {
-                await Task.WhenAll(destroyLater.Select(t => t.Task).ToArray());
-            }
+            await Task.WhenAll(list.Select(DeactivateActivation));
         }
 
         public Task DeactivateAllActivations()
@@ -902,180 +915,6 @@ namespace Orleans.Runtime
             return DeactivateActivations(activationsToShutdown);
         }
 
-        /// <summary>
-        /// Deletes activation immediately regardless of active transactions etc.
-        /// For use by grain delete, transaction abort, etc.
-        /// </summary>
-        /// <param name="activation"></param>
-        private void DestroyActivationVoid(ActivationData activation)
-        {
-            StartDestroyActivations(new List<ActivationData> { activation });
-        }
-
-        private void DestroyActivationAsync(ActivationData activation, MultiTaskCompletionSource tcs)
-        {
-            StartDestroyActivations(new List<ActivationData> { activation }, tcs);
-        }
-
-        /// <summary>
-        /// Forcibly deletes activations now, without waiting for any outstanding transactions to complete.
-        /// Deletes activation immediately regardless of active transactions etc.
-        /// For use by grain delete, transaction abort, etc.
-        /// </summary>
-        /// <param name="list"></param>
-        /// <returns></returns>
-        // Overall code flow:
-        // Deactivating state was already set before, in the correct context under lock.
-        //      that means no more new requests will be accepted into this activation and all timer were stopped (no new ticks will be delivered or enqueued) 
-        // Wait for all already scheduled ticks to finish
-        // CallGrainDeactivate
-        //      when AsyncDeactivate promise is resolved (NOT when all Deactivate turns are done, which may be orphan tasks):
-        // Unregister in the directory 
-        //      when all AsyncDeactivate turns are done (Dispatcher.OnActivationCompletedRequest):
-        // Set Invalid state
-        // UnregisterMessageTarget -> no new tasks will be enqueue (if an orphan task get enqueud, it is ignored and dropped on the floor).
-        // InvalidateCacheEntry
-        // Reroute pending
-        private Task DestroyActivations(List<ActivationData> list)
-        {
-            if (list == null || list.Count == 0) return Task.CompletedTask;
-
-            var tcs = new MultiTaskCompletionSource(list.Count);
-            StartDestroyActivations(list, tcs);
-            return tcs.Task;
-        }
-
-        private async void StartDestroyActivations(List<ActivationData> list, MultiTaskCompletionSource tcs = null)
-        {
-            var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
-
-            int number = destroyActivationsNumber;
-            destroyActivationsNumber++;
-            try
-            {
-                logger.Info(ErrorCode.Catalog_DestroyActivations, "Starting DestroyActivations #{0} of {1} activations", number, list.Count);
-
-                // step 1 - WaitForAllTimersToFinish
-                var tasks1 = new List<Task>();
-                foreach (var activation in list)
-                {
-                    tasks1.Add(activation.WaitForAllTimersToFinish());
-                }
-
-                try
-                {
-                    await Task.WhenAll(tasks1).WithCancellation(cts.Token);
-                }
-                catch (Exception exc)
-                {
-                    logger.Warn(ErrorCode.Catalog_WaitForAllTimersToFinish_Exception, String.Format("WaitForAllTimersToFinish {0} failed.", list.Count), exc);
-                }
-
-                // step 2 - CallGrainDeactivate
-                var tasks2 = new List<Tuple<Task, ActivationData>>();
-                foreach (var activation in list)
-                {
-                    var activationData = activation; // Capture loop variable
-                    var task = scheduler.RunOrQueueTask(() => CallGrainDeactivateAndCleanupStreams(activationData, cts.Token), activationData);
-                    tasks2.Add(new Tuple<Task, ActivationData>(task, activationData));
-                }
-                var asyncQueue = new AsyncBatchedContinuationQueue<ActivationData>();
-                asyncQueue.Queue(tasks2, tupleList =>
-                {
-                    FinishDestroyActivations(tupleList.Select(t => t.Item2).ToList(), number, tcs);
-                    GC.KeepAlive(asyncQueue); // not sure about GC not collecting the asyncQueue local var prematuraly, so just want to capture it here to make sure. Just to be safe.
-                });
-            }
-            catch (Exception exc)
-            {
-                logger.Warn(ErrorCode.Catalog_DeactivateActivation_Exception, String.Format("StartDestroyActivations #{0} failed with {1} Activations.", number, list.Count), exc);
-            }
-        }
-
-        private async void FinishDestroyActivations(List<ActivationData> list, int number, MultiTaskCompletionSource tcs)
-        {
-            try
-            {
-                //logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Starting FinishDestroyActivations #{0} - with {1} Activations.", number, list.Count);
-                // step 3 - UnregisterManyAsync
-                try
-                {            
-                    List<ActivationAddress> activationsToDeactivate = list.
-                        Where((ActivationData d) => d.IsUsingGrainDirectory).
-                        Select((ActivationData d) => ActivationAddress.GetAddress(LocalSilo, d.Grain, d.ActivationId)).ToList();
-
-                    if (activationsToDeactivate.Count > 0)
-                    {
-                        await scheduler.RunOrQueueTask(() =>
-                            this.grainLocator.UnregisterMany(activationsToDeactivate, UnregistrationCause.Force),
-                            this);
-                    }
-                }
-                catch (Exception exc)
-                {
-                    logger.Warn(ErrorCode.Catalog_UnregisterManyAsync, String.Format("UnregisterManyAsync {0} failed.", list.Count), exc);
-                }
-
-                // step 4 - UnregisterMessageTarget and OnFinishedGrainDeactivate
-                foreach (var activationData in list)
-                {
-                    Grain grainInstance = activationData.GrainInstance;
-                    try
-                    {
-                        lock (activationData)
-                        {
-                            activationData.SetState(ActivationState.Invalid); // Deactivate calls on this activation are finished
-                        }
-                        UnregisterMessageTarget(activationData);
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget2, String.Format("UnregisterMessageTarget failed on {0}.", activationData), exc);
-                    }
-
-                    // IMPORTANT: no more awaits and .Ignore after that point.
-
-                    // Just use this opportunity to invalidate local Cache Entry as well. 
-                    // If this silo is not the grain directory partition for this grain, it may have it in its cache.
-                    try
-                    {
-
-                        directory.InvalidateCacheEntry(activationData.Address);
-
-                        RerouteAllQueuedMessages(activationData, null, "Finished Destroy Activation");
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget3, String.Format("Last stage of DestroyActivations failed on {0}.", activationData), exc);
-                    }
-                    try
-                    {
-                        if (grainInstance != null)
-                        {
-                            lock (activationData)
-                            {
-                                grainCreator.Release(activationData, grainInstance);
-                            }
-                        }
-
-                        activationData.Dispose();
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget3, String.Format("Releasing of the grain instance and scope failed on {0}.", activationData), exc);
-                    }
-                }
-                // step 5 - Resolve any waiting TaskCompletionSource
-                if (tcs != null)
-                {
-                    tcs.SetMultipleResults(list.Count);
-                }
-                logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Done FinishDestroyActivations #{0} - Destroyed {1} Activations.", number, list.Count);
-            }catch (Exception exc)
-            {
-                logger.Error(ErrorCode.Catalog_FinishDeactivateActivation_Exception, String.Format("FinishDestroyActivations #{0} failed with {1} Activations.", number, list.Count), exc);
-            }
-        }
         private void RerouteAllQueuedMessages(ActivationData activation, ActivationAddress forwardingAddress, string failedOperation, Exception exc = null)
         {
             lock (activation)
@@ -1363,20 +1202,27 @@ namespace Orleans.Runtime
 
         public Task DeleteActivations(List<ActivationAddress> addresses)
         {
-            return DestroyActivations(TryGetActivationDatas(addresses));
-        }
-
-
-        private List<ActivationData> TryGetActivationDatas(List<ActivationAddress> addresses)
-        {
-            var datas = new List<ActivationData>(addresses.Count);
-            foreach (var activationAddress in addresses)
+            List<ActivationData> TryGetActivationDatas(List<ActivationAddress> addresses)
             {
-                ActivationData data;
-                if (TryGetActivationData(activationAddress.Activation, out data))
-                    datas.Add(data);
+                var datas = new List<ActivationData>(addresses.Count);
+                foreach (var activationAddress in addresses)
+                {
+                    ActivationData data;
+                    if (TryGetActivationData(activationAddress.Activation, out data))
+                        datas.Add(data);
+                }
+                return datas;
             }
-            return datas;
+
+            var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+            var taskCompletionSourceList = new List<TaskCompletionSource<object>>(addresses.Count);
+            var counter = 0;
+            foreach (var activationData in TryGetActivationDatas(addresses))
+            {
+                DestroyActivationAsync(activationData, taskCompletionSourceList[counter], timeoutTokenSource.Token);
+                counter++;
+            }
+            return Task.WhenAll(taskCompletionSourceList.Select(tcs => tcs.Task));
         }
 
         private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
