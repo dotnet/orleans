@@ -7,6 +7,18 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.1.5] (changes since 3.1.4)
+
+- Non-breaking improvements
+  - Don't use iowait in cpu calcs on linux (#6444)
+  - TLS: specify an application protocol to satisfy ALPN (#6455)
+  - Change the error about not supported membership table cleanup functionality into a warning. (#6447)
+  - Update obsoletion warning for ISiloBuilderConfigurator (#6461)
+  - Allow GatewayManager initialization to be retried (#6459)
+
+- Non-breaking bug fixes
+  - Consistently sanitize RowKey & PartitionKey properties for Azure Table Storage reminders implementation (#6460)
+
 ### [3.1.4] (changes since 3.1.3)
 
 - Non-breaking improvements
