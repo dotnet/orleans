@@ -13,7 +13,7 @@ namespace Orleans.Storage
         /// Acquire the storage provider associated with the grain type.
         /// </summary>
         /// <returns></returns>
-        public static IGrainStorage GetGrainStorage(this Grain grain, IServiceProvider services) 
+        public static IGrainStorage GetGrainStorage(this IGrain grain, IServiceProvider services)
             => GetGrainStorage(grain.GetType(), services);
 
         /// <summary>

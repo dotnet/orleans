@@ -24,10 +24,10 @@ namespace Orleans.Runtime.LogConsistency
 
         private readonly ILogger log;
         private readonly IInternalGrainFactory grainFactory;
-        private readonly Grain grain;   // links to the grain that owns this service object
+        private readonly IGrain grain;   // links to the grain that owns this service object
 
         public ProtocolServices(
-            Grain gr,
+            IGrain gr,
             ILoggerFactory loggerFactory,
             SerializationManager serializationManager,
             IInternalGrainFactory grainFactory,
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.LogConsistency
             this.MyClusterId = siloDetails.ClusterId;
         }
         
-        public GrainReference GrainReference => grain.GrainReference;
+        public GrainReference GrainReference => grain.AsWeaklyTypedReference();
 
         /// <inheritdoc />
         public SerializationManager SerializationManager { get; }
@@ -52,20 +52,20 @@ namespace Orleans.Runtime.LogConsistency
 
             log?.Error((int)(throwexception ? ErrorCode.LogConsistency_ProtocolFatalError : ErrorCode.LogConsistency_ProtocolError),
                 string.Format("{0} Protocol Error: {1}",
-                    grain.GrainReference,
+                    grain.AsWeaklyTypedReference(),
                     msg));
 
             if (!throwexception)
                 return;
 
-            throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grain.GrainReference, this.MyClusterId));
+            throw new OrleansException(string.Format("{0} (grain={1}, cluster={2})", msg, grain.AsWeaklyTypedReference(), this.MyClusterId));
         }
 
         public void CaughtException(string where, Exception e)
         {
             log?.Error((int)ErrorCode.LogConsistency_CaughtException,
                string.Format("{0} Exception Caught at {1}",
-                   grain.GrainReference,
+                   grain.AsWeaklyTypedReference(),
                    where),e);
         }
 
@@ -73,7 +73,7 @@ namespace Orleans.Runtime.LogConsistency
         {
             log?.Warn((int)ErrorCode.LogConsistency_UserCodeException,
                 string.Format("{0} Exception caught in user code for {1}, called from {2}",
-                   grain.GrainReference,
+                   grain.AsWeaklyTypedReference(),
                    callback,
                    where), e);
         }
@@ -83,7 +83,7 @@ namespace Orleans.Runtime.LogConsistency
             if (log != null && log.IsEnabled(level))
             {
                 var msg = string.Format("{0} {1}",
-                        grain.GrainReference,
+                        grain.AsWeaklyTypedReference(),
                         string.Format(format, args));
                 log.Log(level, 0, msg, null, (m, exc) => $"{m}");
             }

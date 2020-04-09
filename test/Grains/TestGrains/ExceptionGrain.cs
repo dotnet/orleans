@@ -5,8 +5,15 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class ExceptionGrain : Grain, IExceptionGrain
+    public class ExceptionGrain : IExceptionGrain
     {
+        private readonly IGrainFactory grainFactory;
+
+        public ExceptionGrain(IGrainFactory grainFactory)
+        {
+            this.grainFactory = grainFactory;
+        }
+
         /// <summary>
         /// Returns a canceled <see cref="Task"/>.
         /// </summary>
@@ -43,13 +50,13 @@ namespace UnitTests.Grains
 
         public Task GrainCallToThrowsInvalidOperationException(long otherGrainId)
         {
-            var otherGrain = GrainFactory.GetGrain<IExceptionGrain>(otherGrainId);
+            var otherGrain = grainFactory.GetGrain<IExceptionGrain>(otherGrainId);
             return otherGrain.ThrowsInvalidOperationException();
         }
 
         public Task GrainCallToThrowsAggregateExceptionWrappingInvalidOperationException(long otherGrainId)
         {
-            var otherGrain = GrainFactory.GetGrain<IExceptionGrain>(otherGrainId);
+            var otherGrain = grainFactory.GetGrain<IExceptionGrain>(otherGrainId);
             return otherGrain.ThrowsAggregateExceptionWrappingInvalidOperationException();
         }
 

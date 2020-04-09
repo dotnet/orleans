@@ -384,7 +384,7 @@ namespace Orleans.Runtime
                         // Mark the exception so that it doesn't deactivate any other activations.
                         ise.IsSourceActivation = false;
 
-                        var activation = (target as Grain)?.Data;
+                        var activation = (target as IGrain)?.GetActivationData();
                         if (activation != null)
                         {
                             this.invokeExceptionLogger.Info($"Deactivating {activation} due to inconsistent state.");

@@ -1,9 +1,10 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
 
 namespace UnitTests.GrainInterfaces
 {
-    public interface IClientAddressableTestProducer : IGrainWithIntegerKey
+    public interface IClientAddressableTestProducer : IAddressable
     {
         Task<int> Poll();
     }

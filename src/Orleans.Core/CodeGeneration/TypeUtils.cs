@@ -360,12 +360,15 @@ namespace Orleans.Runtime
             => (field.Attributes & FieldAttributes.NotSerialized) == FieldAttributes.NotSerialized;
 
         /// <summary>
-        /// decide whether the class is derived from Grain
+        /// decide whether the class is a grain implementation
         /// </summary>
         public static bool IsGrainClass(Type type)
         {
             var grainType = typeof(Grain);
             var grainChevronType = typeof(Grain<>);
+
+            var grainInterfaceType = typeof(IGrain);
+            var grainReferenceType = typeof(GrainReference);
 
             if (type.Assembly.ReflectionOnly)
             {
@@ -374,8 +377,11 @@ namespace Orleans.Runtime
             }
 
             if (grainType == type || grainChevronType == type) return false;
+            if (grainReferenceType.IsAssignableFrom(type)) return false;
 
-            if (!grainType.IsAssignableFrom(type)) return false;
+            if (!type.IsClass) return false;
+
+            if (!grainInterfaceType.IsAssignableFrom(type)) return false;
 
             // exclude generated classes.
             return !IsGeneratedType(type);

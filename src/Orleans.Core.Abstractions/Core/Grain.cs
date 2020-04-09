@@ -12,7 +12,7 @@ namespace Orleans
     /// <summary>
     /// The abstract base class for all grain classes.
     /// </summary>
-    public abstract class Grain : IAddressable, ILifecycleParticipant<IGrainLifecycle>
+    public abstract class Grain : IGrain, ILifecycleParticipant<IGrainLifecycle>
     {
         // Do not use this directly because we currently don't provide a way to inject it;
         // any interaction with it will result in non unit-testable code. Any behaviour that can be accessed 

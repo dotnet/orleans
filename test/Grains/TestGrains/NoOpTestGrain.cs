@@ -1,9 +1,9 @@
-﻿using Orleans;
+using Orleans;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class NoOpTestGrain : Grain, INoOpTestGrain
+    public class NoOpTestGrain : INoOpTestGrain
     {
     }
 }

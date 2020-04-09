@@ -167,11 +167,16 @@ namespace Orleans.CodeGenerator.Compatibility
             if (type.TypeKind != TypeKind.Class) return false;
 
             var orig = type.OriginalDefinition;
-            return HasBase(orig, types.Grain) && !IsMarkerType(types, orig);
+            return Implements(orig, types.IGrain) && !IsMarkerType(types, orig) && !HasBase(orig, types.GrainReference);
 
             bool IsMarkerType(WellKnownTypes l, INamedTypeSymbol t)
             {
                 return SymbolEqualityComparer.Default.Equals(t, l.Grain) || SymbolEqualityComparer.Default.Equals(t, l.GrainOfT);
+            }
+
+            bool Implements(INamedTypeSymbol symbol, ITypeSymbol type)
+            {
+                return symbol.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(type,i));
             }
 
             bool HasBase(INamedTypeSymbol t, INamedTypeSymbol baseType)

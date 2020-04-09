@@ -126,7 +126,7 @@ namespace Orleans.Transactions
         {
             if (ct.IsCancellationRequested) return;
 
-            this.participantId = new ParticipantId(this.config.ServiceName, this.context.GrainInstance.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.PriorityManager);
+            this.participantId = new ParticipantId(this.config.ServiceName, this.context.GrainInstance.AsWeaklyTypedReference(), ParticipantId.Role.Resource | ParticipantId.Role.PriorityManager);
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
             ITransactionalStateStorage<OperationState> storage = storageFactory.Create<OperationState>(this.config.StorageName, this.config.ServiceName);

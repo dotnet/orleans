@@ -175,7 +175,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ImplicitStreamSubscriberTable>();
             services.TryAddSingleton<MessageFactory>();
 
-            services.TryAddSingleton<Factory<Grain, ILogConsistencyProtocolServices>>(FactoryUtility.Create<Grain, ProtocolServices>);
+            services.TryAddSingleton<Factory<IGrain, ILogConsistencyProtocolServices>>(FactoryUtility.Create<IGrain, ProtocolServices>);
             services.TryAddSingleton(FactoryUtility.Create<GrainDirectoryPartition>);
 
             // Placement

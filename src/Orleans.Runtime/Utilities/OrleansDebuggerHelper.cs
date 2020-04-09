@@ -19,8 +19,6 @@ namespace Orleans.Runtime.Utilities
         {
             switch (grainReference)
             {
-                case Grain _:
-                    return grainReference;
                 case GrainReference reference:
                     {
                         var runtime = (reference.Runtime as GrainReferenceRuntime)?.RuntimeClient;
@@ -32,6 +30,8 @@ namespace Orleans.Runtime.Utilities
                         var grains = activations.FindTargets(reference.GrainId);
                         return grains?.FirstOrDefault()?.GrainInstance;
                     }
+                case IGrain _:
+                    return grainReference;
                 default:
                     return null;
             }
