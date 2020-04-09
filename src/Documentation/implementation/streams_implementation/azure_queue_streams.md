@@ -53,3 +53,62 @@ hostBuilder
     options.QueueNames = new List<string> { "yourprefix-azurequeueprovider-0" };
   }))
 ```
+
+## Tuning
+
+In a production system can emerge the need of tuning over the default configuration. When tuning there are some factors that should be considered, and it's service specific.
+
+1. First, most of the settings are per queue, so for a large number of streams, the load on each queue can be reduced by configuring more queues.
+2. Since streams process messages in order per stream, the gating factor will be the number of events being sent on a single stream.
+3. A reasonable balance of **cache time** (`StreamPullingAgentOptions.GetQueueMsgsTimerPeriod`) vs **visibility time** (`AzureQueueOptions.MessageVisibilityTimeout`) is that the visibility should be configured **to double** the time messages **are expected** to be in the cache.
+
+### Example
+
+Assuming a system with this characteristics:
+
+* 100 streams,
+* 10 queues,
+* Each stream processing 60 messages per minute,
+* Each message takes around 30ms to process,
+* 1 minute worth of messages in cache (cache time).
+
+So we can calculate some parameters of the system:
+
+* Streams/queue: Even balancing of streams across queues would be an ideal 10 streams/queue (100 streams / 10 queues).
+But since streams won't always be evenly balanced over the queues, doubling (or even tripling) the ideal is safer than expecting ideal distribution.
+Hence **20 streams/queue** (10 streams/queue x 2 as safety factor) is probably reasonable.
+
+* Messages/minute: This means each queue will be expected to process up to **1200 messages/minute** (60 messages x 20 streams).
+
+Then we can determine the visibility time to use:
+
+* Visibility time: The cache time (1 minute) is configured to hold 1 minute of messages (so 1200 messages, as we calculated messages/minute above).
+We assumed that each message takes 30 ms to process, then we can expect messages to spend up to 36 seconds in the cache (0.030 sec x 1200 msg = 36 sec), so the visibility time - doubled for safety - would need be over 72 seconds (36 sec of time in cache x 2).
+Accordingly, if we define a bigger cache, that would require a longer visibility time.
+
+Final considerations in a real world system:
+
+* Since order is only per stream, and a queue consume many streams, it's likely that messages will be processed across multiple streams in parallel (as example: we have a grain for stream, which can run in parallel).
+This means we'll burn through the cache in far less time, but we planned for the worse case: it will give the system room to continue to function well even under intermittent delays and transient errors.
+
+So we can configure Azure Queue Streams using:
+
+``` csharp
+hostBuilder
+  .AddAzureQueueStreams("AzureQueueProvider", configurator => {
+    configurator.ConfigureAzureQueue(
+      ob => ob.Configure(options => {
+        options.ConnectionString = "xxx";
+        options.QueueNames = new List<string> {
+          "yourprefix-azurequeueprovider-1",
+          [...]
+          "yourprefix-azurequeueprovider-10",
+        };
+        options.MessageVisibilityTimeout = TimeSpan.FromSeconds(72);
+      }));
+    configurator.ConfigurePullingAgent(ob => ob.Configure(options => {
+      options.GetQueueMsgsTimerPeriod = TimeSpan.FromMinutes(1);
+    }));
+  })
+```
+
