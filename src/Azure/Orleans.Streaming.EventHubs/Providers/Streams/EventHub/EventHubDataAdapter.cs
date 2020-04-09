@@ -67,6 +67,7 @@ namespace Orleans.ServiceBus.Providers
                 StreamGuid = streamPosition.StreamIdentity.Guid,
                 StreamNamespace = streamPosition.StreamIdentity.Namespace != null ? string.Intern(streamPosition.StreamIdentity.Namespace) : null,
                 SequenceNumber = queueMessage.SystemProperties.SequenceNumber,
+                EventIndex = streamPosition.SequenceToken.EventIndex,
                 EnqueueTimeUtc = queueMessage.SystemProperties.EnqueuedTimeUtc,
                 DequeueTimeUtc = dequeueTime,
                 Segment = EncodeMessageIntoSegment(queueMessage, getSegment)
