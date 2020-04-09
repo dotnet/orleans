@@ -10,7 +10,6 @@ using Microsoft.Extensions.Options;
 using Orleans.AzureUtils;
 using Orleans.Clustering.AzureStorage;
 using Orleans.Clustering.AzureStorage.Utilities;
-using Orleans.Internal;
 using Orleans.Configuration;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
@@ -30,18 +29,19 @@ namespace Orleans.Runtime.MembershipService
             IOptions<ClusterOptions> clusterOptions)
         {
             this.loggerFactory = loggerFactory;
-            logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
+            this.logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
             this.options = clusteringOptions.Value;
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            AzureTableDefaultPolicies.MaxBusyRetries = options.MaxStorageBusyRetries;
             LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureTableUtils.PrintStorageException);
 
-            tableManager = await OrleansSiloInstanceManager.GetManager(
-                this.clusterId, options.ConnectionString, options.TableName, this.loggerFactory);
+            this.tableManager = await OrleansSiloInstanceManager.GetManager(
+                this.clusterId,
+                this.loggerFactory,
+                this.options);
 
             // even if I am not the one who created the table,
             // try to insert an initial table version if it is not already there,

@@ -9,18 +9,12 @@ namespace Orleans.Configuration
     /// <summary>
     /// Configuration for AzureTableGrainStorage
     /// </summary>
-    public class AzureTableStorageOptions
+    public class AzureTableStorageOptions : AzureStorageOperationOptions
     {
-        /// <summary>
-        /// Azure table connection string
-        /// </summary>
-        [RedactConnectionString]
-        public string ConnectionString { get; set; }
-
         /// <summary>
         /// Table name where grain stage is stored
         /// </summary>
-        public string TableName { get; set; } = DEFAULT_TABLE_NAME;
+        public override string TableName { get; set; } = DEFAULT_TABLE_NAME;
         public const string DEFAULT_TABLE_NAME = "OrleansGrainState";
 
         /// <summary>

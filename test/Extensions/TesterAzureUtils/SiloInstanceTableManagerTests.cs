@@ -13,6 +13,7 @@ using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Internal;
+using Orleans.Clustering.AzureStorage;
 
 namespace Tester.AzureUtils
 {
@@ -51,7 +52,10 @@ namespace Tester.AzureUtils
             output.WriteLine("ClusterId={0} Generation={1}", this.clusterId, generation);
 
             output.WriteLine("Initializing SiloInstanceManager");
-            manager = OrleansSiloInstanceManager.GetManager(this.clusterId, TestDefaultConfiguration.DataConnectionString, AzureStorageClusteringOptions.DEFAULT_TABLE_NAME, fixture.LoggerFactory)
+            manager = OrleansSiloInstanceManager.GetManager(
+                this.clusterId,
+                fixture.LoggerFactory,
+                new AzureStorageClusteringOptions { ConnectionString = TestDefaultConfiguration.DataConnectionString, TableName = new AzureStorageClusteringOptions().TableName })
                 .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
         }
 
@@ -78,19 +82,19 @@ namespace Tester.AzureUtils
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public void SiloInstanceTable_Op_ActivateSiloInstance()
+        public async Task SiloInstanceTable_Op_ActivateSiloInstance()
         {
             RegisterSiloInstance();
 
-            manager.ActivateSiloInstance(myEntry);
+            await manager.ActivateSiloInstance(myEntry);
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public void SiloInstanceTable_Op_UnregisterSiloInstance()
+        public async Task SiloInstanceTable_Op_UnregisterSiloInstance()
         {
             RegisterSiloInstance();
 
-            manager.UnregisterSiloInstance(myEntry);
+            await manager.UnregisterSiloInstance(myEntry);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -101,7 +105,7 @@ namespace Tester.AzureUtils
             this.generation = 0;
             RegisterSiloInstance();
             // and mark it as dead
-            manager.UnregisterSiloInstance(myEntry);
+            await manager.UnregisterSiloInstance(myEntry);
 
             // Create new active entries
             for (int i = 1; i < 5; i++)
@@ -125,7 +129,7 @@ namespace Tester.AzureUtils
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
             bool didInsert = await manager.TryCreateTableVersionEntryAsync()
-                .WithTimeout(Orleans.Clustering.AzureStorage.AzureTableDefaultPolicies.TableOperationTimeout);
+                .WithTimeout(new Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions().OperationTimeout);
 
             Assert.True(didInsert, "Did insert");
         }
@@ -156,7 +160,7 @@ namespace Tester.AzureUtils
         {
             RegisterSiloInstance();
 
-            manager.ActivateSiloInstance(myEntry);
+            await manager.ActivateSiloInstance(myEntry);
 
             var data = await FindSiloEntry(siloAddress);
             Assert.NotNull(data); // Data returned should not be null
@@ -177,7 +181,7 @@ namespace Tester.AzureUtils
         {
             RegisterSiloInstance();
 
-            manager.UnregisterSiloInstance(myEntry);
+            await manager.UnregisterSiloInstance(myEntry);
 
             var data = await FindSiloEntry(siloAddress);
             SiloInstanceTableEntry siloEntry = data.Item1;
@@ -192,16 +196,16 @@ namespace Tester.AzureUtils
         }
 
         [SkippableFact, TestCategory("Functional")]
-        public void SiloInstanceTable_FindAllGatewayProxyEndpoints()
+        public async Task SiloInstanceTable_FindAllGatewayProxyEndpoints()
         {
             RegisterSiloInstance();
 
-            var gateways = manager.FindAllGatewayProxyEndpoints().GetResult();
+            var gateways = await manager.FindAllGatewayProxyEndpoints();
             Assert.Equal(0,  gateways.Count);  // "Number of gateways before Silo.Activate"
 
-            manager.ActivateSiloInstance(myEntry);
+            await manager.ActivateSiloInstance(myEntry);
 
-            gateways = manager.FindAllGatewayProxyEndpoints().GetResult();
+            gateways = await manager.FindAllGatewayProxyEndpoints();
             Assert.Equal(1,  gateways.Count);  // "Number of gateways after Silo.Activate"
 
             Uri myGateway = gateways.First();
