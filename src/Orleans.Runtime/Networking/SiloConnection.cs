@@ -86,7 +86,10 @@ namespace Orleans.Runtime.Messaging
             if ((msg.TargetSilo == null) || msg.TargetSilo.Matches(this.LocalSiloAddress))
             {
                 // See if it's a message for a client we're proxying.
-                if (messageCenter.IsProxying && messageCenter.TryDeliverToProxy(msg)) return;
+                if (messageCenter.TryDeliverToProxy(msg))
+                {
+                    return;
+                }
 
                 // Nope, it's for us
                 messageCenter.OnReceivedMessage(msg);
