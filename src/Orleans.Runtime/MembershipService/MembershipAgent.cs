@@ -265,10 +265,7 @@ namespace Orleans.Runtime.MembershipService
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             {
-                Task OnRuntimeInitializeStart(CancellationToken ct)
-                {
-                    return Task.CompletedTask;
-                }
+                Task OnRuntimeInitializeStart(CancellationToken ct) => Task.CompletedTask;
 
                 async Task OnRuntimeInitializeStop(CancellationToken ct)
                 {
@@ -281,7 +278,7 @@ namespace Orleans.Runtime.MembershipService
 
                 lifecycle.Subscribe(
                     nameof(MembershipAgent),
-                    ServiceLifecycleStage.RuntimeInitialize,
+                    ServiceLifecycleStage.RuntimeInitialize + 1, // Gossip before the outbound queue gets closed
                     OnRuntimeInitializeStart,
                     OnRuntimeInitializeStop);
             }
