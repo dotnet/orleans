@@ -453,7 +453,7 @@ namespace Orleans.Runtime.GrainDirectory
         public SiloAddress CalculateGrainDirectoryPartition(GrainId grainId)
         {
             // give a special treatment for special grains
-            if (grainId.IsSystemTarget)
+            if (grainId.IsSystemTarget())
             {
                 if (Constants.SystemMembershipTableId.Equals(grainId))
                 {

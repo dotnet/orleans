@@ -60,8 +60,8 @@ namespace Orleans
         {
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
-            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
+            var grainId = LegacyGrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
+            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId.ToGrainId()));
         }
 
         /// <inheritdoc />
@@ -69,8 +69,8 @@ namespace Orleans
         {
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
-            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
+            var grainId = LegacyGrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, null);
+            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId.ToGrainId()));
         }
 
         /// <inheritdoc />
@@ -79,8 +79,8 @@ namespace Orleans
         {
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey);
-            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
+            var grainId = LegacyGrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey);
+            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId.ToGrainId()));
         }
 
 
@@ -92,8 +92,8 @@ namespace Orleans
 
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
-            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
+            var grainId = LegacyGrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
+            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId.ToGrainId()));
         }
 
         /// <inheritdoc />
@@ -104,8 +104,8 @@ namespace Orleans
 
             Type interfaceType = typeof(TGrainInterface);
             var implementation = this.GetGrainClassData(interfaceType, grainClassNamePrefix);
-            var grainId = GrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
-            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId));
+            var grainId = LegacyGrainId.GetGrainId(implementation.GetTypeCode(interfaceType), primaryKey, keyExtension);
+            return this.Cast<TGrainInterface>(this.MakeGrainReferenceFromType(interfaceType, grainId.ToGrainId()));
         }
 
         /// <inheritdoc />
@@ -335,36 +335,36 @@ namespace Orleans
         /// <inheritdoc />
         public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey)
         {
-            var grainId = GrainId.GetGrainId(GetTypeCode(grainInterfaceType), grainPrimaryKey);
-            return MakeGrainReference(grainInterfaceType, grainId);
+            var grainId = LegacyGrainId.GetGrainId(GetTypeCode(grainInterfaceType), grainPrimaryKey);
+            return MakeGrainReference(grainInterfaceType, grainId.ToGrainId());
         }
 
         /// <inheritdoc />
         public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey)
         {
-            var grainId = GrainId.GetGrainId(GetTypeCode(grainInterfaceType), grainPrimaryKey);
-            return MakeGrainReference(grainInterfaceType, grainId);
+            var grainId = LegacyGrainId.GetGrainId(GetTypeCode(grainInterfaceType), grainPrimaryKey);
+            return MakeGrainReference(grainInterfaceType, grainId.ToGrainId());
         }
 
         /// <inheritdoc />
         public IGrain GetGrain(Type grainInterfaceType, string grainPrimaryKey)
         {
-            var grainId = GrainId.GetGrainId(GetTypeCode(grainInterfaceType), grainPrimaryKey);
-            return MakeGrainReference(grainInterfaceType, grainId);
+            var grainId = LegacyGrainId.GetGrainId(GetTypeCode(grainInterfaceType), grainPrimaryKey);
+            return MakeGrainReference(grainInterfaceType, grainId.ToGrainId());
         }
 
         /// <inheritdoc />
         public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey, string keyExtension)
         {
-            var grainId = GrainId.GetGrainId(GetTypeCode(grainInterfaceType), grainPrimaryKey, keyExtension);
-            return MakeGrainReference(grainInterfaceType, grainId);
+            var grainId = LegacyGrainId.GetGrainId(GetTypeCode(grainInterfaceType), grainPrimaryKey, keyExtension);
+            return MakeGrainReference(grainInterfaceType, grainId.ToGrainId());
         }
 
         /// <inheritdoc />
         public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey, string keyExtension)
         {
-            var grainId = GrainId.GetGrainId(GetTypeCode(grainInterfaceType), grainPrimaryKey, keyExtension);
-            return MakeGrainReference(grainInterfaceType, grainId);
+            var grainId = LegacyGrainId.GetGrainId(GetTypeCode(grainInterfaceType), grainPrimaryKey, keyExtension);
+            return MakeGrainReference(grainInterfaceType, grainId.ToGrainId());
         }
    
         private long GetTypeCode(Type grainInterfaceType)

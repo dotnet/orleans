@@ -129,7 +129,7 @@ namespace UnitTests.Serialization
                 type = type.MakeGenericType(originalGrainType.GetGenericArguments());
             }
 
-            var regularGrainId = GrainId.GetGrainIdForTesting(Guid.NewGuid());
+            var regularGrainId = LegacyGrainId.GetGrainIdForTesting(Guid.NewGuid());
             var grainRef = this.fixture.InternalGrainFactory.GetGrain(regularGrainId);
             return
                 (GrainReference)

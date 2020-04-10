@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Orleans.Runtime
 {
@@ -35,7 +35,7 @@ namespace Orleans.Runtime
 
             // Inject runtime hooks into grain instance
             grain.Runtime = this.grainRuntime.Value;
-            grain.Identity = context.GrainIdentity;
+            grain.Identity = (LegacyGrainId)context.GrainIdentity;
 
             // wire up to lifecycle
             var participant = grain as ILifecycleParticipant<IGrainLifecycle>;

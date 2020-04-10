@@ -117,9 +117,9 @@ namespace Orleans.Runtime
                 {
                     response.SendingActivation = request.TargetActivation;
                 }
-                else if (request.TargetGrain.IsSystemTarget)
+                else if (request.TargetGrain.IsSystemTarget())
                 {
-                    response.SendingActivation = ActivationId.GetSystemActivation(request.TargetGrain, request.TargetSilo);
+                    response.SendingActivation = ActivationId.GetDeterministic(request.TargetGrain);
                 }
             }
 

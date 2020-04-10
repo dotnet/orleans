@@ -27,26 +27,31 @@ namespace Orleans.Runtime
         public const string ORLEANS_CLUSTERING_ZOOKEEPER = "Orleans.Clustering.ZooKeeper";
         public const string TroubleshootingHelpLink = "https://aka.ms/orleans-troubleshooting";
 
-        public static readonly GrainId DirectoryServiceId = GrainId.GetSystemTargetGrainId(10);
-        public static readonly GrainId DirectoryCacheValidatorId = GrainId.GetSystemTargetGrainId(11);
-        public static readonly GrainId SiloControlId = GrainId.GetSystemTargetGrainId(12);
-        public static readonly GrainId ClientObserverRegistrarId = GrainId.GetSystemTargetGrainId(13);
-        public static readonly GrainId CatalogId = GrainId.GetSystemTargetGrainId(14);
-        public static readonly GrainId MembershipOracleId = GrainId.GetSystemTargetGrainId(15);
-        public static readonly GrainId TypeManagerId = GrainId.GetSystemTargetGrainId(17);
-        public static readonly GrainId FallbackSystemTargetId = GrainId.GetSystemTargetGrainId(19);
-        public static readonly GrainId LifecycleSchedulingSystemTargetId = GrainId.GetSystemTargetGrainId(20);
-        public static readonly GrainId DeploymentLoadPublisherSystemTargetId = GrainId.GetSystemTargetGrainId(22);
-        public static readonly GrainId MultiClusterOracleId = GrainId.GetSystemTargetGrainId(23);
-        public static readonly GrainId ClusterDirectoryServiceId = GrainId.GetSystemTargetGrainId(24);
-        public static readonly GrainId StreamProviderManagerAgentSystemTargetId = GrainId.GetSystemTargetGrainId(25);
-        public static readonly GrainId TestHooksSystemTargetId = GrainId.GetSystemTargetGrainId(26);
-        public static readonly GrainId ProtocolGatewayId = GrainId.GetSystemTargetGrainId(27);
-        public static readonly GrainId TransactionAgentSystemTargetId = GrainId.GetSystemTargetGrainId(28);
-        public static readonly GrainId SystemMembershipTableId = GrainId.GetSystemTargetGrainId(29);
-        public static readonly GrainId SiloDirectConnectionId = GrainId.GetSystemGrainId(new Guid("01111111-1111-1111-1111-111111111111"));
+        public static readonly GrainId DirectoryServiceId = LegacyGrainId.GetSystemTargetGrainId(10);
+        public static readonly GrainId DirectoryCacheValidatorId = LegacyGrainId.GetSystemTargetGrainId(11);
+        public static readonly GrainId SiloControlId = LegacyGrainId.GetSystemTargetGrainId(12);
+        public static readonly GrainId ClientObserverRegistrarId = LegacyGrainId.GetSystemTargetGrainId(13);
+        public static readonly GrainId CatalogId = LegacyGrainId.GetSystemTargetGrainId(14);
+        public static readonly GrainId MembershipOracleId = LegacyGrainId.GetSystemTargetGrainId(15);
+        public static readonly GrainId TypeManagerId = LegacyGrainId.GetSystemTargetGrainId(17);
+        public static readonly GrainId FallbackSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(19);
+        public static readonly GrainId LifecycleSchedulingSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(20);
+        public static readonly GrainId DeploymentLoadPublisherSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(22);
+        public static readonly GrainId MultiClusterOracleId = LegacyGrainId.GetSystemTargetGrainId(23);
+        public static readonly GrainId ClusterDirectoryServiceId = LegacyGrainId.GetSystemTargetGrainId(24);
+        public static readonly GrainId StreamProviderManagerAgentSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(25);
+        public static readonly GrainId TestHooksSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(26);
+        public static readonly GrainId ProtocolGatewayId = LegacyGrainId.GetSystemTargetGrainId(27);
+        public static readonly GrainId TransactionAgentSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(28);
+        public static readonly GrainId SystemMembershipTableId = LegacyGrainId.GetSystemTargetGrainId(29);
 
+        public static readonly GrainId SiloDirectConnectionId = GrainId.Create(
+            GrainType.Create(GrainTypePrefix.SystemPrefix + "silo"),
+            SpanId.Create("01111111-1111-1111-1111-111111111111"));
+
+        public static readonly GrainType StreamPullingAgentManagerType = GrainType.CreateForSystemTarget("stream-agent-mgr");
         public const int PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE = 254;
+        public static readonly GrainType StreamPullingAgentType = GrainType.CreateForSystemTarget("stream-agent");
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;
 
         internal const long ReminderTableGrainId = 12345;
@@ -93,7 +98,7 @@ namespace Orleans.Runtime
         {
             string name;
             if (singletonSystemTargetNames.TryGetValue(id, out name)) return name;
-            if (nonSingletonSystemTargetNames.TryGetValue(id.TypeCode, out name)) return name;
+            if (nonSingletonSystemTargetNames.TryGetValue(((LegacyGrainId)id).TypeCode, out name)) return name;
             return String.Empty;
         }
 

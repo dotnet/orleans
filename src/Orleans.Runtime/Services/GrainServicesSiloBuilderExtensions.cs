@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Runtime;
@@ -36,7 +36,7 @@ namespace Orleans.Hosting
                 throw new InvalidOperationException(String.Format($"Cannot find an interface on {serviceType.FullName} which implements IGrainService"));
             }
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
-            var grainId = (IGrainIdentity)GrainId.GetGrainServiceGrainId(0, typeCode);
+            var grainId = (GrainId)LegacyGrainId.GetGrainServiceGrainId(0, typeCode);
             var grainService = (GrainService)ActivatorUtilities.CreateInstance(services, serviceType, grainId);
             return grainService;
         }

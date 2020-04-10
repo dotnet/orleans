@@ -157,7 +157,7 @@ namespace Orleans.Core
             decoder?.DecodeException(exc, out httpStatusCode, out errorCode, true);
 
             return string.Format("Error from storage provider {0} during {1} for grain Type={2} Pk={3} Id={4} Error={5}" + Environment.NewLine + " {6}",
-                $"{this.store.GetType().Name}.{this.name}", what, name, grainRef.GrainId.ToDetailedString(), grainRef, errorCode, LogFormatter.PrintException(exc));
+                $"{this.store.GetType().Name}.{this.name}", what, name, grainRef.GrainId.ToString(), grainRef, errorCode, LogFormatter.PrintException(exc));
         }
     }
 }

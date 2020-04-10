@@ -201,10 +201,10 @@ namespace Orleans.Runtime
             // Need to pick a unique deterministic ActivationId for this client.
             // We store it in the grain directory and there for every GrainId we use ActivationId as a key
             // so every GW needs to behave as a different "activation" with a different ActivationId (its not enough that they have different SiloAddress)
-            string stringToHash = clientId.ToParsableString() + myAddress.Endpoint + myAddress.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string stringToHash = clientId.ToString() + myAddress.Endpoint + myAddress.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
             Guid hash = Utils.CalculateGuidHash(stringToHash);
-            UniqueKey key = UniqueKey.NewKey(hash);
-            return ActivationAddress.GetAddress(myAddress, clientId, ActivationId.GetActivationId(key));
+            var activationId = ActivationId.GetActivationId(UniqueKey.NewKey(hash));
+            return ActivationAddress.GetAddress(myAddress, clientId, activationId);
         }
 
         public void Participate(ISiloLifecycle lifecycle)

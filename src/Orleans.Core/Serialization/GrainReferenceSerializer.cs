@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 
@@ -51,7 +51,7 @@ namespace Orleans.Serialization
             {
                 silo = reader.ReadSiloAddress();
             }
-            bool expectObserverId = id.IsClient;
+            bool expectObserverId = id.IsClient();
             if (expectObserverId)
             {
                 observerId = GuidId.DeserializeFromStream(reader);

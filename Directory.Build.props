@@ -74,6 +74,7 @@
     <MicrosoftWin32RegistryVersion>4.7.0</MicrosoftWin32RegistryVersion>
     <MicrosoftBclAsyncInterfacesVersion>1.1.0</MicrosoftBclAsyncInterfacesVersion>
     <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.0</MicrosoftNETFrameworkReferenceAssembliesVersion>
+    <MicrosoftBclHashCodeVersion>1.0.0</MicrosoftBclHashCodeVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
     <MicrosoftExtensionsConfigurationBinderVersion>3.0.0</MicrosoftExtensionsConfigurationBinderVersion>

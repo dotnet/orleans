@@ -156,8 +156,8 @@ namespace UnitTests.Serialization
             resp.Id = new CorrelationId();
             resp.SendingSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 200), 0);
             resp.TargetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 300), 0);
-            resp.SendingGrain = GrainId.NewId();
-            resp.TargetGrain = GrainId.NewId();
+            resp.SendingGrain = LegacyGrainId.NewId();
+            resp.TargetGrain = LegacyGrainId.NewId();
             resp.IsAlwaysInterleave = true;
             Assert.True(resp.IsUsingInterfaceVersions);
 

@@ -66,7 +66,7 @@ namespace Orleans.Streams
             logger = runtime.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
             logger.Info(ErrorCode.PersistentStreamPullingAgent_01,
                 "Created {0} {1} for Stream Provider {2} on silo {3} for Queue {4}.",
-                GetType().Name, ((ISystemTargetBase)this).GrainId.ToDetailedString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
+                GetType().Name, ((ISystemTargetBase)this).GrainId.ToString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());
             numReadMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES, StatisticUniquePostfix));
             numSentMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES, StatisticUniquePostfix));
             // TODO: move queue cache size statistics tracking into queue cache implementation once Telemetry APIs and LogStatistics have been reconciled.
@@ -97,7 +97,7 @@ namespace Orleans.Streams
         private void InitializeInternal(IQueueAdapter qAdapter, IQueueAdapterCache queueAdapterCache, IStreamFailureHandler failureHandler)
         {
             logger.Info(ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
-                GetType().Name, ((ISystemTargetBase)this).GrainId.ToDetailedString(), Silo, QueueId.ToStringWithHashCode());
+                GetType().Name, ((ISystemTargetBase)this).GrainId.ToString(), Silo, QueueId.ToStringWithHashCode());
 
             // Remove cast once we cleanup
             queueAdapter = qAdapter;

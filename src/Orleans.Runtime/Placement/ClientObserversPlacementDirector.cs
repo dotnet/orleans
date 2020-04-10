@@ -20,7 +20,8 @@ namespace Orleans.Runtime.Placement
             List<ActivationAddress> addresses;
 
             // we need to look up the directory entry for this grain on a remote silo
-            switch (target.Category)
+            var legacyTarget = (LegacyGrainId)target;
+            switch (legacyTarget.Category)
             {
                 case UniqueKey.Category.Client:
                     {

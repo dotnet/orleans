@@ -77,7 +77,6 @@ namespace Orleans.Runtime.Placement
         }
 
         public async Task<PlacementResult> SelectOrAddActivation(
-            ActivationAddress sendingAddress,
             PlacementTarget targetGrain,
             IPlacementRuntime context,
             PlacementStrategy strategy)
@@ -94,7 +93,7 @@ namespace Orleans.Runtime.Placement
 
             var actualStrategy = strategy ?? defaultPlacementStrategy;
             var director = ResolveSelector(actualStrategy);
-            var result = await director.OnSelectActivation(strategy, (GrainId)targetGrain.GrainIdentity, context);
+            var result = await director.OnSelectActivation(strategy, targetGrain.GrainIdentity, context);
             if (result != null) return result;
 
             return await AddActivation(targetGrain, context, actualStrategy);
@@ -110,13 +109,13 @@ namespace Orleans.Runtime.Placement
 
             var director = ResolveDirector(strategy);
             var siloAddress = await director.OnAddActivation(strategy, target, context);
-            var grainTypeName = context.GetGrainTypeName(target.GrainIdentity.TypeCode);
+            var grainTypeName = context.GetGrainTypeName(((LegacyGrainId)target.GrainIdentity).TypeCode);
 
             ActivationId activationId;
             if (strategy.IsDeterministicActivationId)
             {
                 // Use the grain id as the activation id.
-                activationId = ActivationId.GetActivationId(((GrainId)target.GrainIdentity).Key);
+                activationId = ActivationId.GetDeterministic(target.GrainIdentity);
             }
             else
             {
