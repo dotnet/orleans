@@ -21,6 +21,7 @@ namespace Orleans.Runtime
         public const string ScheduleMessageEventName = Category + ".Schedule";
         public const string EnqueueMessageOnActivationEventName = Category + ".Activation.Enqueue";
         public const string InvokeMessageEventName = Category + ".Invoke";
+        public const string RejectSendMessageToDeadSiloEventName = Category + ".Reject.TargetDead";
 
         private static readonly Action<ILogger, Message, MessagingStatisticsGroup.Phase, Exception> LogDropExpiredMessage
             = LoggerMessage.Define<Message, MessagingStatisticsGroup.Phase>(
@@ -51,6 +52,13 @@ namespace Orleans.Runtime
                 LogLevel.Warning,
                 new EventId((int)ErrorCode.Messaging_OutgoingMS_DroppingMessage, DropSendingMessageEventName),
                 "Silo {SiloAddress} is dropping message {Message}. Reason: {Reason}");
+
+        private static readonly Action<ILogger, SiloAddress, SiloAddress, Message, Exception> LogRejectSendMessageToDeadSilo
+            = LoggerMessage.Define<SiloAddress, SiloAddress, Message>(
+                LogLevel.Information,
+                new EventId((int)ErrorCode.MessagingSendingRejection, RejectSendMessageToDeadSiloEventName),
+                  "Silo {SiloAddress} is rejecting message to known-dead silo {DeadSilo}: {Message}");
+
 
         private readonly ILogger log;
 
@@ -168,6 +176,23 @@ namespace Orleans.Runtime
             {
                 this.Write(InvokeMessageEventName, message);
             }
+        }
+
+        public void OnRejectSendMessageToDeadSilo(SiloAddress localSilo, Message message)
+        {
+            MessagingStatisticsGroup.OnFailedSentMessage(message);
+
+            if (this.IsEnabled(RejectSendMessageToDeadSiloEventName))
+            {
+                this.Write(RejectSendMessageToDeadSiloEventName, message);
+            }
+
+            LogRejectSendMessageToDeadSilo(
+                this,
+                localSilo,
+                message.TargetSilo,
+                message,
+                null);
         }
 
         internal void OnSendRequest(Message message)
