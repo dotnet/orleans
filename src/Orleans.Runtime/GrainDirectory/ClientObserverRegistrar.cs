@@ -26,7 +26,7 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly IAsyncTimer refreshTimer;
         private readonly CancellationTokenSource shutdownCancellation = new CancellationTokenSource();
-        private IHostedClient hostedClient;
+        private HostedClient hostedClient;
         private Gateway gateway;
         private Task clientRefreshLoopTask;
         
@@ -49,7 +49,7 @@ namespace Orleans.Runtime
             this.refreshTimer = timerFactory.Create(this.messagingOptions.ClientRegistrationRefresh, "ClientObserverRegistrar.ClientRefreshTimer");
         }
 
-        internal void SetHostedClient(IHostedClient client)
+        internal void SetHostedClient(HostedClient client)
         {
             this.hostedClient = client;
             if (client != null)
