@@ -602,8 +602,13 @@ namespace Orleans.Runtime
                     OnInactive = new List<Action>();
                 }
                 OnInactive.Add(action);
+                if (!IsCurrentlyExecuting)
+                {
+                    RunOnInactive();
+                }
             }
         }
+
         public void RunOnInactive()
         {
             lock (this)

@@ -56,6 +56,7 @@ namespace Orleans.Runtime
             CounterStatistic ctr = FindGrainCounter(grainTypeName);
             ctr.Increment();
         }
+
         internal void DecrementGrainCounter(string grainTypeName)
         {
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Decrement Grain Counter {0}", grainTypeName);
