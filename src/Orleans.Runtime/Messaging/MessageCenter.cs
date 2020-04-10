@@ -29,13 +29,11 @@ namespace Orleans.Runtime.Messaging
 
         public void SetHostedClient(IHostedClient client) => this.hostedClient = client;
 
-        public bool IsProxying => this.Gateway != null || this.hostedClient?.ClientId != null;
-
         public bool TryDeliverToProxy(Message msg)
         {
-            if (msg.TargetGrain == null || !msg.TargetGrain.IsClient) return false;
-            if (this.Gateway != null && this.Gateway.TryDeliverToProxy(msg)) return true;
-            return this.hostedClient?.TryDispatchToClient(msg) ?? false;
+            if (msg.TargetGrain is null || !msg.TargetGrain.IsClient) return false;
+            if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)) return true;
+            return this.hostedClient is IHostedClient client && client.TryDispatchToClient(msg);
         }
         
         // This is determined by the IMA but needed by the OMS, and so is kept here in the message center itself.
