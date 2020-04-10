@@ -15,8 +15,6 @@ namespace Orleans.GrainDirectory
 
         Task Unregister(ActivationAddress address, UnregistrationCause cause);
 
-        Task UnregisterMany(List<ActivationAddress> addresses, UnregistrationCause cause);
-
         Task<List<ActivationAddress>> Lookup(GrainId grainId);
 
         bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses);
