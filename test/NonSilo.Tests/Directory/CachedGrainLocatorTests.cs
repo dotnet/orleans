@@ -20,28 +20,32 @@ using Xunit.Abstractions;
 namespace UnitTests.Directory
 {
     [TestCategory("BVT"), TestCategory("Directory")]
-    public class GrainLocatorTests
+    public class CachedGrainLocatorTests
     {
         private readonly LoggerFactory loggerFactory;
         private readonly SiloLifecycleSubject lifecycle;
 
         private readonly IGrainDirectory grainDirectory;
+        private readonly IGrainDirectoryResolver grainDirectoryResolver;
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly MockClusterMembershipService mockMembershipService;
 
-        private readonly GrainLocator grainLocator;
+        private readonly CachedGrainLocator grainLocator;
 
-        public GrainLocatorTests(ITestOutputHelper output)
+        public CachedGrainLocatorTests(ITestOutputHelper output)
         {
             this.loggerFactory = new LoggerFactory(new[] { new XunitLoggerProvider(output) });
             this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
 
             this.grainDirectory = Substitute.For<IGrainDirectory>();
+            this.grainDirectoryResolver = Substitute.For<IGrainDirectoryResolver>();
+            this.grainDirectoryResolver.Resolve(Arg.Any<GrainId>()).Returns(this.grainDirectory);
+            this.grainDirectoryResolver.Directories.Returns(new[] { this.grainDirectory });
             this.localGrainDirectory = Substitute.For<ILocalGrainDirectory>();
             this.mockMembershipService = new MockClusterMembershipService();
 
-            this.grainLocator = new GrainLocator(
-                this.grainDirectory,
+            this.grainLocator = new CachedGrainLocator(
+                this.grainDirectoryResolver, 
                 new DhtGrainLocator(this.localGrainDirectory),
                 this.mockMembershipService.Target);
 
@@ -263,7 +267,7 @@ namespace UnitTests.Directory
 
         private async Task WaitUntilClusterChangePropagated()
         {
-            await Until(() => this.mockMembershipService.CurrentVersion == ((GrainLocator.ITestAccessor)this.grainLocator).LastMembershipVersion);
+            await Until(() => this.mockMembershipService.CurrentVersion == ((CachedGrainLocator.ITestAccessor)this.grainLocator).LastMembershipVersion);
         }
 
         private static async Task Until(Func<bool> condition)

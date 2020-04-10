@@ -14,9 +14,9 @@ using Xunit;
 namespace Tester.AzureUtils
 {
     [TestCategory("Azure"), TestCategory("Storage")]
-    public class AzureTableGrainDirectoryTests : GrainDirectoryTests
+    public class AzureTableGrainDirectoryTests : GrainDirectoryTests<AzureTableGrainDirectory>
     {
-        protected override IGrainDirectory GetGrainDirectory()
+        protected override AzureTableGrainDirectory GetGrainDirectory()
         {
             TestUtils.CheckForAzureStorage();
 
@@ -33,24 +33,67 @@ namespace Tester.AzureUtils
 
             var loggerFactory = TestingUtils.CreateDefaultLoggerFactory("AzureGrainDirectoryTests.log");
 
-            var directory = new AzureTableGrainDirectory(Options.Create(clusterOptions), Options.Create(directoryOptions), loggerFactory);
+            var directory = new AzureTableGrainDirectory(directoryOptions, Options.Create(clusterOptions), loggerFactory);
             directory.InitializeIfNeeded().GetAwaiter().GetResult();
 
             return directory;
         }
+
+        [SkippableFact]
+        public async Task UnregisterMany()
+        {
+            const int N = 250;
+            const int R = 40;
+
+            // Create and insert N entries
+            var addresses = new List<GrainAddress>();
+            for (var i = 0; i < N; i++)
+            {
+                var addr = new GrainAddress
+                {
+                    ActivationId = Guid.NewGuid().ToString("N"),
+                    GrainId = "user/someraondomuser_" + Guid.NewGuid().ToString("N"),
+                    SiloAddress = "10.0.23.12:1000@5678"
+                };
+                addresses.Add(addr);
+                await this.grainDirectory.Register(addr);
+            }
+
+            // Modify the Rth entry locally, to simulate another activation tentative by another silo
+            var oldActivation = addresses[R].ActivationId;
+            addresses[R].ActivationId = Guid.NewGuid().ToString("N");
+
+            // Batch unregister
+            await this.grainDirectory.UnregisterMany(addresses);
+
+            // Now we should only find the old Rth entry
+            for (int i = 0; i < N; i++)
+            {
+                if (i == R)
+                {
+                    var addr = await this.grainDirectory.Lookup(addresses[i].GrainId);
+                    Assert.NotNull(addr);
+                    Assert.Equal(oldActivation, addr.ActivationId);
+                }
+                else
+                {
+                    Assert.Null(await this.grainDirectory.Lookup(addresses[i].GrainId));
+                }
+            }
+        }
     }
 
     // TODO Move that into a common project
-    public abstract class GrainDirectoryTests
+    public abstract class GrainDirectoryTests<T> where T : IGrainDirectory
     {
-        private IGrainDirectory grainDirectory;
+        protected T grainDirectory;
 
         protected GrainDirectoryTests()
         {
             this.grainDirectory = GetGrainDirectory();
         }
 
-        protected abstract IGrainDirectory GetGrainDirectory();
+        protected abstract T GetGrainDirectory();
 
         [SkippableFact]
         public async Task RegisterLookupUnregisterLookup()
@@ -122,49 +165,6 @@ namespace Tester.AzureUtils
             Assert.Equal(expected, await this.grainDirectory.Register(expected));
             await this.grainDirectory.Unregister(otherEntry);
             Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
-        }
-
-        [SkippableFact]
-        public async Task UnregisterMany()
-        {
-            const int N = 250;
-            const int R = 40;
-
-            // Create and insert N entries
-            var addresses = new List<GrainAddress>();
-            for (var i=0; i<N; i++)
-            {
-                var addr = new GrainAddress
-                {
-                    ActivationId = Guid.NewGuid().ToString("N"),
-                    GrainId = "user/someraondomuser_" + Guid.NewGuid().ToString("N"),
-                    SiloAddress = "10.0.23.12:1000@5678"
-                };
-                addresses.Add(addr);
-                await this.grainDirectory.Register(addr);
-            }
-
-            // Modify the Rth entry locally, to simulate another activation tentative by another silo
-            var oldActivation = addresses[R].ActivationId;
-            addresses[R].ActivationId = Guid.NewGuid().ToString("N");
-
-            // Batch unregister
-            await this.grainDirectory.UnregisterMany(addresses);
-
-            // Now we should only find the old Rth entry
-            for (int i=0; i<N; i++)
-            {
-                if (i == R)
-                {
-                    var addr = await this.grainDirectory.Lookup(addresses[i].GrainId);
-                    Assert.NotNull(addr);
-                    Assert.Equal(oldActivation, addr.ActivationId);
-                }
-                else
-                {
-                    Assert.Null(await this.grainDirectory.Lookup(addresses[i].GrainId));
-                }
-            }
         }
 
         [SkippableFact]

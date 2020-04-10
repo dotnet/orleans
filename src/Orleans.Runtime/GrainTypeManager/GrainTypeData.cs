@@ -6,6 +6,7 @@ using System.Reflection;
 
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
+using Orleans.GrainDirectory;
 using Orleans.Placement;
 
 namespace Orleans.Runtime
@@ -98,6 +99,12 @@ namespace Orleans.Runtime
             }
 
             return defaultPlacement;
+        }
+
+        internal static string GetGrainDirectory(Type grainClass)
+        {
+            var attr = grainClass.GetCustomAttribute<GrainDirectoryAttribute>();
+            return attr != default ? attr.GrainDirectoryName : GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY;
         }
 
         /// <summary>
