@@ -747,21 +747,32 @@ namespace Orleans.Runtime
         private async Task DeactivateActivationsFromCollector(List<ActivationData> list)
         {
             var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
-            var taskCompletionSourceList = new TaskCompletionSource<object>[list.Count];
+            var mtcs = new MultiTaskCompletionSource(list.Count);
+
             logger.Info(ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {0} to promptly Destroy.", list.Count);
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
+
             for (var i = 0; i < list.Count; i++)
             {
                 var activationData = list[i];
-                var tcs = taskCompletionSourceList[i] = new TaskCompletionSource<object>();
                 lock (activationData)
                 {
                     // Continue deactivation when ready
-                    activationData.AddOnInactive(() => DestroyActivationAsync(activationData, tcs, cts.Token));
+                    activationData.AddOnInactive(async () =>
+                    {
+                        try
+                        {
+                            await DestroyActivation(activationData, cts.Token);
+                        }
+                        finally
+                        {
+                            mtcs.SetOneResult();
+                        }
+                    });
                 }
             }
 
-            await Task.WhenAll(taskCompletionSourceList.Select(tcs => tcs.Task)).WithCancellation(cts.Token);
+            await mtcs.Task;
         }
 
         // To be called fro within Activation context.
@@ -802,7 +813,7 @@ namespace Orleans.Runtime
                     }
                     else // busy, so destroy later.
                     {
-                        data.AddOnInactive(() => DestroyActivationAsync(data, null, cts.Token));
+                        data.AddOnInactive(() => _ = DestroyActivation(data, cts.Token));
                     }
                 }
                 else if (data.State == ActivationState.Create)
@@ -828,7 +839,7 @@ namespace Orleans.Runtime
             CounterStatistic.FindOrCreate(statisticName).Increment();
             if (promptly)
             {
-                DestroyActivationAsync(data, null, cts.Token); // Don't await or Ignore, since we are in this activation context and it may have alraedy been destroyed!
+                _ = DestroyActivation(data, cts.Token); // Don't await or Ignore, since we are in this activation context and it may have alraedy been destroyed!
             }
         }
 
@@ -849,13 +860,23 @@ namespace Orleans.Runtime
                 this.activationCollector.TryCancelCollection(activationData);
 
                 // Continue deactivation when ready
-                activationData.AddOnInactive(() => DestroyActivationAsync(activationData, tcs, cts.Token));
+                activationData.AddOnInactive(async () =>
+                {
+                    try
+                    {
+                        await DestroyActivation(activationData, cts.Token);
+                    }
+                    finally
+                    {
+                        tcs.SetResult(null);
+                    }
+                });
             }
 
             await tcs.Task.WithCancellation(cts.Token);
         }
 
-        private async void DestroyActivationAsync(ActivationData activationData, TaskCompletionSource<object> tcs, CancellationToken ct)
+        private async Task DestroyActivation(ActivationData activationData, CancellationToken ct)
         {
             try
             {
@@ -886,9 +907,7 @@ namespace Orleans.Runtime
                         grainCreator.Release(activationData, grainInstance);
                     }
                 }
-
                 activationData.Dispose();
-                tcs?.SetResult(null);
             }
         }
 
@@ -1215,14 +1234,13 @@ namespace Orleans.Runtime
             }
 
             var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
-            var taskCompletionSourceList = new List<TaskCompletionSource<object>>(addresses.Count);
-            var counter = 0;
+            var tasks = new List<Task>(addresses.Count);
             foreach (var activationData in TryGetActivationDatas(addresses))
             {
-                DestroyActivationAsync(activationData, taskCompletionSourceList[counter], timeoutTokenSource.Token);
-                counter++;
+                var capture = activationData;
+                tasks.Add(DestroyActivation(capture, timeoutTokenSource.Token));
             }
-            return Task.WhenAll(taskCompletionSourceList.Select(tcs => tcs.Task));
+            return Task.WhenAll(tasks);
         }
 
         private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
