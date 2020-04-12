@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -232,35 +233,51 @@ namespace Orleans.Runtime.Scheduler
         private void LogEnqueueOnStoppedScheduler(Task task)
         {
             var now = ValueStopwatch.GetTimestamp();
+            LogLevel logLevel;
             if (this.lastShutdownWarningTimestamp == 0)
             {
-                this.log.LogWarning(
-                    (int)ErrorCode.SchedulerEnqueueWorkWhenShutdown,
-                     "Enqueuing task {Task} to a work item group which should have terminated. "
-                    + "Likely reasons are that the task is not being 'awaited' properly or a TaskScheduler was captured and is being used to schedule tasks "
-                    + "after a grain has been deactivated.\nWorkItemGroup: {Status}\nTask.AsyncState: {TaskState}\n{Stack}",
-                    OrleansTaskExtentions.ToString(task),
-                    this.DumpStatus(),
-                    task.AsyncState,
-                    Utils.GetStackTrace());
-
-                this.lastShutdownWarningTimestamp = now;
+                logLevel = LogLevel.Debug;
             }
             else if (ValueStopwatch.FromTimestamp(this.lastShutdownWarningTimestamp, now).Elapsed > this.masterScheduler.StoppedWorkItemGroupWarningInterval)
             {
                 // Upgrade the warning to an error after 1 minute, include a stack trace, and continue to log up to once per minute.
-                this.log.LogError(
-                    (int)ErrorCode.SchedulerEnqueueWorkWhenShutdown,
-                    "Enqueuing task {Task} to a work item group which should have terminated. "
-                    + "Likely reasons are that the task is not being 'awaited' properly or a TaskScheduler was captured and is being used to schedule tasks "
-                    + "after a grain has been deactivated.\nWorkItemGroup: {Status}\nTask.AsyncState: {TaskState}\n{Stack}",
-                    OrleansTaskExtentions.ToString(task),
-                    this.DumpStatus(),
-                    task.AsyncState,
-                    Utils.GetStackTrace());
-
-                this.lastShutdownWarningTimestamp = now;
+                logLevel = LogLevel.Error;
             }
+            else return;
+
+            this.log.Log(
+                logLevel,
+                (int)ErrorCode.SchedulerEnqueueWorkWhenShutdown,
+                "Enqueuing task {Task} to a work item group which should have terminated. "
+                + "Likely reasons are that the task is not being 'awaited' properly or a TaskScheduler was captured and is being used to schedule tasks "
+                + "after a grain has been deactivated.\nWorkItemGroup: {Status}\nTask.AsyncState: {TaskState}\n{Stack}",
+                OrleansTaskExtentions.ToString(task),
+                this.DumpStatus(),
+                DumpAsyncState(task.AsyncState),
+                Utils.GetStackTrace());
+
+            this.lastShutdownWarningTimestamp = now;
+        }
+
+        private static object DumpAsyncState(object o)
+        {
+            if (o is Delegate action)
+                return action.Target is null ? action.Method.DeclaringType + "." + action.Method.Name
+                    : action.Method.DeclaringType.Name + "." + action.Method.Name + ": " + DumpAsyncState(action.Target);
+
+            if (o?.GetType() is { Name: "ContinuationWrapper" } wrapper
+                && (wrapper.GetField("_continuation", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?? wrapper.GetField("m_continuation", BindingFlags.Instance | BindingFlags.NonPublic)
+                    )?.GetValue(o) is Action continuation)
+                return DumpAsyncState(continuation);
+
+#if !NETCOREAPP
+            if (o?.GetType() is { Name: "MoveNextRunner" } runner
+                && runner.GetField("m_stateMachine", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(o) is object stateMachine)
+                return DumpAsyncState(stateMachine);
+#endif
+
+            return o;
         }
 
         /// <summary>
