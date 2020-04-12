@@ -47,7 +47,7 @@ namespace Orleans.ServiceBus.Providers
         public static byte[] SerializeProperties(this EventData eventData, SerializationManager serializationManager)
         {
             var writeStream = new BinaryTokenStreamWriter();
-            serializationManager.Serialize(eventData.Properties.Where(kvp => kvp.Key != EventDataPropertyStreamNamespaceKey).ToList(), writeStream);
+            serializationManager.Serialize(eventData.Properties.Where(kvp => !string.Equals(kvp.Key, EventDataPropertyStreamNamespaceKey, StringComparison.Ordinal)).ToList(), writeStream);
             var result = writeStream.ToByteArray();
             writeStream.ReleaseBuffers();
             return result;
