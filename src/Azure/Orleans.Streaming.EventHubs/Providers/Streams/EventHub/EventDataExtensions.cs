@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Azure.EventHubs;
@@ -12,7 +12,6 @@ namespace Orleans.ServiceBus.Providers
     public static class EventDataExtensions
     {
         private const string EventDataPropertyStreamNamespaceKey = "StreamNamespace";
-        private static readonly string[] SkipProperties = { EventDataPropertyStreamNamespaceKey };
 
         /// <summary>
         /// Adds stream namespace to the EventData
@@ -48,7 +47,7 @@ namespace Orleans.ServiceBus.Providers
         public static byte[] SerializeProperties(this EventData eventData, SerializationManager serializationManager)
         {
             var writeStream = new BinaryTokenStreamWriter();
-            serializationManager.Serialize(eventData.Properties.Where(kvp => !SkipProperties.Contains(kvp.Key)).ToList(), writeStream);
+            serializationManager.Serialize(eventData.Properties.Where(kvp => !string.Equals(kvp.Key, EventDataPropertyStreamNamespaceKey, StringComparison.Ordinal)).ToList(), writeStream);
             var result = writeStream.ToByteArray();
             writeStream.ReleaseBuffers();
             return result;

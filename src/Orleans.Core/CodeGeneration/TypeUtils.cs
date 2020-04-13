@@ -710,7 +710,7 @@ namespace Orleans.Runtime
                     builder.AppendFormat(
                         "{0}[{1}]",
                         elementType,
-                        string.Concat(Enumerable.Range(0, type.GetArrayRank() - 1).Select(_ => ',')));
+                        new string(',', type.GetArrayRank() - 1));
                 }
 
                 return;
@@ -755,7 +755,7 @@ namespace Orleans.Runtime
                 var unadornedTypeName = getNameFunc(type);
                 builder.Append(EscapeIdentifier(unadornedTypeName));
                 var generics =
-                    Enumerable.Range(0, Math.Min(type.GetGenericArguments().Count(), typeArguments.Count))
+                    Enumerable.Range(0, Math.Min(type.GetGenericArguments().Length, typeArguments.Count))
                         .Select(_ => typeArguments.Dequeue())
                         .ToList();
                 if (generics.Count > 0 && options.IncludeTypeParameters)
@@ -772,7 +772,7 @@ namespace Orleans.Runtime
                 var unadornedTypeName = getNameFunc(type);
                 builder.Append(EscapeIdentifier(unadornedTypeName));
                 var generics =
-                    Enumerable.Range(0, Math.Min(type.GetGenericArguments().Count(), typeArguments.Count))
+                    Enumerable.Range(0, Math.Min(type.GetGenericArguments().Length, typeArguments.Count))
                         .Select(_ => typeArguments.Dequeue())
                         .ToList();
                 if (generics.Count > 0 && options.IncludeTypeParameters)

@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
 using Orleans.MultiCluster;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
@@ -15,13 +18,8 @@ using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
 using Orleans.Serialization;
-using Orleans.Streams.Core;
 using Orleans.Streams;
-using System.Runtime.ExceptionServices;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Internal;
+using Orleans.Streams.Core;
 
 namespace Orleans.Runtime
 {
@@ -1084,7 +1082,7 @@ namespace Orleans.Runtime
                 List<Message> msgs = activation.DequeueAllWaitingMessages();
                 if (msgs == null || msgs.Count <= 0) return;
 
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_RerouteAllQueuedMessages, String.Format("RerouteAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count(), activation));
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_RerouteAllQueuedMessages, String.Format("RerouteAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count, activation));
                 this.Dispatcher.ProcessRequestsToInvalidActivation(msgs, activation.Address, forwardingAddress, failedOperation, exc);
             }
         }
@@ -1108,7 +1106,7 @@ namespace Orleans.Runtime
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.Debug(
                         ErrorCode.Catalog_RerouteAllQueuedMessages,
-                        string.Format("RejectAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count(), activation));
+                        string.Format("RejectAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count, activation));
                 this.Dispatcher.ProcessRequestsToInvalidActivation(
                     msgs,
                     activation.Address,

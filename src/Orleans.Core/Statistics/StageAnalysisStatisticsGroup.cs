@@ -257,7 +257,7 @@ namespace Orleans.Runtime
 
                     sb.AppendLine();
                     sb.AppendLine("CPU usage by thread type:");
-                    foreach (var v in cpuBreakdown.OrderBy(key => (-1*key.Value)))
+                    foreach (var v in cpuBreakdown.OrderByDescending(key => key.Value))
                         sb.AppendLine("  " + v.Value.ToString("F3") + ", " + v.Key);
 
                     sb.AppendLine();
