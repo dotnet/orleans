@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -25,7 +24,7 @@ namespace Orleans.Streams
         private readonly IDeploymentConfiguration deploymentConfig;
         private readonly DeploymentBasedQueueBalancerOptions options;
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
-        private ReadOnlyCollection<QueueId> allQueues;
+        private List<QueueId> allQueues;
         private bool isStarting;
 
         public DeploymentBasedQueueBalancer(
@@ -62,7 +61,7 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("queueMapper");
             }
-            this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
+            this.allQueues = queueMapper.GetAllQueues().ToList();
             NotifyAfterStart().Ignore();
             return base.Initialize(queueMapper);
         }

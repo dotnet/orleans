@@ -192,7 +192,7 @@ namespace Orleans.AzureUtils
 
             await DeleteEntriesBatch(entriesList);
 
-            return entriesList.Count();
+            return entriesList.Count;
         }
 
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)

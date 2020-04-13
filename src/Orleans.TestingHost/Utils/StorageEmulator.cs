@@ -38,7 +38,7 @@ namespace Orleans.TestingHost.Utils
         /// <returns></returns>
         public static bool IsStarted()
         {
-            return GetStorageEmulatorProcess() != null;
+            return GetStorageEmulatorProcess();
         }
 
 
@@ -166,12 +166,19 @@ namespace Orleans.TestingHost.Utils
         /// Queries the storage emulator process from the system.
         /// </summary>
         /// <returns></returns>
-        private static Process GetStorageEmulatorProcess()
+        private static bool GetStorageEmulatorProcess()
         {
-            return (storageEmulatorProcessNames
-                .Select(Process.GetProcessesByName)
-                .Where(processes => processes.Length > 0)
-                .Select(processes => processes[0])).FirstOrDefault();
+            foreach (var name in storageEmulatorProcessNames)
+            {
+                var ps = Process.GetProcessesByName(name);
+                if (ps.Length != 0)
+                {
+                    foreach (var p in ps)
+                        p.Dispose();
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -185,8 +192,7 @@ namespace Orleans.TestingHost.Utils
 
             return storageEmulatorFilenames
                 .Select(filename => Path.Combine(exeBasePath, filename))
-                .Where(File.Exists)
-                .FirstOrDefault();
+                .FirstOrDefault(File.Exists);
         }
 
 
