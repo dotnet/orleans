@@ -46,7 +46,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (!this.grainTypeManager.ClusterGrainInterfaceMap.TryGetDirectory(grainType, out var directoryName))
             {
-                throw new OrleansException($"Unexpected: Cannot find an the directory for grain class {grainType}");
+                throw new OrleansException($"Unexpected: Cannot find the directory for grain class {grainType}");
             }
 
             if (string.IsNullOrEmpty(directoryName))
@@ -60,7 +60,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     return default;
                 }
-                throw new OrleansException($"Unexpected: Cannot find an the directory named {directoryName}");
+                throw new OrleansException($"Unexpected: Cannot find the directory named {directoryName}");
             }
 
             return directory;

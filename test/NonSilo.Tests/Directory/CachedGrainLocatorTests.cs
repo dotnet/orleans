@@ -39,7 +39,7 @@ namespace UnitTests.Directory
 
             this.grainDirectory = Substitute.For<IGrainDirectory>();
             this.grainDirectoryResolver = Substitute.For<IGrainDirectoryResolver>();
-            this.grainDirectoryResolver.Resolve(Arg.Any<GrainId>()).Returns(this.grainDirectory);
+            this.grainDirectoryResolver.Resolve(Arg.Any<LegacyGrainId>()).Returns(this.grainDirectory);
             this.grainDirectoryResolver.Directories.Returns(new[] { this.grainDirectory });
             this.localGrainDirectory = Substitute.For<ILocalGrainDirectory>();
             this.mockMembershipService = new MockClusterMembershipService();
