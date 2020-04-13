@@ -3,8 +3,6 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using System.Threading.Channels;
-using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -14,7 +12,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ILogger log;
         private Action<Message> rerouteHandler;
         internal Func<Message, bool> ShouldDrop;
-        private IHostedClient hostedClient;
+        private HostedClient hostedClient;
         private Action<Message> sniffIncomingMessageHandler;
 
         internal OutboundMessageQueue OutboundQueue { get; set; }
@@ -27,7 +25,7 @@ namespace Orleans.Runtime.Messaging
 
         internal bool IsBlockingApplicationMessages { get; private set; }
 
-        public void SetHostedClient(IHostedClient client) => this.hostedClient = client;
+        public void SetHostedClient(HostedClient client) => this.hostedClient = client;
 
         public bool IsProxying => this.Gateway != null || this.hostedClient?.ClientId != null;
 
@@ -35,7 +33,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (msg.TargetGrain is null || !msg.TargetGrain.IsClient) return false;
             if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)) return true;
-            return this.hostedClient is IHostedClient client && client.TryDispatchToClient(msg);
+            return this.hostedClient is HostedClient client && client.TryDispatchToClient(msg);
         }
         
         // This is determined by the IMA but needed by the OMS, and so is kept here in the message center itself.
