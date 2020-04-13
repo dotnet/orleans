@@ -16,7 +16,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// A client which is hosted within a silo.
     /// </summary>
-    internal sealed class HostedClient : IDisposable, IHostedClient, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class HostedClient : IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly Channel<Message> incomingMessages;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> extensionsTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();

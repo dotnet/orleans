@@ -42,9 +42,9 @@ namespace Orleans.Runtime
         private Dispatcher dispatcher;
         private List<IIncomingGrainCallFilter> grainCallFilters;
         private SerializationManager serializationManager;
-        private IHostedClient hostedClient;
+        private HostedClient hostedClient;
 
-        private IHostedClient HostedClient => this.hostedClient ?? (this.hostedClient = this.ServiceProvider.GetRequiredService<IHostedClient>());
+        private HostedClient HostedClient => this.hostedClient ?? (this.hostedClient = this.ServiceProvider.GetRequiredService<HostedClient>());
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping = new InterfaceToImplementationMappingCache();
         private readonly GrainTypeManager typeManager;
         private readonly MessageFactory messageFactory;
