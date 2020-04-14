@@ -1,11 +1,9 @@
-using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Internal;
 using Orleans.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime
@@ -13,14 +11,12 @@ namespace Orleans.Runtime
     internal class GrainReferenceRuntime : IGrainReferenceRuntime
     {
         private readonly Func<GrainReference, InvokeMethodRequest, InvokeMethodOptions, Task<object>> sendRequestDelegate;
-        private readonly ILogger logger;
         private readonly SerializationManager serializationManager;
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
         private readonly IOutgoingGrainCallFilter[] filters;
         private readonly InterfaceToImplementationMappingCache grainReferenceMethodCache;
 
         public GrainReferenceRuntime(
-            ILogger<GrainReferenceRuntime> logger,
             IRuntimeClient runtimeClient,
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
             SerializationManager serializationManager,
@@ -29,7 +25,6 @@ namespace Orleans.Runtime
         {
             this.grainReferenceMethodCache = new InterfaceToImplementationMappingCache();
             this.sendRequestDelegate = SendRequest;
-            this.logger = logger;
             this.RuntimeClient = runtimeClient;
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.GrainReferenceFactory = new GrainReferenceFactory(typeMetadataCache, this);
