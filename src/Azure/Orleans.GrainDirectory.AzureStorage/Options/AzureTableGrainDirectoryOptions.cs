@@ -19,9 +19,9 @@ namespace Orleans.Configuration
     {
         private AzureTableGrainDirectoryOptions options;
 
-        public AzureTableGrainDirectoryOptionsValidator(IOptions<AzureTableGrainDirectoryOptions> options)
+        public AzureTableGrainDirectoryOptionsValidator(AzureTableGrainDirectoryOptions options)
         {
-            this.options = options.Value;
+            this.options = options;
         }
 
         public void ValidateConfiguration()

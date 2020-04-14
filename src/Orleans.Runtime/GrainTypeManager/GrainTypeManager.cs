@@ -195,11 +195,12 @@ namespace Orleans.Runtime
         private void AddToGrainInterfaceToClassMap(Type grainClass, IEnumerable<Type> grainInterfaces, bool isUnordered)
         {
             var placement = GrainTypeData.GetPlacementStrategy(grainClass, this.defaultPlacementStrategy);
+            var directory = GrainTypeData.GetGrainDirectory(grainClass);
 
             foreach (var iface in grainInterfaces)
             {
                 var isPrimaryImplementor = IsPrimaryImplementor(grainClass, iface);
-                grainInterfaceMap.AddEntry(iface, grainClass, placement, isPrimaryImplementor);
+                grainInterfaceMap.AddEntry(iface, grainClass, placement, directory, isPrimaryImplementor);
             }
 
             if (isUnordered)
