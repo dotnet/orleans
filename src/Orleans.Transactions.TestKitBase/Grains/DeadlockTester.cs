@@ -9,11 +9,11 @@ namespace Orleans.Transactions.TestKit.Base.Grains
     [StatelessWorker, Reentrant]
     public class DeadlockTester : Grain, IDeadlockTester
     {
-        private SimpleTransactionalLockObserver monitor;
+        private DeadlockDetectionLockObserver monitor;
 
         public DeadlockTester(ITransactionalLockObserver monitor)
         {
-            this.monitor = (SimpleTransactionalLockObserver)monitor;
+            this.monitor = (DeadlockDetectionLockObserver)monitor;
         }
         public Task<(bool hasCycles, IList<WaitForGraph.Node> cycle, string graphOut)> CheckForCycles()
         {

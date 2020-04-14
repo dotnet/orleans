@@ -8,9 +8,9 @@ namespace Orleans.Transactions.DeadlockDetection
     {
         public static IServiceCollection AddSimpleDeadlockDetection(this IServiceCollection serviceCollection) =>
             serviceCollection
-                .AddSingletonNamedService(SimpleTransactionalLockObserver.ProviderName,
-                    SimpleTransactionalLockObserver.Create).AddSingleton<ITransactionalLockObserver>(sp =>
+                .AddSingletonNamedService(DeadlockDetectionLockObserver.ProviderName,
+                    DeadlockDetectionLockObserver.Create).AddSingleton<ITransactionalLockObserver>(sp =>
                     (ITransactionalLockObserver)sp.GetRequiredServiceByName<IControllable>(
-                        SimpleTransactionalLockObserver.ProviderName));
+                        DeadlockDetectionLockObserver.ProviderName));
     }
 }

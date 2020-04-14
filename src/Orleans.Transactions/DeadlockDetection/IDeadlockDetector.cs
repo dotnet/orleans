@@ -8,12 +8,13 @@ namespace Orleans.Transactions.DeadlockDetection
 
 
 
-    public interface IDeadlockDetector : IGrainWithIntegerKey
+    internal interface IDeadlockDetector : IGrainWithIntegerKey
     {
 
         [Transaction(TransactionOption.Suppress)]
         [OneWay]
         [AlwaysInterleave]
-        Task CheckForDeadlocks(ParticipantId resourceId, IList<Guid> transactionIds);
+        Task CheckForDeadlocks(CollectLocksResponse message);
+
     }
 }
