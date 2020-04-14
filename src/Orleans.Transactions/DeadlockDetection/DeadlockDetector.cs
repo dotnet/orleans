@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -17,65 +18,56 @@ namespace Orleans.Transactions.DeadlockDetection
         private readonly ILogger<DeadlockDetector> logger;
         private readonly ITransactionalLockObserver localObserver;
 
-        public DeadlockDetector(ILogger<DeadlockDetector> logger, ITransactionalLockObserver localObserver)
+        private readonly IDictionary<Guid, DeadlockDetectionBatch> batches =
+            new Dictionary<Guid, DeadlockDetectionBatch>();
+        private readonly IDictionary<Guid, Guid> batchesByTransaction = new Dictionary<Guid, Guid>();
+        private readonly IDictionary<ParticipantId, Guid> batchesByResource = new Dictionary<ParticipantId, Guid>();
+
+        internal DeadlockDetector(ILogger<DeadlockDetector> logger,
+            ITransactionalLockObserver localObserver)
         {
             this.logger = logger;
             this.localObserver = localObserver;
         }
 
-        public async Task CheckForDeadlocks(ParticipantId resourceId, IList<Guid> transactionIds)
+        public async Task CheckForDeadlocks(CollectLocksResponse message)
         {
-            // Right now, this is called multiple times (once for each deadlocked transaction queue).  To avoid
-            // this, we might want to  keep track of things we're currently examining and do a fast exit if
-            // another call is already on it.
-
-            var txStr = string.Join(",", transactionIds);
-            this.logger.LogInformation($"Checking for deadlocks around {resourceId} for {txStr}");
-
-            WaitForGraph wfg = await CollectGraph(resourceId, transactionIds);
-            if (!wfg.HasCycles)
+            if (message.BatchId != null && this.batches.TryGetValue(message.BatchId.Value, out var batch))
             {
-                this.logger.LogInformation($"No cycles detected in {wfg}");
-                return;
+                await this.ScheduleBatchUpdate(batch, message);
             }
 
-            this.logger.LogInformation($"Deadlock detected in {wfg}");
-            foreach (LockInfo lockInfo in wfg.LocksToBreak)
+            // we don't have a batch for this request - lets see if we have any that are interested in
+            // First, we have to merge some batches
+            await this.MergeOverlappingBatches();
+
+            bool handled = false;
+            foreach (var lockInfo in message.Locks)
             {
-                this.logger.LogInformation($"would abort {lockInfo.TransactionId}");
-            }
-        }
-
-        private async Task<WaitForGraph> CollectGraph(ParticipantId resource, IList<Guid> lockedBy)
-        {
-
-            LockSnapshot localSnapshot = localObserver.CreateSnapshot(resource, lockedBy);
-
-            if (localSnapshot.IsLocallyDeadlocked)
-            {
-                return WaitForGraph.FromLockInfo(localSnapshot.Snapshot);
-            }
-
-            var snapshots = await GrainFactory.GetGrain<IManagementGrain>(0)
-                .SendControlCommandToProvider(typeof(SimpleTransactionalLockObserver).FullName,
-                    SimpleTransactionalLockObserver.ProviderName, 0, new CollectLocksRequest
-                    {
-                        ResourceId = resource, TransactionIds = lockedBy
-                    });
-
-            var locks = new List<LockInfo>();
-            foreach (object o in snapshots)
-            {
-                var snapshot = (LockSnapshot)o;
-                if (snapshot.IsLocallyDeadlocked)
+                if (this.batchesByResource.TryGetValue(lockInfo.Resource, out var batchId) && this.batches.TryGetValue(batchId, out batch))
                 {
-                    return WaitForGraph.FromLockInfo(snapshot.Snapshot);
+                    await this.ScheduleBatchUpdate(batch, message);
+                    handled = true;
                 }
 
-                locks.AddRange(snapshot.Snapshot);
+                if (this.batchesByTransaction.TryGetValue(lockInfo.TxId, out batchId) &&
+                    this.batches.TryGetValue(batchId, out batch))
+                {
+                    await this.ScheduleBatchUpdate(batch, message);
+                    handled = true;
+                }
             }
 
-            return WaitForGraph.FromLockInfo(locks);
+            if (!handled)
+            {
+                batch = new DeadlockDetectionBatch();
+                this.batches[batch.Id] = batch;
+                await this.ScheduleBatchUpdate(batch, message);
+            }
         }
+
+        private Task MergeOverlappingBatches() => throw new NotImplementedException();
+
+        private Task ScheduleBatchUpdate(DeadlockDetectionBatch batch, CollectLocksResponse message) => throw new NotImplementedException();
     }
 }
