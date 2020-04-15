@@ -179,11 +179,11 @@ namespace Orleans.Runtime
             return GrainType.Create($"{GrainTypePrefix.SystemTargetPrefix}{typeCode:X16}");
         }
 
-        private SpanId GetGrainKey()
+        private IdSpan GetGrainKey()
         {
             // TODO: intern
             var key = this.Key;
-            return SpanId.Create($"{key.N0:X16}{key.N1:X16}{(key.HasKeyExt ? ("+" + key.KeyExt) : string.Empty)}");
+            return IdSpan.Create($"{key.N0:X16}{key.N1:X16}{(key.HasKeyExt ? ("+" + key.KeyExt) : string.Empty)}");
         }
 
         public GrainId ToGrainId()

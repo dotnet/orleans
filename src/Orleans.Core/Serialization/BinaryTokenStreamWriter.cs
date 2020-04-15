@@ -64,10 +64,10 @@ namespace Orleans.Serialization
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
-        internal static void Write<TWriter>(this TWriter @this, SpanId value) where TWriter : IBinaryTokenStreamWriter
+        internal static void Write<TWriter>(this TWriter @this, IdSpan value) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write(value.GetHashCode());
-            var array = SpanId.UnsafeGetArray(value);
+            var array = IdSpan.UnsafeGetArray(value);
             @this.Write((ushort)array.Length);
             @this.Write(array);
         }

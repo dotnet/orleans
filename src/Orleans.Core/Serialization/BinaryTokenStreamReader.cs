@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Resources;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
@@ -17,20 +16,20 @@ namespace Orleans.Serialization
 {
     internal static class BinaryTokenStreamReaderExtensinons
     {
-        internal static SpanId ReadSpanId<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
+        internal static IdSpan ReadIdSpan<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
             var hashCode = @this.ReadInt();
             var len = @this.ReadUShort();
             var bytes = @this.ReadBytes(len);
-            return SpanId.UnsafeCreate(bytes, hashCode);
+            return IdSpan.UnsafeCreate(bytes, hashCode);
         }
 
         /// <summary> Read an <c>GrainId</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         internal static GrainId ReadGrainId<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
-            var type = @this.ReadSpanId();
-            var key = @this.ReadSpanId();
+            var type = @this.ReadIdSpan();
+            var key = @this.ReadIdSpan();
             return new GrainId(new GrainType(type), key);
         }
 

@@ -49,7 +49,7 @@ namespace Orleans.Runtime
 
         public static readonly GrainId SiloDirectConnectionId = GrainId.Create(
             GrainType.Create(GrainTypePrefix.SystemPrefix + "silo"),
-            SpanId.Create("01111111-1111-1111-1111-111111111111"));
+            IdSpan.Create("01111111-1111-1111-1111-111111111111"));
 
         /// <summary>
         /// Minimum period for registering a reminder ... we want to enforce a lower bound

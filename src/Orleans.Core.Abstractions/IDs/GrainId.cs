@@ -12,29 +12,29 @@ namespace Orleans.Runtime
     [StructLayout(LayoutKind.Auto)]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
     {
-        public GrainId(GrainType type, SpanId key)
+        public GrainId(GrainType type, IdSpan key)
         {
             Type = type;
             Key = key;
         }
 
-        public GrainId(byte[] type, byte[] key) : this(new GrainType(type), new SpanId(key))
+        public GrainId(byte[] type, byte[] key) : this(new GrainType(type), new IdSpan(key))
         {
         }
 
-        public GrainId(GrainType type, byte[] key) : this(type, new SpanId(key))
+        public GrainId(GrainType type, byte[] key) : this(type, new IdSpan(key))
         {
         }
 
         public GrainId(SerializationInfo info, StreamingContext context)
         {
-            Type = new GrainType(SpanId.UnsafeCreate((byte[])info.GetValue("tv", typeof(byte[])), info.GetInt32("th")));
-            Key = SpanId.UnsafeCreate((byte[])info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
+            Type = new GrainType(IdSpan.UnsafeCreate((byte[])info.GetValue("tv", typeof(byte[])), info.GetInt32("th")));
+            Key = IdSpan.UnsafeCreate((byte[])info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
         }
 
         public GrainType Type { get; }
 
-        public SpanId Key { get; }
+        public IdSpan Key { get; }
 
         // TODO: remove implicit conversion (potentially make explicit to start with)
         public static implicit operator LegacyGrainId(GrainId id) => LegacyGrainId.FromGrainId(id);
@@ -45,7 +45,7 @@ namespace Orleans.Runtime
 
         public static GrainId Create(GrainType type, string key) => new GrainId(type, Encoding.UTF8.GetBytes(key));
 
-        public static GrainId Create(GrainType type, SpanId key) => new GrainId(type, key);
+        public static GrainId Create(GrainType type, IdSpan key) => new GrainId(type, key);
 
         public bool IsDefault => Type.IsDefault && Key.IsDefault;
 
@@ -69,7 +69,7 @@ namespace Orleans.Runtime
         {
             info.AddValue("tv", GrainType.UnsafeGetArray(Type));
             info.AddValue("th", Type.GetHashCode());
-            info.AddValue("kv", SpanId.UnsafeGetArray(Key));
+            info.AddValue("kv", IdSpan.UnsafeGetArray(Key));
             info.AddValue("kh", Key.GetHashCode());
         }
 
@@ -90,10 +90,6 @@ namespace Orleans.Runtime
         public static bool operator <(GrainId a, GrainId b) => a.CompareTo(b) < 0;
 
         public override string ToString() => $"{Type.ToStringUtf8()}/{Key.ToStringUtf8()}";
-
-        public static (byte[] Key, int KeyHashCode) UnsafeGetKey(GrainId id) => (SpanId.UnsafeGetArray(id.Key), id.Key.GetHashCode());
-
-        public static SpanId KeyAsSpanId(GrainId id) => id.Key;
 
         public sealed class Comparer : IEqualityComparer<GrainId>, IComparer<GrainId>
         {

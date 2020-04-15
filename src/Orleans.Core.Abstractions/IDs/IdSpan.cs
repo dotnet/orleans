@@ -11,24 +11,24 @@ namespace Orleans.Runtime
     [Immutable]
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
-    public readonly struct SpanId : IEquatable<SpanId>, IComparable<SpanId>, ISerializable
+    public readonly struct IdSpan : IEquatable<IdSpan>, IComparable<IdSpan>, ISerializable
     {
         private readonly byte[] _value;
         private readonly int _hashCode;
 
-        public SpanId(byte[] value)
+        public IdSpan(byte[] value)
         {
             _value = value;
             _hashCode = GetHashCode(value);
         }
 
-        private SpanId(byte[] value, int hashCode)
+        private IdSpan(byte[] value, int hashCode)
         {
             _value = value;
             _hashCode = hashCode;
         }
 
-        public SpanId(SerializationInfo info, StreamingContext context)
+        public IdSpan(SerializationInfo info, StreamingContext context)
         {
             _value = (byte[])info.GetValue("v", typeof(byte[]));
             _hashCode = info.GetInt32("h");
@@ -38,17 +38,17 @@ namespace Orleans.Runtime
 
         public bool IsDefault => _value is null || _value.Length == 0;
 
-        public static SpanId Create(string id) => new SpanId(Encoding.UTF8.GetBytes(id));
+        public static IdSpan Create(string id) => new IdSpan(Encoding.UTF8.GetBytes(id));
 
         public ReadOnlySpan<byte> AsSpan() => _value;
 
         public override bool Equals(object obj)
         {
-            return obj is SpanId kind && this.Equals(kind);
+            return obj is IdSpan kind && this.Equals(kind);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(SpanId obj)
+        public bool Equals(IdSpan obj)
         {
             if (object.ReferenceEquals(_value, obj._value)) return true;
             if (_value is null || obj._value is null) return false;
@@ -65,11 +65,11 @@ namespace Orleans.Runtime
             info.AddValue("h", _hashCode);
         }
 
-        public static SpanId UnsafeCreate(byte[] value, int hashCode) => new SpanId(value, hashCode);
+        public static IdSpan UnsafeCreate(byte[] value, int hashCode) => new IdSpan(value, hashCode);
 
-        public static byte[] UnsafeGetArray(SpanId id) => id._value;
+        public static byte[] UnsafeGetArray(IdSpan id) => id._value;
 
-        public int CompareTo(SpanId other) => _value.AsSpan().SequenceCompareTo(other._value.AsSpan());
+        public int CompareTo(IdSpan other) => _value.AsSpan().SequenceCompareTo(other._value.AsSpan());
 
         public override string ToString() => this.ToStringUtf8();
 
@@ -79,15 +79,23 @@ namespace Orleans.Runtime
             return null;
         }
 
-        public sealed class Comparer : IEqualityComparer<SpanId>, IComparer<SpanId>
+        public static bool operator ==(IdSpan a, IdSpan b) => a.Equals(b);
+
+        public static bool operator !=(IdSpan a, IdSpan b) => !a.Equals(b);
+
+        public static bool operator >(IdSpan a, IdSpan b) => a.CompareTo(b) > 0;
+
+        public static bool operator <(IdSpan a, IdSpan b) => a.CompareTo(b) < 0;
+
+        public sealed class Comparer : IEqualityComparer<IdSpan>, IComparer<IdSpan>
         {
             public static Comparer Instance { get; } = new Comparer();
 
-            public int Compare(SpanId x, SpanId y) => x.CompareTo(y);
+            public int Compare(IdSpan x, IdSpan y) => x.CompareTo(y);
 
-            public bool Equals(SpanId x, SpanId y) => x.Equals(y);
+            public bool Equals(IdSpan x, IdSpan y) => x.Equals(y);
 
-            public int GetHashCode(SpanId obj) => obj.GetHashCode();
+            public int GetHashCode(IdSpan obj) => obj.GetHashCode();
         }
     }
 }

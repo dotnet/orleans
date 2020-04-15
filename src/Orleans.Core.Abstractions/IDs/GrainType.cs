@@ -12,23 +12,23 @@ namespace Orleans.Runtime
     [StructLayout(LayoutKind.Auto)]
     public readonly struct GrainType : IEquatable<GrainType>, IComparable<GrainType>, ISerializable
     {
-        public GrainType(SpanId id) => Value = id;
-        public GrainType(byte[] value) => Value = new SpanId(value);
+        public GrainType(IdSpan id) => Value = id;
+        public GrainType(byte[] value) => Value = new IdSpan(value);
 
         public GrainType(SerializationInfo info, StreamingContext context)
         {
-            Value = SpanId.UnsafeCreate((byte[])info.GetValue("v", typeof(byte[])), info.GetInt32("h"));
+            Value = IdSpan.UnsafeCreate((byte[])info.GetValue("v", typeof(byte[])), info.GetInt32("h"));
         }
 
-        public SpanId Value { get; }
+        public IdSpan Value { get; }
 
         public ReadOnlySpan<byte> AsSpan() => this.Value.AsSpan();
 
         public static GrainType Create(string value) => new GrainType(Encoding.UTF8.GetBytes(value));
 
-        public static explicit operator SpanId(GrainType kind) => kind.Value;
+        public static explicit operator IdSpan(GrainType kind) => kind.Value;
 
-        public static explicit operator GrainType(SpanId id) => new GrainType(id);
+        public static explicit operator GrainType(IdSpan id) => new GrainType(id);
 
         public bool IsDefault => Value.IsDefault;
 
@@ -38,14 +38,14 @@ namespace Orleans.Runtime
 
         public override int GetHashCode() => Value.GetHashCode();
 
-        public static byte[] UnsafeGetArray(GrainType id) => SpanId.UnsafeGetArray(id.Value);
+        public static byte[] UnsafeGetArray(GrainType id) => IdSpan.UnsafeGetArray(id.Value);
 
 
         public int CompareTo(GrainType other) => Value.CompareTo(other.Value);
 
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            info.AddValue("v", SpanId.UnsafeGetArray(Value));
+            info.AddValue("v", IdSpan.UnsafeGetArray(Value));
             info.AddValue("h", Value.GetHashCode());
         }
 
