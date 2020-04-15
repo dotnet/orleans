@@ -22,7 +22,7 @@ namespace Orleans.Runtime
             _hashCode = GetHashCode(value);
         }
 
-        internal SpanId(byte[] value, int hashCode)
+        private SpanId(byte[] value, int hashCode)
         {
             _value = value;
             _hashCode = hashCode;
@@ -34,19 +34,21 @@ namespace Orleans.Runtime
             _hashCode = info.GetInt32("h");
         }
 
+        public ReadOnlyMemory<byte> Value => _value;
+
+        public bool IsDefault => _value is null || _value.Length == 0;
+
         public static SpanId Create(string id) => new SpanId(Encoding.UTF8.GetBytes(id));
 
-        public readonly ReadOnlyMemory<byte> Value => _value;
+        public ReadOnlySpan<byte> AsSpan() => _value;
 
-        public readonly bool IsDefault => _value is null || _value.Length == 0;
-
-        public override readonly bool Equals(object obj)
+        public override bool Equals(object obj)
         {
             return obj is SpanId kind && this.Equals(kind);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool Equals(SpanId obj)
+        public bool Equals(SpanId obj)
         {
             if (object.ReferenceEquals(_value, obj._value)) return true;
             if (_value is null || obj._value is null) return false;
@@ -55,7 +57,7 @@ namespace Orleans.Runtime
 
         public static int GetHashCode(byte[] value) => (int)JenkinsHash.ComputeHash(value);
 
-        public override readonly int GetHashCode() => _hashCode;
+        public override int GetHashCode() => _hashCode;
 
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
@@ -63,13 +65,15 @@ namespace Orleans.Runtime
             info.AddValue("h", _hashCode);
         }
 
+        public static SpanId UnsafeCreate(byte[] value, int hashCode) => new SpanId(value, hashCode);
+
         public static byte[] UnsafeGetArray(SpanId id) => id._value;
 
         public int CompareTo(SpanId other) => _value.AsSpan().SequenceCompareTo(other._value.AsSpan());
 
         public override string ToString() => this.ToStringUtf8();
 
-        public readonly string ToStringUtf8()
+        public string ToStringUtf8()
         {
             if (_value is object) return Encoding.UTF8.GetString(_value);
             return null;

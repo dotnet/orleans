@@ -26,7 +26,7 @@ namespace Orleans.Runtime
             return Create(kind, address);
         }
 
-        private static bool IsSystemTarget(in GrainType type) => type.Value.Span.StartsWith(GrainTypePrefix.SystemTargetPrefixBytes.Span);
+        private static bool IsSystemTarget(in GrainType type) => type.AsSpan().StartsWith(GrainTypePrefix.SystemTargetPrefixBytes.Span);
 
         public static bool IsSystemTarget(in GrainId id) => IsSystemTarget(id.Type);
 

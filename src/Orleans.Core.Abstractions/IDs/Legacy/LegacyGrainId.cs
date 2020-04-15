@@ -205,7 +205,7 @@ namespace Orleans.Runtime
 
         private static unsafe LegacyGrainId FromGrainIdInternal(GrainId id)
         {
-            var typeSpan = id.Type.Value.Span;
+            var typeSpan = id.Type.AsSpan();
             int prefixLength;
             if (typeSpan.StartsWith(GrainTypePrefix.LegacyGrainPrefixBytes.Span))
             {

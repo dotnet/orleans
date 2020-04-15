@@ -22,7 +22,7 @@ namespace Orleans.Serialization
             var hashCode = @this.ReadInt();
             var len = @this.ReadUShort();
             var bytes = @this.ReadBytes(len);
-            return new SpanId(bytes, hashCode);
+            return SpanId.UnsafeCreate(bytes, hashCode);
         }
 
         /// <summary> Read an <c>GrainId</c> value from the stream. </summary>

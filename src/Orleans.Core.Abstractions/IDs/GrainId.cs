@@ -12,21 +12,15 @@ namespace Orleans.Runtime
     [StructLayout(LayoutKind.Auto)]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
     {
-        private readonly GrainType _type;
-        private readonly SpanId _key;
-
         public GrainId(GrainType type, SpanId key)
         {
-            _type = type;
-            _key = key;
+            Type = type;
+            Key = key;
         }
 
         public GrainId(byte[] type, byte[] key) : this(new GrainType(type), new SpanId(key))
         {
         }
-
-        internal GrainId(GrainType type, byte[] key, int keyHashCode) : this(type, new SpanId(key, keyHashCode)) { }
-
 
         public GrainId(GrainType type, byte[] key) : this(type, new SpanId(key))
         {
@@ -34,9 +28,13 @@ namespace Orleans.Runtime
 
         public GrainId(SerializationInfo info, StreamingContext context)
         {
-            _type = new GrainType((byte[])info.GetValue("tv", typeof(byte[])), info.GetInt32("th"));
-            _key = new SpanId((byte[])info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
+            Type = new GrainType(SpanId.UnsafeCreate((byte[])info.GetValue("tv", typeof(byte[])), info.GetInt32("th")));
+            Key = SpanId.UnsafeCreate((byte[])info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
         }
+
+        public GrainType Type { get; }
+
+        public SpanId Key { get; }
 
         // TODO: remove implicit conversion (potentially make explicit to start with)
         public static implicit operator LegacyGrainId(GrainId id) => LegacyGrainId.FromGrainId(id);
@@ -49,21 +47,17 @@ namespace Orleans.Runtime
 
         public static GrainId Create(GrainType type, SpanId key) => new GrainId(type, key);
 
-        public readonly GrainType Type => _type;
+        public bool IsDefault => Type.IsDefault && Key.IsDefault;
 
-        public readonly SpanId Key => _key;
+        public override bool Equals(object obj) => obj is GrainId id && this.Equals(id);
 
-        public readonly bool IsDefault => _type.IsDefault && _key.IsDefault;
+        public bool Equals(GrainId other) => this.Type.Equals(other.Type) && this.Key.Equals(other.Key);
 
-        public override readonly bool Equals(object obj) => obj is GrainId id && this.Equals(id);
+        public override int GetHashCode() => HashCode.Combine(Type, Key);
 
-        public readonly bool Equals(GrainId other) => this.Type.Equals(other.Type) && this._key.Equals(other._key);
+        public uint GetUniformHashCode() => unchecked((uint)this.GetHashCode());
 
-        public override readonly int GetHashCode() => HashCode.Combine(_type, _key);
-
-        public readonly uint GetUniformHashCode() => unchecked((uint)this.GetHashCode());
-
-        public readonly uint GetHashCode_Modulo(uint umod)
+        public uint GetHashCode_Modulo(uint umod)
         {
             int key = GetHashCode();
             int mod = (int)umod;
@@ -71,20 +65,20 @@ namespace Orleans.Runtime
             return checked((uint)key);
         }
 
-        public readonly void GetObjectData(SerializationInfo info, StreamingContext context)
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            info.AddValue("tv", GrainType.UnsafeGetArray(_type));
-            info.AddValue("th", _type.GetHashCode());
-            info.AddValue("kv", SpanId.UnsafeGetArray(_key));
-            info.AddValue("kh", _key.GetHashCode());
+            info.AddValue("tv", GrainType.UnsafeGetArray(Type));
+            info.AddValue("th", Type.GetHashCode());
+            info.AddValue("kv", SpanId.UnsafeGetArray(Key));
+            info.AddValue("kh", Key.GetHashCode());
         }
 
-        public readonly int CompareTo(GrainId other)
+        public int CompareTo(GrainId other)
         {
-            var typeComparison = _type.CompareTo(other._type);
+            var typeComparison = Type.CompareTo(other.Type);
             if (typeComparison != 0) return typeComparison;
 
-            return _key.CompareTo(other._key);
+            return Key.CompareTo(other.Key);
         }
 
         public static bool operator ==(GrainId a, GrainId b) => a.Equals(b);
@@ -95,11 +89,11 @@ namespace Orleans.Runtime
 
         public static bool operator <(GrainId a, GrainId b) => a.CompareTo(b) < 0;
 
-        public override readonly string ToString() => $"{_type.ToStringUtf8()}/{_key.ToStringUtf8()}";
+        public override string ToString() => $"{Type.ToStringUtf8()}/{Key.ToStringUtf8()}";
 
-        public static (byte[] Key, int KeyHashCode) UnsafeGetKey(GrainId id) => (SpanId.UnsafeGetArray(id._key), id._key.GetHashCode());
+        public static (byte[] Key, int KeyHashCode) UnsafeGetKey(GrainId id) => (SpanId.UnsafeGetArray(id.Key), id.Key.GetHashCode());
 
-        public static SpanId KeyAsSpanId(GrainId id) => id._key;
+        public static SpanId KeyAsSpanId(GrainId id) => id.Key;
 
         public sealed class Comparer : IEqualityComparer<GrainId>, IComparer<GrainId>
         {

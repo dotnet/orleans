@@ -60,7 +60,7 @@ namespace Orleans.Serialization
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
         internal static void Write<TWriter>(this TWriter @this, GrainType type) where TWriter : IBinaryTokenStreamWriter
         {
-            @this.Write(GrainType.AsSpanId(type));
+            @this.Write(type.Value);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
