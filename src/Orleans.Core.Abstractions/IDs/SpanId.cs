@@ -22,7 +22,7 @@ namespace Orleans.Runtime
             _hashCode = GetHashCode(value);
         }
 
-        public SpanId(byte[] value, int hashCode)
+        internal SpanId(byte[] value, int hashCode)
         {
             _value = value;
             _hashCode = hashCode;
@@ -49,7 +49,7 @@ namespace Orleans.Runtime
         public readonly bool Equals(SpanId obj)
         {
             if (object.ReferenceEquals(_value, obj._value)) return true;
-            if (_value is null ^ obj._value is null) return false;
+            if (_value is null || obj._value is null) return false;
             return _value.AsSpan().SequenceEqual(obj._value);
         }
 

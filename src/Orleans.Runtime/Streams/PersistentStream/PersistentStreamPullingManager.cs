@@ -39,7 +39,7 @@ namespace Orleans.Streams
         private int NumberRunningAgents { get { return queuesToAgentsMap.Count; } }
 
         internal PersistentStreamPullingManager(
-            GrainId managerId,
+            SystemTargetGrainId managerId,
             string strProviderName, 
             IStreamProviderRuntime runtime,
             IStreamPubSub streamPubSub,
@@ -223,7 +223,7 @@ namespace Orleans.Streams
                 try
                 {
                     var agentIdNumber = Interlocked.Increment(ref nextAgentId);
-                    var agentId = GrainTypePrefix.GetSystemTargetGrainId(Constants.StreamPullingAgentType, this.Silo, $"{streamProviderName}_{agentIdNumber}_{queueId.ToStringWithHashCode()}");
+                    var agentId = SystemTargetGrainId.Create(Constants.StreamPullingAgentType, this.Silo, $"{streamProviderName}_{agentIdNumber}_{queueId.ToStringWithHashCode()}");
                     var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, pubSub, queueId, this.options, this.Silo);
                     providerRuntime.RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);

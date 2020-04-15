@@ -74,11 +74,10 @@ namespace Orleans.Runtime.Messaging
                 msg.TargetActivation = default;
                 msg.ClearTargetAddress();
 
-                if (msg.TargetGrain.IsSystemTarget())
+                if (SystemTargetGrainId.TryParse(msg.TargetGrain, out var systemTargetId))
                 {
                     msg.TargetSilo = this.myAddress;
-                    var inputGrainId = msg.TargetGrain;
-                    msg.TargetGrain = GrainTypePrefix.ReplaceSystemTargetSilo(inputGrainId, this.myAddress);
+                    msg.TargetGrain = systemTargetId.WithSiloAddress(this.myAddress).GrainId;
                     msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 
@@ -90,10 +89,9 @@ namespace Orleans.Runtime.Messaging
                 // send directly
                 msg.TargetSilo = targetAddress;
 
-                if (msg.TargetGrain.IsSystemTarget())
+                if (SystemTargetGrainId.TryParse(msg.TargetGrain, out var systemTargetId))
                 {
-                    var inputGrainId = msg.TargetGrain;
-                    msg.TargetGrain = GrainTypePrefix.ReplaceSystemTargetSilo(inputGrainId, targetAddress);
+                    msg.TargetGrain = systemTargetId.WithSiloAddress(targetAddress).GrainId;
                     msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 

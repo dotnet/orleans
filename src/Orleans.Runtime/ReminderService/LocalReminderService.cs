@@ -32,7 +32,7 @@ namespace Orleans.Runtime.ReminderService
             TimeSpan initTimeout,
             ILoggerFactory loggerFactory,
             IAsyncTimerFactory asyncTimerFactory)
-            : base(GrainTypePrefix.GetGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, silo.SiloAddress), silo, loggerFactory)
+            : base(SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, silo.SiloAddress), silo, loggerFactory)
         {
             localReminders = new Dictionary<ReminderIdentity, LocalReminderData>();
             this.reminderTable = reminderTable;

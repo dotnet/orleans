@@ -141,8 +141,8 @@ namespace Orleans
         public TGrainInterface GetSystemTarget<TGrainInterface>(GrainType grainType, SiloAddress destination)
             where TGrainInterface : ISystemTarget
         {
-            var grainId = GrainTypePrefix.GetSystemTargetGrainId(grainType, destination);
-            return this.GetSystemTarget<TGrainInterface>(grainId);
+            var grainId = SystemTargetGrainId.Create(grainType, destination);
+            return this.GetSystemTarget<TGrainInterface>(grainId.GrainId);
         }
 
         /// <summary>

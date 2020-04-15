@@ -47,7 +47,7 @@ namespace Orleans.Runtime
 
         /// <summary>Constructor to use for grain services</summary>
         protected GrainService(GrainId grainId, Silo silo, ILoggerFactory loggerFactory)
-            : base(GrainTypePrefix.GetSystemTargetGrainId(grainId.Type, silo.SiloAddress), silo.SiloAddress, lowPriority: true, loggerFactory:loggerFactory)
+            : base(SystemTargetGrainId.Create(grainId.Type, silo.SiloAddress), silo.SiloAddress, lowPriority: true, loggerFactory:loggerFactory)
         {
             typeName = this.GetType().FullName;
             Logger = loggerFactory.CreateLogger(typeName);

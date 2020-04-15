@@ -37,7 +37,7 @@ namespace Orleans.Hosting
             }
 
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
-            var grainId = GrainTypePrefix.GetGrainServiceGrainId(typeCode, null, SiloAddress.Zero);
+            var grainId = SystemTargetGrainId.CreateGrainServiceGrainId(typeCode, null, SiloAddress.Zero);
             var grainService = (IGrainService)ActivatorUtilities.CreateInstance(services, serviceType, grainId);
             return grainService;
         }

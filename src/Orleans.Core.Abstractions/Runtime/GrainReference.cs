@@ -84,9 +84,9 @@ namespace Orleans.Runtime
 
             // SystemTarget checks
             var isSystemTarget = grainId.IsSystemTarget();
-            if (isSystemTarget)
+            if (SystemTargetGrainId.TryParse(grainId, out var systemTargetId))
             {
-                this.SystemTargetSilo = GrainTypePrefix.GetSystemTargetSilo(grainId);
+                this.SystemTargetSilo = systemTargetId.GetSiloAddress();
                 if (SystemTargetSilo == null)
                 {
                     throw new ArgumentNullException("systemTargetSilo", String.Format("Trying to create a GrainReference for SystemTarget grain id {0}, but passing null systemTargetSilo.", grainId));

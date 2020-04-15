@@ -120,11 +120,16 @@ namespace Orleans.Runtime.MembershipService
             ILocalSiloDetails localSiloDetails,
             ILoggerFactory loggerFactory,
             SerializationManager serializationManager)
-            : base(GrainId.Create(Constants.SystemMembershipTableType, SiloAddress.New(localSiloDetails.SiloAddress.Endpoint, 0).ToParsableString()), localSiloDetails.SiloAddress, lowPriority: false, loggerFactory)
+            : base(CreateId(localSiloDetails), localSiloDetails.SiloAddress, lowPriority: false, loggerFactory)
         {
             logger = loggerFactory.CreateLogger<MembershipTableSystemTarget>();
             table = new InMemoryMembershipTable(serializationManager);
             logger.Info(ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
+        }
+
+        private static SystemTargetGrainId CreateId(ILocalSiloDetails localSiloDetails)
+        {
+            return SystemTargetGrainId.Create(Constants.SystemMembershipTableType, SiloAddress.New(localSiloDetails.SiloAddress.Endpoint, 0));
         }
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)

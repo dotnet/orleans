@@ -27,25 +27,25 @@ namespace Orleans.Runtime
         public const string ORLEANS_CLUSTERING_ZOOKEEPER = "Orleans.Clustering.ZooKeeper";
         public const string TroubleshootingHelpLink = "https://aka.ms/orleans-troubleshooting";
 
-        public static readonly GrainType DirectoryServiceType = GrainTypePrefix.GetSystemTargetType("dir.mem");
-        public static readonly GrainType DirectoryCacheValidatorType = GrainTypePrefix.GetSystemTargetType("dir.cache-validator");
-        public static readonly GrainType SiloControlType = GrainTypePrefix.GetSystemTargetType("silo-control");
-        public static readonly GrainType ClientObserverRegistrarType = GrainTypePrefix.GetSystemTargetType("observer.registrar");
-        public static readonly GrainType CatalogType = GrainTypePrefix.GetSystemTargetType("catalog");
-        public static readonly GrainType MembershipOracleType = GrainTypePrefix.GetSystemTargetType("clustering.oracle");
-        public static readonly GrainType TypeManagerType = GrainTypePrefix.GetSystemTargetType("type-manager");
-        public static readonly GrainType FallbackSystemTargetType = GrainTypePrefix.GetSystemTargetType("fallback");
-        public static readonly GrainType LifecycleSchedulingSystemTargetType = GrainTypePrefix.GetSystemTargetType("lifecycle");
-        public static readonly GrainType DeploymentLoadPublisherSystemTargetType = GrainTypePrefix.GetSystemTargetType("load-publisher");
-        public static readonly GrainType MultiClusterOracleType = GrainTypePrefix.GetSystemTargetType("multicluster-oracle");
-        public static readonly GrainType ClusterDirectoryServiceType = GrainTypePrefix.GetSystemTargetType("multicluster-directory");
-        public static readonly GrainType StreamProviderManagerAgentSystemTargetType = GrainTypePrefix.GetSystemTargetType("streams.provider-manager");
-        public static readonly GrainType TestHooksSystemTargetType = GrainTypePrefix.GetSystemTargetType("test.hooks");
-        public static readonly GrainType ProtocolGatewayType = GrainTypePrefix.GetSystemTargetType("multicluster.protocol-gw");
-        public static readonly GrainType TransactionAgentSystemTargetType = GrainTypePrefix.GetSystemTargetType("txn.agent");
-        public static readonly GrainType SystemMembershipTableType = GrainTypePrefix.GetSystemTargetType("clustering.dev");
-        public static readonly GrainType StreamPullingAgentManagerType = GrainTypePrefix.GetSystemTargetType("stream-agent-mgr");
-        public static readonly GrainType StreamPullingAgentType = GrainTypePrefix.GetSystemTargetType("stream-agent");
+        public static readonly GrainType DirectoryServiceType = SystemTargetGrainId.CreateGrainType("dir.mem");
+        public static readonly GrainType DirectoryCacheValidatorType = SystemTargetGrainId.CreateGrainType("dir.cache-validator");
+        public static readonly GrainType SiloControlType = SystemTargetGrainId.CreateGrainType("silo-control");
+        public static readonly GrainType ClientObserverRegistrarType = SystemTargetGrainId.CreateGrainType("observer.registrar");
+        public static readonly GrainType CatalogType = SystemTargetGrainId.CreateGrainType("catalog");
+        public static readonly GrainType MembershipOracleType = SystemTargetGrainId.CreateGrainType("clustering.oracle");
+        public static readonly GrainType TypeManagerType = SystemTargetGrainId.CreateGrainType("type-manager");
+        public static readonly GrainType FallbackSystemTargetType = SystemTargetGrainId.CreateGrainType("fallback");
+        public static readonly GrainType LifecycleSchedulingSystemTargetType = SystemTargetGrainId.CreateGrainType("lifecycle");
+        public static readonly GrainType DeploymentLoadPublisherSystemTargetType = SystemTargetGrainId.CreateGrainType("load-publisher");
+        public static readonly GrainType MultiClusterOracleType = SystemTargetGrainId.CreateGrainType("multicluster-oracle");
+        public static readonly GrainType ClusterDirectoryServiceType = SystemTargetGrainId.CreateGrainType("multicluster-directory");
+        public static readonly GrainType StreamProviderManagerAgentSystemTargetType = SystemTargetGrainId.CreateGrainType("streams.provider-manager");
+        public static readonly GrainType TestHooksSystemTargetType = SystemTargetGrainId.CreateGrainType("test.hooks");
+        public static readonly GrainType ProtocolGatewayType = SystemTargetGrainId.CreateGrainType("multicluster.protocol-gw");
+        public static readonly GrainType TransactionAgentSystemTargetType = SystemTargetGrainId.CreateGrainType("txn.agent");
+        public static readonly GrainType SystemMembershipTableType = SystemTargetGrainId.CreateGrainType("clustering.dev");
+        public static readonly GrainType StreamPullingAgentManagerType = SystemTargetGrainId.CreateGrainType("stream-agent-mgr");
+        public static readonly GrainType StreamPullingAgentType = SystemTargetGrainId.CreateGrainType("stream-agent");
 
         public static readonly GrainId SiloDirectConnectionId = GrainId.Create(
             GrainType.Create(GrainTypePrefix.SystemPrefix + "silo"),

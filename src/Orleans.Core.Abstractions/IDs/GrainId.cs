@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         {
         }
 
-        public GrainId(GrainType type, byte[] key, int keyHashCode) : this(type, new SpanId(key, keyHashCode)) { }
+        internal GrainId(GrainType type, byte[] key, int keyHashCode) : this(type, new SpanId(key, keyHashCode)) { }
 
 
         public GrainId(GrainType type, byte[] key) : this(type, new SpanId(key))

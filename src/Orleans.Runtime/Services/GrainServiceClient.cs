@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Services
             get
             {
                 var destination = MapGrainReferenceToSiloRing(CallingGrainReference);
-                var grainId = GrainTypePrefix.GetGrainServiceGrainId(grainTypeCode, null, destination);
+                var grainId = SystemTargetGrainId.CreateGrainServiceGrainId(grainTypeCode, null, destination);
                 var grainService = grainFactory.GetSystemTarget<TGrainService>(grainId);
 
                 return grainService;
