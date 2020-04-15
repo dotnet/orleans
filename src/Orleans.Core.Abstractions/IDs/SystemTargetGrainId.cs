@@ -7,6 +7,8 @@ namespace Orleans.Runtime
     /// </summary>
     public readonly struct SystemTargetGrainId : IEquatable<SystemTargetGrainId>, IComparable<SystemTargetGrainId>
     {
+        private const char SegmentSeparator = '+';
+
         private SystemTargetGrainId(GrainId grainId)
         {
             this.GrainId = grainId;
@@ -20,19 +22,17 @@ namespace Orleans.Runtime
         {
             if (extraIdentifier is string)
             {
-                return new SystemTargetGrainId(GrainId.Create(kind, address.ToParsableString() + "+" + extraIdentifier));
+                return new SystemTargetGrainId(GrainId.Create(kind, address.ToParsableString() + SegmentSeparator + extraIdentifier));
             }
 
             return Create(kind, address);
         }
 
-        private static bool IsSystemTarget(in GrainType type) => type.AsSpan().StartsWith(GrainTypePrefix.SystemTargetPrefixBytes.Span);
-
-        public static bool IsSystemTarget(in GrainId id) => IsSystemTarget(id.Type);
+        public static bool IsSystemTargetGrainId(in GrainId id) => id.Type.AsSpan().StartsWith(GrainTypePrefix.SystemTargetPrefixBytes.Span);
 
         public static bool TryParse(GrainId grainId, out SystemTargetGrainId systemTargetId)
         {
-            if (!IsSystemTarget(grainId))
+            if (!IsSystemTargetGrainId(grainId))
             {
                 systemTargetId = default;
                 return false;
@@ -46,7 +46,7 @@ namespace Orleans.Runtime
         {
             string extraIdentifier = null;
             var key = this.GrainId.Key.ToStringUtf8();
-            if (key.IndexOf('+') is int index && index >= 0)
+            if (key.IndexOf(SegmentSeparator) is int index && index >= 0)
             {
                 extraIdentifier = key.Substring(index + 1);
             }
@@ -57,7 +57,7 @@ namespace Orleans.Runtime
         public SiloAddress GetSiloAddress()
         {
             var key = this.GrainId.Key.ToStringUtf8();
-            if (key.IndexOf('+') is int index && index >= 0)
+            if (key.IndexOf(SegmentSeparator) is int index && index >= 0)
             {
                 key = key.Substring(0, index);
             }
