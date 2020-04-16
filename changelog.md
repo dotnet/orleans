@@ -7,6 +7,18 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.1.6] (changes since 3.1.5)
+
+- Non-breaking improvements
+  - Added eventIndex (#6467)
+  - Send rejections for messages enqueued on stopped outbound queue (#6474)
+  - Stopped WorkItemGroup logging enhancement (#6483)
+  - Streamline LINQ/Enumerable use (#6482)
+
+- Non-breaking bug fixes
+  - Gossip that the silo is dead before the outbound queue gets closed (#6480)
+  - Fix a race condition in LifecycleSubject (#6481)
+
 ### [3.1.5] (changes since 3.1.4)
 
 - Non-breaking improvements
