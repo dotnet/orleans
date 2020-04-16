@@ -21,7 +21,6 @@ namespace Orleans.Transactions.Tests.Memory
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.AddSiloBuilderConfigurator<DeadlockConfigurator>();
             builder.Options.InitialSilosCount = 2;
-
         }
 
         public class DeadlockConfigurator : ISiloBuilderConfigurator
@@ -30,7 +29,7 @@ namespace Orleans.Transactions.Tests.Memory
             {
                 hostBuilder
                     .ConfigureServices(services =>
-                        services.AddSimpleDeadlockDetection()
+                        services.UseTransactionalDeadlockDetection()
                     );
             }
         }
@@ -46,12 +45,6 @@ namespace Orleans.Transactions.Tests.Memory
         }
 
         [Fact]
-        public async Task CheckExceptions()
-        {
-            await this.client.GetGrain<IDelayedGrain>(0).ThrowException();
-        }
-
-        [Fact]
         public async Task CauseDeadlock()
         {
             var coordinator = this.client.GetGrain<IDeadlockCoordinator>(0);
@@ -61,24 +54,15 @@ namespace Orleans.Transactions.Tests.Memory
                 coordinator.RunOrdered(3, 2, 1, 0)
             };
             Task.WhenAll(tasks).Ignore();
-            await Task.Delay(TimeSpan.FromSeconds(5));
-        }
-
-        [Fact]
-        public async Task ComplexDeadlocks()
-        {
-            // NB: This has stopped reliably deadlocking?
-            var tasks = new List<Task>();
-            var order = Enumerable.Range(0, 10).ToArray();
-            for (int i = 0; i < 10; i++)
+            var start = DateTime.UtcNow;
+            while (DateTime.UtcNow - start < TimeSpan.FromSeconds(5))
             {
-                tasks.Add(this.grainFactory.GetGrain<IDeadlockCoordinator>(0).RunOrdered(
-                    Shuffle(order)
-                    ));
+                for (var i = 0; i < 4; i++)
+                {
+                    await this.client.GetGrain<IDelayedGrain>(i).GetState();
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                }
             }
-
-            Task delay = Task.Delay(TimeSpan.FromSeconds(7));
-            await Task.WhenAny(delay, Task.WhenAll(tasks));
         }
 
 

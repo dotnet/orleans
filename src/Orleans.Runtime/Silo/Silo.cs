@@ -28,6 +28,7 @@ using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Serialization;
 using Orleans.Internal;
+using Orleans.Transactions;
 
 namespace Orleans.Runtime
 {
@@ -78,11 +79,14 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly IMembershipService membershipService;
+
+        private readonly ILocalDeadlockDetector localDeadlockDetector;
+
         private List<GrainService> grainServices = new List<GrainService>();
 
         private readonly ILoggerFactory loggerFactory;
         /// <summary>
-        /// Gets the type of this 
+        /// Gets the type of this
         /// </summary>
         internal string Name => this.siloDetails.Name;
         internal OrleansTaskScheduler LocalScheduler { get { return scheduler; } }
@@ -231,6 +235,8 @@ namespace Orleans.Runtime
                 multiClusterOracle = Services.GetRequiredService<IMultiClusterOracle>();
             }
 
+            this.localDeadlockDetector = this.Services.GetService<ILocalDeadlockDetector>();
+
             this.SystemStatus = SystemStatus.Created;
             AsynchAgent.IsStarting = false;
 
@@ -292,7 +298,7 @@ namespace Orleans.Runtime
 
             logger.Debug("Creating {0} System Target", "DeploymentLoadPublisher");
             RegisterSystemTarget(Services.GetRequiredService<DeploymentLoadPublisher>());
-            
+
             logger.Debug("Creating {0} System Target", "RemoteGrainDirectory + CacheValidator");
             RegisterSystemTarget(LocalGrainDirectory.RemoteGrainDirectory);
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
@@ -322,7 +328,13 @@ namespace Orleans.Runtime
                 logger.Debug("Creating {0} System Target", "MultiClusterOracle");
                 RegisterSystemTarget((SystemTarget)multiClusterOracle);
             }
-            
+
+            if (this.localDeadlockDetector != null && this.localDeadlockDetector is SystemTarget detectorSystemTarget)
+            {
+                this.logger.Debug("Creating {0} System Target", "LocalDeadlockDetector");
+                RegisterSystemTarget(detectorSystemTarget);
+            }
+
             logger.Debug("Finished creating System Targets for this silo.");
         }
 
@@ -344,7 +356,7 @@ namespace Orleans.Runtime
             if (reminderTable != null)
             {
                 logger.Info($"Creating reminder grain service for type={reminderTable.GetType()}");
-                
+
                 // Start the reminder service system target
                 reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory); ;
                 RegisterSystemTarget((SystemTarget)reminderService);
@@ -381,7 +393,7 @@ namespace Orleans.Runtime
                 };
                 AppDomain.CurrentDomain.ProcessExit += this.processExitHandler;
             }
-            
+
             //TODO: setup thead pool directly to lifecycle
             StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
                 this.ConfigureThreadPoolAndServicePointSettings, Stopwatch.StartNew());
@@ -416,13 +428,13 @@ namespace Orleans.Runtime
                 incomingPingAgent.Start();
                 incomingSystemAgent.Start();
                 incomingAgent.Start();
-            } 
+            }
 
             StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
 
             StartTaskWithPerfAnalysis("Init implicit stream subscribe table", InitImplicitStreamSubscribeTable, stopWatch);
             void InitImplicitStreamSubscribeTable()
-            {             
+            {
                 // Initialize the implicit stream subscribers table.
                 var implicitStreamSubscriberTable = Services.GetRequiredService<ImplicitStreamSubscriberTable>();
                 var grainTypeManager = Services.GetRequiredService<GrainTypeManager>();
@@ -430,7 +442,7 @@ namespace Orleans.Runtime
             }
 
             this.runtimeClient.CurrentStreamProviderRuntime = this.Services.GetRequiredService<SiloProviderRuntime>();
-            
+
             // This has to follow the above steps that start the runtime components
             await StartAsyncTaskWithPerfAnalysis("Create system targets and inject dependencies", () =>
             {
@@ -450,7 +462,7 @@ namespace Orleans.Runtime
             // Load and init grain services before silo becomes active.
             await StartAsyncTaskWithPerfAnalysis("Init grain services",
                 () => CreateGrainServices(), stopWatch);
-            
+
             var versionStore = Services.GetService<IVersionStore>();
             await StartAsyncTaskWithPerfAnalysis("Init type manager", () => scheduler
                 .QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager.SchedulingContext)
@@ -610,7 +622,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Gracefully stop the run time system only, but not the application. 
+        /// Gracefully stop the run time system only, but not the application.
         /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
         /// Grains are not deactivated.
         /// </summary>
@@ -622,7 +634,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Gracefully stop the run time system and the application. 
+        /// Gracefully stop the run time system and the application.
         /// All grains will be properly deactivated.
         /// All in-flight applications requests would be awaited and finished gracefully.
         /// </summary>
@@ -633,7 +645,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Gracefully stop the run time system only, but not the application. 
+        /// Gracefully stop the run time system only, but not the application.
         /// Applications requests would be abruptly terminated, while the internal system state gracefully stopped and saved as much as possible.
         /// </summary>
         public async Task StopAsync(CancellationToken cancellationToken)
@@ -719,7 +731,7 @@ namespace Orleans.Runtime
             SafeExecute(incomingAgent.Stop);
 
             // timers
-            if (platformWatchdog != null) 
+            if (platformWatchdog != null)
                 SafeExecute(platformWatchdog.Stop); // Silo may be dying before platformWatchdog was set up
 
             if (!ct.IsCancellationRequested)
@@ -753,7 +765,7 @@ namespace Orleans.Runtime
                     await scheduler.QueueTask(()=>localGrainDirectory.Stop(true), localGrainDirectory.CacheValidator.SchedulingContext)
                         .WithCancellation(ct, "localGrainDirectory Stop failed because the task was cancelled");
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
-                    //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
+                    //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
                     await Task.Delay(WaitForMessageToBeQueuedForOutbound);
                 }
             }
@@ -788,8 +800,8 @@ namespace Orleans.Runtime
                 if (this.logger.IsEnabled(LogLevel.Debug))
                 {
                     logger.Debug(
-                        "{GrainServiceType} Grain Service with Id {GrainServiceId} stopped successfully.", 
-                        grainService.GetType().FullName, 
+                        "{GrainServiceType} Grain Service with Id {GrainServiceId} stopped successfully.",
+                        grainService.GetType().FullName,
                         grainService.GetPrimaryKeyLong(out string ignored));
                 }
             }
@@ -819,10 +831,10 @@ namespace Orleans.Runtime
         /// <returns>Debug data for this silo.</returns>
         public string GetDebugDump(bool all = true)
         {
-            var sb = new StringBuilder();            
+            var sb = new StringBuilder();
             foreach (var systemTarget in activationDirectory.AllSystemTargets())
-                sb.AppendFormat("System target {0}:", ((ISystemTargetBase)systemTarget).GrainId.ToString()).AppendLine();               
-            
+                sb.AppendFormat("System target {0}:", ((ISystemTargetBase)systemTarget).GrainId.ToString()).AppendLine();
+
             var enumerator = activationDirectory.GetEnumerator();
             while(enumerator.MoveNext())
             {

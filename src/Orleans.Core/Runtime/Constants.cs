@@ -45,7 +45,7 @@ namespace Orleans.Runtime
         public static readonly GrainId TransactionAgentSystemTargetId = GrainId.GetSystemTargetGrainId(28);
         public static readonly GrainId SystemMembershipTableId = GrainId.GetSystemTargetGrainId(29);
         public static readonly GrainId SiloDirectConnectionId = GrainId.GetSystemGrainId(new Guid("01111111-1111-1111-1111-111111111111"));
-
+        public static readonly GrainId LocalDeadlockDetectorId = GrainId.GetSystemTargetGrainId(30);
         public const int PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE = 254;
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;
 
@@ -103,4 +103,4 @@ namespace Orleans.Runtime
         }
     }
 }
- 
+

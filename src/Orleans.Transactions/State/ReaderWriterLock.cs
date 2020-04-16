@@ -335,7 +335,9 @@ namespace Orleans.Transactions.State
                         else if(currentGroup.DeadlockDeadline.HasValue){
                             if (currentGroup.DeadlockDeadline.Value < now)
                             {
-                                transactionalLockObserver.StartDeadlockDetection(queue.Resource,
+                                this.logger.LogInformation($"deadlock possible for {this.currentGroup} on {this.queue.Resource} (observer: {this.transactionalLockObserver}");
+
+                                transactionalLockObserver?.StartDeadlockDetection(queue.Resource,
                                     currentGroup.Keys).Ignore();
                                 // clear this so we don't get stuck forever.
                                 currentGroup.DeadlockDeadline = null;

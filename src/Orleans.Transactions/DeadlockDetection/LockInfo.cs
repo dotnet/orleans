@@ -24,6 +24,8 @@ namespace Orleans.Transactions.DeadlockDetection
 
         public static readonly IEqualityComparer<LockInfo> EqualityComparer = new LockKeyEqualityComparer();
 
+        public override string ToString() => this.IsWait ? $"{this.TxId} -W-> {this.Resource}" : $"{this.Resource} -L-> {this.TxId}";
+
         private class LockKeyEqualityComparer : IEqualityComparer<LockInfo>
         {
             public bool Equals(LockInfo x, LockInfo y) =>

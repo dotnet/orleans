@@ -3,6 +3,8 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Orleans.TelemetryConsumers.Counters")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost.AppDomain")]
+// required for deadlock detection internals
+[assembly: InternalsVisibleTo("Orleans.Transactions")]
 
 [assembly: InternalsVisibleTo("AWSUtils.Tests")]
 [assembly: InternalsVisibleTo("LoadTestGrains")]

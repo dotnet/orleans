@@ -15,7 +15,7 @@ namespace Orleans.Transactions.DeadlockDetection
         public List<LockInfo> Snapshot { get; } = new List<LockInfo>();
     }
 
-    internal interface ITransactionalLockObserver : IControllable
+    internal interface ITransactionalLockObserver
     {
         void OnResourceRequested(Guid transactionId, ParticipantId resourceId);
 

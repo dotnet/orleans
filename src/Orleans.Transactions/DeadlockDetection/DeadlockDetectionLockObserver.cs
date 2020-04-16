@@ -9,22 +9,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.DeadlockDetection
 {
-    internal class DeadlockDetectionLockObserver : SystemTarget, ITransactionalLockObserver
+    internal class DeadlockDetectionLockObserver : SystemTarget, ITransactionalLockObserver, ILocalDeadlockDetector
     {
-        public const string ProviderName = nameof(DeadlockDetectionLockObserver);
-
-        public static IControllable Create(IServiceProvider sp, string providerName) =>
-            ActivatorUtilities.CreateInstance<DeadlockDetectionLockObserver>(sp);
-
-        public Task<object> ExecuteCommand(int command, object arg)
-        {
-            var request = (CollectLocksRequest)arg;
-            return Task.FromResult<object>(null);
-        }
-
         private long currentVersion = 0L;
 
         private readonly LockTracker lockTracker = new LockTracker();
@@ -35,10 +25,11 @@ namespace Orleans.Transactions.DeadlockDetection
 
         private readonly IGrainRuntime runtime;
 
-        public DeadlockDetectionLockObserver(ILogger<DeadlockDetectionLockObserver> logger,
-            IGrainFactory grainFactory, IGrainRuntime runtime)
+        public DeadlockDetectionLockObserver(IMessageCenter messageCenter, ILoggerFactory loggerFactory,
+            IGrainFactory grainFactory, IGrainRuntime runtime) :
+            base(Constants.LocalDeadlockDetectorId, messageCenter.MyAddress, loggerFactory)
         {
-            this.logger = logger;
+            this.logger = loggerFactory.CreateLogger<DeadlockDetectionLockObserver>();
             this.grainFactory = grainFactory;
             this.runtime = runtime;
         }
@@ -66,11 +57,15 @@ namespace Orleans.Transactions.DeadlockDetection
             var localGraph = new WaitForGraph(this.lockTracker.GetLocks()).GetConnectedSubGraph(lockedBy, new[]{ resource });
             if (localGraph.DetectCycles(out var cycle))
             {
-                // blow it up locally
+               this.logger.LogInformation($"found a local cycle: {string.Join(",", cycle)}");
+               var tasks = cycle.Where(l => !l.IsWait).Select(l =>
+                   l.Resource.Reference.AsReference<ITransactionalResourceExtension>().BreakLocks(l.Resource.Name));
+               await Task.WhenAll(tasks);
+               this.logger.LogInformation("broke the locks?");
             }
             else
             {
-                await grainFactory.GetGrain<IDeadlockDetector>(0).CheckForDeadlocks(new CollectLocksResponse
+                await this.grainFactory.GetGrain<IDeadlockDetector>(0).CheckForDeadlocks(new CollectLocksResponse
                 {
                     Locks = localGraph.ToLockKeys(),
                     BatchId = null,
@@ -82,7 +77,7 @@ namespace Orleans.Transactions.DeadlockDetection
 
         private long IncrementMaxVersion() => Interlocked.Increment(ref this.currentVersion);
 
-        internal Task<CollectLocksResponse> CollectLocks(CollectLocksRequest request)
+        public async Task CollectLocks(CollectLocksRequest request)
         {
             long responseMaxVersion;
             if (request.MaxVersion == null)
@@ -97,7 +92,7 @@ namespace Orleans.Transactions.DeadlockDetection
             var snapshot = this.lockTracker.GetLocks(request.MaxVersion);
             var wfg = new WaitForGraph(snapshot).GetConnectedSubGraph(request.TransactionIds, Enumerable.Empty<ParticipantId>());
 
-            return Task.FromResult(new CollectLocksResponse
+            await this.grainFactory.GetGrain<IDeadlockDetector>(0).CheckForDeadlocks(new CollectLocksResponse
             {
                 BatchId = request.BatchId,
                 Locks = wfg.ToLockKeys(),

@@ -15,12 +15,11 @@ namespace Orleans.Transactions.DeadlockDetection
             Resource, Transaction
         }
 
-        [StructLayout(LayoutKind.Explicit)]
         private readonly struct Node
         {
-            [FieldOffset(0)] private readonly uint idAndFlag;
-            [FieldOffset(sizeof(int))] private readonly ParticipantId participantId;
-            [FieldOffset(sizeof(int))] private readonly Guid transactionId;
+            private readonly uint idAndFlag;
+            private readonly ParticipantId participantId;
+            private readonly Guid transactionId;
 
             public int Id => (int) (this.idAndFlag >> 1);
             public bool IsTransaction => (this.idAndFlag & 1) == 0;
@@ -174,8 +173,13 @@ namespace Orleans.Transactions.DeadlockDetection
             this.nodes = nodeList.ToArray();
         }
 
-        private IEnumerable<int> GetAllEdges(int nodeId) =>
-            this.edges[nodeId].Concat(this.backEdges[nodeId]);
+        private IEnumerable<int> GetAllEdges(int nodeId)
+        {
+            var e = this.edges.TryGetValue(nodeId, out var es) ? es : Enumerable.Empty<int>();
+            var b = this.backEdges.TryGetValue(nodeId, out es) ? es : Enumerable.Empty<int>();
+            return e.Concat(b);
+        }
+
 
         private IList<int> GetConnectedSubGraph(IEnumerable<int> nodeIds)
         {
@@ -213,7 +217,7 @@ namespace Orleans.Transactions.DeadlockDetection
                     {
                         ref var tail = ref this.nodes[tailId];
                         Debug.Assert(tail.IsResource, "malformed WFG");
-                        keys.Add(LockInfo.ForLock(tail.ParticipantId, head.TransactionId));
+                        keys.Add(LockInfo.ForWait(tail.ParticipantId, head.TransactionId));
                     }
                 }
                 else
@@ -222,7 +226,7 @@ namespace Orleans.Transactions.DeadlockDetection
                     {
                         ref var tail = ref this.nodes[tailId];
                         Debug.Assert(tail.IsTransaction, "malformed WFG");
-                        keys.Add(LockInfo.ForWait(head.ParticipantId, tail.TransactionId));
+                        keys.Add(LockInfo.ForLock(head.ParticipantId, tail.TransactionId));
                     }
                 }
             }
@@ -240,7 +244,7 @@ namespace Orleans.Transactions.DeadlockDetection
             bool changed = false;
             foreach (var lockKey in lockSet)
             {
-                changed = changed || myLocks.Add(lockKey);
+                if (myLocks.Add(lockKey)) changed = true;
             }
 
             if (!changed)
@@ -263,19 +267,13 @@ namespace Orleans.Transactions.DeadlockDetection
             }
 
             locksInCycle = new List<LockInfo>();
-            for (var i = 0; i < cycle.Count; i++)
+            for (var i = 0; i < cycle.Count - 1; i++)
             {
                 ref var current = ref this.nodes[cycle[i]];
-                ref var next = ref this.nodes[i + 1 > cycle.Count ? 0 : i + 1];
-                if (current.IsTransaction)
-                {
-                    // transaction is a wait for the next node
-                    locksInCycle.Add(LockInfo.ForWait(next.ParticipantId, current.TransactionId));
-                }
-                else
-                {
-                    locksInCycle.Add(LockInfo.ForLock(current.ParticipantId, next.TransactionId));
-                }
+                ref var next = ref this.nodes[cycle[i+1]];
+                locksInCycle.Add(current.IsTransaction
+                    ? LockInfo.ForWait(next.ParticipantId, current.TransactionId)
+                    : LockInfo.ForLock(current.ParticipantId, next.TransactionId));
             }
 
             return true;

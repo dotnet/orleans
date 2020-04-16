@@ -17,6 +17,10 @@ namespace Orleans.Transactions.Abstractions
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
+        Task BreakLocks(string resourceId);
+
+        [AlwaysInterleave]
+        [Transaction(TransactionOption.Suppress)]
         Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status);
 
         [AlwaysInterleave]

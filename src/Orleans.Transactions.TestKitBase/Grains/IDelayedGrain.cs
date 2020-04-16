@@ -10,5 +10,8 @@ namespace Orleans.Transactions.TestKit.Base.Grains
 
         [Transaction(TransactionOption.CreateOrJoin)]
         Task ThrowException();
+
+        [Transaction(TransactionOption.CreateOrJoin)]
+        Task<string> GetState();
     }
 }

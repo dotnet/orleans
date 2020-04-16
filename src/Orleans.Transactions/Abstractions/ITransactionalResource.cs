@@ -9,7 +9,7 @@ namespace Orleans.Transactions.Abstractions
     public interface ITransactionalResource
     {
         /// <summary>
-        /// Request sent by TA to all participants of a read-only transaction (one-phase commit). 
+        /// Request sent by TA to all participants of a read-only transaction (one-phase commit).
         /// Participants respond after committing or aborting the read.
         /// </summary>
         /// <param name="transactionId">the id of the transaction to prepare</param>
@@ -19,7 +19,7 @@ namespace Orleans.Transactions.Abstractions
         Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
 
         /// <summary>
-        /// One-way message sent by TA to all participants except TM.  
+        /// One-way message sent by TA to all participants except TM.
         /// </summary>
         /// <param name="transactionId">the id of the transaction to prepare</param>
         /// <param name="accessCount">number of reads/writes performed on this participant by this transaction</param>
@@ -50,5 +50,11 @@ namespace Orleans.Transactions.Abstractions
         /// <param name="transactionId">The id of the committed transaction</param>
         /// <param name="timeStamp">The commit timestamp of the committed transaction</param>
         Task Confirm(Guid transactionId, DateTime timeStamp);
+
+        /// <summary>
+        /// Request sent from the IDeadlockDetector grain to instruct this participant to abort any transactions that
+        /// were in the lock
+        /// </summary>
+        Task BreakLocks();
     }
 }

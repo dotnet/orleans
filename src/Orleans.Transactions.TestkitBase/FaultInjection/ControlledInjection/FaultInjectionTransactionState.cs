@@ -36,12 +36,14 @@ namespace Orleans.Transactions.TestKit
         //storage exception injection phase
         BeforeConfirm,
         BeforePrepare,
-        BeforePrepareAndCommit
+        BeforePrepareAndCommit,
+
+        BeforeBreakLocks
     }
 
     public enum FaultInjectionType
     {
-        None, 
+        None,
         Deactivation,
         ExceptionBeforeStore,
         ExceptionAfterStore

@@ -87,7 +87,7 @@ namespace Orleans.Transactions.TestKit
         private readonly TransactionalResource<TState> tResource;
         private readonly IControlledTransactionFaultInjector faultInjector;
         private readonly ILogger logger;
-        public FaultInjectionTransactionalResource(IControlledTransactionFaultInjector faultInjector, FaultInjectionControl faultInjectionControl, 
+        public FaultInjectionTransactionalResource(IControlledTransactionFaultInjector faultInjector, FaultInjectionControl faultInjectionControl,
             TransactionalResource<TState> tResource, IGrainActivationContext activationContext, ILogger logger, IGrainRuntime grainRuntime)
         {
             this.grainRuntime = grainRuntime;
@@ -159,6 +159,14 @@ namespace Orleans.Transactions.TestKit
                 this.logger.Info($"Grain {this.context.GrainInstance} deactivating after transaction {transactionId} Confirm");
             }
             this.faultInjectionControl.Reset();
+        }
+
+        public async Task BreakLocks()
+        {
+            // TODO deadlock detection - we could add some faults here
+
+            this.logger.Info($"Grain {this.context.GrainInstance} told to break its locks");
+            await this.tResource.BreakLocks();
         }
 
         public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
