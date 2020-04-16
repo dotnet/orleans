@@ -35,7 +35,7 @@ namespace Orleans
 
         internal readonly ClientStatisticsManager ClientStatistics;
         private readonly MessagingTrace messagingTrace;
-        private readonly GrainId clientId;
+        private readonly ClientGrainId clientId;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
         private readonly TimeSpan typeMapRefreshInterval;
@@ -95,7 +95,7 @@ namespace Orleans
             this.ClientStatistics = clientStatisticsManager;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            this.clientId = LegacyGrainId.NewClientId();
+            this.clientId = ClientGrainId.Create();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             this.typeMapRefreshInterval = typeManagementOptions.Value.TypeMapRefreshInterval;
@@ -190,7 +190,7 @@ namespace Orleans
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
             await Task.Run(() => this.StartInternal(retryFilter)).ConfigureAwait(false);
 
-            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + clientId);
+            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client ID: " + clientId);
         }
         
         // used for testing to (carefully!) allow two clients in the same process
@@ -203,7 +203,7 @@ namespace Orleans
             MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
             MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
             MessageCenter.Start();
-            CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, clientId);
+            CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, clientId.GrainId);
 
             await ExecuteWithRetries(
                 async () => this.GrainTypeResolver = await MessageCenter.GetGrainTypeResolver(this.InternalGrainFactory),
@@ -216,7 +216,7 @@ namespace Orleans
                 this.typeMapRefreshInterval,
                 this.typeMapRefreshInterval);
 
-            ClientStatistics.Start(MessageCenter, clientId);
+            ClientStatistics.Start(MessageCenter, clientId.GrainId);
             
             await ExecuteWithRetries(StreamingInitialize, retryFilter);
 
@@ -307,11 +307,6 @@ namespace Orleans
                 {
                     message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
                 }
-            }
-            // Client sending messages to another client (observer). Yes, we support that.
-            if (target.IsObserverReference)
-            {
-                message.TargetObserverId = target.ObserverId;
             }
 
             if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
@@ -448,22 +443,31 @@ namespace Orleans
             if (obj is Grain)
                 throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
-            GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId(), this.GrainReferenceRuntime);
-            if (!localObjects.TryRegister(obj, gr.ObserverId, invoker))
+            var observerId = ObserverGrainId.Create(this.clientId);
+            GrainReference reference = GrainReference.NewObserverGrainReference(observerId, this.GrainReferenceRuntime);
+            if (!localObjects.TryRegister(obj, observerId, invoker))
             {
-                throw new ArgumentException(String.Format("Failed to add new observer {0} to localObjects collection.", gr), "gr");
+                throw new ArgumentException($"Failed to add new observer {reference} to localObjects collection.", "reference");
             }
-            return gr;
+            return reference;
         }
 
         public void DeleteObjectReference(IAddressable obj)
         {
-            if (!(obj is GrainReference))
+            if (!(obj is GrainReference reference))
+            {
                 throw new ArgumentException("Argument reference is not a grain reference.");
+            }
 
-            var reference = (GrainReference)obj;
-            if (!localObjects.TryDeregister(reference.ObserverId))
+            if (!ObserverGrainId.TryParse(reference.GrainId, out var observerId))
+            {
+                throw new ArgumentException($"Reference {reference.GrainId} is not an observer reference");
+            }
+
+            if (!localObjects.TryDeregister(observerId))
+            {
                 throw new ArgumentException("Reference is not associated with a local object.", "reference");
+            }
         }
 
         private string PrintAppDomainDetails()

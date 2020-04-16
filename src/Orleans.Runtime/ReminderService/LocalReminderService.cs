@@ -154,14 +154,14 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task<IGrainReminder> GetReminder(GrainReference grainRef, string reminderName)
         {
-            if(logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_GetReminder,"GetReminder: GrainReference={0} ReminderName={1}", grainRef.ToDetailedString(), reminderName);
+            if(logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_GetReminder,"GetReminder: GrainReference={0} ReminderName={1}", grainRef.ToString(), reminderName);
             var entry = await reminderTable.ReadRow(grainRef, reminderName);
             return entry == null ? null : entry.ToIGrainReminder();
         }
 
         public async Task<List<IGrainReminder>> GetReminders(GrainReference grainRef)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_GetReminders, "GetReminders: GrainReference={0}", grainRef.ToDetailedString());
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.RS_GetReminders, "GetReminders: GrainReference={0}", grainRef.ToString());
             var tableData = await reminderTable.ReadRows(grainRef);
             return tableData.Reminders.Select(entry => entry.ToIGrainReminder()).ToList();
         }
@@ -460,7 +460,7 @@ namespace Orleans.Runtime.ReminderService
             if (!RingRange.InRange(grainRef))
             {
                 logger.Warn(ErrorCode.RS_NotResponsible, "I shouldn't have received request '{0}' for {1}. It is not in my responsibility range: {2}",
-                    debugInfo, grainRef.ToDetailedString(), RingRange);
+                    debugInfo, grainRef.ToString(), RingRange);
                 // For now, we still let the caller proceed without throwing an exception... the periodical mechanism will take care of reminders being registered at the wrong silo
                 // otherwise, we can either reject the request, or re-route the request
             }
@@ -628,7 +628,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 return string.Format("[{0}, {1}, {2}, {3}, {4}, {5}, {6}]",
                                         Identity.ReminderName,
-                                        Identity.GrainRef?.ToDetailedString(),
+                                        Identity.GrainRef?.ToString(),
                                         period,
                                         LogFormatter.PrintDate(firstTickTime),
                                         ETag,

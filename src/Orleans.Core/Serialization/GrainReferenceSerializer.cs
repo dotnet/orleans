@@ -27,7 +27,7 @@ namespace Orleans.Serialization
 
             if (input.IsObserverReference)
             {
-                input.ObserverId.SerializeToStream(writer);
+                GuidId.Default.SerializeToStream(writer);
             }
 
             // store as null, serialize as empty.
@@ -44,7 +44,6 @@ namespace Orleans.Serialization
         {
             var reader = context.StreamReader;
             GrainId id = reader.ReadGrainId();
-            GuidId observerId = null;
             byte siloAddressPresent = reader.ReadByte();
             if (siloAddressPresent != 0)
             {
@@ -55,7 +54,7 @@ namespace Orleans.Serialization
             bool expectObserverId = id.IsClient();
             if (expectObserverId)
             {
-                observerId = GuidId.DeserializeFromStream(reader);
+                _ = GuidId.DeserializeFromStream(reader);
             }
             // store as null, serialize as empty.
             var genericArg = reader.ReadString();
@@ -64,10 +63,6 @@ namespace Orleans.Serialization
 
             var runtimeClient = context.AdditionalContext as IRuntimeClient;
             var runtime = runtimeClient?.GrainReferenceRuntime;
-            if (expectObserverId)
-            {
-                return GrainReference.NewObserverGrainReference(id, observerId, runtime);
-            }
 
             return GrainReference.FromGrainId(id, runtime, genericArg);
         }

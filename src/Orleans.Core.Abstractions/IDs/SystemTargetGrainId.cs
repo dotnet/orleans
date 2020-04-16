@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
@@ -125,27 +126,35 @@ namespace Orleans.Runtime
         public static bool operator !=(SystemTargetGrainId left, SystemTargetGrainId right) => !(left == right);
 
         /// <inheritdoc/>
-        public static bool operator <(SystemTargetGrainId left, SystemTargetGrainId right)
-        {
-            return left.CompareTo(right) < 0;
-        }
+        public static bool operator <(SystemTargetGrainId left, SystemTargetGrainId right) => left.CompareTo(right) < 0;
 
         /// <inheritdoc/>
-        public static bool operator <=(SystemTargetGrainId left, SystemTargetGrainId right)
-        {
-            return left.CompareTo(right) <= 0;
-        }
+        public static bool operator <=(SystemTargetGrainId left, SystemTargetGrainId right) => left.CompareTo(right) <= 0;
 
         /// <inheritdoc/>
-        public static bool operator >(SystemTargetGrainId left, SystemTargetGrainId right)
-        {
-            return left.CompareTo(right) > 0;
-        }
+        public static bool operator >(SystemTargetGrainId left, SystemTargetGrainId right) => left.CompareTo(right) > 0;
 
         /// <inheritdoc/>
-        public static bool operator >=(SystemTargetGrainId left, SystemTargetGrainId right)
+        public static bool operator >=(SystemTargetGrainId left, SystemTargetGrainId right) => left.CompareTo(right) >= 0;
+
+        /// <summary>
+        /// An <see cref="IEqualityComparer{T}"/> and <see cref="IComparer{T}"/> implementation for <see cref="SystemTargetGrainId"/>.
+        /// </summary>
+        public sealed class Comparer : IEqualityComparer<SystemTargetGrainId>, IComparer<SystemTargetGrainId>
         {
-            return left.CompareTo(right) >= 0;
+            /// <summary>
+            /// A singleton <see cref="Comparer"/> instance.
+            /// </summary>
+            public static Comparer Instance { get; } = new Comparer();
+
+            /// <inheritdoc/>
+            public int Compare(SystemTargetGrainId x, SystemTargetGrainId y) => x.CompareTo(y);
+
+            /// <inheritdoc/>
+            public bool Equals(SystemTargetGrainId x, SystemTargetGrainId y) => x.Equals(y);
+
+            /// <inheritdoc/>
+            public int GetHashCode(SystemTargetGrainId obj) => obj.GetHashCode();
         }
     }
 }

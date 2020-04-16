@@ -174,11 +174,6 @@ namespace Orleans.Runtime
                 sharedData = this.sharedCallbackData;
             }
 
-            if (target.IsObserverReference)
-            {
-                message.TargetObserverId = target.ObserverId;
-            }
-
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             if (context is null && !oneWay)
             {

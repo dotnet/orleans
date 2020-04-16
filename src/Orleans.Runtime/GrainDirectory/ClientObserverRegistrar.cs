@@ -117,7 +117,7 @@ namespace Orleans.Runtime
             }
         }
 
-        internal void ClientAdded(GrainId clientId)
+        internal void ClientAdded(ClientGrainId clientId)
         {
             // Use a ActivationId that is hashed from clientId, and not random ActivationId.
             // That way, when we refresh it in the directiry, it's the same one.
@@ -127,7 +127,7 @@ namespace Orleans.Runtime
                 this).Ignore();
         }
 
-        internal void ClientDropped(GrainId clientId)
+        internal void ClientDropped(ClientGrainId clientId)
         {
             var addr = GetClientActivationAddress(clientId);
             scheduler.QueueTask(
@@ -164,22 +164,27 @@ namespace Orleans.Runtime
         {
             try
             {
-                List<GrainId> clients = null;
+                List<ClientGrainId> clients = null;
                 if (this.gateway is Gateway gw)
                 {
                     var gatewayClients = gw.GetConnectedClients();
-                    clients = new List<GrainId>(gatewayClients.Count + 1);
+                    clients = new List<ClientGrainId>(gatewayClients.Count + 1);
                     clients.AddRange(gatewayClients);
                 }
 
-                if (this.hostedClient?.ClientId is GrainId hostedClientId)
+                if (this.hostedClient?.ClientId is ClientGrainId hostedClientId)
                 {
-                    clients ??= new List<GrainId>(1);
+                    clients ??= new List<ClientGrainId>(1);
                     clients.Add(hostedClientId);
                 }
 
+                if (clients is null)
+                {
+                    return;
+                }
+
                 var tasks = new List<Task>();
-                foreach (GrainId clientId in clients)
+                foreach (ClientGrainId clientId in clients)
                 {
                     var addr = GetClientActivationAddress(clientId);
                     Task task = grainDirectory.RegisterAsync(addr, singleActivation: false).
@@ -196,7 +201,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private ActivationAddress GetClientActivationAddress(GrainId clientId)
+        private ActivationAddress GetClientActivationAddress(ClientGrainId clientId)
         {
             // Need to pick a unique deterministic ActivationId for this client.
             // We store it in the grain directory and there for every GrainId we use ActivationId as a key
@@ -204,7 +209,7 @@ namespace Orleans.Runtime
             string stringToHash = clientId.ToString() + myAddress.Endpoint + myAddress.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
             Guid hash = Utils.CalculateGuidHash(stringToHash);
             var activationId = ActivationId.GetActivationId(UniqueKey.NewKey(hash));
-            return ActivationAddress.GetAddress(myAddress, clientId, activationId);
+            return ActivationAddress.GetAddress(myAddress, clientId.GrainId, activationId);
         }
 
         public void Participate(ISiloLifecycle lifecycle)
