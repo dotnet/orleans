@@ -17,17 +17,17 @@ namespace Orleans.Transactions.TestKit.Base.Grains
         }
 
 
-        [AlwaysInterleave]
         public async Task RunOrdered(params int[] order)
         {
             for (int i = 0; i < order.Length; i++)
             {
-                var delay = TimeSpan.FromMilliseconds(random.NextDouble() * 1500);
+                var delay = TimeSpan.FromMilliseconds(random.NextDouble() * 200);
                 logger.LogError($"starting {order[i]} with {delay}");
                 await GrainFactory.GetGrain<IDelayedGrain>(order[i])
                     .UpdateState(delay, $"changed-{i}");
                 logger.LogError($"finished delayed grain update {order[i]}");
             }
+
         }
 
     }

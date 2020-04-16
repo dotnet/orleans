@@ -54,24 +54,36 @@ namespace Orleans.Transactions.DeadlockDetection
 
         public async Task StartDeadlockDetection(ParticipantId resource, IEnumerable<Guid> lockedBy)
         {
-            var localGraph = new WaitForGraph(this.lockTracker.GetLocks()).GetConnectedSubGraph(lockedBy, new[]{ resource });
-            if (localGraph.DetectCycles(out var cycle))
+            // Because we don't actually await this call (to avoid messing up transactional state on an error), we wrap it in
+            // a try catch.
+            try
             {
-               this.logger.LogInformation($"found a local cycle: {string.Join(",", cycle)}");
-               var tasks = cycle.Where(l => !l.IsWait).Select(l =>
-                   l.Resource.Reference.AsReference<ITransactionalResourceExtension>().BreakLocks(l.Resource.Name));
-               await Task.WhenAll(tasks);
-               this.logger.LogInformation("broke the locks?");
-            }
-            else
-            {
-                await this.grainFactory.GetGrain<IDeadlockDetector>(0).CheckForDeadlocks(new CollectLocksResponse
+                var localGraph =
+                    new WaitForGraph(this.lockTracker.GetLocks()).GetConnectedSubGraph(lockedBy, new[] {resource});
+                if (localGraph.DetectCycles(out var cycle))
                 {
-                    Locks = localGraph.ToLockKeys(),
-                    BatchId = null,
-                    MaxVersion = null,
-                    SiloAddress = this.runtime.SiloAddress
-                });
+                    this.logger.LogInformation($"found a local cycle: {string.Join(",", cycle)}");
+                    var tasks = cycle.Where(l => !l.IsWait).Select(l =>
+                        l.Resource.Reference.AsReference<ITransactionalResourceExtension>()
+                            .BreakLocks(l.Resource.Name));
+                    await Task.WhenAll(tasks);
+                    this.logger.LogInformation("broke the locks?");
+                }
+                else
+                {
+                    await this.grainFactory.GetGrain<IDeadlockDetector>(0).CheckForDeadlocks(new CollectLocksResponse
+                    {
+                        Locks = localGraph.ToLockKeys(),
+                        BatchId = null,
+                        MaxVersion = null,
+                        SiloAddress = this.runtime.SiloAddress
+                    });
+                }
+
+            }
+            catch (Exception e)
+            {
+                this.logger.LogError(e, "deadlock detection threw an exception");
             }
         }
 

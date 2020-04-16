@@ -81,17 +81,9 @@ namespace Orleans.Transactions.Tests
             var sub1 = full.GetConnectedSubGraph(new[] {Tx("0")}, Enumerable.Empty<ParticipantId>());
             var sub2 = full.GetConnectedSubGraph(new[] {Tx("2")}, Enumerable.Empty<ParticipantId>());
 
-            var locks1 = new HashSet<LockInfo>(sub1.ToLockKeys());
-            var locks2 = new HashSet<LockInfo>(sub2.ToLockKeys());
+            AssertSameLocks(first.ToLockKeys(), sub1.ToLockKeys());
+            AssertSameLocks(second.ToLockKeys(), sub2.ToLockKeys());
 
-            this.output.WriteLine($"full={FormatCycle(full.ToLockKeys())}");
-            this.output.WriteLine($"sub1={FormatCycle(sub1.ToLockKeys())}");
-            this.output.WriteLine($"sub2={FormatCycle(sub2.ToLockKeys())}");
-            this.output.WriteLine($"first={FormatCycle(first.ToLockKeys())}");
-            this.output.WriteLine($"second={FormatCycle(second.ToLockKeys())}");
-
-            Assert.True(locks1.Equals(new HashSet<LockInfo>(sub1.ToLockKeys())));
-            Assert.True(locks2.Equals(new HashSet<LockInfo>(sub2.ToLockKeys())));
         }
 
 

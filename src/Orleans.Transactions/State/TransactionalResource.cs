@@ -63,7 +63,8 @@ namespace Orleans.Transactions.State
         public async Task BreakLocks()
         {
             await this.queue.Ready();
-            await this.queue.RWLock.AbortExecutingTransactions();
+            this.queue.RWLock.AbortQueuedTransactions();
+            this.queue.RWLock.Notify();
         }
 
         public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)

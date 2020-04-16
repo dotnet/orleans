@@ -70,27 +70,28 @@ namespace Orleans.Transactions.DeadlockDetection
         private int MaxRequestCount { get; } = 5;
         private TimeSpan RequestTimeout { get; } = TimeSpan.FromSeconds(2);
 
-        private readonly ISiloStatusOracle siloStatusOracle;
+        private ISiloStatusOracle siloStatusOracle;
         private readonly ILogger<DeadlockDetector> logger;
-        private readonly ITransactionalLockObserver localObserver;
         private readonly IDictionary<Guid, Batch> batches =
             new Dictionary<Guid, Batch>();
 
-        private readonly IInternalGrainFactory internalGrainFactory;
+        private IInternalGrainFactory internalGrainFactory;
 
-        internal DeadlockDetector(ILogger<DeadlockDetector> logger,
-            ITransactionalLockObserver localObserver,
-            ISiloStatusOracle siloStatusOracle,
-            IInternalGrainFactory internalGrainFactory)
+        public DeadlockDetector(ILogger<DeadlockDetector> logger)
         {
             this.logger = logger;
-            this.localObserver = localObserver;
-            this.siloStatusOracle = siloStatusOracle;
-            this.internalGrainFactory = internalGrainFactory;
+        }
+
+        public override async Task OnActivateAsync()
+        {
+            await base.OnActivateAsync();
+            this.siloStatusOracle = this.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
+            this.internalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
         }
 
         public async Task CheckForDeadlocks(CollectLocksResponse message)
         {
+            this.logger.LogInformation($"CheckForDeadlocks({message.BatchId},{message.SiloAddress},{message.MaxVersion})");
             Batch batch;
             if (message.BatchId == null)
             {
@@ -133,7 +134,19 @@ namespace Orleans.Transactions.DeadlockDetection
                 siloInfo.MaxVersion = Math.Max(message.MaxVersion.Value, siloInfo.MaxVersion.GetValueOrDefault(0));
             }
 
-            if (batch.WaitForGraph.MergeWith(message.Locks, out var updatedGraph))
+            WaitForGraph updatedGraph;
+            bool graphChanged;
+            if (batch.WaitForGraph == null)
+            {
+                updatedGraph = new WaitForGraph(message.Locks);
+                graphChanged = true;
+            }
+            else
+            {
+                graphChanged = batch.WaitForGraph.MergeWith(message.Locks, out updatedGraph);
+            }
+
+            if(graphChanged)
             {
                 batch.WaitForGraph = updatedGraph;
                 if (batch.WaitForGraph.DetectCycles(out var cycle))

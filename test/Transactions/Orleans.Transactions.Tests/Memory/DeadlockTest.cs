@@ -47,22 +47,32 @@ namespace Orleans.Transactions.Tests.Memory
         [Fact]
         public async Task CauseDeadlock()
         {
-            var coordinator = this.client.GetGrain<IDeadlockCoordinator>(0);
+            var coordinator = this.grainFactory.GetGrain<IDeadlockCoordinator>(0);
             var tasks = new Task[]
             {
                 coordinator.RunOrdered(0, 1, 2, 3),
-                coordinator.RunOrdered(3, 2, 1, 0)
+                coordinator.RunOrdered(3, 2, 1, 0),
             };
-            Task.WhenAll(tasks).Ignore();
-            var start = DateTime.UtcNow;
-            while (DateTime.UtcNow - start < TimeSpan.FromSeconds(5))
+            bool threw = false;
+            try
             {
-                for (var i = 0; i < 4; i++)
-                {
-                    await this.client.GetGrain<IDelayedGrain>(i).GetState();
-                    await Task.Delay(TimeSpan.FromSeconds(2));
-                }
+                await Task.WhenAll(tasks);
             }
+            catch (Exception e)
+            {
+                this.testOutput($"threw {e}");
+                threw = true;
+            }
+
+            Assert.True(threw, "bad ordering should throw!");
+        }
+
+        [Fact]
+        public async Task OrderedAccessWorks()
+        {
+            var coordinator = this.grainFactory.GetGrain<IDeadlockCoordinator>(0);
+            var tasks = new[] {coordinator.RunOrdered(0, 1), coordinator.RunOrdered(0, 1)};
+            await Task.WhenAll(tasks);
         }
 
 

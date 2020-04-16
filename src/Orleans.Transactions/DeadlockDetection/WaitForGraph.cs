@@ -180,6 +180,10 @@ namespace Orleans.Transactions.DeadlockDetection
             return e.Concat(b);
         }
 
+        private IEnumerable<int> GetEdges(int nodeId)
+        {
+            return this.edges.TryGetValue(nodeId, out var e) ? e : Enumerable.Empty<int>();
+        }
 
         private IList<int> GetConnectedSubGraph(IEnumerable<int> nodeIds)
         {
@@ -299,7 +303,7 @@ namespace Orleans.Transactions.DeadlockDetection
 
                 marks[nodeId] = gray;
                 history.Add(nodeId);
-                foreach (var edge in this.edges[nodeId])
+                foreach (var edge in this.GetEdges(nodeId))
                 {
                     if (Visit(edge, history))
                     {
