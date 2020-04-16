@@ -38,7 +38,7 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             IClusterMembershipService clusterMembershipService,
             IAsyncTimerFactory timerFactory)
-            : base(Constants.ClientObserverRegistrarId, siloDetails.SiloAddress, loggerFactory)
+            : base(Constants.ClientObserverRegistrarType, siloDetails.SiloAddress, loggerFactory)
         {
             this.grainDirectory = grainDirectory;
             this.myAddress = siloDetails.SiloAddress;

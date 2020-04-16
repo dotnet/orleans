@@ -23,8 +23,7 @@ namespace Orleans
         /// <summary>
         /// The cache of typed system target references.
         /// </summary>
-        private readonly Dictionary<Tuple<GrainId, Type>, Dictionary<SiloAddress, ISystemTarget>> typedSystemTargetReferenceCache =
-                    new Dictionary<Tuple<GrainId, Type>, Dictionary<SiloAddress, ISystemTarget>>();
+        private readonly Dictionary<Tuple<GrainId, Type>, ISystemTarget> typedSystemTargetReferenceCache = new Dictionary<Tuple<GrainId, Type>, ISystemTarget>();
 
         /// <summary>
         /// The cache of type metadata.
@@ -139,39 +138,36 @@ namespace Orleans
         /// <returns>A reference to <paramref name="grain"/> which implements <paramref name="interfaceType"/>.</returns>
         public object Cast(IAddressable grain, Type interfaceType) => this.GrainReferenceRuntime.Convert(grain, interfaceType);
 
+        public TGrainInterface GetSystemTarget<TGrainInterface>(GrainType grainType, SiloAddress destination)
+            where TGrainInterface : ISystemTarget
+        {
+            var grainId = SystemTargetGrainId.Create(grainType, destination);
+            return this.GetSystemTarget<TGrainInterface>(grainId.GrainId);
+        }
+
         /// <summary>
         /// Gets a reference to the specified system target.
         /// </summary>
         /// <typeparam name="TGrainInterface">The system target interface.</typeparam>
         /// <param name="grainId">The id of the target.</param>
-        /// <param name="destination">The destination silo.</param>
         /// <returns>A reference to the specified system target.</returns>
-        public TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
+        public TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId)
             where TGrainInterface : ISystemTarget
         {
-            Dictionary<SiloAddress, ISystemTarget> cache;
+            ISystemTarget reference;
             Tuple<GrainId, Type> key = Tuple.Create(grainId, typeof(TGrainInterface));
 
             lock (this.typedSystemTargetReferenceCache)
             {
-                if (!this.typedSystemTargetReferenceCache.TryGetValue(key, out cache))
+                if (this.typedSystemTargetReferenceCache.TryGetValue(key, out reference))
                 {
-                    cache = new Dictionary<SiloAddress, ISystemTarget>();
-                    this.typedSystemTargetReferenceCache[key] = cache;
+                    return (TGrainInterface)reference;
                 }
-            }
 
-            ISystemTarget reference;
-            lock (cache)
-            {
-                if (!cache.TryGetValue(destination, out reference))
-                {
-                    reference = this.Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, this.GrainReferenceRuntime, null, destination));
-                    cache[destination] = reference; // Store for next time
-                }
+                reference = this.Cast<TGrainInterface>(GrainReference.FromGrainId(grainId, this.GrainReferenceRuntime, null));
+                this.typedSystemTargetReferenceCache[key] = reference;
+                return (TGrainInterface)reference;
             }
-
-            return (TGrainInterface)reference;
         }
 
         /// <inheritdoc />

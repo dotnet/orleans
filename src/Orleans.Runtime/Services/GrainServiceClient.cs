@@ -39,12 +39,9 @@ namespace Orleans.Runtime.Services
         {
             get
             {
-                // Currently we only support a single GrainService per Silo, hence we pass zero here instead of partitioning.
-                var grainId = LegacyGrainId.GetGrainServiceGrainId(0, grainTypeCode);
-
                 var destination = MapGrainReferenceToSiloRing(CallingGrainReference);
-
-                var grainService = grainFactory.GetSystemTarget<TGrainService>(grainId, destination);
+                var grainId = SystemTargetGrainId.CreateGrainServiceGrainId(grainTypeCode, null, destination);
+                var grainService = grainFactory.GetSystemTarget<TGrainService>(grainId);
 
                 return grainService;
             }

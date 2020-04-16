@@ -7,108 +7,141 @@ using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Identifies a grain.
+    /// </summary>
     [Immutable]
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
     {
-        private readonly GrainType _type;
-        private readonly SpanId _key;
-
-        public GrainId(GrainType type, SpanId key)
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
+        public GrainId(GrainType type, IdSpan key)
         {
-            _type = type;
-            _key = key;
+            Type = type;
+            Key = key;
         }
 
-        public GrainId(byte[] type, byte[] key) : this(new GrainType(type), new SpanId(key))
-        {
-        }
-
-        public GrainId(GrainType type, byte[] key, int keyHashCode) : this(type, new SpanId(key, keyHashCode)) { }
-
-
-        public GrainId(GrainType type, byte[] key) : this(type, new SpanId(key))
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
+        public GrainId(byte[] type, byte[] key) : this(new GrainType(type), new IdSpan(key))
         {
         }
 
-        public GrainId(SerializationInfo info, StreamingContext context)
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
+        public GrainId(GrainType type, byte[] key) : this(type, new IdSpan(key))
         {
-            _type = new GrainType((byte[])info.GetValue("tv", typeof(byte[])), info.GetInt32("th"));
-            _key = new SpanId((byte[])info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
         }
+
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
+        private GrainId(SerializationInfo info, StreamingContext context)
+        {
+            Type = new GrainType(IdSpan.UnsafeCreate((byte[])info.GetValue("tv", typeof(byte[])), info.GetInt32("th")));
+            Key = IdSpan.UnsafeCreate((byte[])info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
+        }
+
+        /// <summary>
+        /// The grain type.
+        /// </summary>
+        public GrainType Type { get; }
+
+        /// <summary>
+        /// The key.
+        /// </summary>
+        public IdSpan Key { get; }
 
         // TODO: remove implicit conversion (potentially make explicit to start with)
         public static implicit operator LegacyGrainId(GrainId id) => LegacyGrainId.FromGrainId(id);
 
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
         public static GrainId Create(string type, string key) => Create(GrainType.Create(type), key);
 
-        public static GrainId Create(string type, Guid key) => Create(GrainType.Create(type), key.ToString("N"));
-
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
         public static GrainId Create(GrainType type, string key) => new GrainId(type, Encoding.UTF8.GetBytes(key));
 
-        public static GrainId Create(GrainType type, SpanId key) => new GrainId(type, key);
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
+        public static GrainId Create(GrainType type, IdSpan key) => new GrainId(type, key);
 
-        public readonly GrainType Type => _type;
+        /// <summary>
+        /// <see langword="true"/> if this instance is the default value, <see langword="false"/> if it is not.
+        /// </summary>
+        public bool IsDefault => Type.IsDefault && Key.IsDefault;
 
-        public readonly SpanId Key => _key;
-
-        public readonly bool IsDefault => _type.IsDefault && _key.IsDefault;
-
+        /// <inheritdoc/>
         public override bool Equals(object obj) => obj is GrainId id && this.Equals(id);
 
-        public bool Equals(GrainId other) => this.Type.Equals(other.Type) && this._key.Equals(other._key);
+        /// <inheritdoc/>
+        public bool Equals(GrainId other) => this.Type.Equals(other.Type) && this.Key.Equals(other.Key);
 
-        public override readonly int GetHashCode() => HashCode.Combine(_type, _key);
+        /// <inheritdoc/>
+        public override int GetHashCode() => HashCode.Combine(Type, Key);
 
-        public readonly uint GetUniformHashCode() => unchecked((uint)this.GetHashCode());
+        /// <inheritdoc/>
+        public uint GetUniformHashCode() => unchecked((uint)this.GetHashCode());
 
-        public uint GetHashCode_Modulo(uint umod)
+        /// <inheritdoc/>
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            int key = GetHashCode();
-            int mod = (int)umod;
-            key = ((key % mod) + mod) % mod; // key should be positive now. So assert with checked.
-            return checked((uint)key);
+            info.AddValue("tv", GrainType.UnsafeGetArray(Type));
+            info.AddValue("th", Type.GetHashCode());
+            info.AddValue("kv", IdSpan.UnsafeGetArray(Key));
+            info.AddValue("kh", Key.GetHashCode());
         }
 
-        public readonly void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.AddValue("tv", GrainType.UnsafeGetArray(_type));
-            info.AddValue("th", _type.GetHashCode());
-            info.AddValue("kv", SpanId.UnsafeGetArray(_key));
-            info.AddValue("kh", _key.GetHashCode());
-        }
-
+        /// <inheritdoc/>
         public int CompareTo(GrainId other)
         {
-            var typeComparison = _type.CompareTo(other._type);
+            var typeComparison = Type.CompareTo(other.Type);
             if (typeComparison != 0) return typeComparison;
 
-            return _key.CompareTo(other._key);
+            return Key.CompareTo(other.Key);
         }
 
+        /// <inheritdoc/>
         public static bool operator ==(GrainId a, GrainId b) => a.Equals(b);
 
+        /// <inheritdoc/>
         public static bool operator !=(GrainId a, GrainId b) => !a.Equals(b);
 
+        /// <inheritdoc/>
         public static bool operator >(GrainId a, GrainId b) => a.CompareTo(b) > 0;
 
+        /// <inheritdoc/>
         public static bool operator <(GrainId a, GrainId b) => a.CompareTo(b) < 0;
 
-        public override readonly string ToString() => $"{_type.ToStringUtf8()}/{_key.ToStringUtf8()}";
+        /// <inheritdoc/>
+        public override string ToString() => $"{Type.ToStringUtf8()}/{Key.ToStringUtf8()}";
 
-        public static (byte[] Key, int KeyHashCode) UnsafeGetKey(GrainId id) => (SpanId.UnsafeGetArray(id._key), id._key.GetHashCode());
-
-        public static SpanId KeyAsSpanId(GrainId id) => id._key;
-
+        /// <summary>
+        /// An <see cref="IEqualityComparer{T}"/> and <see cref="IComparer{T}"/> implementation for <see cref="GrainId"/>.
+        /// </summary>
         public sealed class Comparer : IEqualityComparer<GrainId>, IComparer<GrainId>
         {
+            /// <summary>
+            /// A singleton <see cref="Comparer"/> instance.
+            /// </summary>
             public static Comparer Instance { get; } = new Comparer();
 
+            /// <inheritdoc/>
             public int Compare(GrainId x, GrainId y) => x.CompareTo(y);
 
+            /// <inheritdoc/>
             public bool Equals(GrainId x, GrainId y) => x.Equals(y);
 
+            /// <inheritdoc/>
             public int GetHashCode(GrainId obj) => obj.GetHashCode();
         }
     }

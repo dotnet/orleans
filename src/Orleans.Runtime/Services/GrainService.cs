@@ -35,18 +35,19 @@ namespace Orleans.Runtime
             }
         }
 
-        public GrainReference GetGrainReference() => GrainReference.FromGrainId(((ISystemTargetBase)this).GrainId, ((ISystemTargetBase)this).GrainReferenceRuntime, null, this.Silo);
+        public GrainReference GetGrainReference() => GrainReference.FromGrainId(((ISystemTargetBase)this).GrainId, ((ISystemTargetBase)this).GrainReferenceRuntime, null);
 
         /// <summary>Only to make Reflection happy. Do not use it in your implementation</summary>
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         [System.Diagnostics.DebuggerHidden]
-        protected GrainService() : base(default(GrainId), null, null)
+        protected GrainService() : base()
         {
             throw new Exception("This should not be constructed by client code.");
         }
 
         /// <summary>Constructor to use for grain services</summary>
-        protected GrainService(GrainId grainId, Silo silo, ILoggerFactory loggerFactory) : base(grainId, silo.SiloAddress, lowPriority: true, loggerFactory:loggerFactory)
+        protected GrainService(GrainId grainId, Silo silo, ILoggerFactory loggerFactory)
+            : base(SystemTargetGrainId.Create(grainId.Type, silo.SiloAddress), silo.SiloAddress, lowPriority: true, loggerFactory:loggerFactory)
         {
             typeName = this.GetType().FullName;
             Logger = loggerFactory.CreateLogger(typeName);

@@ -123,7 +123,7 @@ namespace Orleans.Runtime
             IOptions<SiloMessagingOptions> messagingOptions,
             RuntimeMessagingTrace messagingTrace,
             IAsyncTimerFactory timerFactory)
-            : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
+            : base(Constants.CatalogType, messageCenter.MyAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
             this.localSiloName = localSiloDetails.Name;

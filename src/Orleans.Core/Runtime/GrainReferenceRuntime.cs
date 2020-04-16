@@ -134,7 +134,9 @@ namespace Orleans.Runtime
 
         private bool IsUnordered(GrainReference reference)
         {
-            return this.RuntimeClient.GrainTypeResolver?.IsUnordered(((LegacyGrainId)reference.GrainId).TypeCode) == true;
+            return LegacyGrainId.TryConvertFromGrainId(reference.GrainId, out var legacyId)
+                && this.RuntimeClient.GrainTypeResolver is IGrainTypeResolver resolver
+                && resolver.IsUnordered(legacyId.TypeCode);
         }
     }
 }

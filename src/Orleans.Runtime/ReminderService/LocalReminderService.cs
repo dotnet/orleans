@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
 using Microsoft.Extensions.Logging;
+using Orleans.CodeGeneration;
 using Orleans.Internal;
 
 namespace Orleans.Runtime.ReminderService
@@ -32,7 +32,7 @@ namespace Orleans.Runtime.ReminderService
             TimeSpan initTimeout,
             ILoggerFactory loggerFactory,
             IAsyncTimerFactory asyncTimerFactory)
-            : base(GetGrainId(), silo, loggerFactory)
+            : base(SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, silo.SiloAddress), silo, loggerFactory)
         {
             localReminders = new Dictionary<ReminderIdentity, LocalReminderData>();
             this.reminderTable = reminderTable;
@@ -474,12 +474,6 @@ namespace Orleans.Runtime.ReminderService
             var str = String.Format("{0}{1}{2}", (msg ?? "Current list of reminders:"), Environment.NewLine,
                 Utils.EnumerableToString(localReminders, null, Environment.NewLine));
             logger.Trace(str);
-        }
-
-        private static GrainId GetGrainId()
-        {
-            var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService));
-            return LegacyGrainId.GetGrainServiceGrainId(0, typeCode);
         }
 
         private class LocalReminderData

@@ -42,7 +42,7 @@ namespace Orleans.Streams
         private string StatisticUniquePostfix => streamProviderName + "." + QueueId;
 
         internal PersistentStreamPullingAgent(
-            GrainId id,
+            SystemTargetGrainId id,
             string strProviderName,
             IStreamProviderRuntime runtime,
             ILoggerFactory loggerFactory,

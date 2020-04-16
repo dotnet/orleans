@@ -59,7 +59,7 @@ namespace Orleans.Runtime
             IAppEnvironmentStatistics appEnvironmentStatistics,
             IHostEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(Constants.SiloControlId, localSiloDetails.SiloAddress, loggerFactory)
+            : base(Constants.SiloControlType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.localSiloDetails = localSiloDetails;
 

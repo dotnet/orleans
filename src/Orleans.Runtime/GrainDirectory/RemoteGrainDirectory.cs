@@ -13,8 +13,8 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly GrainDirectoryPartition partition;
         private readonly ILogger logger;
 
-        internal RemoteGrainDirectory(LocalGrainDirectory r, GrainId grainId, ILoggerFactory loggerFactory)
-            : base(grainId, r.MyAddress, loggerFactory)
+        internal RemoteGrainDirectory(LocalGrainDirectory r, GrainType grainType, ILoggerFactory loggerFactory)
+            : base(grainType, r.MyAddress, loggerFactory)
         {
             router = r;
             partition = r.DirectoryPartition;

@@ -71,7 +71,7 @@ namespace Orleans.Runtime
 
             CollectionAgeLimit = ageLimit;
 
-            GrainReference = GrainReference.FromGrainId(addr.Grain, runtimeClient.GrainReferenceRuntime, genericArguments, Grain.IsSystemTarget() ? addr.Silo : null);
+            GrainReference = GrainReference.FromGrainId(addr.Grain, runtimeClient.GrainReferenceRuntime, genericArguments);
         }
 
         public Type GrainType => GrainTypeData.Type;

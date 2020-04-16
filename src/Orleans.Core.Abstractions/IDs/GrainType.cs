@@ -7,66 +7,116 @@ using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Represents the type of a grain.
+    /// </summary>
     [Immutable]
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
     public readonly struct GrainType : IEquatable<GrainType>, IComparable<GrainType>, ISerializable
     {
-        private readonly SpanId _value;
-        
-        public GrainType(byte[] value) => _value = new SpanId(value);
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
+        public GrainType(IdSpan id) => Value = id;
 
-        public GrainType(byte[] value, int hashCode) => _value = new SpanId(value, hashCode);
-        
-        public GrainType(SerializationInfo info, StreamingContext context)
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
+        public GrainType(byte[] value) => Value = new IdSpan(value);
+
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
+        private GrainType(SerializationInfo info, StreamingContext context)
         {
-            _value = new SpanId((byte[])info.GetValue("v", typeof(byte[])), info.GetInt32("h"));
+            Value = IdSpan.UnsafeCreate((byte[])info.GetValue("v", typeof(byte[])), info.GetInt32("h"));
         }
 
-        public GrainType(SpanId id) => _value = id;
+        /// <summary>
+        /// The underlying value.
+        /// </summary>
+        public IdSpan Value { get; }
 
+        /// <summary>
+        /// Returns a span representation of this instance.
+        /// </summary>
+        public ReadOnlySpan<byte> AsSpan() => this.Value.AsSpan();
+
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
         public static GrainType Create(string value) => new GrainType(Encoding.UTF8.GetBytes(value));
 
-        public static GrainType CreateForSystemTarget(string name) => Create(GrainTypePrefix.SystemTargetPrefix + name);
+        /// <inheritdoc/>
+        public static explicit operator IdSpan(GrainType kind) => kind.Value;
 
-        public static explicit operator SpanId(GrainType kind) => kind._value;
+        /// <inheritdoc/>
+        public static explicit operator GrainType(IdSpan id) => new GrainType(id);
 
-        public static explicit operator GrainType(SpanId id) => new GrainType(id);
+        /// <summary>
+        /// <see langword="true"/> if this instance is the default value, <see langword="false"/> if it is not.
+        /// </summary>
+        public bool IsDefault => Value.IsDefault;
 
-        public readonly bool IsDefault => _value.IsDefault;
+        /// <inheritdoc/>
+        public override bool Equals(object obj) => obj is GrainType kind && this.Equals(kind);
 
-        public readonly ReadOnlyMemory<byte> Value => _value.Value;
+        /// <inheritdoc/>
+        public bool Equals(GrainType obj) => Value.Equals(obj.Value);
 
-        public override readonly bool Equals(object obj) => obj is GrainType kind && this.Equals(kind);
+        /// <inheritdoc/>
+        public override int GetHashCode() => Value.GetHashCode();
 
-        public readonly bool Equals(GrainType obj) => _value.Equals(obj._value);
+        public static byte[] UnsafeGetArray(GrainType id) => IdSpan.UnsafeGetArray(id.Value);
 
-        public override readonly int GetHashCode() => _value.GetHashCode();
+        /// <inheritdoc/>
+        public int CompareTo(GrainType other) => Value.CompareTo(other.Value);
 
-        public static byte[] UnsafeGetArray(GrainType id) => SpanId.UnsafeGetArray(id._value);
-
-        public static SpanId AsSpanId(GrainType id) => id._value;
-
-        public readonly int CompareTo(GrainType other) => _value.CompareTo(other._value);
-
-        public readonly void GetObjectData(SerializationInfo info, StreamingContext context)
+        /// <inheritdoc/>
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            info.AddValue("v", SpanId.UnsafeGetArray(_value));
-            info.AddValue("h", _value.GetHashCode());
+            info.AddValue("v", IdSpan.UnsafeGetArray(Value));
+            info.AddValue("h", Value.GetHashCode());
         }
 
+        /// <inheritdoc/>
         public override string ToString() => this.ToStringUtf8();
 
-        public readonly string ToStringUtf8() => _value.ToStringUtf8();
+        /// <summary>
+        /// Returns a string representation of this instance, decoding the value as UTF8.
+        /// </summary>
+        public string ToStringUtf8() => Value.ToStringUtf8();
 
+        /// <inheritdoc/>
+        public static bool operator ==(GrainType left, GrainType right)
+        {
+            return left.Equals(right);
+        }
+
+        /// <inheritdoc/>
+        public static bool operator !=(GrainType left, GrainType right)
+        {
+            return !(left == right);
+        }
+
+        /// <summary>
+        /// An <see cref="IEqualityComparer{T}"/> and <see cref="IComparer{T}"/> implementation for <see cref="GrainType"/>.
+        /// </summary>
         public sealed class Comparer : IEqualityComparer<GrainType>, IComparer<GrainType>
         {
+            /// <summary>
+            /// A singleton <see cref="Comparer"/> instance.
+            /// </summary>
             public static Comparer Instance { get; } = new Comparer();
 
+            /// <inheritdoc/>
             public int Compare(GrainType x, GrainType y) => x.CompareTo(y);
 
+            /// <inheritdoc/>
             public bool Equals(GrainType x, GrainType y) => x.Equals(y);
 
+            /// <inheritdoc/>
             public int GetHashCode(GrainType obj) => obj.GetHashCode();
         }
     }
