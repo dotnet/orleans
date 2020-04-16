@@ -1,9 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.OrleansRuntime</PackageId>
     <Title>Microsoft Orleans Runtime</Title>
     <Description>Core runtime library of Microsoft Orleans that hosts and executes grains within a silo.</Description>
-    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>8</LangVersion>
   </PropertyGroup>
 
   <PropertyGroup>

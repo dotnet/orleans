@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.DeadlockDetection;
 using Orleans.Transactions.State;
 
 namespace Orleans.Transactions.TOC
@@ -22,8 +23,9 @@ namespace Orleans.Transactions.TOC
             IClock clock,
             ILogger logger,
             ITimerManager timerManager,
-            IActivationLifetime activationLifetime)
-            : base(options, resource, deactivate, storage, clock, logger, timerManager, activationLifetime)
+            IActivationLifetime activationLifetime,
+            ITransactionalLockObserver lockObserver)
+            : base(options, resource, deactivate, storage, clock, logger, timerManager, activationLifetime, lockObserver)
         {
             this.service = service;
         }
