@@ -14,13 +14,13 @@ namespace Orleans.Runtime
 
         public static readonly ActivationId Zero;
 
-        private static readonly Interner<UniqueKey, ActivationId> interner;
-        private static readonly Interner<GrainId, ActivationId> interner2;
+        private static readonly Interner<UniqueKey, ActivationId> legacyKeyInterner;
+        private static readonly Interner<GrainId, ActivationId> interner;
 
         static ActivationId()
         {
-            interner = new Interner<UniqueKey, ActivationId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq);
-            interner2 = new Interner<GrainId, ActivationId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq);
+            legacyKeyInterner = new Interner<UniqueKey, ActivationId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq);
+            interner = new Interner<GrainId, ActivationId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq);
             Zero = FindOrCreate(UniqueKey.Empty);
         }
 
@@ -48,7 +48,7 @@ namespace Orleans.Runtime
         // Need to remove it all together. For now, just use grain id as activation id.
         public static ActivationId GetDeterministic(GrainId grain)
         {
-            return interner2.FindOrCreate(grain, CreateActivationId);
+            return interner.FindOrCreate(grain, CreateActivationId);
 
             static ActivationId CreateActivationId(GrainId grainId)
             {
@@ -66,7 +66,7 @@ namespace Orleans.Runtime
 
         private static ActivationId FindOrCreate(UniqueKey key)
         {
-            return interner.FindOrCreate(key, k => new ActivationId(k));
+            return legacyKeyInterner.FindOrCreate(key, k => new ActivationId(k));
         }
 
         public override bool Equals(object obj)
