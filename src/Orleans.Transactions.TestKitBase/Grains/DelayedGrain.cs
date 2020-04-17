@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.TestKit.Base.Grains
@@ -11,6 +12,7 @@ namespace Orleans.Transactions.TestKit.Base.Grains
         public string Value { get; set; }
     }
 
+    [Reentrant]
     public class DelayedGrain : Grain, IDelayedGrain
     {
         private readonly ITransactionalState<DelayedGrainState> data;
@@ -32,6 +34,7 @@ namespace Orleans.Transactions.TestKit.Base.Grains
                 state.Value = newState;
                 this.logger.LogInformation($"About to leave lock on {this.GetPrimaryKey()} after {delay}");
             });
+            this.logger.LogInformation("after perform update");
         }
 
         public Task<string> GetState() => this.data.PerformRead(state => state.Value);

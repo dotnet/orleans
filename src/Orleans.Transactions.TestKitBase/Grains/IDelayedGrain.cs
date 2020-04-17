@@ -1,8 +1,10 @@
 using System;
 using System.Threading.Tasks;
+using Orleans.Concurrency;
 
 namespace Orleans.Transactions.TestKit.Base.Grains
 {
+
     public interface IDelayedGrain : IGrainWithIntegerKey
     {
         [Transaction(TransactionOption.Join)]

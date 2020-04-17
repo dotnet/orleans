@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.DeadlockDetection
 {
@@ -43,5 +46,16 @@ namespace Orleans.Transactions.DeadlockDetection
             }
         }
 
+    }
+
+    public static class LockInfoExtensions
+    {
+        public static Task BreakLocks(this IEnumerable<LockInfo> locks)
+        {
+            var tasks = locks.Select(l =>
+                l.Resource.Reference.AsReference<ITransactionalResourceExtension>()
+                    .BreakLocks(l.Resource.Name));
+            return Task.WhenAll(tasks);
+        }
     }
 }

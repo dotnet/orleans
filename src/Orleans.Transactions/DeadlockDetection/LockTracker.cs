@@ -37,9 +37,5 @@ namespace Orleans.Transactions.DeadlockDetection
             return this.locksAndWaits.Where(kv => kv.Value <= maxVersion)
                 .Select(kv => kv.Key).ToArray();
         }
-
-
-
-
     }
 }

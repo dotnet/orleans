@@ -143,6 +143,13 @@ namespace Orleans.Transactions.State
                     if (logger.IsEnabled(LogLevel.Trace))
                         logger.Trace("set lock expiration at {Deadline}", group.Deadline.Value.ToString("o"));
                 }
+                else
+                {
+                    if (this.transactionalLockObserver != null)
+                    {
+                        group.DeadlockDeadline = now + this.options.DeadlockDetectionThreshold;
+                    }
+                }
 
                 // create a new record for this transaction
                 record = new TransactionRecord<TState>()
@@ -158,6 +165,8 @@ namespace Orleans.Transactions.State
 
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
+                    this.logger.LogTrace($"added {record} for {transactionId}");
+
                     if (group == currentGroup)
                         logger.Trace($"enter-lock {transactionId} fc={group.FillCount}");
                     else
@@ -191,7 +200,7 @@ namespace Orleans.Transactions.State
             else
             {
                 // execute task right now
-                this.transactionalLockObserver?.OnResourceLocked(transactionId, this.queue.Resource, isRead);
+                this.transactionalLockObserver?.OnResourceLocked(transactionId, this.queue.Resource);
                 completion();
             }
 
@@ -338,6 +347,10 @@ namespace Orleans.Transactions.State
                             storageWorker.Notify();
                         }
                         else if(currentGroup.DeadlockDeadline.HasValue){
+                            if (this.logger.IsEnabled(LogLevel.Trace))
+                            {
+                                this.logger.LogTrace($"deadlock deadline has value - {this.currentGroup.DeadlockDeadline.Value}, checking it");
+                            }
                             if (currentGroup.DeadlockDeadline.Value < now)
                             {
                                 this.logger.LogInformation($"deadlock possible for {this.currentGroup} on {this.queue.Resource} (observer: {this.transactionalLockObserver}");
@@ -349,8 +362,10 @@ namespace Orleans.Transactions.State
                             }
                             else
                             {
+                                if(this.logger.IsEnabled(LogLevel.Information)) this.logger.LogInformation($"notifying later (lock-work)");
                                 this.lockWorker.Notify(
                                     this.currentGroup.NextDeadline ?? this.currentGroup.DeadlockDeadline.Value);
+                                if(this.logger.IsEnabled(LogLevel.Information)) this.logger.LogInformation($"done notify later (lock-work)");
                             }
                         }
                         else if (currentGroup.Deadline.HasValue)
@@ -378,24 +393,34 @@ namespace Orleans.Transactions.State
                             string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
                             logger.LogWarning("Deadline not set for transactions {TransactionIds}", txlist);
                         }
+
+                        if(this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("done with non-empty current group");
                     }
                     else
                     {
                         // the lock is empty, a new group can enter
                         currentGroup = currentGroup.Next;
 
+                        if (this.logger.IsEnabled(LogLevel.Trace))
+                        {
+                            this.logger.LogTrace("empty group, starting next group");
+                        }
+
                         if (currentGroup != null)
                         {
                             currentGroup.Deadline = now + this.options.LockTimeout;
                             if (this.transactionalLockObserver != null)
                             {
+                                this.logger.LogInformation("will set deadlock deadline");
                                 currentGroup.DeadlockDeadline = now + this.options.DeadlockDetectionThreshold;
+                                this.logger.LogInformation($"set deadlock deadline to {this.currentGroup.DeadlockDeadline}, next={this.currentGroup.NextDeadline}");
                             }
 
                             // discard expired waiters that have no chance to succeed
                             // because they have been waiting for the lock for a longer timespan than the
                             // total transaction timeout
                             List<Guid> expiredWaiters = null;
+                            this.logger.LogInformation("checking for expired waiters");
                             foreach (var kvp in currentGroup)
                             {
                                 if (now > kvp.Value.Deadline)
@@ -409,11 +434,11 @@ namespace Orleans.Transactions.State
                                 }
                                 else
                                 {
-                                    this.transactionalLockObserver?.OnResourceLocked(kvp.Key, this.queue.Resource,
-                                        kvp.Value.IsReadOnly);
+                                    this.transactionalLockObserver?.OnResourceLocked(kvp.Key, this.queue.Resource);
                                 }
                             }
 
+                            this.logger.LogTrace("done checking for waiters");
                             if (expiredWaiters != null)
                             {
                                 foreach (var guid in expiredWaiters)

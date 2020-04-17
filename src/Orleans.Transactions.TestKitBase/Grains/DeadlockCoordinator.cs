@@ -5,7 +5,7 @@ using Orleans.Concurrency;
 
 namespace Orleans.Transactions.TestKit.Base.Grains
 {
-    [Reentrant]
+    [Reentrant, StatelessWorker]
     public class DeadlockCoordinator: Grain, IDeadlockCoordinator
     {
 
@@ -27,7 +27,6 @@ namespace Orleans.Transactions.TestKit.Base.Grains
                     .UpdateState(delay, $"changed-{i}");
                 logger.LogError($"finished delayed grain update {order[i]}");
             }
-
         }
 
     }

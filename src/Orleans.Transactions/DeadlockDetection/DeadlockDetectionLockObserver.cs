@@ -25,32 +25,26 @@ namespace Orleans.Transactions.DeadlockDetection
 
         private readonly IGrainRuntime runtime;
 
+        private readonly IDeadlockListener[] deadlockListeners;
+
         public DeadlockDetectionLockObserver(IMessageCenter messageCenter, ILoggerFactory loggerFactory,
-            IGrainFactory grainFactory, IGrainRuntime runtime) :
+            IGrainFactory grainFactory, IGrainRuntime runtime, IServiceProvider serviceProvider) :
             base(Constants.LocalDeadlockDetectorId, messageCenter.MyAddress, loggerFactory)
         {
             this.logger = loggerFactory.CreateLogger<DeadlockDetectionLockObserver>();
             this.grainFactory = grainFactory;
             this.runtime = runtime;
+            this.deadlockListeners = serviceProvider.GetServices<IDeadlockListener>().ToArray();
         }
 
-        public void OnResourceRequested(Guid transactionId, ParticipantId resourceId)
-        {
-            this.logger.LogInformation($"WAIT: {transactionId} for {resourceId}");
+        public void OnResourceRequested(Guid transactionId, ParticipantId resourceId) =>
             this.lockTracker.TrackWait(resourceId, transactionId, this.currentVersion);
-        }
 
-        public void OnResourceLocked(Guid transactionId, ParticipantId resourceId, bool isReadOnly)
-        {
-            this.logger.LogInformation($"LOCK: {transactionId} on {resourceId} (ro={isReadOnly})");
+        public void OnResourceLocked(Guid transactionId, ParticipantId resourceId) =>
             this.lockTracker.TrackEnterLock(resourceId, transactionId, this.currentVersion);
-        }
 
-        public void OnResourceUnlocked(Guid transactionId, ParticipantId resourceId)
-        {
-            this.logger.LogInformation($"UNLOCK: {transactionId} on {resourceId}");
+        public void OnResourceUnlocked(Guid transactionId, ParticipantId resourceId) =>
             this.lockTracker.TrackExitLock(resourceId, transactionId);
-        }
 
         public async Task StartDeadlockDetection(ParticipantId resource, IEnumerable<Guid> lockedBy)
         {
@@ -58,16 +52,13 @@ namespace Orleans.Transactions.DeadlockDetection
             // a try catch.
             try
             {
+                var startTime = DateTime.UtcNow;
                 var localGraph =
                     new WaitForGraph(this.lockTracker.GetLocks()).GetConnectedSubGraph(lockedBy, new[] {resource});
                 if (localGraph.DetectCycles(out var cycle))
                 {
-                    this.logger.LogInformation($"found a local cycle: {string.Join(",", cycle)}");
-                    var tasks = cycle.Where(l => !l.IsWait).Select(l =>
-                        l.Resource.Reference.AsReference<ITransactionalResourceExtension>()
-                            .BreakLocks(l.Resource.Name));
-                    await Task.WhenAll(tasks);
-                    this.logger.LogInformation("broke the locks?");
+                    await cycle.BreakLocks();
+                    NotifyDeadlockListeners(startTime, DateTime.UtcNow, cycle);
                 }
                 else
                 {
@@ -79,11 +70,28 @@ namespace Orleans.Transactions.DeadlockDetection
                         SiloAddress = this.runtime.SiloAddress
                     });
                 }
-
             }
             catch (Exception e)
             {
                 this.logger.LogError(e, "deadlock detection threw an exception");
+            }
+        }
+
+        private void NotifyDeadlockListeners(DateTime startTime, DateTime now, IList<LockInfo> locksInCycle)
+        {
+            for(var i=0; i < this.deadlockListeners.Length; i ++)
+            {
+                var listener = this.deadlockListeners[i];
+                if (listener == null) continue;
+                try
+                {
+                    listener.DeadlockDetected(locksInCycle, startTime, true, 0, now - startTime);
+                }
+                catch (Exception e)
+                {
+                    this.logger.LogError(e, $"Error while notifying local deadlock listener {listener}.  It will be removed");
+                    this.deadlockListeners[i] = null; // Not sure about removing them, but seems safer for now
+                }
             }
         }
 

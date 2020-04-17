@@ -55,15 +55,18 @@ namespace Orleans.Transactions.DeadlockDetection
 
             public int RequestCount { get; set; }
 
-            public Batch(IEnumerable<SiloAddress> silos)
+            public Batch(IEnumerable<SiloAddress> silos, DateTime analysisStartTime)
             {
                 this.Id = Guid.NewGuid();
+                this.AnalysisStartTime = analysisStartTime;
                 this.SiloInfos = new Dictionary<SiloAddress, SiloInfo>();
                 foreach (var address in silos)
                 {
                     this.SiloInfos[address] = new SiloInfo(address);
                 }
             }
+
+            public DateTime AnalysisStartTime { get; }
         }
 
         // TODO deadlock options
@@ -76,6 +79,7 @@ namespace Orleans.Transactions.DeadlockDetection
             new Dictionary<Guid, Batch>();
 
         private IInternalGrainFactory internalGrainFactory;
+        private IDeadlockListener[] deadlockListeners;
 
         public DeadlockDetector(ILogger<DeadlockDetector> logger)
         {
@@ -87,23 +91,23 @@ namespace Orleans.Transactions.DeadlockDetection
             await base.OnActivateAsync();
             this.siloStatusOracle = this.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
             this.internalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
+            this.deadlockListeners = this.ServiceProvider.GetServices<IDeadlockListener>().ToArray();
         }
 
         public async Task CheckForDeadlocks(CollectLocksResponse message)
         {
-            this.logger.LogInformation($"CheckForDeadlocks({message.BatchId},{message.SiloAddress},{message.MaxVersion})");
+            // TODO LOG  this.logger.LogInformation($"CheckForDeadlocks({message.BatchId},{message.SiloAddress},{message.MaxVersion})");
             Batch batch;
             if (message.BatchId == null)
             {
-                // new batch!
-                batch = new Batch(this.GetSiloAddresses());
+                // new batch - TODO rate limit this
+                batch = new Batch(this.GetSiloAddresses(), DateTime.UtcNow);
                 this.batches[batch.Id] = batch;
             }
             else if(!this.batches.TryGetValue(message.BatchId.Value, out batch))
             {
-                if(this.logger.IsEnabled(LogLevel.Information)){ this.logger.LogInformation($"received message for missing batch {message}"); }
-
-                return;
+               // TODO LOG  if(this.logger.IsEnabled(LogLevel.Trace)){ this.logger.LogInformation($"received message for missing batch {message}"); }
+               return;
             }
 
             await this.UpdateBatch(batch, message);
@@ -217,27 +221,42 @@ namespace Orleans.Transactions.DeadlockDetection
 
         private Task BreakLocks(Batch batch, IEnumerable<LockInfo> cycle)
         {
-
-            // TODO report stuff
+            var locks = cycle.ToArray();
+            this.NotifyDeadlockDetected(batch, locks);
             this.batches.Remove(batch.Id);
-
-          var lockedGrains = new HashSet<ParticipantId>();
-            foreach (var lockInfo in cycle)
-            {
-                if (!lockInfo.IsWait)
-                {
-                    lockedGrains.Add(lockInfo.Resource);
-                }
-            }
-
-            var tasks = lockedGrains.Select(p => p.Reference.AsReference<ITransactionalResourceExtension>().BreakLocks(p.Name));
-            return Task.WhenAll(tasks);
+            return locks.BreakLocks();
         }
 
         private void EndBatch(Batch batch, EndBatchReason reason)
         {
-            // TODO report and such
+            this.NotifyDetectionFailed(batch, reason);
             this.batches.Remove(batch.Id);
+        }
+
+        private void NotifyDeadlockDetected(Batch batch, IEnumerable<LockInfo> cycle) =>
+            this.RunListeners(l => l.DeadlockDetected(cycle, batch.AnalysisStartTime, false, batch.RequestCount,
+                DateTime.UtcNow - batch.AnalysisStartTime));
+
+        private void NotifyDetectionFailed(Batch batch, EndBatchReason reason) =>
+            this.RunListeners(l => l.DeadlockNotDetected(batch.AnalysisStartTime, batch.RequestCount,
+                DateTime.UtcNow - batch.AnalysisStartTime, reason == EndBatchReason.Stable));
+
+        private void RunListeners(Action<IDeadlockListener> action)
+        {
+            for (var i = 0; i < this.deadlockListeners.Length; i++)
+            {
+                var listener = this.deadlockListeners[i];
+                if (listener == null) continue;
+                try
+                {
+                    action(listener);
+                }
+                catch (Exception e)
+                {
+                    this.logger.LogError(e, "Error notifying global deadlock listener {listener}, will be removed", listener);
+                    this.deadlockListeners[i] = null;
+                }
+            }
         }
 
         private void RequestLocksFromSilo(Batch batch, SiloInfo silo, IEnumerable<Guid> transactions)
