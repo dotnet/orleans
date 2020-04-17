@@ -178,16 +178,6 @@ namespace Orleans.Runtime
             }
         }
         
-        public GuidId TargetObserverId
-        {
-            get { return Headers.TargetObserverId; }
-            set
-            {
-                Headers.TargetObserverId = value;
-                targetAddress = null;
-            }
-        }
-        
         public SiloAddress SendingSilo
         {
             get { return Headers.SendingSilo; }
@@ -406,7 +396,6 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.SENDING_SILO, sb, (m) => m.SendingSilo);
             AppendIfExists(HeadersContainer.Headers.TARGET_ACTIVATION, sb, (m) => m.TargetActivation);
             AppendIfExists(HeadersContainer.Headers.TARGET_GRAIN, sb, (m) => m.TargetGrain);
-            AppendIfExists(HeadersContainer.Headers.TARGET_OBSERVER, sb, (m) => m.TargetObserverId);
             AppendIfExists(HeadersContainer.Headers.CALL_CHAIN_ID, sb, (m) => m.CallChainId);
             AppendIfExists(HeadersContainer.Headers.TRACE_CONTEXT, sb, (m) => m.TraceContext);
             AppendIfExists(HeadersContainer.Headers.TARGET_SILO, sb, (m) => m.TargetSilo);
@@ -449,8 +438,8 @@ namespace Orleans.Runtime
                 IsNewPlacement ? "NewPlacement " : "", // 2
                 response,  //3
                 Direction, //4
-                String.Format("{0}{1}{2}", SendingSilo, SendingGrain, SendingActivation), //5
-                String.Format("{0}{1}{2}{3}", TargetSilo, TargetGrain, TargetActivation, TargetObserverId), //6
+                $"[{SendingSilo} {SendingGrain} {SendingActivation}]", //5
+                $"[{TargetSilo} {TargetGrain} {TargetActivation}]", //6
                 Id, //7
                 ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : ""); //8
         }
@@ -596,7 +585,6 @@ namespace Orleans.Runtime
             private SiloAddress _targetSilo;
             private GrainId _targetGrain;
             private ActivationId _targetActivation;
-            private GuidId _targetObserverId;
             private SiloAddress _sendingSilo;
             private GrainId _sendingGrain;
             private ActivationId _sendingActivation;
@@ -731,15 +719,6 @@ namespace Orleans.Runtime
                 set
                 {
                     _targetActivation = value;
-                }
-            }
-
-            public GuidId TargetObserverId
-            {
-                get { return _targetObserverId; }
-                set
-                {
-                    _targetObserverId = value;
                 }
             }
 
@@ -910,7 +889,6 @@ namespace Orleans.Runtime
                 headers = _targetSilo == null ? headers & ~Headers.TARGET_SILO : headers | Headers.TARGET_SILO;
                 headers = _targetGrain.IsDefault ? headers & ~Headers.TARGET_GRAIN : headers | Headers.TARGET_GRAIN;
                 headers = _targetActivation is null ? headers & ~Headers.TARGET_ACTIVATION : headers | Headers.TARGET_ACTIVATION;
-                headers = _targetObserverId is null ? headers & ~Headers.TARGET_OBSERVER : headers | Headers.TARGET_OBSERVER;
                 headers = _sendingSilo is null ? headers & ~Headers.SENDING_SILO : headers | Headers.SENDING_SILO;
                 headers = _sendingGrain.IsDefault ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
                 headers = _sendingActivation is null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
@@ -1043,11 +1021,6 @@ namespace Orleans.Runtime
                     writer.Write(input.TargetGrain);
                 }
 
-                if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
-                {
-                    WriteObj(sm, context, typeof(GuidId), input.TargetObserverId);
-                }
-
                 if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
                 {
                     writer.Write(input.CallChainId);
@@ -1170,7 +1143,7 @@ namespace Orleans.Runtime
                     result.TargetGrain = reader.ReadGrainId();
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
-                    result.TargetObserverId = (GuidId)ReadObj(sm, typeof(GuidId), context);
+                    _ = (GuidId)ReadObj(sm, typeof(GuidId), context);
 
                 if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
                     result.CallChainId = reader.ReadCorrelationId();
