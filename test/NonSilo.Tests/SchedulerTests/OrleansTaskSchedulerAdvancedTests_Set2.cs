@@ -680,7 +680,7 @@ namespace UnitTests.SchedulerTests
 
         internal async Task Run_ActivationSched_Test1(TaskScheduler scheduler, bool bounceToThreadPool)
         {
-            var grainId = GrainId.GetGrainId(0, Guid.NewGuid());
+            var grainId = LegacyGrainId.GetGrainId(0, Guid.NewGuid());
             var silo = new MockSiloDetails
             {
                 SiloAddress = SiloAddressUtils.NewLocalSiloAddress(23)

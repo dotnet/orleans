@@ -1,36 +1,37 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 
 namespace Orleans.Runtime
 {
     internal interface IGrainTypeResolver
     {
         bool TryGetGrainClassData(Type grainInterfaceType, out GrainClassData implementation, string grainClassNamePrefix);
-        bool TryGetGrainClassData(int grainInterfaceId, out GrainClassData implementation, string grainClassNamePrefix);
-        bool TryGetGrainClassData(string grainImplementationClassName, out GrainClassData implementation);
         bool IsUnordered(int grainTypeCode);
-        string GetLoadedGrainAssemblies();
     }
 
     [Serializable]
     internal class GrainTypeResolver : IGrainTypeResolver
     {
         private readonly Dictionary<string, GrainInterfaceData> typeToInterfaceData;
+
+#pragma warning disable IDE0051 // Remove unused private members
+#pragma warning disable CS0169 // Remove unused private members
+        // Unused. Retained for serializer compatibility.
         private readonly Dictionary<int, GrainInterfaceData> table;
+
+        // Unused. Retained for serializer compatibility.
         private readonly HashSet<string> loadedGrainAsemblies;
+#pragma warning restore CS0169 // Remove unused private members
+#pragma warning restore IDE0051 // Remove unused private members
+
         private readonly HashSet<int> unordered;
 
         public GrainTypeResolver(
             Dictionary<string, GrainInterfaceData> typeToInterfaceData,
-            Dictionary<int, GrainInterfaceData> table,
-            HashSet<string> loadedGrainAsemblies,
             HashSet<int> unordered)
         {
             this.typeToInterfaceData = typeToInterfaceData;
-            this.table = table;
-            this.loadedGrainAsemblies = loadedGrainAsemblies;
             this.unordered = unordered;
         }
 
@@ -56,38 +57,6 @@ namespace Orleans.Runtime
             }
 
             return false;
-        }
-
-        public bool TryGetGrainClassData(int grainInterfaceId, out GrainClassData implementation, string grainClassNamePrefix = null)
-        {
-            implementation = null;
-            GrainInterfaceData interfaceData;
-            if (!table.TryGetValue(grainInterfaceId, out interfaceData))
-            {
-                return false;
-            }
-            return TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix);
-        }
-
-        public bool TryGetGrainClassData(string grainImplementationClassName, out GrainClassData implementation)
-        {
-            implementation = null;
-            // have to iterate since _primaryImplementations is not serialized.
-            foreach (var interfaceData in table.Values)
-            {
-                foreach (var implClass in interfaceData.Implementations)
-                    if (implClass.GrainClass.Equals(grainImplementationClassName))
-                    {
-                        implementation = implClass;
-                        return true;
-                    }
-            }
-            return false;
-        }
-
-        public string GetLoadedGrainAssemblies()
-        {
-            return loadedGrainAsemblies != null ? loadedGrainAsemblies.ToStrings() : String.Empty;
         }
 
         public bool IsUnordered(int grainTypeCode)

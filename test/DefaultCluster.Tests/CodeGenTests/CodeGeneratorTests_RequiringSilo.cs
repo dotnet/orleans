@@ -24,8 +24,8 @@ namespace DefaultCluster.Tests.CodeGeneration
         {
             var g1Key = GetRandomGrainId();
             ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(g1Key);
-            GrainId id1 = ((GrainReference)g1).GrainId;
-            UniqueKey k1 = id1.Key;
+            LegacyGrainId id1 = ((GrainReference)g1).GrainId;
+            var k1 = id1.Key;
             Assert.True(id1.IsGrain, "GrainReference should be for a grain");
             Assert.Equal(UniqueKey.Category.Grain, k1.IdCategory);  // "GrainId should be for self-managed type"
             Assert.Equal(g1Key, k1.PrimaryKeyToLong());  // "Encoded primary key should match"
@@ -37,7 +37,7 @@ namespace DefaultCluster.Tests.CodeGeneration
         {
             var g1Key = GetRandomGrainId();
             ICollectionTestGrain g1 = this.GrainFactory.GetGrain<ICollectionTestGrain>(g1Key);
-            GrainId id1 = ((GrainReference)g1).GrainId;
+            LegacyGrainId id1 = ((GrainReference)g1).GrainId;
             UniqueKey k1 = id1.Key;
             output.WriteLine("GrainId={0} UniqueKey={1} PK={2} KeyType={3} IdCategory={4}",
                 id1, k1, id1.GetPrimaryKeyLong(), k1.IdCategory, k1.BaseTypeCode);

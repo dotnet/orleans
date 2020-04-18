@@ -16,7 +16,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// A client which is hosted within a silo.
     /// </summary>
-    internal sealed class HostedClient : IDisposable, IHostedClient, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class HostedClient : IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly Channel<Message> incomingMessages;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> extensionsTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
@@ -59,14 +59,15 @@ namespace Orleans.Runtime
             this.messagingTrace = messagingTrace;
             this.logger = logger;
 
-            this.ClientAddress = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, GrainId.NewClientId());
+            this.ClientId = ClientGrainId.Create($"hosted-{messageCenter.MyAddress.ToParsableString()}");
+            this.ClientAddress = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, this.ClientId.GrainId);
         }
 
         /// <inheritdoc />
         public ActivationAddress ClientAddress { get; }
 
         /// <inheritdoc />
-        public GrainId ClientId => this.ClientAddress.Grain;
+        public ClientGrainId ClientId { get; }
 
         /// <inheritdoc />
         public StreamDirectory StreamDirectory { get; } = new StreamDirectory();
@@ -79,8 +80,9 @@ namespace Orleans.Runtime
         {
             if (obj is GrainReference) throw new ArgumentException("Argument obj is already a grain reference.");
 
-            var grainReference = GrainReference.NewObserverGrainReference(this.ClientAddress.Grain, GuidId.GetNewGuidId(), this.grainReferenceRuntime);
-            if (!this.invokableObjects.TryRegister(obj, grainReference.ObserverId, invoker))
+            var observerId = ObserverGrainId.Create(this.ClientId);
+            var grainReference = GrainReference.NewObserverGrainReference(observerId, this.grainReferenceRuntime);
+            if (!this.invokableObjects.TryRegister(obj, observerId, invoker))
             {
                 throw new ArgumentException(
                     string.Format("Failed to add new observer {0} to localObjects collection.", grainReference),
@@ -93,9 +95,20 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public void DeleteObjectReference(IAddressable obj)
         {
-            if (!(obj is GrainReference reference)) throw new ArgumentException("Argument reference is not a grain reference.");
+            if (!(obj is GrainReference reference))
+            {
+                throw new ArgumentException("Argument reference is not a grain reference.");
+            }
 
-            if (!this.invokableObjects.TryDeregister(reference.ObserverId))throw new ArgumentException("Reference is not associated with a local object.", nameof(obj));
+            if (!ObserverGrainId.TryParse(reference.GrainId, out var observerId))
+            {
+                throw new ArgumentException($"Reference {reference.GrainId} is not an observer reference");
+            }
+
+            if (!invokableObjects.TryDeregister(observerId))
+            {
+                throw new ArgumentException("Reference is not associated with a local object.", "reference");
+            }
         }
 
         /// <inheritdoc />
@@ -138,7 +151,11 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public bool TryDispatchToClient(Message message)
         {
-            if (!this.ClientId.Equals(message.TargetGrain)) return false;
+            if (!ClientGrainId.TryParse(message.TargetGrain, out var targetClient) || !this.ClientId.Equals(targetClient))
+            {
+                return false;
+            }
+
             if (message.IsExpired)
             {
                 this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Receive);

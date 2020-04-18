@@ -45,15 +45,18 @@ namespace Orleans.Transactions.DynamoDB
         /// <summary>
         /// Create a DynamoDBStorage instance
         /// </summary>
-        /// <param name="loggerFactory"></param>
+        /// <param name="logger"></param>
         /// <param name="accessKey"></param>
         /// <param name="secretKey"></param>
         /// <param name="service"></param>
         /// <param name="readCapacityUnits"></param>
         /// <param name="writeCapacityUnits"></param>
         /// <param name="useProvisionedThroughput"></param>
-        public DynamoDBStorage(ILoggerFactory loggerFactory, string service,
-            string accessKey = "", string secretKey = "",
+        public DynamoDBStorage(
+            ILogger logger,
+            string service,
+            string accessKey = "",
+            string secretKey = "",
             int readCapacityUnits = DefaultReadCapacityUnits,
             int writeCapacityUnits = DefaultWriteCapacityUnits,
             bool useProvisionedThroughput = true)
@@ -65,7 +68,7 @@ namespace Orleans.Transactions.DynamoDB
             this.readCapacityUnits = readCapacityUnits;
             this.writeCapacityUnits = writeCapacityUnits;
             this.useProvisionedThroughput = useProvisionedThroughput;
-            Logger = loggerFactory.CreateLogger<DynamoDBStorage>();
+            Logger = logger;
             CreateClient();
         }
 

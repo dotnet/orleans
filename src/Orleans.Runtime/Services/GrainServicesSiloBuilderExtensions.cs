@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Runtime;
@@ -31,13 +31,14 @@ namespace Orleans.Hosting
         private static IGrainService GrainServiceFactory(Type serviceType, IServiceProvider services)
         {
             var grainServiceInterfaceType = serviceType.GetInterfaces().FirstOrDefault(x => x.GetInterfaces().Contains(typeof(IGrainService)));
-            if (grainServiceInterfaceType == null)
+            if (grainServiceInterfaceType is null)
             {
                 throw new InvalidOperationException(String.Format($"Cannot find an interface on {serviceType.FullName} which implements IGrainService"));
             }
+
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
-            var grainId = (IGrainIdentity)GrainId.GetGrainServiceGrainId(0, typeCode);
-            var grainService = (GrainService)ActivatorUtilities.CreateInstance(services, serviceType, grainId);
+            var grainId = SystemTargetGrainId.CreateGrainServiceGrainId(typeCode, null, SiloAddress.Zero);
+            var grainService = (IGrainService)ActivatorUtilities.CreateInstance(services, serviceType, grainId);
             return grainService;
         }
 

@@ -1,8 +1,8 @@
 using System;
 using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Options;
-using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
+using Orleans.Streaming.AzureStorage;
 
 namespace Orleans.Configuration
 {

@@ -29,7 +29,7 @@ namespace Orleans.LogConsistency
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
         /// </summary>
-        protected LogConsistentGrain(IGrainIdentity identity, IGrainRuntime runtime)
+        protected LogConsistentGrain(GrainId identity, IGrainRuntime runtime)
             : base(identity, runtime)
         {
         }

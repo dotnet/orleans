@@ -9,7 +9,6 @@ using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.GrainDirectory.AzureStorage.Utilities;
 using Orleans.Runtime;
 
 namespace Orleans.GrainDirectory.AzureStorage
@@ -48,14 +47,15 @@ namespace Orleans.GrainDirectory.AzureStorage
         }
 
         public AzureTableGrainDirectory(
+            AzureTableGrainDirectoryOptions directoryOptions,
             IOptions<ClusterOptions> clusterOptions,
-            IOptions<AzureTableGrainDirectoryOptions> directoryOptions,
             ILoggerFactory loggerFactory)
         {
             this.tableDataManager = new AzureTableDataManager<GrainDirectoryEntity>(
-                tableName: directoryOptions.Value.TableName,
-                storageConnectionString: directoryOptions.Value.ConnectionString,
-                loggerFactory: loggerFactory);
+                tableName: directoryOptions.TableName,
+                storageConnectionString: directoryOptions.ConnectionString,
+                loggerFactory.CreateLogger<AzureTableDataManager<GrainDirectoryEntity>>(),
+                storagePolicyOptions: directoryOptions.StoragePolicyOptions);
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
@@ -93,20 +93,25 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public async Task UnregisterMany(List<GrainAddress> addresses)
         {
-            if (addresses.Count <= AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+            if (addresses.Count <= this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows)
             {
                 await UnregisterManyBlock(addresses);
             }
             else
             {
                 var tasks = new List<Task>();
-                foreach (var subList in addresses.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                foreach (var subList in addresses.BatchIEnumerable(this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows))
                 {
                     tasks.Add(UnregisterManyBlock(subList));
                 }
                 await Task.WhenAll(tasks);
             }
-            
+        }
+
+        public Task UnregisterSilos(List<string> siloAddresses)
+        {
+            // Too costly to implement using Azure Table
+            return Task.CompletedTask;
         }
 
         private async Task UnregisterManyBlock(List<GrainAddress> addresses)

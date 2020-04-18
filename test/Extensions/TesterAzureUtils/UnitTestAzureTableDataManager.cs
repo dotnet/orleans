@@ -51,9 +51,9 @@ namespace Tester.AzureUtils
         protected const string INSTANCE_TABLE_NAME = "UnitTestAzureData";
 
         public UnitTestAzureTableDataManager(string storageConnectionString, ILoggerFactory loggerFactory)
-            : base(INSTANCE_TABLE_NAME, storageConnectionString, loggerFactory)
+            : base(INSTANCE_TABLE_NAME, storageConnectionString, loggerFactory.CreateLogger<UnitTestAzureTableDataManager>(), new AzureStoragePolicyOptions())
         {
-            InitTableAsync().WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Wait();
+            InitTableAsync().WithTimeout(new AzureStoragePolicyOptions().CreationTimeout).Wait();
         }
     }
 }

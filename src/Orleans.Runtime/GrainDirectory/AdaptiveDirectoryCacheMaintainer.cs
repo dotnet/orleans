@@ -25,7 +25,7 @@ namespace Orleans.Runtime.GrainDirectory
             AdaptiveGrainDirectoryCache cache,
             IInternalGrainFactory grainFactory,
             ILoggerFactory loggerFactory)
-            :base(nameSuffix: null, loggerFactory)
+            : base(loggerFactory)
         {
             this.grainFactory = grainFactory;
             this.router = router;
@@ -103,11 +103,11 @@ namespace Orleans.Runtime.GrainDirectory
                         else
                         {
                             // 3. If the entry is expired and was accessed in the last time interval, put into "fetch-batch-requests" list
-                            if (!fetchInBatchList.ContainsKey(owner))
+                            if (!fetchInBatchList.TryGetValue(owner, out var list))
                             {
-                                fetchInBatchList[owner] = new List<GrainId>();
+                                fetchInBatchList[owner] = list = new List<GrainId>();
                             }
-                            fetchInBatchList[owner].Add(grain);
+                            list.Add(grain);
                             // And reset the entry's access count for next time
                             entry.NumAccesses = 0;
                             cnt4++;                         // for debug
@@ -129,29 +129,29 @@ namespace Orleans.Runtime.GrainDirectory
 
         private void SendBatchCacheRefreshRequests(Dictionary<SiloAddress, List<GrainId>> refreshRequests)
         {
-            foreach (SiloAddress silo in refreshRequests.Keys)
+            foreach (var kv in refreshRequests)
             {
-                List<Tuple<GrainId, int>> cachedGrainAndETagList = BuildGrainAndETagList(refreshRequests[silo]);
+                var cachedGrainAndETagList = BuildGrainAndETagList(kv.Value);
 
-                SiloAddress capture = silo;
+                var silo = kv.Key;
 
                 router.CacheValidationsSent.Increment();
                 // Send all of the items in one large request
-                var validator = this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorId, capture);
-                                
+                var validator = this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorType, silo);
+
                 router.Scheduler.QueueTask(async () =>
                 {
                     var response = await validator.LookUpMany(cachedGrainAndETagList);
-                    ProcessCacheRefreshResponse(capture, response);
+                    ProcessCacheRefreshResponse(silo, response);
                 }, router.CacheValidator).Ignore();
 
-                if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} is sending request to silo {1} with {2} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);                
+                if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} is sending request to silo {1} with {2} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);
             }
         }
 
         private void ProcessCacheRefreshResponse(
             SiloAddress silo,
-            IReadOnlyCollection<Tuple<GrainId, int, List<ActivationAddress>>> refreshResponse)
+            List<Tuple<GrainId, int, List<ActivationAddress>>> refreshResponse)
         {
             if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} received ProcessCacheRefreshResponse. #Response entries {1}.", router.MyAddress, refreshResponse.Count);
 
@@ -196,7 +196,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="grains">List of grains owned by the same silo</param>
         /// <returns>List of grains in input along with their generation counters stored in the cache </returns>
-        private List<Tuple<GrainId, int>> BuildGrainAndETagList(IEnumerable<GrainId> grains)
+        private List<Tuple<GrainId, int>> BuildGrainAndETagList(List<GrainId> grains)
         {
             var grainAndETagList = new List<Tuple<GrainId, int>>();
 

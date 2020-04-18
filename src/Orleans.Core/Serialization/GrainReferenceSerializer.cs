@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 
@@ -27,7 +27,7 @@ namespace Orleans.Serialization
 
             if (input.IsObserverReference)
             {
-                input.ObserverId.SerializeToStream(writer);
+                GuidId.Default.SerializeToStream(writer);
             }
 
             // store as null, serialize as empty.
@@ -44,17 +44,17 @@ namespace Orleans.Serialization
         {
             var reader = context.StreamReader;
             GrainId id = reader.ReadGrainId();
-            SiloAddress silo = null;
-            GuidId observerId = null;
             byte siloAddressPresent = reader.ReadByte();
             if (siloAddressPresent != 0)
             {
-                silo = reader.ReadSiloAddress();
+                // Unused: silo.
+                // Note, this should become part of the GrainId when reading a legacy SystemTarget grain id, and therefore converting it to a new GrainId
+                _ = reader.ReadSiloAddress();
             }
-            bool expectObserverId = id.IsClient;
+            bool expectObserverId = id.IsClient();
             if (expectObserverId)
             {
-                observerId = GuidId.DeserializeFromStream(reader);
+                _ = GuidId.DeserializeFromStream(reader);
             }
             // store as null, serialize as empty.
             var genericArg = reader.ReadString();
@@ -63,12 +63,8 @@ namespace Orleans.Serialization
 
             var runtimeClient = context.AdditionalContext as IRuntimeClient;
             var runtime = runtimeClient?.GrainReferenceRuntime;
-            if (expectObserverId)
-            {
-                return GrainReference.NewObserverGrainReference(id, observerId, runtime);
-            }
 
-            return GrainReference.FromGrainId(id, runtime, genericArg, silo);
+            return GrainReference.FromGrainId(id, runtime, genericArg);
         }
 
         /// <summary> Copier function for grain reference. </summary>

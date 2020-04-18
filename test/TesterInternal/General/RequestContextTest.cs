@@ -492,7 +492,7 @@ namespace UnitTests.General
             {
                 output.WriteLine("OnInvoke called for Grain={0} PrimaryKey={1} GrainId={2} with {3} arguments",
                     grain.GetType().FullName,
-                    ((GrainReference)grain).GrainId.GetPrimaryKeyLong(),
+                    ((LegacyGrainId)((GrainReference)grain).GrainId).GetPrimaryKeyLong(),
                     ((GrainReference)grain).GrainId,
                     request.Arguments != null ? request.Arguments.Length : 0);
             }

@@ -1,6 +1,6 @@
+using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
-using System;
 
 namespace Orleans.Configuration.Internal
 {
@@ -47,8 +47,7 @@ namespace Orleans.Configuration.Internal
         /// <param name="services">The service collection.</param>
         public static void TryAddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
         {
-            var providedService = services.FirstOrDefault(service => service.ServiceType == typeof(TService));
-            if (providedService == null)
+            if (!services.Any(service => service.ServiceType == typeof(TService)))
             {
                 services.AddFromExisting<TService, TImplementation>();
             }

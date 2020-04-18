@@ -33,14 +33,18 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private readonly ILogger                         logger;
         [NonSerialized]
         private readonly AsyncLock                      initLock;
-        [NonSerialized]
-        private readonly ILoggerFactory loggerFactory;
         internal bool IsRewindable { get; private set; }
 
-        internal SimpleMessageStreamProducer(StreamImpl<T> stream, string streamProviderName,
-            IStreamProviderRuntime providerUtilities, bool fireAndForgetDelivery, bool optimizeForImmutableData,
-            IStreamPubSub pubSub, bool isRewindable, SerializationManager serializationManager,
-            ILoggerFactory loggerFactory)
+        internal SimpleMessageStreamProducer(
+            StreamImpl<T> stream,
+            string streamProviderName,
+            IStreamProviderRuntime providerUtilities,
+            bool fireAndForgetDelivery,
+            bool optimizeForImmutableData,
+            IStreamPubSub pubSub,
+            bool isRewindable,
+            SerializationManager serializationManager,
+            ILogger<SimpleMessageStreamProducer<T>> logger)
         {
             this.stream = stream;
             this.streamProviderName = streamProviderName;
@@ -53,15 +57,14 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             IsRewindable = isRewindable;
             isDisposed = false;
             initLock = new AsyncLock();
-            this.loggerFactory = loggerFactory;
-            this.logger = loggerFactory.CreateLogger(this.GetType().FullName);
+            this.logger = logger;
             ConnectToRendezvous().Ignore();
         }
 
         private async Task<ISet<PubSubSubscriptionState>> RegisterProducer()
         {
             var tup = await providerRuntime.BindExtension<SimpleMessageStreamProducerExtension, IStreamProducerExtension>(
-                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, this.loggerFactory, fireAndForgetDelivery, optimizeForImmutableData));
+                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, this.logger, fireAndForgetDelivery, optimizeForImmutableData));
 
             myExtension = tup.Item1;
             myGrainReference = tup.Item2;

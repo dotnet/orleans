@@ -49,7 +49,7 @@ namespace Orleans.Runtime
             IAppEnvironmentStatistics appEnvironmentStatistics,
             IHostEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(Constants.DeploymentLoadPublisherSystemTargetId, siloDetails.SiloAddress, loggerFactory)
+            : base(Constants.DeploymentLoadPublisherSystemTargetType, siloDetails.SiloAddress, loggerFactory)
         {
             this.logger = loggerFactory.CreateLogger<DeploymentLoadPublisher>();
             this.siloDetails = siloDetails;
@@ -88,7 +88,7 @@ namespace Orleans.Runtime
             try
             {
                 if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("PublishStatistics.");
-                List<SiloAddress> members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToList();
+                var members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
                 var tasks = new List<Task>();
                 var activationCount = this.activationDirectory.Count;
                 var recentlyUsedActivationCount = this.activationCollector.GetNumRecentlyUsed(TimeSpan.FromMinutes(10));
@@ -105,7 +105,7 @@ namespace Orleans.Runtime
                     try
                     {
                         tasks.Add(this.grainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
-                            Constants.DeploymentLoadPublisherSystemTargetId, siloAddress)
+                            Constants.DeploymentLoadPublisherSystemTargetType, siloAddress)
                             .UpdateRuntimeStatistics(this.siloDetails.SiloAddress, myStats));
                     }
                     catch (Exception)
@@ -146,11 +146,11 @@ namespace Orleans.Runtime
             await this.scheduler.RunOrQueueTask(() =>
                 {
                     var tasks = new List<Task>();
-                    List<SiloAddress> members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToList();
+                    var members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
                     foreach (var siloAddress in members)
                     {
                         var capture = siloAddress;
-                        Task task = this.grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, capture)
+                        Task task = this.grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, capture)
                                 .GetRuntimeStatistics()
                                 .ContinueWith((Task<SiloRuntimeStatistics> statsTask) =>
                                     {

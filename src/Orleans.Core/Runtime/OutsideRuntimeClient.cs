@@ -29,15 +29,13 @@ namespace Orleans
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager localObjects;
-
-        private ClientMessageCenter transport;
         private bool disposing;
 
         private ClientProviderRuntime clientProviderRuntime;
 
         internal readonly ClientStatisticsManager ClientStatistics;
         private readonly MessagingTrace messagingTrace;
-        private readonly GrainId clientId;
+        private readonly ClientGrainId clientId;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
         private readonly TimeSpan typeMapRefreshInterval;
@@ -51,7 +49,6 @@ namespace Orleans
 
         private MessageFactory messageFactory;
         private IPAddress localAddress;
-        private IGatewayListProvider gatewayListProvider;
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<StatisticsOptions> statisticsOptions;
         private readonly ApplicationRequestsStatisticsGroup appRequestStatistics;
@@ -77,7 +74,7 @@ namespace Orleans
 
         public IGrainReferenceRuntime GrainReferenceRuntime { get; private set; }
 
-        internal ClientMessageCenter MessageCenter => this.transport;
+        internal ClientMessageCenter MessageCenter { get; private set; }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
@@ -98,7 +95,7 @@ namespace Orleans
             this.ClientStatistics = clientStatisticsManager;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            this.clientId = GrainId.NewClientId();
+            this.clientId = ClientGrainId.Create();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             this.typeMapRefreshInterval = typeManagementOptions.Value.TypeMapRefreshInterval;
@@ -165,8 +162,6 @@ namespace Orleans
                     throw new InvalidOperationException("TestOnlyThrowExceptionDuringInit");
                 }
 
-                this.gatewayListProvider = this.ServiceProvider.GetRequiredService<IGatewayListProvider>();
-
                 var statisticsLevel = statisticsOptions.Value.CollectionLevel;
                 if (statisticsLevel.CollectThreadTimeTrackingStats())
                 {
@@ -185,7 +180,7 @@ namespace Orleans
 
         private async Task StreamingInitialize()
         {
-            var implicitSubscriberTable = await transport.GetImplicitStreamSubscriberTable(this.InternalGrainFactory);
+            var implicitSubscriberTable = await MessageCenter.GetImplicitStreamSubscriberTable(this.InternalGrainFactory);
             clientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
         }
 
@@ -195,42 +190,23 @@ namespace Orleans
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
             await Task.Run(() => this.StartInternal(retryFilter)).ConfigureAwait(false);
 
-            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client GUID ID: " + clientId);
+            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client ID: " + clientId);
         }
         
         // used for testing to (carefully!) allow two clients in the same process
         private async Task StartInternal(Func<Exception, Task<bool>> retryFilter)
         {
-            // Initialize the gateway list provider, since information from the cluster is required to successfully
-            // initialize subsequent services.
-            var initializedGatewayProvider = new[] {false};
-            await ExecuteWithRetries(async () =>
-                {
-                    if (!initializedGatewayProvider[0])
-                    {
-                        await this.gatewayListProvider.InitializeGatewayListProvider();
-                        initializedGatewayProvider[0] = true;
-                    }
-
-                    var gateways = await this.gatewayListProvider.GetGateways();
-                    if (gateways.Count == 0)
-                    {
-                        var gatewayProviderType = this.gatewayListProvider.GetType().GetParseableName();
-                        var err = $"Could not find any gateway in {gatewayProviderType}. Orleans client cannot initialize.";
-                        logger.Error(ErrorCode.GatewayManager_NoGateways, err);
-                        throw new SiloUnavailableException(err);
-                    }
-                },
-                retryFilter);
+            var gatewayManager = this.ServiceProvider.GetRequiredService<GatewayManager>();
+            await ExecuteWithRetries(async () => await gatewayManager.StartAsync(CancellationToken.None), retryFilter);
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
-            transport = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
-            transport.RegisterLocalMessageHandler(this.HandleMessage);
-            transport.Start();
-            CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, clientId);
+            MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
+            MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
+            MessageCenter.Start();
+            CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, clientId.GrainId);
 
             await ExecuteWithRetries(
-                async () => this.GrainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory),
+                async () => this.GrainTypeResolver = await MessageCenter.GetGrainTypeResolver(this.InternalGrainFactory),
                 retryFilter);
 
             this.typeMapRefreshTimer = new AsyncTaskSafeTimer(
@@ -240,7 +216,7 @@ namespace Orleans
                 this.typeMapRefreshInterval,
                 this.typeMapRefreshInterval);
 
-            ClientStatistics.Start(transport, clientId);
+            ClientStatistics.Start(MessageCenter, clientId.GrainId);
             
             await ExecuteWithRetries(StreamingInitialize, retryFilter);
 
@@ -266,7 +242,7 @@ namespace Orleans
         {
             try
             {
-                GrainTypeResolver = await transport.GetGrainTypeResolver(this.InternalGrainFactory);
+                GrainTypeResolver = await MessageCenter.GetGrainTypeResolver(this.InternalGrainFactory);
             }
             catch(Exception ex)
             {
@@ -301,7 +277,7 @@ namespace Orleans
             OrleansOutsideRuntimeClientEvent.Log.SendResponse(message);
             message.BodyObject = response;
 
-            transport.SendMessage(message);
+            MessageCenter.SendMessage(message);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
@@ -323,19 +299,14 @@ namespace Orleans
             if (!String.IsNullOrEmpty(genericArguments))
                 message.GenericGrainType = genericArguments;
 
-            if (targetGrainId.IsSystemTarget)
+            if (targetGrainId.IsSystemTarget())
             {
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = target.SystemTargetSilo;
                 if (target.SystemTargetSilo != null)
                 {
-                    message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, target.SystemTargetSilo);
+                    message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
                 }
-            }
-            // Client sending messages to another client (observer). Yes, we support that.
-            if (target.IsObserverReference)
-            {
-                message.TargetObserverId = target.ObserverId;
             }
 
             if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
@@ -351,7 +322,7 @@ namespace Orleans
             }
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Send {0}", message);
-            transport.SendMessage(message);
+            MessageCenter.SendMessage(message);
         }
 
         public void ReceiveResponse(Message response)
@@ -421,9 +392,9 @@ namespace Orleans
 
             Utils.SafeExecute(() =>
                 {
-                    if (transport != null)
+                    if (MessageCenter != null)
                     {
-                        transport.Stop();
+                        MessageCenter.Stop();
                     }
                 }, logger, "Client.Stop-Transport");
             Utils.SafeExecute(() =>
@@ -472,22 +443,31 @@ namespace Orleans
             if (obj is Grain)
                 throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
-            GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId(), this.GrainReferenceRuntime);
-            if (!localObjects.TryRegister(obj, gr.ObserverId, invoker))
+            var observerId = ObserverGrainId.Create(this.clientId);
+            GrainReference reference = GrainReference.NewObserverGrainReference(observerId, this.GrainReferenceRuntime);
+            if (!localObjects.TryRegister(obj, observerId, invoker))
             {
-                throw new ArgumentException(String.Format("Failed to add new observer {0} to localObjects collection.", gr), "gr");
+                throw new ArgumentException($"Failed to add new observer {reference} to localObjects collection.", "reference");
             }
-            return gr;
+            return reference;
         }
 
         public void DeleteObjectReference(IAddressable obj)
         {
-            if (!(obj is GrainReference))
+            if (!(obj is GrainReference reference))
+            {
                 throw new ArgumentException("Argument reference is not a grain reference.");
+            }
 
-            var reference = (GrainReference)obj;
-            if (!localObjects.TryDeregister(reference.ObserverId))
+            if (!ObserverGrainId.TryParse(reference.GrainId, out var observerId))
+            {
+                throw new ArgumentException($"Reference {reference.GrainId} is not an observer reference");
+            }
+
+            if (!localObjects.TryDeregister(observerId))
+            {
                 throw new ArgumentException("Reference is not associated with a local object.", "reference");
+            }
         }
 
         private string PrintAppDomainDetails()
@@ -510,7 +490,7 @@ namespace Orleans
                 }
             });
             
-            Utils.SafeExecute(() => transport?.Dispose());
+            Utils.SafeExecute(() => MessageCenter?.Dispose());
             if (ClientStatistics != null)
             {
                 Utils.SafeExecute(() => ClientStatistics.Dispose());

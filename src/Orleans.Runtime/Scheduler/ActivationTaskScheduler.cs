@@ -21,9 +21,9 @@ namespace Orleans.Runtime.Scheduler
         private readonly CounterStatistic turnsExecutedStatistic;
 #endif
 
-        internal ActivationTaskScheduler(WorkItemGroup workGroup, ILoggerFactory loggerFactory)
+        internal ActivationTaskScheduler(WorkItemGroup workGroup, ILogger<ActivationTaskScheduler> logger)
         {
-            this.logger = loggerFactory.CreateLogger<ActivationTaskScheduler>();
+            this.logger = logger;
             myId = Interlocked.Increment(ref idCounter);
             workerGroup = workGroup;
 #if EXTRA_STATS

@@ -52,7 +52,7 @@ namespace Orleans.Runtime.Messaging
 
                 await ConnectionPreamble.Write(
                     this.Context,
-                    this.messageCenter.ClientId,
+                    this.messageCenter.ClientId.GrainId,
                     this.connectionOptions.ProtocolVersion,
                     siloAddress: null);
 
@@ -84,7 +84,7 @@ namespace Orleans.Runtime.Messaging
             if (!this.IsValid)
             {
                 // Recycle the message we've dequeued. Note that this will recycle messages that were queued up to be sent when the gateway connection is declared dead
-                msg.TargetActivation = null;
+                msg.TargetActivation = default;
                 msg.TargetSilo = null;
                 this.messageCenter.SendMessage(msg);
                 return false;
@@ -93,8 +93,8 @@ namespace Orleans.Runtime.Messaging
             if (msg.TargetSilo != null) return true;
 
             msg.TargetSilo = this.remoteSiloAddress;
-            if (msg.TargetGrain.IsSystemTarget)
-                msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, msg.TargetSilo);
+            if (msg.TargetGrain.IsSystemTarget())
+                msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
 
             return true;
         }

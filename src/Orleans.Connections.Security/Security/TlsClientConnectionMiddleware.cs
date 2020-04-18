@@ -1,9 +1,6 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.IO.Pipelines;
 using System.Net.Security;
-using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,7 +32,7 @@ namespace Orleans.Connections.Security
 
 
             _options = options;
-            _logger = loggerFactory?.CreateLogger<TlsServerConnectionMiddleware>();
+            _logger = loggerFactory?.CreateLogger<TlsClientConnectionMiddleware>();
         }
 
         public Task OnConnectionAsync(ConnectionContext context)
@@ -118,7 +115,7 @@ namespace Orleans.Connections.Security
                 {
                     var sslOptions = new TlsClientAuthenticationOptions
                     {
-                        ClientCertificates = _certificate == null ? null : new X509CertificateCollection(new[] { _certificate }),
+                        ClientCertificates = _certificate == null ? null : new X509CertificateCollection { _certificate },
                         EnabledSslProtocols = _options.SslProtocols,
                     };
 

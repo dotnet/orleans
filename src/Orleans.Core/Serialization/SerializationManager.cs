@@ -1,28 +1,23 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Linq;
-using System.Net;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
 using System.Text;
-using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Metadata;
+using Orleans.Runtime;
 using Orleans.Utilities;
-using System.Buffers;
 
 namespace Orleans.Serialization
 {
@@ -101,12 +96,14 @@ namespace Orleans.Serialization
             deserializers = new Dictionary<Type, Deserializer>();
             grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
 
-            var options = serializationProviderOptions.Value;
+            this.SerializationProviderOptions = serializationProviderOptions.Value;
 
-            fallbackSerializer = GetFallbackSerializer(serviceProvider, options.FallbackSerializationProvider);
+            fallbackSerializer = GetFallbackSerializer(serviceProvider, SerializationProviderOptions.FallbackSerializationProvider);
             
-            RegisterSerializationProviders(options.SerializationProviders);
+            RegisterSerializationProviders(SerializationProviderOptions.SerializationProviders);
         }
+
+        internal SerializationProviderOptions SerializationProviderOptions { get; }
 
         public void RegisterSerializers(IApplicationPartManager applicationPartManager)
         {
@@ -173,7 +170,7 @@ namespace Orleans.Serialization
                 return null;
 
             // If the type lacks a Serializer attribute then it's a self-serializing type and all serialization methods must be static
-            if (!serializerType.GetCustomAttributes(typeof(SerializerAttribute), true).Any())
+            if (!serializerType.IsDefined(typeof(SerializerAttribute), true))
                 return null;
 
             var constructors = serializerType.GetConstructors();
@@ -523,15 +520,15 @@ namespace Orleans.Serialization
             deserializer = null;
             foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
             {
-                if (method.GetCustomAttributes(typeof(CopierMethodAttribute), true).Any())
+                if (method.IsDefined(typeof(CopierMethodAttribute), true))
                 {
                     copier = method;
                 }
-                else if (method.GetCustomAttributes(typeof(SerializerMethodAttribute), true).Any())
+                else if (method.IsDefined(typeof(SerializerMethodAttribute), true))
                 {
                     serializer = method;
                 }
-                else if (method.GetCustomAttributes(typeof(DeserializerMethodAttribute), true).Any())
+                else if (method.IsDefined(typeof(DeserializerMethodAttribute), true))
                 {
                     deserializer = method;
                 }

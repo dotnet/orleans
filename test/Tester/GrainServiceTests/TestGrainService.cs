@@ -54,10 +54,10 @@ namespace Tester
 
     public class TestGrainService : GrainService, ITestGrainService
     {
-        private readonly IGrainIdentity id;
+        private readonly GrainId id;
         private TestGrainServiceOptions config;
 
-        public TestGrainService(IGrainIdentity id, Silo silo, ILoggerFactory loggerFactory, IOptions<TestGrainServiceOptions> options) : base(id, silo, loggerFactory)
+        public TestGrainService(GrainId id, Silo silo, ILoggerFactory loggerFactory, IOptions<TestGrainServiceOptions> options) : base(id, silo, loggerFactory)
         {
             this.id = id;
             this.config = options.Value;

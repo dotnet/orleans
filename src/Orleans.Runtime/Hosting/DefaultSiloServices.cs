@@ -117,7 +117,18 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ActivationCollector>();
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
-            services.TryAddSingleton<IGrainLocator>(sp => GrainLocatorFactory.GetGrainLocator(sp));
+            services.AddSingleton<DhtGrainLocator>();
+            services.AddSingleton<IGrainDirectoryResolver, GrainDirectoryResolver>();
+            if (GrainDirectoryResolver.HasAnyRegisteredGrainDirectory(services))
+            {
+                services.AddSingleton<IGrainLocator, GrainLocatorSelector>();
+                services.AddSingleton<CachedGrainLocator>();
+                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator>();
+            }
+            else
+            {
+                services.AddFromExisting<IGrainLocator, DhtGrainLocator>();
+            }
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
@@ -300,7 +311,6 @@ namespace Orleans.Hosting
 
             // Enable hosted client.
             services.TryAddSingleton<HostedClient>();
-            services.TryAddFromExisting<IHostedClient, HostedClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, HostedClient>();
             services.TryAddSingleton<InvokableObjectManager>();
             services.TryAddSingleton<InternalClusterClient>();

@@ -48,7 +48,7 @@ namespace Orleans.Runtime.MembershipService
             }
 
             var grainFactory = this.serviceProvider.GetRequiredService<IInternalGrainFactory>();
-            var result = grainFactory.GetSystemTarget<IMembershipTableSystemTarget>(Constants.SystemMembershipTableId, SiloAddress.New(options.PrimarySiloEndpoint, 0));
+            var result = grainFactory.GetSystemTarget<IMembershipTableSystemTarget>(Constants.SystemMembershipTableType, SiloAddress.New(options.PrimarySiloEndpoint, 0));
             if (isPrimarySilo)
             {
                 await this.WaitForTableGrainToInit(result);
@@ -120,11 +120,16 @@ namespace Orleans.Runtime.MembershipService
             ILocalSiloDetails localSiloDetails,
             ILoggerFactory loggerFactory,
             SerializationManager serializationManager)
-            : base(Constants.SystemMembershipTableId, localSiloDetails.SiloAddress, loggerFactory)
+            : base(CreateId(localSiloDetails), localSiloDetails.SiloAddress, lowPriority: false, loggerFactory)
         {
             logger = loggerFactory.CreateLogger<MembershipTableSystemTarget>();
             table = new InMemoryMembershipTable(serializationManager);
             logger.Info(ErrorCode.MembershipGrainBasedTable1, "GrainBasedMembershipTable Activated.");
+        }
+
+        private static SystemTargetGrainId CreateId(ILocalSiloDetails localSiloDetails)
+        {
+            return SystemTargetGrainId.Create(Constants.SystemMembershipTableType, SiloAddress.New(localSiloDetails.SiloAddress.Endpoint, 0));
         }
 
         public Task InitializeMembershipTable(bool tryInitTableVersion)

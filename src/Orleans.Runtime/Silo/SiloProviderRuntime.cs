@@ -91,7 +91,7 @@ namespace Orleans.Runtime.Providers
             IQueueAdapter queueAdapter)
         {
             IStreamQueueBalancer queueBalancer = CreateQueueBalancer(streamProviderName);
-            var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
+            var managerId = SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, this.siloDetails.SiloAddress, streamProviderName);
             var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
             var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
             var manager = new PersistentStreamPullingManager(

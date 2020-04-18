@@ -50,7 +50,7 @@ namespace Orleans.Runtime.TestHooks
             ISiloStatusOracle siloStatusOracle,
             TestHooksHostEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(Constants.TestHooksSystemTargetId, siloDetails.SiloAddress, loggerFactory)
+            : base(Constants.TestHooksSystemTargetType, siloDetails.SiloAddress, loggerFactory)
         {
             this.host = host;
             this.siloStatusOracle = siloStatusOracle;

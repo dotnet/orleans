@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     /// </summary>
     public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable, IGrainContext
     {
-        private readonly GrainId grainId;
+        private readonly SystemTargetGrainId id;
         private GrainReference selfReference;
         private IGrainMethodInvoker lastInvoker;
         private Message running;
@@ -22,7 +22,7 @@ namespace Orleans.Runtime
         public SiloAddress Silo { get; }
         internal ActivationAddress ActivationAddress { get; }
 
-        GrainId ISystemTargetBase.GrainId => grainId;
+        GrainId ISystemTargetBase.GrainId => id.GrainId;
         internal ActivationId ActivationId { get; set; }
         private ISiloRuntimeClient runtimeClient;
         private readonly ILogger timerLogger;
@@ -50,9 +50,9 @@ namespace Orleans.Runtime
 
         IGrainReferenceRuntime ISystemTargetBase.GrainReferenceRuntime => this.RuntimeClient.GrainReferenceRuntime;
 
-        GrainReference IGrainContext.GrainReference => selfReference ??= GrainReference.FromGrainId(this.grainId, this.RuntimeClient.GrainReferenceRuntime, systemTargetSilo: this.Silo);
+        GrainReference IGrainContext.GrainReference => selfReference ??= GrainReference.FromGrainId(this.id.GrainId, this.RuntimeClient.GrainReferenceRuntime);
 
-        GrainId IGrainContext.GrainId => this.grainId;
+        GrainId IGrainContext.GrainId => this.id.GrainId;
 
         IAddressable IGrainContext.GrainInstance => this;
 
@@ -65,18 +65,23 @@ namespace Orleans.Runtime
         {
         }
 
-        internal SystemTarget(GrainId grainId, SiloAddress silo, ILoggerFactory loggerFactory) 
-            : this(grainId, silo, false, loggerFactory)
+        internal SystemTarget(GrainType grainType, SiloAddress silo, ILoggerFactory loggerFactory)
+            : this(SystemTargetGrainId.Create(grainType, silo), silo, false, loggerFactory)
         {
         }
 
-        internal SystemTarget(GrainId grainId, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
+        internal SystemTarget(GrainType grainType, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
+            : this(SystemTargetGrainId.Create(grainType, silo), silo, lowPriority, loggerFactory)
         {
-            this.grainId = grainId;
+        }
+
+        internal SystemTarget(SystemTargetGrainId grainId, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
+        {
+            this.id = grainId;
             this.Silo = silo;
-            this.ActivationAddress = ActivationAddress.GetAddress(this.Silo, this.grainId, this.ActivationId);
-            this.ActivationId = ActivationId.GetSystemActivation(grainId, silo);
+            this.ActivationAddress = ActivationAddress.GetAddress(this.Silo, this.id.GrainId, this.ActivationId);
             this.IsLowPriority = lowPriority;
+            this.ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
         }
 
@@ -143,7 +148,7 @@ namespace Orleans.Runtime
             return String.Format("[{0}SystemTarget: {1}{2}{3}]",
                  IsLowPriority ? "LowPriority" : string.Empty,
                  Silo,
-                 this.grainId,
+                 this.id,
                  this.ActivationId);
         }
 

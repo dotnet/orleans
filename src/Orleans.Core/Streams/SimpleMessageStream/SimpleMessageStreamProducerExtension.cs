@@ -26,17 +26,15 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private readonly bool                       fireAndForgetDelivery;
         private readonly bool                       optimizeForImmutableData;
         private readonly ILogger                    logger;
-        private readonly ILoggerFactory             loggerFactory;
 
-        internal SimpleMessageStreamProducerExtension(IStreamProviderRuntime providerRt, IStreamPubSub pubsub, ILoggerFactory loggerFactory, bool fireAndForget, bool optimizeForImmutable)
+        internal SimpleMessageStreamProducerExtension(IStreamProviderRuntime providerRt, IStreamPubSub pubsub, ILogger logger, bool fireAndForget, bool optimizeForImmutable)
         {
             providerRuntime = providerRt;
             streamPubSub = pubsub;
             fireAndForgetDelivery = fireAndForget;
             optimizeForImmutableData = optimizeForImmutable;
             remoteConsumers = new Dictionary<StreamId, StreamConsumerExtensionCollection>();
-            logger = loggerFactory.CreateLogger<SimpleMessageStreamProducerExtension>();
-            this.loggerFactory = loggerFactory;
+            this.logger = logger;
         }
 
         internal void AddStream(StreamId streamId)
@@ -46,7 +44,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             // so this call is only made once, when StreamProducer is created.
             if (remoteConsumers.TryGetValue(streamId, out obs)) return;
 
-            obs = new StreamConsumerExtensionCollection(streamPubSub, this.loggerFactory);
+            obs = new StreamConsumerExtensionCollection(streamPubSub, this.logger);
             remoteConsumers.Add(streamId, obs);
         }
 
@@ -170,11 +168,11 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             private readonly IStreamPubSub streamPubSub;
             private readonly ILogger logger;
 
-            internal StreamConsumerExtensionCollection(IStreamPubSub pubSub, ILoggerFactory loggerFactory)
+            internal StreamConsumerExtensionCollection(IStreamPubSub pubSub, ILogger logger)
             {
-                streamPubSub = pubSub;
-                this.logger = loggerFactory.CreateLogger<StreamConsumerExtensionCollection>();
-                consumers = new ConcurrentDictionary<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>>();
+                this.streamPubSub = pubSub;
+                this.logger = logger;
+                this.consumers = new ConcurrentDictionary<GuidId, Tuple<IStreamConsumerExtension, IStreamFilterPredicateWrapper>>();
             }
 
             internal void AddRemoteSubscriber(GuidId subscriptionId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)

@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System.Diagnostics;
 
 namespace Orleans
 {
@@ -38,7 +40,7 @@ namespace Orleans
             get { return Data?.ServiceProvider ?? Runtime?.ServiceProvider; }
         }
 
-        internal IGrainIdentity Identity;
+        internal GrainId Identity;
 
         /// <summary>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of Grain) do not have to add a constructor.
@@ -53,20 +55,17 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
         /// </summary>
-        protected Grain(IGrainIdentity identity, IGrainRuntime runtime)
+        protected Grain(GrainId identity, IGrainRuntime runtime)
         {
             Identity = identity;
             Runtime = runtime;
         }
 
-        
+
         /// <summary>
         /// String representation of grain's SiloIdentity including type and primary key.
         /// </summary>
-        public string IdentityString
-        {
-            get { return Identity?.IdentityString ?? string.Empty; }
-        }
+        public string IdentityString => this.Identity.ToString();
 
         /// <summary>
         /// A unique identifier for the current silo.
@@ -265,7 +264,7 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
         /// </summary>
-        protected Grain(IGrainIdentity identity, IGrainRuntime runtime, IStorage<TGrainState> storage)
+        protected Grain(GrainId identity, IGrainRuntime runtime, IStorage<TGrainState> storage)
             : base(identity, runtime)
         {
             this.storage = storage;

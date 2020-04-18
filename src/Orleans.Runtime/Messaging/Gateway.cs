@@ -22,7 +22,7 @@ namespace Orleans.Runtime.Messaging
         // Any client currently in the system appears in this collection. 
         // In addition, we use clientConnections collection for fast retrival of ClientState. 
         // Anything that appears in those 2 collections should also appear in the main clients collection.
-        private readonly ConcurrentDictionary<GrainId, ClientState> clients;
+        private readonly ConcurrentDictionary<ClientGrainId, ClientState> clients;
         private readonly ConcurrentDictionary<GatewayInboundConnection, ClientState> clientConnections;
         private readonly SiloAddress gatewayAddress;
         private readonly GatewaySender sender;
@@ -46,7 +46,7 @@ namespace Orleans.Runtime.Messaging
             messageCenter = msgCtr;
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
             dropper = new GatewayClientCleanupAgent(this, loggerFactory, messagingOptions.ClientDropTimeout);
-            clients = new ConcurrentDictionary<GrainId, ClientState>();
+            clients = new ConcurrentDictionary<ClientGrainId, ClientState>();
             clientConnections = new ConcurrentDictionary<GatewayInboundConnection, ClientState>();
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
             this.gatewayAddress = siloDetails.GatewayAddress;
@@ -66,12 +66,12 @@ namespace Orleans.Runtime.Messaging
             dropper.Stop();
         }
 
-        internal ICollection<GrainId> GetConnectedClients()
+        internal ICollection<ClientGrainId> GetConnectedClients()
         {
             return clients.Keys;
         }
 
-        internal void RecordOpenedConnection(GatewayInboundConnection connection, GrainId clientId)
+        internal void RecordOpenedConnection(GatewayInboundConnection connection, ClientGrainId clientId)
         {
             lock (lockable)
             {
@@ -128,11 +128,11 @@ namespace Orleans.Runtime.Messaging
             // it to this address...
             // EXCEPT if the value is equal to the current GatewayAdress: in this case we will return
             // null and the local dispatcher will forward the Message to a local SystemTarget activation
-            if (msg.TargetGrain.IsSystemTarget && !IsTargetingLocalGateway(msg.TargetSilo))
+            if (msg.TargetGrain.IsSystemTarget() && !IsTargetingLocalGateway(msg.TargetSilo))
                 return msg.TargetSilo;
 
             // for responses from ClientAddressableObject to ClientGrain try to use clientsReplyRoutingCache for sending replies directly back.
-            if (!msg.SendingGrain.IsClient || !msg.TargetGrain.IsClient) return null;
+            if (!msg.SendingGrain.IsClient() || !msg.TargetGrain.IsClient()) return null;
 
             if (msg.Direction != Message.Directions.Response) return null;
 
@@ -198,15 +198,22 @@ namespace Orleans.Runtime.Messaging
         {
             // See if it's a grain we're proxying.
             ClientState client;
-            
-            // not taking global lock on the crytical path!
-            if (!clients.TryGetValue(msg.TargetGrain, out client))
+
+            var targetGrain = msg.TargetGrain;
+            if (!ClientGrainId.TryParse(targetGrain, out var clientId))
+            {
                 return false;
+            }
+
+            if (!clients.TryGetValue(clientId, out client))
+            {
+                return false;
+            }
             
             // when this Gateway receives a message from client X to client addressale object Y
             // it needs to record the original Gateway address through which this message came from (the address of the Gateway that X is connected to)
             // it will use this Gateway to re-route the REPLY from Y back to X.
-            if (msg.SendingGrain.IsClient && msg.TargetGrain.IsClient)
+            if (msg.SendingGrain.IsClient())
             {
                 clientsReplyRoutingCache.RecordClientRoute(msg.SendingGrain, msg.SendingSilo);
             }
@@ -214,8 +221,11 @@ namespace Orleans.Runtime.Messaging
             msg.TargetSilo = null;
             // Override the SendingSilo only if the sending grain is not 
             // a system target
-            if (!msg.SendingGrain.IsSystemTarget)
+            if (!msg.SendingGrain.IsSystemTarget())
+            {
                 msg.SendingSilo = gatewayAddress;
+            }
+
             QueueRequest(client, msg);
             return true;
         }
@@ -228,11 +238,11 @@ namespace Orleans.Runtime.Messaging
             internal Queue<Message> PendingToSend { get; private set; }
             internal GatewayInboundConnection Connection { get; private set; }
             internal DateTime DisconnectedSince { get; private set; }
-            internal GrainId Id { get; private set; }
+            internal ClientGrainId Id { get; private set; }
 
             internal bool IsConnected => this.Connection != null;
 
-            internal ClientState(GrainId id, TimeSpan clientDropTimeout)
+            internal ClientState(ClientGrainId id, TimeSpan clientDropTimeout)
             {
                 Id = id;
                 this.clientDropTimeout = clientDropTimeout;

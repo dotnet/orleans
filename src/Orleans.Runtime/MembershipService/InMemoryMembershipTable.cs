@@ -24,8 +24,8 @@ namespace Orleans.Runtime.MembershipService
 
         public MembershipTableData Read(SiloAddress key)
         {
-            return siloTable.ContainsKey(key) ? 
-                new MembershipTableData((Tuple<MembershipEntry, string>)this.serializationManager.DeepCopy(siloTable[key]), tableVersion) 
+            return siloTable.TryGetValue(key, out var data) ?
+                new MembershipTableData((Tuple<MembershipEntry, string>)this.serializationManager.DeepCopy(data), tableVersion)
                 : new MembershipTableData(tableVersion);
         }
 

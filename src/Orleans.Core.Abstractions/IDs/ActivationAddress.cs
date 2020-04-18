@@ -59,7 +59,7 @@ namespace Orleans.Runtime
                 String.Format(
                     "[ActivationAddress: {0}, Full GrainId: {1}, Full ActivationId: {2}]",
                     this.ToString(),                        // 0
-                    this.Grain.ToFullString(),              // 1
+                    this.Grain.ToString(),                  // 1
                     this.Activation.ToFullString());        // 2
         }
 

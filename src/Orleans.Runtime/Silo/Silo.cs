@@ -796,7 +796,7 @@ namespace Orleans.Runtime
     internal class FallbackSystemTarget : SystemTarget
     {
         public FallbackSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
-            : base(Constants.FallbackSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
+            : base(Constants.FallbackSystemTargetType, localSiloDetails.SiloAddress, loggerFactory)
         {
         }
     }
@@ -805,7 +805,7 @@ namespace Orleans.Runtime
     internal class LifecycleSchedulingSystemTarget : SystemTarget
     {
         public LifecycleSchedulingSystemTarget(ILocalSiloDetails localSiloDetails, ILoggerFactory loggerFactory)
-            : base(Constants.LifecycleSchedulingSystemTargetId, localSiloDetails.SiloAddress, loggerFactory)
+            : base(Constants.LifecycleSchedulingSystemTargetType, localSiloDetails.SiloAddress, loggerFactory)
         {
         }
     }

@@ -42,9 +42,9 @@ namespace Orleans.Runtime
         private Dispatcher dispatcher;
         private List<IIncomingGrainCallFilter> grainCallFilters;
         private SerializationManager serializationManager;
-        private IHostedClient hostedClient;
+        private HostedClient hostedClient;
 
-        private IHostedClient HostedClient => this.hostedClient ?? (this.hostedClient = this.ServiceProvider.GetRequiredService<IHostedClient>());
+        private HostedClient HostedClient => this.hostedClient ?? (this.hostedClient = this.ServiceProvider.GetRequiredService<HostedClient>());
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping = new InterfaceToImplementationMappingCache();
         private readonly GrainTypeManager typeManager;
         private readonly MessageFactory messageFactory;
@@ -160,23 +160,18 @@ namespace Orleans.Runtime
             var targetGrainId = target.GrainId;
             message.TargetGrain = targetGrainId;
             SharedCallbackData sharedData;
-            if (targetGrainId.IsSystemTarget)
+            if (targetGrainId.IsSystemTarget())
             {
                 SiloAddress targetSilo = (target.SystemTargetSilo ?? MySilo);
                 message.TargetSilo = targetSilo;
-                message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, targetSilo);
-                message.Category = targetGrainId.Equals(Constants.MembershipOracleId) ?
+                message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
+                message.Category = targetGrainId.Type.Equals(Constants.MembershipOracleType) ?
                     Message.Categories.Ping : Message.Categories.System;
                 sharedData = this.systemSharedCallbackData;
             }
             else
             {
                 sharedData = this.sharedCallbackData;
-            }
-
-            if (target.IsObserverReference)
-            {
-                message.TargetObserverId = target.ObserverId;
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
@@ -198,7 +193,7 @@ namespace Orleans.Runtime
 
             this.messagingTrace.OnSendRequest(message);
 
-            if (targetGrainId.IsSystemTarget)
+            if (targetGrainId.IsSystemTarget())
             {
                 // Messages to system targets bypass the task system and get sent "in-line"
                 this.Dispatcher.TransportMessage(message);
@@ -286,7 +281,7 @@ namespace Orleans.Runtime
                 }
 
                 RequestContextExtensions.Import(message.RequestContextData);
-                if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
+                if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget())
                 {
                     UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation));
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop

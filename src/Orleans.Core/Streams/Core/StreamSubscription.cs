@@ -1,10 +1,11 @@
-﻿using Orleans.Core;
+using Orleans.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
 namespace Orleans.Streams.Core
 {
@@ -12,7 +13,7 @@ namespace Orleans.Streams.Core
     [Immutable]
     public class StreamSubscription
     {
-        public StreamSubscription(Guid subscriptionId, string streamProviderName, IStreamIdentity streamId, IGrainIdentity grainId)
+        public StreamSubscription(Guid subscriptionId, string streamProviderName, IStreamIdentity streamId, GrainId grainId)
         {
             this.SubscriptionId = subscriptionId;
             this.StreamProviderName = streamProviderName;
@@ -22,6 +23,6 @@ namespace Orleans.Streams.Core
         public Guid SubscriptionId { get; set; }
         public string StreamProviderName { get; set; }
         public IStreamIdentity StreamId { get; set; }
-        public IGrainIdentity GrainId { get; set; }
+        public GrainId GrainId { get; set; }
     }
 }

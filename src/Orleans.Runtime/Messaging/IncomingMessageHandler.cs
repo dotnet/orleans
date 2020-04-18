@@ -37,7 +37,7 @@ namespace Orleans.Runtime.Messaging
 
             IGrainContext context;
             // Find the activation it targets; first check for a system activation, then an app activation
-            if (msg.TargetGrain.IsSystemTarget)
+            if (msg.TargetGrain.IsSystemTarget())
             {
                 SystemTarget target = this.directory.FindSystemTarget(msg.TargetActivation);
                 if (target == null)

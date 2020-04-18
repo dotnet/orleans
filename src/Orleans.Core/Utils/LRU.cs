@@ -9,7 +9,7 @@ namespace Orleans.Runtime
 {
     // This class implements an LRU cache of values. It keeps a bounded set of values and will
     // flush "old" values 
-    internal class LRU<TKey, TValue> : IEnumerable<KeyValuePair<TKey,TValue>> where TKey : class
+    internal class LRU<TKey, TValue> : IEnumerable<KeyValuePair<TKey,TValue>>
     {
         // Delegate type for fetching the value associated with a given key.
         public delegate TValue FetchValueDelegate(TKey key);
@@ -92,11 +92,7 @@ namespace Orleans.Runtime
             cache.AddOrUpdate(key, result, (k, o) => result);
         }
 
-        public bool ContainsKey(TKey key)
-        {
-            TimestampedValue ignore;
-            return cache.TryGetValue(key, out ignore);
-        }
+        public bool ContainsKey(TKey key) => cache.ContainsKey(key);
 
         public bool RemoveKey(TKey key, out TValue value)
         {

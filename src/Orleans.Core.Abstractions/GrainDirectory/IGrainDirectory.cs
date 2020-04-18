@@ -26,17 +26,18 @@ namespace Orleans.GrainDirectory
         Task Unregister(GrainAddress address);
 
         /// <summary>
-        /// Unregister a batch of <see cref="GrainAddress"/> entries in the directory.
-        /// </summary>
-        /// <param name="addresses">The grains to unregister</param>
-        Task UnregisterMany(List<GrainAddress> addresses);
-
-        /// <summary>
         /// Lookup for a <see cref="GrainAddress"/> for a given Grain ID.
         /// </summary>
         /// <param name="grainId">The Grain ID to lookup</param>
         /// <returns>The <see cref="GrainAddress"/> entry found in the directory, if any</returns>
         Task<GrainAddress> Lookup(string grainId);
+
+        /// <summary>
+        /// Unregister from the directory all entries that point to one of the silo in argument.
+        /// Can be a NO-OP depending on the implementation.
+        /// </summary>
+        /// <param name="siloAddresses">The silos to be removed from the directory</param>
+        Task UnregisterSilos(List<string> siloAddresses);
     }
 
     /// <summary>

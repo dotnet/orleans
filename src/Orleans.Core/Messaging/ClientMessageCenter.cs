@@ -51,7 +51,7 @@ namespace Orleans.Messaging
         internal static readonly TimeSpan MINIMUM_INTERCONNECT_DELAY = TimeSpan.FromMilliseconds(100);   // wait one tenth of a second between connect attempts
         internal const int CONNECT_RETRY_COUNT = 2;                                                      // Retry twice before giving up on a gateway server
 
-        internal GrainId ClientId { get; private set; }
+        internal ClientGrainId ClientId { get; private set; }
         public IRuntimeClient RuntimeClient { get; }
         internal bool Running { get; private set; }
 
@@ -77,7 +77,7 @@ namespace Orleans.Messaging
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             IPAddress localAddress,
             int gen,
-            GrainId clientId,
+            ClientGrainId clientId,
             SerializationManager serializationManager,
             IRuntimeClient runtimeClient,
             MessageFactory messageFactory,
@@ -233,7 +233,7 @@ namespace Orleans.Messaging
             }
 
             // For untargeted messages to system targets, and for unordered messages, pick a next connection in round robin fashion.
-            if (msg.TargetGrain.IsSystemTarget || msg.IsUnordered)
+            if (msg.TargetGrain.IsSystemTarget() || msg.IsUnordered)
             {
                 // Get the cached list of live gateways.
                 // Pick a next gateway name in a round robin fashion.
@@ -260,7 +260,7 @@ namespace Orleans.Messaging
             }
 
             // Otherwise, use the buckets to ensure ordering.
-            var index = msg.TargetGrain.GetHashCode_Modulo((uint)grainBuckets.Length);
+            var index = GetHashCodeModulo(msg.TargetGrain.GetHashCode(), (uint)grainBuckets.Length);
 
             // Repeated from above, at the declaration of the grainBuckets array:
             // Requests are bucketed by GrainID, so that all requests to a grain get routed through the same bucket.
@@ -340,6 +340,14 @@ namespace Orleans.Messaging
                     if (result is null) this.gatewayManager.MarkAsDead(gateway);
                 }
             }
+
+
+            static uint GetHashCodeModulo(int key, uint umod)
+            {
+                int mod = (int)umod;
+                key = ((key % mod) + mod) % mod; // key should be positive now. So assert with checked.
+                return checked((uint)key);
+            }
         }
 
         private void UpdateBucket(uint index, Connection connection)
@@ -393,7 +401,7 @@ namespace Orleans.Messaging
 
         private IClusterTypeManager GetTypeManager(SiloAddress destination, IInternalGrainFactory grainFactory)
         {
-            return grainFactory.GetSystemTarget<IClusterTypeManager>(Constants.TypeManagerId, destination);
+            return grainFactory.GetSystemTarget<IClusterTypeManager>(Constants.TypeManagerType, destination);
         }
 
         private SiloAddress GetLiveGatewaySiloAddress()

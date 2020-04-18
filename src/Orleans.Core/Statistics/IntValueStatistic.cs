@@ -8,20 +8,13 @@ namespace Orleans.Runtime
 {
     class IntValueStatistic : ICounter<long>
     {
-        private static readonly Dictionary<string, IntValueStatistic> registeredStatistics;
-        private static readonly object lockable;
+        private static readonly Dictionary<string, IntValueStatistic> dict = new Dictionary<string, IntValueStatistic>();
         private readonly string currentName;
 
         public string Name { get; }
         public CounterStorage Storage { get; private set; }
 
         private Func<long> fetcher;
-
-        static IntValueStatistic()
-        {
-            registeredStatistics = new Dictionary<string, IntValueStatistic>();
-            lockable = new object();
-        }
 
         // Must be called while Lockable is locked
         private IntValueStatistic(string n, Func<long> f)
@@ -33,39 +26,38 @@ namespace Orleans.Runtime
 
         public static IntValueStatistic Find(StatisticName name)
         {
-            lock (lockable)
+            lock (dict)
             {
-                return registeredStatistics.ContainsKey(name.Name) ? registeredStatistics[name.Name] : null;
+                dict.TryGetValue(name.Name, out var stat);
+                return stat;
             }
         }
 
         public static IntValueStatistic FindOrCreate(StatisticName name, Func<long> f, CounterStorage storage = CounterStorage.LogOnly)
         {
-            lock (lockable)
+            lock (dict)
             {
-                IntValueStatistic stat;
-                if (registeredStatistics.TryGetValue(name.Name, out stat))
+                if (dict.TryGetValue(name.Name, out var stat))
                 {
                     return stat;
                 }
                 var ctr = new IntValueStatistic(name.Name, f) { Storage = storage };
-                registeredStatistics[name.Name] = ctr;
+                dict[name.Name] = ctr;
                 return ctr;
             }
         }
 
         public static void Delete(StatisticName name)
         {
-            lock (lockable)
+            lock (dict)
             {
-                IntValueStatistic stat;
-                if (registeredStatistics.TryGetValue(name.Name, out stat))
+                if (dict.TryGetValue(name.Name, out var stat))
                 {
-                    registeredStatistics.Remove(name.Name);
+                    dict.Remove(name.Name);
                     // Null the fetcher delegate to prevent memory leaks via undesirable reference capture by the fetcher lambda.
                     stat.fetcher = null;
                 }
-            }   
+            }
         }
 
         /// <summary>
@@ -87,9 +79,9 @@ namespace Orleans.Runtime
 
         public static void AddCounters(List<ICounter> list, Func<ICounter, bool> predicate)
         {
-            lock (lockable)
+            lock (dict)
             {
-                list.AddRange(registeredStatistics.Values.Where(predicate));
+                list.AddRange(dict.Values.Where(predicate));
             }
         }
 

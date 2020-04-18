@@ -8,7 +8,7 @@ using System.Text;
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal class UniqueKey : IComparable<UniqueKey>, IEquatable<UniqueKey>
+    public class UniqueKey : IComparable<UniqueKey>, IEquatable<UniqueKey>
     {
         private const ulong TYPE_CODE_DATA_MASK = 0xFFFFFFFF; // Lowest 4 bytes
         private static readonly char[] KeyExtSeparationChar = {'+'};
@@ -105,7 +105,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private static UniqueKey NewKey(ulong n0, ulong n1, Category category, long typeData, string keyExt)
+        internal static UniqueKey NewKey(ulong n0, ulong n1, Category category, long typeData, string keyExt)
         {
             if (!IsKeyExt(category) && keyExt != null)
                 throw new ArgumentException("Only key extended grains can specify a non-null key extension.");

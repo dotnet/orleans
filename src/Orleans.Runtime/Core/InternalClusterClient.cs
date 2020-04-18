@@ -118,9 +118,15 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        TGrainInterface IInternalGrainFactory.GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
+        TGrainInterface IInternalGrainFactory.GetSystemTarget<TGrainInterface>(GrainType grainType, SiloAddress destination)
         {
-            return this.grainFactory.GetSystemTarget<TGrainInterface>(grainId, destination);
+            return this.grainFactory.GetSystemTarget<TGrainInterface>(grainType, destination);
+        }
+
+        /// <inheritdoc />
+        TGrainInterface IInternalGrainFactory.GetSystemTarget<TGrainInterface>(GrainId grainId)
+        {
+            return this.grainFactory.GetSystemTarget<TGrainInterface>(grainId);
         }
 
         /// <inheritdoc />
@@ -136,7 +142,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        TGrainInterface IInternalGrainFactory.GetGrain<TGrainInterface>(GrainId grainId)
+        TGrainInterface IGrainFactory.GetGrain<TGrainInterface>(GrainId grainId)
         {
             return this.grainFactory.GetGrain<TGrainInterface>(grainId);
         }

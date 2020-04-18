@@ -297,8 +297,12 @@ namespace Orleans.Providers.Streams.Generator
             CreateBufferPoolIfNotCreatedYet();
             var dimensions = new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId);
             var cacheMonitor = this.CacheMonitorFactory(dimensions, this.telemetryProducer);
-            return new GeneratorPooledCache(bufferPool, this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.Name}.{queueId}"), serializationManager, 
-                cacheMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
+            return new GeneratorPooledCache(
+                bufferPool,
+                this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.Name}.{queueId}"),
+                serializationManager,
+                cacheMonitor,
+                this.statisticOptions.StatisticMonitorWriteInterval);
         }
 
         public static GeneratorAdapterFactory Create(IServiceProvider services, string name)

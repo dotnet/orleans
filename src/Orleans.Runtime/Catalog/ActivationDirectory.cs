@@ -56,6 +56,7 @@ namespace Orleans.Runtime
             CounterStatistic ctr = FindGrainCounter(grainTypeName);
             ctr.Increment();
         }
+
         internal void DecrementGrainCounter(string grainTypeName)
         {
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Decrement Grain Counter {0}", grainTypeName);
@@ -96,9 +97,9 @@ namespace Orleans.Runtime
         {
             var systemTarget = (ISystemTargetBase) target;
             systemTargets.TryAdd(target.ActivationId, target);
-            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId))
+            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId)).Increment();
+                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId.Type)).Increment();
             }
         }
 
@@ -107,9 +108,9 @@ namespace Orleans.Runtime
             var systemTarget = (ISystemTargetBase) target;
             SystemTarget ignore;
             systemTargets.TryRemove(target.ActivationId, out ignore);
-            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId))
+            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId)).DecrementBy(1);
+                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId.Type)).DecrementBy(1);
             }
         }
 

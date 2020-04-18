@@ -35,7 +35,7 @@ namespace Orleans
             }
 
             var systemTarget = grain as ISystemTargetBase;
-            if (systemTarget != null) return GrainReference.FromGrainId(systemTarget.GrainId, systemTarget.GrainReferenceRuntime, null, systemTarget.Silo);
+            if (systemTarget != null) return GrainReference.FromGrainId(systemTarget.GrainId, systemTarget.GrainReferenceRuntime, null);
 
             throw new ArgumentException(
                 $"AsWeaklyTypedReference has been called on an unexpected type: {grain.GetType().FullName}.",
@@ -89,52 +89,50 @@ namespace Orleans
 
         internal static GrainId GetGrainId(IAddressable grain)
         {
-            var reference = grain as GrainReference;
-            if (reference != null)
+            switch (grain)
             {
-                if (reference.GrainId == null)
-                {
-                    throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
-                }
-                return reference.GrainId;
+                case Grain grainBase:
+                    if (grainBase.Identity.IsDefault)
+                    {
+                        throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
+                    }
+                    return grainBase.Identity;
+                case GrainReference grainReference:
+                    if (grainReference.GrainId.IsDefault)
+                    {
+                        throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
+                    }
+                    return grainReference.GrainId;
+                case ISystemTargetBase systemTarget:
+                    if (systemTarget.GrainId.IsDefault)
+                    {
+                        throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
+                    }
+                    return systemTarget.GrainId;
+                default:
+                    throw new ArgumentException(String.Format("GetGrainId has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
             }
-
-            var grainBase = grain as Grain;
-            if (grainBase != null)
-            {
-                if (grainBase.Data == null || grainBase.Data.GrainId == null)
-                {
-                    throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
-                }
-                return grainBase.Data.GrainId;
-            }
-
-            throw new ArgumentException(String.Format("GetGrainId has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
         }
 
-        public static IGrainIdentity GetGrainIdentity(this IGrain grain)
+        public static GrainId GetGrainIdentity(this IGrain grain)
         {
-            var grainBase = grain as Grain;
-            if (grainBase != null)
+            switch (grain)
             {
-                if (grainBase.Identity == null)
-                {
-                    throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
-                }
-                return grainBase.Identity;
+                case Grain grainBase:
+                    if (grainBase.Identity.IsDefault)
+                    {
+                        throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
+                    }
+                    return grainBase.Identity;
+                case GrainReference grainReference:
+                    if (grainReference.GrainId.IsDefault)
+                    {
+                        throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
+                    }
+                    return grainReference.GrainId;
+                default:
+                    throw new ArgumentException(String.Format("GetGrainIdentity has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
             }
-
-            var grainReference = grain as GrainReference;
-            if (grainReference != null)
-            {
-                if (grainReference.GrainId == null)
-                {
-                    throw new ArgumentException(WRONG_GRAIN_ERROR_MSG, "grain");
-                }
-                return grainReference.GrainId;
-            }
-
-            throw new ArgumentException(String.Format("GetGrainIdentity has been called on an unexpected type: {0}.", grain.GetType().FullName), "grain");
         }
 
         /// <summary>
@@ -143,7 +141,7 @@ namespace Orleans
         /// <param name="grain">The target grain.</param>
         public static bool IsPrimaryKeyBasedOnLong(this IAddressable grain)
         {
-            return GetGrainId(grain).IsLongKey;
+            return ((LegacyGrainId)GetGrainId(grain)).IsLongKey;
         }
 
         /// <summary>
@@ -154,7 +152,7 @@ namespace Orleans
         /// <returns>A long representing the primary key for this grain.</returns>
         public static long GetPrimaryKeyLong(this IAddressable grain, out string keyExt)
         {
-            return GetGrainId(grain).GetPrimaryKeyLong(out keyExt);
+            return ((LegacyGrainId)GetGrainId(grain)).GetPrimaryKeyLong(out keyExt);
         }
 
         /// <summary>
@@ -164,7 +162,7 @@ namespace Orleans
         /// <returns>A long representing the primary key for this grain.</returns>
         public static long GetPrimaryKeyLong(this IAddressable grain)
         {
-            return GetGrainId(grain).GetPrimaryKeyLong();
+            return ((LegacyGrainId)GetGrainId(grain)).GetPrimaryKeyLong();
         }
 
         /// <summary>
@@ -175,7 +173,7 @@ namespace Orleans
         /// <returns>A Guid representing the primary key for this grain.</returns>
         public static Guid GetPrimaryKey(this IAddressable grain, out string keyExt)
         {
-            return GetGrainId(grain).GetPrimaryKey(out keyExt);
+            return ((LegacyGrainId)GetGrainId(grain)).GetPrimaryKey(out keyExt);
         }
 
         /// <summary>
@@ -185,7 +183,7 @@ namespace Orleans
         /// <returns>A Guid representing the primary key for this grain.</returns>
         public static Guid GetPrimaryKey(this IAddressable grain)
         {
-            return GetGrainId(grain).GetPrimaryKey();
+            return ((LegacyGrainId)GetGrainId(grain)).GetPrimaryKey();
         }
 
         /// <summary>
@@ -195,29 +193,29 @@ namespace Orleans
         /// <returns>A string representing the primary key for this grain.</returns>
         public static string GetPrimaryKeyString(this IAddressable grain)
         {
-            return GetGrainId(grain).GetPrimaryKeyString();
+            return ((LegacyGrainId)GetGrainId(grain)).GetPrimaryKeyString();
         }
 
         public static long GetPrimaryKeyLong(this IGrain grain, out string keyExt)
         {
-            return GetGrainIdentity(grain).GetPrimaryKeyLong(out keyExt);
+            return ((LegacyGrainId)GetGrainIdentity(grain)).GetPrimaryKeyLong(out keyExt);
         }
         public static long GetPrimaryKeyLong(this IGrain grain)
         {
-            return GetGrainIdentity(grain).PrimaryKeyLong;
+            return ((LegacyGrainId)GetGrainIdentity(grain)).PrimaryKeyLong;
         }
         public static Guid GetPrimaryKey(this IGrain grain, out string keyExt)
         {
-            return GetGrainIdentity(grain).GetPrimaryKey(out keyExt);
+            return ((LegacyGrainId)GetGrainIdentity(grain)).GetPrimaryKey(out keyExt);
         }
         public static Guid GetPrimaryKey(this IGrain grain)
         {
-            return GetGrainIdentity(grain).PrimaryKey;
+            return ((LegacyGrainId)GetGrainIdentity(grain)).PrimaryKey;
         }
 
         public static string GetPrimaryKeyString(this IGrainWithStringKey grain)
         {
-            return GetGrainIdentity(grain).PrimaryKeyString;
+            return ((LegacyGrainId)GetGrainIdentity(grain)).PrimaryKeyString;
         }
 
         /// <summary>

@@ -33,7 +33,6 @@ namespace Orleans.Storage
         private SerializationManager serializationManager;
         private IGrainFactory grainFactory;
         private ITypeResolver typeResolver;
-        private ILoggerFactory loggerFactory;
 
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(
@@ -42,15 +41,14 @@ namespace Orleans.Storage
             SerializationManager serializationManager,
             IGrainFactory grainFactory,
             ITypeResolver typeResolver,
-            ILoggerFactory loggerFactory)
+            ILogger<AzureBlobGrainStorage> logger)
         {
             this.name = name;
             this.options = options;
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
             this.typeResolver = typeResolver;
-            this.loggerFactory = loggerFactory;
-            this.logger = this.loggerFactory.CreateLogger($"{typeof(AzureTableGrainStorageFactory).FullName}.{name}");
+            this.logger = logger;
         }
 
         /// <summary> Read state data function for this storage provider. </summary>

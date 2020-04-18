@@ -4,9 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.MultiCluster;
 using Orleans.Runtime.MembershipService;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
@@ -273,7 +270,7 @@ namespace Orleans.Runtime.Management
                 return silos;
 
             return this.siloStatusOracle
-                       .GetApproximateSiloStatuses(true).Select(s => s.Key).ToArray();
+                       .GetApproximateSiloStatuses(true).Keys.ToArray();
         }
 
         /// <summary>
@@ -331,7 +328,7 @@ namespace Orleans.Runtime.Management
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
+            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
         }
     }
 }

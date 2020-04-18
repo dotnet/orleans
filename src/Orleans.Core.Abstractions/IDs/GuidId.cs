@@ -18,6 +18,8 @@ namespace Orleans.Runtime
 
         public readonly Guid Guid;
 
+        public static GuidId Default { get; } = new GuidId(Guid.Empty);
+
         // TODO: Need to integrate with Orleans serializer to really use Interner.
         private GuidId(Guid guid)
         {

@@ -18,9 +18,12 @@ namespace Orleans.Serialization
         public IServiceProvider ServiceProvider => this.SerializationManager.ServiceProvider;
         public abstract object AdditionalContext { get; }
 
+        protected int MaxSustainedSerializationContextCapacity { get; }
+
         protected SerializationContextBase(SerializationManager serializationManager)
         {
             this.SerializationManager = serializationManager;
+            this.MaxSustainedSerializationContextCapacity = serializationManager.SerializationProviderOptions.MaxSustainedSerializationContextCapacity;
         }
     }
 }

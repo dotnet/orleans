@@ -71,13 +71,14 @@ namespace Orleans.Runtime.Messaging
             {
                 // reroute via Dispatcher
                 msg.TargetSilo = null;
-                msg.TargetActivation = null;
+                msg.TargetActivation = default;
                 msg.ClearTargetAddress();
 
-                if (msg.TargetGrain.IsSystemTarget)
+                if (SystemTargetGrainId.TryParse(msg.TargetGrain, out var systemTargetId))
                 {
                     msg.TargetSilo = this.myAddress;
-                    msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, this.myAddress);
+                    msg.TargetGrain = systemTargetId.WithSiloAddress(this.myAddress).GrainId;
+                    msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 
                 MessagingStatisticsGroup.OnMessageReRoute(msg);
@@ -87,6 +88,13 @@ namespace Orleans.Runtime.Messaging
             {
                 // send directly
                 msg.TargetSilo = targetAddress;
+
+                if (SystemTargetGrainId.TryParse(msg.TargetGrain, out var systemTargetId))
+                {
+                    msg.TargetGrain = systemTargetId.WithSiloAddress(targetAddress).GrainId;
+                    msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
+                }
+
                 this.messageCenter.SendMessage(msg);
             }
         }
@@ -104,14 +112,14 @@ namespace Orleans.Runtime.Messaging
                     this.myAddress);
             }
 
-            if (grainId.Equals(Constants.SiloDirectConnectionId))
+            if (!ClientGrainId.TryParse(grainId, out var clientId))
             {
-                throw new InvalidOperationException($"Unexpected direct silo connection on proxy endpoint from {siloAddress?.ToString() ?? "unknown silo"}");
+                throw new InvalidOperationException($"Unexpected connection id {grainId} on proxy endpoint from {siloAddress?.ToString() ?? "unknown silo"}");
             }
 
             try
             {
-                this.gateway.RecordOpenedConnection(this, grainId);
+                this.gateway.RecordOpenedConnection(this, clientId);
                 await base.RunInternal();
             }
             finally

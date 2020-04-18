@@ -28,7 +28,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             this.loggerFactory = loggerFactory;
             this.Name = name;
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{name}");
+            this.logger = loggerFactory.CreateLogger<SimpleMessageStreamProvider>();
             this.options = options;
             this.providerRuntime = providerRuntime as IStreamProviderRuntime;
             this.runtimeClient = providerRuntime.ServiceProvider.GetService<IRuntimeClient>();
@@ -61,9 +61,16 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
-            return new SimpleMessageStreamProducer<T>((StreamImpl<T>)stream, Name, providerRuntime,
-                this.options.FireAndForgetDelivery, this.options.OptimizeForImmutableData, providerRuntime.PubSub(this.options.PubSubType), IsRewindable,
-                this.serializationManager, this.loggerFactory);
+            return new SimpleMessageStreamProducer<T>(
+                (StreamImpl<T>)stream,
+                Name,
+                providerRuntime,
+                this.options.FireAndForgetDelivery,
+                this.options.OptimizeForImmutableData,
+                providerRuntime.PubSub(this.options.PubSubType),
+                IsRewindable,
+                this.serializationManager,
+                this.loggerFactory.CreateLogger<SimpleMessageStreamProducer<T>>());
         }
 
         IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)

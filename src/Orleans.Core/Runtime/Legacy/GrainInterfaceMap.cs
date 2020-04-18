@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using Orleans.CodeGeneration;
-using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
 {
@@ -19,13 +16,11 @@ namespace Orleans.Runtime
 
         private readonly Dictionary<int, GrainClassData> implementationIndex;
         private readonly Dictionary<int, PlacementStrategy> placementStrategiesIndex;
+        private readonly Dictionary<int, string> directoriesIndex;
 
         [NonSerialized] // Client shouldn't need this
         private readonly Dictionary<string, string> primaryImplementations;
 
-        private readonly bool localTestMode;
-        private readonly HashSet<string> loadedGrainAsemblies;
-		
 		private readonly PlacementStrategy defaultPlacementStrategy;
 
         internal IEnumerable<GrainClassData> SupportedGrainClassData
@@ -38,18 +33,16 @@ namespace Orleans.Runtime
             get { return table.Values; }
         }
 
-        public GrainInterfaceMap(bool localTestMode, PlacementStrategy defaultPlacementStrategy)
+        public GrainInterfaceMap(PlacementStrategy defaultPlacementStrategy)
         {
             table = new Dictionary<int, GrainInterfaceData>();
             typeToInterfaceData = new Dictionary<string, GrainInterfaceData>();
             primaryImplementations = new Dictionary<string, string>();
             implementationIndex = new Dictionary<int, GrainClassData>();
             placementStrategiesIndex = new Dictionary<int, PlacementStrategy>();
+            directoriesIndex = new Dictionary<int, string>();
             unordered = new HashSet<int>();
-            this.localTestMode = localTestMode;
             this.defaultPlacementStrategy = defaultPlacementStrategy;
-            if(localTestMode) // if we are running in test mode, we'll build a list of loaded grain assemblies to help with troubleshooting deployment issue
-                loadedGrainAsemblies = new HashSet<string>();
         }
 
         internal void AddMap(GrainInterfaceMap map)
@@ -90,9 +83,17 @@ namespace Orleans.Runtime
                     placementStrategiesIndex.Add(kvp.Key, kvp.Value);
                 }
             }
+
+            foreach (var kvp in map.directoriesIndex)
+            {
+                if (!directoriesIndex.ContainsKey(kvp.Key))
+                {
+                    directoriesIndex.Add(kvp.Key, kvp.Value);
+                }
+            }
         }
 
-        internal void AddEntry(Type iface, Type grain, PlacementStrategy placement, bool primaryImplementation)
+        internal void AddEntry(Type iface, Type grain, PlacementStrategy placement, string directory, bool primaryImplementation)
         {
             lock (this)
             {
@@ -107,6 +108,8 @@ namespace Orleans.Runtime
                     implementationIndex.Add(grainTypeCode, implementation);
                 if (!placementStrategiesIndex.ContainsKey(grainTypeCode))
                     placementStrategiesIndex.Add(grainTypeCode, placement);
+                if (!directoriesIndex.ContainsKey(grainTypeCode))
+                    directoriesIndex.Add(grainTypeCode, directory);
 
                 grainInterfaceData.AddImplementation(implementation, primaryImplementation);
                 if (primaryImplementation)
@@ -117,13 +120,6 @@ namespace Orleans.Runtime
                 {
                     if (!primaryImplementations.ContainsKey(grainInterfaceData.GrainInterface))
                         primaryImplementations.Add(grainInterfaceData.GrainInterface, grainName);
-                }
-
-                if (localTestMode)
-                {
-                    var assembly = grain.Assembly.CodeBase;
-                    if (!loadedGrainAsemblies.Contains(assembly))
-                        loadedGrainAsemblies.Add(assembly);
                 }
             }
         }
@@ -156,14 +152,6 @@ namespace Orleans.Runtime
             return grainInterfaceData;
         }
 
-        internal Dictionary<string, string> GetPrimaryImplementations()
-        {
-            lock (this)
-            {
-                return new Dictionary<string, string>(primaryImplementations);
-            }
-        }
-
         internal bool TryGetPrimaryImplementation(string grainInterface, out string grainClass)
         {
             lock (this)
@@ -178,10 +166,9 @@ namespace Orleans.Runtime
             {
                 iface = null;
 
-                if (!table.ContainsKey(interfaceId))
+                if (!table.TryGetValue(interfaceId, out var interfaceData))
                     return false;
 
-                var interfaceData = table[interfaceId];
                 iface = interfaceData.Interface;
                 return true;
             }
@@ -198,12 +185,26 @@ namespace Orleans.Runtime
             {
                 grainClass = null;
                 placement = this.defaultPlacementStrategy;
-                if (!implementationIndex.ContainsKey(typeCode))
+                if (!implementationIndex.TryGetValue(typeCode, out var implementation))
                     return false;
 
-                var implementation = implementationIndex[typeCode];
                 grainClass = implementation.GetClassName(genericArguments);
                 placement = placementStrategiesIndex[typeCode];
+                return true;
+            }
+        }
+
+        internal bool TryGetDirectory(int typeCode, out string directory)
+        {
+            lock (this)
+            {
+                if (!directoriesIndex.ContainsKey(typeCode))
+                {
+                    directory = null;
+                    return false;
+                }
+
+                directory = directoriesIndex[typeCode];
                 return true;
             }
         }
@@ -217,10 +218,10 @@ namespace Orleans.Runtime
             else 
             {
                 return TypeUtils.GetTemplatedName(
-                            TypeUtils.GetFullName(interfaceType),
-                            interfaceType,
-                            interfaceType.GetGenericArguments(),
-                            t => false);
+                    TypeUtils.GetFullName(interfaceType),
+                    interfaceType,
+                    interfaceType.GetGenericArguments(),
+                    t => false);
             }
         }
 
@@ -238,12 +239,7 @@ namespace Orleans.Runtime
 
         public IGrainTypeResolver GetGrainTypeResolver()
         {
-            return new GrainTypeResolver(
-                this.typeToInterfaceData,
-                this.table,
-                this.loadedGrainAsemblies,
-                this.unordered
-                );
+            return new GrainTypeResolver(this.typeToInterfaceData, this.unordered);
         }
     }
 }

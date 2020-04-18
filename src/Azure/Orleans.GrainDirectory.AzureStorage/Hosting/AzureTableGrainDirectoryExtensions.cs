@@ -23,7 +23,23 @@ namespace Orleans.Hosting
             this ISiloHostBuilder builder,
             Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAzureTableGrainDirectoryAsDefault(configureOptions));
+            return builder.ConfigureServices(services => services.AddAzureTableGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureOptions));
+        }
+
+        public static ISiloHostBuilder AddAzureTableGrainDirectory(
+            this ISiloHostBuilder builder,
+            string name,
+            Action<AzureTableGrainDirectoryOptions> configureOptions)
+        {
+            return builder.AddAzureTableGrainDirectory(name, ob => ob.Configure(configureOptions));
+        }
+
+        public static ISiloHostBuilder AddAzureTableGrainDirectory(
+            this ISiloHostBuilder builder,
+            string name,
+            Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)
+        {
+            return builder.ConfigureServices(services => services.AddAzureTableGrainDirectory(name, configureOptions));
         }
 
         public static ISiloBuilder UseAzureTableGrainDirectoryAsDefault(
@@ -37,21 +53,36 @@ namespace Orleans.Hosting
             this ISiloBuilder builder,
             Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.UseAzureTableGrainDirectoryAsDefault(configureOptions));
+            return builder.ConfigureServices(services => services.AddAzureTableGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureOptions));
         }
 
-        private static IServiceCollection UseAzureTableGrainDirectoryAsDefault(
-            this IServiceCollection services,
+        public static ISiloBuilder AddAzureTableGrainDirectory(
+            this ISiloBuilder builder,
+            string name,
+            Action<AzureTableGrainDirectoryOptions> configureOptions)
+        {
+            return builder.AddAzureTableGrainDirectory(name, ob => ob.Configure(configureOptions));
+        }
+
+        public static ISiloBuilder AddAzureTableGrainDirectory(
+            this ISiloBuilder builder,
+            string name,
             Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)
         {
-            configureOptions.Invoke(services.AddOptions<AzureTableGrainDirectoryOptions>());
-            services
-                .AddTransient<IConfigurationValidator, AzureTableGrainDirectoryOptionsValidator>()
-                .ConfigureFormatter<AzureTableGrainDirectoryOptions>()
-                .AddSingleton<AzureTableGrainDirectory>();
+            return builder.ConfigureServices(services => services.AddAzureTableGrainDirectory(name, configureOptions));
+        }
 
-            services.AddFromExisting<IGrainDirectory, AzureTableGrainDirectory>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureTableGrainDirectory>();
+        private static IServiceCollection AddAzureTableGrainDirectory(
+            this IServiceCollection services,
+            string name,
+            Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)
+        {
+            configureOptions.Invoke(services.AddOptions<AzureTableGrainDirectoryOptions>(name));
+            services
+                .AddTransient<IConfigurationValidator>(sp => new AzureTableGrainDirectoryOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableGrainDirectoryOptions>>().Get(name)))
+                .ConfigureNamedOptionForLogging<AzureTableGrainDirectoryOptions>(name)
+                .AddSingletonNamedService<IGrainDirectory>(name, (sp, name) => ActivatorUtilities.CreateInstance<AzureTableGrainDirectory>(sp, sp.GetOptionsByName<AzureTableGrainDirectoryOptions>(name)))
+                .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainDirectory>(n));
 
             return services;
         }
