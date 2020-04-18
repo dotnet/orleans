@@ -211,14 +211,6 @@ namespace Orleans.Runtime
             {
                 prefixLength = GrainTypePrefix.LegacyGrainPrefixBytes.Length;
             }
-            else if (typeSpan.StartsWith(GrainTypePrefix.SystemTargetPrefixBytes.Span))
-            {
-                prefixLength = GrainTypePrefix.SystemTargetPrefixBytes.Length;
-            }
-            else if (typeSpan.StartsWith(GrainTypePrefix.ClientPrefixBytes.Span))
-            {
-                return null;
-            }
             else
             {
                 return null;

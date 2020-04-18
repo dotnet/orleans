@@ -28,7 +28,7 @@ namespace UnitTests.Grains
         public Task CompareGrainReferences(ISimpleGenericGrain<T> clientReference)
         {
             // Compare reference to this grain created by the client 
-            var thisReference = GrainFactory.GetGrain <ISimpleGenericGrain<T>>(this.GetPrimaryKeyLong());
+            var thisReference = GrainFactory.GetGrain<ISimpleGenericGrain<T>>(this.GetPrimaryKeyLong());
             if(!thisReference.Equals(clientReference))
                 throw new Exception(String.Format("Case_3: 2 grain references are different, while should have been the same: gr1={0}, gr2={1}", thisReference, clientReference));
 
