@@ -116,7 +116,7 @@ namespace Orleans.Streams
         {
             subscriptionId = Guid.Empty;
 
-            if (!HasImplicitSubscription(streamId.Namespace, LegacyGrainId.FromGrainId(grainId).TypeCode))
+            if (!IsImplicitSubscriber(grainId, streamId))
             {
                 return false;
             }

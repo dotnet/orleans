@@ -259,7 +259,7 @@ namespace UnitTests.Directory
         private int generation = 0;
         private ActivationAddress GenerateActivationAddress()
         {
-            var grainId = LegacyGrainId.GetGrainIdForTesting(Guid.NewGuid());
+            var grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(Guid.NewGuid()));
             var siloAddr = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), ++generation);
 
             return ActivationAddress.NewActivationAddress(siloAddr, grainId);

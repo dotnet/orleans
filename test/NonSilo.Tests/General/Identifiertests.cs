@@ -185,35 +185,33 @@ namespace UnitTests.General
         public void GrainId_ToFromPrintableString()
         {
             Guid guid = Guid.NewGuid();
-            GrainId grainId = LegacyGrainId.GetGrainIdForTesting(guid);
+            GrainId grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid));
             GrainId roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key
 
             string extKey = "Guid-ExtKey-1";
             guid = Guid.NewGuid();
-            grainId = LegacyGrainId.GetGrainId(0, guid, extKey);
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid, extKey));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + Extended Key
 
-            grainId = LegacyGrainId.GetGrainId(0, guid, null);
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid, null));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + null Extended Key
 
             long key = random.Next();
-            guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
-            grainId = LegacyGrainId.GetGrainIdForTesting(guid);
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateIntegerKey(key));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key
 
             extKey = "Long-ExtKey-2";
             key = random.Next();
-            guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
-            grainId = LegacyGrainId.GetGrainId(0, guid, extKey);
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateIntegerKey(key, extKey));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key + Extended Key
 
-            guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
-            grainId = LegacyGrainId.GetGrainId(0, guid, null);
+            key = UniqueKey.NewKey(key).PrimaryKeyToLong();
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateIntegerKey(key, extKey));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key + null Extended Key
         }
