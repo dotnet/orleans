@@ -41,6 +41,7 @@ using Orleans.Timers.Internal;
 using Microsoft.AspNetCore.Connections;
 using Orleans.Networking.Shared;
 using Orleans.Configuration.Internal;
+using Orleans.Runtime.Metadata;
 
 namespace Orleans.Hosting
 {
@@ -115,20 +116,18 @@ namespace Orleans.Hosting
             services.TryAddSingleton<TypeMetadataCache>();
             services.TryAddSingleton<ActivationDirectory>();
             services.TryAddSingleton<ActivationCollector>();
+
+            // Directory
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
+            services.AddSingleton<GrainLocator>();
+            services.AddSingleton<GrainLocatorResolver>();
             services.AddSingleton<DhtGrainLocator>();
-            services.AddSingleton<IGrainDirectoryResolver, GrainDirectoryResolver>();
-            if (GrainDirectoryResolver.HasAnyRegisteredGrainDirectory(services))
-            {
-                services.AddSingleton<IGrainLocator, GrainLocatorSelector>();
-                services.AddSingleton<CachedGrainLocator>();
-                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator>();
-            }
-            else
-            {
-                services.AddFromExisting<IGrainLocator, DhtGrainLocator>();
-            }
+            services.AddSingleton<GrainDirectoryResolver>();
+            services.AddSingleton<CachedGrainLocator>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator>();
+            services.AddSingleton<ClientGrainLocator>();
+
             services.TryAddSingleton<GrainTypeManager>();
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
@@ -182,8 +181,10 @@ namespace Orleans.Hosting
 
             // Placement
             services.AddSingleton<IConfigurationValidator, ActivationCountBasedPlacementOptionsValidator>();
-            services.TryAddSingleton<PlacementDirectorsManager>();
-            services.TryAddSingleton<ClientObserversPlacementDirector>();
+            services.AddSingleton<PlacementService>();
+            services.AddSingleton<PlacementStrategyResolver>();
+            services.AddSingleton<PlacementDirectorResolver>();
+            services.AddSingleton<IPlacementStrategyResolver, ClientObserverPlacementStrategyResolver>();
 
             // Configure the default placement strategy.
             services.TryAddSingleton<PlacementStrategy, RandomPlacement>();
@@ -195,6 +196,7 @@ namespace Orleans.Hosting
             services.Replace(new ServiceDescriptor(typeof(StatelessWorkerPlacement), sp => new StatelessWorkerPlacement(), ServiceLifetime.Singleton));
             services.AddPlacementDirector<ActivationCountBasedPlacement, ActivationCountPlacementDirector>();
             services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
+            services.AddPlacementDirector<ClientObserversPlacement, ClientObserversPlacementDirector>();
 
             // Activation selectors
             services.AddSingletonKeyedService<Type, IActivationSelector, RandomPlacementDirector>(typeof(RandomPlacement));
@@ -282,6 +284,23 @@ namespace Orleans.Hosting
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<GrainClassFeature>());
             applicationPartManager.AddFeatureProvider(new AssemblyAttributeFeatureProvider<SerializerFeature>());
             services.AddTransient<IConfigurationValidator, ApplicationPartValidator>();
+
+            // Type metadata
+            services.AddSingleton<SiloManifestProvider>();
+            services.AddSingleton<SiloManifest>(sp => sp.GetRequiredService<SiloManifestProvider>().SiloManifest);
+            services.AddSingleton<Metadata.GrainTypeResolver>();
+            services.AddSingleton<Metadata.IGrainTypeProvider, LegacyGrainTypeResolver>();
+            services.AddSingleton<GrainPropertiesResolver>();
+            services.AddSingleton<GrainInterfaceIdResolver>();
+            services.AddSingleton<Metadata.IGrainTypeProvider, AttributeGrainTypeProvider>();
+            services.AddSingleton<IGrainInterfacePropertiesProvider, AttributeGrainInterfacePropertiesProvider>();
+            services.AddSingleton<IGrainPropertiesProvider, AttributeGrainPropertiesProvider>();
+            services.AddSingleton<IGrainInterfacePropertiesProvider, DiagnosticInfoGrainPropertiesProvider>();
+            services.AddSingleton<IGrainPropertiesProvider, DiagnosticInfoGrainPropertiesProvider>();
+            services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
+            services.AddSingleton<ClusterManifestProvider>();
+            services.AddFromExisting<IClusterManifestProvider, ClusterManifestProvider>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterManifestProvider>();
 
             //Add default option formatter if none is configured, for options which are required to be configured
             services.ConfigureFormatter<SiloOptions>();

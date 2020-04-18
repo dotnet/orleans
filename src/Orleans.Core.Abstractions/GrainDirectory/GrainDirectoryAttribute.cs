@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
+using Orleans.Metadata;
+using Orleans.Runtime;
 
 namespace Orleans.GrainDirectory
 {
     [AttributeUsage(AttributeTargets.Class)]
-    public sealed class GrainDirectoryAttribute : Attribute
+    public sealed class GrainDirectoryAttribute : Attribute, IGrainPropertiesProviderAttribute
     {
         public const string DEFAULT_GRAIN_DIRECTORY = "default";
 
@@ -14,6 +15,12 @@ namespace Orleans.GrainDirectory
         public GrainDirectoryAttribute()
         {
             this.GrainDirectoryName = DEFAULT_GRAIN_DIRECTORY;
+        }
+
+        /// <inheritdoc />
+        public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
+        {
+            properties[WellKnownGrainTypeProperties.GrainDirectory] = this.GrainDirectoryName ?? DEFAULT_GRAIN_DIRECTORY;
         }
     }
 }

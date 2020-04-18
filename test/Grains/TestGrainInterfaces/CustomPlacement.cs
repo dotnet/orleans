@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Metadata;
 using Orleans.Placement;
 using Orleans.Runtime;
 
@@ -29,6 +30,8 @@ namespace UnitTests.GrainInterfaces
     [Serializable]
     public class TestCustomPlacementStrategy : PlacementStrategy
     {
+        private const string ScenarioKey = "test-placement-scenario";
+
         public CustomPlacementScenario Scenario { get; private set; }
 
         public static TestCustomPlacementStrategy FixedSilo { get; } = new TestCustomPlacementStrategy(CustomPlacementScenario.FixedSilo);
@@ -38,6 +41,24 @@ namespace UnitTests.GrainInterfaces
         internal TestCustomPlacementStrategy(CustomPlacementScenario scenario)
         {
             Scenario = scenario;
+        }
+
+        public TestCustomPlacementStrategy() { }
+
+        public override void Initialize(GrainProperties properties)
+        {
+            base.Initialize(properties);
+            CustomPlacementScenario result;
+            if (properties.Properties.TryGetValue(ScenarioKey, out var value) && Enum.TryParse(value, out result))
+            {
+                this.Scenario = result;
+            }
+        }
+
+        public override void PopulateGrainProperties(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
+        {
+            base.PopulateGrainProperties(services, grainClass, grainType, properties);
+            properties[ScenarioKey] = this.Scenario.ToString();
         }
     }
 

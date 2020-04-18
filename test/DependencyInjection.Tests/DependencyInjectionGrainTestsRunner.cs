@@ -99,8 +99,8 @@ namespace DependencyInjection.Tests
             var grain2 = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(id2);
 
             // the injected service will only return a different value if it's a different instance
-            Assert.Contains(id1.ToString(), await grain1.GetStringValue());
-            Assert.Contains(id2.ToString(), await grain2.GetStringValue());
+            Assert.Contains(id1.ToString("X"), await grain1.GetStringValue());
+            Assert.Contains(id2.ToString("X"), await grain2.GetStringValue());
 
             await grain1.DoDeactivate();
             await grain2.DoDeactivate();

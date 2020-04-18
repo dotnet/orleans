@@ -46,6 +46,7 @@ namespace Orleans.Runtime
         public static readonly GrainType SystemMembershipTableType = SystemTargetGrainId.CreateGrainType("clustering.dev");
         public static readonly GrainType StreamPullingAgentManagerType = SystemTargetGrainId.CreateGrainType("stream-agent-mgr");
         public static readonly GrainType StreamPullingAgentType = SystemTargetGrainId.CreateGrainType("stream-agent");
+        public static readonly GrainType ManifestProviderType = SystemTargetGrainId.CreateGrainType("manifest");
 
         public static readonly GrainId SiloDirectConnectionId = GrainId.Create(
             GrainType.Create(GrainTypePrefix.SystemPrefix + "silo"),

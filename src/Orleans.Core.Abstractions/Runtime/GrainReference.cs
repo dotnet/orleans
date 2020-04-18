@@ -14,7 +14,6 @@ namespace Orleans.Runtime
     public class GrainReference : IAddressable, IEquatable<GrainReference>, ISerializable
     {
         private readonly string genericArguments;
-        private readonly GuidId observerId;
 
         /// <summary>
         /// Invoke method options specific to this grain reference instance
@@ -28,8 +27,6 @@ namespace Orleans.Runtime
 
         internal bool IsObserverReference { get { return ObserverGrainId.TryParse(GrainId, out _); } }
 
-        internal GuidId ObserverId { get { return observerId; } }
-        
         internal bool HasGenericArgument { get { return !String.IsNullOrEmpty(genericArguments); } }
 
         internal IGrainReferenceRuntime Runtime
@@ -274,12 +271,6 @@ namespace Orleans.Runtime
         }
 
         private const string GRAIN_REFERENCE_STR = "GrainReference";
-        private const string SYSTEM_TARGET_STR = "SystemTarget";
-        private const string SYSTEM_TARGET_STR_WITH_EQUAL_SIGN = SYSTEM_TARGET_STR + "=";
-        private const string OBSERVER_ID_STR = "ObserverId";
-        private const string OBSERVER_ID_STR_WITH_EQUAL_SIGN = OBSERVER_ID_STR + "=";
-        private const string GENERIC_ARGUMENTS_STR = "GenericArguments";
-        private const string GENERIC_ARGUMENTS_STR_WITH_EQUAL_SIGN = GENERIC_ARGUMENTS_STR + "=";
 
         /// <summary>Returns a string representation of this reference.</summary>
         public override string ToString()
@@ -288,60 +279,13 @@ namespace Orleans.Runtime
         }
 
         /// <summary> Get the key value for this grain, as a string. </summary>
-        public string ToKeyString()
-        {
-            if (IsObserverReference)
-            {
-                return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, ((LegacyGrainId)GrainId).ToParsableString(), OBSERVER_ID_STR, observerId.ToParsableString());
-            }
-            if (IsSystemTarget)
-            {
-                return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, ((LegacyGrainId)GrainId).ToParsableString(), SYSTEM_TARGET_STR, SystemTargetSilo.ToParsableString());
-            }
-            if (HasGenericArgument)
-            {
-                return String.Format("{0}={1} {2}={3}", GRAIN_REFERENCE_STR, ((LegacyGrainId)GrainId).ToParsableString(), GENERIC_ARGUMENTS_STR, genericArguments);
-            }
-            return String.Format("{0}={1}", GRAIN_REFERENCE_STR, ((LegacyGrainId)GrainId).ToParsableString());
-        }
-        
+        public string ToKeyString() => GrainId.ToString();
+
         internal static GrainReference FromKeyString(string key, IGrainReferenceRuntime runtime)
         {
             if (string.IsNullOrWhiteSpace(key)) throw new ArgumentNullException(nameof(key), "GrainReference.FromKeyString cannot parse null key");
 
-            ReadOnlySpan<char> trimmed = key.AsSpan().Trim();
-            ReadOnlySpan<char> grainIdStr;
-            int grainIdIndex = (GRAIN_REFERENCE_STR + "=").Length;
-
-            int genericIndex = trimmed.IndexOf(GENERIC_ARGUMENTS_STR_WITH_EQUAL_SIGN.AsSpan(), StringComparison.Ordinal);
-            int observerIndex = trimmed.IndexOf(OBSERVER_ID_STR_WITH_EQUAL_SIGN.AsSpan(), StringComparison.Ordinal);
-            int systemTargetIndex = trimmed.IndexOf(SYSTEM_TARGET_STR_WITH_EQUAL_SIGN.AsSpan(), StringComparison.Ordinal);
-
-            if (genericIndex >= 0)
-            {
-                grainIdStr = trimmed.Slice(grainIdIndex, genericIndex - grainIdIndex).Trim();
-                ReadOnlySpan<char> genericStr = trimmed.Slice(genericIndex + GENERIC_ARGUMENTS_STR_WITH_EQUAL_SIGN.Length);
-                return FromGrainId(LegacyGrainId.FromParsableString(grainIdStr), runtime, genericStr.ToString());
-            }
-            else if (observerIndex >= 0)
-            {
-                grainIdStr = trimmed.Slice(grainIdIndex, observerIndex - grainIdIndex).Trim();
-                return FromGrainId(LegacyGrainId.FromParsableString(grainIdStr), runtime);
-            }
-            else if (systemTargetIndex >= 0)
-            {
-                grainIdStr = trimmed.Slice(grainIdIndex, systemTargetIndex - grainIdIndex).Trim();
-                ReadOnlySpan<char> systemTargetStr = trimmed.Slice(systemTargetIndex + SYSTEM_TARGET_STR_WITH_EQUAL_SIGN.Length);
-
-                // TODO: Incorporate SiloAddress into GrainId or entirely remove FromKeyString - perhaps shift to a legacy/compat library
-                _ = SiloAddress.FromParsableString(systemTargetStr.ToString());
-                return FromGrainId(LegacyGrainId.FromParsableString(grainIdStr), runtime, null);
-            }
-            else
-            {
-                grainIdStr = trimmed.Slice(grainIdIndex);
-                return FromGrainId(LegacyGrainId.FromParsableString(grainIdStr), runtime);
-            }
+            return FromGrainId(GrainId.Parse(key), runtime);
         }
 
         internal static GrainReference FromKeyInfo(GrainReferenceKeyInfo keyInfo, IGrainReferenceRuntime runtime)
@@ -371,10 +315,6 @@ namespace Orleans.Runtime
             {
                 info.AddValue("SystemTargetSilo", SystemTargetSilo.ToParsableString(), typeof(string));
             }
-            if (IsObserverReference)
-            {
-                info.AddValue(OBSERVER_ID_STR, observerId.ToParsableString(), typeof(string));
-            }
             string genericArg = String.Empty;
             if (HasGenericArgument)
                 genericArg = genericArguments;
@@ -386,16 +326,13 @@ namespace Orleans.Runtime
         {
             // Reset the property value using the GetValue method.
             GrainId = (GrainId)info.GetValue("GrainId", typeof(GrainId));
+
             if (IsSystemTarget)
             {
                 var siloAddressStr = info.GetString("SystemTargetSilo");
                 SystemTargetSilo = SiloAddress.FromParsableString(siloAddressStr);
             }
-            if (IsObserverReference)
-            {
-                var observerIdStr = info.GetString(OBSERVER_ID_STR);
-                observerId = GuidId.FromParsableString(observerIdStr);
-            }
+
             var genericArg = info.GetString("GenericArguments");
             if (String.IsNullOrEmpty(genericArg))
                 genericArg = null;

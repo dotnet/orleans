@@ -72,9 +72,9 @@ namespace Orleans.Runtime
 
         private static readonly TimeSpan UnregisterTimeout = TimeSpan.FromSeconds(1);
 
-        private readonly IGrainLocator grainLocator;
+        private readonly GrainLocator grainLocator;
         private readonly GrainTypeManager grainTypeManager;
-        private readonly IGrainDirectoryResolver grainDirectoryResolver;
+        private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly ILocalGrainDirectory directory;
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activations;
@@ -99,11 +99,12 @@ namespace Orleans.Runtime
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly IOptions<SiloMessagingOptions> messagingOptions;
         private readonly RuntimeMessagingTrace messagingTrace;
+        private readonly PlacementStrategyResolver placementStrategyResolver;
 
         public Catalog(
             ILocalSiloDetails localSiloDetails,
-            IGrainLocator grainLocator,
-            IGrainDirectoryResolver grainDirectoryResolver,
+            GrainLocator grainLocator,
+            GrainDirectoryResolver grainDirectoryResolver,
             ILocalGrainDirectory grainDirectory,
             GrainTypeManager typeManager,
             OrleansTaskScheduler scheduler,
@@ -111,7 +112,6 @@ namespace Orleans.Runtime
             ActivationCollector activationCollector,
             GrainCreator grainCreator,
             MessageCenter messageCenter,
-            PlacementDirectorsManager placementDirectorsManager,
             MessageFactory messageFactory,
             SerializationManager serializationManager,
             IStreamProviderRuntime providerRuntime,
@@ -122,7 +122,9 @@ namespace Orleans.Runtime
             IOptions<GrainCollectionOptions> collectionOptions,
             IOptions<SiloMessagingOptions> messagingOptions,
             RuntimeMessagingTrace messagingTrace,
-            IAsyncTimerFactory timerFactory)
+            IAsyncTimerFactory timerFactory,
+            PlacementStrategyResolver placementStrategyResolver,
+            PlacementService placementService)
             : base(Constants.CatalogType, messageCenter.MyAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
@@ -143,6 +145,7 @@ namespace Orleans.Runtime
             this.collectionOptions = collectionOptions;
             this.messagingOptions = messagingOptions;
             this.messagingTrace = messagingTrace;
+            this.placementStrategyResolver = placementStrategyResolver;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
             this.Dispatcher = new Dispatcher(
@@ -150,7 +153,7 @@ namespace Orleans.Runtime
                 messageCenter,
                 this,
                 this.messagingOptions,
-                placementDirectorsManager,
+                placementService,
                 grainDirectory,
                 grainLocator,
                 this.activationCollector,
@@ -427,9 +430,9 @@ namespace Orleans.Runtime
                 (data.IsReentrant || data.MayInterleave((InvokeMethodRequest)message.BodyObject));
         }
 
-        public void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, string genericArguments = null)
+        public void GetGrainTypeInfo(int typeCode, out string grainClass, string genericArguments = null)
         {
-            grainTypeManager.GetTypeInfo(typeCode, out grainClass, out placement, genericArguments);
+            grainTypeManager.GetTypeInfo(typeCode, out grainClass, out _, genericArguments);
         }
 
         public int ActivationCount { get { return activations.Count; } }
@@ -457,7 +460,7 @@ namespace Orleans.Runtime
         {
             ActivationData result;
             activatedPromise = Task.CompletedTask;
-            PlacementStrategy placement;
+            PlacementStrategy placement = this.placementStrategyResolver.GetPlacementStrategy(address.Grain.Type);
 
             lock (activations)
             {
@@ -467,20 +470,11 @@ namespace Orleans.Runtime
                 }
 
                 int typeCode = LegacyGrainId.FromGrainId(address.Grain).TypeCode;
-                string actualGrainType = null;
 
-                if (typeCode != 0)
+                GetGrainTypeInfo(typeCode, out var actualGrainType, genericArguments);
+                if (string.IsNullOrEmpty(grainType))
                 {
-                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement, genericArguments);
-                    if (string.IsNullOrEmpty(grainType))
-                    {
-                        grainType = actualGrainType;
-                    }
-                }
-                else
-                {
-                    // special case for Membership grain.
-                    placement = SystemPlacement.Singleton;
+                    grainType = actualGrainType;
                 }
 
                 if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
@@ -687,8 +681,7 @@ namespace Orleans.Runtime
                 var typeCode = LegacyGrainId.FromGrainId(data.GrainId).TypeCode;
                 if (typeCode != 0)
                 {
-                    PlacementStrategy unused;
-                    GetGrainTypeInfo(typeCode, out grainClassName, out unused, genericArguments);
+                    GetGrainTypeInfo(typeCode, out grainClassName, genericArguments);
                 }
                 else
                 {
@@ -1264,7 +1257,7 @@ namespace Orleans.Runtime
                         try
                         {
                             var activationData = activation.Value;
-                            if (!activationData.IsUsingGrainDirectory || grainDirectoryResolver.Resolve(activationData.GrainId) != default) continue;
+                            if (!activationData.IsUsingGrainDirectory || grainDirectoryResolver.HasNonDefaultDirectory(activationData.GrainId.Type)) continue;
                             if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.GrainId))) continue;
 
                             lock (activationData)

@@ -216,11 +216,10 @@ namespace UnitTests.General
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key + null Extended Key
         }
 
-        private LegacyGrainId RoundTripGrainIdToParsable(LegacyGrainId input)
+        private GrainId RoundTripGrainIdToParsable(GrainId input)
         {
-            string str = input.ToParsableString();
-            LegacyGrainId output = LegacyGrainId.FromParsableString(str);
-            return output;
+            string str = input.ToString();
+            return GrainId.Parse(str);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]

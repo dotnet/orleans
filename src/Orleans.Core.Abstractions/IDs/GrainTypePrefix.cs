@@ -52,12 +52,12 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns <see langword="true"/> if the type is a client, <see langword="false"/> if not.
         /// </summary>
-        internal static bool IsClient(this in GrainType type) => type.AsSpan().StartsWith(ClientPrefixBytes.Span);
+        public static bool IsClient(this in GrainType type) => type.AsSpan().StartsWith(ClientPrefixBytes.Span);
 
         /// <summary>
         /// Returns <see langword="true"/> if the type is a system target, <see langword="false"/> if not.
         /// </summary>
-        private static bool IsSystemTarget(this in GrainType type) => type.AsSpan().StartsWith(SystemTargetPrefixBytes.Span);
+        public static bool IsSystemTarget(this in GrainType type) => type.AsSpan().StartsWith(SystemTargetPrefixBytes.Span);
 
         /// <summary>
         /// Returns <see langword="true"/> if the type is a legacy grain, <see langword="false"/> if not.

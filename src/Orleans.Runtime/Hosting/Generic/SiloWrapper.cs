@@ -51,12 +51,21 @@ namespace Orleans.Hosting
         }
 
         /// <inheritdoc />
-        public void Dispose()
+        public void Dispose() => this.DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+        public async ValueTask DisposeAsync()
         {
             if (!isDisposing)
             {
                 this.isDisposing = true;
-                (this.Services as IDisposable)?.Dispose();
+                if (this.Services is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync();
+                }
+                else if (this.Services is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
             }
         }
     }

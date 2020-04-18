@@ -1,69 +1,80 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.GrainDirectory;
-using Orleans.Utilities;
+using Orleans.Metadata;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal interface IGrainDirectoryResolver
-    {
-        IReadOnlyCollection<IGrainDirectory> Directories { get; }
-
-        IGrainDirectory Resolve(LegacyGrainId grainId);
-    }
-
-    internal class GrainDirectoryResolver : IGrainDirectoryResolver
+    internal class GrainDirectoryResolver
     {
         private readonly Dictionary<string, IGrainDirectory> directoryPerName = new Dictionary<string, IGrainDirectory>();
-        private readonly CachedReadConcurrentDictionary<int, IGrainDirectory> directoryPerType = new CachedReadConcurrentDictionary<int, IGrainDirectory>();
-        private readonly GrainTypeManager grainTypeManager;
+        private readonly ConcurrentDictionary<GrainType, IGrainDirectory> directoryPerType = new ConcurrentDictionary<GrainType, IGrainDirectory>(GrainType.Comparer.Instance);
+        private readonly GrainPropertiesResolver grainPropertiesResolver;
+        private readonly IGrainDirectoryResolver[] resolvers;
+        private readonly Func<GrainType, IGrainDirectory> getGrainDirectoryInternal;
 
-        public IReadOnlyCollection<IGrainDirectory> Directories => this.directoryPerName.Values;
-
-        public GrainDirectoryResolver(IServiceProvider serviceProvider, GrainTypeManager grainTypeManager)
+        public GrainDirectoryResolver(
+            IServiceProvider serviceProvider,
+            GrainPropertiesResolver grainPropertiesResolver,
+            IEnumerable<IGrainDirectoryResolver> resolvers)
         {
-            this.grainTypeManager = grainTypeManager;
+            this.getGrainDirectoryInternal = GetGrainDirectoryPerType;
+            this.resolvers = resolvers.ToArray();
 
             // Load all registered directories
-            var services = serviceProvider
-                .GetRequiredService<IKeyedServiceCollection<string, IGrainDirectory>>()
-                .GetServices(serviceProvider);
+            var services = serviceProvider.GetService<IKeyedServiceCollection<string, IGrainDirectory>>()?.GetServices(serviceProvider)
+                ?? Enumerable.Empty<IKeyedService<string, IGrainDirectory>>();
             foreach (var svc in services)
             {
                 this.directoryPerName.Add(svc.Key, svc.GetService(serviceProvider));
             }
+
+            this.directoryPerName.TryGetValue(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, out var defaultDirectory);
+            this.DefaultGrainDirectory = defaultDirectory;
+            this.grainPropertiesResolver = grainPropertiesResolver;
         }
+
+        public IReadOnlyCollection<IGrainDirectory> Directories => this.directoryPerName.Values;
 
         public static bool HasAnyRegisteredGrainDirectory(IServiceCollection services) => services.Any(svc => svc.ServiceType == typeof(IKeyedService<string, IGrainDirectory>));
 
-        public IGrainDirectory Resolve(LegacyGrainId grainId) => this.directoryPerType.GetOrAdd(grainId.TypeCode, GetGrainDirectoryPerType);
+        public IGrainDirectory DefaultGrainDirectory { get; }
 
-        private IGrainDirectory GetGrainDirectoryPerType(int grainType)
+        public IGrainDirectory Resolve(GrainType grainType) => this.directoryPerType.GetOrAdd(grainType, this.getGrainDirectoryInternal);
+
+        public bool HasNonDefaultDirectory(GrainType grainType) => !ReferenceEquals(Resolve(grainType), this.DefaultGrainDirectory);
+
+        private IGrainDirectory GetGrainDirectoryPerType(GrainType grainType)
         {
-            if (!this.grainTypeManager.ClusterGrainInterfaceMap.TryGetDirectory(grainType, out var directoryName))
-            {
-                throw new OrleansException($"Unexpected: Cannot find the directory for grain class {grainType}");
-            }
+            IGrainDirectory directory;
+            this.grainPropertiesResolver.TryGetGrainProperties(grainType, out var properties);
 
-            if (string.IsNullOrEmpty(directoryName))
+            foreach (var resolver in this.resolvers)
             {
-                return default;
-            }
-
-            if (!this.directoryPerName.TryGetValue(directoryName, out var directory))
-            {
-                if (string.Equals(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, directoryName, StringComparison.InvariantCulture))
+                if (resolver.TryResolveGrainDirectory(grainType, properties, out directory))
                 {
-                    return default;
+                    return directory;
                 }
-                throw new OrleansException($"Unexpected: Cannot find the directory named {directoryName}");
             }
 
-            return directory;
+            if (properties is object
+                && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.GrainDirectory, out var directoryName)
+                && !string.IsNullOrWhiteSpace(directoryName))
+            {
+                if (this.directoryPerName.TryGetValue(directoryName, out directory))
+                {
+                    return directory;
+                }
+                else
+                {
+                    throw new KeyNotFoundException($"Could not resolve grain directory {directoryName} for grain type {grainType}");
+                }
+            }
+
+            return this.DefaultGrainDirectory;
         }
     }
 }

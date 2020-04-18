@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.GrainDirectory
 {
@@ -68,13 +69,6 @@ namespace Orleans.GrainDirectory
                    this.ActivationId == address.ActivationId;
         }
 
-        public override int GetHashCode()
-        {
-            var hashCode = 1043893337;
-            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(this.SiloAddress);
-            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(this.GrainId);
-            hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode(this.ActivationId);
-            return hashCode;
-        }
+        public override int GetHashCode() => HashCode.Combine(this.SiloAddress, this.GrainId, this.ActivationId);
     }
 }

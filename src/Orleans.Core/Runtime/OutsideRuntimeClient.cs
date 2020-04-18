@@ -209,6 +209,10 @@ namespace Orleans
                 async () => this.GrainTypeResolver = await MessageCenter.GetGrainTypeResolver(this.InternalGrainFactory),
                 retryFilter);
 
+            await ExecuteWithRetries(
+                async () => await this.ServiceProvider.GetRequiredService<ClientClusterManifestProvider>().StartAsync(),
+                retryFilter);
+
             this.typeMapRefreshTimer = new AsyncTaskSafeTimer(
                 this.logger, 
                 RefreshGrainTypeResolver, 

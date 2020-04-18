@@ -25,9 +25,9 @@ namespace Orleans.Runtime
         private readonly Catalog catalog;
         private readonly ILogger logger;
         private readonly SiloMessagingOptions messagingOptions;
-        private readonly PlacementDirectorsManager placementDirectorsManager;
+        private readonly PlacementService placementService;
         private readonly ILocalGrainDirectory localGrainDirectory;
-        private readonly IGrainLocator grainLocator;
+        private readonly GrainLocator grainLocator;
         private readonly ActivationCollector activationCollector;
         private readonly MessageFactory messageFactory;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
@@ -41,9 +41,9 @@ namespace Orleans.Runtime
             MessageCenter transport, 
             Catalog catalog,
             IOptions<SiloMessagingOptions> messagingOptions,
-            PlacementDirectorsManager placementDirectorsManager,
+            PlacementService placementService,
             ILocalGrainDirectory localGrainDirectory,
-            IGrainLocator grainLocator,
+            GrainLocator grainLocator,
             ActivationCollector activationCollector,
             MessageFactory messageFactory,
             CompatibilityDirectorManager compatibilityDirectorManager,
@@ -57,7 +57,7 @@ namespace Orleans.Runtime
             Transport = transport;
             this.messagingOptions = messagingOptions.Value;
             this.invokeWorkItemLogger = loggerFactory.CreateLogger<InvokeWorkItem>();
-            this.placementDirectorsManager = placementDirectorsManager;
+            this.placementService = placementService;
             this.localGrainDirectory = localGrainDirectory;
             this.grainLocator = grainLocator;
             this.activationCollector = activationCollector;
@@ -727,11 +727,6 @@ namespace Orleans.Runtime
             var targetAddress = message.TargetAddress;
             if (targetAddress.IsComplete) return Task.CompletedTask;
 
-            // placement strategy is determined by searching for a specification. first, we check for a strategy associated with the grain reference,
-            // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
-            // message.
-            var strategy = targetAddress.Grain.IsLegacyGrain() ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
-
             var request = message.IsUsingInterfaceVersions
                 ? message.BodyObject as InvokeMethodRequest
                 : null;
@@ -741,21 +736,20 @@ namespace Orleans.Runtime
                 request?.InterfaceId ?? 0,
                 request?.InterfaceVersion ?? 0);
 
-            PlacementResult placementResult;
-            if (placementDirectorsManager.TrySelectActivationSynchronously(
-                message.SendingAddress, target, this.catalog, strategy, out placementResult) && placementResult != null)
+            var placementTask = placementService.GetOrPlaceActivation(target, this.catalog);
+
+            if (placementTask.IsCompletedSuccessfully)
             {
-                SetMessageTargetPlacement(message, placementResult, targetAddress);
+                SetMessageTargetPlacement(message, placementTask.Result, targetAddress);
                 return Task.CompletedTask;
             }
 
-           return AddressMessageAsync(message, target, strategy, targetAddress);
-        }
+            return AddressMessageAsync(placementTask);
 
-        private async Task AddressMessageAsync(Message message, PlacementTarget target, PlacementStrategy strategy, ActivationAddress targetAddress)
-        {
-            var placementResult = await placementDirectorsManager.SelectOrAddActivation(target, (IPlacementRuntime)this.catalog, strategy);
-            SetMessageTargetPlacement(message, placementResult, targetAddress);
+            async Task AddressMessageAsync(ValueTask<PlacementResult> addressTask)
+            {
+                SetMessageTargetPlacement(message, await addressTask, targetAddress);
+            }
         }
 
         private void SetMessageTargetPlacement(Message message, PlacementResult placementResult, ActivationAddress targetAddress)
