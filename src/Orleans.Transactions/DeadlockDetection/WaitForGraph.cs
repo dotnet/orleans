@@ -261,72 +261,104 @@ namespace Orleans.Transactions.DeadlockDetection
             return true;
         }
 
-        public bool DetectCycles(out IList<LockInfo> locksInCycle)
+        public bool DetectCycles(out IList<IList<LockInfo>> locksInCycles)
         {
-            var cycle = new List<int>();
-            if (!this.DetectCycles(cycle))
+            var cycles = this.DetectCycles();
+            if (cycles.Count == 0)
             {
-                locksInCycle = Array.Empty<LockInfo>();
+                locksInCycles = Array.Empty<IList<LockInfo>>();
                 return false;
             }
 
-            locksInCycle = new List<LockInfo>();
-            for (var i = 0; i < cycle.Count - 1; i++)
-            {
-                ref var current = ref this.nodes[cycle[i]];
-                ref var next = ref this.nodes[cycle[i+1]];
-                locksInCycle.Add(current.IsTransaction
-                    ? LockInfo.ForWait(next.ParticipantId, current.TransactionId)
-                    : LockInfo.ForLock(current.ParticipantId, next.TransactionId));
-            }
-
+            locksInCycles = cycles.Select(this.CycleToLocks).ToList();
             return true;
         }
 
-        private bool DetectCycles(List<int> cycle)
+        private IList<LockInfo> CycleToLocks(IList<int> cycle)
         {
-            const byte white = 0;
-            const byte gray = 1;
-            const byte black = 2;
-
-            var marks = new byte[this.nodes.Length];
-
-            bool Visit(int nodeId, List<int> history)
+            var locks = new List<LockInfo>(cycle.Count + 1); // we include the back edge
+            for (int i = 0; i < cycle.Count; i++)
             {
-                if (marks[nodeId] == black) return false;
-                if (marks[nodeId] == gray)
-                {
-                    // cycle detected!
-                    history.Add(nodeId);
-                    return true;
-                }
+                ref var current = ref this.nodes[cycle[i]];
+                ref var next = ref this.nodes[i + 1 >= cycle.Count ? cycle[0] : cycle[i + 1]];
 
-                marks[nodeId] = gray;
-                history.Add(nodeId);
-                foreach (var edge in this.GetEdges(nodeId))
+                if (current.IsTransaction && next.IsResource)
                 {
-                    if (Visit(edge, history))
-                    {
-                        return true;
-                    }
+                    locks.Add(LockInfo.ForLock(next.ParticipantId, current.TransactionId));
                 }
-                marks[nodeId] = black;
-                history.RemoveAt(history.Count - 1);
-                return false;
-            }
-
-            foreach (var curr in this.nodes)
-            {
-                if (marks[curr.Id] == white)
+                else if (current.IsResource && next.IsTransaction)
                 {
-                    if(Visit(curr.Id, cycle))
-                    {
-                        return true;
-                    }
+                    locks.Add(LockInfo.ForWait(current.ParticipantId, next.TransactionId));
                 }
             }
 
-            return false;
+            return locks;
+        }
+
+        // book keeping for the detect cycles method below.
+        private struct NodeInfo
+        {
+            public int Index;
+            public int MinLink;
+            public bool OnStack;
+        }
+
+        private List<List<int>> DetectCycles()
+        {
+            // this uses tarjan's scc algorithm - any scc with a single vertex can be discarded, because
+            // vertex's cannot have edges to themselves in our wfg construction (all edges are tx -> res or res -> tx).
+
+            var stack = new Stack<int>();
+            var nextIndex = 1; // we use 0 to indicate that a node hasn't been visited
+            var info = new NodeInfo[this.nodes.Length];
+            var cycles = new List<List<int>>();
+
+            for (var i = 0; i < this.nodes.Length; i++)
+            {
+                if (info[i].Index == 0)
+                {
+                    StrongConnect(i);
+                }
+            }
+
+            void StrongConnect(int v)
+            {
+                info[v] = new NodeInfo {Index = nextIndex, MinLink = nextIndex, OnStack = true};
+                nextIndex++;
+                stack.Push(v);
+
+                foreach (var w in this.GetEdges(v))
+                {
+                    if (info[w].Index == 0)
+                    {
+                        StrongConnect(w);
+                        info[v].MinLink = Math.Min(info[v].MinLink, info[w].MinLink);
+                    }
+                    else if (info[w].OnStack)
+                    {
+                        info[v].MinLink = Math.Min(info[v].MinLink, info[w].Index);
+                    }
+                }
+
+                if (info[v].MinLink == info[v].Index)
+                {
+                    var scc = new List<int>();
+                    int w;
+                    do
+                    {
+                        w = stack.Pop();
+                        info[w].OnStack = false;
+                        scc.Add(w);
+                    } while (w != v);
+
+                    if (scc.Count > 1)
+                    {
+                        cycles.Add(scc);
+                    }
+                }
+            }
+
+            return cycles;
         }
 
     }

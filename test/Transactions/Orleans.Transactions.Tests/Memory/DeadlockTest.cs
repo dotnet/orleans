@@ -105,7 +105,7 @@ namespace Orleans.Transactions.Tests.Memory
                 if (e.Deadlocked)
                 {
                     this.testOutput(
-                        $"At {e.StartTime.Second}.{e.StartTime.Millisecond} ({e.RequestCount}): {dns.Format(e.Locks)}");
+                        $"At {e.StartTime.TimeOfDay:G} ({e.RequestCount}): {dns.Format(e.Locks)}");
                 }
                 else
                 {
@@ -119,22 +119,35 @@ namespace Orleans.Transactions.Tests.Memory
             private readonly Dictionary<Guid, string> txNames = new Dictionary<Guid, string>();
             private readonly Dictionary<ParticipantId, string> rsNames = new Dictionary<ParticipantId, string>();
 
-            public string Format(LockInfo lockInfo) =>
-                new StringBuilder()
-                    .Append(Name(this.txNames, lockInfo.TxId, "T"))
-                    .Append(lockInfo.IsWait ? "~>" : "=>")
-                    .Append(Name(this.rsNames, lockInfo.Resource, "R"))
-                    .ToString();
+            public string Format(LockInfo lockInfo)
+            {
+                if (lockInfo.IsWait)
+                {
+                    return new StringBuilder(Name(this.txNames, lockInfo.TxId, "T")).Append("~>")
+                        .Append(Name(this.rsNames, lockInfo.Resource, "R")).ToString();
+                }
+                else
+                {
+                    return new StringBuilder(Name(this.rsNames, lockInfo.Resource, "R")).Append("=>")
+                        .Append(Name(this.txNames, lockInfo.TxId, "T")).ToString();
+                }
+            }
 
             public string Format(IEnumerable<LockInfo> cycle) =>
                 new StringBuilder("[").Append(string.Join(",", cycle.Select(this.Format)))
                     .Append("]").ToString();
 
             private static string Name<TKey>(Dictionary<TKey, string> dict, TKey k, string prefix)
+                where TKey : struct
             {
-                if (!dict.TryGetValue(k, out var name))
+                string name;
+                if (k.Equals(default(TKey)))
                 {
-                    name = dict[k] = prefix + dict.Count.ToString();
+                    name = "BAD";
+                }
+                else if (!dict.TryGetValue(k, out  name))
+                {
+                    name = dict[k] = prefix + dict.Count;
                 }
                 return name;
             }

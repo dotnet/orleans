@@ -259,7 +259,7 @@ namespace Orleans.Transactions.State
             if (this.logger.IsEnabled(LogLevel.Information))
             {
                 this.logger.LogInformation("aborting all transactions in {CurrentGroup}",
-                    string.Join(",", this.currentGroup?.Keys));
+                    string.Join(",", this.currentGroup?.Keys ?? Enumerable.Empty<Guid>()));
             }
             if (currentGroup != null)
             {

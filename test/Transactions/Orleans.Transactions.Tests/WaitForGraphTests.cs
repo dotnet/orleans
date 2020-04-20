@@ -65,9 +65,12 @@ namespace Orleans.Transactions.Tests
             var locks = new[] {Lock("0", "a"), Wait("1", "a"), Lock("1", "b"), Wait("0", "b")};
             var wfg = new WaitForGraph(locks);
             AssertSameLocks(wfg.ToLockKeys(), locks);
-            var found = wfg.DetectCycles(out var cycle);
+            var found = wfg.DetectCycles(out var cycles);
             Assert.True(found);
-            this.output.WriteLine(FormatCycle(cycle));
+            foreach (var cycle in cycles)
+            {
+                this.output.WriteLine(FormatCycle(cycle));
+            }
         }
 
         [Fact]
@@ -87,5 +90,36 @@ namespace Orleans.Transactions.Tests
         }
 
 
+        [Fact]
+        public void DetectsCycles()
+        {
+            var graph = new WaitForGraph(new[]
+            {
+                Lock("0", "a"),
+                Wait("0",  "b"),
+                Lock("1", "b"),
+                Wait("1", "a"),
+            });
+
+            Assert.True(graph.DetectCycles(out var cycles), "graph should have a cycle");
+            foreach (var cycle in cycles)
+            {
+                this.output.WriteLine(FormatCycle(cycle));
+            }
+        }
+
+        [Fact]
+        public void DoesNotDetectNonCycles()
+        {
+            var graph = new WaitForGraph(new []
+            {
+                Lock("R3", "T1"),
+                Wait("T1", "R0"),
+                Lock("R0", "T0"),
+                Wait("T0", "R1"),
+                Lock("R1", "T2")
+            });
+            Assert.False(graph.DetectCycles(out var _), "graph should not have a cycle");
+        }
     }
 }

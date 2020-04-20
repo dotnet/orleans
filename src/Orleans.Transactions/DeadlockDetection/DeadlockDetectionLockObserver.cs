@@ -55,10 +55,14 @@ namespace Orleans.Transactions.DeadlockDetection
                 var startTime = DateTime.UtcNow;
                 var localGraph =
                     new WaitForGraph(this.lockTracker.GetLocks()).GetConnectedSubGraph(lockedBy, new[] {resource});
-                if (localGraph.DetectCycles(out var cycle))
+                if (localGraph.DetectCycles(out var cycles))
                 {
-                    await cycle.BreakLocks();
-                    NotifyDeadlockListeners(startTime, DateTime.UtcNow, cycle);
+                    var tasks = cycles.Select(async c =>
+                    {
+                        await c.BreakLocks();
+                        this.NotifyDeadlockListeners(startTime, DateTime.UtcNow, c);
+                    });
+                    await Task.WhenAll(tasks);
                 }
                 else
                 {
