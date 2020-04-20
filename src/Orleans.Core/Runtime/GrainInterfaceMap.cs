@@ -20,6 +20,10 @@ namespace Orleans.Runtime
         private readonly Dictionary<int, GrainClassData> implementationIndex;
         private readonly Dictionary<int, PlacementStrategy> placementStrategiesIndex;
 
+
+        // Keep it for wire serialization compatibility
+        private readonly Dictionary<int, MultiClusterRegistrationStrategy> registrationStrategiesIndex;
+
         [NonSerialized] // Client shouldn't need this
         private readonly Dictionary<string, string> primaryImplementations;
 
@@ -45,6 +49,7 @@ namespace Orleans.Runtime
             primaryImplementations = new Dictionary<string, string>();
             implementationIndex = new Dictionary<int, GrainClassData>();
             placementStrategiesIndex = new Dictionary<int, PlacementStrategy>();
+            registrationStrategiesIndex = new Dictionary<int, MultiClusterRegistrationStrategy>(); // init to avoid nullref in previous versions
             unordered = new HashSet<int>();
             this.localTestMode = localTestMode;
             this.defaultPlacementStrategy = defaultPlacementStrategy;
