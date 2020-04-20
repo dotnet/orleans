@@ -19,7 +19,7 @@ namespace AdventureGrainInterfaces
         Task Enter(PlayerInfo player);
         Task Exit(PlayerInfo player);
 
-        // Players can enter or exit a room
+        // Monsters can enter or exit a room
         Task Enter(MonsterInfo monster);
         Task Exit(MonsterInfo monster);
 
