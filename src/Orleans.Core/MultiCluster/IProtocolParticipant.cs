@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans.Concurrency;
 
 namespace Orleans.MultiCluster
@@ -8,24 +8,6 @@ namespace Orleans.MultiCluster
     /// </summary>
     public interface ILogConsistencyProtocolParticipant  : IGrain  
     {
-        /// <summary>
-        /// Called when a message is received from another cluster.
-        /// This MUST interleave with other calls to avoid deadlocks.
-        /// </summary>
-        /// <param name="payload">the protocol message to be delivered</param>
-        /// <returns></returns>
-        [AlwaysInterleave]
-        Task<ILogConsistencyProtocolMessage> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payload);
-
-        /// <summary>
-        /// Called when a configuration change notification is received.
-        /// </summary>
-        /// <param name="next">the next multi-cluster configuration</param>
-        /// <returns></returns>
-        [AlwaysInterleave]
-        Task OnMultiClusterConfigurationChange(MultiClusterConfiguration next);
-
-
         /// <summary>
         /// Called immediately before the user-level OnActivateAsync, on same scheduler.
         /// </summary>

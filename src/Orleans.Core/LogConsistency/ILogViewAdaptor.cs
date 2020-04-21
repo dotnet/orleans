@@ -1,4 +1,4 @@
-﻿using Orleans.MultiCluster;
+using Orleans.MultiCluster;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,12 +29,6 @@ namespace Orleans.LogConsistency
 
         /// <summary>Called during deactivation, right after the user-defined <see cref="Grain.OnDeactivateAsync"/>.</summary>
         Task PostOnDeactivate();
-
-        /// <summary>Called when a grain receives a message from a remote instance.</summary>
-        Task<ILogConsistencyProtocolMessage> OnProtocolMessageReceived(ILogConsistencyProtocolMessage payload);
-
-        /// <summary>Called after the silo receives a new multi-cluster configuration.</summary>
-        Task OnMultiClusterConfigurationChange(MultiClusterConfiguration next);
     }
 
     /// <summary>

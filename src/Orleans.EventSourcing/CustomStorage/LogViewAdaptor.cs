@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -67,15 +67,8 @@ namespace Orleans.EventSourcing.CustomStorage
         {
             get
             {
-                return MayAccessStorage();
+                return true;
             }
-        }
-
-        private bool MayAccessStorage()
-        {
-            return (!Services.MultiClusterEnabled)
-                   || string.IsNullOrEmpty(primaryCluster)
-                   || primaryCluster == Services.MyClusterId;
         }
 
         /// <inheritdoc/>
@@ -103,9 +96,6 @@ namespace Orleans.EventSourcing.CustomStorage
         {
             var request = (ReadRequest) payload;
 
-            if (! MayAccessStorage())
-                throw new ProtocolTransportException("message destined for primary cluster ended up elsewhere (inconsistent configurations?)");
-
             var response = new ReadResponse<TLogView>() { Version = version };
 
             // optimization: include value only if version is newer
@@ -124,26 +114,10 @@ namespace Orleans.EventSourcing.CustomStorage
             {
                 try
                 {
-                    if (MayAccessStorage())
-                    {
-                        // read from storage
-                        var result = await ((ICustomStorageInterface<TLogView, TLogEntry>)Host).ReadStateFromStorage();
-                        version = result.Key;
-                        cached = result.Value;
-                    }
-                    else
-                    {
-                        // read from primary cluster
-                        var request = new ReadRequest() { KnownVersion = version };
-                        if (!Services.MultiClusterConfiguration.Clusters.Contains(primaryCluster))
-                            throw new ProtocolTransportException("the specified primary cluster is not in the multicluster configuration");
-                        var response =(ReadResponse<TLogView>) await Services.SendMessage(request, primaryCluster);
-                        if (response.Version > request.KnownVersion)
-                        {
-                            version = response.Version;
-                            cached = response.Value;
-                        }              
-                    }
+                    // read from storage
+                    var result = await ((ICustomStorageInterface<TLogView, TLogEntry>)Host).ReadStateFromStorage();
+                    version = result.Key;
+                    cached = result.Value;
 
                     Services.Log(LogLevel.Debug, "read success v{0}", version);
 
@@ -246,15 +220,6 @@ namespace Orleans.EventSourcing.CustomStorage
                     Services.Log(LogLevel.Debug, "read failed {0}", LastPrimaryIssue);
                 }
             }
-
-            // broadcast notifications to all other clusters
-            // TODO: send state instead of updates, if smaller
-            if (writesuccessful)
-                BroadcastNotification(new UpdateNotificationMessage()
-                   {
-                       Version = version,
-                       Updates = updates,
-                   });
 
             exit_operation("WriteAsync");
 

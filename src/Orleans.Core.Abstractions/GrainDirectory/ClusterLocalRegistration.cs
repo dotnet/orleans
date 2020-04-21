@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using Orleans.MultiCluster;
 
 namespace Orleans.GrainDirectory
 {

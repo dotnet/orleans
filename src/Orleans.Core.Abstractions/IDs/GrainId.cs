@@ -19,7 +19,7 @@ namespace Orleans.Runtime
 
         public bool IsGrain => Category == UniqueKey.Category.Grain || Category == UniqueKey.Category.KeyExtGrain; 
 
-        public bool IsClient => Category == UniqueKey.Category.Client || Category == UniqueKey.Category.GeoClient; 
+        public bool IsClient => Category == UniqueKey.Category.Client; 
 
         internal GrainId(UniqueKey key)
             : base(key)
@@ -33,13 +33,12 @@ namespace Orleans.Runtime
 
         public static GrainId NewClientId(string clusterId = null)
         {
-            return NewClientId(Guid.NewGuid(), clusterId);
+            return NewClientId(Guid.NewGuid());
         }
 
-        internal static GrainId NewClientId(Guid id, string clusterId = null)
+        internal static GrainId NewClientId(Guid id)
         {
-            return FindOrCreateGrainId(UniqueKey.NewKey(id,
-                clusterId == null ? UniqueKey.Category.Client : UniqueKey.Category.GeoClient, 0, clusterId));
+            return FindOrCreateGrainId(UniqueKey.NewKey(id, UniqueKey.Category.Client, 0));
         }
 
         internal static GrainId GetGrainId(UniqueKey key)
@@ -239,9 +238,6 @@ namespace Orleans.Runtime
                     break;
                 case UniqueKey.Category.Client:
                     fullString = $"*cli/{idString}";
-                    break;
-                case UniqueKey.Category.GeoClient:
-                    fullString = $"*gcl/{Key.KeyExt}/{idString}";
                     break;
                 case UniqueKey.Category.SystemTarget:
                 case UniqueKey.Category.KeyExtSystemTarget:

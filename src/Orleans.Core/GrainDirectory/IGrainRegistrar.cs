@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans.Runtime;
 using System.Collections.Generic;
 
@@ -72,10 +72,4 @@ namespace Orleans.GrainDirectory
         /// <param name="gid">The id of the grain</param>
         Task DeleteAsync(GrainId gid);
     }
-
-    /// <summary>
-    /// Interface for <see cref="IGrainRegistrar"/> implementations which implement a given registration strategy.
-    /// </summary>
-    /// <typeparam name="TStrategy">The registration strategy.</typeparam>
-    internal interface IGrainRegistrar<TStrategy> : IGrainRegistrar where TStrategy : IMultiClusterRegistrationStrategy { }
 }
