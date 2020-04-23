@@ -29,11 +29,11 @@ If you need the GrainService to write to streams for you, then you will have to 
 ``` csharp
 [Reentrant]
 
-public class LightstreamerDataService : GrainService, IDataService {
+public class DataService : GrainService, IDataService {
 
     readonly IGrainFactory GrainFactory;
 
-    public LightstreamerDataService(IServiceProvider services, IGrainIdentity id, Silo silo, ILoggerFactory loggerFactory, IGrainFactory grainFactory) : base(id, silo, loggerFactory) {
+    public DataService(IServiceProvider services, IGrainIdentity id, Silo silo, ILoggerFactory loggerFactory, IGrainFactory grainFactory) : base(id, silo, loggerFactory) {
         GrainFactory = grainFactory;
     }
 
