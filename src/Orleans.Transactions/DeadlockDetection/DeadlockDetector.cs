@@ -25,7 +25,7 @@ namespace Orleans.Transactions.DeadlockDetection
 
         private enum EndBatchReason
         {
-            OutOfRequests, Stable, Deadlocked
+            OutOfRequests, Stable
         }
 
         private class SiloInfo
@@ -52,6 +52,7 @@ namespace Orleans.Transactions.DeadlockDetection
             public WaitForGraph WaitForGraph { get; set; }
             public bool Changed { get; set; }
             public ISet<Guid> KnownTransactions { get; } = new HashSet<Guid>();
+            public ISet<ParticipantId> KnownResources { get; } = new HashSet<ParticipantId>();
             public ISet<Guid> NewTransactions { get; } = new HashSet<Guid>();
 
             public int RequestCount { get; set; }
@@ -69,10 +70,6 @@ namespace Orleans.Transactions.DeadlockDetection
 
             public DateTime AnalysisStartTime { get; }
         }
-
-        // TODO deadlock options
-        private int MaxRequestCount { get; } = 5;
-        private TimeSpan RequestTimeout { get; } = TimeSpan.FromSeconds(2);
 
         private ISiloStatusOracle siloStatusOracle;
         private readonly ILogger<DeadlockDetector> logger;
@@ -99,7 +96,10 @@ namespace Orleans.Transactions.DeadlockDetection
 
         public async Task CheckForDeadlocks(CollectLocksResponse message)
         {
-            // TODO LOG  this.logger.LogInformation($"CheckForDeadlocks({message.BatchId},{message.SiloAddress},{message.MaxVersion})");
+            if (this.logger.IsEnabled(LogLevel.Trace))
+                this.logger.LogTrace(
+                    $"CheckForDeadlocks({message.BatchId},{message.SiloAddress},{message.MaxVersion})");
+
             Batch batch;
             if (message.BatchId == null)
             {
@@ -109,14 +109,20 @@ namespace Orleans.Transactions.DeadlockDetection
                 }
                 else
                 {
-                    // TODO log rate limited
+                    if (this.logger.IsEnabled(LogLevel.Trace))
+                    {
+                        this.logger.LogTrace("Deadlock detection was rate limited");
+                    }
                     return;
                 }
             }
             else if(!this.batches.TryGetValue(message.BatchId.Value, out batch))
             {
-               // TODO LOG  if(this.logger.IsEnabled(LogLevel.Trace)){ this.logger.LogInformation($"received message for missing batch {message}"); }
-               return;
+                if (this.logger.IsEnabled(LogLevel.Trace))
+                {
+                    this.logger.LogTrace("received message for missing batch: {BatchId}", message.BatchId.Value);
+                }
+                return;
             }
 
             await this.UpdateBatch(batch, message);
@@ -124,32 +130,42 @@ namespace Orleans.Transactions.DeadlockDetection
 
         private bool StartNewBatch(CollectLocksResponse message, out Batch batch)
         {
-            if (this.batches.Count >= this.options.MaxConcurrentDeadlockAnalysis)
-            {
-                // TODO report?
-                this.logger.LogWarning("Too many batches exist, discarding a message");
-                batch = null;
-                return false;
-            }
 
-            // look for a batch that intersects the grains / transactions in this message
+
+            // look for a batch that has transactions/resources overlapping those in this message
             // before starting a new one
             var transactionsInMessage = message.Locks.Select(l => l.TxId).ToSet();
+            var resourcesInMessage = message.Locks.Select(l => l.Resource).ToSet();
             foreach (var existingBatch in this.batches.Values)
             {
-                this.logger.LogInformation(
-                    $"checking for overlap between messageTxs {string.Join(",", transactionsInMessage)}" +
-                    $" and batch tx {string.Join(",", existingBatch.KnownTransactions)}");
-                if (existingBatch.KnownTransactions.Overlaps(transactionsInMessage))
+                if (this.logger.IsEnabled(LogLevel.Trace))
                 {
-                    this.logger.LogInformation("joined existing batch");
+                    this.logger.LogTrace($"checking for overlap between messageTxs {string.Join(",", transactionsInMessage)}" +
+                                         $" and batch tx {string.Join(",", existingBatch.KnownTransactions)}");
+                }
+
+                if (existingBatch.KnownTransactions.Overlaps(transactionsInMessage) ||
+                    existingBatch.KnownResources.Overlaps(resourcesInMessage))
+                {
+                    if (this.logger.IsEnabled(LogLevel.Trace))
+                    {
+                        this.logger.LogTrace("joining an existing batch with overlapping transactions");
+                    }
                     batch = existingBatch;
                     return true;
                 }
             }
 
-            this.logger.LogInformation("no existing batch found - starting a new one");
-            // we're starting a new one
+            if (this.batches.Count >= this.options.MaxConcurrentDeadlockAnalysis)
+            {
+                batch = null;
+                return false;
+            }
+
+            if (this.logger.IsEnabled(LogLevel.Trace))
+            {
+                this.logger.LogTrace("No existing batches found - starting a new one");
+            }
             batch = new Batch(this.GetSiloAddresses(), DateTime.UtcNow);
             return true;
         }
@@ -207,6 +223,8 @@ namespace Orleans.Transactions.DeadlockDetection
                 {
                     batch.NewTransactions.Add(lockInfo.TxId);
                 }
+
+                batch.KnownResources.Add(lockInfo.Resource);
 
                 siloInfo.Grains.Add(lockInfo.Resource);
             }
@@ -301,6 +319,8 @@ namespace Orleans.Transactions.DeadlockDetection
                 }
                 catch (Exception e)
                 {
+                    // TODO jjmason - I'm not sure about removing listeners like this.  We do have to be really careful
+                    // about throwing exceptions from within the transaction infrastructure though.
                     this.logger.LogError(e, "Error notifying global deadlock listener {listener}, will be removed", listener);
                     this.deadlockListeners[i] = null;
                 }
@@ -310,7 +330,7 @@ namespace Orleans.Transactions.DeadlockDetection
         private void RequestLocksFromSilo(Batch batch, SiloInfo silo, IEnumerable<Guid> transactions)
         {
             silo.Status = SiloStatus.WaitingForLocks;
-            silo.RequestDeadline = DateTime.UtcNow + this.RequestTimeout;
+            silo.RequestDeadline = DateTime.UtcNow + this.options.DeadlockRequestTimeout;
             var lockObserver =
                 this.internalGrainFactory.GetSystemTarget<ILocalDeadlockDetector>(
                     Constants.LocalDeadlockDetectorId, silo.Address);
