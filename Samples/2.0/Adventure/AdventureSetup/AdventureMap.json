@@ -10,10 +10,10 @@
         { "id" : -2, "name" : "hades", "description" : "\nWelcome to Hades!\n\nWe must inform you that no one ever leaves.\nYou might as well end right now.", "directions" : { } }
     ],
     "things" : [ 
-        { "id" : 0, "name" : "brass key", "article": "a", category: "key", "foundIn" : 2, "commands" : ["lock","unlock"]},
-        { "id" : 1, "name" : "knife", "article": "a", category: "weapon", "foundIn" : 3, "commands" : ["kill"]},
-        { "id" : 2, "name" : "sandwich", "article": "a", category: "food", "foundIn" : 4, "commands" : ["eat"]},
-        { "id" : 3, "name" : "glass of water", "article": "a", category: "beverage", "foundIn" : 4, "commands" : ["drink"]}
+        { "id" : 0, "name" : "brass key", "article": "a", "category": "key", "foundIn" : 2, "commands" : ["lock","unlock"]},
+        { "id" : 1, "name" : "knife", "article": "a", "category": "weapon", "foundIn" : 3, "commands" : ["kill"]},
+        { "id" : 2, "name" : "sandwich", "article": "a", "category": "food", "foundIn" : 4, "commands" : ["eat"]},
+        { "id" : 3, "name" : "glass of water", "article": "a", "category": "beverage", "foundIn" : 4, "commands" : ["drink"]}
     ],
     "monsters" : [
         { "id" : 0, "name" : "An Angry Customer", "killedBy" : [1]},

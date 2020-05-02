@@ -717,7 +717,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 CloudStorageAccount storageAccount = AzureTableUtils.GetCloudStorageAccount(ConnectionString);
                 CloudTableClient operationsClient = storageAccount.CreateCloudTableClient();
                 operationsClient.DefaultRequestOptions.RetryPolicy = this.StoragePolicyOptions.OperationRetryPolicy;
-                operationsClient.DefaultRequestOptions.MaximumExecutionTime = this.StoragePolicyOptions.OperationTimeout;
+                operationsClient.DefaultRequestOptions.ServerTimeout = this.StoragePolicyOptions.OperationTimeout;
                 // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
                 operationsClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
                 return operationsClient;
@@ -736,7 +736,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 CloudStorageAccount storageAccount = AzureTableUtils.GetCloudStorageAccount(ConnectionString);
                 CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
                 creationClient.DefaultRequestOptions.RetryPolicy = this.StoragePolicyOptions.CreationRetryPolicy;
-                creationClient.DefaultRequestOptions.MaximumExecutionTime = this.StoragePolicyOptions.CreationTimeout;
+                creationClient.DefaultRequestOptions.ServerTimeout = this.StoragePolicyOptions.CreationTimeout;
                 // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
                 creationClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
                 return creationClient;
