@@ -111,6 +111,11 @@ namespace CodeGenerator.Tests
                     MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.dll")),
                     MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Core.dll")),
                     MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.dll")),
+
+#if NET461
+                    MetadataReference.CreateFromFile(typeof(ValueTask).Assembly.Location),
+#endif
+
                     MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.Serialization.Formatters.dll"))
                 };
             }

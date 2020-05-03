@@ -13,6 +13,10 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="$(xUnitVersion)" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net461' ">
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="$(SystemThreadingTasksExtensionsVersion)" />
+  </ItemGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="RoslynTypeNameFormatterTests.cs" />
   </ItemGroup>
