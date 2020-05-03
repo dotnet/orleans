@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -195,15 +196,23 @@ namespace Orleans.CodeGenerator.Generators
 
                     if (isOneWayTask)
                     {
-                        if (!SymbolEqualityComparer.Default.Equals(wellKnownTypes.Task, method.ReturnType))
+                        if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.Task, method.ReturnType))
+                        {
+                            var done = wellKnownTypes.Task.ToNameSyntax().Member((object _) => Task.CompletedTask);
+                            body.Add(ReturnStatement(done));
+                        }
+                        else if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.ValueTaskNamed, method.ReturnType))
+                        {
+                            body.Add(ReturnStatement(LiteralExpression(SyntaxKind.DefaultLiteralExpression)));
+                        }
+                        else
                         {
                             throw new CodeGenerationException(
                                 $"Method {method} is marked with [{wellKnownTypes.OneWayAttribute.Name}], " +
-                                $"but has a return type which is not assignable from {typeof(Task)}");
+                                $"but has a return type which is not assignable from {typeof(Task)} or {typeof(ValueTask)}");
                         }
 
-                        var done = wellKnownTypes.Task.ToNameSyntax().Member((object _) => Task.CompletedTask);
-                        body.Add(ReturnStatement(done));
+                        
                     }
                 }
                 else if (method.ReturnType is INamedTypeSymbol methodReturnType)

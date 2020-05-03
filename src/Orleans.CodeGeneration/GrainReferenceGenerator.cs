@@ -57,7 +57,7 @@ namespace Orleans.CodeGenerator
                                          .Select(_ => SF.TypeParameter(_.ToString()))
                                          .ToArray()
                                    : new TypeParameterSyntax[0];
-            
+
             // Create the special marker attribute.
             var markerAttribute =
                 SF.Attribute(typeof(GrainReferenceAttribute).GetNameSyntax())
@@ -91,7 +91,7 @@ namespace Orleans.CodeGenerator
             {
                 classDeclaration = classDeclaration.AddTypeParameterListParameters(genericTypes);
             }
-            
+
             return classDeclaration;
         }
 
@@ -157,7 +157,7 @@ namespace Orleans.CodeGenerator
                                     .AddArgumentListArguments(SF.Argument(parameter.Name.ToIdentifierName()))));
                     }
                 }
-                
+
                 // Get the parameters argument value.
                 ExpressionSyntax args;
                 if (method.IsGenericMethodDefinition)
@@ -209,15 +209,21 @@ namespace Orleans.CodeGenerator
 
                     if (isOneWayTask)
                     {
-                        if (method.ReturnType != typeof(Task))
+                        if (method.ReturnType == typeof(Task))
+                        {
+                            var done = typeof(Task).GetNameSyntax(true).Member((object _) => Task.CompletedTask);
+                            body.Add(SF.ReturnStatement(done));
+                        }
+                        else if (method.ReturnType == typeof(ValueTask))
+                        {
+                            body.Add(SF.ReturnStatement(SF.LiteralExpression(SyntaxKind.DefaultLiteralExpression)));
+                        }
+                        else
                         {
                             throw new CodeGenerationException(
                                 $"Method {grainType.GetParseableName()}.{method.Name} is marked with [{nameof(OneWayAttribute)}], " +
-                                $"but has a return type which is not assignable from {typeof(Task)}");
+                                $"but has a return type which is not assignable from {typeof(Task)} or {typeof(ValueTask)}");
                         }
-
-                        var done = typeof(Task).GetNameSyntax(true).Member((object _) => Task.CompletedTask);
-                        body.Add(SF.ReturnStatement(done));
                     }
                 }
                 else
@@ -236,7 +242,7 @@ namespace Orleans.CodeGenerator
                     }
 
                     ExpressionSyntax returnContent = invocation;
-                    if (method.ReturnType.IsGenericType 
+                    if (method.ReturnType.IsGenericType
                         && method.ReturnType.GetGenericTypeDefinition().FullName == "System.Threading.Tasks.ValueTask`1")
                     {
                         // Wrapping invocation expression with initialization of ValueTask (e.g. new ValueTask<int>(base.InvokeMethod()))
@@ -326,7 +332,7 @@ namespace Orleans.CodeGenerator
             return SF.Argument(SF.NameColon("options"), SF.Token(SyntaxKind.None), allOptions);
         }
 
-         private static ExpressionSyntax GetParameterForInvocation(ParameterInfo arg, int argIndex)
+        private static ExpressionSyntax GetParameterForInvocation(ParameterInfo arg, int argIndex)
         {
             var argIdentifier = arg.GetOrCreateName(argIndex).ToIdentifierName();
 
@@ -363,7 +369,7 @@ namespace Orleans.CodeGenerator
             var property = TypeUtils.Member((GrainReference _) => _.InterfaceVersion);
             var returnValue = SF.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
-                SF.Literal(GrainInterfaceUtils.GetGrainInterfaceVersion(grainType))); 
+                SF.Literal(GrainInterfaceUtils.GetGrainInterfaceVersion(grainType)));
             return
                 SF.PropertyDeclaration(typeof(ushort).GetTypeSyntax(), property.Name)
                     .AddAccessorListAccessors(
