@@ -203,7 +203,7 @@ namespace Orleans.CodeGenerator.Generators
                         }
                         else if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.ValueTaskNamed, method.ReturnType))
                         {
-                            body.Add(ReturnStatement(ParseExpression("default(System.Threading.Tasks.ValueTask)")));
+                            body.Add(ReturnStatement(LiteralExpression(SyntaxKind.DefaultLiteralExpression)));
                         }
                         else
                         {

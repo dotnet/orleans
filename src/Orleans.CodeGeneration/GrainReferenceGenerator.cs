@@ -216,7 +216,7 @@ namespace Orleans.CodeGenerator
                         }
                         else if (method.ReturnType == typeof(ValueTask))
                         {
-                            body.Add(SF.ReturnStatement(SF.ParseExpression("default(System.Threading.Tasks.ValueTask)")));   
+                            body.Add(SF.ReturnStatement(SF.LiteralExpression(SyntaxKind.DefaultLiteralExpression)));
                         }
                         else
                         {
