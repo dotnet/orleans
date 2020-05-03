@@ -63,6 +63,7 @@ namespace Orleans.CodeGenerator
             SerializerFeature = Type("Orleans.Serialization.SerializerFeature");
             String = compilation.GetSpecialType(SpecialType.System_String);
             Task = Type("System.Threading.Tasks.Task");
+            ValueTaskNamed = Type("System.Threading.Tasks.ValueTask");
             Task_1 = Type("System.Threading.Tasks.Task`1");
             ValueTask = OptionalType("System.Threading.Tasks.ValueTask");
             TimeSpan = Type("System.TimeSpan");
@@ -220,6 +221,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol String { get; }
         public INamedTypeSymbol Task { get; }
         public INamedTypeSymbol Task_1 { get; }
+        public INamedTypeSymbol ValueTaskNamed { get; }
         public OptionalType ValueTask { get; }
         public INamedTypeSymbol TransactionAttribute { get; }
         public INamedTypeSymbol TransactionOption { get; }

@@ -55,9 +55,17 @@ namespace UnitTests.GrainInterfaces
         Task Notify(ISimpleGrainObserver observer);
 
         [OneWay]
+        ValueTask NotifyValueTask(ISimpleGrainObserver observer);
+
+        [OneWay]
         Task ThrowsOneWay();
 
+        [OneWay]
+        ValueTask ThrowsOneWayValueTask();
+
         Task<bool> NotifyOtherGrain(IOneWayGrain otherGrain, ISimpleGrainObserver observer);
+
+        Task<bool> NotifyOtherGrainValueTask(IOneWayGrain otherGrain, ISimpleGrainObserver observer);
 
         Task<IOneWayGrain> GetOtherGrain();
 
@@ -78,7 +86,11 @@ namespace UnitTests.GrainInterfaces
     {
         Task Notify(ISimpleGrainObserver observer);
 
+        ValueTask NotifyValueTask(ISimpleGrainObserver observer);
+
         Task Throws();
+
+        ValueTask ThrowsValueTask();
 
         Task<int> GetCount();
     }
