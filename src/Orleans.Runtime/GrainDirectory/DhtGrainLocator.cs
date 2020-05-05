@@ -41,7 +41,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public  Task Unregister(ActivationAddress address, UnregistrationCause cause)
         {
-            var tcs = new TaskCompletionSource<object>();
+            var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.unregistrationQueue.Enqueue((tcs, address, cause));
             UnregisterExecute().Ignore();
             return tcs.Task;
