@@ -106,7 +106,7 @@ namespace HelloWorld.Grains
 }
 ```
 
-A grain class implements one or more grain interfaces, as you can read [here, in the Grains section.](http://dotnet.github.io/orleans/Documentation/grains/index.html))
+A grain class implements one or more grain interfaces, as you can read [here, in the Grains section.](http://dotnet.github.io/orleans/Documentation/grains/index.html)
 
 ```csharp
 [...]
