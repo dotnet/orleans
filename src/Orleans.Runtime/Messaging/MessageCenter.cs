@@ -203,7 +203,7 @@ namespace Orleans.Runtime.Messaging
         {
             MessagingStatisticsGroup.OnRejectedMessage(msg);
 
-            if (msg.Result == Message.ResponseTypes.Rejection)
+            if (msg.Direction == Message.Directions.Response && msg.Result == Message.ResponseTypes.Rejection)
             {
                 // Do not send reject a rejection locally, it will create a stack overflow
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
