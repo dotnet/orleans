@@ -204,10 +204,20 @@ namespace Orleans.Runtime.Messaging
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
         {
             MessagingStatisticsGroup.OnRejectedMessage(msg);
-            if (string.IsNullOrEmpty(reason)) reason = string.Format("Rejection from silo {0} - Unknown reason.", MyAddress);
-            Message error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
-            // rejection msgs are always originated in the local silo, they are never remote.
-            this.OnReceivedMessage(error);
+
+            if (msg.Direction == Message.Directions.Response && msg.Result == Message.ResponseTypes.Rejection)
+            {
+                // Do not send reject a rejection locally, it will create a stack overflow
+                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+                if (this.log.IsEnabled(LogLevel.Debug)) log.Debug("Dropping rejection {msg}", msg);
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(reason)) reason = $"Rejection from silo {this.MyAddress} - Unknown reason.";
+                var error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
+                // rejection msgs are always originated in the local silo, they are never remote.
+                this.OnReceivedMessage(error);
+            }
         }
 
         public void RegisterLocalMessageHandler(IncomingMessageHandler handler)
