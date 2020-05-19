@@ -7,6 +7,45 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.1.7] (changes since 3.1.6)
+
+- Non-breaking bug fixes
+  - Do not reject rejection messages locally. Drop them instead (#6525)
+
+### [3.2.0-rc1] (changes since 3.1.6)
+
+- Breaking changes
+  - Remove current multicluster implementation (#6498)
+
+- Non-breaking improvements
+  - Support for pluggable grain directory (#6340, #6354, #6366, #6385, #6473, #6485, #6502, #6524)
+  - Expose timeouts for Azure Table Storage (#6462, #6501, #6509)
+  - Schedule Tasks and WorkItems on .NET ThreadPool (#6261)
+  - Schedule received messages onto thread pool in Connection.ProcessIncoming (#6263)
+  - Remove AsyncAgent, Executor and related (#6264)
+  - Reorient RuntimeContext around IGrainContext (#6365)
+  - Remove Message.DebugContext and related code (#6323)
+  - Remove obviated GrainId constructor and associated code (#6322)
+  - Set isolation level to `READ COMMITED` to avoid Gap Lock issues (#6331)
+  - AdoNet: Rename Storage table to OrleansStorage for consistency with other tables. (#6336)
+  - Avoid using GrainTimer in non-grain contexts (#6342)
+  - Remove unnecessary provider runtime members (#6362)
+  - Remove ClientInvokeCallback (#6364)
+  - Remove ProcessExitHandlingOptions (#6369)
+  - Simplify OrleansTaskScheduler (#6370)
+  - Remove IServiceProvider from IGrainContext (#6372)
+  - Streamline MemoryStorage and InMemoryReminderTable (#6315)
+  - Fix test glitch in PersistenceProvider_Memory_FixedLatency_WriteRead (#6378)
+  - Fix errors reported by GitHub Semmle code analysis tools. (#6374)
+  - Remove Microsoft prefix from logging categories (#6431)
+  - Streamline Dictionary use and remove some dead code (#6439)
+  - Make methods on AITelemetryConsumer virtual; clean-up (#6469)
+  - Remove IHostedClient abstraction (#6475)
+  - Only allocate an array for lengths when array rank is greater than 3 (#6493)
+
+- Non-breaking bug fixes
+  - Fix log message (#6408)
+
 ### [3.1.6] (changes since 3.1.5)
 
 - Non-breaking improvements
