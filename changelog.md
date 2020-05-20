@@ -7,6 +7,11 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.2.0-rc2] (changes since 3.2.0-rc1)
+
+- Non-breaking bug fixes
+  - Do not reject rejection messages locally. Drop them instead (#6525)
+
 ### [3.1.7] (changes since 3.1.6)
 
 - Non-breaking bug fixes
