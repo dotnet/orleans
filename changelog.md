@@ -31,7 +31,7 @@ The idea is to track end-user facing changes as they occur.*
   - Reorient RuntimeContext around IGrainContext (#6365)
   - Remove Message.DebugContext and related code (#6323)
   - Remove obviated GrainId constructor and associated code (#6322)
-  - Set isolation level to `READ COMMITED` to avoid Gap Lock issues (#6331)
+  - Set isolation level to `READ COMMITTED` to avoid Gap Lock issues (#6331)
   - AdoNet: Rename Storage table to OrleansStorage for consistency with other tables. (#6336)
   - Avoid using GrainTimer in non-grain contexts (#6342)
   - Remove unnecessary provider runtime members (#6362)
