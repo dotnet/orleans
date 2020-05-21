@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <PackageReference Include="StackExchange.Redis" Version="$(StackExchangeRedis)" />
+    <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
   </ItemGroup>
 
   <ItemGroup>

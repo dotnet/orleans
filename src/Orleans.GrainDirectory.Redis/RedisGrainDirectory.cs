@@ -1,43 +1,74 @@
-using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using StackExchange.Redis;
 
 namespace Orleans.GrainDirectory.Redis
 {
     public class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
     {
+        private readonly RedisGrainDirectoryOptions directoryOptions;
+        private ConnectionMultiplexer redis;
+        private IDatabase database;
+        private LuaScript deleteScript;
+
         public RedisGrainDirectory(
-            RedisGrainDirectoryOptions directoryOptions,
-            IOptions<ClusterOptions> clusterOptions)
+            RedisGrainDirectoryOptions directoryOptions)
         {
+            this.directoryOptions = directoryOptions;
         }
 
-        public Task<GrainAddress> Lookup(string grainId)
+        public async Task<GrainAddress> Lookup(string grainId)
         {
-            throw new NotImplementedException();
+            var result = (string) await this.database.StringGetAsync(grainId);
+
+            if (string.IsNullOrWhiteSpace(result))
+                return default;
+
+            return JsonConvert.DeserializeObject<GrainAddress>(result);
         }
 
-        public Task<GrainAddress> Register(GrainAddress address)
+        public async Task<GrainAddress> Register(GrainAddress address)
         {
-            throw new NotImplementedException();
+            var success = await this.database.StringSetAsync(address.GrainId, JsonConvert.SerializeObject(address), when: When.NotExists);
+
+            if (success)
+                return address;
+
+            return await Lookup(address.GrainId);
         }
 
-        public Task Unregister(GrainAddress address)
+        public async Task Unregister(GrainAddress address)
         {
-            throw new NotImplementedException();
+            await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = address.GrainId, val = JsonConvert.SerializeObject(address) });
         }
 
         public Task UnregisterSilos(List<string> siloAddresses)
         {
-            throw new NotImplementedException();
+            return Task.CompletedTask;
         }
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            throw new NotImplementedException();
+            lifecycle.Subscribe(nameof(RedisGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, Initialize);
+        }
+
+        public async Task Initialize(CancellationToken ct = default)
+        {
+            this.redis = await ConnectionMultiplexer.ConnectAsync(directoryOptions.ConfigurationOptions);
+            this.database = redis.GetDatabase();
+            this.deleteScript = LuaScript.Prepare(
+                @"
+local cur = redis.call('GET', @key)
+if cur == @val  then
+  return redis.call('DEL', @key)
+else
+  return 0
+end
+                ");
         }
     }
 }
