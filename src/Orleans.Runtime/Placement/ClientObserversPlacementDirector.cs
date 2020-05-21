@@ -34,7 +34,7 @@ namespace Orleans.Runtime.Placement
             PlacementTarget target, 
             IPlacementContext context)
         {
-            throw new InvalidOperationException("Client Observers are not activated using the placement subsystem. Grain " + target.GrainIdentity);
+            throw new ClientNotAvailableException(target.GrainIdentity);
         }
     }
 }

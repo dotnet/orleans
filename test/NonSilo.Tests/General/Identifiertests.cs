@@ -175,8 +175,8 @@ namespace UnitTests.General
             for (int i = 0; i < repeat; ++i)
             {
                 Guid expected = Guid.NewGuid();
-                GrainId grainId = LegacyGrainId.GetGrainIdForTesting(expected);
-                Guid actual = ((LegacyGrainId)grainId).Key.PrimaryKeyToGuid();
+                GrainId grainId = GrainId.Create(GrainType.Create("foo"), GrainIdKeyExtensions.CreateGuidKey(expected));
+                Guid actual = grainId.GetGuidKey();
                 Assert.Equal(expected, actual); // Failed to encode and decode grain id
             }
         }
@@ -185,44 +185,41 @@ namespace UnitTests.General
         public void GrainId_ToFromPrintableString()
         {
             Guid guid = Guid.NewGuid();
-            GrainId grainId = LegacyGrainId.GetGrainIdForTesting(guid);
+            GrainId grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid));
             GrainId roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key
 
             string extKey = "Guid-ExtKey-1";
             guid = Guid.NewGuid();
-            grainId = LegacyGrainId.GetGrainId(0, guid, extKey);
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid, extKey));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + Extended Key
 
-            grainId = LegacyGrainId.GetGrainId(0, guid, null);
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(guid, null));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Guid key + null Extended Key
 
             long key = random.Next();
-            guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
-            grainId = LegacyGrainId.GetGrainIdForTesting(guid);
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateIntegerKey(key));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key
 
             extKey = "Long-ExtKey-2";
             key = random.Next();
-            guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
-            grainId = LegacyGrainId.GetGrainId(0, guid, extKey);
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateIntegerKey(key, extKey));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key + Extended Key
 
-            guid = UniqueKey.NewKey(key).PrimaryKeyToGuid();
-            grainId = LegacyGrainId.GetGrainId(0, guid, null);
+            key = UniqueKey.NewKey(key).PrimaryKeyToLong();
+            grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateIntegerKey(key, extKey));
             roundTripped = RoundTripGrainIdToParsable(grainId);
             Assert.Equal(grainId, roundTripped); // GrainId.ToPrintableString -- Int64 key + null Extended Key
         }
 
         private GrainId RoundTripGrainIdToParsable(GrainId input)
         {
-            string str = ((LegacyGrainId)input).ToParsableString();
-            GrainId output = LegacyGrainId.FromParsableString(str);
-            return output;
+            string str = input.ToString();
+            return GrainId.Parse(str);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
@@ -394,33 +391,6 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
-        public void GrainID_AsGuid()
-        {
-            string guidString = "0699605f-884d-4343-9977-f40a39ab7b2b";
-            Guid grainIdGuid = Guid.Parse(guidString);
-            GrainId grainId = LegacyGrainId.GetGrainIdForTesting(grainIdGuid);
-            //string grainIdToKeyString = grainId.ToKeyString();
-            string grainIdToFullString = ((LegacyGrainId)grainId).ToFullString();
-            string grainIdToGuidString = GrainIdToGuidString(grainId);
-            string grainIdKeyString = grainId.Key.ToString();
-
-            output.WriteLine("Guid={0}", grainIdGuid);
-            output.WriteLine("GrainId={0}", grainId);
-            //output.WriteLine("GrainId.ToKeyString={0}", grainIdToKeyString);
-            output.WriteLine("GrainId.Key.ToString={0}", grainIdKeyString);
-            output.WriteLine("GrainIdToGuidString={0}", grainIdToGuidString);
-            output.WriteLine("GrainId.ToFullString={0}", grainIdToFullString);
-
-            // Equal: Public APIs
-            //Assert.Equal(guidString, grainIdToKeyString); // GrainId.ToKeyString
-            Assert.Equal(guidString, grainIdToGuidString); // GrainIdToGuidString
-            // Equal: Internal APIs
-            Assert.Equal(grainIdGuid, ((LegacyGrainId)grainId).GetPrimaryKey()); // GetPrimaryKey Guid
-            // NOT-Equal: Internal APIs
-            Assert.NotEqual(guidString, grainIdKeyString); // GrainId.Key.ToString
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void SiloAddress_ToFrom_ParsableString()
         {
             SiloAddress address1 = SiloAddressUtils.NewLocalSiloAddress(12345);
@@ -443,16 +413,6 @@ namespace UnitTests.General
 
             Assert.Equal(addressStr2, addressStr2Out); // SiloAddress equal after From-To-ParsableString
         }
-
-        internal string GrainIdToGuidString(GrainId grainId)
-        {
-            const string pkIdentifierStr = "PrimaryKey:";
-            string grainIdFullString = ((LegacyGrainId)grainId).ToFullString();
-            int pkStartIdx = grainIdFullString.IndexOf(pkIdentifierStr, StringComparison.Ordinal) + pkIdentifierStr.Length + 1;
-            string pkGuidString = grainIdFullString.Substring(pkStartIdx, Guid.Empty.ToString().Length);
-            return pkGuidString;
-        }
-
         [Fact, TestCategory("BVT"), TestCategory("Identifiers"), TestCategory("GrainReference")]
         public void GrainReference_Test1()
         {

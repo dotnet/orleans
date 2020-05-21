@@ -88,7 +88,7 @@ namespace Orleans.Runtime
         {
             if (!activations.TryAdd(target.ActivationId, target))
                 return;
-            grainToActivationsMap.AddOrUpdate(target.Grain,
+            grainToActivationsMap.AddOrUpdate(target.GrainId,
                 g => new List<ActivationData> { target },
                 (g, list) => { lock (list) { list.Add(target); } return list; });
         }
@@ -120,7 +120,7 @@ namespace Orleans.Runtime
             if (!activations.TryRemove(target.ActivationId, out ignore))
                 return;
             List<ActivationData> list;
-            if (grainToActivationsMap.TryGetValue(target.Grain, out list))
+            if (grainToActivationsMap.TryGetValue(target.GrainId, out list))
             {
                 lock (list)
                 {
@@ -128,13 +128,13 @@ namespace Orleans.Runtime
                     if (list.Count == 0)
                     {
                         List<ActivationData> list2; // == list
-                        if (grainToActivationsMap.TryRemove(target.Grain, out list2))
+                        if (grainToActivationsMap.TryRemove(target.GrainId, out list2))
                         {
                             lock (list2)
                             {
                                 if (list2.Count > 0)
                                 {
-                                    grainToActivationsMap.AddOrUpdate(target.Grain,
+                                    grainToActivationsMap.AddOrUpdate(target.GrainId,
                                         g => list2,
                                         (g, list3) => { lock (list3) { list3.AddRange(list2); } return list3; });
                                 }

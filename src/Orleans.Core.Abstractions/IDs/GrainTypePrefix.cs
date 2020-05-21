@@ -52,12 +52,12 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns <see langword="true"/> if the type is a client, <see langword="false"/> if not.
         /// </summary>
-        internal static bool IsClient(this in GrainType type) => type.AsSpan().StartsWith(ClientPrefixBytes.Span);
+        public static bool IsClient(this in GrainType type) => type.AsSpan().StartsWith(ClientPrefixBytes.Span);
 
         /// <summary>
         /// Returns <see langword="true"/> if the type is a system target, <see langword="false"/> if not.
         /// </summary>
-        private static bool IsSystemTarget(this in GrainType type) => type.AsSpan().StartsWith(SystemTargetPrefixBytes.Span);
+        public static bool IsSystemTarget(this in GrainType type) => type.AsSpan().StartsWith(SystemTargetPrefixBytes.Span);
 
         /// <summary>
         /// Returns <see langword="true"/> if the type is a legacy grain, <see langword="false"/> if not.
@@ -67,17 +67,17 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns <see langword="true"/> if the type is a client, <see langword="false"/> if not.
         /// </summary>
-        public static bool IsClient(this in GrainId id) => id.Type.IsClient() || LegacyGrainId.TryConvertFromGrainId(id, out var legacyId) && legacyId.IsClient;
+        public static bool IsClient(this in GrainId id) => id.Type.IsClient();
 
         /// <summary>
         /// Returns <see langword="true"/> if the type is a system target, <see langword="false"/> if not.
         /// </summary>
-        public static bool IsSystemTarget(this in GrainId id) => id.Type.IsSystemTarget() || LegacyGrainId.TryConvertFromGrainId(id, out var legacyId) && legacyId.IsSystemTarget;
+        public static bool IsSystemTarget(this in GrainId id) => id.Type.IsSystemTarget();
 
         /// <summary>
         /// Returns <see langword="true"/> if the type is a legacy grain, <see langword="false"/> if not.
         /// </summary>
         public static bool IsLegacyGrain(this in GrainId id) => id.Type.IsLegacyGrain()
-            || (LegacyGrainId.TryConvertFromGrainId(id, out var legacyId) && legacyId.IsGrain);
+            || LegacyGrainId.TryConvertFromGrainId(id, out var legacyId) && legacyId.IsGrain;
     }
 }

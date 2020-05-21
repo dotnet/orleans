@@ -25,30 +25,13 @@ namespace Orleans.Runtime.Placement
         /// <param name="activationData"></param>
         /// <returns></returns>
         bool TryGetActivationData(ActivationId id, out ActivationData activationData);
-
-        void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, string genericArguments = null);
     }
 
     internal static class PlacementRuntimeExtensions
     {
-        public static PlacementStrategy GetGrainPlacementStrategy(this IPlacementRuntime @this, int typeCode, string genericArguments = null)
-        {
-            string unused;
-            PlacementStrategy placement;
-            @this.GetGrainTypeInfo(typeCode, out unused, out placement, genericArguments);
-            return placement;
-        }
-
-        public static PlacementStrategy GetGrainPlacementStrategy(this IPlacementRuntime @this, GrainId grainId, string genericArguments = null)
-        {
-            return @this.GetGrainPlacementStrategy(((LegacyGrainId)grainId).TypeCode, genericArguments);
-        }
-
         public static string GetGrainTypeName(this IPlacementRuntime @this, int typeCode, string genericArguments = null)
         {
-            string grainClass;
-            PlacementStrategy unused;
-            @this.GetGrainTypeInfo(typeCode, out grainClass, out unused, genericArguments);
+            ((Catalog)@this).GetGrainTypeInfo(typeCode, out var grainClass, genericArguments);
             return grainClass;
         }
 

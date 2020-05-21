@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +18,8 @@ namespace Tester.HostBuilder.Fakes
         public void Dispose()
         {
         }
+
+        public ValueTask DisposeAsync() => default;
 
         public Task StartAsync(CancellationToken cancellationToken = default(CancellationToken))
         {

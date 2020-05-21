@@ -197,7 +197,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Unique Id for the grain.
         /// </summary>
-        public IGrainIdentity GrainIdentity { get; set; }
+        public GrainId GrainId { get; set; }
 
         /// <summary>
         /// The grains Category

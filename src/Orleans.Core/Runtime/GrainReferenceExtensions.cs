@@ -10,10 +10,6 @@ namespace Orleans.Runtime
         /// </summary>
         public static string ToShortKeyString(this GrainReference grainRef)
         {
-            if (grainRef.IsObserverReference)
-            {
-                return String.Format("{0}_{1}", grainRef.GrainId.ToString(), grainRef.ObserverId.ToParsableString());
-            }
             if (grainRef.IsSystemTarget)
             {
                 return String.Format("{0}_{1}", grainRef.GrainId.ToString(), grainRef.SystemTargetSilo.ToParsableString());

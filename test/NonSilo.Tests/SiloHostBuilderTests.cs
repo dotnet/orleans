@@ -6,11 +6,13 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
 using Orleans.Hosting;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Statistics;
@@ -89,6 +91,30 @@ namespace NonSilo.Tests
                 })
                 .Build();
 
+            var clusterClient = host.Services.GetRequiredService<IClusterClient>();
+        }
+
+        [Fact]
+        public void GrainMetadataTest()
+        {
+            var host = new HostBuilder()
+                .UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseLocalhostClustering()
+                        .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
+                        .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
+                })
+                .UseDefaultServiceProvider((context, options) =>
+                {
+                    options.ValidateScopes = true;
+                    options.ValidateOnBuild = true;
+                })
+                .Build();
+
+            var localMetadata = host.Services.GetRequiredService<SiloManifest>();
+
+            var str = JsonConvert.SerializeObject(localMetadata);
             var clusterClient = host.Services.GetRequiredService<IClusterClient>();
         }
 

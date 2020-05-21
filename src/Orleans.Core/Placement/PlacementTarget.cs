@@ -10,8 +10,6 @@ namespace Orleans.Runtime.Placement
 
         public ushort InterfaceVersion { get; }
 
-        public bool IsClient => GrainIdentity.IsClient();
-
         public Dictionary<string, object> RequestContextData { get; }
 
         public PlacementTarget(GrainId grainIdentity, Dictionary<string, object> requestContextData, int interfaceId, ushort interfaceVersion)

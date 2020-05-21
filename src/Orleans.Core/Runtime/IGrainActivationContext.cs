@@ -1,7 +1,5 @@
 using System;
-using Orleans.Core;
 using System.Collections.Generic;
-using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime
 {
@@ -14,7 +12,7 @@ namespace Orleans.Runtime
         Type GrainType { get; }
 
         /// <summary>Gets the identity of the grain activation.</summary>
-        IGrainIdentity GrainIdentity { get; }
+        GrainId GrainId { get; }
 
         /// <summary>Gets the <see cref="IServiceProvider"/> that provides access to the grain activation's service container.</summary>
         IServiceProvider ActivationServices { get; }

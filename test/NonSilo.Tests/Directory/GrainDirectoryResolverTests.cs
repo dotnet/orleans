@@ -1,23 +1,14 @@
 using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Net;
-using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans;
-using Orleans.ApplicationParts;
-using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Serialization;
-using Tester.HostBuilder.Fakes;
 using TestExtensions;
 using UnitTests.Grains.Directories;
 using Xunit;
@@ -31,7 +22,7 @@ namespace NonSilo.Tests.Directory
         private readonly IGrainDirectory azureDirectory = Substitute.For<IGrainDirectory>();
         private readonly IGrainDirectory otherDirectory = Substitute.For<IGrainDirectory>();
         private readonly IGrainDirectory againAnotherDirectory = Substitute.For<IGrainDirectory>();
-        private readonly IGrainDirectoryResolver target;
+        private readonly GrainDirectoryResolver target;
 
         public GrainDirectoryResolverTests(ITestOutputHelper output)
         {
@@ -50,21 +41,21 @@ namespace NonSilo.Tests.Directory
 
             var host = hostBuilder.Build();
 
-            this.target = host.Services.GetRequiredService<IGrainDirectoryResolver>();
+            this.target = host.Services.GetRequiredService<GrainDirectoryResolver>();
         }
 
         [Fact]
         public void UserProvidedDirectory()
         {
             var grainId = LegacyGrainId.GetGrainId(AzureTableDirectoryGrain.TYPECODE, Guid.NewGuid());
-            Assert.Same(this.azureDirectory, this.target.Resolve(grainId));
+            Assert.Same(this.azureDirectory, this.target.Resolve(grainId.ToGrainId().Type));
         }
 
         [Fact]
         public void DefaultDhtDirectory()
         {
             var grainId = LegacyGrainId.GetGrainId(DefaultDirectoryGrain.TYPECODE, Guid.NewGuid());
-            Assert.Null(this.target.Resolve(grainId));
+            Assert.Null(this.target.Resolve(grainId.ToGrainId().Type));
         }
 
         [Fact]

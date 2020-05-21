@@ -83,7 +83,7 @@ namespace Orleans
 
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
 
-            // Add default option formatter if none is configured, for options which are requied to be configured 
+            // Add default option formatter if none is configured, for options which are required to be configured 
             services.ConfigureFormatter<ClusterOptions>();
             services.ConfigureFormatter<ClientMessagingOptions>();
             services.ConfigureFormatter<ConnectionOptions>();
@@ -114,6 +114,10 @@ namespace Orleans
             services.AddSingleton<GatewayManager>();
             services.AddSingleton<NetworkingTrace>();
             services.AddSingleton<MessagingTrace>();
+
+            // Type metadata
+            services.AddSingleton<ClientClusterManifestProvider>();
+            services.AddFromExisting<IClusterManifestProvider, ClientClusterManifestProvider>();
         }
     }
 }

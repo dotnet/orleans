@@ -135,7 +135,7 @@ namespace Samples.StorageProviders
         /// <returns>File info for this storage data file.</returns>
         private FileInfo GetStorageFilePath(string collectionName, string key)
         {
-            string fileName = key + "." + collectionName;
+            string fileName = (key + "." + collectionName).Replace('/', '_');
             string path = Path.Combine(directory.FullName, fileName);
             return new FileInfo(path);
         }

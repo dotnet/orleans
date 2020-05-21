@@ -15,6 +15,8 @@ namespace Orleans.Runtime
     [StructLayout(LayoutKind.Auto)]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
     {
+        private static readonly char[] SegmentSeparator = new[] { '/' };
+
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
@@ -27,14 +29,14 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
-        public GrainId(byte[] type, byte[] key) : this(new GrainType(type), new IdSpan(key))
+        internal GrainId(byte[] type, byte[] key) : this(new GrainType(type), new IdSpan(key))
         {
         }
 
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
-        public GrainId(GrainType type, byte[] key) : this(type, new IdSpan(key))
+        internal GrainId(GrainType type, byte[] key) : this(type, new IdSpan(key))
         {
         }
 
@@ -58,7 +60,7 @@ namespace Orleans.Runtime
         public IdSpan Key { get; }
 
         // TODO: remove implicit conversion (potentially make explicit to start with)
-        public static implicit operator LegacyGrainId(GrainId id) => LegacyGrainId.FromGrainId(id);
+        //public static implicit operator LegacyGrainId(GrainId id) => LegacyGrainId.FromGrainId(id);
 
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
@@ -74,6 +76,41 @@ namespace Orleans.Runtime
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
         public static GrainId Create(GrainType type, IdSpan key) => new GrainId(type, key);
+
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
+        public static GrainId Parse(string value)
+        {
+            if (!TryParse(value, out var result))
+            {
+                ThrowInvalidGrainId(value);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Creates a new <see cref="GrainType"/> instance.
+        /// </summary>
+        public static bool TryParse(string value, out GrainId grainId)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                grainId = default;
+                return false;
+            }
+
+            var parts = value.Split(SegmentSeparator, 2);
+            if (parts.Length != 2)
+            {
+                grainId = default;
+                return false;
+            }
+
+            grainId = Create(parts[0], parts[1]);
+            return true;
+        }
 
         /// <summary>
         /// <see langword="true"/> if this instance is the default value, <see langword="false"/> if it is not.
@@ -123,7 +160,9 @@ namespace Orleans.Runtime
         public static bool operator <(GrainId a, GrainId b) => a.CompareTo(b) < 0;
 
         /// <inheritdoc/>
-        public override string ToString() => $"{Type.ToStringUtf8()}/{Key.ToStringUtf8()}";
+        public override string ToString() => $"{Type.ToStringUtf8()}{SegmentSeparator[0]}{Key.ToStringUtf8()}";
+
+        private static void ThrowInvalidGrainId(string value) => throw new ArgumentException($"Unable to parse \"{value}\" as a grain id");
 
         /// <summary>
         /// An <see cref="IEqualityComparer{T}"/> and <see cref="IComparer{T}"/> implementation for <see cref="GrainId"/>.

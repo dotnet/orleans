@@ -9,8 +9,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
-using Orleans.Core;
-using Orleans.GrainDirectory;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
 using Orleans.Storage;
@@ -64,7 +62,7 @@ namespace Orleans.Runtime
             Address = addr;
             State = ActivationState.Create;
             PlacedUsing = placedUsing;
-            if (!Grain.IsSystemTarget())
+            if (!GrainId.IsSystemTarget())
             {
                 this.collector = collector;
             }
@@ -75,8 +73,6 @@ namespace Orleans.Runtime
         }
 
         public Type GrainType => GrainTypeData.Type;
-
-        public IGrainIdentity GrainIdentity => (LegacyGrainId)this.GrainId;
 
         public IServiceProvider ActivationServices => this.serviceScope.ServiceProvider;
 
@@ -173,11 +169,6 @@ namespace Orleans.Runtime
             await streamDirectory.Cleanup(true, false);
         }
 
-        public GrainId GrainId
-        {
-            get { return Grain; }
-        }
-
         public GrainTypeData GrainTypeData { get; private set; }
 
         public Grain GrainInstance { get; private set; }
@@ -207,7 +198,7 @@ namespace Orleans.Runtime
 
         public SiloAddress Silo { get { return Address.Silo;  } }
 
-        public GrainId Grain { get { return Address.Grain; } }
+        public GrainId GrainId { get { return Address.Grain; } }
 
         public ActivationState State { get; private set; }
 
@@ -684,7 +675,7 @@ namespace Orleans.Runtime
         {
             return String.Format("[Activation: {0}{1}{2}{3} State={4}]",
                  Silo,
-                 Grain,
+                 GrainId,
                  this.ActivationId,
                  GetActivationInfoString(),
                  State);
@@ -696,7 +687,7 @@ namespace Orleans.Runtime
                 String.Format(
                     "[Activation: {0}{1}{2}{3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} InFlightCount={7} NumRunning={8} IdlenessTimeSpan={9} CollectionAgeLimit={10}{11}]",
                     Silo.ToLongString(),
-                    Grain.ToString(),
+                    GrainId.ToString(),
                     this.ActivationId,
                     GetActivationInfoString(),
                     State,                          // 4
@@ -715,7 +706,7 @@ namespace Orleans.Runtime
             {
                 return String.Format("[Activation: {0}{1}{2}{3}]",
                      Silo,
-                     Grain,
+                     GrainId,
                      this.ActivationId,
                      GetActivationInfoString());
             }

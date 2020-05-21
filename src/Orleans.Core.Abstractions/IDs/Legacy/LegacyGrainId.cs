@@ -8,7 +8,7 @@ using Orleans.Core;
 namespace Orleans.Runtime
 {
     [Serializable]
-    public class LegacyGrainId : IEquatable<LegacyGrainId>, IComparable<LegacyGrainId>, IGrainIdentity
+    public class LegacyGrainId : IEquatable<LegacyGrainId>, IComparable<LegacyGrainId>
     {
         private static readonly object lockable = new object();
         private const int INTERN_CACHE_INITIAL_SIZE = InternerConstants.SIZE_LARGE;
@@ -210,14 +210,6 @@ namespace Orleans.Runtime
             if (typeSpan.StartsWith(GrainTypePrefix.LegacyGrainPrefixBytes.Span))
             {
                 prefixLength = GrainTypePrefix.LegacyGrainPrefixBytes.Length;
-            }
-            else if (typeSpan.StartsWith(GrainTypePrefix.SystemTargetPrefixBytes.Span))
-            {
-                prefixLength = GrainTypePrefix.SystemTargetPrefixBytes.Length;
-            }
-            else if (typeSpan.StartsWith(GrainTypePrefix.ClientPrefixBytes.Span))
-            {
-                return null;
             }
             else
             {

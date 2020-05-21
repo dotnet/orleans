@@ -2,17 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Net;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 using NSubstitute;
 using Orleans;
 using Orleans.GrainDirectory;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Utilities;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -26,7 +24,7 @@ namespace UnitTests.Directory
         private readonly SiloLifecycleSubject lifecycle;
 
         private readonly IGrainDirectory grainDirectory;
-        private readonly IGrainDirectoryResolver grainDirectoryResolver;
+        private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly MockClusterMembershipService mockMembershipService;
 
@@ -38,15 +36,20 @@ namespace UnitTests.Directory
             this.lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
 
             this.grainDirectory = Substitute.For<IGrainDirectory>();
-            this.grainDirectoryResolver = Substitute.For<IGrainDirectoryResolver>();
-            this.grainDirectoryResolver.Resolve(Arg.Any<LegacyGrainId>()).Returns(this.grainDirectory);
-            this.grainDirectoryResolver.Directories.Returns(new[] { this.grainDirectory });
+            var services = new ServiceCollection()
+                .AddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>))
+                .AddSingletonKeyedService<string, IGrainDirectory>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (sp, name) => this.grainDirectory)
+                .BuildServiceProvider();
+
+            this.grainDirectoryResolver = new GrainDirectoryResolver(
+                services,
+                new GrainPropertiesResolver(new NoOpClusterManifestProvider()),
+                Array.Empty<IGrainDirectoryResolver>());
             this.localGrainDirectory = Substitute.For<ILocalGrainDirectory>();
             this.mockMembershipService = new MockClusterMembershipService();
 
             this.grainLocator = new CachedGrainLocator(
-                this.grainDirectoryResolver, 
-                new DhtGrainLocator(this.localGrainDirectory),
+                this.grainDirectoryResolver,
                 this.mockMembershipService.Target);
 
             this.grainLocator.Participate(this.lifecycle);
@@ -259,7 +262,7 @@ namespace UnitTests.Directory
         private int generation = 0;
         private ActivationAddress GenerateActivationAddress()
         {
-            var grainId = LegacyGrainId.GetGrainIdForTesting(Guid.NewGuid());
+            var grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(Guid.NewGuid()));
             var siloAddr = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), ++generation);
 
             return ActivationAddress.NewActivationAddress(siloAddr, grainId);
@@ -275,6 +278,20 @@ namespace UnitTests.Directory
             var maxTimeout = 40_000;
             while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
             Assert.True(maxTimeout > 0);
+        }
+
+        private class NoOpClusterManifestProvider : IClusterManifestProvider
+        {
+            public ClusterManifest Current => new ClusterManifest(MajorMinorVersion.Zero, ImmutableDictionary<SiloAddress, SiloManifest>.Empty);
+
+            public IAsyncEnumerable<ClusterManifest> Updates => this.GetUpdates();
+
+            private async IAsyncEnumerable<ClusterManifest> GetUpdates()
+            {
+                yield return this.Current;
+                await Task.Delay(100);
+                yield break;
+            }
         }
     }
 }

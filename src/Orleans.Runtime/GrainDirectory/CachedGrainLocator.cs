@@ -17,8 +17,7 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class CachedGrainLocator : IGrainLocator, ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator.ITestAccessor
     {
-        private readonly IGrainDirectoryResolver grainDirectoryResolver;
-        private readonly DhtGrainLocator inClusterGrainLocator;
+        private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly IGrainDirectoryCache cache;
 
         private readonly CancellationTokenSource shutdownToken = new CancellationTokenSource();
@@ -36,21 +35,20 @@ namespace Orleans.Runtime.GrainDirectory
         MembershipVersion ITestAccessor.LastMembershipVersion { get; set; }
 
         public CachedGrainLocator(
-            IGrainDirectoryResolver grainDirectoryResolver,
-            DhtGrainLocator inClusterGrainLocator,
+            GrainDirectoryResolver grainDirectoryResolver,
             IClusterMembershipService clusterMembershipService)
         {
             this.grainDirectoryResolver = grainDirectoryResolver;
-            this.inClusterGrainLocator = inClusterGrainLocator;
             this.clusterMembershipService = clusterMembershipService;
             this.cache = new LRUBasedGrainDirectoryCache(GrainDirectoryOptions.DEFAULT_CACHE_SIZE, GrainDirectoryOptions.DEFAULT_MAXIMUM_CACHE_TTL);
         }
 
         public async Task<List<ActivationAddress>> Lookup(GrainId grainId)
         {
-            if (ClientGrainId.TryParse(grainId, out var clientId))
+            var grainType = grainId.Type;
+            if (grainType.IsClient() || grainType.IsSystemTarget())
             {
-                return await this.inClusterGrainLocator.Lookup(clientId.GrainId);
+                ThrowUnsupportedGrainType(grainId);
             }
 
             List<ActivationAddress> results;
@@ -63,7 +61,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             results = new List<ActivationAddress>();
 
-            var entry = await GetGrainDirectory(grainId).Lookup(((LegacyGrainId)grainId).ToParsableString());
+            var entry = await GetGrainDirectory(grainId.Type).Lookup(grainId.ToString());
 
             // Nothing found
             if (entry == null)
@@ -75,7 +73,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (this.knownDeadSilos.Contains(activationAddress.Silo))
             {
                 // Remove it from the directory
-                await GetGrainDirectory(grainId).Unregister(entry);
+                await GetGrainDirectory(grainId.Type).Unregister(entry);
             }
             else
             {
@@ -89,23 +87,23 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async Task<ActivationAddress> Register(ActivationAddress address)
         {
-            if (address.Grain.IsClient())
+            var grainType = address.Grain.Type;
+            if (grainType.IsClient() || grainType.IsSystemTarget())
             {
-                return await this.inClusterGrainLocator.Register(address);
+                ThrowUnsupportedGrainType(address.Grain);
             }
 
             var grainAddress = address.ToGrainAddress();
-            var grainId = address.Grain;
 
-            var result = await GetGrainDirectory(grainId).Register(grainAddress);
+            var result = await GetGrainDirectory(grainType).Register(grainAddress);
             var activationAddress = result.ToActivationAddress();
 
             // Check if the entry point to a dead silo
             if (this.knownDeadSilos.Contains(activationAddress.Silo))
             {
                 // Remove outdated entry and retry to register
-                await GetGrainDirectory(grainId).Unregister(result);
-                result = await GetGrainDirectory(grainId).Register(grainAddress);
+                await GetGrainDirectory(grainType).Unregister(result);
+                result = await GetGrainDirectory(grainType).Register(grainAddress);
                 activationAddress = result.ToActivationAddress();
             }
 
@@ -120,9 +118,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses)
         {
+            var grainType = grainId.Type;
+            if (grainType.IsClient() || grainType.IsSystemTarget())
+            {
+                ThrowUnsupportedGrainType(grainId);
+            }
+
             if (this.cache.LookUp(grainId, out var results))
             {
-
                 // IGrainDirectory only supports single activation
                 var result = results[0];
 
@@ -147,7 +150,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             try
             {
-                await GetGrainDirectory(address.Grain).Unregister(address.ToGrainAddress());
+                await GetGrainDirectory(address.Grain.Type).Unregister(address.ToGrainAddress());
             }
             finally
             {
@@ -171,7 +174,7 @@ namespace Orleans.Runtime.GrainDirectory
             lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
         }
 
-        private IGrainDirectory GetGrainDirectory(GrainId grainId) => this.grainDirectoryResolver.Resolve(grainId);
+        private IGrainDirectory GetGrainDirectory(GrainType grainType) => this.grainDirectoryResolver.Resolve(grainType);
 
         private async Task ListenToClusterChange()
         {
@@ -211,6 +214,8 @@ namespace Orleans.Runtime.GrainDirectory
                 ((ITestAccessor)this).LastMembershipVersion = snapshot.Version;
             }
         }
+
+        private static void ThrowUnsupportedGrainType(GrainId grainId) => throw new InvalidOperationException($"Unsupported grain type for grain {grainId}");
     }
 
     internal static class AddressHelpers
@@ -219,7 +224,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             return ActivationAddress.GetAddress(
                     SiloAddress.FromParsableString(addr.SiloAddress),
-                    LegacyGrainId.FromParsableString(addr.GrainId),
+                    GrainId.Parse(addr.GrainId),
                     ActivationId.GetActivationId(UniqueKey.Parse(addr.ActivationId.AsSpan())));
         }
 
@@ -228,7 +233,7 @@ namespace Orleans.Runtime.GrainDirectory
             return new GrainAddress
             {
                 SiloAddress = addr.Silo.ToParsableString(),
-                GrainId = ((LegacyGrainId)addr.Grain).ToParsableString(),
+                GrainId = addr.Grain.ToString(),
                 ActivationId = (addr.Activation.Key.ToHexString())
             };
         }

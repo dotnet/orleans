@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using Orleans.Metadata;
 using Orleans.Runtime;
 
 namespace Orleans.Placement
@@ -7,7 +9,7 @@ namespace Orleans.Placement
     /// Base for all placement policy marker attributes.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public abstract class PlacementAttribute : Attribute
+    public abstract class PlacementAttribute : Attribute, IGrainPropertiesProviderAttribute
     {
         public PlacementStrategy PlacementStrategy { get; private set; }
 
@@ -16,6 +18,12 @@ namespace Orleans.Placement
             if (placement == null) throw new ArgumentNullException(nameof(placement));
 
             this.PlacementStrategy = placement;
+        }
+
+        /// <inheritdoc />
+        public virtual void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
+        {
+            this.PlacementStrategy?.PopulateGrainProperties(services, grainClass, grainType, properties);
         }
     }
 

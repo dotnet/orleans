@@ -72,9 +72,9 @@ namespace Orleans.Runtime
 
         private static readonly TimeSpan UnregisterTimeout = TimeSpan.FromSeconds(1);
 
-        private readonly IGrainLocator grainLocator;
+        private readonly GrainLocator grainLocator;
         private readonly GrainTypeManager grainTypeManager;
-        private readonly IGrainDirectoryResolver grainDirectoryResolver;
+        private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly ILocalGrainDirectory directory;
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activations;
@@ -99,11 +99,12 @@ namespace Orleans.Runtime
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly IOptions<SiloMessagingOptions> messagingOptions;
         private readonly RuntimeMessagingTrace messagingTrace;
+        private readonly PlacementStrategyResolver placementStrategyResolver;
 
         public Catalog(
             ILocalSiloDetails localSiloDetails,
-            IGrainLocator grainLocator,
-            IGrainDirectoryResolver grainDirectoryResolver,
+            GrainLocator grainLocator,
+            GrainDirectoryResolver grainDirectoryResolver,
             ILocalGrainDirectory grainDirectory,
             GrainTypeManager typeManager,
             OrleansTaskScheduler scheduler,
@@ -111,7 +112,6 @@ namespace Orleans.Runtime
             ActivationCollector activationCollector,
             GrainCreator grainCreator,
             MessageCenter messageCenter,
-            PlacementDirectorsManager placementDirectorsManager,
             MessageFactory messageFactory,
             SerializationManager serializationManager,
             IStreamProviderRuntime providerRuntime,
@@ -122,7 +122,9 @@ namespace Orleans.Runtime
             IOptions<GrainCollectionOptions> collectionOptions,
             IOptions<SiloMessagingOptions> messagingOptions,
             RuntimeMessagingTrace messagingTrace,
-            IAsyncTimerFactory timerFactory)
+            IAsyncTimerFactory timerFactory,
+            PlacementStrategyResolver placementStrategyResolver,
+            PlacementService placementService)
             : base(Constants.CatalogType, messageCenter.MyAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
@@ -143,6 +145,7 @@ namespace Orleans.Runtime
             this.collectionOptions = collectionOptions;
             this.messagingOptions = messagingOptions;
             this.messagingTrace = messagingTrace;
+            this.placementStrategyResolver = placementStrategyResolver;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
             this.Dispatcher = new Dispatcher(
@@ -150,7 +153,7 @@ namespace Orleans.Runtime
                 messageCenter,
                 this,
                 this.messagingOptions,
-                placementDirectorsManager,
+                placementService,
                 grainDirectory,
                 grainLocator,
                 this.activationCollector,
@@ -200,7 +203,7 @@ namespace Orleans.Runtime
             if (this.messagingOptions.Value.AssumeHomogenousSilosForTesting)
                 return AllActiveSilos;
 
-            var typeCode = ((LegacyGrainId)target.GrainIdentity).TypeCode;
+            var typeCode = LegacyGrainId.FromGrainId(target.GrainIdentity).TypeCode;
             var silos = target.InterfaceVersion > 0
                 ? versionSelectorManager.GetSuitableSilos(typeCode, target.InterfaceId, target.InterfaceVersion).SuitableSilos
                 : grainTypeManager.GetSupportedSilos(typeCode);
@@ -217,7 +220,7 @@ namespace Orleans.Runtime
             if (target.InterfaceVersion == 0)
                 throw new ArgumentException("Interface version not provided", nameof(target));
 
-            var typeCode = ((LegacyGrainId)target.GrainIdentity).TypeCode;
+            var typeCode = LegacyGrainId.FromGrainId(target.GrainIdentity).TypeCode;
             var silos = versionSelectorManager
                 .GetSuitableSilos(typeCode, target.InterfaceId, target.InterfaceVersion)
                 .SuitableSilosByVersion;
@@ -270,7 +273,7 @@ namespace Orleans.Runtime
             if (list != null && list.Count > 0)
             {
                 count = list.Count;
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CollectActivations{0}", list.ToStrings(d => d.Grain.ToString() + d.ActivationId));
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CollectActivations{0}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
                 await DeactivateActivationsFromCollector(list);
             }
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
@@ -296,12 +299,12 @@ namespace Orleans.Runtime
                     int n;
                     if (!counts.TryGetValue(grainTypeName, out grains))
                     {
-                        counts.Add(grainTypeName, new Dictionary<GrainId, int> { { data.Grain, 1 } });
+                        counts.Add(grainTypeName, new Dictionary<GrainId, int> { { data.GrainId, 1 } });
                     }
-                    else if (!grains.TryGetValue(data.Grain, out n))
-                        grains[data.Grain] = 1;
+                    else if (!grains.TryGetValue(data.GrainId, out n))
+                        grains[data.GrainId] = 1;
                     else
-                        grains[data.Grain] = n + 1;
+                        grains[data.GrainId] = n + 1;
                 }
             }
             return counts
@@ -324,9 +327,8 @@ namespace Orleans.Runtime
                         stats.Add(new DetailedGrainStatistic()
                         {
                             GrainType = TypeUtils.GetFullName(data.GrainInstanceType),
-                            GrainIdentity = (LegacyGrainId)data.Grain,
-                            SiloAddress = data.Silo,
-                            Category = ((LegacyGrainId)data.Grain).Category.ToString()
+                            GrainId = data.GrainId,
+                            SiloAddress = data.Silo
                         });
                     }
                 }
@@ -354,7 +356,8 @@ namespace Orleans.Runtime
             {
                 PlacementStrategy unused;
                 string grainClassName;
-                grainTypeManager.GetTypeInfo(((LegacyGrainId)grain).TypeCode, out grainClassName, out unused);
+
+                grainTypeManager.GetTypeInfo(LegacyGrainId.FromGrainId(grain).TypeCode, out grainClassName, out unused);
                 report.GrainClassTypeName = grainClassName;
             }
             catch (Exception exc)
@@ -427,9 +430,9 @@ namespace Orleans.Runtime
                 (data.IsReentrant || data.MayInterleave((InvokeMethodRequest)message.BodyObject));
         }
 
-        public void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, string genericArguments = null)
+        public void GetGrainTypeInfo(int typeCode, out string grainClass, string genericArguments = null)
         {
-            grainTypeManager.GetTypeInfo(typeCode, out grainClass, out placement, genericArguments);
+            grainTypeManager.GetTypeInfo(typeCode, out grainClass, out _, genericArguments);
         }
 
         public int ActivationCount { get { return activations.Count; } }
@@ -457,7 +460,7 @@ namespace Orleans.Runtime
         {
             ActivationData result;
             activatedPromise = Task.CompletedTask;
-            PlacementStrategy placement;
+            PlacementStrategy placement = this.placementStrategyResolver.GetPlacementStrategy(address.Grain.Type);
 
             lock (activations)
             {
@@ -465,22 +468,13 @@ namespace Orleans.Runtime
                 {
                     return result;
                 }
-                
-                int typeCode = ((LegacyGrainId)address.Grain).TypeCode;
-                string actualGrainType = null;
 
-                if (typeCode != 0)
+                int typeCode = LegacyGrainId.FromGrainId(address.Grain).TypeCode;
+
+                GetGrainTypeInfo(typeCode, out var actualGrainType, genericArguments);
+                if (string.IsNullOrEmpty(grainType))
                 {
-                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement, genericArguments);
-                    if (string.IsNullOrEmpty(grainType))
-                    {
-                        grainType = actualGrainType;
-                    }
-                }
-                else
-                {
-                    // special case for Membership grain.
-                    placement = SystemPlacement.Singleton;
+                    grainType = actualGrainType;
                 }
 
                 if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
@@ -684,11 +678,10 @@ namespace Orleans.Runtime
             if (!grainTypeManager.TryGetPrimaryImplementation(grainTypeName, out grainClassName))
             {
                 // Lookup from grain type code
-                var typeCode = ((LegacyGrainId)data.Grain).TypeCode;
+                var typeCode = LegacyGrainId.FromGrainId(data.GrainId).TypeCode;
                 if (typeCode != 0)
                 {
-                    PlacementStrategy unused;
-                    GetGrainTypeInfo(typeCode, out grainClassName, out unused, genericArguments);
+                    GetGrainTypeInfo(typeCode, out grainClassName, genericArguments);
                 }
                 else
                 {
@@ -714,7 +707,7 @@ namespace Orleans.Runtime
             
             activations.IncrementGrainCounter(grainClassName);
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CreateGrainInstance {0}{1}", data.GrainId, data.ActivationId);
         }
 
         private void InstallStreamConsumerExtension(ActivationData result, IStreamSubscriptionObserver observer)
@@ -1264,8 +1257,8 @@ namespace Orleans.Runtime
                         try
                         {
                             var activationData = activation.Value;
-                            if (!activationData.IsUsingGrainDirectory || grainDirectoryResolver.Resolve(activationData.Grain) != default) continue;
-                            if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.Grain))) continue;
+                            if (!activationData.IsUsingGrainDirectory || grainDirectoryResolver.HasNonDefaultDirectory(activationData.GrainId.Type)) continue;
+                            if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.GrainId))) continue;
 
                             lock (activationData)
                             {

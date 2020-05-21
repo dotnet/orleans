@@ -33,7 +33,7 @@ namespace Orleans.Runtime.GrainDirectory
         public async Task<ActivationAddress> Register(ActivationAddress address)
             => (await this.localGrainDirectory.RegisterAsync(address, singleActivation: true)).Address;
 
-        public  Task Unregister(ActivationAddress address, UnregistrationCause cause)
+        public Task Unregister(ActivationAddress address, UnregistrationCause cause)
             => this.localGrainDirectory.UnregisterAsync(address, cause);
 
         public Task UnregisterMany(List<ActivationAddress> addresses, UnregistrationCause cause)
