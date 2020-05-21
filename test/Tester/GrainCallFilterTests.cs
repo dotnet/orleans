@@ -37,7 +37,7 @@ namespace UnitTests.General
                     hostBuilder
                         .AddIncomingGrainCallFilter(context =>
                         {
-                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
+                            if (string.Equals(context.InterfaceMethod?.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
                             {
                                 if (RequestContext.Get(GrainCallFilterTestConstants.Key) != null) throw new InvalidOperationException();
                                 RequestContext.Set(GrainCallFilterTestConstants.Key, "1");
@@ -131,7 +131,7 @@ namespace UnitTests.General
 
             public Task Invoke(IIncomingGrainCallContext context)
             {
-                if (string.Equals(context.ImplementationMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
+                if (string.Equals(context.ImplementationMethod?.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
                 {
                     if (RequestContext.Get(GrainCallFilterTestConstants.Key) is string value)
                     {
@@ -216,6 +216,18 @@ namespace UnitTests.General
             Assert.Equal("Thanks for nothing", result);
 
             await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => grain.ThrowIfGreaterThanZero(2));
+        }
+
+        /// <summary>
+        /// Tests that an incoming call filter works with HashSet.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_Incoming_HashSet_Test()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(0);
+
+            var result = await grain.SumSet(new HashSet<int> { 1, 2, 3 });
+            Assert.Equal(6, result);
         }
 
         /// <summary>

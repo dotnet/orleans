@@ -184,6 +184,13 @@ namespace UnitTests.Grains
             {
                 try
                 {
+                    var interfaceMethod = ctx.InterfaceMethod ?? throw new ArgumentException("InterfaceMethod is null!");
+                    var implementationMethod = ctx.ImplementationMethod ?? throw new ArgumentException("ImplementationMethod is null!");
+                    if (!string.Equals(implementationMethod.Name, interfaceMethod.Name))
+                    {
+                        throw new ArgumentException("InterfaceMethod.Name != ImplementationMethod.Name");
+                    }
+
                     if (RequestContext.Get(Key) is string value) RequestContext.Set(Key, value + '3');
                     await ctx.Invoke();
                     return;
@@ -198,6 +205,11 @@ namespace UnitTests.Grains
                     --attemptsRemaining;
                 }
             }
+        }
+
+        public Task<int> SumSet(HashSet<int> numbers)
+        {
+            return Task.FromResult(numbers.Sum());
         }
     }
 
