@@ -39,7 +39,6 @@ set TESTS=^
 %CMDHOME%\test\Extensions\TestServiceFabric,^
 %CMDHOME%\test\Extensions\TesterAdoNet,^
 %CMDHOME%\test\Extensions\TesterZooKeeperUtils,^
-%CMDHOME%\test\RuntimeCodeGen.Tests,^
 %CMDHOME%\test\Transactions\Orleans.Transactions.Tests,^
 %CMDHOME%\test\Transactions\Orleans.Transactions.Azure.Test,^
 %CMDHOME%\test\TestInfrastructure\Orleans.TestingHost.Tests,^
