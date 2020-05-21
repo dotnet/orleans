@@ -106,9 +106,7 @@ hostBuilder
         };
         options.MessageVisibilityTimeout = TimeSpan.FromSeconds(72);
       }));
-    configurator.ConfigurePullingAgent(ob => ob.Configure(options => {
-      options.GetQueueMsgsTimerPeriod = TimeSpan.FromMinutes(1);
-    }));
+    configurator.ConfigureCacheSize(1200);
   })
 ```
 
