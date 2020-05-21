@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -341,7 +341,7 @@ namespace UnitTests.StreamingTests
         {
             var grainIds = targets.Distinct().Where(t => t is GrainReference).Select(t => ((GrainReference)t).GrainId).ToArray();
             IManagementGrain systemManagement = grainFactory.GetGrain<IManagementGrain>(0);
-            var tasks = grainIds.Select(g => systemManagement.GetGrainActivationCount(grainFactory.GetGrain(g))).ToArray();
+            var tasks = grainIds.Select(g => systemManagement.GetGrainActivationCount((GrainReference)grainFactory.GetGrain(g))).ToArray();
             await Task.WhenAll(tasks);
             return tasks.Sum(t => t.Result);
         }

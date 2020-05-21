@@ -8,7 +8,7 @@ namespace Orleans
     {
         private static readonly MethodInfo create = typeof(IPersistentStateFactory).GetMethod("Create");
 
-        public Factory<IGrainActivationContext, object> GetFactory(ParameterInfo parameter, PersistentStateAttribute attribute)
+        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, PersistentStateAttribute attribute)
         {
             IPersistentStateConfiguration config = attribute;
             // set state name to parameter name, if not already specified
@@ -21,7 +21,7 @@ namespace Orleans
             return context => Create(context, genericCreate, config);
         }
 
-        private object Create(IGrainActivationContext context, MethodInfo genericCreate, IPersistentStateConfiguration config)
+        private object Create(IGrainContext context, MethodInfo genericCreate, IPersistentStateConfiguration config)
         {
             IPersistentStateFactory factory = context.ActivationServices.GetRequiredService<IPersistentStateFactory>();
             object[] args = new object[] { context, config };

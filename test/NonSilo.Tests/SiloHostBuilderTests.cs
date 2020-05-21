@@ -94,30 +94,6 @@ namespace NonSilo.Tests
             var clusterClient = host.Services.GetRequiredService<IClusterClient>();
         }
 
-        [Fact]
-        public void GrainMetadataTest()
-        {
-            var host = new HostBuilder()
-                .UseOrleans((ctx, siloBuilder) =>
-                {
-                    siloBuilder
-                        .UseLocalhostClustering()
-                        .Configure<ClusterOptions>(options => options.ClusterId = "someClusterId")
-                        .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
-                })
-                .UseDefaultServiceProvider((context, options) =>
-                {
-                    options.ValidateScopes = true;
-                    options.ValidateOnBuild = true;
-                })
-                .Build();
-
-            var localMetadata = host.Services.GetRequiredService<SiloManifest>();
-
-            var str = JsonConvert.SerializeObject(localMetadata);
-            var clusterClient = host.Services.GetRequiredService<IClusterClient>();
-        }
-
         /// <summary>
         /// Tests that a silo cannot be created without specifying a ClusterId and a ServiceId.
         /// </summary>

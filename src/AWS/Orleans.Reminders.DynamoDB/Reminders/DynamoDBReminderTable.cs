@@ -29,7 +29,7 @@ namespace Orleans.Reminders.DynamoDB
         private SafeRandom _random = new SafeRandom();
 
         private readonly ILogger logger;
-        private readonly IGrainReferenceConverter grainReferenceConverter;
+        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private readonly DynamoDBReminderStorageOptions options;
         private readonly string serviceId;
 
@@ -41,7 +41,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <param name="clusterOptions"></param>
         /// <param name="storageOptions"></param>
         public DynamoDBReminderTable(
-            IGrainReferenceConverter grainReferenceConverter, 
+            GrainReferenceKeyStringConverter grainReferenceConverter, 
             ILoggerFactory loggerFactory, 
             IOptions<ClusterOptions> clusterOptions, 
             IOptions<DynamoDBReminderStorageOptions> storageOptions)
@@ -187,7 +187,7 @@ namespace Orleans.Reminders.DynamoDB
             return new ReminderEntry
             {
                 ETag = item[ETAG_PROPERTY_NAME].N,
-                GrainRef = this.grainReferenceConverter.GetGrainFromKeyString(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
+                GrainRef = this.grainReferenceConverter.FromKeyString(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
                 Period = TimeSpan.Parse(item[PERIOD_PROPERTY_NAME].S),
                 ReminderName = item[REMINDER_NAME_PROPERTY_NAME].S,
                 StartAt = DateTime.Parse(item[START_TIME_PROPERTY_NAME].S)

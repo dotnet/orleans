@@ -36,8 +36,8 @@ namespace Orleans.Storage
         private readonly DynamoDBStorageOptions options;
         private readonly SerializationManager serializationManager;
         private readonly ILogger logger;
-        private readonly IGrainFactory grainFactory;
-        private readonly ITypeResolver typeResolver;
+        private readonly IServiceProvider serviceProvider;
+        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private readonly string name;
 
         private DynamoDBStorage storage;
@@ -50,16 +50,16 @@ namespace Orleans.Storage
             string name,
             DynamoDBStorageOptions options,
             SerializationManager serializationManager,
-            IGrainFactory grainFactory,
-            ITypeResolver typeResolver,
+            IServiceProvider serviceProvider,
+            GrainReferenceKeyStringConverter grainReferenceConverter,
             ILogger<DynamoDBGrainStorage> logger)
         {
             this.name = name;
             this.logger = logger;
             this.options = options;
             this.serializationManager = serializationManager;
-            this.grainFactory = grainFactory;
-            this.typeResolver = typeResolver;
+            this.serviceProvider = serviceProvider;
+            this.grainReferenceConverter = grainReferenceConverter;
         }
 
         public void Participate(ISiloLifecycle lifecycle)
@@ -78,7 +78,7 @@ namespace Orleans.Storage
                         this.name, this.options.ServiceId, this.options.TableName, this.options.DeleteStateOnClear);
 
                 this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(
-                    OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory),
+                    OrleansJsonSerializer.GetDefaultSerializerSettings(this.serviceProvider),
                     this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
                 this.options.ConfigureJsonSerializerSettings?.Invoke(this.jsonSettings);
 
@@ -302,7 +302,7 @@ namespace Orleans.Storage
 
         private string GetKeyString(GrainReference grainReference)
         {
-            var key = string.Format("{0}_{1}", this.options.ServiceId, grainReference.ToKeyString());
+            var key = string.Format("{0}_{1}", this.options.ServiceId, this.grainReferenceConverter.ToKeyString(grainReference));
             return AWSUtils.ValidateDynamoDBPartitionKey(key);
         }
 

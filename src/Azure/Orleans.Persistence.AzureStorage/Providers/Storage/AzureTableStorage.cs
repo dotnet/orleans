@@ -30,8 +30,7 @@ namespace Orleans.Storage
         private readonly AzureTableStorageOptions options;
         private readonly ClusterOptions clusterOptions;
         private readonly SerializationManager serializationManager;
-        private readonly IGrainFactory grainFactory;
-        private readonly ITypeResolver typeResolver;
+        private readonly IServiceProvider services;
         private readonly ILogger logger;
 
         private GrainStateTableDataManager tableDataManager;
@@ -53,16 +52,14 @@ namespace Orleans.Storage
             AzureTableStorageOptions options,
             IOptions<ClusterOptions> clusterOptions,
             SerializationManager serializationManager,
-            IGrainFactory grainFactory,
-            ITypeResolver typeResolver,
+            IServiceProvider services,
             ILogger<AzureTableGrainStorage> logger)
         {
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
             this.name = name;
             this.serializationManager = serializationManager;
-            this.grainFactory = grainFactory;
-            this.typeResolver = typeResolver;
+            this.services = services;
             this.logger = logger;
         }
 
@@ -75,7 +72,7 @@ namespace Orleans.Storage
             string pk = GetKeyString(grainReference);
             if(logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_ReadingData, "Reading: GrainType={0} Pk={1} Grainid={2} from Table={3}", grainType, pk, grainReference, this.options.TableName);
             string partitionKey = pk;
-            string rowKey = grainType;
+            string rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
             GrainStateRecord record = await tableDataManager.Read(partitionKey, rowKey).ConfigureAwait(false);
             if (record != null)
             {
@@ -101,18 +98,19 @@ namespace Orleans.Storage
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Writing: GrainType={0} Pk={1} Grainid={2} ETag={3} to Table={4}", grainType, pk, grainReference, grainState.ETag, this.options.TableName);
 
-            var entity = new DynamicTableEntity(pk, grainType);
+            var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
+            var entity = new DynamicTableEntity(pk, rowKey);
             ConvertToStorageFormat(grainState.State, entity);
             var record = new GrainStateRecord { Entity = entity, ETag = grainState.ETag };
             try
             {
-                await DoOptimisticUpdate(() => tableDataManager.Write(record), grainType, grainReference, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                await DoOptimisticUpdate(() => tableDataManager.Write(record), grainType, grainReference.GrainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 grainState.ETag = record.ETag;
             }
             catch (Exception exc)
             {
                 logger.Error((int)AzureProviderErrorCode.AzureTableProvider_WriteError,
-                    $"Error Writing: GrainType={grainType} Grainid={grainReference} ETag={grainState.ETag} to Table={this.options.TableName} Exception={exc.Message}", exc);
+                    $"Error Writing: GrainType={grainType} GrainId={grainReference.GrainId} ETag={grainState.ETag} to Table={this.options.TableName} Exception={exc.Message}", exc);
                 throw;
             }
         }
@@ -130,7 +128,8 @@ namespace Orleans.Storage
 
             string pk = GetKeyString(grainReference);
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace((int)AzureProviderErrorCode.AzureTableProvider_WritingData, "Clearing: GrainType={0} Pk={1} Grainid={2} ETag={3} DeleteStateOnClear={4} from Table={5}", grainType, pk, grainReference, grainState.ETag, this.options.DeleteStateOnClear, this.options.TableName);
-            var entity = new DynamicTableEntity(pk, grainType);
+            var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
+            var entity = new DynamicTableEntity(pk, rowKey);
             var record = new GrainStateRecord { Entity = entity, ETag = grainState.ETag };
             string operation = "Clearing";
             try
@@ -138,11 +137,11 @@ namespace Orleans.Storage
                 if (this.options.DeleteStateOnClear)
                 {
                     operation = "Deleting";
-                    await DoOptimisticUpdate(() => tableDataManager.Delete(record), grainType, grainReference, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Delete(record), grainType, grainReference.GrainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 }
                 else
                 {
-                    await DoOptimisticUpdate(() => tableDataManager.Write(record), grainType, grainReference, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Write(record), grainType, grainReference.GrainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 }
 
                 grainState.ETag = record.ETag; // Update in-memory data to the new ETag
@@ -155,7 +154,7 @@ namespace Orleans.Storage
             }
         }
 
-        private static async Task DoOptimisticUpdate(Func<Task> updateOperation, string grainType, GrainReference grainReference, string tableName, string currentETag)
+        private static async Task DoOptimisticUpdate(Func<Task> updateOperation, string grainType, GrainId grainId, string tableName, string currentETag)
         {
             try
             {
@@ -163,7 +162,7 @@ namespace Orleans.Storage
             }
             catch (StorageException ex) when (ex.IsPreconditionFailed() || ex.IsConflict() || ex.IsNotFound())
             {
-                throw new TableStorageUpdateConditionNotSatisfiedException(grainType, grainReference, tableName, "Unknown", currentETag, ex);
+                throw new TableStorageUpdateConditionNotSatisfiedException(grainType, grainId.ToString(), tableName, "Unknown", currentETag, ex);
             }
         }
 
@@ -478,7 +477,7 @@ namespace Orleans.Storage
             {
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"AzureTableGrainStorage {name} initializing: {this.options.ToString()}");
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, $"AzureTableGrainStorage {name} is using DataConnectionString: {ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)}");
-                this.JsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
+                this.JsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.services), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
                 this.options.ConfigureJsonSerializerSettings?.Invoke(this.JsonSettings);
                 this.tableDataManager = new GrainStateTableDataManager(this.options.TableName, this.options.ConnectionString, this.logger, this.options.StoragePolicyOptions);
                 await this.tableDataManager.InitTableAsync();

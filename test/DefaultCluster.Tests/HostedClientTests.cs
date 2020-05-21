@@ -45,6 +45,7 @@ namespace DefaultCluster.Tests.General
                         options.ClusterId = Guid.NewGuid().ToString();
                         options.ServiceId = Guid.NewGuid().ToString();
                     })
+                    .ConfigureLogging(logging => logging.AddDebug())
                     .AddMemoryGrainStorage("PubSubStore")
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemStream")
                     .Build();
@@ -166,14 +167,14 @@ namespace DefaultCluster.Tests.General
 
             var handle = new AsyncResultHandle();
             var vals = new List<int>();
-            await client.GetStreamProvider("MemStream").GetStream<int>(Guid.Empty, "hi")
-                        .SubscribeAsync(
-                            (val, token) =>
-                            {
-                                vals.Add(val);
-                                if (vals.Count >= 2) handle.Done = true;
-                                return Task.CompletedTask;
-                            });
+            var stream0 = client.GetStreamProvider("MemStream").GetStream<int>(Guid.Empty, "hi");
+            await stream0.SubscribeAsync(
+                (val, token) =>
+                {
+                    vals.Add(val);
+                    if (vals.Count >= 2) handle.Done = true;
+                    return Task.CompletedTask;
+                });
             var stream = client.GetStreamProvider("MemStream").GetStream<int>(Guid.Empty, "hi");
             await stream.OnNextAsync(1);
             await stream.OnNextAsync(409);

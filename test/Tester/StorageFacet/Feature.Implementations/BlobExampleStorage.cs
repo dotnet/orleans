@@ -31,15 +31,15 @@ namespace Tester.StorageFacet.Implementations
 
     public class BlobExampleStorageFactory : IExampleStorageFactory
     {
-        private readonly IGrainActivationContext context;
-        public BlobExampleStorageFactory(IGrainActivationContext context)
+        private readonly IGrainContextAccessor contextAccessor;
+        public BlobExampleStorageFactory(IGrainContextAccessor contextAccessor)
         {
-            this.context = context;
+            this.contextAccessor = contextAccessor;
         }
 
         public IExampleStorage<TState> Create<TState>(IExampleStorageConfig config)
         {
-            var storage = this.context.ActivationServices.GetRequiredService<BlobExampleStorage<TState>>();
+            var storage = this.contextAccessor.GrainContext.ActivationServices.GetRequiredService<BlobExampleStorage<TState>>();
             storage.Configure(config);
             return storage;
         }

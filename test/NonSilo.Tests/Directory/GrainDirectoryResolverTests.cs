@@ -10,6 +10,7 @@ using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using TestExtensions;
+using UnitTests.GrainInterfaces.Directories;
 using UnitTests.Grains.Directories;
 using Xunit;
 using Xunit.Abstractions;
@@ -22,6 +23,7 @@ namespace NonSilo.Tests.Directory
         private readonly IGrainDirectory azureDirectory = Substitute.For<IGrainDirectory>();
         private readonly IGrainDirectory otherDirectory = Substitute.For<IGrainDirectory>();
         private readonly IGrainDirectory againAnotherDirectory = Substitute.For<IGrainDirectory>();
+        private readonly IHost host;
         private readonly GrainDirectoryResolver target;
 
         public GrainDirectoryResolverTests(ITestOutputHelper output)
@@ -39,7 +41,7 @@ namespace NonSilo.Tests.Directory
                     .UseLocalhostClustering();
             });
 
-            var host = hostBuilder.Build();
+            this.host = hostBuilder.Build();
 
             this.target = host.Services.GetRequiredService<GrainDirectoryResolver>();
         }
@@ -47,8 +49,8 @@ namespace NonSilo.Tests.Directory
         [Fact]
         public void UserProvidedDirectory()
         {
-            var grainId = LegacyGrainId.GetGrainId(CustomDirectoryGrain.TYPECODE, Guid.NewGuid());
-            Assert.Same(this.azureDirectory, this.target.Resolve(grainId.ToGrainId().Type));
+            var grainId = host.Services.GetRequiredService<IGrainFactory>().GetGrain<ICustomDirectoryGrain>(Guid.NewGuid()).GetGrainId();
+            Assert.Same(this.azureDirectory, this.target.Resolve(grainId.Type));
         }
 
         [Fact]

@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 
 namespace Orleans.Streams
 {
-    [Serializable]
     internal class AllStreamNamespacesPredicate : IStreamNamespacePredicate
     {
+        public string PredicatePattern => "*";
+
         public bool IsMatch(string streamNamespace)
         {
             return true;

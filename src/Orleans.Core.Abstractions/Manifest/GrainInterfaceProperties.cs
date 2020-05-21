@@ -65,6 +65,11 @@ namespace Orleans.Metadata
         /// This is used for resolving a grain type from an interface.
         /// </summary>
         public const string DefaultGrainType = "primary-grain-type";
+
+        /// <summary>
+        /// The name of the type of this interface. Used for convention-based matching of primary implementations.
+        /// </summary>
+        public const string TypeName = "type-name";
     }
 
     /// <summary>

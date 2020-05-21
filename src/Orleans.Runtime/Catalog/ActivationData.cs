@@ -7,11 +7,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.GrainReferences;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
-using Orleans.Storage;
 
 namespace Orleans.Runtime
 {
@@ -20,39 +19,38 @@ namespace Orleans.Runtime
     /// MUST lock this object for any concurrent access
     /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
     /// </summary>
-    internal class ActivationData : IGrainActivationContext, IActivationData, IInvokable, IDisposable
+    internal class ActivationData : IActivationData, IGrainExtensionBinder, IAsyncDisposable
     {
-        internal class GrainActivationContextFactory
-        {
-            public IGrainActivationContext Context { get; set; }
-        }
-
         // This is the maximum amount of time we expect a request to continue processing
         private readonly TimeSpan maxRequestProcessingTime;
         private readonly TimeSpan maxWarningRequestProcessingTime;
         private readonly SiloMessagingOptions messagingOptions;
-        public readonly TimeSpan CollectionAgeLimit;
         private readonly ILogger logger;
-        private IGrainMethodInvoker lastInvoker;
-        private IServiceScope serviceScope;
+        private readonly IServiceScope serviceScope;
+        public readonly TimeSpan CollectionAgeLimit;
+        private readonly GrainSharedComponents _shared;
         private HashSet<IGrainTimer> timers;
-        
+        private Dictionary<Type, object> _components;
+
         public ActivationData(
             ActivationAddress addr,
-            string genericArguments,
             PlacementStrategy placedUsing,
             IActivationCollector collector,
             TimeSpan ageLimit,
             IOptions<SiloMessagingOptions> messagingOptions,
             TimeSpan maxWarningRequestProcessingTime,
 			TimeSpan maxRequestProcessingTime,
-            IRuntimeClient runtimeClient,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IServiceProvider applicationServices,
+            IGrainRuntime grainRuntime,
+            GrainReferenceActivator referenceActivator,
+            GrainSharedComponents sharedComponents)
         {
             if (null == addr) throw new ArgumentNullException(nameof(addr));
             if (null == placedUsing) throw new ArgumentNullException(nameof(placedUsing));
             if (null == collector) throw new ArgumentNullException(nameof(collector));
 
+            _shared = sharedComponents;
             logger = loggerFactory.CreateLogger<ActivationData>();
             this.lifecycle = new GrainLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
             this.maxRequestProcessingTime = maxRequestProcessingTime;
@@ -62,86 +60,74 @@ namespace Orleans.Runtime
             Address = addr;
             State = ActivationState.Create;
             PlacedUsing = placedUsing;
-            if (!GrainId.IsSystemTarget())
+            if (!this.GrainId.IsSystemTarget())
             {
                 this.collector = collector;
             }
 
             CollectionAgeLimit = ageLimit;
 
-            GrainReference = GrainReference.FromGrainId(addr.Grain, runtimeClient.GrainReferenceRuntime, genericArguments);
+            this.GrainReference = referenceActivator.CreateReference(addr.Grain, default);
+            this.serviceScope = applicationServices.CreateScope();
+            this.Runtime = grainRuntime;
         }
 
-        public Type GrainType => GrainTypeData.Type;
+        public IGrainRuntime Runtime { get; }
 
         public IServiceProvider ActivationServices => this.serviceScope.ServiceProvider;
 
         internal WorkItemGroup WorkItemGroup { get; set; }
 
-        private ExtensionInvoker extensionInvoker;
-        internal ExtensionInvoker ExtensionInvoker
+        public TComponent GetComponent<TComponent>()
         {
-            get
+            TComponent result;
+            if (this.GrainInstance is TComponent grainResult)
             {
-                this.lastInvoker = null;
-                return this.extensionInvoker ?? (this.extensionInvoker = new ExtensionInvoker());
+                result = grainResult;
             }
-        }
-
-        public IGrainMethodInvoker GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType = null)
-        {
-            // Return previous cached invoker, if applicable
-            if (lastInvoker != null && interfaceId == lastInvoker.InterfaceId) // extension invoker returns InterfaceId==0, so this condition will never be true if an extension is installed
-                return lastInvoker;
-
-            if (extensionInvoker != null && extensionInvoker.IsExtensionInstalled(interfaceId))
+            else if (this is TComponent contextResult)
             {
-                // Shared invoker for all extensions installed on this grain
-                lastInvoker = extensionInvoker;
+                result = contextResult;
+            }
+            else if (_components is object && _components.TryGetValue(typeof(TComponent), out var resultObj))
+            {
+                result = (TComponent)resultObj;
             }
             else
             {
-                // Find the specific invoker for this interface / grain type
-                lastInvoker = typeManager.GetInvoker(interfaceId, genericGrainType);
+                result = _shared.GetComponent<TComponent>();
             }
 
-            return lastInvoker;
+            return result;
+        }
+
+        public void SetComponent<TComponent>(TComponent instance)
+        {
+            if (this.GrainInstance is TComponent)
+            {
+                throw new ArgumentException("Cannot override a component which is implemented by this grain");
+            }
+
+            if (this is TComponent)
+            {
+                throw new ArgumentException("Cannot override a component which is implemented by this grain context");
+            }
+
+            if (instance == null)
+            {
+                _components?.Remove(typeof(TComponent));
+                return;
+            }
+
+            if (_components is null) _components = new Dictionary<Type, object>();
+            _components[typeof(TComponent)] = instance;
         }
 
         public HashSet<ActivationId> RunningRequestsSenders { get; } = new HashSet<ActivationId>();
 
-        internal Type GrainInstanceType => GrainTypeData?.Type;
-
         internal void SetGrainInstance(Grain grainInstance)
         {
             GrainInstance = grainInstance;
-        }
-
-        internal void SetupContext(GrainTypeData typeData, IServiceProvider grainServices)
-        {
-            this.GrainTypeData = typeData;
-            this.Items = new Dictionary<object, object>();
-            this.serviceScope = grainServices.CreateScope();
-
-            SetGrainActivationContextInScopedServices(this.ActivationServices, this);
-
-            if (typeData != null)
-            {
-                var grainType = typeData.Type;
-
-                // Don't ever collect system grains or reminder table grain or memory store grains.
-                bool doNotCollect = typeof(IReminderTableGrain).IsAssignableFrom(grainType) || typeof(IMemoryStorageGrain).IsAssignableFrom(grainType);
-                if (doNotCollect)
-                {
-                    this.collector = null;
-                }
-            }
-        }
-
-        private static void SetGrainActivationContextInScopedServices(IServiceProvider sp, IGrainActivationContext context)
-        {
-            var contextFactory = sp.GetRequiredService<GrainActivationContextFactory>();
-            contextFactory.Context = context;
         }
         
         private Streams.StreamDirectory streamDirectory;
@@ -158,7 +144,7 @@ namespace Orleans.Runtime
         internal async Task DeactivateStreamResources()
         {
             if (streamDirectory == null) return; // No streams - Nothing to do.
-            if (extensionInvoker == null) return; // No installed extensions - Nothing to do.
+            if (_components == null) return; // No installed extensions - Nothing to do.
 
             if (StreamResourceTestControl.TestOnlySuppressStreamCleanupOnDeactivate)
             {
@@ -169,19 +155,13 @@ namespace Orleans.Runtime
             await streamDirectory.Cleanup(true, false);
         }
 
-        public GrainTypeData GrainTypeData { get; private set; }
-
-        public Grain GrainInstance { get; private set; }
-
-        IAddressable IGrainContext.GrainInstance => this.GrainInstance;
+        public IAddressable GrainInstance { get; private set; }
 
         public ActivationId ActivationId { get { return Address.Activation; } }
 
         public ActivationAddress Address { get; private set; }
 
         public IServiceProvider ServiceProvider => this.serviceScope?.ServiceProvider;
-
-        public IDictionary<object, object> Items { get; private set; }
 
         private readonly GrainLifecycle lifecycle;
 
@@ -626,7 +606,7 @@ namespace Orleans.Runtime
 
         public void OnTimerDisposed(IGrainTimer orleansTimerInsideGrain)
         {
-            lock (this) // need to lock since dispose can be called on finalizer thread, outside garin context (not single threaded).
+            lock (this) // need to lock since dispose can be called on finalizer thread, outside grain context (not single threaded).
             {
                 timers.Remove(orleansTimerInsideGrain);
             }
@@ -675,7 +655,7 @@ namespace Orleans.Runtime
         {
             return String.Format("[Activation: {0}{1}{2}{3} State={4}]",
                  Silo,
-                 GrainId,
+                 this.GrainId,
                  this.ActivationId,
                  GetActivationInfoString(),
                  State);
@@ -685,9 +665,9 @@ namespace Orleans.Runtime
         {
             return
                 String.Format(
-                    "[Activation: {0}{1}{2}{3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} InFlightCount={7} NumRunning={8} IdlenessTimeSpan={9} CollectionAgeLimit={10}{11}]",
+                    "[Activation: {0}{1}{2} {3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} InFlightCount={7} NumRunning={8} IdlenessTimeSpan={9} CollectionAgeLimit={10}{11}]",
                     Silo.ToLongString(),
-                    GrainId.ToString(),
+                    this.GrainId.ToString(),
                     this.ActivationId,
                     GetActivationInfoString(),
                     State,                          // 4
@@ -706,7 +686,7 @@ namespace Orleans.Runtime
             {
                 return String.Format("[Activation: {0}{1}{2}{3}]",
                      Silo,
-                     GrainId,
+                     this.GrainId,
                      this.ActivationId,
                      GetActivationInfoString());
             }
@@ -725,18 +705,73 @@ namespace Orleans.Runtime
         private string GetActivationInfoString()
         {
             var placement = PlacedUsing != null ? PlacedUsing.GetType().Name : String.Empty;
-            return GrainInstanceType == null ? placement :
-                String.Format(" #GrainType={0} Placement={1}", GrainInstanceType.FullName, placement);
+            return GrainInstance is null ? placement : $"#GrainType={GrainInstance.GetType().FullName} Placement={placement}";
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            IDisposable disposable = serviceScope;
-            if (disposable != null) disposable.Dispose();
-            this.serviceScope = null;
+            var activator = this.GetComponent<IGrainActivator>();
+            if (activator != null)
+            {
+                await activator.DisposeInstance(this, this.GrainInstance);
+            } 
+
+            switch (this.serviceScope)
+            {
+                case IAsyncDisposable asyncDisposable:
+                    await asyncDisposable.DisposeAsync();
+                    break;
+                case IDisposable disposable:
+                    disposable.Dispose();
+                    break;
+            }
         }
 
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
+
+        public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
+            where TExtension : TExtensionInterface
+            where TExtensionInterface : IGrainExtension
+        {
+            TExtension implementation;
+            if (this.GetComponent<TExtensionInterface>() is object existing)
+            {
+                if (existing is TExtension typedResult)
+                {
+                    implementation = typedResult;
+                }
+                else
+                {
+                    throw new InvalidCastException($"Cannot cast existing extension of type {existing.GetType()} to target type {typeof(TExtension)}");
+                }
+            }
+            else
+            {
+                implementation = newExtensionFunc();
+                this.SetComponent<TExtensionInterface>(implementation);
+            }
+
+            var reference = this.GrainReference.Cast<TExtensionInterface>();
+            return (implementation, reference);
+        }
+
+        public TExtensionInterface GetExtension<TExtensionInterface>()
+            where TExtensionInterface : IGrainExtension
+        {
+            if (this.GetComponent<TExtensionInterface>() is TExtensionInterface result)
+            {
+                return result;
+            }
+
+            var implementation = this.ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TExtensionInterface));
+            if (!(implementation is TExtensionInterface typedResult))
+            {
+                throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
+            }
+
+            this.SetComponent<TExtensionInterface>(typedResult);
+            return typedResult;
+        }
     }
 
     internal static class StreamResourceTestControl

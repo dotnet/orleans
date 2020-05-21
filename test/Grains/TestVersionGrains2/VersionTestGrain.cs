@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,9 +17,10 @@ namespace TestVersionGrains
             return Task.FromResult(2);
         }
 
-        public Task<int> ProxyGetVersion(IVersionUpgradeTestGrain other)
+        public async Task<int> ProxyGetVersion(IVersionUpgradeTestGrain other)
         {
-            return other.GetVersion();
+            var version = await other.GetVersion();
+            return version;
         }
 
         public async Task<bool> LongRunningTask(TimeSpan taskTime)

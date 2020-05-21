@@ -37,7 +37,7 @@ namespace Orleans.Runtime
         /// <param name="timeout">New response timeout value</param>
         void SetResponseTimeout(TimeSpan timeout);
 
-        void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, InvokeMethodOptions options, string genericArguments);
+        void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, InvokeMethodOptions options);
 
         void SendResponse(Message request, Response response);
 
@@ -45,13 +45,11 @@ namespace Orleans.Runtime
 
         void Reset(bool cleanup);
 
-        GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
+        IAddressable CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
 
         void DeleteObjectReference(IAddressable obj);
         
         Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
-
-        IGrainTypeResolver GrainTypeResolver { get; }
 
         IGrainReferenceRuntime GrainReferenceRuntime { get; }
 

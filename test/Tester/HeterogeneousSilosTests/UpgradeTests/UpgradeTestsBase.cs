@@ -154,6 +154,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             // New activation should be V2
             var grain1 = Client.GetGrain<IVersionUpgradeTestGrain>(1);
             Assert.Equal(2, await grain1.GetVersion());
+            Assert.Equal(1, await grain0.GetVersion());
 
             Assert.Equal(expectedVersion, await grain1.ProxyGetVersion(grain0));
             Assert.Equal(expectedVersion, await grain0.GetVersion());

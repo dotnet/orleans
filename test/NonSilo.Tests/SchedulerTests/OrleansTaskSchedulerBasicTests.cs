@@ -11,6 +11,7 @@ using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
 using Orleans.Internal;
 using Orleans;
+using System.Collections.Generic;
 
 // ReSharper disable ConvertToConstant.Local
 
@@ -27,6 +28,18 @@ namespace UnitTests.SchedulerTests
         public ActivationId ActivationId => throw new NotImplementedException();
 
         public ActivationAddress Address => throw new NotImplementedException();
+
+        public IServiceProvider ActivationServices => throw new NotImplementedException();
+
+        public IDictionary<object, object> Items => throw new NotImplementedException();
+
+        public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
+
+        IAddressable IGrainContext.GrainInstance => throw new NotImplementedException();
+
+        public TComponent GetComponent<TComponent>() => throw new NotImplementedException();
+
+        public void SetComponent<TComponent>(TComponent value) => throw new NotImplementedException();
 
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
     }

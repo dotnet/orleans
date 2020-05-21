@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.Runtime;
 using Orleans.Utilities;
 
 namespace Orleans.Metadata
@@ -10,15 +11,18 @@ namespace Orleans.Metadata
     /// </summary>
     public class GrainInterfaceIdResolver
     {
-        private readonly IGrainInterfaceIdProvider[] providers;
+        private readonly IGrainInterfaceIdProvider[] _providers;
+        private readonly TypeConverter _typeConverter;
 
         /// <summary>
         /// Creates a <see cref="GrainInterfaceIdResolver"/> instance.
         /// </summary>
-        /// <param name="providers"></param>
-        public GrainInterfaceIdResolver(IEnumerable<IGrainInterfaceIdProvider> providers)
+        public GrainInterfaceIdResolver(
+            IEnumerable<IGrainInterfaceIdProvider> providers,
+            TypeConverter typeConverter)
         {
-            this.providers = providers.ToArray();
+            _providers = providers.ToArray();
+            _typeConverter = typeConverter;
         }
 
         /// <summary>
@@ -33,16 +37,12 @@ namespace Orleans.Metadata
                 throw new ArgumentException($"Argument {nameof(type)} must be an interface. Provided value, \"{type}\", is not an interface.", nameof(type));
             }
 
-            if (type.IsConstructedGenericType)
-            {
-                type = type.GetGenericTypeDefinition();
-            }
-
             // Configured providers take precedence
-            foreach (var provider in this.providers)
+            foreach (var provider in this._providers)
             {
                 if (provider.TryGetGrainInterfaceId(type, out var interfaceId))
                 {
+                    interfaceId = AddGenericParameters(interfaceId, type);
                     return interfaceId;
                 }
             }
@@ -51,6 +51,30 @@ namespace Orleans.Metadata
             return GetGrainInterfaceIdByConvention(type);
         }
 
-        public static GrainInterfaceId GetGrainInterfaceIdByConvention(Type type) => GrainInterfaceId.Create(RuntimeTypeNameFormatter.Format(type));
+        public GrainInterfaceId GetGrainInterfaceIdByConvention(Type type)
+        {
+            var result = GrainInterfaceId.Create(_typeConverter.Format(type, DropOuterAssemblyQualification));
+            result = AddGenericParameters(result, type);
+            return result;
+
+            static TypeSpec DropOuterAssemblyQualification(TypeSpec input) => input switch
+            {
+                AssemblyQualifiedTypeSpec asm => asm.Type,
+                _ => input
+            };
+        }
+
+        private GrainInterfaceId AddGenericParameters(GrainInterfaceId result, Type type)
+        {
+            if (GenericGrainInterfaceId.TryParse(result, out var genericGrainType)
+                && type.IsConstructedGenericType
+                && !type.ContainsGenericParameters
+                && !genericGrainType.IsConstructed)
+            {
+                result = genericGrainType.Construct(_typeConverter, type.GetGenericArguments()).Value;
+            }
+
+            return result;
+        }
     }
 }

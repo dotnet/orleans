@@ -5,8 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Metadata;
 using Orleans.Runtime.Providers;
@@ -17,12 +15,10 @@ namespace Orleans.Runtime.Metadata
     internal class ClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly SiloAddress _localSiloAddress;
-        private readonly IInternalGrainFactory _grainFactory;
         private readonly ILogger<ClusterManifestProvider> _logger;
         private readonly IServiceProvider _services;
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly IFatalErrorHandler _fatalErrorHandler;
-        private readonly TypeManagementOptions _options;
         private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
         private readonly AsyncEnumerable<ClusterManifest> _updates;
         private ClusterManifest _current;
@@ -30,24 +26,22 @@ namespace Orleans.Runtime.Metadata
 
         public ClusterManifestProvider(
             ILocalSiloDetails localSiloDetails,
-            SiloManifest localSiloManifest,
-            IInternalGrainFactory grainFactory,
+            SiloManifestProvider siloManifestProvider,
             ClusterMembershipService clusterMembershipService,
             IFatalErrorHandler fatalErrorHandler,
             ILogger<ClusterManifestProvider> logger,
-            IOptions<TypeManagementOptions> options,
             IServiceProvider services)
         {
             _localSiloAddress = localSiloDetails.SiloAddress;
-            _grainFactory = grainFactory;
             _logger = logger;
             _services = services;
             _clusterMembershipService = clusterMembershipService;
             _fatalErrorHandler = fatalErrorHandler;
-            _options = options.Value;
+            this.LocalGrainManifest = siloManifestProvider.SiloManifest;
             _current = new ClusterManifest(
                 MajorMinorVersion.Zero,
-                ImmutableDictionary.CreateRange(new[] { new KeyValuePair<SiloAddress, SiloManifest>(localSiloDetails.SiloAddress, localSiloManifest) }));
+                ImmutableDictionary.CreateRange(new[] { new KeyValuePair<SiloAddress, GrainManifest>(localSiloDetails.SiloAddress, this.LocalGrainManifest) }),
+                ImmutableArray.Create(this.LocalGrainManifest));
             _updates = new AsyncEnumerable<ClusterManifest>(
                 (previous, proposed) => previous.Version <= MajorMinorVersion.Zero || proposed.Version > previous.Version,
                 _current)
@@ -59,6 +53,8 @@ namespace Orleans.Runtime.Metadata
         public ClusterManifest Current => _current;
 
         public IAsyncEnumerable<ClusterManifest> Updates => _updates;
+
+        public GrainManifest LocalGrainManifest { get; }
 
         private async Task ProcessMembershipUpdates()
         {
@@ -126,7 +122,7 @@ namespace Orleans.Runtime.Metadata
             }
 
             // Next, fill missing entries.
-            var tasks = new List<Task<(SiloAddress Key, SiloManifest Value, Exception Exception)>>();
+            var tasks = new List<Task<(SiloAddress Key, GrainManifest Value, Exception Exception)>>();
             foreach (var entry in clusterMembership.Members)
             {
                 var member = entry.Value;
@@ -151,12 +147,13 @@ namespace Orleans.Runtime.Metadata
 
                 tasks.Add(GetManifest(member.SiloAddress));
 
-                async Task<(SiloAddress, SiloManifest, Exception)> GetManifest(SiloAddress siloAddress)
+                async Task<(SiloAddress, GrainManifest, Exception)> GetManifest(SiloAddress siloAddress)
                 {
                     try
                     {
                         // Get the manifest from the remote silo.
-                        var remoteManifestProvider = _grainFactory.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, member.SiloAddress);
+                        var grainFactory = _services.GetRequiredService<IInternalGrainFactory>();
+                        var remoteManifestProvider = grainFactory.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, member.SiloAddress);
                         var manifest = await remoteManifestProvider.GetSiloManifest();
                         return (siloAddress, manifest, null);
                     }
@@ -188,13 +185,11 @@ namespace Orleans.Runtime.Metadata
             var version = new MajorMinorVersion(clusterMembership.Version.Value, existingManifest.Version.Minor + 1);
             if (modified)
             {
-                return _updates.TryPublish(new ClusterManifest(version, builder.ToImmutable())) && fetchSuccess;
+                return _updates.TryPublish(new ClusterManifest(version, builder.ToImmutable(), builder.Values.ToImmutableArray())) && fetchSuccess;
             }
 
             return fetchSuccess;
         }
-
-        public ValueTask<ClusterManifest> GetClusterManifest() => new ValueTask<ClusterManifest>(_current);
 
         private Task StartAsync(CancellationToken _)
         {

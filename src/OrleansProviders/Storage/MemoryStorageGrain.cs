@@ -12,6 +12,7 @@ namespace Orleans.Storage
     /// Implementation class for the Storage Grain used by In-memory storage provider
     /// <c>Orleans.Storage.MemoryStorage</c>
     /// </summary>
+    [KeepAlive]
     internal class MemoryStorageGrain : Grain, IMemoryStorageGrain
     {
         private Dictionary<(string, string), IGrainState> grainStore;

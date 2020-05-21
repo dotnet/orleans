@@ -10,7 +10,7 @@ namespace Orleans.Runtime.Versions.Selector
     {
         private readonly VersionSelectorStrategy strategyFromConfig;
         private readonly IServiceProvider serviceProvider;
-        private readonly Dictionary<int, IVersionSelector> versionSelectors;
+        private readonly Dictionary<GrainInterfaceId, IVersionSelector> versionSelectors;
 
         public IVersionSelector Default { get; set; }
 
@@ -19,10 +19,10 @@ namespace Orleans.Runtime.Versions.Selector
             this.serviceProvider = serviceProvider;
             this.strategyFromConfig = serviceProvider.GetRequiredServiceByName<VersionSelectorStrategy>(options.Value.DefaultVersionSelectorStrategy);
             Default = ResolveVersionSelector(serviceProvider, this.strategyFromConfig);
-            versionSelectors = new Dictionary<int, IVersionSelector>();
+            versionSelectors = new Dictionary<GrainInterfaceId, IVersionSelector>();
         }
 
-        public IVersionSelector GetSelector(int interfaceId)
+        public IVersionSelector GetSelector(GrainInterfaceId interfaceId)
         {
             IVersionSelector selector;
             return this.versionSelectors.TryGetValue(interfaceId, out selector)
@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Versions.Selector
             Default = selector;
         }
 
-        public void SetSelector(int interfaceId, VersionSelectorStrategy strategy)
+        public void SetSelector(GrainInterfaceId interfaceId, VersionSelectorStrategy strategy)
         {
             if (strategy == null)
             {
@@ -49,8 +49,7 @@ namespace Orleans.Runtime.Versions.Selector
             }
         }
 
-        private static IVersionSelector ResolveVersionSelector(IServiceProvider serviceProvider,
-            VersionSelectorStrategy strategy)
+        private static IVersionSelector ResolveVersionSelector(IServiceProvider serviceProvider, VersionSelectorStrategy strategy)
         {
             var policyType = strategy.GetType();
             return serviceProvider.GetRequiredServiceByKey<Type, IVersionSelector>(policyType);

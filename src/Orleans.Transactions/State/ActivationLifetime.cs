@@ -11,7 +11,7 @@ namespace Orleans.Transactions.State
 
         private int pendingDeactivationLocks;
 
-        public ActivationLifetime(IGrainActivationContext activationContext)
+        public ActivationLifetime(IGrainContext activationContext)
         {
             activationContext.ObservableLifecycle.Subscribe(GrainLifecycleStage.First, this);
             activationContext.ObservableLifecycle.Subscribe(GrainLifecycleStage.Last, this);

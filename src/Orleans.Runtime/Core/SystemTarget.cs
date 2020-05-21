@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.CodeGeneration;
+using Orleans.GrainReferences;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
@@ -11,12 +13,12 @@ namespace Orleans.Runtime
     /// Made public for GrainSerive to inherit from it.
     /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
-    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable, IGrainContext
+    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder
     {
         private readonly SystemTargetGrainId id;
         private GrainReference selfReference;
-        private IGrainMethodInvoker lastInvoker;
         private Message running;
+        private Dictionary<Type, object> _components = new Dictionary<Type, object>();
 
         /// <summary>Silo address of the system target.</summary>
         public SiloAddress Silo { get; }
@@ -38,19 +40,9 @@ namespace Orleans.Runtime
             set { this.runtimeClient = value; }
         }
 
-        private ExtensionInvoker extensionInvoker;
-        internal ExtensionInvoker ExtensionInvoker
-        {
-            get
-            {
-                this.lastInvoker = null;
-                return this.extensionInvoker ?? (this.extensionInvoker = new ExtensionInvoker());
-            }
-        }
-
         IGrainReferenceRuntime ISystemTargetBase.GrainReferenceRuntime => this.RuntimeClient.GrainReferenceRuntime;
 
-        GrainReference IGrainContext.GrainReference => selfReference ??= GrainReference.FromGrainId(this.id.GrainId, this.RuntimeClient.GrainReferenceRuntime);
+        public GrainReference GrainReference => selfReference ??= this.RuntimeClient.ServiceProvider.GetRequiredService<GrainReferenceActivator>().CreateReference(this.id.GrainId, default);
 
         GrainId IGrainContext.GrainId => this.id.GrainId;
 
@@ -89,30 +81,50 @@ namespace Orleans.Runtime
 
         internal WorkItemGroup WorkItemGroup { get; set; }
 
-        IGrainMethodInvoker IInvokable.GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType)
-        {
-            // Return previous cached invoker, if applicable
-            if (lastInvoker != null && interfaceId == lastInvoker.InterfaceId) // extension invoker returns InterfaceId==0, so this condition will never be true if an extension is installed
-                return lastInvoker;
+        public IServiceProvider ActivationServices => this.RuntimeClient.ServiceProvider;
 
-            if (extensionInvoker != null && extensionInvoker.IsExtensionInstalled(interfaceId))
+        IGrainLifecycle IGrainContext.ObservableLifecycle => throw new NotImplementedException("IGrainContext.ObservableLifecycle is not implemented by SystemTarget");
+
+        public TComponent GetComponent<TComponent>()
+        {
+            TComponent result;
+            if (this is TComponent instanceResult)
             {
-                // Shared invoker for all extensions installed on this target
-                lastInvoker = extensionInvoker;
+                result = instanceResult;
+            }
+            else if (_components.TryGetValue(typeof(TComponent), out var resultObj))
+            {
+                result = (TComponent)resultObj;
             }
             else
             {
-                // Find the specific invoker for this interface / grain type
-                lastInvoker = typeManager.GetInvoker(interfaceId, genericGrainType);
+                result = default;
             }
 
-            return lastInvoker;
+            return result;
+        }
+
+        public void SetComponent<TComponent>(TComponent instance)
+        {
+            if (this is TComponent)
+            {
+                throw new ArgumentException("Cannot override a component which is implemented by this grain");
+            }
+
+            if (instance == null)
+            {
+                _components?.Remove(typeof(TComponent));
+                return;
+            }
+
+            if (_components is null) _components = new Dictionary<Type, object>();
+            _components[typeof(TComponent)] = instance;
         }
 
         internal void HandleNewRequest(Message request)
         {
             running = request;
-            this.RuntimeClient.Invoke(this, this, request).Ignore();
+            this.RuntimeClient.Invoke(this, request).Ignore();
         }
 
         internal void HandleResponse(Message response)
@@ -159,5 +171,49 @@ namespace Orleans.Runtime
         }
 
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
+
+        public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
+            where TExtension : TExtensionInterface
+            where TExtensionInterface : IGrainExtension
+        {
+            TExtension implementation;
+            if (this.GetComponent<TExtensionInterface>() is object existing)
+            {
+                if (existing is TExtension typedResult)
+                {
+                    implementation = typedResult;
+                }
+                else
+                {
+                    throw new InvalidCastException($"Cannot cast existing extension of type {existing.GetType()} to target type {typeof(TExtension)}");
+                }
+            }
+            else
+            {
+                implementation = newExtensionFunc();
+                this.SetComponent<TExtensionInterface>(implementation);
+            }
+
+            var reference = this.GrainReference.Cast<TExtensionInterface>();
+            return (implementation, reference);
+        }
+
+        public TExtensionInterface GetExtension<TExtensionInterface>()
+            where TExtensionInterface : IGrainExtension
+        {
+            if (this.GetComponent<TExtensionInterface>() is TExtensionInterface result)
+            {
+                return result;
+            }
+
+            var implementation = this.ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TExtensionInterface));
+            if (!(implementation is TExtensionInterface typedResult))
+            {
+                throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
+            }
+
+            this.SetComponent<TExtensionInterface>(typedResult);
+            return typedResult;
+        }
     }
 }

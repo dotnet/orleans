@@ -31,7 +31,6 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = request,
-                IsUsingInterfaceVersions = request.InterfaceVersion > 0,
                 RequestContextData = RequestContextExtensions.Export(this.serializationManager)
             };
 
