@@ -20,7 +20,7 @@ namespace Orleans.Transactions
         where TService : class
     {
         private readonly ITransactionCommitterConfiguration config;
-        private readonly IGrainActivationContext context;
+        private readonly IGrainContext context;
         private readonly ITransactionDataCopier<OperationState> copier;
         private readonly IGrainRuntime grainRuntime;
         private readonly ActivationLifetime activationLifetime;
@@ -32,13 +32,13 @@ namespace Orleans.Transactions
 
         public TransactionCommitter(
             ITransactionCommitterConfiguration config,
-            IGrainActivationContext context,
+            IGrainContextAccessor contextAccessor,
             ITransactionDataCopier<OperationState> copier,
             IGrainRuntime grainRuntime,
             ILogger<TransactionCommitter<TService>> logger)
         {
             this.config = config;
-            this.context = context;
+            this.context = contextAccessor.GrainContext;
             this.copier = copier;
             this.grainRuntime = grainRuntime;
             this.logger = logger;
@@ -126,13 +126,13 @@ namespace Orleans.Transactions
         {
             if (ct.IsCancellationRequested) return;
 
-            this.participantId = new ParticipantId(this.config.ServiceName, this.context.GrainInstance.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.PriorityManager);
+            this.participantId = new ParticipantId(this.config.ServiceName, this.context.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.PriorityManager);
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
             ITransactionalStateStorage<OperationState> storage = storageFactory.Create<OperationState>(this.config.StorageName, this.config.ServiceName);
 
             // setup transaction processing pipe
-            Action deactivate = () => grainRuntime.DeactivateOnIdle(context.GrainInstance);
+            Action deactivate = () => grainRuntime.DeactivateOnIdle((Grain)context.GrainInstance);
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
             TService service = this.context.ActivationServices.GetRequiredServiceByName<TService>(this.config.ServiceName);

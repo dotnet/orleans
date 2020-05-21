@@ -37,10 +37,10 @@ namespace Orleans
         /// </summary>
         protected IServiceProvider ServiceProvider 
         {
-            get { return Data?.ServiceProvider ?? Runtime?.ServiceProvider; }
+            get { return Data?.ActivationServices ?? Runtime?.ServiceProvider; }
         }
 
-        internal GrainId GrainId;
+        internal GrainId GrainId => this.Data.GrainId;
 
         /// <summary>
         /// This constructor should never be invoked. We expose it so that client code (subclasses of Grain) do not have to add a constructor.
@@ -48,6 +48,26 @@ namespace Orleans
         /// </summary>
         protected Grain()
         {
+            var context = RuntimeContext.CurrentGrainContext;
+            if (context is null)
+            {
+                return;
+            }
+
+            if (!(context is IActivationData data))
+            {
+                ThrowInvalidContext();
+                return;
+            }
+
+            this.Data = data;
+            this.Runtime = data.Runtime;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowInvalidContext()
+        {
+            throw new InvalidOperationException("Current execution context is not suitable for use with Grain");
         }
 
         /// <summary>
@@ -55,12 +75,10 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
         /// </summary>
-        protected Grain(GrainId identity, IGrainRuntime runtime)
+        protected Grain(IGrainRuntime runtime) : this()
         {
-            GrainId = identity;
             Runtime = runtime;
         }
-
 
         /// <summary>
         /// String representation of grain's SiloIdentity including type and primary key.
@@ -264,8 +282,7 @@ namespace Orleans
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
         /// </summary>
-        protected Grain(GrainId identity, IGrainRuntime runtime, IStorage<TGrainState> storage)
-            : base(identity, runtime)
+        protected Grain(IStorage<TGrainState> storage)
         {
             this.storage = storage;
         }

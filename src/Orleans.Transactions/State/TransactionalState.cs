@@ -20,7 +20,7 @@ namespace Orleans.Transactions
         where TState : class, new()
     {
         private readonly TransactionalStateConfiguration config;
-        private readonly IGrainActivationContext context;
+        private readonly IGrainContext context;
         private readonly ITransactionDataCopier<TState> copier;
         private readonly Dictionary<Type,object> copiers;
         private readonly IGrainRuntime grainRuntime;
@@ -35,13 +35,13 @@ namespace Orleans.Transactions
 
         public TransactionalState(
             TransactionalStateConfiguration transactionalStateConfiguration, 
-            IGrainActivationContext context, 
+            IGrainContextAccessor contextAccessor, 
             ITransactionDataCopier<TState> copier,
             IGrainRuntime grainRuntime,
             ILogger<TransactionalState<TState>> logger)
         {
             this.config = transactionalStateConfiguration;
-            this.context = context;
+            this.context = contextAccessor.GrainContext;
             this.copier = copier;
             this.grainRuntime = grainRuntime;
             this.logger = logger;
@@ -187,7 +187,7 @@ namespace Orleans.Transactions
             lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, (ct) => OnSetupState(ct, SetupResourceFactory));
         }
 
-        private static void SetupResourceFactory(IGrainActivationContext context, string stateName, TransactionQueue<TState> queue)
+        private static void SetupResourceFactory(IGrainContext context, string stateName, TransactionQueue<TState> queue)
         {
             // Add resources factory to the grain context
             context.RegisterResourceFactory<ITransactionalResource>(stateName, () => new TransactionalResource<TState>(queue));
@@ -196,17 +196,17 @@ namespace Orleans.Transactions
             context.RegisterResourceFactory<ITransactionManager>(stateName, () => new TransactionManager<TState>(queue));
         }
 
-        internal async Task OnSetupState(CancellationToken ct, Action<IGrainActivationContext, string, TransactionQueue<TState>> setupResourceFactory)
+        internal async Task OnSetupState(CancellationToken ct, Action<IGrainContext, string, TransactionQueue<TState>> setupResourceFactory)
         {
             if (ct.IsCancellationRequested) return;
 
-            this.participantId = new ParticipantId(this.config.StateName, this.context.GrainInstance.GrainReference, this.config.SupportedRoles);
+            this.participantId = new ParticipantId(this.config.StateName, this.context.GrainReference, this.config.SupportedRoles);
 
             var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
             ITransactionalStateStorage<TState> storage = storageFactory.Create<TState>(this.config.StorageName, this.config.StateName);
 
             // setup transaction processing pipe
-            Action deactivate = () => grainRuntime.DeactivateOnIdle(context.GrainInstance);
+            Action deactivate = () => grainRuntime.DeactivateOnIdle((Grain)context.GrainInstance);
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
             var clock = this.context.ActivationServices.GetRequiredService<IClock>();
             var timerManager = this.context.ActivationServices.GetRequiredService<ITimerManager>();

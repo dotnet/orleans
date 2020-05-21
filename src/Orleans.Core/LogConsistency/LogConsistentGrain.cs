@@ -21,19 +21,6 @@ namespace Orleans.LogConsistency
     /// <typeparam name="TView">The type of the view</typeparam>
     public abstract class LogConsistentGrain<TView> : Grain, ILifecycleParticipant<IGrainLifecycle>
     {
-        protected LogConsistentGrain()
-        {
-        }
-
-        /// <summary>
-        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
-        /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
-        /// </summary>
-        protected LogConsistentGrain(GrainId identity, IGrainRuntime runtime)
-            : base(identity, runtime)
-        {
-        }
-
         /// <summary>
         /// called right after grain construction to install the log view adaptor 
         /// </summary>
@@ -64,9 +51,9 @@ namespace Orleans.LogConsistency
         private Task OnSetupState(CancellationToken ct)
         {
             if (ct.IsCancellationRequested) return Task.CompletedTask;
-            IGrainActivationContext activationContext = this.ServiceProvider.GetRequiredService<IGrainActivationContext>();
+            IGrainContextAccessor grainContextAccessor = this.ServiceProvider.GetRequiredService<IGrainContextAccessor>();
             Factory<Grain, ILogConsistencyProtocolServices> protocolServicesFactory = this.ServiceProvider.GetRequiredService<Factory<Grain, ILogConsistencyProtocolServices>>();
-            ILogViewAdaptorFactory consistencyProvider = SetupLogConsistencyProvider(activationContext);
+            ILogViewAdaptorFactory consistencyProvider = SetupLogConsistencyProvider(grainContextAccessor.GrainContext);
             IGrainStorage grainStorage = consistencyProvider.UsesStorageProvider ? this.GetGrainStorage(this.ServiceProvider) : null;
             InstallLogViewAdaptor(protocolServicesFactory, consistencyProvider, grainStorage);
             return Task.CompletedTask;
@@ -96,7 +83,7 @@ namespace Orleans.LogConsistency
         }
 
 
-        private ILogViewAdaptorFactory SetupLogConsistencyProvider(IGrainActivationContext activationContext)
+        private ILogViewAdaptorFactory SetupLogConsistencyProvider(IGrainContext activationContext)
         {
             var attr = this.GetType().GetCustomAttributes<LogConsistencyProviderAttribute>(true).FirstOrDefault();
 

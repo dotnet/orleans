@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Orleans.Runtime;
@@ -8,22 +9,23 @@ namespace Orleans.Transactions
 {
     public class TransactionalStateFactory : ITransactionalStateFactory
     {
-        private IGrainActivationContext context;
-        public TransactionalStateFactory(IGrainActivationContext context)
+        private IGrainContextAccessor contextAccessor;
+        public TransactionalStateFactory(IGrainContextAccessor contextAccessor)
         {
-            this.context = context;
+            this.contextAccessor = contextAccessor;
         }
 
         public ITransactionalState<TState> Create<TState>(TransactionalStateConfiguration config) where TState : class, new()
         {
-            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(this.context.ActivationServices, config, this.context);
-            transactionalState.Participate(context.ObservableLifecycle);
+            var currentContext = this.contextAccessor.GrainContext;
+            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(currentContext.ActivationServices, config, this.contextAccessor);
+            transactionalState.Participate(currentContext.ObservableLifecycle);
             return transactionalState;
         }
 
-        public static JsonSerializerSettings GetJsonSerializerSettings(ITypeResolver typeResolver, IGrainFactory grainFactory)
+        public static JsonSerializerSettings GetJsonSerializerSettings(IServiceProvider serviceProvider)
         {
-            var serializerSettings = OrleansJsonSerializer.GetDefaultSerializerSettings(typeResolver, grainFactory);
+            var serializerSettings = OrleansJsonSerializer.GetDefaultSerializerSettings(serviceProvider);
             serializerSettings.PreserveReferencesHandling = PreserveReferencesHandling.None;
             return serializerSettings;
         }

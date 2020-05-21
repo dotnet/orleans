@@ -93,7 +93,7 @@ namespace Orleans.Runtime
                 return name;
             }
 
-            return string.Empty;
+            return id.ToStringUtf8();
         }
 
         public static bool IsSingletonSystemTarget(GrainType id)

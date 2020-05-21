@@ -69,7 +69,6 @@ namespace Orleans.CodeGenerator.Generators
                         GrainInterfaceCommon.GenerateInterfaceIdProperty(this.wellKnownTypes, description).AddModifiers(Token(SyntaxKind.OverrideKeyword)),
                         GrainInterfaceCommon.GenerateInterfaceVersionProperty(this.wellKnownTypes, description).AddModifiers(Token(SyntaxKind.OverrideKeyword)),
                         GenerateInterfaceNameProperty(description),
-                        GenerateIsCompatibleMethod(description),
                         GenerateGetMethodNameMethod(description))
                     .AddMembers(GenerateInvokeMethods(description))
                     .AddAttributeLists(attributes);
@@ -368,37 +367,6 @@ namespace Orleans.CodeGenerator.Generators
             }
 
             return Argument(NameColon("options"), Token(SyntaxKind.None), allOptions);
-        }
-
-        private MemberDeclarationSyntax GenerateIsCompatibleMethod(GrainInterfaceDescription description)
-        {
-            var method = wellKnownTypes.GrainReference.Method("IsCompatible");
-            var interfaceIdParameter = method.Parameters[0].Name.ToIdentifierName();
-
-            var interfaceIds =
-                new HashSet<int>(
-                    new[] { description.InterfaceId }.Concat(
-                        description.Type.AllInterfaces.Where(wellKnownTypes.IsGrainInterface).Select(wellKnownTypes.GetTypeId)));
-
-            var returnValue = default(BinaryExpressionSyntax);
-            foreach (var interfaceId in interfaceIds)
-            {
-                var check = BinaryExpression(
-                    SyntaxKind.EqualsExpression,
-                    interfaceIdParameter,
-                    interfaceId.ToHexLiteral());
-
-                // If this is the first check, assign it, otherwise OR this check with the previous checks.
-                returnValue = returnValue == null
-                                  ? check
-                                  : BinaryExpression(SyntaxKind.LogicalOrExpression, returnValue, check);
-            }
-
-            return
-                method.GetDeclarationSyntax()
-                    .AddModifiers(Token(SyntaxKind.OverrideKeyword))
-                    .WithExpressionBody(ArrowExpressionClause(returnValue))
-                    .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
         }
 
         private MemberDeclarationSyntax GenerateInterfaceNameProperty(GrainInterfaceDescription description)

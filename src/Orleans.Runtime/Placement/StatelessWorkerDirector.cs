@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Placement
             }
 
             // otherwise, place somewhere else
-            return Task.FromResult(compatibleSilos[random.Next(compatibleSilos.Count)]);
+            return Task.FromResult(compatibleSilos[random.Next(compatibleSilos.Length)]);
         }
 
         private PlacementResult SelectActivationCore(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)

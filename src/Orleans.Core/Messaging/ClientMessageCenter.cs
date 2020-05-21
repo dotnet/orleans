@@ -360,18 +360,6 @@ namespace Orleans.Messaging
             }
         }
 
-        public Task<IGrainTypeResolver> GetGrainTypeResolver(IInternalGrainFactory grainFactory)
-        {
-            var silo = GetLiveGatewaySiloAddress();
-            return GetTypeManager(silo, grainFactory).GetClusterGrainTypeResolver();
-        }
-
-        public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(IInternalGrainFactory grainFactory)
-        {
-            var silo = GetLiveGatewaySiloAddress();
-            return GetTypeManager(silo, grainFactory).GetImplicitStreamSubscriberTable(silo);
-        }
-
         public void RegisterLocalMessageHandler(Action<Message> handler)
         {
             this.messageHandler = handler;
@@ -397,11 +385,6 @@ namespace Orleans.Messaging
         public int SendQueueLength
         {
             get { return 0; }
-        }
-
-        private IClusterTypeManager GetTypeManager(SiloAddress destination, IInternalGrainFactory grainFactory)
-        {
-            return grainFactory.GetSystemTarget<IClusterTypeManager>(Constants.TypeManagerType, destination);
         }
 
         private SiloAddress GetLiveGatewaySiloAddress()

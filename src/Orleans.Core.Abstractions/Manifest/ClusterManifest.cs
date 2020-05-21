@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Immutable;
 using Orleans.Runtime;
 
@@ -13,10 +14,14 @@ namespace Orleans.Metadata
         /// <summary>
         /// Creates a new <see cref="ClusterManifest"/> instance.
         /// </summary>
-        public ClusterManifest(MajorMinorVersion version, ImmutableDictionary<SiloAddress, SiloManifest> silos)
+        public ClusterManifest(
+            MajorMinorVersion version,
+            ImmutableDictionary<SiloAddress, GrainManifest> silos,
+            ImmutableArray<GrainManifest> allGrainManifests)
         {
             this.Version = version;
             this.Silos = silos;
+            this.AllGrainManifests = allGrainManifests;
         }
 
         /// <summary>
@@ -27,6 +32,11 @@ namespace Orleans.Metadata
         /// <summary>
         /// Manifests for each silo in the cluster.
         /// </summary>
-        public ImmutableDictionary<SiloAddress, SiloManifest> Silos { get; }
+        public ImmutableDictionary<SiloAddress, GrainManifest> Silos { get; }
+
+        /// <summary>
+        /// All grain manifests.
+        /// </summary>
+        public ImmutableArray<GrainManifest> AllGrainManifests { get; }
     }
 }

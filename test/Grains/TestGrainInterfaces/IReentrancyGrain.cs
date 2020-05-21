@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
@@ -94,10 +94,5 @@ namespace UnitTests.GrainInterfaces
         Task FanOutACNonReentrant(int offset, int num);
         Task FanOutACReentrant_Chain(int offset, int num);
         Task FanOutACNonReentrant_Chain(int offset, int num);
-    }
-
-    public interface IReentrantTestSupportGrain : IGrainWithIntegerKey
-    {
-        Task<bool> IsReentrant(string fullTypeName);
     }
 }

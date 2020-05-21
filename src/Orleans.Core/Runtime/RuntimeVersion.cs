@@ -63,18 +63,6 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Writes the Orleans program ident info to the Console, eg: 'OrleansHost v2012.5.9.51607 Build:12345 Timestamp: 20120509-185359'
-        /// </summary>
-        public static void ProgamIdent()
-        {
-            string progTitle = string.Format("{0} v{1}", ProgramName, Current);
-            ConsoleText.WriteStatus(progTitle);
-#if DEBUG
-            Console.Title = progTitle;
-#endif
-        }
-
-        /// <summary>
         /// Returns a value indicating whether the provided <paramref name="assembly"/> was built in debug mode.
         /// </summary>
         /// <param name="assembly">

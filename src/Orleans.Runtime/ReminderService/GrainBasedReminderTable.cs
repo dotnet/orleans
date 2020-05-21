@@ -8,6 +8,7 @@ using Orleans.Concurrency;
 namespace Orleans.Runtime.ReminderService
 {
     [Reentrant]
+    [KeepAlive]
     internal class GrainBasedReminderTable : Grain, IReminderTableGrain
     {
         private readonly Dictionary<GrainReference, Dictionary<string, ReminderEntry>> reminderTable = new Dictionary<GrainReference, Dictionary<string, ReminderEntry>>();

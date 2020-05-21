@@ -52,15 +52,21 @@ namespace Orleans.Runtime
             get
             {
                 var implementationType = this.grainReference.GetType();
+                foreach (var @interface in implementationType.GetInterfaces())
+                {
+                    // Get or create the implementation map for this object.
+                    var implementationMap = mapping.GetOrCreate(
+                        implementationType,
+                        @interface);
 
-                // Get or create the implementation map for this object.
-                var implementationMap = mapping.GetOrCreate(
-                    implementationType,
-                    request.InterfaceId);
+                    // Get the method info for the method being invoked.
+                    if (implementationMap.TryGetValue(request.MethodId, out var method))
+                    {
+                        return method.InterfaceMethod;
+                    }
+                }
 
-                // Get the method info for the method being invoked.
-                implementationMap.TryGetValue(request.MethodId, out var method);
-                return method.InterfaceMethod;
+                return null;
             }
         }
 

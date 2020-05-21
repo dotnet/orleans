@@ -36,17 +36,18 @@ namespace Orleans.Transactions.TestKit
 
     public class FaultInjectionTransactionalStateFactory : IFaultInjectionTransactionalStateFactory
     {
-        private IGrainActivationContext context;
-        public FaultInjectionTransactionalStateFactory(IGrainActivationContext context)
+        private IGrainContextAccessor contextAccessor;
+        public FaultInjectionTransactionalStateFactory(IGrainContextAccessor contextAccessor)
         {
-            this.context = context;
+            this.contextAccessor = contextAccessor;
         }
 
         public IFaultInjectionTransactionalState<TState> Create<TState>(IFaultInjectionTransactionalStateConfiguration config) where TState : class, new()
         {
-            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(this.context.ActivationServices, new TransactionalStateConfiguration(config), this.context);
-            FaultInjectionTransactionalState<TState> deactivationTransactionalState = ActivatorUtilities.CreateInstance<FaultInjectionTransactionalState<TState>>(this.context.ActivationServices, transactionalState, this.context);
-            deactivationTransactionalState.Participate(context.ObservableLifecycle);
+            var currentContext = this.contextAccessor.GrainContext;
+            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(currentContext.ActivationServices, new TransactionalStateConfiguration(config), this.contextAccessor);
+            FaultInjectionTransactionalState<TState> deactivationTransactionalState = ActivatorUtilities.CreateInstance<FaultInjectionTransactionalState<TState>>(currentContext.ActivationServices, transactionalState, this.contextAccessor);
+            deactivationTransactionalState.Participate(currentContext.ObservableLifecycle);
             return deactivationTransactionalState;
         }
     }
@@ -55,7 +56,7 @@ namespace Orleans.Transactions.TestKit
     {
         private static readonly MethodInfo create =
             typeof(IFaultInjectionTransactionalStateFactory).GetMethod("Create");
-        public Factory<IGrainActivationContext, object> GetFactory(ParameterInfo parameter, FaultInjectionTransactionalStateAttribute attribute)
+        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, FaultInjectionTransactionalStateAttribute attribute)
         {
             IFaultInjectionTransactionalStateConfiguration config = attribute;
             // use generic type args to define collection type.
@@ -64,7 +65,7 @@ namespace Orleans.Transactions.TestKit
             return context => Create(context, genericCreate, args);
         }
 
-        private object Create(IGrainActivationContext context, MethodInfo genericCreate, object[] args)
+        private object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
         {
             IFaultInjectionTransactionalStateFactory factory = context.ActivationServices.GetRequiredService<IFaultInjectionTransactionalStateFactory>();
             return genericCreate.Invoke(factory, args);

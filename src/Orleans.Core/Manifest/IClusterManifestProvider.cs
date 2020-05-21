@@ -19,5 +19,10 @@ namespace Orleans.Runtime
         /// Gets the stream of cluster manifest updates.
         /// </summary>
         IAsyncEnumerable<ClusterManifest> Updates { get; }
+
+        /// <summary>
+        /// Gets the local grain manifest
+        /// </summary>
+        GrainManifest LocalGrainManifest { get; }
     }
 }

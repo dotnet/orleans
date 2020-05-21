@@ -1,4 +1,5 @@
 using System;
+using Orleans.Metadata;
 using Orleans.Runtime;
 
 namespace Orleans.Metadata
@@ -33,7 +34,7 @@ namespace Orleans.Metadata
         /// <inheritdoc />
         public bool TryGetGrainType(Type grainClass, out GrainType grainType)
         {
-            foreach (var attr in grainClass.GetCustomAttributes(inherit: true))
+            foreach (var attr in grainClass.GetCustomAttributes(inherit: false))
             {
                 if (attr is IGrainTypeProviderAttribute typeProviderAttribute)
                 {
@@ -58,7 +59,10 @@ namespace Orleans.Metadata
         /// </summary>
         GrainType GetGrainType(IServiceProvider services, Type type);
     }
+}
 
+namespace Orleans
+{
     /// <summary>
     /// Specifies the grain type of the grain class which it is attached to.
     /// </summary>

@@ -21,6 +21,7 @@ namespace NonSilo.Tests
                 typeof(int),
                 typeof(int[]),
                 typeof(int*[]),
+                typeof(int[]),
                 typeof(List<>),
                 typeof(List<int>),
                 typeof(List<int*[]>),

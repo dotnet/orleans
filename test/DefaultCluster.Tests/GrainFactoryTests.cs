@@ -17,7 +17,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_Ambiguous()
         {
-            Assert.Throws<OrleansException>(() =>
+            Assert.Throws<ArgumentException>(() =>
             {
                 var g = this.GrainFactory.GetGrain<IBase>(GetRandomGrainId());
             });
@@ -48,7 +48,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_AmbiguousPrefix()
         {
-            Assert.Throws<OrleansException>(() =>
+            Assert.Throws<ArgumentException>(() =>
             {
                 var g = this.GrainFactory.GetGrain<IBase>(GetRandomGrainId(), "UnitTests.Grains");
             });

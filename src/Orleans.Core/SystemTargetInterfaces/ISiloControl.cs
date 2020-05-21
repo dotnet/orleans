@@ -22,6 +22,5 @@ namespace Orleans
         Task<int> GetActivationCount();
 
         Task<object> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg);
-        Task<string[]> GetGrainTypeList();
     }
 }

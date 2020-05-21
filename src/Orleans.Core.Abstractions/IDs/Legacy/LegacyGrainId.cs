@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
-using Orleans.Core;
 
 namespace Orleans.Runtime
 {
@@ -64,6 +63,23 @@ namespace Orleans.Runtime
         internal static LegacyGrainId GetSystemTargetGrainId(long typeData)
         {
             return FindOrCreateGrainId(UniqueKey.NewSystemTargetKey(Guid.Empty, typeData));
+        }
+
+        internal static GrainType GetGrainType(long typeCode, bool isKeyExt)
+        {
+            LegacyGrainId grainId;
+            if (isKeyExt)
+            {
+                var dummyKey = UniqueKey.NewKey(0, UniqueKey.Category.KeyExtGrain, typeCode, "keyext");
+                grainId = new LegacyGrainId(dummyKey);
+            }
+            else
+            {
+                var dummyKey = UniqueKey.NewKey(0, UniqueKey.Category.Grain, typeCode);
+                grainId = new LegacyGrainId(dummyKey);
+            }
+
+            return grainId.GetGrainType();
         }
 
         internal static LegacyGrainId GetGrainId(long typeCode, long primaryKey, string keyExt = null)
@@ -395,6 +411,13 @@ namespace Orleans.Runtime
             return typeof(IGrainWithGuidKey).IsAssignableFrom(type)
                 || typeof(IGrainWithIntegerKey).IsAssignableFrom(type)
                 || typeof(IGrainWithStringKey).IsAssignableFrom(type)
+                || typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(type)
+                || typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(type);
+        }
+
+        public static bool IsLegacyKeyExtGrainType(Type type)
+        {
+            return typeof(IGrainWithStringKey).IsAssignableFrom(type)
                 || typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(type)
                 || typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(type);
         }

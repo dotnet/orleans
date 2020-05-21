@@ -49,7 +49,7 @@ namespace Tester.AzureUtils.TimerTests
             var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = this.serviceId });
             var storageOptions = Options.Create(new AzureTableReminderStorageOptions { ConnectionString = TestDefaultConfiguration.DataConnectionString });
 
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, clusterOptions, storageOptions);
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<GrainReferenceKeyStringConverter>(), this.loggerFactory, clusterOptions, storageOptions);
             await table.Init();
 
             await TestTableInsertRate(table, 10);
@@ -62,7 +62,7 @@ namespace Tester.AzureUtils.TimerTests
             string clusterId = NewClusterId();
             var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = this.serviceId });
             var storageOptions = Options.Create(new AzureTableReminderStorageOptions { ConnectionString = TestDefaultConfiguration.DataConnectionString });
-            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, clusterOptions, storageOptions);
+            IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<GrainReferenceKeyStringConverter>(), this.loggerFactory, clusterOptions, storageOptions);
             await table.Init();
 
             ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
@@ -97,7 +97,7 @@ namespace Tester.AzureUtils.TimerTests
                     var e = new ReminderEntry
                     {
                         //GrainId = LegacyGrainId.GetGrainId(new Guid(s)),
-                        GrainRef = this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()),
+                        GrainRef = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()),
                         ReminderName = "MY_REMINDER_" + i,
                         Period = TimeSpan.FromSeconds(5),
                         StartAt = DateTime.UtcNow
@@ -129,7 +129,7 @@ namespace Tester.AzureUtils.TimerTests
             Guid guid = Guid.NewGuid();
             return new ReminderEntry
                 {
-                    GrainRef = this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()),
+                    GrainRef = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId()),
                     ReminderName = string.Format("TestReminder.{0}", guid),
                     Period = TimeSpan.FromSeconds(5),
                     StartAt = DateTime.UtcNow

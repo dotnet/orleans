@@ -3,7 +3,7 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal class ActivationAddress
+    public class ActivationAddress
     {
         public GrainId Grain { get; private set; }
         public ActivationId Activation { get; private set; }

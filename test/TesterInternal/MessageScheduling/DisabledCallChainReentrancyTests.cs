@@ -16,19 +16,6 @@ namespace UnitTests
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            }
-        }
-
-        public class SiloConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.Configure<SchedulingOptions>(options =>
-                {
-                    options.AllowCallChainReentrancy = false;
-                    options.PerformDeadlockDetection = false;
-                });
             }
         }
 
