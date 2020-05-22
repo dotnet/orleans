@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Text;
+using Orleans.Runtime;
 
 namespace Orleans.Utilities
 {
@@ -149,9 +150,17 @@ namespace Orleans.Utilities
         private static void AddAssembly(StringBuilder builder, Type type)
         {
             // Do not include the assembly name for the system assembly.
-            if (SystemAssembly.Equals(type.Assembly)) return;
+            if (IsSystemNamespace(type)) return;
             builder.Append(',');
             builder.Append(type.Assembly.GetName().Name);
+        }
+
+        private static bool IsSystemNamespace(Type type)
+        {
+            var ns = type?.Namespace;
+            if (string.IsNullOrWhiteSpace(ns)) return false;
+            if (type.DeclaringType is Type declaringType) return IsSystemNamespace(declaringType);
+            return string.Equals(ns, "System", StringComparison.Ordinal) || ns.StartsWith("System.", StringComparison.Ordinal);
         }
     }
 }

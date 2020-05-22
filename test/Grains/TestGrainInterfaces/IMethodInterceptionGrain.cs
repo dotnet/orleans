@@ -51,6 +51,8 @@ namespace UnitTests.GrainInterfaces
     {
         Task<string> ThrowIfGreaterThanZero(int value);
         Task<string> GetRequestContext();
+
+        Task<int> SumSet(HashSet<int> numbers);
     }
 
     public interface IHungryGrain<T> : IGrainWithIntegerKey
