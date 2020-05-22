@@ -27,12 +27,13 @@ namespace Tester.Redis
                 throw new SkipException("No connection string found. Skipping");
             }
 
-            var options = new RedisGrainDirectoryOptions
+            var directoryOptions = new RedisGrainDirectoryOptions
             {
                 ConfigurationOptions = ConfigurationOptions.Parse(configuration),
             };
 
-            var directory = new RedisGrainDirectory(options);
+            var clusterOptions = Options.Create(new ClusterOptions { ServiceId = "SomeServiceId", ClusterId = Guid.NewGuid().ToString("N") });
+            var directory = new RedisGrainDirectory(directoryOptions, clusterOptions);
             directory.Initialize().GetAwaiter().GetResult();
             return directory;
         }

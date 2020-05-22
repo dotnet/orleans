@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -11,19 +12,23 @@ namespace Orleans.GrainDirectory.Redis
     public class RedisGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly RedisGrainDirectoryOptions directoryOptions;
+        private readonly ClusterOptions clusterOptions;
+
         private ConnectionMultiplexer redis;
         private IDatabase database;
         private LuaScript deleteScript;
 
         public RedisGrainDirectory(
-            RedisGrainDirectoryOptions directoryOptions)
+            RedisGrainDirectoryOptions directoryOptions,
+            IOptions<ClusterOptions> clusterOptions)
         {
             this.directoryOptions = directoryOptions;
+            this.clusterOptions = clusterOptions.Value;
         }
 
         public async Task<GrainAddress> Lookup(string grainId)
         {
-            var result = (string) await this.database.StringGetAsync(grainId);
+            var result = (string) await this.database.StringGetAsync(GetKey(grainId));
 
             if (string.IsNullOrWhiteSpace(result))
                 return default;
@@ -33,7 +38,7 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task<GrainAddress> Register(GrainAddress address)
         {
-            var success = await this.database.StringSetAsync(address.GrainId, JsonConvert.SerializeObject(address), when: When.NotExists);
+            var success = await this.database.StringSetAsync(GetKey(address.GrainId), JsonConvert.SerializeObject(address), when: When.NotExists);
 
             if (success)
                 return address;
@@ -43,7 +48,7 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Unregister(GrainAddress address)
         {
-            await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = address.GrainId, val = JsonConvert.SerializeObject(address) });
+            await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = JsonConvert.SerializeObject(address) });
         }
 
         public Task UnregisterSilos(List<string> siloAddresses)
@@ -69,6 +74,11 @@ else
   return 0
 end
                 ");
+        }
+
+        private string GetKey(string grainId)
+        {
+            return $"{this.clusterOptions.ClusterId}-{grainId}";
         }
     }
 }
