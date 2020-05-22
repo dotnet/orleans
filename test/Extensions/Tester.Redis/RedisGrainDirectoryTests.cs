@@ -30,6 +30,7 @@ namespace Tester.Redis
             var directoryOptions = new RedisGrainDirectoryOptions
             {
                 ConfigurationOptions = ConfigurationOptions.Parse(configuration),
+                EntryExpiry = TimeSpan.FromMinutes(1),
             };
 
             var clusterOptions = Options.Create(new ClusterOptions { ServiceId = "SomeServiceId", ClusterId = Guid.NewGuid().ToString("N") });

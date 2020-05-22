@@ -8,6 +8,8 @@ namespace Orleans.Configuration
     {
         [Redact]
         public ConfigurationOptions ConfigurationOptions { get; set; }
+
+        public TimeSpan? EntryExpiry { get; set; } = null;
     }
 
     public class RedisGrainDirectoryOptionsValidator : IConfigurationValidator

@@ -38,7 +38,11 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task<GrainAddress> Register(GrainAddress address)
         {
-            var success = await this.database.StringSetAsync(GetKey(address.GrainId), JsonConvert.SerializeObject(address), when: When.NotExists);
+            var success = await this.database.StringSetAsync(
+                GetKey(address.GrainId),
+                JsonConvert.SerializeObject(address),
+                this.directoryOptions.EntryExpiry,
+                When.NotExists);
 
             if (success)
                 return address;
