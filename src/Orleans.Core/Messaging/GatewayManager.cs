@@ -312,11 +312,11 @@ namespace Orleans.Messaging
                             prevRefresh);
                 }
 
-                this.AbortEvictedGatewayConnections(live);
+                this.CloseEvictedGatewayConnections(live);
             }
         }
 
-        private void AbortEvictedGatewayConnections(List<SiloAddress> liveGateways)
+        private void CloseEvictedGatewayConnections(List<SiloAddress> liveGateways)
         {
             if (this.connectionManager == null) return;
 
@@ -337,10 +337,10 @@ namespace Orleans.Messaging
                 {
                     if (logger.IsEnabled(LogLevel.Information))
                     {
-                        this.logger.LogInformation("Aborting connection to {Endpoint} because it has been marked as dead", address);
+                        this.logger.LogInformation("Closing connection to {Endpoint} because it has been marked as dead", address);
                     }
 
-                    this.connectionManager.Abort(address);
+                    this.connectionManager.Close(address);
                 }
             }
         }
