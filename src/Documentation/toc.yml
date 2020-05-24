@@ -14,7 +14,6 @@
     href: index.md
   - name: Deployment
     href: deployment/toc.yml
-  items:
   - name: Multi-Cluster Support
     href: index.md
 - name: Tutorials and Samples
