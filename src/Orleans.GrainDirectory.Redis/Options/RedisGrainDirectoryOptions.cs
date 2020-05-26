@@ -39,7 +39,7 @@ namespace Orleans.Configuration
 
         public void ValidateConfiguration()
         {
-            if (this.options == null)
+            if (this.options.ConfigurationOptions == null)
             {
                 throw new OrleansConfigurationException($"Invalid {nameof(RedisGrainDirectoryOptions)} values for {nameof(RedisGrainDirectory)}. {nameof(options.ConfigurationOptions)} is required.");
             }
