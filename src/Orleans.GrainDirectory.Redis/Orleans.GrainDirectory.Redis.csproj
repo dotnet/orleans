@@ -6,6 +6,7 @@
     <Description>Microsoft Orleans Grain Directory implementation that uses Refis</Description>
     <PackageTags>$(PackageTags) Redis Grain Directory</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">beta1</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>
