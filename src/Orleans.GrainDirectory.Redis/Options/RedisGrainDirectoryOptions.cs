@@ -5,11 +5,21 @@ using StackExchange.Redis;
 
 namespace Orleans.Configuration
 {
+    /// <summary>
+    /// Configuration options for the <see cref="RedisGrainDirectory"/>
+    /// </summary>
     public class RedisGrainDirectoryOptions 
     {
+        /// <summary>
+        /// Configure the Redis client
+        /// </summary>
         [RedactRedisConfigurationOptions]
         public ConfigurationOptions ConfigurationOptions { get; set; }
 
+        /// <summary>
+        /// Entry expiry, null by default. A value should be set ONLY for ephemeral environments (like in tests).
+        /// Setting a value different from null will cause duplicate activations in the cluster.
+        /// </summary>
         public TimeSpan? EntryExpiry { get; set; } = null;
     }
 
