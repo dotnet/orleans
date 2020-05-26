@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -81,7 +82,7 @@ namespace Orleans.GrainDirectory.Redis
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(nameof(RedisGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, Initialize);
+            lifecycle.Subscribe(nameof(RedisGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, Initialize, Uninitialize);
         }
 
         public async Task Initialize(CancellationToken ct = default)
@@ -96,6 +97,17 @@ namespace Orleans.GrainDirectory.Redis
             this.redis.IncludeDetailInExceptions = true;
 
             this.database = this.redis.GetDatabase();
+        }
+
+        private async Task Uninitialize(CancellationToken arg)
+        {
+            if (this.redis != null && this.redis.IsConnected)
+            {
+                await this.redis.CloseAsync();
+                this.redis.Dispose();
+                this.redis = null;
+                this.database = null;
+            }
         }
 
         private string GetKey(string grainId) => $"{this.clusterOptions.ClusterId}-{grainId}";
