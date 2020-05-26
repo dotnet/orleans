@@ -16,7 +16,6 @@ namespace Orleans.GrainDirectory.Redis
 
         private ConnectionMultiplexer redis;
         private IDatabase database;
-        private LuaScript deleteScript;
 
         public RedisGrainDirectory(
             RedisGrainDirectoryOptions directoryOptions,
@@ -52,7 +51,12 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Unregister(GrainAddress address)
         {
-            await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = JsonConvert.SerializeObject(address) });
+            var key = GetKey(address.GrainId);
+
+            var tx = this.database.CreateTransaction();
+            tx.AddCondition(Condition.StringEqual(key, JsonConvert.SerializeObject(address)));
+            tx.KeyDeleteAsync(key).Ignore();
+            await tx.ExecuteAsync();
         }
 
         public Task UnregisterSilos(List<string> siloAddresses)
@@ -69,15 +73,6 @@ namespace Orleans.GrainDirectory.Redis
         {
             this.redis = await ConnectionMultiplexer.ConnectAsync(directoryOptions.ConfigurationOptions);
             this.database = redis.GetDatabase();
-            this.deleteScript = LuaScript.Prepare(
-                @"
-local cur = redis.call('GET', @key)
-if cur == @val  then
-  return redis.call('DEL', @key)
-else
-  return 0
-end
-                ");
         }
 
         private string GetKey(string grainId)
