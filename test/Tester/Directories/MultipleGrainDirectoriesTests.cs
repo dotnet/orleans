@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans.GrainDirectory.Redis;
 using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.TestingHost;
@@ -42,13 +44,16 @@ namespace Tester.Directories
         {
             public void Configure(ISiloBuilder siloBuilder)
             {
-                siloBuilder.AddRedisGrainDirectory(
-                    CustomDirectoryGrain.DIRECTORY,
-                    options =>
-                    {
-                        options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
-                        options.EntryExpiry = TimeSpan.FromMinutes(5);
-                    });
+                siloBuilder
+                    .AddRedisGrainDirectory(
+                        CustomDirectoryGrain.DIRECTORY,
+                        options =>
+                        {
+                            options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+                            options.EntryExpiry = TimeSpan.FromMinutes(5);
+                        })
+                    .ConfigureLogging(builder => builder.AddFilter(typeof(RedisGrainDirectory).FullName, LogLevel.Debug));
+
             }
         }
 

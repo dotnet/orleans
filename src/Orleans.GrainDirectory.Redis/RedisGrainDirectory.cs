@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Configuration;
@@ -13,21 +14,27 @@ namespace Orleans.GrainDirectory.Redis
     {
         private readonly RedisGrainDirectoryOptions directoryOptions;
         private readonly ClusterOptions clusterOptions;
+        private readonly ILogger<RedisGrainDirectory> logger;
 
         private ConnectionMultiplexer redis;
         private IDatabase database;
 
         public RedisGrainDirectory(
             RedisGrainDirectoryOptions directoryOptions,
-            IOptions<ClusterOptions> clusterOptions)
+            IOptions<ClusterOptions> clusterOptions,
+            ILogger<RedisGrainDirectory> logger)
         {
             this.directoryOptions = directoryOptions;
+            this.logger = logger;
             this.clusterOptions = clusterOptions.Value;
         }
 
         public async Task<GrainAddress> Lookup(string grainId)
         {
             var result = (string) await this.database.StringGetAsync(GetKey(grainId));
+
+            if (this.logger.IsEnabled(LogLevel.Debug))
+                this.logger.LogDebug("Lookup {grainId}: {result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
 
             if (string.IsNullOrWhiteSpace(result))
                 return default;
@@ -37,11 +44,15 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task<GrainAddress> Register(GrainAddress address)
         {
+            var value = JsonConvert.SerializeObject(address);
             var success = await this.database.StringSetAsync(
-                GetKey(address.GrainId),
-                JsonConvert.SerializeObject(address),
+                this.GetKey(address.GrainId),
+                value,
                 this.directoryOptions.EntryExpiry,
                 When.NotExists);
+
+            if (this.logger.IsEnabled(LogLevel.Debug))
+                this.logger.LogDebug("Register {grainId} ({address}): {result}", address.GrainId, value, success ? "OK": "Conflict");
 
             if (success)
                 return address;
@@ -54,9 +65,13 @@ namespace Orleans.GrainDirectory.Redis
             var key = GetKey(address.GrainId);
 
             var tx = this.database.CreateTransaction();
-            tx.AddCondition(Condition.StringEqual(key, JsonConvert.SerializeObject(address)));
+            var value = JsonConvert.SerializeObject(address);
+            tx.AddCondition(Condition.StringEqual(key, value));
             tx.KeyDeleteAsync(key).Ignore();
-            await tx.ExecuteAsync();
+            var success = await tx.ExecuteAsync();
+
+            if (this.logger.IsEnabled(LogLevel.Debug))
+                this.logger.LogDebug("Unregister {grainId} ({address}): {result}", address.GrainId, value, success ? "OK" : "Conflict");
         }
 
         public Task UnregisterSilos(List<string> siloAddresses)
@@ -71,13 +86,32 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Initialize(CancellationToken ct = default)
         {
-            this.redis = await ConnectionMultiplexer.ConnectAsync(directoryOptions.ConfigurationOptions);
-            this.database = redis.GetDatabase();
+            this.redis = await ConnectionMultiplexer.ConnectAsync(this.directoryOptions.ConfigurationOptions);
+
+            // Configure logging
+            this.redis.ConnectionRestored += this.LogConnectionRestored;
+            this.redis.ConnectionFailed += this.LogConnectionFailed;
+            this.redis.ErrorMessage += this.LogErrorMessage;
+            this.redis.InternalError += this.LogInternalError;
+            this.redis.IncludeDetailInExceptions = true;
+
+            this.database = this.redis.GetDatabase();
         }
 
-        private string GetKey(string grainId)
-        {
-            return $"{this.clusterOptions.ClusterId}-{grainId}";
-        }
+        private string GetKey(string grainId) => $"{this.clusterOptions.ClusterId}-{grainId}";
+
+        #region Logging
+        private void LogConnectionRestored(object sender, ConnectionFailedEventArgs e)
+            => this.logger.LogInformation(e.Exception, "Connection to {endpoint) failed: {failureType}", e.EndPoint, e.FailureType);
+
+        private void LogConnectionFailed(object sender, ConnectionFailedEventArgs e)
+            => this.logger.LogError(e.Exception, "Connection to {endpoint) failed: {failureType}", e.EndPoint, e.FailureType);
+
+        private void LogErrorMessage(object sender, RedisErrorEventArgs e)
+            => this.logger.LogError(e.Message);
+
+        private void LogInternalError(object sender, InternalErrorEventArgs e)
+            => this.logger.LogError(e.Exception, "Internal error");
+        #endregion
     }
 }

@@ -11,12 +11,17 @@ using Orleans.TestingHost.Utils;
 using Tester.Directories;
 using TestExtensions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tester.AzureUtils
 {
     [TestCategory("Azure"), TestCategory("Storage")]
     public class AzureTableGrainDirectoryTests : GrainDirectoryTests<AzureTableGrainDirectory>
     {
+        public AzureTableGrainDirectoryTests(ITestOutputHelper testOutput) : base(testOutput)
+        {
+        }
+
         protected override AzureTableGrainDirectory GetGrainDirectory()
         {
             TestUtils.CheckForAzureStorage();

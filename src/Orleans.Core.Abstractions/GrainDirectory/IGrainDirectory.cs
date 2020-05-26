@@ -47,11 +47,6 @@ namespace Orleans.GrainDirectory
     public class GrainAddress
     {
         /// <summary>
-        /// Address of the silo where the grain activation lives
-        /// </summary>
-        public string SiloAddress { get; set; }
-
-        /// <summary>
         /// Identifier of the Grain
         /// </summary>
         public string GrainId { get; set; }
@@ -60,6 +55,11 @@ namespace Orleans.GrainDirectory
         /// Id of the specific Grain activation
         /// </summary>
         public string ActivationId { get; set; }
+
+        /// <summary>
+        /// Address of the silo where the grain activation lives
+        /// </summary>
+        public string SiloAddress { get; set; }
 
         public override bool Equals(object obj)
         {

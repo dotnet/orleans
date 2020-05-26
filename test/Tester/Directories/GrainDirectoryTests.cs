@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
+using TestExtensions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tester.Directories
 {
@@ -11,9 +14,12 @@ namespace Tester.Directories
     public abstract class GrainDirectoryTests<T> where T : IGrainDirectory
     {
         protected T grainDirectory;
+        protected readonly ILoggerFactory loggerFactory;
 
-        protected GrainDirectoryTests()
+        protected GrainDirectoryTests(ITestOutputHelper testOutput)
         {
+            this.loggerFactory = new LoggerFactory();
+            this.loggerFactory.AddProvider(new XunitLoggerProvider(testOutput));
             this.grainDirectory = GetGrainDirectory();
         }
 

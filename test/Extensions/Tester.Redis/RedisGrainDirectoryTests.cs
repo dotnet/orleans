@@ -12,12 +12,18 @@ using StackExchange.Redis;
 using Tester.Directories;
 using TestExtensions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tester.Redis
 {
     [TestCategory("Redis"), TestCategory("Directory")]
     public class RedisGrainDirectoryTests : GrainDirectoryTests<RedisGrainDirectory>
     {
+        public RedisGrainDirectoryTests(ITestOutputHelper testOutput)
+            : base(testOutput)
+        {
+        }
+
         protected override RedisGrainDirectory GetGrainDirectory()
         {
             var configuration = TestDefaultConfiguration.RedisConnectionString;
@@ -34,7 +40,10 @@ namespace Tester.Redis
             };
 
             var clusterOptions = Options.Create(new ClusterOptions { ServiceId = "SomeServiceId", ClusterId = Guid.NewGuid().ToString("N") });
-            var directory = new RedisGrainDirectory(directoryOptions, clusterOptions);
+            var directory = new RedisGrainDirectory(
+                directoryOptions,
+                clusterOptions,
+                this.loggerFactory.CreateLogger<RedisGrainDirectory>());
             directory.Initialize().GetAwaiter().GetResult();
             return directory;
         }
