@@ -16,31 +16,6 @@ namespace Tester.Directories
     [TestCategory("Azure")]
     public class AzureMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
     {
-        protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForAzureStorage();
-
-        protected override void ConfigureCustomGrainDirectory(ISiloBuilder siloBuilder, string directoryName)
-        {
-            siloBuilder.AddAzureTableGrainDirectory(
-                    CustomDirectoryGrain.DIRECTORY,
-                    options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
-        }
-    }
-
-    [TestCategory("Redis")]
-    public class RedisMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
-    {
-        protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForAzureStorage();
-
-        protected override void ConfigureCustomGrainDirectory(ISiloBuilder siloBuilder, string directoryName)
-        {
-            siloBuilder.AddRedisGrainDirectory(
-                    CustomDirectoryGrain.DIRECTORY,
-                    options => options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString));
-        }
-    }
-
-    public abstract class MultipleGrainDirectoriesTests : TestClusterPerTest
-    {
         public class SiloConfigurator : ISiloConfigurator
         {
             public void Configure(ISiloBuilder siloBuilder)
@@ -51,14 +26,52 @@ namespace Tester.Directories
             }
         }
 
-        protected abstract void ConfigureCustomGrainDirectory(ISiloBuilder siloBuilder, string directoryName);
-
         protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForAzureStorage();
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.Options.InitialSilosCount = 2;
+            base.ConfigureTestCluster(builder);
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+    }
+
+    [TestCategory("Redis")]
+    public class RedisMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
+    {
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder siloBuilder)
+            {
+                siloBuilder.AddRedisGrainDirectory(
+                    CustomDirectoryGrain.DIRECTORY,
+                    options =>
+                    {
+                        options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+                        options.EntryExpiry = TimeSpan.FromMinutes(5);
+                    });
+            }
+        }
+
+        protected override void CheckPreconditionsOrThrow()
+        {
+            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
+            {
+                throw new SkipException("TestDefaultConfiguration.RedisConnectionString is empty");
+            }
+        }
+
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            base.ConfigureTestCluster(builder);
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+    }
+
+    public abstract class MultipleGrainDirectoriesTests : TestClusterPerTest
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.Options.InitialSilosCount = 2;
         }
 
         [SkippableFact, TestCategory("Directory"), TestCategory("Functionals")]
