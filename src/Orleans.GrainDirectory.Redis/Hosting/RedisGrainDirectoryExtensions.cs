@@ -10,6 +10,9 @@ namespace Orleans.Hosting
 {
     public static class RedisGrainDirectoryExtensions
     {
+        /// <summary>
+        /// Use a Redis data-store as the default Grain Directory
+        /// </summary>
         public static ISiloHostBuilder UseRedisGrainDirectoryAsDefault(
             this ISiloHostBuilder builder,
             Action<RedisGrainDirectoryOptions> configureOptions)
@@ -17,6 +20,9 @@ namespace Orleans.Hosting
             return builder.UseRedisGrainDirectoryAsDefault(ob => ob.Configure(configureOptions));
         }
 
+        /// <summary>
+        /// Use a Redis data-store as the default Grain Directory
+        /// </summary>
         public static ISiloHostBuilder UseRedisGrainDirectoryAsDefault(
             this ISiloHostBuilder builder,
             Action<OptionsBuilder<RedisGrainDirectoryOptions>> configureOptions)
@@ -24,6 +30,9 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(services => services.AddRedisGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureOptions));
         }
 
+        /// <summary>
+        /// Add a Redis data-store as a named Grain Directory
+        /// </summary>
         public static ISiloHostBuilder AddRedisGrainDirectory(
             this ISiloHostBuilder builder,
             string name,
@@ -32,6 +41,9 @@ namespace Orleans.Hosting
             return builder.AddRedisGrainDirectory(name, ob => ob.Configure(configureOptions));
         }
 
+        /// <summary>
+        /// Add a Redis data-store as a named Grain Directory
+        /// </summary>
         public static ISiloHostBuilder AddRedisGrainDirectory(
             this ISiloHostBuilder builder,
             string name,
@@ -40,6 +52,9 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(services => services.AddRedisGrainDirectory(name, configureOptions));
         }
 
+        /// <summary>
+        /// Use a Redis data-store as the default Grain Directory
+        /// </summary>
         public static ISiloBuilder UseRedisGrainDirectoryAsDefault(
             this ISiloBuilder builder,
             Action<RedisGrainDirectoryOptions> configureOptions)
@@ -47,6 +62,9 @@ namespace Orleans.Hosting
             return builder.UseRedisGrainDirectoryAsDefault(ob => ob.Configure(configureOptions));
         }
 
+        /// <summary>
+        /// Use a Redis data-store as the default Grain Directory
+        /// </summary>
         public static ISiloBuilder UseRedisGrainDirectoryAsDefault(
             this ISiloBuilder builder,
             Action<OptionsBuilder<RedisGrainDirectoryOptions>> configureOptions)
@@ -54,6 +72,9 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(services => services.AddRedisGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureOptions));
         }
 
+        /// <summary>
+        /// Add a Redis data-store as a named Grain Directory
+        /// </summary>
         public static ISiloBuilder AddRedisGrainDirectory(
             this ISiloBuilder builder,
             string name,
@@ -62,6 +83,9 @@ namespace Orleans.Hosting
             return builder.AddRedisGrainDirectory(name, ob => ob.Configure(configureOptions));
         }
 
+        /// <summary>
+        /// Add a Redis data-store as a named Grain Directory
+        /// </summary>
         public static ISiloBuilder AddRedisGrainDirectory(
             this ISiloBuilder builder,
             string name,
