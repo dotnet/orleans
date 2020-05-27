@@ -32,7 +32,7 @@ namespace NonSilo.Tests.Directory
             hostBuilder.UseOrleans(siloBuilder =>
             {
                 siloBuilder
-                    .ConfigureServices((ctx, svc) => svc.AddSingletonNamedService(AzureTableDirectoryGrain.DIRECTORY, (sp, nameof) => this.azureDirectory))
+                    .ConfigureServices((ctx, svc) => svc.AddSingletonNamedService(CustomDirectoryGrain.DIRECTORY, (sp, nameof) => this.azureDirectory))
                     .ConfigureServices((ctx, svc) => svc.AddSingletonNamedService("OtherDirectory", (sp, nameof) => this.otherDirectory))
                     .ConfigureServices((ctx, svc) => svc.AddSingletonNamedService("AgainAnotherDirectory", (sp, nameof) => this.againAnotherDirectory))
                     .ConfigureLogging(builder => builder.AddProvider(new XunitLoggerProvider(output)))
@@ -47,7 +47,7 @@ namespace NonSilo.Tests.Directory
         [Fact]
         public void UserProvidedDirectory()
         {
-            var grainId = LegacyGrainId.GetGrainId(AzureTableDirectoryGrain.TYPECODE, Guid.NewGuid());
+            var grainId = LegacyGrainId.GetGrainId(CustomDirectoryGrain.TYPECODE, Guid.NewGuid());
             Assert.Same(this.azureDirectory, this.target.Resolve(grainId.ToGrainId().Type));
         }
 

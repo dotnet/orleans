@@ -8,14 +8,20 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.GrainDirectory.AzureStorage;
 using Orleans.TestingHost.Utils;
+using Tester.Directories;
 using TestExtensions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tester.AzureUtils
 {
     [TestCategory("Azure"), TestCategory("Storage")]
     public class AzureTableGrainDirectoryTests : GrainDirectoryTests<AzureTableGrainDirectory>
     {
+        public AzureTableGrainDirectoryTests(ITestOutputHelper testOutput) : base(testOutput)
+        {
+        }
+
         protected override AzureTableGrainDirectory GetGrainDirectory()
         {
             TestUtils.CheckForAzureStorage();
@@ -80,97 +86,6 @@ namespace Tester.AzureUtils
                     Assert.Null(await this.grainDirectory.Lookup(addresses[i].GrainId));
                 }
             }
-        }
-    }
-
-    // TODO Move that into a common project
-    public abstract class GrainDirectoryTests<T> where T : IGrainDirectory
-    {
-        protected T grainDirectory;
-
-        protected GrainDirectoryTests()
-        {
-            this.grainDirectory = GetGrainDirectory();
-        }
-
-        protected abstract T GetGrainDirectory();
-
-        [SkippableFact]
-        public async Task RegisterLookupUnregisterLookup()
-        {
-            var expected = new GrainAddress
-            {
-                ActivationId = Guid.NewGuid().ToString("N"),
-                GrainId = "user/someraondomuser_" + Guid.NewGuid().ToString("N"),
-                SiloAddress = "10.0.23.12:1000@5678"
-            };
-
-            Assert.Equal(expected, await this.grainDirectory.Register(expected));
-
-            Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
-
-            await this.grainDirectory.Unregister(expected);
-
-            Assert.Null(await this.grainDirectory.Lookup(expected.GrainId));
-        }
-
-        [SkippableFact]
-        public async Task DoNotOverrideEntry()
-        {
-            var expected = new GrainAddress
-            {
-                ActivationId = Guid.NewGuid().ToString("N"),
-                GrainId = "user/someraondomuser_" + Guid.NewGuid().ToString("N"),
-                SiloAddress = "10.0.23.12:1000@5678"
-            };
-
-            var differentActivation = new GrainAddress
-            {
-                ActivationId = Guid.NewGuid().ToString("N"),
-                GrainId = expected.GrainId,
-                SiloAddress = "10.0.23.12:1000@5678"
-            };
-
-            var differentSilo = new GrainAddress
-            {
-                ActivationId = expected.ActivationId,
-                GrainId = expected.GrainId,
-                SiloAddress = "10.0.23.14:1000@4583"
-            };
-
-            Assert.Equal(expected, await this.grainDirectory.Register(expected));
-            Assert.Equal(expected, await this.grainDirectory.Register(differentActivation));
-            Assert.Equal(expected, await this.grainDirectory.Register(differentSilo));
-
-            Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
-        }
-
-        [SkippableFact]
-        public async Task DoNotDeleteDifferentActivationIdEntry()
-        {
-            var expected = new GrainAddress
-            {
-                ActivationId = Guid.NewGuid().ToString("N"),
-                GrainId = "user/someraondomuser_" + Guid.NewGuid().ToString("N"),
-                SiloAddress = "10.0.23.12:1000@5678"
-            };
-
-            var otherEntry = new GrainAddress
-            {
-                ActivationId = Guid.NewGuid().ToString("N"),
-                GrainId = expected.GrainId,
-                SiloAddress = "10.0.23.12:1000@5678"
-            };
-
-            Assert.Equal(expected, await this.grainDirectory.Register(expected));
-            await this.grainDirectory.Unregister(otherEntry);
-            Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
-        }
-
-        [SkippableFact]
-        public async Task LookupNotFound()
-        {
-            Assert.Null(await this.grainDirectory.Lookup("user/someraondomuser_" + Guid.NewGuid().ToString("N")));
         }
     }
 }

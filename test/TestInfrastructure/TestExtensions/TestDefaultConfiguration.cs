@@ -29,6 +29,7 @@ namespace TestExtensions
         public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
+        public static string RedisConnectionString => defaultConfiguration[nameof(RedisConnectionString)];
 
         public static bool GetValue(string key, out string value)
         {
