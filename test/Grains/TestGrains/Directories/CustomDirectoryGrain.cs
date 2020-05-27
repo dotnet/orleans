@@ -7,13 +7,13 @@ using UnitTests.GrainInterfaces.Directories;
 namespace UnitTests.Grains.Directories
 {
     [GrainDirectory(GrainDirectoryName = DIRECTORY), TypeCodeOverride(TYPECODE)]
-    public class AzureTableDirectoryGrain : Grain, IAzureTableDirectoryGrain
+    public class CustomDirectoryGrain : Grain, ICustomDirectoryGrain
     {
         private int counter = 0;
 
         public const int TYPECODE = 1000;
 
-        public const string DIRECTORY = "AzureTable";
+        public const string DIRECTORY = "CustomGrainDirectory";
 
         public Task<int> Ping() => Task.FromResult(++this.counter);
 

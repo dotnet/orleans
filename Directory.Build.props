@@ -114,6 +114,7 @@
     <NSubstituteVersion>4.2.0</NSubstituteVersion>
     <NSubstituteAnalyzersCSharpVersion>1.0.10</NSubstituteAnalyzersCSharpVersion>
     <ZooKeeperNetExVersion>3.4.12.1</ZooKeeperNetExVersion>
+    <StackExchangeRedis>2.0.601</StackExchangeRedis>
 
     <!-- Test related packages -->
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>

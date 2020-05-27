@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans.GrainDirectory.Redis;
 using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.TestingHost;
+using StackExchange.Redis;
 using TestExtensions;
 using UnitTests.GrainInterfaces.Directories;
 using UnitTests.Grains.Directories;
@@ -12,14 +15,15 @@ using Xunit;
 
 namespace Tester.Directories
 {
-    public class MultipleGrainDirectoriesTests : TestClusterPerTest
+    [TestCategory("Azure")]
+    public class AzureMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
     {
         public class SiloConfigurator : ISiloConfigurator
         {
             public void Configure(ISiloBuilder siloBuilder)
             {
                 siloBuilder.AddAzureTableGrainDirectory(
-                    AzureTableDirectoryGrain.DIRECTORY,
+                    CustomDirectoryGrain.DIRECTORY,
                     options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
             }
         }
@@ -28,8 +32,51 @@ namespace Tester.Directories
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.Options.InitialSilosCount = 2;
+            base.ConfigureTestCluster(builder);
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+    }
+
+    [TestCategory("Redis")]
+    public class RedisMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
+    {
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder siloBuilder)
+            {
+                siloBuilder
+                    .AddRedisGrainDirectory(
+                        CustomDirectoryGrain.DIRECTORY,
+                        options =>
+                        {
+                            options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+                            options.EntryExpiry = TimeSpan.FromMinutes(5);
+                        })
+                    .ConfigureLogging(builder => builder.AddFilter(typeof(RedisGrainDirectory).FullName, LogLevel.Debug));
+
+            }
+        }
+
+        protected override void CheckPreconditionsOrThrow()
+        {
+            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
+            {
+                throw new SkipException("TestDefaultConfiguration.RedisConnectionString is empty");
+            }
+        }
+
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            base.ConfigureTestCluster(builder);
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+        }
+    }
+
+    public abstract class MultipleGrainDirectoriesTests : TestClusterPerTest
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.Options.InitialSilosCount = 2;
         }
 
         [SkippableFact, TestCategory("Directory"), TestCategory("Functionals")]
@@ -57,22 +104,22 @@ namespace Tester.Directories
             Assert.Equal(1, await grainOnSecondary.Ping());
         }
 
-        private async Task<IAzureTableDirectoryGrain> GetGrainOnPrimary()
+        private async Task<ICustomDirectoryGrain> GetGrainOnPrimary()
         {
             while (true)
             {
-                var grain = this.GrainFactory.GetGrain<IAzureTableDirectoryGrain>(Guid.NewGuid());
+                var grain = this.GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.Primary.SiloAddress.Endpoint.ToString()))
                     return grain;
             }
         }
 
-        private async Task<IAzureTableDirectoryGrain> GetGrainOnSecondary()
+        private async Task<ICustomDirectoryGrain> GetGrainOnSecondary()
         {
             while (true)
             {
-                var grain = this.GrainFactory.GetGrain<IAzureTableDirectoryGrain>(Guid.NewGuid());
+                var grain = this.GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
                 if (instanceId.Contains(HostedCluster.SecondarySilos[0].SiloAddress.Endpoint.ToString()))
                     return grain;
