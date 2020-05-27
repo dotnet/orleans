@@ -35,7 +35,7 @@ namespace Orleans.GrainDirectory.Redis
             var result = (string) await this.database.StringGetAsync(GetKey(grainId));
 
             if (this.logger.IsEnabled(LogLevel.Debug))
-                this.logger.LogDebug("Lookup {grainId}: {result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
+                this.logger.LogDebug("Lookup {GrainId}: {Result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
 
             if (string.IsNullOrWhiteSpace(result))
                 return default;
@@ -53,7 +53,7 @@ namespace Orleans.GrainDirectory.Redis
                 When.NotExists);
 
             if (this.logger.IsEnabled(LogLevel.Debug))
-                this.logger.LogDebug("Register {grainId} ({address}): {result}", address.GrainId, value, success ? "OK": "Conflict");
+                this.logger.LogDebug("Register {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK": "Conflict");
 
             if (success)
                 return address;
@@ -72,7 +72,7 @@ namespace Orleans.GrainDirectory.Redis
             var success = await tx.ExecuteAsync();
 
             if (this.logger.IsEnabled(LogLevel.Debug))
-                this.logger.LogDebug("Unregister {grainId} ({address}): {result}", address.GrainId, value, success ? "OK" : "Conflict");
+                this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK" : "Conflict");
         }
 
         public Task UnregisterSilos(List<string> siloAddresses)
@@ -114,10 +114,10 @@ namespace Orleans.GrainDirectory.Redis
 
         #region Logging
         private void LogConnectionRestored(object sender, ConnectionFailedEventArgs e)
-            => this.logger.LogInformation(e.Exception, "Connection to {endpoint) failed: {failureType}", e.EndPoint, e.FailureType);
+            => this.logger.LogInformation(e.Exception, "Connection to {EndPoint) failed: {FailureType}", e.EndPoint, e.FailureType);
 
         private void LogConnectionFailed(object sender, ConnectionFailedEventArgs e)
-            => this.logger.LogError(e.Exception, "Connection to {endpoint) failed: {failureType}", e.EndPoint, e.FailureType);
+            => this.logger.LogError(e.Exception, "Connection to {EndPoint) failed: {FailureType}", e.EndPoint, e.FailureType);
 
         private void LogErrorMessage(object sender, RedisErrorEventArgs e)
             => this.logger.LogError(e.Message);
