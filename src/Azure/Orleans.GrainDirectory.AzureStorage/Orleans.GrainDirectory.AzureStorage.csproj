@@ -5,6 +5,7 @@
     <Description>Microsoft Orleans Grain Directory implementation that uses Azure Storage</Description>
     <PackageTags>$(PackageTags) Azure Grain Directory</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">beta1</VersionSuffix>
   </PropertyGroup>
 
   <PropertyGroup>
