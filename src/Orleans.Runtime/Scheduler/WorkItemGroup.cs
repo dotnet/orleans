@@ -108,7 +108,7 @@ namespace Orleans.Runtime.Scheduler
 
         private bool IsShutdown => this.shutdownSinceTimestamp > 0;
 
-        // This is the maximum number of work items to be processed in an activation turn. 
+        // This is the maximum number of work items to be processed in an activation turn.
         // If this is set to zero or a negative number, then the full work queue is drained (MaxTimePerTurn allowing).
         private const int MaxWorkItemsPerTurn = 0; // Unlimited
 
@@ -116,7 +116,7 @@ namespace Orleans.Runtime.Scheduler
         // per ActivationWorker. An attempt to wait when there are already too many threads waiting
         // will result in a TooManyWaitersException being thrown.
         //private static readonly int MaxWaitingThreads = 500;
-        
+
         internal WorkItemGroup(
             OrleansTaskScheduler sched,
             IGrainContext grainContext,
@@ -333,7 +333,7 @@ namespace Orleans.Runtime.Scheduler
 
         public IGrainContext GrainContext { get; }
 
-        // Execute one or more turns for this activation. 
+        // Execute one or more turns for this activation.
         // This method is always called in a single-threaded environment -- that is, no more than one
         // thread will be in this method at once -- but other asynch threads may still be queueing tasks, etc.
         public void Execute()
@@ -357,7 +357,7 @@ namespace Orleans.Runtime.Scheduler
                             this.log.LogWarning(
                                 (int)ErrorCode.SchedulerSkipWorkCancelled,
                                 "Thread {Thread} is exiting work loop due to cancellation token. WorkItemGroup: {WorkItemGroup}, Have {WorkItemCount} work items in the queue",
-                                Thread.CurrentThread.ManagedThreadId.ToString(),
+                                Thread.CurrentThread.ManagedThreadId,
                                 this.ToString(),
                                 this.WorkItemCount);
 
@@ -414,7 +414,7 @@ namespace Orleans.Runtime.Scheduler
                                 this.GrainContext.ToString(),
                                 taskLength.ToString("g"),
                                 OrleansTaskScheduler.TurnWarningLengthThreshold,
-                                Thread.CurrentThread.ManagedThreadId.ToString());
+                                Thread.CurrentThread.ManagedThreadId);
                         }
 
                         CurrentTask = null;
@@ -435,8 +435,8 @@ namespace Orleans.Runtime.Scheduler
             }
             finally
             {
-                // Now we're not Running anymore. 
-                // If we left work items on our run list, we're Runnable, and need to go back on the silo run queue; 
+                // Now we're not Running anymore.
+                // If we left work items on our run list, we're Runnable, and need to go back on the silo run queue;
                 // If our run list is empty, then we're waiting.
                 lock (lockable)
                 {
