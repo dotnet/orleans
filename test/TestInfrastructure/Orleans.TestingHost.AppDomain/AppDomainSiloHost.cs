@@ -19,7 +19,6 @@ namespace Orleans.TestingHost
         {
             var deserializedSources = TestClusterHostFactory.DeserializeConfigurationSources(serializedConfigurationSources);
             this.host = TestClusterHostFactory.CreateSiloHost(appDomainName, deserializedSources);
-            this.AppDomainTestHook = new AppDomainTestHooks(this.host);
         }
 
         /// <summary> SiloAddress for this silo. </summary>
@@ -27,8 +26,6 @@ namespace Orleans.TestingHost
 
         /// <summary> Gateway address for this silo. </summary>
         public SiloAddress GatewayAddress => this.host.Services.GetRequiredService<ILocalSiloDetails>().GatewayAddress;
-
-        internal AppDomainTestHooks AppDomainTestHook { get; }
 
         /// <summary>Starts the silo</summary>
         public void Start() => this.host.StartAsync().GetAwaiter().GetResult();
