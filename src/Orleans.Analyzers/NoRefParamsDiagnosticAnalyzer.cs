@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -9,9 +10,10 @@ namespace Orleans.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class NoRefParamsDiagnosticAnalyzer : DiagnosticAnalyzer
     {
-        private const string DiagnosticId = "ORLEANS0002";
-        private const string Title = "Reference parameter modifiers are not allowed";
-        private const string MessageFormat = Title;
+        private const string BaseInterfaceName = "IGrain";
+        public const string DiagnosticId = "ORLEANS0002";
+        public const string Title = "Reference parameter modifiers are not allowed";
+        public const string MessageFormat = Title;
         public const string Category = "Usage";
 
         private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
@@ -26,14 +28,18 @@ namespace Orleans.Analyzers
 
         private static void AnalyzeSyntax(SyntaxNodeAnalysisContext context)
         {
-            var syntax = (MethodDeclarationSyntax)context.Node;
-            var symbol = context.SemanticModel.GetDeclaredSymbol(syntax);
+            if (!(context.Node is MethodDeclarationSyntax syntax)) return;
 
-            if (symbol.ContainingType.TypeKind == TypeKind.Interface)
-            {
-                // TODO: Check that interface inherits from IGrain
-                return;
-            }
+            var symbol = context.SemanticModel.GetDeclaredSymbol(syntax);
+            var isClassOrInterface = symbol.ContainingType.TypeKind == TypeKind.Interface ||
+                                     symbol.ContainingType.TypeKind == TypeKind.Class;
+
+            if (!isClassOrInterface) return;
+
+            var implementedInterfaces = symbol.ContainingType
+                                              .AllInterfaces
+                                              .Select(interfaceDef => interfaceDef.Name);
+            if (!implementedInterfaces.Contains(BaseInterfaceName)) return;
 
             foreach(var param in symbol.Parameters)
             {
