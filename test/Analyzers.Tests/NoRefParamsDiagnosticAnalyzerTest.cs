@@ -10,7 +10,7 @@ namespace Analyzers.Tests
     public class NoRefParamsDiagnosticAnalyzerTest : DiagnosticAnalyzerTestBase<NoRefParamsDiagnosticAnalyzer>
     {
         [Fact]
-        public async Task NoRefParamsDiagnosticAnalyzer_InterfaceTest()
+        public async Task NoRefParamsDiagnosticAnalyzerInInterface()
         {
             var code = @"public interface I : IGrain
                         {
@@ -30,7 +30,7 @@ namespace Analyzers.Tests
         }
 
         [Fact]
-        public async Task NoRefParamsDiagnosticAnalyzerWithClass()
+        public async Task NoRefParamsDiagnosticAnalyzerInClass()
         {
             var code = @"public interface I : IGrain
                         {
@@ -58,6 +58,25 @@ namespace Analyzers.Tests
             Assert.Equal(NoRefParamsDiagnosticAnalyzer.DiagnosticId, diagnostic.Id);
             Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
             Assert.Equal(NoRefParamsDiagnosticAnalyzer.MessageFormat, diagnostic.GetMessage());
+        }
+
+        [Fact]
+        public async Task NoRefParamsDiagnosticAnalyzerNoError()
+        {
+            var code = @"public interface I : IGrain
+                        {
+                            Task GetSomething(int i);
+                        }
+
+                        public class Imp : I
+                        {
+                            public Task GetSomething(int i) => Task.CompletedTask;
+                        }
+                        ";
+
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+
+            Assert.Empty(diagnostics);
         }
     }
 }
