@@ -10,7 +10,7 @@ namespace Orleans.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class NoRefParamsDiagnosticAnalyzer : DiagnosticAnalyzer
     {
-        private const string BaseInterfaceName = "IGrain";
+        private const string BaseInterfaceName = "IAddressable";
         public const string DiagnosticId = "ORLEANS0002";
         public const string Title = "Reference parameter modifiers are not allowed";
         public const string MessageFormat = Title;
