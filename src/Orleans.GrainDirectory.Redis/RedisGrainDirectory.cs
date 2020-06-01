@@ -44,7 +44,7 @@ namespace Orleans.GrainDirectory.Redis
 
                 return JsonConvert.DeserializeObject<GrainAddress>(result);
             }
-            catch (RedisException ex)
+            catch (Exception ex)
             {
                 this.logger.LogError(ex, "Lookup failed for {GrainId}", grainId);
                 throw new OrleansException($"Lookup failed for {grainId} : {ex.ToString()}");
@@ -71,7 +71,7 @@ namespace Orleans.GrainDirectory.Redis
 
                 return await Lookup(address.GrainId);
             }
-            catch (RedisException ex)
+            catch (Exception ex)
             {
                 this.logger.LogError(ex, "Register failed for {GrainId} ({Address})", address.GrainId, value);
                 throw new OrleansException($"Register failed for {address.GrainId} ({value}) : {ex.ToString()}");
@@ -93,7 +93,7 @@ namespace Orleans.GrainDirectory.Redis
                 if (this.logger.IsEnabled(LogLevel.Debug))
                     this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK" : "Conflict");
             }
-            catch (RedisException ex)
+            catch (Exception ex)
             {
                 this.logger.LogError(ex, "Unregister failed for {GrainId} ({Address})", address.GrainId, value);
                 throw new OrleansException($"Unregister failed for {address.GrainId} ({value}) : {ex.ToString()}");
