@@ -52,7 +52,7 @@ namespace Analyzers.Tests
             var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
 
             Assert.NotEmpty(diagnostics);
-            Assert.Equal(4, diagnostics.Length);
+            Assert.Equal(2, diagnostics.Length);
 
             var diagnostic = diagnostics.First();
             Assert.Equal(NoRefParamsDiagnosticAnalyzer.DiagnosticId, diagnostic.Id);

@@ -32,10 +32,8 @@ namespace Orleans.Analyzers
             if (!(context.Node is MethodDeclarationSyntax syntax)) return;
 
             var symbol = context.SemanticModel.GetDeclaredSymbol(syntax);
-            var isClassOrInterface = symbol.ContainingType.TypeKind == TypeKind.Interface ||
-                                     symbol.ContainingType.TypeKind == TypeKind.Class;
 
-            if (!isClassOrInterface) return;
+            if (symbol.ContainingType.TypeKind != TypeKind.Interface) return;
 
             var implementedInterfaces = symbol.ContainingType
                                               .AllInterfaces
