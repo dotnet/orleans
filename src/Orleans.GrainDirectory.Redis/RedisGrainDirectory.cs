@@ -19,6 +19,7 @@ namespace Orleans.GrainDirectory.Redis
 
         private ConnectionMultiplexer redis;
         private IDatabase database;
+        private LuaScript deleteScript;
 
         public RedisGrainDirectory(
             RedisGrainDirectoryOptions directoryOptions,
@@ -85,13 +86,10 @@ namespace Orleans.GrainDirectory.Redis
 
             try
             {
-                var tx = this.database.CreateTransaction();
-                tx.AddCondition(Condition.StringEqual(key, value));
-                tx.KeyDeleteAsync(key).Ignore();
-                var success = await tx.ExecuteAsync();
+                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = JsonConvert.SerializeObject(address) });
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
-                    this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK" : "Conflict");
+                    this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, value, (result != 0) ? "OK" : "Conflict");
             }
             catch (RedisException ex)
             {
@@ -122,6 +120,16 @@ namespace Orleans.GrainDirectory.Redis
             this.redis.IncludeDetailInExceptions = true;
 
             this.database = this.redis.GetDatabase();
+
+            this.deleteScript = LuaScript.Prepare(
+    @"	
+local cur = redis.call('GET', @key)	
+if cur == @val  then	
+  return redis.call('DEL', @key)	
+else	
+  return 0	
+end	
+                ");
         }
 
         private async Task Uninitialize(CancellationToken arg)
