@@ -84,8 +84,10 @@ namespace Orleans.Providers.Streams.Common
             this.periodicMonitoring?.TryAction(nowUtc);
         }
 
-        /// <inheritdoc />
-        public virtual bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, DateTime nowUtc)
+        /// <summary>
+        /// Given a purge cached message, indicates whether it should be purged from the cache.
+        /// </summary>
+        protected virtual bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, DateTime nowUtc)
         {
             TimeSpan timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
             // age of message relative to the most recent event in the cache.

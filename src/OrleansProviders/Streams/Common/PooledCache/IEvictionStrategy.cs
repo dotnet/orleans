@@ -28,15 +28,6 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="newBlock"></param>
         void OnBlockAllocated(FixedSizeBuffer newBlock);
-
-        /// <summary>
-        /// Given a purge cached message, indicates whether it should be purged from the cache.
-        /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <param name="newestCachedMessage"></param>
-        /// <param name="nowUtc"></param>
-        /// <returns></returns>
-        bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, DateTime nowUtc);
     }
 
     /// <summary>
