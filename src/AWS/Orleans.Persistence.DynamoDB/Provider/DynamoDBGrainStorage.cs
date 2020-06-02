@@ -149,6 +149,7 @@ namespace Orleans.Storage
             if (record != null)
             {
                 var loadedState = ConvertFromStorageFormat(record, grainState.Type);
+                grainState.RecordExists = loadedState != null;
                 grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
                 grainState.ETag = record.ETag.ToString();
             }
@@ -242,6 +243,7 @@ namespace Orleans.Storage
             }
 
             grainState.ETag = newEtag.ToString();
+            grainState.RecordExists = !clear;
         }
 
         /// <summary> Clear / Delete state data function for this storage provider. </summary>

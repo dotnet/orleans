@@ -31,10 +31,9 @@ namespace Orleans.Core
             }
         }
 
-        public string Etag
-        {
-            get { return grainState.ETag; }
-        }
+        public string Etag => grainState.ETag;
+
+        public bool RecordExists => grainState.RecordExists;
 
         public StateStorageBridge(string name, GrainReference grainRef, IGrainStorage store, ILoggerFactory loggerFactory)
         {

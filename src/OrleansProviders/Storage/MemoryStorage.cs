@@ -72,6 +72,7 @@ namespace Orleans.Storage
             {
                 grainState.ETag = state.ETag;
                 grainState.State = state.State;
+                grainState.RecordExists = true;
             }
         }
 
@@ -86,6 +87,7 @@ namespace Orleans.Storage
             try
             {
                 grainState.ETag = await storageGrain.WriteStateAsync(STATE_STORE_NAME, key, grainState);
+                grainState.RecordExists = true;
             }
             catch (MemoryStorageEtagMismatchException e)
             {
@@ -105,6 +107,7 @@ namespace Orleans.Storage
             {
                 await storageGrain.DeleteStateAsync(STATE_STORE_NAME, key, grainState.ETag);
                 grainState.ETag = null;
+                grainState.RecordExists = false;
             }
             catch (MemoryStorageEtagMismatchException e)
             {
@@ -134,7 +137,7 @@ namespace Orleans.Storage
     /// <summary>
     /// Factory for creating MemoryGrainStorage
     /// </summary>
-    public class MemoryGrainStorageFactory
+    public static class MemoryGrainStorageFactory
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
