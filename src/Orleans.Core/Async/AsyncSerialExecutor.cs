@@ -40,7 +40,7 @@ namespace Orleans
         /// <returns></returns>
         public Task<TResult> AddNext(Func<Task<TResult>> func)
         {
-            var resolver = new TaskCompletionSource<TResult>();
+            var resolver = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             actions.Enqueue(new Tuple<TaskCompletionSource<TResult>, Func<Task<TResult>>>(resolver, func));
             Task<TResult> task = resolver.Task;
             ExecuteNext().Ignore();

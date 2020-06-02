@@ -186,7 +186,7 @@ namespace Orleans
                     // but that task does not exist yet, so we use a promise that signals when the next work cycle is launched
                     if (nextWorkCyclePromise == null)
                     {
-                        nextWorkCyclePromise = new TaskCompletionSource<Task>();
+                        nextWorkCyclePromise = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
                     }
 
                     waitfortasktask = nextWorkCyclePromise.Task;
@@ -219,7 +219,7 @@ namespace Orleans
                     moreWork = true;
                     if (nextWorkCyclePromise == null)
                     {
-                        nextWorkCyclePromise = new TaskCompletionSource<Task>();
+                        nextWorkCyclePromise = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
                     }
 
                     waitForTaskTask = nextWorkCyclePromise.Task;
