@@ -97,33 +97,41 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                if (this.siloStatusOracle.IsDeadSilo(msg.TargetSilo))
+                if (this.connectionManager.TryGetConnection(msg.TargetSilo, out var existingConnection))
                 {
+                    existingConnection.Send(msg);
+                    return;
+                }
+                else if (this.siloStatusOracle.IsDeadSilo(msg.TargetSilo))
+                {
+                    // Do not try to establish 
                     this.messagingTrace.OnRejectSendMessageToDeadSilo(this.messageCenter.MyAddress, msg);
                     this.messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead");
                     return;
                 }
-
-                var senderTask = this.connectionManager.GetConnection(msg.TargetSilo);
-                if (senderTask.IsCompletedSuccessfully)
-                {
-                    var sender = senderTask.Result;
-                    sender.Send(msg);
-                }
                 else
                 {
-                    _ = SendAsync(senderTask, msg);
-
-                    async Task SendAsync(ValueTask<Connection> c, Message m)
+                    var senderTask = this.connectionManager.GetConnection(msg.TargetSilo);
+                    if (senderTask.IsCompletedSuccessfully)
                     {
-                        try
+                        var sender = senderTask.Result;
+                        sender.Send(msg);
+                    }
+                    else
+                    {
+                        _ = SendAsync(senderTask, msg);
+
+                        async Task SendAsync(ValueTask<Connection> c, Message m)
                         {
-                            var sender = await c;
-                            sender.Send(m);
-                        }
-                        catch (Exception exception)
-                        {
-                            this.messageCenter.SendRejection(m, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
+                            try
+                            {
+                                var sender = await c;
+                                sender.Send(m);
+                            }
+                            catch (Exception exception)
+                            {
+                                this.messageCenter.SendRejection(m, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
+                            }
                         }
                     }
                 }
