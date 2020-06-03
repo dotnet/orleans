@@ -117,7 +117,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ActivationCollector>();
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
-            services.AddSingleton<DhtGrainLocator>();
+            services.AddSingleton<DhtGrainLocator>(sp => DhtGrainLocator.FromLocalGrainDirectory(sp.GetService<LocalGrainDirectory>()));
             services.AddSingleton<IGrainDirectoryResolver, GrainDirectoryResolver>();
             if (GrainDirectoryResolver.HasAnyRegisteredGrainDirectory(services))
             {

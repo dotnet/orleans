@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -14,12 +15,19 @@ namespace Orleans.Runtime.GrainDirectory
     internal class DhtGrainLocator : IGrainLocator
     {
         private readonly ILocalGrainDirectory localGrainDirectory;
+        private readonly OrleansTaskScheduler taskScheduler;
+        private readonly IGrainContext grainContext;
         private readonly ConcurrentQueue<(TaskCompletionSource<object> tcs, ActivationAddress address, UnregistrationCause cause)> unregistrationQueue = new ConcurrentQueue<(TaskCompletionSource<object> tcs, ActivationAddress address, UnregistrationCause cause)>();
         private int isWorking = 0;
 
-        public DhtGrainLocator(ILocalGrainDirectory localGrainDirectory)
+        public DhtGrainLocator(
+            ILocalGrainDirectory localGrainDirectory,
+            OrleansTaskScheduler taskScheduler,
+            IGrainContext grainContext)
         {
             this.localGrainDirectory = localGrainDirectory;
+            this.taskScheduler = taskScheduler;
+            this.grainContext = grainContext;
         }
 
         public async Task<List<ActivationAddress>> Lookup(GrainId grainId)
@@ -39,13 +47,17 @@ namespace Orleans.Runtime.GrainDirectory
         public async Task<ActivationAddress> Register(ActivationAddress address)
             => (await this.localGrainDirectory.RegisterAsync(address, singleActivation: true)).Address;
 
-        public  Task Unregister(ActivationAddress address, UnregistrationCause cause)
+        public Task Unregister(ActivationAddress address, UnregistrationCause cause)
         {
             var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.unregistrationQueue.Enqueue((tcs, address, cause));
-            UnregisterExecute().Ignore();
+            // Make sure to not run the loop on the Grain Activation context
+            this.taskScheduler.RunOrQueueTask(() => this.UnregisterExecute(), this.grainContext).Ignore();
             return tcs.Task;
         }
+
+        public static DhtGrainLocator FromLocalGrainDirectory(LocalGrainDirectory localGrainDirectory)
+            => new DhtGrainLocator(localGrainDirectory, localGrainDirectory.Scheduler, localGrainDirectory.RemoteGrainDirectory);
 
         private async Task UnregisterExecute()
         {
