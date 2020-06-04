@@ -78,37 +78,39 @@ namespace Orleans.Runtime.MembershipService
                 this.log.LogTrace("Going to send Ping #{ProbeNumber}/{Id} to probe silo {Silo}", diagnosticProbeNumber, id, this.SiloAddress);
             }
 
-            var probeTask = this.PerformProbe(id, diagnosticProbeNumber, cancellation);
-            var resultTask = await Task.WhenAny(this.stopping, probeTask);
-
-            // If the probe finished and the result was valid then return the number of missed probes.
-            if (ReferenceEquals(resultTask, probeTask) && probeTask.GetAwaiter().GetResult()) return this.missedProbes;
-
-            // The probe was superseded or the monitor is being shutdown.
-            return -1;
-        }
-
-        private async Task<bool> PerformProbe(long id, int diagnosticProbeNumber, CancellationToken cancellation)
-        {
+            bool probeResult;
             try
             {
                 var probeCancellation = cancellation.WhenCancelled();
-                var task = await Task.WhenAny(probeCancellation, this.prober.Probe(this.SiloAddress, diagnosticProbeNumber));
+                var probeTask = prober.Probe(SiloAddress, diagnosticProbeNumber);
+                var task = await Task.WhenAny(stopping, probeCancellation, probeTask);
 
-                if (ReferenceEquals(task, probeCancellation))
+                if (ReferenceEquals(task, stopping))
                 {
-                    return this.RecordFailure(id, diagnosticProbeNumber, new OperationCanceledException($"The ping attempt was cancelled. Ping #{diagnosticProbeNumber}/{id}"));
+                    probeTask.Ignore();
+                    probeResult = false;
+                }
+                else if (ReferenceEquals(task, probeCancellation))
+                {
+                    probeTask.Ignore();
+                    probeResult = this.RecordFailure(id, diagnosticProbeNumber, new OperationCanceledException($"The ping attempt was cancelled. Ping #{diagnosticProbeNumber}/{id}"));
                 }
                 else
                 {
-                    await task;
-                    return this.RecordSuccess(id, diagnosticProbeNumber);
+                    await probeTask;
+                    probeResult = this.RecordSuccess(id, diagnosticProbeNumber);
                 }
             }
             catch (Exception exception)
             {
-                return this.RecordFailure(id, diagnosticProbeNumber, exception);
+                probeResult = this.RecordFailure(id, diagnosticProbeNumber, exception);
             }
+
+            // If the probe finished and the result was valid then return the number of missed probes.
+            if (probeResult) return this.missedProbes;
+
+            // The probe was superseded or the monitor is being shutdown.
+            return -1;
         }
 
         private bool RecordSuccess(long id, int diagnosticProbeNumber)
