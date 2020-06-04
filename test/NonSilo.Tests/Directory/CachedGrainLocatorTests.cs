@@ -12,15 +12,18 @@ using Orleans;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Utilities;
 using TestExtensions;
+using UnitTests.SchedulerTests;
+using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace UnitTests.Directory
 {
     [TestCategory("BVT"), TestCategory("Directory")]
-    public class CachedGrainLocatorTests
+    public class CachedGrainLocatorTests : IDisposable
     {
         private readonly LoggerFactory loggerFactory;
         private readonly SiloLifecycleSubject lifecycle;
@@ -29,7 +32,8 @@ namespace UnitTests.Directory
         private readonly IGrainDirectoryResolver grainDirectoryResolver;
         private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly MockClusterMembershipService mockMembershipService;
-
+        private readonly UnitTestSchedulingContext rootContext;
+        private readonly OrleansTaskScheduler taskScheduler;
         private readonly CachedGrainLocator grainLocator;
 
         public CachedGrainLocatorTests(ITestOutputHelper output)
@@ -43,10 +47,12 @@ namespace UnitTests.Directory
             this.grainDirectoryResolver.Directories.Returns(new[] { this.grainDirectory });
             this.localGrainDirectory = Substitute.For<ILocalGrainDirectory>();
             this.mockMembershipService = new MockClusterMembershipService();
+            this.rootContext = new UnitTestSchedulingContext();
+            this.taskScheduler = TestInternalHelper.InitializeSchedulerForTesting(this.rootContext, this.loggerFactory);
 
             this.grainLocator = new CachedGrainLocator(
                 this.grainDirectoryResolver, 
-                new DhtGrainLocator(this.localGrainDirectory),
+                new DhtGrainLocator(this.localGrainDirectory, this.taskScheduler, this.rootContext),
                 this.mockMembershipService.Target);
 
             this.grainLocator.Participate(this.lifecycle);
@@ -275,6 +281,14 @@ namespace UnitTests.Directory
             var maxTimeout = 40_000;
             while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
             Assert.True(maxTimeout > 0);
+        }
+
+        public void Dispose()
+        {
+            if (this.taskScheduler != null)
+            {
+                this.taskScheduler.Stop();
+            }
         }
     }
 }
