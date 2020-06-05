@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Data.Common;
 using System.IO;
 using System.Threading;
@@ -186,7 +186,7 @@ namespace Orleans.Tests.SqlUtils
 
             if(cancellationToken.IsCancellationRequested)
             {
-                var tcs = new TaskCompletionSource<int>();
+                var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
                 tcs.SetCanceled();
                 return tcs.Task;
             }
@@ -203,7 +203,7 @@ namespace Orleans.Tests.SqlUtils
             catch(Exception e)
             {
                 //Due to call to Read, this is for sure a IOException and can be thrown out.
-                var tcs = new TaskCompletionSource<int>();
+                var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
                 tcs.SetException(e);
 
                 return tcs.Task;

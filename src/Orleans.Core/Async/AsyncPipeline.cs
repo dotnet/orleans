@@ -161,7 +161,7 @@ namespace Orleans.Runtime
                     }
 
                     full = true;
-                    tcs = new TaskCompletionSource<bool>();
+                    tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
                     waiting.AddLast(Tuple.Create(task, tcs));
                 }
                 tcs.Task.Wait();
