@@ -72,6 +72,7 @@ namespace Orleans.Messaging
         private readonly IClusterConnectionStatusListener connectionStatusListener;
         private readonly ConnectionManager connectionManager;
         private StatisticsLevel statisticsLevel;
+        private Dictionary<SiloAddress, DateTime> maskedGateways = new Dictionary<SiloAddress, DateTime>();
 
         public ClientMessageCenter(
             IOptions<ClientMessagingOptions> clientMessagingOptions,
@@ -269,7 +270,10 @@ namespace Orleans.Messaging
             // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
             WeakReference<Connection> weakRef = grainBuckets[index];
 
-            if (weakRef != null && weakRef.TryGetTarget(out var existingConnection) && existingConnection.IsValid)
+            if (weakRef != null
+                && weakRef.TryGetTarget(out var existingConnection)
+                && existingConnection.IsValid
+                && gatewayManager.GetLiveGateways().Contains(msg.TargetSilo))
             {
                 return new ValueTask<Connection>(existingConnection);
             }
@@ -392,6 +396,11 @@ namespace Orleans.Messaging
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 OnReceivedMessage(error);
             }
+        }
+
+        public void StopSendingMessageTo(SiloAddress gateway)
+        {
+            this.gatewayManager.MarkAsUnavailableForSend(gateway);
         }
 
         public int SendQueueLength

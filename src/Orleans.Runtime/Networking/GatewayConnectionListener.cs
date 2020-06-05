@@ -3,6 +3,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -15,6 +16,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly MessageCenter messageCenter;
         private readonly ConnectionCommon connectionShared;
+        private readonly ILogger<GatewayConnectionListener> logger;
         private readonly EndpointOptions endpointOptions;
         private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly OverloadDetector overloadDetector;
@@ -29,7 +31,8 @@ namespace Orleans.Runtime.Messaging
             IOptions<EndpointOptions> endpointOptions,
             MessageCenter messageCenter,
             ConnectionManager connectionManager,
-            ConnectionCommon connectionShared)
+            ConnectionCommon connectionShared,
+            ILogger<GatewayConnectionListener> logger)
             : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
@@ -38,6 +41,7 @@ namespace Orleans.Runtime.Messaging
             this.localSiloDetails = localSiloDetails;
             this.messageCenter = messageCenter;
             this.connectionShared = connectionShared;
+            this.logger = logger;
             this.endpointOptions = endpointOptions.Value;
         }
 
@@ -45,6 +49,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override Connection CreateConnection(ConnectionContext context)
         {
+            this.logger.LogInformation("Creating client connection from {RemoteEndPoint}", context.RemoteEndPoint);
             return new GatewayInboundConnection(
                 context,
                 this.ConnectionDelegate,
@@ -68,7 +73,7 @@ namespace Orleans.Runtime.Messaging
             if (this.Endpoint is null) return;
 
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.RuntimeInitialize-1, this.OnRuntimeInitializeStart, this.OnRuntimeInitializeStop);
-            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, this.OnActive, _ => Task.CompletedTask);
+            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, this.OnActive, this.OnActiveStop);
         }
 
         private async Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
@@ -85,6 +90,26 @@ namespace Orleans.Runtime.Messaging
         {
             // Start accepting connections
             await Task.Run(() => this.Start());
+        }
+
+        private async Task OnActiveStop(CancellationToken cancellationToken)
+        {
+            await Task.Run(() => this.SendDisconnectionRequest());
+        }
+
+        private async Task SendDisconnectionRequest()
+        {
+            var msg = new Message
+            {
+                SendingSilo = this.localSiloDetails.GatewayAddress,
+                CloseRequested = true
+            };
+            foreach (var conn in this.connections)
+            {
+                this.logger.LogInformation("Notify {RemoteEndPoint} that we are shutting down", conn.Key.RemoteEndPoint);
+                conn.Key.Send(msg);
+            }
+            await Task.Delay(TimeSpan.FromSeconds(5));
         }
     }
 }

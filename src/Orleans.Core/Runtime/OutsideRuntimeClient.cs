@@ -256,6 +256,13 @@ namespace Orleans
 
         private void HandleMessage(Message message)
         {
+            if (message.CloseRequested)
+            {
+                this.logger.LogInformation("Gateway {Gateway} request us to stop sending message to it", message.SendingSilo);
+                this.MessageCenter.StopSendingMessageTo(message.SendingSilo);
+                return;
+            }
+
             switch (message.Direction)
             {
                 case Message.Directions.Response:

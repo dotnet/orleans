@@ -124,6 +124,12 @@ namespace Orleans.Runtime
             set { Headers.IsTransactionRequired = value; }
         }
 
+        public bool CloseRequested
+        {
+            get { return Headers.CloseRequested; }
+            set { Headers.CloseRequested = value; }
+        }
+
         public CorrelationId Id
         {
             get { return Headers.Id; }
@@ -538,7 +544,7 @@ namespace Orleans.Runtime
                 CACHE_INVALIDATION_HEADER = 1 << 1,
                 CATEGORY = 1 << 2,
                 CORRELATION_ID = 1 << 3,
-                DEBUG_CONTEXT = 1 << 4, // No longer used
+                CLOSE_REQUESTED = 1 << 4, 
                 DIRECTION = 1 << 5,
                 TIME_TO_LIVE = 1 << 6,
                 FORWARD_COUNT = 1 << 7,
@@ -602,6 +608,7 @@ namespace Orleans.Runtime
             private CorrelationId _callChainId;
             private readonly DateTime _localCreationTime;
             private TraceContext traceContext;
+            private bool _closeRequested;
 
             public HeadersContainer()
             {
@@ -867,6 +874,15 @@ namespace Orleans.Runtime
                 }
             }
 
+            public bool CloseRequested
+            {
+                get { return _closeRequested; }
+                set
+                {
+                    _closeRequested = value;
+                }
+            }
+
             internal Headers GetHeadersMask()
             {
                 Headers headers = Headers.NONE;
@@ -907,6 +923,7 @@ namespace Orleans.Runtime
                 headers = traceContext == null? headers & ~Headers.TRACE_CONTEXT : headers | Headers.TRACE_CONTEXT;
                 headers = IsTransactionRequired ? headers | Headers.IS_TRANSACTION_REQUIRED : headers & ~Headers.IS_TRANSACTION_REQUIRED;
                 headers = _transactionInfo == null ? headers & ~Headers.TRANSACTION_INFO : headers | Headers.TRANSACTION_INFO;
+                headers = _closeRequested ? headers | Headers.CLOSE_REQUESTED : headers & ~Headers.CLOSE_REQUESTED;
                 return headers;
             }
 
@@ -1065,8 +1082,7 @@ namespace Orleans.Runtime
                 if ((headers & Headers.CATEGORY) != Headers.NONE)
                     result.Category = (Categories)reader.ReadByte();
 
-                if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
-                    _ = reader.ReadString();
+                result.CloseRequested = (headers & Headers.CLOSE_REQUESTED) != Headers.NONE;
 
                 if ((headers & Headers.DIRECTION) != Headers.NONE)
                     result.Direction = (Message.Directions)reader.ReadByte();

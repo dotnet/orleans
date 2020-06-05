@@ -24,6 +24,7 @@ namespace Orleans.Messaging
         private readonly object lockable = new object();
         private readonly SafeRandom rand = new SafeRandom();
         private readonly Dictionary<SiloAddress, DateTime> knownDead = new Dictionary<SiloAddress, DateTime>();
+        private readonly Dictionary<SiloAddress, DateTime> knownMasked = new Dictionary<SiloAddress, DateTime>();
         private readonly IGatewayListProvider gatewayListProvider;
         private readonly ILogger logger;
         private readonly ConnectionManager connectionManager;
@@ -107,6 +108,18 @@ namespace Orleans.Messaging
             lock (lockable)
             {
                 knownDead[gateway] = DateTime.UtcNow;
+                var copy = new List<SiloAddress>(cachedLiveGateways);
+                copy.Remove(gateway);
+                // swap the reference, don't mutate cachedLiveGateways, so we can access cachedLiveGateways without the lock.
+                cachedLiveGateways = copy;
+            }
+        }
+
+        public void MarkAsUnavailableForSend(SiloAddress gateway)
+        {
+            lock (lockable)
+            {
+                knownMasked[gateway] = DateTime.UtcNow;
                 var copy = new List<SiloAddress>(cachedLiveGateways);
                 copy.Remove(gateway);
                 // swap the reference, don't mutate cachedLiveGateways, so we can access cachedLiveGateways without the lock.
@@ -250,7 +263,7 @@ namespace Orleans.Messaging
         // This function is called asynchronously from gateway refresh timer.
         private void UpdateLiveGatewaysSnapshot(IEnumerable<SiloAddress> refreshedGateways, TimeSpan maxStaleness)
         {
-            // this is a short lock, protecting the access to knownDead and cachedLiveGateways.
+            // this is a short lock, protecting the access to knownDead, knownMasked and cachedLiveGateways.
             lock (lockable)
             {
                 // now take whatever listProvider gave us and exclude those we think are dead.
@@ -278,6 +291,18 @@ namespace Orleans.Messaging
                         {
                             // Remove stale entries.
                             knownDead.Remove(address);
+                        }
+                    }
+                    if (knownMasked.TryGetValue(address, out var maskedAt))
+                    {
+                        if (now.Subtract(maskedAt) < maxStaleness)
+                        {
+                            isDead = true;
+                        }
+                        else
+                        {
+                            // Remove stale entries.
+                            knownMasked.Remove(address);
                         }
                     }
 
@@ -312,7 +337,12 @@ namespace Orleans.Messaging
                             prevRefresh);
                 }
 
-                this.CloseEvictedGatewayConnections(live);
+                // Close connections to known dead connections, but keep the "masked" ones.
+                // Client will not send any new request to the "masked" connections, but might still
+                // receive responses
+                var connectionsToKeepAlive = new List<SiloAddress>(live);
+                connectionsToKeepAlive.AddRange(knownMasked.Select(e => e.Key));
+                this.CloseEvictedGatewayConnections(connectionsToKeepAlive);
             }
         }
 
