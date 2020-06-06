@@ -14,7 +14,7 @@ using Xunit;
 namespace Tester.AzureUtils
 {
     [TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
-    public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTests>, IDisposable
+    public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTests>, IAsyncLifetime
     {
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -28,12 +28,13 @@ namespace Tester.AzureUtils
             this.loggerFactory = loggerFactory;
         }
 
-        public void Dispose()
-        {
-            AzureQueueDataManager manager = GetTableManager(queueName).Result;
-            manager.DeleteQueue().Wait();
-        }
+        public Task InitializeAsync() => Task.CompletedTask;
 
+        public async Task DisposeAsync()
+        {
+            AzureQueueDataManager manager = await GetTableManager(queueName);
+            await manager.DeleteQueue();
+        }
 
         private async Task<AzureQueueDataManager> GetTableManager(string qName, TimeSpan? visibilityTimeout = null)
         {

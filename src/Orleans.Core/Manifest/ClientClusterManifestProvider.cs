@@ -14,7 +14,7 @@ using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime
 {
-    internal class ClientClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable
+    internal class ClientClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable
     {
         private readonly TaskCompletionSource<bool> _initialized = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ILogger<ClientClusterManifestProvider> _logger;
@@ -72,7 +72,7 @@ namespace Orleans.Runtime
                     {
                         var provider = grainFactory.GetGrain<IClusterManifestSystemTarget>(SystemTargetGrainId.Create(Constants.ManifestProviderType, gateway).GrainId);
                         var refreshTask = provider.GetClusterManifest().AsTask();
-                        var task = await Task.WhenAny(cancellationTask, refreshTask);
+                        var task = await Task.WhenAny(cancellationTask, refreshTask).ConfigureAwait(false);
 
                         if (ReferenceEquals(task, cancellationTask))
                         {
@@ -92,7 +92,7 @@ namespace Orleans.Runtime
                             _logger.LogDebug("Refreshed cluster manifest");
                         }
 
-                        await Task.Delay(_typeManagementOptions.TypeMapRefreshInterval);
+                        await Task.WhenAny(cancellationTask, Task.Delay(_typeManagementOptions.TypeMapRefreshInterval));
                     }
                     catch (Exception exception)
                     {
@@ -116,6 +116,11 @@ namespace Orleans.Runtime
         {
             _cancellation.Cancel();
             return _runTask is Task task ? new ValueTask(task) : default;
+        }
+
+        public void Dispose()
+        {
+            _cancellation.Cancel();
         }
     }
 }

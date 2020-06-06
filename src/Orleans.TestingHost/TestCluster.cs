@@ -26,9 +26,8 @@ namespace Orleans.TestingHost
     /// Make sure that your test project references your test grains and test grain interfaces 
     /// projects, and has CopyLocal=True set on those references [which should be the default].
     /// </remarks>
-    public class TestCluster : IDisposable
+    public class TestCluster : IDisposable, IAsyncDisposable
     {
-        private readonly object _lockObj = new object();
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
         private readonly TestClusterOptions options;
         private readonly StringBuilder log = new StringBuilder();
@@ -388,20 +387,25 @@ namespace Orleans.TestingHost
 
         private async Task StopClusterClientAsync()
         {
+            var client = this.InternalClient;
             try
             {
-                if (InternalClient != null)
+                if (client != null)
                 {
-                    await this.InternalClient.Close();
+                    await client.Close().ConfigureAwait(false);
                 }                
             }
             catch (Exception exc)
             {
-                WriteLog("Exception Uninitializing grain client: {0}", exc);
+                WriteLog("Exception stopping client: {0}", exc);
             }
             finally
             {
-                this.InternalClient?.Dispose();
+                if (client is object)
+                {
+                    await client.DisposeAsync().ConfigureAwait(false);
+                }
+
                 this.InternalClient = null;
             }
         }
@@ -616,11 +620,12 @@ namespace Orleans.TestingHost
         {
             try
             {
-                await instance.StopSiloAsync(stopGracefully);
-                instance.Dispose();
+                await instance.StopSiloAsync(stopGracefully).ConfigureAwait(false);
             }
             finally
             {
+                await instance.DisposeAsync().ConfigureAwait(false);
+
                 Interlocked.Decrement(ref this.startedInstances);
             }
         }
@@ -646,6 +651,39 @@ namespace Orleans.TestingHost
             Console.WriteLine(GetLog());
         }
 
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            await Task.Run(async () =>
+            {
+                foreach (var handle in this.SecondarySilos)
+                {
+                    await handle.DisposeAsync().ConfigureAwait(false);
+                }
+
+                if (this.Primary is object)
+                {
+                    await this.Primary.DisposeAsync().ConfigureAwait(false);
+                }
+
+                if (this.Client is object)
+                {
+                    await this.Client.DisposeAsync().ConfigureAwait(false);
+                }
+
+                if (this.PortAllocator is object)
+                {
+                    this.PortAllocator.Dispose();
+                }
+            });
+
+            _disposed = true;
+        }
+
         public void Dispose()
         {
             if (_disposed)
@@ -653,28 +691,20 @@ namespace Orleans.TestingHost
                 return;
             }
 
-            lock (_lockObj)
+            foreach (var handle in this.SecondarySilos)
             {
-                if (_disposed)
-                {
-                    return;
-                }
-
-                foreach (var handle in this.SecondarySilos)
-                {
-                    handle.Dispose();
-                }
-
-                this.Primary?.Dispose();
-                this.Client?.Dispose();
-
-                if (this.PortAllocator is object)
-                {
-                    this.PortAllocator.Dispose();
-                }
-
-                _disposed = true;
+                handle.Dispose();
             }
+
+            this.Primary?.Dispose();
+            this.Client?.Dispose();
+
+            if (this.PortAllocator is object)
+            {
+                this.PortAllocator.Dispose();
+            }
+
+            _disposed = true;
         }
     }
 }

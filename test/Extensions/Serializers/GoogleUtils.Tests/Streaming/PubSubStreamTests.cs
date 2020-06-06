@@ -63,8 +63,9 @@ namespace GoogleUtils.Tests.Streaming
             }
         }
 
-        public PubSubStreamTests()
+        public override async Task InitializeAsync()
         {
+            await base.InitializeAsync();
             runner = new SingleStreamTestRunner(InternalClient, PUBSUB_STREAM_PROVIDER_NAME);
         }
 

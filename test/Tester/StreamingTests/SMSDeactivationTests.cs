@@ -17,10 +17,12 @@ namespace UnitTests.StreamingTests
     {
         private const string SMSStreamProviderName = "SMSProvider";
         private const string StreamNamespace = "SMSDeactivationTestsNamespace";
-        private readonly DeactivationTestRunner runner;
+        private DeactivationTestRunner runner;
         public static readonly TimeSpan CollectionAge = GrainCollectionOptions.DEFAULT_COLLECTION_QUANTUM + TimeSpan.FromSeconds(1);
-        public SMSDeactivationTests()
+
+        public override async Task InitializeAsync()
         {
+            await base.InitializeAsync();
             runner = new DeactivationTestRunner(SMSStreamProviderName, this.Client);
         }
 

@@ -443,17 +443,10 @@ namespace Orleans
             Utils.SafeExecute(() => this.callbackTimer?.Dispose());
             
             Utils.SafeExecute(() => MessageCenter?.Dispose());
-            if (ClientStatistics != null)
-            {
-                Utils.SafeExecute(() => ClientStatistics.Dispose());
-            }
 
-            Utils.SafeExecute(() => (this.ServiceProvider as IDisposable)?.Dispose());
+            this.ClusterConnectionLost = null;
+            this.GatewayCountChanged = null;
 
-            Utils.SafeExecute(() => this.ClusterConnectionLost = null);
-            Utils.SafeExecute(() => this.GatewayCountChanged = null);
-
-            this.ServiceProvider = null;
             GC.SuppressFinalize(this);
         }
 

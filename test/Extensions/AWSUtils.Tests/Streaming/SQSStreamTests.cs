@@ -79,16 +79,20 @@ namespace AWSUtils.Tests.Streaming
             }
         }
         
-        public SQSStreamTests()
+        public override async Task InitializeAsync()
         {
+            await base.InitializeAsync();
             runner = new SingleStreamTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME);
         }
 
-        public override void Dispose()
+        public override async Task DisposeAsync()
         {
             var clusterId = HostedCluster.Options.ClusterId;
-            base.Dispose();
-            SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, clusterId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
+            await base.DisposeAsync();
+            if (!string.IsNullOrWhiteSpace(AWSTestConstants.DefaultSQSConnectionString))
+            {
+                SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, clusterId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
+            }
         }
 
         ////------------------------ One to One ----------------------//
