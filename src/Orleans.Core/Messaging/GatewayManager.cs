@@ -31,6 +31,7 @@ namespace Orleans.Messaging
         private readonly GatewayOptions gatewayOptions;
         private AsyncTaskSafeTimer gatewayRefreshTimer;
         private List<SiloAddress> cachedLiveGateways;
+        private HashSet<SiloAddress> cachedLiveGatewaysSet;
         private List<SiloAddress> knownGateways;
         private DateTime lastRefreshTime;
         private int roundRobinCounter;
@@ -84,6 +85,7 @@ namespace Orleans.Messaging
 
             this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : this.rand.Next(knownGateways.Count);
             this.knownGateways = this.cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
+            this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
             this.lastRefreshTime = DateTime.UtcNow;
         }
 
@@ -112,6 +114,7 @@ namespace Orleans.Messaging
                 copy.Remove(gateway);
                 // swap the reference, don't mutate cachedLiveGateways, so we can access cachedLiveGateways without the lock.
                 cachedLiveGateways = copy;
+                cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
             }
         }
 
@@ -124,6 +127,7 @@ namespace Orleans.Messaging
                 copy.Remove(gateway);
                 // swap the reference, don't mutate cachedLiveGateways, so we can access cachedLiveGateways without the lock.
                 cachedLiveGateways = copy;
+                cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
             }
         }
 
@@ -191,12 +195,18 @@ namespace Orleans.Messaging
                             this.logger.LogWarning("All known gateways have been marked dead locally. Expediting gateway refresh and resetting all gateways to live status.");
 
                             cachedLiveGateways = knownGateways;
+                            cachedLiveGatewaysSet = new HashSet<SiloAddress>(knownGateways);
                         }
                     }
                 }
             }
 
             return cachedLiveGateways;
+        }
+
+        public bool IsGatewayAvailable(SiloAddress siloAddress)
+        {
+            return cachedLiveGatewaysSet.Contains(siloAddress);
         }
 
         internal void ExpediteUpdateLiveGatewaysSnapshot()
@@ -323,6 +333,7 @@ namespace Orleans.Messaging
 
                 // swap cachedLiveGateways pointer in one atomic operation
                 cachedLiveGateways = live;
+                cachedLiveGatewaysSet = new HashSet<SiloAddress>(live);
 
                 DateTime prevRefresh = lastRefreshTime;
                 lastRefreshTime = now;
