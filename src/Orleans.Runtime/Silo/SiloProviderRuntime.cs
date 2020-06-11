@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Providers
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activationDirectory;
         private readonly IConsistentRingProvider consistentRingProvider;
-        private readonly ISiloRuntimeClient runtimeClient;
+        private readonly InsideRuntimeClient runtimeClient;
         private readonly IStreamPubSub grainBasedPubSub;
         private readonly IStreamPubSub implictPubSub;
         private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Providers
 
         public SiloProviderRuntime(
             IConsistentRingProvider consistentRingProvider,
-            ISiloRuntimeClient runtimeClient,
+            InsideRuntimeClient runtimeClient,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
             OrleansTaskScheduler scheduler,
             ActivationDirectory activationDirectory,

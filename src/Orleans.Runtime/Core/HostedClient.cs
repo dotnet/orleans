@@ -156,18 +156,24 @@ namespace Orleans.Runtime
                 return true;
             }
 
-            if (message.Direction == Message.Directions.Response)
+            this.ReceiveMessage(message);
+            return true;
+        }
+
+        public void ReceiveMessage(object message)
+        {
+            var msg = (Message)message;
+
+            if (msg.Direction == Message.Directions.Response)
             {
                 // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
-                this.runtimeClient.ReceiveResponse(message);
+                this.runtimeClient.ReceiveResponse(msg);
             }
             else
             {
                 // Requests against client objects are scheduled for execution on the client.
-                this.incomingMessages.Writer.TryWrite(message);
+                this.incomingMessages.Writer.TryWrite(msg);
             }
-
-            return true;
         }
 
         /// <inheritdoc />

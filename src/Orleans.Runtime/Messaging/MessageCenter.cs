@@ -21,7 +21,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionManager senderManager;
         private readonly MessagingTrace messagingTrace;
         private SiloMessagingOptions messagingOptions;
-        private IncomingMessageHandler messageHandler;
+        private Dispatcher dispatcher;
 
         internal bool IsBlockingApplicationMessages { get; private set; }
 
@@ -43,7 +43,6 @@ namespace Orleans.Runtime.Messaging
             MessageFactory messageFactory,
             Factory<MessageCenter, Gateway> gatewayFactory,
             ILoggerFactory loggerFactory,
-            IOptions<StatisticsOptions> statisticsOptions,
             ISiloStatusOracle siloStatusOracle,
             ConnectionManager senderManager,
             MessagingTrace messagingTrace)
@@ -135,7 +134,7 @@ namespace Orleans.Runtime.Messaging
 
         public void OnReceivedMessage(Message message)
         {
-            var handler = this.messageHandler;
+            var handler = this.dispatcher;
             if (handler is null)
             {
                 ThrowNullMessageHandler();
@@ -218,16 +217,14 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void RegisterLocalMessageHandler(IncomingMessageHandler handler)
+        public void SetDispatcher(Dispatcher dispatcher)
         {
-            this.messageHandler = handler;
+            this.dispatcher = dispatcher;
         }
 
         public void Dispose()
         {
             OutboundQueue?.Dispose();
-
-            GC.SuppressFinalize(this);
         }
 
         public int SendQueueLength { get { return OutboundQueue.GetCount(); } }

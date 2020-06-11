@@ -1,31 +1,32 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Scheduler
 {
     internal class InvokeWorkItem : WorkItemBase
     {
-        private readonly ILogger logger;
         private readonly ActivationData activation;
         private readonly Message message;
-        private readonly Dispatcher dispatcher;
+        private readonly InsideRuntimeClient runtimeClient;
+        private readonly ActivationMessageScheduler messsageScheduler;
 
-        public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher, ILogger logger)
+        public InvokeWorkItem(ActivationData activation, Message message, InsideRuntimeClient runtimeClient, ActivationMessageScheduler messageScheduler)
         {
-            this.logger = logger;
             if (activation?.GrainInstance == null)
             {
-                var str = string.Format("Creating InvokeWorkItem with bad activation: {0}. Message: {1}", activation, message);
-                logger.Warn(ErrorCode.SchedulerNullActivation, str);
-                throw new ArgumentException(str);
+                ThrowMissingActivation(activation, message);
             }
 
             this.activation = activation;
             this.message = message;
-            this.dispatcher = dispatcher;
+            this.runtimeClient = runtimeClient;
+            this.messsageScheduler = messageScheduler;
             activation.IncrementInFlightCount();
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowMissingActivation(ActivationData activation, Message message) => throw new ArgumentException($"Creating InvokeWorkItem with bad activation: {activation}. Message: {message}");
 
         public override WorkItemType ItemType
         {
@@ -44,8 +45,7 @@ namespace Orleans.Runtime.Scheduler
             try
             {
                 RuntimeContext.SetExecutionContext(this.activation);
-                var runtimeClient = this.dispatcher.RuntimeClient;
-                Task task = runtimeClient.Invoke(this.activation, this.message);
+                Task task = this.runtimeClient.Invoke(this.activation, this.message);
 
                 // Note: This runs for all outcomes of resultPromiseTask - both Success or Fault
                 if (task.IsCompleted)
@@ -57,10 +57,8 @@ namespace Orleans.Runtime.Scheduler
                     task.ContinueWith(t => OnComplete()).Ignore();
                 }
             }
-            catch (Exception exc)
+            catch
             {
-                logger.Warn(ErrorCode.InvokeWorkItem_UnhandledExceptionInInvoke, 
-                    String.Format("Exception trying to invoke request {0} on activation {1}.", message, activation), exc);
                 OnComplete();
             }
             finally
@@ -72,7 +70,7 @@ namespace Orleans.Runtime.Scheduler
         private void OnComplete()
         {
             activation.DecrementInFlightCount();
-            this.dispatcher.OnActivationCompletedRequest(activation, message);
+            this.messsageScheduler.OnActivationCompletedRequest(activation, message);
         }
 
         public override string ToString()

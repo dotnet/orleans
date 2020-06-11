@@ -26,9 +26,12 @@ namespace Orleans.Runtime
 
         GrainId ISystemTargetBase.GrainId => id.GrainId;
         internal ActivationId ActivationId { get; set; }
-        private ISiloRuntimeClient runtimeClient;
+        private InsideRuntimeClient runtimeClient;
+        private RuntimeMessagingTrace messagingTrace;
         private readonly ILogger timerLogger;
-        internal ISiloRuntimeClient RuntimeClient
+        private readonly ILogger logger;
+
+        internal InsideRuntimeClient RuntimeClient
         {
             get
             {
@@ -51,6 +54,7 @@ namespace Orleans.Runtime
         ActivationId IGrainContext.ActivationId => this.ActivationId;
 
         ActivationAddress IGrainContext.Address => this.ActivationAddress;
+        private RuntimeMessagingTrace MessagingTrace => this.messagingTrace ??= this.RuntimeClient.ServiceProvider.GetRequiredService<RuntimeMessagingTrace>();
         
         /// <summary>Only needed to make Reflection happy.</summary>
         protected SystemTarget()
@@ -75,6 +79,7 @@ namespace Orleans.Runtime
             this.IsLowPriority = lowPriority;
             this.ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
+            this.logger = loggerFactory.CreateLogger(this.GetType());
         }
 
         public bool IsLowPriority { get; }
@@ -215,5 +220,34 @@ namespace Orleans.Runtime
             this.SetComponent<TExtensionInterface>(typedResult);
             return typedResult;
         }
+
+        public void ReceiveMessage(object message)
+        {
+            var msg = (Message)message;
+            switch (msg.Direction)
+            {
+                case Message.Directions.Request:
+                    {
+                        this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
+                        var workItem = new RequestWorkItem(this, msg);
+                        Task task = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
+                        task.Start(this.WorkItemGroup.TaskScheduler);
+                        break;
+                    }
+
+                case Message.Directions.Response:
+                    {
+                        this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
+                        var workItem = new ResponseWorkItem(this, msg);
+                        Task task = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
+                        task.Start(this.WorkItemGroup.TaskScheduler);
+                        break;
+                    }
+
+                default:
+                    this.logger.LogError((int)ErrorCode.Runtime_Error_100097, "Invalid message: {Message}", msg);
+                    break;
+            }
+        } 
     }
 }

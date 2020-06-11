@@ -62,7 +62,7 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     internal class StreamLifecycleConsumerInternalGrain : StreamLifecycleConsumerGrain, IStreamLifecycleConsumerInternalGrain
     {
-        public StreamLifecycleConsumerInternalGrain(ILoggerFactory loggerFactory, ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime)
+        public StreamLifecycleConsumerInternalGrain(ILoggerFactory loggerFactory, InsideRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime)
             : base(runtimeClient, streamProviderRuntime, loggerFactory)
         {
         }

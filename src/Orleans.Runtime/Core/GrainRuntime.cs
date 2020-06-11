@@ -5,14 +5,12 @@ using Orleans.Configuration;
 using Orleans.Core;
 using Orleans.Timers;
 using Orleans.Storage;
-using Orleans.Runtime.Scheduler;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime
 {
     internal class GrainRuntime : IGrainRuntime
     {
-        private readonly ISiloRuntimeClient runtimeClient;
+        private readonly InsideRuntimeClient runtimeClient;
         private readonly ILoggerFactory loggerFactory;
         private readonly IServiceProvider serviceProvider;
         private readonly IReminderRegistry reminderRegistry;
@@ -26,7 +24,7 @@ namespace Orleans.Runtime
             ITimerRegistry timerRegistry,
             IReminderRegistry reminderRegistry,
             IServiceProvider serviceProvider,
-            ISiloRuntimeClient runtimeClient,
+            InsideRuntimeClient runtimeClient,
             ILoggerFactory loggerFactory)
         {
             this.runtimeClient = runtimeClient;

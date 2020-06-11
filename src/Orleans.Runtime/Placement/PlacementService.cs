@@ -29,22 +29,23 @@ namespace Orleans.Runtime.Placement
             var director = _directorResolver.GetPlacementDirector(strategy);
             var selector = director as IActivationSelector ?? _defaultActivationSelector;
 
-            if (selector.TrySelectActivationSynchronously(strategy, target.GrainIdentity, placementRuntime, out var placementResult))
+            var selectActivationTask = selector.OnSelectActivation(strategy, target.GrainIdentity, placementRuntime);
+            if (selectActivationTask.IsCompletedSuccessfully && selectActivationTask.Result is object)
             {
-                return new ValueTask<PlacementResult>(placementResult);
+                return selectActivationTask;
             }
 
-            return GetOrPlaceActivationAsync(target, strategy, placementRuntime, selector, director);
+            return GetOrPlaceActivationAsync(selectActivationTask, target, strategy, placementRuntime, director);
         }
 
         private async ValueTask<PlacementResult> GetOrPlaceActivationAsync(
+            ValueTask<PlacementResult> selectActivationTask,
             PlacementTarget target,
             PlacementStrategy strategy,
             IPlacementRuntime placementRuntime,
-            IActivationSelector selector,
             IPlacementDirector director)
         {
-            var placementResult = await selector.OnSelectActivation(strategy, target.GrainIdentity, placementRuntime);
+            var placementResult = await selectActivationTask;
             if (placementResult is object)
             {
                 return placementResult;

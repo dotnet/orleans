@@ -13,7 +13,6 @@ namespace Orleans.Runtime.Services
     /// <typeparam name="TGrainService"></typeparam>
     public abstract class GrainServiceClient<TGrainService> : IGrainServiceClient<TGrainService> where TGrainService : IGrainService
     {
-        private readonly ISiloRuntimeClient runtimeClient;
         private readonly IInternalGrainFactory grainFactory;
         private readonly IConsistentRingProvider ringProvider;
         private readonly int grainTypeCode;
@@ -23,7 +22,6 @@ namespace Orleans.Runtime.Services
         /// </summary>
         protected GrainServiceClient(IServiceProvider serviceProvider)
         {
-            runtimeClient =  serviceProvider.GetRequiredService<ISiloRuntimeClient>();
             grainFactory = serviceProvider.GetRequiredService<IInternalGrainFactory>();
             ringProvider = serviceProvider.GetRequiredService<IConsistentRingProvider>();
 

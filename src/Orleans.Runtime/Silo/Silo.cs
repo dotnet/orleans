@@ -7,22 +7,17 @@ using System.Runtime;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.LogConsistency;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
-using Orleans.Streams;
-using Orleans.Runtime.Versions;
-using Orleans.Versions;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Serialization;
@@ -188,18 +183,6 @@ namespace Orleans.Runtime
             RingProvider = Services.GetRequiredService<IConsistentRingProvider>();
 
             catalog = Services.GetRequiredService<Catalog>();
-
-            // Now the incoming message agents
-            var messageFactory = this.Services.GetRequiredService<MessageFactory>();
-            var messagingTrace = this.Services.GetRequiredService<MessagingTrace>();
-            messageCenter.RegisterLocalMessageHandler(new IncomingMessageHandler(
-                messageCenter,
-                activationDirectory,
-                LocalScheduler,
-                catalog.Dispatcher,
-                messageFactory,
-                this.loggerFactory.CreateLogger<IncomingMessageHandler>(),
-                messagingTrace));
 
             siloStatusOracle = Services.GetRequiredService<ISiloStatusOracle>();
             this.membershipService = Services.GetRequiredService<IMembershipService>();
