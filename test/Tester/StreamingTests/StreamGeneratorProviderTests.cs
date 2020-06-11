@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Generator;
@@ -42,6 +43,7 @@ namespace UnitTests.StreamingTests
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
+                        .ConfigureLogging(logging => logging.AddDebug())
                         .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(StreamProviderName, (s, n) => GeneratorConfig))
                         .AddPersistentStreams(
                             StreamProviderName,
@@ -63,7 +65,7 @@ namespace UnitTests.StreamingTests
             this.fixture = fixture;
         }
 
-        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
+        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ValidateGeneratedStreamsTest()

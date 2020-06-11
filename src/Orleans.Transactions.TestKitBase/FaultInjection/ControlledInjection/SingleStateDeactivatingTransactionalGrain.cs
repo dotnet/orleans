@@ -41,7 +41,7 @@ namespace Orleans.Transactions.TestKit
 
         public override Task OnActivateAsync()
         {
-            this.logger = this.loggerFactory.CreateLogger(this.GetGrainIdentity().ToString());
+            this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
             this.logger.LogInformation($"GrainId : {this.GetPrimaryKey()}.");
 
             return base.OnActivateAsync();

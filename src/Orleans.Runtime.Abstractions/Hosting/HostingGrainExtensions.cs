@@ -1,4 +1,5 @@
-﻿using Orleans.CodeGeneration;
+using System;
+using Orleans.CodeGeneration;
 using Orleans.Runtime;
 
 namespace Orleans.Hosting
@@ -17,8 +18,7 @@ namespace Orleans.Hosting
             where TExtensionInterface : class, IGrainExtension
             where TExtension : class, TExtensionInterface
         {
-            int interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(typeof(TExtensionInterface));
-            return builder.ConfigureServices(services => services.AddTransientKeyedService<int, IGrainExtension, TExtension>(interfaceId));
+            return builder.ConfigureServices(services => services.AddTransientKeyedService<Type, IGrainExtension, TExtension>(typeof(TExtensionInterface)));
         }
 
         /// <summary>
@@ -30,8 +30,7 @@ namespace Orleans.Hosting
             where TExtensionInterface : class, IGrainExtension
             where TExtension : class, TExtensionInterface
         {
-            int interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(typeof(TExtensionInterface));
-            return builder.ConfigureServices(services => services.AddTransientKeyedService<int, IGrainExtension, TExtension>(interfaceId));
+            return builder.ConfigureServices(services => services.AddTransientKeyedService<Type, IGrainExtension, TExtension>(typeof(TExtensionInterface)));
         }
     }
 }

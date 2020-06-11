@@ -158,7 +158,7 @@ namespace DependencyInjection.Tests
             ISimpleDIGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
             var exception = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLongValue());
             Assert.Contains("Error creating activation for", exception.Message);
-            Assert.Contains(nameof(ExplicitlyRegisteredSimpleDIGrain), exception.Message);
+            Assert.Contains("explicitly-registered", exception.Message);
         }
 
         [Fact]

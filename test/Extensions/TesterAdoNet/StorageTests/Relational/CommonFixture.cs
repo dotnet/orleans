@@ -17,6 +17,7 @@ using Orleans.Tests.SqlUtils;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.General;
+using Orleans.Streams;
 
 namespace UnitTests.StorageTests.Relational
 {
@@ -60,7 +61,12 @@ namespace UnitTests.StorageTests.Relational
         public CommonFixture()
         {
             var clusterOptions = this.Services.GetRequiredService<IOptions<ClusterOptions>>();
-            DefaultProviderRuntime = new ClientProviderRuntime(this.InternalGrainFactory, this.Services, NullLoggerFactory.Instance, clusterOptions);
+            DefaultProviderRuntime = new ClientProviderRuntime(
+                this.InternalGrainFactory,
+                this.Services,
+                NullLoggerFactory.Instance,
+                this.Services.GetRequiredService<ImplicitStreamSubscriberTable>(),
+                this.Services.GetRequiredService<ClientGrainContext>());
         }
 
         /// <summary>

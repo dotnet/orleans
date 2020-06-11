@@ -6,7 +6,7 @@ namespace Orleans.Runtime.Scheduler
 {
     internal class AsyncClosureWorkItem : WorkItemBase
     {
-        private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>();
+        private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly Func<Task> continuation;
         private readonly string name;
 
@@ -61,7 +61,7 @@ namespace Orleans.Runtime.Scheduler
 
     internal class AsyncClosureWorkItem<T> : WorkItemBase
     {
-        private readonly TaskCompletionSource<T> completion = new TaskCompletionSource<T>();
+        private readonly TaskCompletionSource<T> completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly Func<Task<T>> continuation;
         private readonly string name;
 

@@ -199,15 +199,23 @@ namespace Orleans.TestingHost
 
             public void SignalRelease(string name)
             {
-                _workItems.Add(() =>
+                if (_workItems.IsAddingCompleted) return;
+
+                try
                 {
-                    if (_mutexes.TryGetValue(name, out var value))
+                    _workItems.Add(() =>
                     {
-                        _mutexes.Remove(name);
-                        value.ReleaseMutex();
-                        value.Close();
-                    }
-                });
+                        if (_mutexes.TryGetValue(name, out var value))
+                        {
+                            _mutexes.Remove(name);
+                            value.ReleaseMutex();
+                            value.Close();
+                        }
+                    });
+                }
+                catch
+                {
+                }
             }
 
             private void Run()

@@ -42,7 +42,7 @@ namespace Orleans.Runtime.ReminderService
             tardinessStat = AverageTimeSpanStatistic.FindOrCreate(StatisticNames.REMINDERS_AVERAGE_TARDINESS_SECONDS);
             IntValueStatistic.FindOrCreate(StatisticNames.REMINDERS_NUMBER_ACTIVE_REMINDERS, () => localReminders.Count);
             ticksDeliveredStat = CounterStatistic.FindOrCreate(StatisticNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
-            startedTask = new TaskCompletionSource<bool>();
+            startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = loggerFactory.CreateLogger<LocalReminderService>();
             this.listRefreshTimer = asyncTimerFactory.Create(Constants.RefreshReminderList, "ReminderService.ReminderListRefresher");
         }

@@ -378,10 +378,5 @@ namespace Orleans.Runtime
             return new System.Diagnostics.StackTrace(skipFrames).ToString();
 #endif
         }
-
-        public static GrainReference FromKeyString(string key, IGrainReferenceRuntime runtime)
-        {
-            return GrainReference.FromKeyString(key, runtime);
-        }
     }
 }

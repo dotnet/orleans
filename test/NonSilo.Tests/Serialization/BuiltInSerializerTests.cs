@@ -8,11 +8,13 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.GrainReferences;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
@@ -546,12 +548,12 @@ namespace UnitTests.Serialization
             source4[0] = new GrainReference[2];
             source4[1] = new GrainReference[3];
             source4[2] = new GrainReference[1];
-            source4[0][0] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
-            source4[0][1] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
-            source4[1][0] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
-            source4[1][1] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
-            source4[1][2] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
-            source4[2][0] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[0][0] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[0][1] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[1][0] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[1][1] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[1][2] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+            source4[2][0] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             deserialized = OrleansSerializationLoop(environment.SerializationManager, source4);
             ValidateArrayOfArrays(source4, deserialized, "grain reference");
 
@@ -561,7 +563,7 @@ namespace UnitTests.Serialization
                 source5[i] = new GrainReference[64];
                 for (int j = 0; j < source5[i].Length; j++)
                 {
-                    source5[i][j] = environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
+                    source5[i][j] = (GrainReference)environment.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
                 }
             }
             deserialized = OrleansSerializationLoop(environment.SerializationManager, source5);
@@ -778,7 +780,7 @@ namespace UnitTests.Serialization
         {
             var environment = InitializeSerializer(serializerToUse);
             GrainId grainId = LegacyGrainId.NewId();
-            GrainReference input = environment.InternalGrainFactory.GetGrain(grainId);
+            GrainReference input = (GrainReference)environment.InternalGrainFactory.GetGrain(grainId);
 
             object deserialized = OrleansSerializationLoop(environment.SerializationManager, input);
 
@@ -793,7 +795,7 @@ namespace UnitTests.Serialization
         {
             var environment = InitializeSerializer(serializerToUse);
             GrainId grainId = LegacyGrainId.NewId();
-            GrainReference input = environment.InternalGrainFactory.GetGrain(grainId);
+            GrainReference input = (GrainReference)environment.InternalGrainFactory.GetGrain(grainId);
             Assert.True(input.IsBound);
 
             object deserialized = DotNetSerializationLoop(input, environment.SerializationManager);
@@ -934,7 +936,8 @@ namespace UnitTests.Serialization
             object deserialized;
             var formatter = new BinaryFormatter
             {
-                Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager))
+                Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager)),
+                SurrogateSelector = new BinaryFormatterGrainReferenceSurrogateSelector(serializationManager.ServiceProvider.GetService<GrainReferenceActivator>())
             };
             using (var str = new MemoryStream())
             {

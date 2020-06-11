@@ -6,16 +6,16 @@ namespace Orleans.Runtime.Placement
     {
         public GrainId GrainIdentity { get; }
 
-        public int InterfaceId { get; }
+        public GrainInterfaceType InterfaceType { get; }
 
         public ushort InterfaceVersion { get; }
 
         public Dictionary<string, object> RequestContextData { get; }
 
-        public PlacementTarget(GrainId grainIdentity, Dictionary<string, object> requestContextData, int interfaceId, ushort interfaceVersion)
+        public PlacementTarget(GrainId grainIdentity, Dictionary<string, object> requestContextData, GrainInterfaceType interfaceType, ushort interfaceVersion)
         {
             this.GrainIdentity = grainIdentity;
-            this.InterfaceId = interfaceId;
+            this.InterfaceType = interfaceType;
             this.InterfaceVersion = interfaceVersion;
             this.RequestContextData = requestContextData;
         }

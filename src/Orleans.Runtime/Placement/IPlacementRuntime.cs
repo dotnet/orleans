@@ -29,12 +29,6 @@ namespace Orleans.Runtime.Placement
 
     internal static class PlacementRuntimeExtensions
     {
-        public static string GetGrainTypeName(this IPlacementRuntime @this, int typeCode, string genericArguments = null)
-        {
-            ((Catalog)@this).GetGrainTypeInfo(typeCode, out var grainClass, genericArguments);
-            return grainClass;
-        }
-
         public static string GetGrainTypeName(this IPlacementRuntime @this, GrainId grainId, string genericArguments = null)
         {
             return @this.GetGrainTypeName(grainId, genericArguments);

@@ -44,9 +44,8 @@ namespace Orleans.Runtime.Scheduler
             try
             {
                 RuntimeContext.SetExecutionContext(this.activation);
-                var grain = activation.GrainInstance;
                 var runtimeClient = this.dispatcher.RuntimeClient;
-                Task task = runtimeClient.Invoke(grain, this.activation, this.message);
+                Task task = runtimeClient.Invoke(this.activation, this.message);
 
                 // Note: This runs for all outcomes of resultPromiseTask - both Success or Fault
                 if (task.IsCompleted)

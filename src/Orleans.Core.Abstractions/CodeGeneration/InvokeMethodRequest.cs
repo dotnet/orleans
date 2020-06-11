@@ -10,17 +10,15 @@ namespace Orleans.CodeGeneration
     public sealed class InvokeMethodRequest
     {
         /// <summary> InterfaceId for this Invoke request. </summary>
-        public int InterfaceId { get; private set; }
-        public ushort InterfaceVersion { get; private set; }
+        public int InterfaceTypeCode { get; private set; }
         /// <summary> MethodId for this Invoke request. </summary>
         public int MethodId { get; private set; }
         /// <summary> Arguments for this Invoke request. </summary>
         public object[] Arguments { get; private set; }
 
-        internal InvokeMethodRequest(int interfaceId, ushort interfaceVersion, int methodId, object[] arguments)
+        internal InvokeMethodRequest(int interfaceTypeCode, int methodId, object[] arguments)
         {
-            InterfaceId = interfaceId;
-            InterfaceVersion = interfaceVersion;
+            InterfaceTypeCode = interfaceTypeCode;
             MethodId = methodId;
             Arguments = arguments;
         }
@@ -33,7 +31,7 @@ namespace Orleans.CodeGeneration
         /// </remarks>
         public override string ToString()
         {
-            return String.Format("InvokeMethodRequest {0}:{1}", InterfaceId, MethodId);
+            return String.Format("InvokeMethodRequest {0}:{1}", InterfaceTypeCode, MethodId);
         }
     }
 

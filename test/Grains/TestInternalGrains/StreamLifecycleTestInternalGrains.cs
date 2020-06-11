@@ -1,6 +1,4 @@
 #define USE_STORAGE
-//#define USE_CAST
-#define COUNT_ACTIVATE_DEACTIVATE
 
 using System;
 using System.Threading.Tasks;
@@ -73,17 +71,9 @@ namespace UnitTests.Grains
             InitStream(streamIdGuid, null, providerName);
             var observer = new MyStreamObserver<int>(logger);
 
-            //var subsHandle = await State.Stream.SubscribeAsync(observer);
+            var (myExtension, myExtensionReference) = this.streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
+                () => new StreamConsumerExtension(streamProviderRuntime));
 
-            IStreamConsumerExtension myExtensionReference;
-#if USE_CAST
-            myExtensionReference = StreamConsumerExtensionFactory.Cast(this.AsReference());
-#else
-            var tup = await this.runtimeClient.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                        () => new StreamConsumerExtension(this.streamProviderRuntime));
-            StreamConsumerExtension myExtension = tup.Item1;
-            myExtensionReference = tup.Item2;
-#endif
             string extKey = providerName + "_" + State.Stream.Namespace;
             IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamIdGuid, extKey, null);
             GuidId subscriptionId = GuidId.GetNewGuidId();

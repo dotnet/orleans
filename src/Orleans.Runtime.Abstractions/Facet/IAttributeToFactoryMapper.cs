@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 
 namespace Orleans.Runtime
 {
@@ -11,6 +11,6 @@ namespace Orleans.Runtime
         /// <summary>
         /// Responsible for mapping a facet metadata to a cachable factory from the parameter and facet metadata.
         /// </summary>
-        Factory<IGrainActivationContext, object> GetFactory(ParameterInfo parameter, TMetadata metadata);
+        Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, TMetadata metadata);
     }
 }

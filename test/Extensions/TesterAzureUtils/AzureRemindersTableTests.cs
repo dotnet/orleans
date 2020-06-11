@@ -47,7 +47,7 @@ namespace UnitTests.RemindersTest
                     {
                         ConnectionString = this.connectionStringFixture.ConnectionString
                     });
-            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), loggerFactory, this.clusterOptions, options);
+            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<GrainReferenceKeyStringConverter>(), loggerFactory, this.clusterOptions, options);
         }
 
         protected override Task<string> GetConnectionString()

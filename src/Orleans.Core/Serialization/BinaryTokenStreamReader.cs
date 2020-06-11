@@ -20,6 +20,11 @@ namespace Orleans.Serialization
         {
             var hashCode = @this.ReadInt();
             var len = @this.ReadUShort();
+            if (len == 0)
+            {
+                return default;
+            }
+
             var bytes = @this.ReadBytes(len);
             return IdSpan.UnsafeCreate(bytes, hashCode);
         }
@@ -31,6 +36,12 @@ namespace Orleans.Serialization
             var type = @this.ReadIdSpan();
             var key = @this.ReadIdSpan();
             return new GrainId(new GrainType(type), key);
+        }
+
+        internal static GrainInterfaceType ReadGrainInterfaceType<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
+        {
+            var id = @this.ReadIdSpan();
+            return new GrainInterfaceType(id);
         }
 
         /// <summary> Read an <c>ActivationId</c> value from the stream. </summary>

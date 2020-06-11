@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
@@ -32,9 +32,8 @@ namespace Orleans.Transactions.Tests.Memory
                 Timestamp = DateTime.UtcNow,
                 WriteParticipants = new List<ParticipantId>() { new ParticipantId("bob", reference, ParticipantId.Role.Resource | ParticipantId.Role.Manager) }
             });
-            JsonSerializerSettings serializerSettings = TransactionalStateFactory.GetJsonSerializerSettings(
-                this.fixture.Client.ServiceProvider.GetService<ITypeResolver>(),
-                this.grainFactory);
+            JsonSerializerSettings serializerSettings = TransactionalStateFactory.GetJsonSerializerSettings(this.fixture.Client.ServiceProvider);
+
             //should be able to serialize it
             string jsonMetaData = JsonConvert.SerializeObject(metaData, serializerSettings);
 

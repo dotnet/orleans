@@ -43,7 +43,7 @@ namespace Orleans.Tests.SqlUtils
     /// </summary>
     private readonly DbStoredQueries dbStoredQueries;
 
-        private readonly IGrainReferenceConverter grainReferenceConverter;
+        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
 
         /// <summary>
         /// Constructor
@@ -51,7 +51,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="storage">the underlying relational storage</param>
         /// <param name="dbStoredQueries">Orleans functional queries</param>
         /// <param name="grainReferenceConverter"></param>
-        private RelationalOrleansQueries(IRelationalStorage storage, DbStoredQueries dbStoredQueries, IGrainReferenceConverter grainReferenceConverter)
+        private RelationalOrleansQueries(IRelationalStorage storage, DbStoredQueries dbStoredQueries, GrainReferenceKeyStringConverter grainReferenceConverter)
         {
             this.storage = storage;
             this.dbStoredQueries = dbStoredQueries;
@@ -65,7 +65,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="invariantName">The invariant name of the connector for this database.</param>
         /// <param name="connectionString">The connection string this database should use for database operations.</param>
         /// <param name="grainReferenceConverter"></param>
-        internal static async Task<RelationalOrleansQueries> CreateInstance(string invariantName, string connectionString, IGrainReferenceConverter grainReferenceConverter)
+        internal static async Task<RelationalOrleansQueries> CreateInstance(string invariantName, string connectionString, GrainReferenceKeyStringConverter grainReferenceConverter)
         {
             var storage = RelationalStorage.CreateInstance(invariantName, connectionString);
 

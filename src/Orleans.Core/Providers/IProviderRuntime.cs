@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans.Providers
@@ -31,8 +30,8 @@ namespace Orleans.Providers
         /// <typeparam name="TExtensionInterface">The public interface type of the implementation.</typeparam>
         /// <param name="newExtensionFunc">A factory function that constructs a new extension object.</param>
         /// <returns>A tuple, containing first the extension and second an addressable reference to the extension's interface.</returns>
-        Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : IGrainExtension
+        (TExtension, TExtensionInterface) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
+            where TExtension : TExtensionInterface
             where TExtensionInterface : IGrainExtension;
     }
 }

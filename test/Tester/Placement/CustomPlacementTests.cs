@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
-using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
@@ -37,7 +36,6 @@ namespace Tester.CustomPlacementTests
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = true);
-                    hostBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100));
                     hostBuilder.ConfigureServices(ConfigureServices);
                 }
             }
@@ -139,7 +137,7 @@ namespace Tester.CustomPlacementTests
             {
                 var g = this.fixture.GrainFactory.GetGrain<IHashBasedPlacementGrain>(Guid.NewGuid(),
                     "UnitTests.Grains.HashBasedBasedPlacementGrain");
-                grains.Add(g.GetGrainIdentity());
+                grains.Add(g.GetGrainId());
                 tasks[i] = g.GetSiloAddress();
             }
 

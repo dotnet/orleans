@@ -7,13 +7,13 @@ namespace Orleans.Runtime.ReminderService
 {
     internal class AdoNetReminderTable : IReminderTable
     {
-        private readonly IGrainReferenceConverter grainReferenceConverter;
+        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private readonly AdoNetReminderTableOptions options;
         private readonly string serviceId;
         private RelationalOrleansQueries orleansQueries;
 
         public AdoNetReminderTable(
-            IGrainReferenceConverter grainReferenceConverter, 
+            GrainReferenceKeyStringConverter grainReferenceConverter, 
             IOptions<ClusterOptions> clusterOptions, 
             IOptions<AdoNetReminderTableOptions> storageOptions)
         {

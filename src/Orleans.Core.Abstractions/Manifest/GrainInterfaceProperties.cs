@@ -65,6 +65,11 @@ namespace Orleans.Metadata
         /// This is used for resolving a grain type from an interface.
         /// </summary>
         public const string DefaultGrainType = "primary-grain-type";
+
+        /// <summary>
+        /// The name of the type of this interface. Used for convention-based matching of primary implementations.
+        /// </summary>
+        public const string TypeName = "type-name";
     }
 
     /// <summary>
@@ -75,7 +80,7 @@ namespace Orleans.Metadata
         /// <summary>
         /// Adds grain interface properties to <paramref name="properties"/>.
         /// </summary>
-        void Populate(Type interfaceType, GrainInterfaceId interfaceId, Dictionary<string, string> properties);
+        void Populate(Type interfaceType, GrainInterfaceType grainInterfaceType, Dictionary<string, string> properties);
     }
 
     /// <summary>
@@ -105,7 +110,7 @@ namespace Orleans.Metadata
         }
 
         /// <inheritdoc />
-        public void Populate(Type interfaceType, GrainInterfaceId interfaceId, Dictionary<string, string> properties)
+        public void Populate(Type interfaceType, GrainInterfaceType grainInterfaceType, Dictionary<string, string> properties)
         {
             foreach (var attr in interfaceType.GetCustomAttributes(inherit: true))
             {

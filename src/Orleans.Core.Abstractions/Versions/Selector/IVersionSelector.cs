@@ -6,7 +6,7 @@ namespace Orleans.Versions.Selector
 {
     public interface IVersionSelector
     {
-        IReadOnlyList<ushort> GetSuitableVersion(ushort requestedVersion, IReadOnlyList<ushort> availableVersions, ICompatibilityDirector compatibilityDirector);
+        ushort[] GetSuitableVersion(ushort requestedVersion, ushort[] availableVersions, ICompatibilityDirector compatibilityDirector);
     }
 
     [Serializable]

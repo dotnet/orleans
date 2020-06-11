@@ -283,9 +283,14 @@ namespace UnitTests.Directory
 
         private class NoOpClusterManifestProvider : IClusterManifestProvider
         {
-            public ClusterManifest Current => new ClusterManifest(MajorMinorVersion.Zero, ImmutableDictionary<SiloAddress, SiloManifest>.Empty);
+            public ClusterManifest Current => new ClusterManifest(
+                MajorMinorVersion.Zero,
+                ImmutableDictionary<SiloAddress, GrainManifest>.Empty,
+                ImmutableArray.Create(new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty)));
 
             public IAsyncEnumerable<ClusterManifest> Updates => this.GetUpdates();
+
+            public GrainManifest LocalGrainManifest { get; } = new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
 
             private async IAsyncEnumerable<ClusterManifest> GetUpdates()
             {

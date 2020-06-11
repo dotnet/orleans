@@ -88,7 +88,7 @@ namespace Tester.HeterogeneousSilosTests
 
             // Should fail
             var exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<ITestGrain>(0));
-            Assert.Contains("Cannot find an implementation class for grain interface", exception.Message);
+            Assert.Contains("Could not find an implementation for interface", exception.Message);
 
             // Should not fail
             this.cluster.GrainFactory.GetGrain<ISimpleGrainWithAsyncMethods>(0);
@@ -148,7 +148,7 @@ namespace Tester.HeterogeneousSilosTests
 
             // Should fail
             var exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
-            Assert.Contains("Cannot find an implementation class for grain interface", exception.Message);
+            Assert.Contains("Could not find an implementation for interface", exception.Message);
 
             // Start a new silo with TestGrain
             await cluster.StartAdditionalSiloAsync();
@@ -191,7 +191,7 @@ namespace Tester.HeterogeneousSilosTests
 
             // Should fail
             exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
-            Assert.Contains("Cannot find an implementation class for grain interface", exception.Message);
+            Assert.Contains("Could not find an implementation for interface", exception.Message);
         }        
 
         public Task InitializeAsync()

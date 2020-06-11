@@ -212,7 +212,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         
         public override Task OnActivateAsync()
         {
-            this.logger = this.loggerFactory.CreateLogger(this.GetGrainIdentity().ToString());
+            this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
             this.logger.LogTrace($"GrainId : {this.GetPrimaryKey()}.");
 
             return base.OnActivateAsync();

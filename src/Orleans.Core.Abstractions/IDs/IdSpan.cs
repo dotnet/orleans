@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
@@ -56,7 +55,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="IdSpan"/> instance from the provided value.
         /// </summary>
-        public static IdSpan Create(string id) => new IdSpan(Encoding.UTF8.GetBytes(id));
+        public static IdSpan Create(string id) => id is string idString ? new IdSpan(Encoding.UTF8.GetBytes(idString)) : default;
 
         /// <summary>
         /// Returns a span representation of this instance.

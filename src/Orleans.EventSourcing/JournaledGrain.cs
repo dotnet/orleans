@@ -19,15 +19,6 @@ namespace Orleans.EventSourcing
         where TGrainState : class, new()
     {
         protected JournaledGrain() { }
-
-        /// <summary>
-        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
-        /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
-        /// </summary>
-        protected JournaledGrain(GrainId identity, IGrainRuntime runtime)
-            : base(identity, runtime)
-        {
-        }
     }
 
 
@@ -45,15 +36,6 @@ namespace Orleans.EventSourcing
         where TEventBase: class
     {
         protected JournaledGrain() { }
-
-        /// <summary>
-        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
-        /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
-        /// </summary>
-        protected JournaledGrain(GrainId identity, IGrainRuntime runtime)
-            : base(identity, runtime)
-        {
-        }
 
         /// <summary>
         /// Raise an event.

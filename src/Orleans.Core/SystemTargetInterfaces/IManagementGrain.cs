@@ -100,12 +100,5 @@ namespace Orleans.Runtime
         /// This is an opaque value to the Orleans runtime - the control protocol semantics are decided between the sender and provider.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg = null);
-
-        /// <summary>
-        /// Returns an array of all the active grain types in the system
-        /// </summary>
-        /// <param name="hostsIds">List of silos this command is to be sent to.</param>
-        /// <returns></returns>
-        Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null);
     }
 }

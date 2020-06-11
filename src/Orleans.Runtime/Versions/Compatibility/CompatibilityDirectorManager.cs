@@ -10,7 +10,7 @@ namespace Orleans.Runtime.Versions.Compatibility
     {
         private readonly CompatibilityStrategy strategyFromConfig;
         private readonly IServiceProvider serviceProvider;
-        private readonly Dictionary<int, ICompatibilityDirector> compatibilityDirectors;
+        private readonly Dictionary<GrainInterfaceType, ICompatibilityDirector> compatibilityDirectors;
 
         public ICompatibilityDirector Default { get; private set; }
 
@@ -19,14 +19,14 @@ namespace Orleans.Runtime.Versions.Compatibility
         {
             this.serviceProvider = serviceProvider;
             this.strategyFromConfig = serviceProvider.GetRequiredServiceByName<CompatibilityStrategy>(options.Value.DefaultCompatibilityStrategy);
-            this.compatibilityDirectors = new Dictionary<int, ICompatibilityDirector>();
+            this.compatibilityDirectors = new Dictionary<GrainInterfaceType, ICompatibilityDirector>();
             Default = ResolveVersionDirector(serviceProvider, this.strategyFromConfig);
         }
 
-        public ICompatibilityDirector GetDirector(int interfaceId)
+        public ICompatibilityDirector GetDirector(GrainInterfaceType interfaceType)
         {
             ICompatibilityDirector director;
-            return compatibilityDirectors.TryGetValue(interfaceId, out director) 
+            return compatibilityDirectors.TryGetValue(interfaceType, out director) 
                 ? director 
                 : Default;
         }
@@ -36,16 +36,16 @@ namespace Orleans.Runtime.Versions.Compatibility
             Default = director;
         }
 
-        public void SetStrategy(int interfaceId, CompatibilityStrategy strategy)
+        public void SetStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy)
         {
             if (strategy == null)
             {
-                compatibilityDirectors.Remove(interfaceId);
+                compatibilityDirectors.Remove(interfaceType);
             }
             else
             {
                 var selector = ResolveVersionDirector(this.serviceProvider, strategy);
-                compatibilityDirectors[interfaceId] = selector;
+                compatibilityDirectors[interfaceType] = selector;
             }
         }
 

@@ -5,8 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 
 namespace Orleans.Providers
 {
@@ -16,25 +14,24 @@ namespace Orleans.Providers
         private IStreamPubSub implicitPubSub;
         private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private StreamDirectory streamDirectory;
-        private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
-        private readonly AsyncLock lockable;
         private readonly IInternalGrainFactory grainFactory;
+        private readonly ImplicitStreamSubscriberTable implicitSubscriberTable;
+        private readonly ClientGrainContext clientContext;
         private readonly IRuntimeClient runtimeClient;
         private readonly ILogger timerLogger;
-        private readonly ClusterOptions clusterOptions;
 
         public ClientProviderRuntime(
             IInternalGrainFactory grainFactory,
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
-            IOptions<ClusterOptions> clusterOptions)
+            ImplicitStreamSubscriberTable implicitSubscriberTable,
+            ClientGrainContext clientContext)
         {
-            this.clusterOptions = clusterOptions.Value;
             this.grainFactory = grainFactory;
             this.ServiceProvider = serviceProvider;
+            this.implicitSubscriberTable = implicitSubscriberTable;
+            this.clientContext = clientContext;
             this.runtimeClient = serviceProvider.GetService<IRuntimeClient>();
-            caoTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
-            lockable = new AsyncLock();
             //all async timer created through current class all share this logger for perf reasons
             this.timerLogger = loggerFactory.CreateLogger<AsyncTaskSafeTimer>();
         }
@@ -42,14 +39,10 @@ namespace Orleans.Providers
         public IGrainFactory GrainFactory => this.grainFactory;
         public IServiceProvider ServiceProvider { get; }
 
-        public void StreamingInitialize(ImplicitStreamSubscriberTable implicitStreamSubscriberTable) 
+        public void StreamingInitialize() 
         {
-            if (null == implicitStreamSubscriberTable)
-            {
-                throw new ArgumentNullException(nameof(implicitStreamSubscriberTable));
-            }
             grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
-            var tmp = new ImplicitStreamPubSub(this.grainFactory, implicitStreamSubscriberTable);
+            var tmp = new ImplicitStreamPubSub(this.grainFactory, this.implicitSubscriberTable);
             implicitPubSub = tmp;
             combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(grainBasedPubSub, tmp);
             streamDirectory = new StreamDirectory();
@@ -93,41 +86,11 @@ namespace Orleans.Providers
             return new AsyncTaskSafeTimer(this.timerLogger, asyncCallback, state, dueTime, period);
         }
 
-        public async Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : IGrainExtension
+        public (TExtension, TExtensionInterface) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
+            where TExtension : TExtensionInterface
             where TExtensionInterface : IGrainExtension
         {
-            IAddressable addressable;
-            TExtension extension;
-
-            using (await lockable.LockAsync())
-            {
-                Tuple<IGrainExtension, IAddressable> entry;
-                if (caoTable.TryGetValue(typeof(TExtensionInterface), out entry))
-                {
-                    extension = (TExtension)entry.Item1;
-                    addressable = entry.Item2;
-                }
-                else
-                { 
-                    extension = newExtensionFunc();
-                    var obj = ((GrainFactory)this.GrainFactory).CreateObjectReference<TExtensionInterface>(extension);
-
-                    addressable = obj;
-                     
-                    if (null == addressable)
-                    {
-                        throw new NullReferenceException("addressable");
-                    }
-                    entry = Tuple.Create((IGrainExtension)extension, addressable);
-                    caoTable.Add(typeof(TExtensionInterface), entry);
-                }
-            }
-
-            var typedAddressable = addressable.Cast<TExtensionInterface>();
-            // we have to return the extension as well as the IAddressable because the caller needs to root the extension
-            // to prevent it from being collected (the IAddressable uses a weak reference).
-            return Tuple.Create(extension, typedAddressable);
+            return this.clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)

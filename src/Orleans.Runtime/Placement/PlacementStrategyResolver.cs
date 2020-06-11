@@ -11,7 +11,7 @@ namespace Orleans.Runtime.Placement
     /// <summary>
     /// Responsible for resolving an <see cref="PlacementStrategy"/> for a <see cref="GrainType"/>.
     /// </summary>
-    internal sealed class PlacementStrategyResolver
+    public sealed class PlacementStrategyResolver
     {
         private readonly ConcurrentDictionary<GrainType, PlacementStrategy> _resolvedStrategies = new ConcurrentDictionary<GrainType, PlacementStrategy>(GrainType.Comparer.Instance);
         private readonly Func<GrainType, PlacementStrategy> _getStrategyInternal;
@@ -54,16 +54,15 @@ namespace Orleans.Runtime.Placement
         /// </summary>
         public PlacementStrategy GetPlacementStrategy(GrainType grainType) => _resolvedStrategies.GetOrAdd(grainType, _getStrategyInternal);
 
-        private PlacementStrategy GetPlacementStrategyInternal(GrainType grainType)
+        internal bool TryGetNonDefaultPlacementStrategy(GrainType grainType, out PlacementStrategy strategy)
         {
-            PlacementStrategy result;
             _grainPropertiesResolver.TryGetGrainProperties(grainType, out var properties);
 
             foreach (var resolver in _resolvers)
             {
-                if (resolver.TryResolvePlacementStrategy(grainType, properties, out result))
+                if (resolver.TryResolvePlacementStrategy(grainType, properties, out strategy))
                 {
-                    return result;
+                    return true;
                 }
             }
 
@@ -73,14 +72,25 @@ namespace Orleans.Runtime.Placement
             {
                 if (_strategies.TryGetValue(placementStrategyId, out var strategyType))
                 {
-                    result = (PlacementStrategy)_services.GetService(strategyType);
-                    result.Initialize(properties);
-                    return result;
+                    strategy = (PlacementStrategy)_services.GetService(strategyType);
+                    strategy.Initialize(properties);
+                    return true;
                 }
                 else
                 {
                     throw new KeyNotFoundException($"Could not resolve placement strategy {placementStrategyId} for grain type {grainType}");
                 }
+            }
+
+            strategy = default;
+            return false;
+        }
+
+        private PlacementStrategy GetPlacementStrategyInternal(GrainType grainType)
+        {
+            if (TryGetNonDefaultPlacementStrategy(grainType, out var result))
+            {
+                return result;
             }
 
             return _defaultPlacementStrategy;

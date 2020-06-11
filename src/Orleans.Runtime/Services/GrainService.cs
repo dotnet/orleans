@@ -35,7 +35,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public GrainReference GetGrainReference() => GrainReference.FromGrainId(((ISystemTargetBase)this).GrainId, ((ISystemTargetBase)this).GrainReferenceRuntime, null);
+        public GrainReference GetGrainReference() => this.GrainReference;
 
         /// <summary>Only to make Reflection happy. Do not use it in your implementation</summary>
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]

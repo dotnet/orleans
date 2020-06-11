@@ -11,14 +11,18 @@ namespace Orleans.Metadata
     public class GrainTypeResolver
     {
         private const string GrainSuffix = "grain";
-        private readonly IGrainTypeProvider[] providers;
+        private readonly IGrainTypeProvider[] _providers;
+        private readonly TypeConverter _typeConverter;
 
         /// <summary>
         /// Creates a <see cref="GrainTypeResolver"/> instance.
         /// </summary>
-        public GrainTypeResolver(IEnumerable<IGrainTypeProvider> resolvers)
+        public GrainTypeResolver(
+            IEnumerable<IGrainTypeProvider> resolvers,
+            TypeConverter argumentFormatter)
         {
-            this.providers = resolvers.ToArray();
+            _providers = resolvers.ToArray();
+            _typeConverter = argumentFormatter;
         }
 
         /// <summary>
@@ -34,10 +38,12 @@ namespace Orleans.Metadata
             }
 
             // Configured providers take precedence
-            foreach (var provider in this.providers)
+            foreach (var provider in _providers)
             {
                 if (provider.TryGetGrainType(type, out var grainType))
                 {
+                    grainType = AddGenericParameters(grainType, type);
+
                     return grainType;
                 }
             }
@@ -46,7 +52,7 @@ namespace Orleans.Metadata
             return GetGrainTypeByConvention(type);
         }
 
-        private static GrainType GetGrainTypeByConvention(Type type)
+        private GrainType GetGrainTypeByConvention(Type type)
         {
             var name = type.Name.ToLowerInvariant();
 
@@ -70,7 +76,22 @@ namespace Orleans.Metadata
                 name = name + '`' + type.GetGenericArguments().Length;
             }
 
-            return GrainType.Create(name);
+            var grainType = GrainType.Create(name);
+            grainType = AddGenericParameters(grainType, type);
+            return grainType;
+        }
+
+        private GrainType AddGenericParameters(GrainType grainType, Type type)
+        {
+            if (GenericGrainType.TryParse(grainType, out var genericGrainType)
+                && type.IsConstructedGenericType
+                && !type.ContainsGenericParameters
+                && !genericGrainType.IsConstructed)
+            {
+                grainType = genericGrainType.Construct(_typeConverter, type.GetGenericArguments()).GrainType;
+            }
+
+            return grainType;
         }
     }
 }

@@ -160,7 +160,7 @@ namespace Orleans.Runtime
         public static bool operator <(GrainId a, GrainId b) => a.CompareTo(b) < 0;
 
         /// <inheritdoc/>
-        public override string ToString() => $"{Type.ToStringUtf8()}{SegmentSeparator[0]}{Key.ToStringUtf8()}";
+        public override string ToString() => $"{Type.ToStringUtf8()}/{Key.ToStringUtf8()}";
 
         private static void ThrowInvalidGrainId(string value) => throw new ArgumentException($"Unable to parse \"{value}\" as a grain id");
 

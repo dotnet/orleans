@@ -1,12 +1,9 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Scheduler;
-using Orleans.Statistics;
 
 namespace UnitTests.TesterInternal
 {
@@ -24,7 +21,6 @@ namespace UnitTests.TesterInternal
             services.AddSingleton(loggerFactory);
             services.Configure<SchedulingOptions>(options =>
             {
-                options.MaxActiveThreads = 4;
                 options.DelayWarningThreshold = TimeSpan.FromMilliseconds(100);
                 options.ActivationSchedulingQuantum = TimeSpan.FromMilliseconds(100);
                 options.TurnWarningLengthThreshold = TimeSpan.FromMilliseconds(100);

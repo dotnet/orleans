@@ -7,17 +7,18 @@ namespace Orleans.Transactions
 {
     public class TransactionCommitterFactory : ITransactionCommitterFactory
     {
-        private IGrainActivationContext context;
+        private IGrainContextAccessor contextAccessor;
 
-        public TransactionCommitterFactory(IGrainActivationContext context)
+        public TransactionCommitterFactory(IGrainContextAccessor contextAccessor)
         {
-            this.context = context;
+            this.contextAccessor = contextAccessor;
         }
 
         public ITransactionCommitter<TService> Create<TService>(ITransactionCommitterConfiguration config) where TService : class
         {
-            TransactionCommitter<TService> transactionalState = ActivatorUtilities.CreateInstance<TransactionCommitter<TService>>(this.context.ActivationServices, config, this.context);
-            transactionalState.Participate(context.ObservableLifecycle);
+            var currentContext = contextAccessor.GrainContext;
+            TransactionCommitter<TService> transactionalState = ActivatorUtilities.CreateInstance<TransactionCommitter<TService>>(currentContext.ActivationServices, config, this.contextAccessor);
+            transactionalState.Participate(currentContext.ObservableLifecycle);
             return transactionalState;
         }
     }
