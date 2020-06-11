@@ -12,27 +12,27 @@ namespace Orleans.Runtime.Versions
 {
     internal interface IVersionStoreGrain : IGrainWithStringKey
     {
-        Task<Dictionary<GrainInterfaceId, CompatibilityStrategy>> GetCompatibilityStrategies();
-        Task<Dictionary<GrainInterfaceId, VersionSelectorStrategy>> GetSelectorStrategies();
+        Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies();
+        Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies();
         Task<CompatibilityStrategy> GetCompatibilityStrategy();
         Task<VersionSelectorStrategy> GetSelectorStrategy();
         Task SetCompatibilityStrategy(CompatibilityStrategy strategy);
         Task SetSelectorStrategy(VersionSelectorStrategy strategy);
-        Task SetCompatibilityStrategy(GrainInterfaceId interfaceId, CompatibilityStrategy strategy);
-        Task SetSelectorStrategy(GrainInterfaceId interfaceId, VersionSelectorStrategy strategy);
+        Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy);
+        Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy);
     }
 
     internal class VersionStoreGrainState
     {
-        internal Dictionary<GrainInterfaceId, CompatibilityStrategy> CompatibilityStrategies { get; }
-        internal Dictionary<GrainInterfaceId, VersionSelectorStrategy> VersionSelectorStrategies { get; }
+        internal Dictionary<GrainInterfaceType, CompatibilityStrategy> CompatibilityStrategies { get; }
+        internal Dictionary<GrainInterfaceType, VersionSelectorStrategy> VersionSelectorStrategies { get; }
         public VersionSelectorStrategy SelectorOverride { get; set; }
         public CompatibilityStrategy CompatibilityOverride { get; set; }
 
         public VersionStoreGrainState()
         {
-            this.CompatibilityStrategies = new Dictionary<GrainInterfaceId, CompatibilityStrategy>();
-            this.VersionSelectorStrategies = new Dictionary<GrainInterfaceId, VersionSelectorStrategy>();
+            this.CompatibilityStrategies = new Dictionary<GrainInterfaceType, CompatibilityStrategy>();
+            this.VersionSelectorStrategies = new Dictionary<GrainInterfaceType, VersionSelectorStrategy>();
         }
     }
 
@@ -51,13 +51,13 @@ namespace Orleans.Runtime.Versions
             await this.WriteStateAsync();
         }
 
-        public async Task SetCompatibilityStrategy(GrainInterfaceId ifaceId, CompatibilityStrategy strategy)
+        public async Task SetCompatibilityStrategy(GrainInterfaceType ifaceId, CompatibilityStrategy strategy)
         {
             this.State.CompatibilityStrategies[ifaceId] = strategy;
             await this.WriteStateAsync();
         }
 
-        public async Task SetSelectorStrategy(GrainInterfaceId ifaceId, VersionSelectorStrategy strategy)
+        public async Task SetSelectorStrategy(GrainInterfaceType ifaceId, VersionSelectorStrategy strategy)
         {
             this.State.VersionSelectorStrategies[ifaceId] = strategy;
             await this.WriteStateAsync();
@@ -65,12 +65,12 @@ namespace Orleans.Runtime.Versions
 
         public bool IsEnabled { get; }
 
-        public Task<Dictionary<GrainInterfaceId, CompatibilityStrategy>> GetCompatibilityStrategies()
+        public Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies()
         {
             return Task.FromResult(this.State.CompatibilityStrategies);
         }
 
-        public Task<Dictionary<GrainInterfaceId, VersionSelectorStrategy>> GetSelectorStrategies()
+        public Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies()
         {
             return Task.FromResult(this.State.VersionSelectorStrategies);
         }

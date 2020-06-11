@@ -28,7 +28,7 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly IServiceScope serviceScope;
         public readonly TimeSpan CollectionAgeLimit;
-        private readonly GrainSharedComponents _shared;
+        private readonly GrainTypeComponents _shared;
         private HashSet<IGrainTimer> timers;
         private Dictionary<Type, object> _components;
 
@@ -44,7 +44,7 @@ namespace Orleans.Runtime
             IServiceProvider applicationServices,
             IGrainRuntime grainRuntime,
             GrainReferenceActivator referenceActivator,
-            GrainSharedComponents sharedComponents)
+            GrainTypeComponents sharedComponents)
         {
             if (null == addr) throw new ArgumentNullException(nameof(addr));
             if (null == placedUsing) throw new ArgumentNullException(nameof(placedUsing));

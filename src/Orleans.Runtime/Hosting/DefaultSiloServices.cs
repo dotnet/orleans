@@ -111,7 +111,7 @@ namespace Orleans.Hosting
             services.AddTransientKeyedService<Type, IGrainExtension>(typeof(ICancellationSourcesExtension), (sp, _) => sp.GetRequiredService<CancellationSourcesExtension>());
             services.TryAddSingleton<OrleansTaskScheduler>();
             services.TryAddSingleton<GrainFactory>(sp => sp.GetService<InsideRuntimeClient>().ConcreteGrainFactory);
-            services.TryAddSingleton<GrainInterfaceToTypeResolver>();
+            services.TryAddSingleton<GrainInterfaceTypeToGrainTypeResolver>();
             services.TryAddFromExisting<IGrainFactory, GrainFactory>();
             services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
             services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
@@ -119,7 +119,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IGrainReferenceActivatorProvider, ImrGrainReferenceActivatorProvider>();
             services.AddSingleton<IGrainReferenceActivatorProvider, UntypedGrainReferenceActivatorProvider>();
             services.AddSingleton<IConfigureGrainContextProvider, MayInterleaveConfiguratorProvider>();
-            services.AddSingleton<IConfigureGrainSharedComponents, ReentrantSharedComponentsConfigurator>();
+            services.AddSingleton<IConfigureGrainTypeComponents, ReentrantSharedComponentsConfigurator>();
             services.TryAddSingleton<ImrRpcProvider>();
             services.TryAddSingleton<ImrGrainMethodInvokerProvider>();
             services.TryAddSingleton<GrainReferenceSerializer>();
@@ -128,7 +128,7 @@ namespace Orleans.Hosting
             services.AddSingleton<GrainVersionManifest>();
             services.TryAddSingleton<TypeMetadataCache>();
             services.TryAddSingleton<GrainBindingsResolver>();
-            services.TryAddSingleton<GrainSharedComponentsResolver>();
+            services.TryAddSingleton<GrainTypeComponentsResolver>();
             services.TryAddSingleton<ActivationDirectory>();
             services.AddSingleton<ActivationCollector>();
             services.AddFromExisting<IActivationCollector, ActivationCollector>();
@@ -261,7 +261,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<Catalog>();
             services.AddFromExisting<IHealthCheckParticipant, Catalog>();
             services.TryAddSingleton<GrainContextActivator>();
-            services.AddSingleton<IConfigureGrainSharedComponents, ConfigureDefaultGrainActivator>();
+            services.AddSingleton<IConfigureGrainTypeComponents, ConfigureDefaultGrainActivator>();
             services.TryAddSingleton<GrainReferenceActivator>();
             services.TryAddSingleton<IGrainContextActivatorProvider, ActivationDataActivatorProvider>();
             services.TryAddSingleton<IGrainContextAccessor, GrainContextAccessor>();
@@ -317,7 +317,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IGrainTypeProvider, AttributeGrainTypeProvider>();
             services.AddSingleton<IGrainTypeProvider, LegacyGrainTypeResolver>();
             services.AddSingleton<GrainPropertiesResolver>();
-            services.AddSingleton<GrainInterfaceIdResolver>();
+            services.AddSingleton<GrainInterfaceTypeResolver>();
             services.AddSingleton<IGrainInterfacePropertiesProvider, AttributeGrainInterfacePropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, AttributeGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, AttributeGrainBindingsProvider>();

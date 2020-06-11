@@ -71,14 +71,14 @@ namespace Orleans.Serialization
             var typed = (GrainReference)obj;
             info.AddValue("type", typed.GrainId.Type.ToStringUtf8(), typeof(string));
             info.AddValue("key", typed.GrainId.Key.ToStringUtf8(), typeof(string));
-            info.AddValue("interface", typed.InterfaceId.ToStringUtf8(), typeof(string));
+            info.AddValue("interface", typed.InterfaceType.ToStringUtf8(), typeof(string));
         }
 
         /// <inheritdoc/>
         public object SetObjectData(object obj, SerializationInfo info, StreamingContext context, ISurrogateSelector selector)
         {
             var id = GrainId.Create(info.GetString("type"), info.GetString("key"));
-            var iface = GrainInterfaceId.Create(info.GetString("interface"));
+            var iface = GrainInterfaceType.Create(info.GetString("interface"));
             return _activator.CreateReference(id, iface);
         }
     }

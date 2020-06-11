@@ -23,7 +23,7 @@ namespace Orleans.GrainReferences
         private readonly object _lockObj = new object();
         private readonly IServiceProvider _serviceProvider;
         private readonly IGrainReferenceActivatorProvider[] _providers;
-        private Dictionary<(GrainType, GrainInterfaceId), Entry> _activators = new Dictionary<(GrainType, GrainInterfaceId), Entry>();
+        private Dictionary<(GrainType, GrainInterfaceType), Entry> _activators = new Dictionary<(GrainType, GrainInterfaceType), Entry>();
 
         public GrainReferenceActivator(
             IServiceProvider serviceProvider,
@@ -33,27 +33,27 @@ namespace Orleans.GrainReferences
             _providers = providers.ToArray();
         }
 
-        public GrainReference CreateReference(GrainId grainId, GrainInterfaceId interfaceId)
+        public GrainReference CreateReference(GrainId grainId, GrainInterfaceType interfaceType)
         {
-            if (!_activators.TryGetValue((grainId.Type, interfaceId), out var entry))
+            if (!_activators.TryGetValue((grainId.Type, interfaceType), out var entry))
             {
-                entry = CreateActivator(grainId.Type, interfaceId);
+                entry = CreateActivator(grainId.Type, interfaceType);
             }
 
             var result = entry.Activator.CreateReference(grainId);
             return result;
         }
 
-        private Entry CreateActivator(GrainType grainType, GrainInterfaceId interfaceId)
+        private Entry CreateActivator(GrainType grainType, GrainInterfaceType interfaceType)
         {
             lock (_lockObj)
             {
-                if (!_activators.TryGetValue((grainType, interfaceId), out var entry))
+                if (!_activators.TryGetValue((grainType, interfaceType), out var entry))
                 {
                     IGrainReferenceActivator activator = null;
                     foreach (var provider in _providers)
                     {
-                        if (provider.TryGet(grainType, interfaceId, out activator))
+                        if (provider.TryGet(grainType, interfaceType, out activator))
                         {
                             break;
                         }
@@ -65,7 +65,7 @@ namespace Orleans.GrainReferences
                     }
 
                     entry = new Entry(activator);
-                    _activators = new Dictionary<(GrainType, GrainInterfaceId), Entry>(_activators) { [(grainType, interfaceId)] = entry };
+                    _activators = new Dictionary<(GrainType, GrainInterfaceType), Entry>(_activators) { [(grainType, interfaceType)] = entry };
                 }
 
                 return entry;
@@ -93,16 +93,16 @@ namespace Orleans.GrainReferences
             _serviceProvider = serviceProvider;
         }
 
-        public bool TryGet(GrainType grainType, GrainInterfaceId interfaceId, out IGrainReferenceActivator activator)
+        public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
         {
-            if (!interfaceId.IsDefault)
+            if (!interfaceType.IsDefault)
             {
                 activator = default;
                 return false;
             }
        
             var runtime = _grainReferenceRuntime ??= _serviceProvider.GetRequiredService<IGrainReferenceRuntime>();
-            var shared = new GrainReferenceShared(grainType, interfaceId, runtime, InvokeMethodOptions.None);
+            var shared = new GrainReferenceShared(grainType, interfaceType, runtime, InvokeMethodOptions.None);
             activator = new UntypedGrainReferenceActivator(shared);
             return true;
         }
@@ -126,35 +126,35 @@ namespace Orleans.GrainReferences
     internal class ImrRpcProvider
     {
         private readonly TypeConverter _typeConverter;
-        private readonly Dictionary<GrainInterfaceId, (Type ReferenceType, Type InvokerType)> _mapping;
+        private readonly Dictionary<GrainInterfaceType, (Type ReferenceType, Type InvokerType)> _mapping;
         public ImrRpcProvider(
         IServiceProvider serviceProvider,
         IApplicationPartManager appParts,
-        GrainInterfaceIdResolver resolver,
+        GrainInterfaceTypeResolver resolver,
         TypeConverter typeConverter)
         {
             _typeConverter = typeConverter;
             var interfaces = appParts.CreateAndPopulateFeature<GrainInterfaceFeature>();
-            _mapping = new Dictionary<GrainInterfaceId, (Type ReferenceType, Type InvokerType)>();
+            _mapping = new Dictionary<GrainInterfaceType, (Type ReferenceType, Type InvokerType)>();
             foreach (var @interface in interfaces.Interfaces)
             {
-                var id = resolver.GetGrainInterfaceId(@interface.InterfaceType);
+                var id = resolver.GetGrainInterfaceType(@interface.InterfaceType);
                 _mapping[id] = (@interface.ReferenceType, @interface.InvokerType);
             }
         }
 
-        public bool TryGet(GrainInterfaceId interfaceId, out (Type ReferenceType, Type InvokerType) result)
+        public bool TryGet(GrainInterfaceType interfaceType, out (Type ReferenceType, Type InvokerType) result)
         {
-            GrainInterfaceId lookupId;
+            GrainInterfaceType lookupId;
             Type[] args;
-            if (GenericGrainInterfaceId.TryParse(interfaceId, out var genericId))
+            if (GenericGrainInterfaceType.TryParse(interfaceType, out var genericId))
             {
                 lookupId = genericId.GetGenericGrainType().Value;
                 args = genericId.GetArguments(_typeConverter);
             }
             else
             {
-                lookupId = interfaceId;
+                lookupId = interfaceType;
                 args = default;
             }
 
@@ -181,7 +181,7 @@ namespace Orleans.GrainReferences
     {
         private readonly ImrRpcProvider _rpcProvider;
         private readonly IServiceProvider _serviceProvider;
-        private readonly ConcurrentDictionary<GrainInterfaceId, IGrainMethodInvoker> _invokers = new ConcurrentDictionary<GrainInterfaceId, IGrainMethodInvoker>();
+        private readonly ConcurrentDictionary<GrainInterfaceType, IGrainMethodInvoker> _invokers = new ConcurrentDictionary<GrainInterfaceType, IGrainMethodInvoker>();
 
         public ImrGrainMethodInvokerProvider(ImrRpcProvider rpcProvider, IServiceProvider serviceProvider)
         {
@@ -189,20 +189,20 @@ namespace Orleans.GrainReferences
             _serviceProvider = serviceProvider;
         }
 
-        public bool TryGet(GrainInterfaceId interfaceId, out IGrainMethodInvoker invoker)
+        public bool TryGet(GrainInterfaceType interfaceType, out IGrainMethodInvoker invoker)
         {
-            if (_invokers.TryGetValue(interfaceId, out invoker))
+            if (_invokers.TryGetValue(interfaceType, out invoker))
             {
                 return true;
             }
 
-            if (!_rpcProvider.TryGet(interfaceId, out var types))
+            if (!_rpcProvider.TryGet(interfaceType, out var types))
             {
                 invoker = default;
                 return false;
             }
 
-            _invokers[interfaceId] = invoker = (IGrainMethodInvoker)ActivatorUtilities.CreateInstance(_serviceProvider, types.InvokerType);
+            _invokers[interfaceType] = invoker = (IGrainMethodInvoker)ActivatorUtilities.CreateInstance(_serviceProvider, types.InvokerType);
             return true;
         }
     }
@@ -224,9 +224,9 @@ namespace Orleans.GrainReferences
             _rpcProvider = rpcProvider;
         }
 
-        public bool TryGet(GrainType grainType, GrainInterfaceId interfaceId, out IGrainReferenceActivator activator)
+        public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
         {
-            if (!_rpcProvider.TryGet(interfaceId, out var types))
+            if (!_rpcProvider.TryGet(interfaceType, out var types))
             {
                 activator = default;
                 return false;
@@ -242,7 +242,7 @@ namespace Orleans.GrainReferences
 
             var invokeMethodOptions = unordered ? InvokeMethodOptions.Unordered : InvokeMethodOptions.None;
             var runtime = _grainReferenceRuntime ??= _serviceProvider.GetRequiredService<IGrainReferenceRuntime>();
-            var shared = new GrainReferenceShared(grainType, interfaceId, runtime, invokeMethodOptions);
+            var shared = new GrainReferenceShared(grainType, interfaceType, runtime, invokeMethodOptions);
             activator = new ImrGrainReferenceActivator(types.ReferenceType, shared);
             return true;
         }
@@ -272,7 +272,7 @@ namespace Orleans.GrainReferences
 
     public interface IGrainReferenceActivatorProvider
     {
-        bool TryGet(GrainType grainType, GrainInterfaceId interfaceId, out IGrainReferenceActivator activator);
+        bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator);
     }
 
     public interface IGrainReferenceActivator

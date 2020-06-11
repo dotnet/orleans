@@ -23,7 +23,7 @@ namespace Orleans.Serialization
             var writer = context.StreamWriter;
             var input = (GrainReference)obj;
             writer.Write(input.GrainId);
-            writer.Write(input.InterfaceId);
+            writer.Write(input.InterfaceType);
         }
 
         /// <summary> Deserializer function for grain reference.</summary>
@@ -33,9 +33,9 @@ namespace Orleans.Serialization
         {
             var reader = context.StreamReader;
             GrainId id = reader.ReadGrainId();
-            GrainInterfaceId interfaceId = reader.ReadGrainInterfaceId();
+            GrainInterfaceType interfaceType = reader.ReadGrainInterfaceType();
 
-            return _activator.CreateReference(id, interfaceId);
+            return _activator.CreateReference(id, interfaceType);
         }
 
         /// <summary> Copier function for grain reference. </summary>

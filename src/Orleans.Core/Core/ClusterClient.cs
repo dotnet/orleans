@@ -310,7 +310,7 @@ namespace Orleans
         public object Cast(IAddressable grain, Type outputGrainInterfaceType)
             => this.InternalGrainFactory.Cast(grain, outputGrainInterfaceType);
 
-        public IAddressable GetGrain(GrainId grainId, GrainInterfaceId interfaceId)
-            => this.InternalGrainFactory.GetGrain(grainId, interfaceId);
+        public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
+            => this.InternalGrainFactory.GetGrain(grainId, interfaceType);
     }
 }

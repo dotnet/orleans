@@ -177,7 +177,7 @@ namespace Orleans.Runtime
             return this.grainFactory.GetGrain(grainInterfaceType, grainPrimaryKey);
         }
 
-        public IAddressable GetGrain(GrainId grainId, GrainInterfaceId interfaceId)
+        public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceId)
         {
             return this.grainFactory.GetGrain(grainId, interfaceId);
         }

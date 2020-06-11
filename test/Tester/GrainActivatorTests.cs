@@ -33,7 +33,7 @@ namespace UnitTests.General
                 {
                     hostBuilder.ConfigureServices(services =>
                     {
-                        services.AddSingleton<IConfigureGrainSharedComponents, HardcodedGrainActivator>();
+                        services.AddSingleton<IConfigureGrainTypeComponents, HardcodedGrainActivator>();
                     });
                 }
             }
@@ -71,7 +71,7 @@ namespace UnitTests.General
             Assert.Equal(initialReleasedInstances + 1, finalReleasedInstances);
         }
 
-        private class HardcodedGrainActivator : IGrainActivator, IConfigureGrainSharedComponents
+        private class HardcodedGrainActivator : IGrainActivator, IConfigureGrainTypeComponents
         {
             public const string HardcodedValue = "Hardcoded Test Value";
             private readonly GrainClassMap _grainClassMap;
@@ -82,7 +82,7 @@ namespace UnitTests.General
                 _grainClassMap = grainClassMap;
             }
 
-            public void Configure(GrainType grainType, GrainProperties properties, GrainSharedComponents shared)
+            public void Configure(GrainType grainType, GrainProperties properties, GrainTypeComponents shared)
             {
                 if (_grainClassMap.TryGetGrainClass(grainType, out var grainClass) && grainClass.IsAssignableFrom(typeof(ExplicitlyRegisteredSimpleDIGrain)))
                 {

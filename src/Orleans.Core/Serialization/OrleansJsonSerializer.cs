@@ -312,7 +312,7 @@ namespace Orleans.Serialization
             writer.WriteValue(val.GrainId.Key.ToStringUtf8());
             writer.WriteEndObject();
             writer.WritePropertyName("Interface");
-            writer.WriteValue(val.InterfaceId.ToStringUtf8());
+            writer.WriteValue(val.InterfaceType.ToStringUtf8());
             writer.WriteEndObject();
         }
 
@@ -321,7 +321,7 @@ namespace Orleans.Serialization
             JObject jo = JObject.Load(reader);
             var id = jo["Id"];
             GrainId grainId = GrainId.Create(id["Type"].ToObject<string>(), id["Key"].ToObject<string>());
-            var iface = GrainInterfaceId.Create(jo["Interface"].ToString());
+            var iface = GrainInterfaceType.Create(jo["Interface"].ToString());
             return this.referenceActivator.CreateReference(grainId, iface);
         }
     }

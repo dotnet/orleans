@@ -72,7 +72,7 @@ namespace Orleans.Metadata
         public const string Unordered = "unordered";
 
         /// <summary>
-        /// Prefix for keys which indicate <see cref="GrainInterfaceId"/> of interfaces which a grain class implements.
+        /// Prefix for keys which indicate <see cref="GrainInterfaceType"/> of interfaces which a grain class implements.
         /// </summary>
         public const string ImplementedInterfacePrefix = "interface.";
 

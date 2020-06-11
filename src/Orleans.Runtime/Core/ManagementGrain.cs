@@ -170,20 +170,20 @@ namespace Orleans.Runtime.Management
                 siloControl => siloControl.SetSelectorStrategy(strategy));
         }
 
-        public async Task SetCompatibilityStrategy(GrainInterfaceId interfaceId, CompatibilityStrategy strategy)
+        public async Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy)
         {
-            CheckIfIsExistingInterface(interfaceId);
+            CheckIfIsExistingInterface(interfaceType);
             await SetStrategy(
-                store => store.SetCompatibilityStrategy(interfaceId, strategy),
-                siloControl => siloControl.SetCompatibilityStrategy(interfaceId, strategy));
+                store => store.SetCompatibilityStrategy(interfaceType, strategy),
+                siloControl => siloControl.SetCompatibilityStrategy(interfaceType, strategy));
         }
 
-        public async Task SetSelectorStrategy(GrainInterfaceId interfaceId, VersionSelectorStrategy strategy)
+        public async Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
         {
-            CheckIfIsExistingInterface(interfaceId);
+            CheckIfIsExistingInterface(interfaceType);
             await SetStrategy(
-                store => store.SetSelectorStrategy(interfaceId, strategy),
-                siloControl => siloControl.SetSelectorStrategy(interfaceId, strategy));
+                store => store.SetSelectorStrategy(interfaceType, strategy),
+                siloControl => siloControl.SetSelectorStrategy(interfaceType, strategy));
         }
 
         public async Task<int> GetTotalActivationCount()
@@ -208,21 +208,21 @@ namespace Orleans.Runtime.Management
                 String.Format("SendControlCommandToProvider of type {0} and name {1} command {2}.", providerTypeFullName, providerName, command));
         }
 
-        private void CheckIfIsExistingInterface(GrainInterfaceId interfaceId)
+        private void CheckIfIsExistingInterface(GrainInterfaceType interfaceType)
         {
-            GrainInterfaceId lookupId;
-            if (GenericGrainInterfaceId.TryParse(interfaceId, out var generic))
+            GrainInterfaceType lookupId;
+            if (GenericGrainInterfaceType.TryParse(interfaceType, out var generic))
             {
                 lookupId = generic.Value;
             }
             else
             {
-                lookupId = interfaceId;
+                lookupId = interfaceType;
             }
 
             if (!this.siloManifest.Interfaces.TryGetValue(lookupId, out _))
             { 
-                throw new ArgumentException($"Interface '{interfaceId} not found", nameof(interfaceId));
+                throw new ArgumentException($"Interface '{interfaceType} not found", nameof(interfaceType));
             }
         }
 

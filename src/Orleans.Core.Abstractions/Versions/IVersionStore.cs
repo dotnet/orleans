@@ -9,8 +9,8 @@ namespace Orleans.Versions
     public interface IVersionStore : IVersionManager
     {
         bool IsEnabled { get; }
-        Task<Dictionary<GrainInterfaceId, CompatibilityStrategy>> GetCompatibilityStrategies();
-        Task<Dictionary<GrainInterfaceId, VersionSelectorStrategy>> GetSelectorStrategies();
+        Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies();
+        Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies();
         Task<CompatibilityStrategy> GetCompatibilityStrategy();
         Task<VersionSelectorStrategy> GetSelectorStrategy();
     }

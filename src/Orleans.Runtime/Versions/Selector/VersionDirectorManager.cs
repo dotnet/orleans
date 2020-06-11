@@ -10,7 +10,7 @@ namespace Orleans.Runtime.Versions.Selector
     {
         private readonly VersionSelectorStrategy strategyFromConfig;
         private readonly IServiceProvider serviceProvider;
-        private readonly Dictionary<GrainInterfaceId, IVersionSelector> versionSelectors;
+        private readonly Dictionary<GrainInterfaceType, IVersionSelector> versionSelectors;
 
         public IVersionSelector Default { get; set; }
 
@@ -19,13 +19,13 @@ namespace Orleans.Runtime.Versions.Selector
             this.serviceProvider = serviceProvider;
             this.strategyFromConfig = serviceProvider.GetRequiredServiceByName<VersionSelectorStrategy>(options.Value.DefaultVersionSelectorStrategy);
             Default = ResolveVersionSelector(serviceProvider, this.strategyFromConfig);
-            versionSelectors = new Dictionary<GrainInterfaceId, IVersionSelector>();
+            versionSelectors = new Dictionary<GrainInterfaceType, IVersionSelector>();
         }
 
-        public IVersionSelector GetSelector(GrainInterfaceId interfaceId)
+        public IVersionSelector GetSelector(GrainInterfaceType interfaceType)
         {
             IVersionSelector selector;
-            return this.versionSelectors.TryGetValue(interfaceId, out selector)
+            return this.versionSelectors.TryGetValue(interfaceType, out selector)
                 ? selector
                 : Default;
         }
@@ -36,16 +36,16 @@ namespace Orleans.Runtime.Versions.Selector
             Default = selector;
         }
 
-        public void SetSelector(GrainInterfaceId interfaceId, VersionSelectorStrategy strategy)
+        public void SetSelector(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
         {
             if (strategy == null)
             {
-                versionSelectors.Remove(interfaceId);
+                versionSelectors.Remove(interfaceType);
             }
             else
             {
                 var selector = ResolveVersionSelector(this.serviceProvider, strategy);
-                versionSelectors[interfaceId] = selector;
+                versionSelectors[interfaceType] = selector;
             }
         }
 

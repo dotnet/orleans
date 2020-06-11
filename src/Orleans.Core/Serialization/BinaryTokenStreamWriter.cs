@@ -63,7 +63,7 @@ namespace Orleans.Serialization
             @this.Write(type.Value);
         }
 
-        internal static void Write<TWriter>(this TWriter @this, GrainInterfaceId type) where TWriter : IBinaryTokenStreamWriter
+        internal static void Write<TWriter>(this TWriter @this, GrainInterfaceType type) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write(type.Value);
         }

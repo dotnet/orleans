@@ -16,7 +16,7 @@ namespace Orleans.Runtime
         private readonly PlacementStrategyResolver _placementStrategyResolver;
         private readonly IActivationCollector _activationCollector;
         private readonly GrainManifest _siloManifest;
-        private readonly GrainSharedComponentsResolver _sharedComponentsResolver;
+        private readonly GrainTypeComponentsResolver _sharedComponentsResolver;
         private readonly GrainClassMap _grainClassMap;
         private readonly GrainCollectionOptions _collectionOptions;
         private readonly IOptions<SiloMessagingOptions> _messagingOptions;
@@ -36,7 +36,7 @@ namespace Orleans.Runtime
             IOptions<GrainCollectionOptions> collectionOptions,
             ILoggerFactory loggerFactory,
             GrainReferenceActivator grainReferenceActivator,
-            GrainSharedComponentsResolver sharedComponentsResolver)
+            GrainTypeComponentsResolver sharedComponentsResolver)
         {
             _sharedComponentsResolver = sharedComponentsResolver;
             _grainClassMap = grainClassMap;
@@ -61,7 +61,7 @@ namespace Orleans.Runtime
                 return false;
             }
 
-            var sharedComponents = _sharedComponentsResolver.GetSharedComponents(grainType);
+            var sharedComponents = _sharedComponentsResolver.GetComponents(grainType);
             IGrainActivator instanceActivator = sharedComponents.GetComponent<IGrainActivator>();
             if (instanceActivator is null)
             {
@@ -123,7 +123,7 @@ namespace Orleans.Runtime
             private readonly IServiceProvider _serviceProvider;
             private readonly IGrainRuntime _grainRuntime;
             private readonly GrainReferenceActivator _grainReferenceActivator;
-            private readonly GrainSharedComponents _sharedComponents;
+            private readonly GrainTypeComponents _sharedComponents;
 
             public ActivationDataActivator(
                 IGrainActivator grainActivator,
@@ -137,7 +137,7 @@ namespace Orleans.Runtime
                 IServiceProvider serviceProvider,
                 IGrainRuntime grainRuntime,
                 GrainReferenceActivator grainReferenceActivator,
-                GrainSharedComponents sharedComponents)
+                GrainTypeComponents sharedComponents)
             {
                 _grainActivator = grainActivator;
                 _placementStrategy = placementStrategy;

@@ -66,8 +66,8 @@ namespace Orleans.Runtime
             ApplicationRequestsStatisticsGroup appRequestStatistics,
             MessagingTrace messagingTrace,
             GrainReferenceActivator referenceActivator,
-            GrainInterfaceIdResolver interfaceIdResolver,
-            GrainInterfaceToTypeResolver interfaceToTypeResolver,
+            GrainInterfaceTypeResolver interfaceIdResolver,
+            GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
             ImrGrainMethodInvokerProvider invokers)
         {
             this.ServiceProvider = serviceProvider;
@@ -132,7 +132,7 @@ namespace Orleans.Runtime
             InvokeMethodOptions options)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            message.InterfaceId = target.InterfaceId;
+            message.InterfaceType = target.InterfaceType;
             message.InterfaceVersion = target.InterfaceVersion;
 
             // fill in sender
@@ -305,9 +305,9 @@ namespace Orleans.Runtime
                         CancellationSourcesExtension.RegisterCancellationTokens(target, request);
                     }
 
-                    if (!this.invokers.TryGet(message.InterfaceId, out var invoker))
+                    if (!this.invokers.TryGet(message.InterfaceType, out var invoker))
                     {
-                        throw new KeyNotFoundException($"Could not find an invoker for interface {message.InterfaceId}");
+                        throw new KeyNotFoundException($"Could not find an invoker for interface {message.InterfaceType}");
                     }
 
                     messagingTrace.OnInvokeMessage(message);

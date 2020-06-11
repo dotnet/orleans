@@ -15,7 +15,7 @@ namespace Orleans.Metadata
             properties["diag.asm"] = grainClass.Assembly.GetName().Name;
         }
 
-        public void Populate(Type interfaceType, GrainInterfaceId interfaceId, Dictionary<string, string> properties)
+        public void Populate(Type interfaceType, GrainInterfaceType interfaceId, Dictionary<string, string> properties)
         {
             properties[WellKnownGrainInterfaceProperties.TypeName] = interfaceType.Name;
             properties["diag.type"] = RuntimeTypeNameFormatter.Format(interfaceType);

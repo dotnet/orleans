@@ -6,27 +6,27 @@ using Orleans.CodeGeneration;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Properties common to <see cref="GrainReference"/> instances with the same <see cref="Orleans.Runtime.GrainType"/> and <see cref="GrainInterfaceId"/>.
+    /// Properties common to <see cref="GrainReference"/> instances with the same <see cref="Orleans.Runtime.GrainType"/> and <see cref="GrainInterfaceType"/>.
     /// </summary>
     public class GrainReferenceShared
     {
         public GrainReferenceShared(
             GrainType graintype,
-            GrainInterfaceId grainInterfaceId,
+            GrainInterfaceType grainInterfaceType,
             IGrainReferenceRuntime runtime,
             InvokeMethodOptions invokeMethodOptions)
         {
             this.GrainType = graintype;
-            this.InterfaceId = grainInterfaceId;
+            this.InterfaceType = grainInterfaceType;
             this.Runtime = runtime;
             this.InvokeMethodOptions = invokeMethodOptions;
         }
 
-        public IGrainReferenceRuntime Runtime { get; }
+        public IGrainReferenceRuntime Runtime { get; }  
 
         public GrainType GrainType { get; }
 
-        public GrainInterfaceId InterfaceId { get; }
+        public GrainInterfaceType InterfaceType { get; }
 
         public InvokeMethodOptions InvokeMethodOptions { get; }
     }
@@ -53,7 +53,7 @@ namespace Orleans.Runtime
 
         public GrainId GrainId => GrainId.Create(_shared.GrainType, _key);
 
-        public GrainInterfaceId InterfaceId => _shared.InterfaceId;
+        public GrainInterfaceType InterfaceType => _shared.InterfaceType;
 
         /// <summary>Constructs a reference to the grain with the specified Id.</summary>
         protected GrainReference(GrainReferenceShared shared, IdSpan key)
@@ -158,10 +158,10 @@ namespace Orleans.Runtime
         /// Return the name of the interface for this GrainReference. 
         /// Implemented in Orleans generated code.
         /// </summary>
-        public virtual string InterfaceName => InterfaceId.ToStringUtf8();
+        public virtual string InterfaceName => InterfaceType.ToStringUtf8();
 
         /// <summary>Returns a string representation of this reference.</summary>
-        public override string ToString() => $"GrainReference:{GrainId}:{InterfaceId}";
+        public override string ToString() => $"GrainReference:{GrainId}:{InterfaceType}";
 
         /// <summary>
         /// Called from generated code.

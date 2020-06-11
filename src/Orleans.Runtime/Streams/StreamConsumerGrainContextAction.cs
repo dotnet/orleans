@@ -14,8 +14,6 @@ namespace Orleans.Streams
             _streamProviderRuntime = streamProviderRuntime;
         }
 
-        public bool CanConfigure(GrainType grainType) => true;
-
         public void Configure(IGrainContext context)
         {
             if (context.GrainInstance is IStreamSubscriptionObserver observer)

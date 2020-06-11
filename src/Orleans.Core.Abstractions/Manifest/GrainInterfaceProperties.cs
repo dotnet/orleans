@@ -80,7 +80,7 @@ namespace Orleans.Metadata
         /// <summary>
         /// Adds grain interface properties to <paramref name="properties"/>.
         /// </summary>
-        void Populate(Type interfaceType, GrainInterfaceId interfaceId, Dictionary<string, string> properties);
+        void Populate(Type interfaceType, GrainInterfaceType grainInterfaceType, Dictionary<string, string> properties);
     }
 
     /// <summary>
@@ -110,7 +110,7 @@ namespace Orleans.Metadata
         }
 
         /// <inheritdoc />
-        public void Populate(Type interfaceType, GrainInterfaceId interfaceId, Dictionary<string, string> properties)
+        public void Populate(Type interfaceType, GrainInterfaceType grainInterfaceType, Dictionary<string, string> properties)
         {
             foreach (var attr in interfaceType.GetCustomAttributes(inherit: true))
             {

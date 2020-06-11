@@ -49,7 +49,7 @@ namespace Orleans
             services.TryAddFromExisting<IRuntimeClient, OutsideRuntimeClient>();
             services.TryAddFromExisting<IClusterConnectionStatusListener, OutsideRuntimeClient>();
             services.TryAddSingleton<GrainFactory>();
-            services.TryAddSingleton<GrainInterfaceToTypeResolver>();
+            services.TryAddSingleton<GrainInterfaceTypeToGrainTypeResolver>();
             services.TryAddSingleton<GrainReferenceActivator>();
             services.AddSingleton<IGrainReferenceActivatorProvider, ImrGrainReferenceActivatorProvider>();
             services.AddSingleton<IGrainReferenceActivatorProvider, UntypedGrainReferenceActivatorProvider>();
@@ -59,7 +59,7 @@ namespace Orleans
             services.TryAddSingleton<BinaryFormatterGrainReferenceSurrogateSelector>();
             services.TryAddSingleton<GrainReferenceKeyStringConverter>();
             services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
-            services.TryAddSingleton<GrainInterfaceIdResolver>();
+            services.TryAddSingleton<GrainInterfaceTypeResolver>();
             services.TryAddSingleton<GrainPropertiesResolver>();
             services.TryAddSingleton<TypeConverter>();
             services.TryAddSingleton<IGrainCancellationTokenRuntime, GrainCancellationTokenRuntime>();
@@ -136,12 +136,12 @@ namespace Orleans
             services.AddSingleton<ClientClusterManifestProvider>();
             services.AddFromExisting<IClusterManifestProvider, ClientClusterManifestProvider>();
             services.AddSingleton<ClientManifestProvider>();
-            services.AddSingleton<IGrainInterfaceIdProvider, AttributeGrainInterfaceIdProvider>();
+            services.AddSingleton<IGrainInterfaceTypeProvider, AttributeGrainInterfaceTypeProvider>();
             services.AddSingleton<GrainTypeResolver>();
             services.AddSingleton<IGrainTypeProvider, AttributeGrainTypeProvider>();
             services.AddSingleton<IGrainTypeProvider, LegacyGrainTypeResolver>();
             services.AddSingleton<GrainPropertiesResolver>();
-            services.AddSingleton<GrainInterfaceIdResolver>();
+            services.AddSingleton<GrainInterfaceTypeResolver>();
             services.AddSingleton<IGrainInterfacePropertiesProvider, AttributeGrainInterfacePropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, AttributeGrainPropertiesProvider>();
             services.AddSingleton<IGrainInterfacePropertiesProvider, TypeNameGrainPropertiesProvider>();

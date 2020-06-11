@@ -156,14 +156,14 @@ namespace Orleans.Runtime
     /// <summary>
     /// Resolves components which are common to all instances of a given grain type.
     /// </summary>
-    public class GrainSharedComponentsResolver
+    public class GrainTypeComponentsResolver
     {
-        private readonly ConcurrentDictionary<GrainType, GrainSharedComponents> _components = new ConcurrentDictionary<GrainType, GrainSharedComponents>();
-        private readonly IConfigureGrainSharedComponents[] _configurators;
+        private readonly ConcurrentDictionary<GrainType, GrainTypeComponents> _components = new ConcurrentDictionary<GrainType, GrainTypeComponents>();
+        private readonly IConfigureGrainTypeComponents[] _configurators;
         private readonly GrainPropertiesResolver _resolver;
-        private readonly Func<GrainType, GrainSharedComponents> _createFunc;
+        private readonly Func<GrainType, GrainTypeComponents> _createFunc;
 
-        public GrainSharedComponentsResolver(IEnumerable<IConfigureGrainSharedComponents> configurators, GrainPropertiesResolver resolver)
+        public GrainTypeComponentsResolver(IEnumerable<IConfigureGrainTypeComponents> configurators, GrainPropertiesResolver resolver)
         {
             _configurators = configurators.ToArray();
             _resolver = resolver;
@@ -173,11 +173,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns shared grain components for the provided grain type.
         /// </summary>
-        public GrainSharedComponents GetSharedComponents(GrainType grainType) => _components.GetOrAdd(grainType, _createFunc);
+        public GrainTypeComponents GetComponents(GrainType grainType) => _components.GetOrAdd(grainType, _createFunc);
 
-        private GrainSharedComponents Create(GrainType grainType)
+        private GrainTypeComponents Create(GrainType grainType)
         {
-            var result = new GrainSharedComponents();
+            var result = new GrainTypeComponents();
             var properties = _resolver.GetGrainProperties(grainType);
             foreach (var configurator in _configurators)
             {
@@ -191,18 +191,18 @@ namespace Orleans.Runtime
     /// <summary>
     /// Configures shared components which are common for all instances of a given grain type.
     /// </summary>
-    public interface IConfigureGrainSharedComponents
+    public interface IConfigureGrainTypeComponents
     {
         /// <summary>
         /// Configures shared components which are common for all instances of a given grain type.
         /// </summary>
-        void Configure(GrainType grainType, GrainProperties properties, GrainSharedComponents shared);
+        void Configure(GrainType grainType, GrainProperties properties, GrainTypeComponents shared);
     }
 
     /// <summary>
     /// Components common to all grains of a given <see cref="GrainType"/>.
     /// </summary>
-    public class GrainSharedComponents
+    public class GrainTypeComponents
     {
         private Dictionary<Type, object> _components = new Dictionary<Type, object>();
 
@@ -234,9 +234,9 @@ namespace Orleans.Runtime
         }
     }
 
-    internal class ReentrantSharedComponentsConfigurator : IConfigureGrainSharedComponents
+    internal class ReentrantSharedComponentsConfigurator : IConfigureGrainTypeComponents
     {
-        public void Configure(GrainType grainType, GrainProperties properties, GrainSharedComponents shared)
+        public void Configure(GrainType grainType, GrainProperties properties, GrainTypeComponents shared)
         {
             if (properties.Properties.TryGetValue(WellKnownGrainTypeProperties.Reentrant, out var value) && bool.Parse(value))
             {
@@ -350,7 +350,7 @@ namespace Orleans.Runtime
         }
     }
 
-    internal class ConfigureDefaultGrainActivator : IConfigureGrainSharedComponents
+    internal class ConfigureDefaultGrainActivator : IConfigureGrainTypeComponents
     {
         private readonly GrainClassMap _grainClassMap;
         private readonly ConstructorArgumentFactory _constructorArgumentFactory;
@@ -361,7 +361,7 @@ namespace Orleans.Runtime
             _grainClassMap = grainClassMap;
         }
 
-        public void Configure(GrainType grainType, GrainProperties properties, GrainSharedComponents shared)
+        public void Configure(GrainType grainType, GrainProperties properties, GrainTypeComponents shared)
         {
             if (shared.GetComponent<IGrainActivator>() is object) return;
 

@@ -9,10 +9,10 @@ namespace Orleans.Runtime.Versions
     internal class GrainVersionManifest
     {
         private readonly object _lockObj = new object();
-        private readonly ConcurrentDictionary<GrainInterfaceId, GrainInterfaceId> _genericInterfaceMapping = new ConcurrentDictionary<GrainInterfaceId, GrainInterfaceId>();
+        private readonly ConcurrentDictionary<GrainInterfaceType, GrainInterfaceType> _genericInterfaceMapping = new ConcurrentDictionary<GrainInterfaceType, GrainInterfaceType>();
         private readonly ConcurrentDictionary<GrainType, GrainType> _genericGrainTypeMapping = new ConcurrentDictionary<GrainType, GrainType>();
         private readonly IClusterManifestProvider _clusterManifestProvider;
-        private readonly Dictionary<GrainInterfaceId, ushort> _localVersions;
+        private readonly Dictionary<GrainInterfaceType, ushort> _localVersions;
         private Cache _cache;
 
         public GrainVersionManifest(IClusterManifestProvider clusterManifestProvider)
@@ -24,43 +24,43 @@ namespace Orleans.Runtime.Versions
 
         public MajorMinorVersion LatestVersion => _clusterManifestProvider.Current.Version;
 
-        public ushort GetLocalVersion(GrainInterfaceId interfaceId)
+        public ushort GetLocalVersion(GrainInterfaceType interfaceType)
         {
-            if (_localVersions.TryGetValue(interfaceId, out var result))
+            if (_localVersions.TryGetValue(interfaceType, out var result))
             {
                 return result;
             }
 
-            if (_genericInterfaceMapping.TryGetValue(interfaceId, out var genericInterfaceId))
+            if (_genericInterfaceMapping.TryGetValue(interfaceType, out var genericInterfaceId))
             {
                 return GetLocalVersion(genericInterfaceId);
             }
 
-            if (GenericGrainInterfaceId.TryParse(interfaceId, out var generic) && generic.IsConstructed)
+            if (GenericGrainInterfaceType.TryParse(interfaceType, out var generic) && generic.IsConstructed)
             {
-                var genericId = _genericInterfaceMapping[interfaceId] = generic.GetGenericGrainType().Value;
+                var genericId = _genericInterfaceMapping[interfaceType] = generic.GetGenericGrainType().Value;
                 return GetLocalVersion(genericId);
             }
 
             return 0;
         }
 
-        public (MajorMinorVersion Version, ushort[] Result) GetAvailableVersions(GrainInterfaceId interfaceId)
+        public (MajorMinorVersion Version, ushort[] Result) GetAvailableVersions(GrainInterfaceType interfaceType)
         {
             var cache = GetCache();
-            if (cache.AvailableVersions.TryGetValue(interfaceId, out var result))
+            if (cache.AvailableVersions.TryGetValue(interfaceType, out var result))
             {
                 return (cache.Version, result);
             }
 
-            if (_genericInterfaceMapping.TryGetValue(interfaceId, out var genericInterfaceId))
+            if (_genericInterfaceMapping.TryGetValue(interfaceType, out var genericInterfaceId))
             {
                 return GetAvailableVersions(genericInterfaceId);
             }
 
-            if (GenericGrainInterfaceId.TryParse(interfaceId, out var generic) && generic.IsConstructed)
+            if (GenericGrainInterfaceType.TryParse(interfaceType, out var generic) && generic.IsConstructed)
             {
-                var genericId = _genericInterfaceMapping[interfaceId] = generic.GetGenericGrainType().Value;
+                var genericId = _genericInterfaceMapping[interfaceType] = generic.GetGenericGrainType().Value;
                 return GetAvailableVersions(genericId);
             }
 
@@ -68,22 +68,22 @@ namespace Orleans.Runtime.Versions
             return (cache.Version, Array.Empty<ushort>());
         }
 
-        public (MajorMinorVersion Version, SiloAddress[] Result) GetSupportedSilos(GrainInterfaceId interfaceId, ushort version)
+        public (MajorMinorVersion Version, SiloAddress[] Result) GetSupportedSilos(GrainInterfaceType interfaceType, ushort version)
         {
             var cache = GetCache();
-            if (cache.SupportedSilosByInterface.TryGetValue((interfaceId, version), out var result))
+            if (cache.SupportedSilosByInterface.TryGetValue((interfaceType, version), out var result))
             {
                 return (cache.Version, result);
             }
 
-            if (_genericInterfaceMapping.TryGetValue(interfaceId, out var genericInterfaceId))
+            if (_genericInterfaceMapping.TryGetValue(interfaceType, out var genericInterfaceId))
             {
                 return GetSupportedSilos(genericInterfaceId, version);
             }
 
-            if (GenericGrainInterfaceId.TryParse(interfaceId, out var generic) && generic.IsConstructed)
+            if (GenericGrainInterfaceType.TryParse(interfaceType, out var generic) && generic.IsConstructed)
             {
-                var genericId = _genericInterfaceMapping[interfaceId] = generic.GetGenericGrainType().Value;
+                var genericId = _genericInterfaceMapping[interfaceType] = generic.GetGenericGrainType().Value;
                 return GetSupportedSilos(genericId, version);
             }
 
@@ -114,7 +114,7 @@ namespace Orleans.Runtime.Versions
             return (cache.Version, Array.Empty<SiloAddress>());
         }
 
-        public (MajorMinorVersion Version, Dictionary<ushort, SiloAddress[]> Result) GetSupportedSilos(GrainType grainType, GrainInterfaceId interfaceId, ushort[] versions)
+        public (MajorMinorVersion Version, Dictionary<ushort, SiloAddress[]> Result) GetSupportedSilos(GrainType grainType, GrainInterfaceType interfaceType, ushort[] versions)
         {
             var result = new Dictionary<ushort, SiloAddress[]>();
 
@@ -132,7 +132,7 @@ namespace Orleans.Runtime.Versions
                 // We need to sort this so the list of silos returned will
                 // be the same across all silos in the cluster
                 SiloAddress[] silosWithCorrectVersion;
-                (cacheVersion, silosWithCorrectVersion) = this.GetSupportedSilos(interfaceId, version);
+                (cacheVersion, silosWithCorrectVersion) = this.GetSupportedSilos(interfaceType, version);
 
                 if (!minCacheVersion.HasValue || cacheVersion > minCacheVersion.Value)
                 {
@@ -172,9 +172,9 @@ namespace Orleans.Runtime.Versions
             }
         }
 
-        private static Dictionary<GrainInterfaceId, ushort> BuildLocalVersionMap(GrainManifest manifest)
+        private static Dictionary<GrainInterfaceType, ushort> BuildLocalVersionMap(GrainManifest manifest)
         {
-            var result = new Dictionary<GrainInterfaceId, ushort>();
+            var result = new Dictionary<GrainInterfaceType, ushort>();
             foreach (var grainInterface in manifest.Interfaces)
             {
                 var id = grainInterface.Key;
@@ -193,8 +193,8 @@ namespace Orleans.Runtime.Versions
 
         private static Cache BuildCache(ClusterManifest clusterManifest)
         {
-            var available = new Dictionary<GrainInterfaceId, List<ushort>>();
-            var supportedInterfaces = new Dictionary<(GrainInterfaceId, ushort), List<SiloAddress>>();
+            var available = new Dictionary<GrainInterfaceType, List<ushort>>();
+            var supportedInterfaces = new Dictionary<(GrainInterfaceType, ushort), List<SiloAddress>>();
             var supportedGrains = new Dictionary<GrainType, List<SiloAddress>>();
 
             foreach (var entry in clusterManifest.Silos)
@@ -244,14 +244,14 @@ namespace Orleans.Runtime.Versions
                 }
             }
 
-            var resultAvailable = new Dictionary<GrainInterfaceId, ushort[]>();
+            var resultAvailable = new Dictionary<GrainInterfaceType, ushort[]>();
             foreach (var entry in available)
             {
                 entry.Value.Sort();
                 resultAvailable[entry.Key] = entry.Value.ToArray();
             }
 
-            var resultSupportedByInterface = new Dictionary<(GrainInterfaceId, ushort), SiloAddress[]>();
+            var resultSupportedByInterface = new Dictionary<(GrainInterfaceType, ushort), SiloAddress[]>();
             foreach (var entry in supportedInterfaces)
             {
                 entry.Value.Sort();
@@ -272,8 +272,8 @@ namespace Orleans.Runtime.Versions
         {
             public Cache(
                 MajorMinorVersion version,
-                Dictionary<GrainInterfaceId, ushort[]> availableVersions,
-                Dictionary<(GrainInterfaceId, ushort), SiloAddress[]> supportedSilosByInterface,
+                Dictionary<GrainInterfaceType, ushort[]> availableVersions,
+                Dictionary<(GrainInterfaceType, ushort), SiloAddress[]> supportedSilosByInterface,
                 Dictionary<GrainType, SiloAddress[]> supportedSilosByGrainType)
             {
                 this.Version = version;
@@ -283,8 +283,8 @@ namespace Orleans.Runtime.Versions
             }
 
             public MajorMinorVersion Version { get; }
-            public Dictionary<GrainInterfaceId, ushort[]> AvailableVersions { get; } 
-            public Dictionary<(GrainInterfaceId, ushort), SiloAddress[]> SupportedSilosByInterface { get; } = new Dictionary<(GrainInterfaceId, ushort), SiloAddress[]>();
+            public Dictionary<GrainInterfaceType, ushort[]> AvailableVersions { get; } 
+            public Dictionary<(GrainInterfaceType, ushort), SiloAddress[]> SupportedSilosByInterface { get; } = new Dictionary<(GrainInterfaceType, ushort), SiloAddress[]>();
             public Dictionary<GrainType, SiloAddress[]> SupportedSilosByGrainType { get; } = new Dictionary<GrainType, SiloAddress[]>();
         }
     }

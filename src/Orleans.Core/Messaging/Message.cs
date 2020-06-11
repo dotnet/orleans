@@ -249,12 +249,12 @@ namespace Orleans.Runtime
             }
         }
 
-        public GrainInterfaceId InterfaceId
+        public GrainInterfaceType InterfaceType
         {
-            get { return Headers.InterfaceId; }
+            get { return Headers.InterfaceType; }
             set
             {
-                Headers.InterfaceId = value;
+                Headers.InterfaceType = value;
             }
         }
 
@@ -555,7 +555,7 @@ namespace Orleans.Runtime
 
                 TRACE_CONTEXT = 1 << 30,
 
-                INTERFACE_ID = 1 << 31
+                INTERFACE_TYPE = 1 << 31
                 // Do not add over int.MaxValue of these.
             }
 
@@ -586,7 +586,7 @@ namespace Orleans.Runtime
             private CorrelationId _callChainId;
             private readonly DateTime _localCreationTime;
             private TraceContext _traceContext;
-            private GrainInterfaceId _interfaceId;
+            private GrainInterfaceType interfaceType;
 
             public HeadersContainer()
             {
@@ -827,12 +827,12 @@ namespace Orleans.Runtime
                 }
             }
 
-            public GrainInterfaceId InterfaceId
+            public GrainInterfaceType InterfaceType
             {
-                get { return _interfaceId; }
+                get { return interfaceType; }
                 set
                 {
-                    _interfaceId = value;
+                    interfaceType = value;
                 }
             }
 
@@ -874,7 +874,7 @@ namespace Orleans.Runtime
                 headers = _traceContext == null? headers & ~Headers.TRACE_CONTEXT : headers | Headers.TRACE_CONTEXT;
                 headers = IsTransactionRequired ? headers | Headers.IS_TRANSACTION_REQUIRED : headers & ~Headers.IS_TRANSACTION_REQUIRED;
                 headers = _transactionInfo == null ? headers & ~Headers.TRANSACTION_INFO : headers | Headers.TRANSACTION_INFO;
-                headers = _interfaceId.IsDefault ? headers & ~Headers.INTERFACE_ID : headers | Headers.INTERFACE_ID;
+                headers = interfaceType.IsDefault ? headers & ~Headers.INTERFACE_TYPE : headers | Headers.INTERFACE_TYPE;
                 return headers;
             }
 
@@ -1001,9 +1001,9 @@ namespace Orleans.Runtime
                     SerializationManager.SerializeInner(input._traceContext, context, typeof(TraceContext));
                 }
 
-                if ((headers & Headers.INTERFACE_ID) != Headers.NONE)
+                if ((headers & Headers.INTERFACE_TYPE) != Headers.NONE)
                 {
-                    writer.Write(input._interfaceId);
+                    writer.Write(input.interfaceType);
                 }
             }
 
@@ -1126,8 +1126,8 @@ namespace Orleans.Runtime
                 if ((headers & Headers.TRACE_CONTEXT) != Headers.NONE)
                     result.TraceContext = SerializationManager.DeserializeInner<TraceContext>(context);
 
-                if ((headers & Headers.INTERFACE_ID) != Headers.NONE)
-                    result.InterfaceId = reader.ReadGrainInterfaceId();
+                if ((headers & Headers.INTERFACE_TYPE) != Headers.NONE)
+                    result.InterfaceType = reader.ReadGrainInterfaceType();
 
                 return result;
             }

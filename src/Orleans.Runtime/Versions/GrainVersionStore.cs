@@ -40,25 +40,25 @@ namespace Orleans.Runtime.Versions
             await StoreGrain.SetSelectorStrategy(strategy);
         }
 
-        public async Task SetCompatibilityStrategy(GrainInterfaceId interfaceId, CompatibilityStrategy strategy)
+        public async Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy)
         {
             ThrowIfNotEnabled();
-            await StoreGrain.SetCompatibilityStrategy(interfaceId, strategy);
+            await StoreGrain.SetCompatibilityStrategy(interfaceType, strategy);
         }
 
-        public async Task SetSelectorStrategy(GrainInterfaceId interfaceId, VersionSelectorStrategy strategy)
+        public async Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
         {
             ThrowIfNotEnabled();
-            await StoreGrain.SetSelectorStrategy(interfaceId, strategy);
+            await StoreGrain.SetSelectorStrategy(interfaceType, strategy);
         }
 
-        public async Task<Dictionary<GrainInterfaceId, CompatibilityStrategy>> GetCompatibilityStrategies()
+        public async Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies()
         {
             ThrowIfNotEnabled();
             return await StoreGrain.GetCompatibilityStrategies();
         }
 
-        public async Task<Dictionary<GrainInterfaceId, VersionSelectorStrategy>> GetSelectorStrategies()
+        public async Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies()
         {
             ThrowIfNotEnabled();
             return await StoreGrain.GetSelectorStrategies();

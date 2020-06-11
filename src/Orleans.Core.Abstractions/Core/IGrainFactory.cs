@@ -148,8 +148,8 @@ namespace Orleans
         IAddressable GetGrain(GrainId grainId);
 
         /// <summary>
-        /// Returns a reference for the provided grain id and interface id.
+        /// Returns a reference for the provided grain id and interface type.
         /// </summary>
-        IAddressable GetGrain(GrainId grainId, GrainInterfaceId interfaceId);
+        IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType);
     }
 }

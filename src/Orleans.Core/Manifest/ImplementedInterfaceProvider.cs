@@ -7,11 +7,11 @@ namespace Orleans.Metadata
 {
     internal class ImplementedInterfaceProvider : IGrainPropertiesProvider
     {
-        private readonly GrainInterfaceIdResolver interfaceIdProvider;
+        private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
 
-        public ImplementedInterfaceProvider(GrainInterfaceIdResolver interfaceIdProvider)
+        public ImplementedInterfaceProvider(GrainInterfaceTypeResolver interfaceTypeResolver)
         {
-            this.interfaceIdProvider = interfaceIdProvider;
+            this.interfaceTypeResolver = interfaceTypeResolver;
         }
 
         public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
@@ -21,7 +21,7 @@ namespace Orleans.Metadata
             {
                 if (!IsGrainInterface(@interface)) continue;
 
-                var interfaceId = this.interfaceIdProvider.GetGrainInterfaceId(@interface);
+                var interfaceId = this.interfaceTypeResolver.GetGrainInterfaceType(@interface);
                 var key = WellKnownGrainTypeProperties.ImplementedInterfacePrefix + counter.ToString(CultureInfo.InvariantCulture);
                 properties[key] = interfaceId.ToStringUtf8();
                 ++counter;

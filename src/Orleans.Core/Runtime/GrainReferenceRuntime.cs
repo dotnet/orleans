@@ -15,7 +15,7 @@ namespace Orleans.Runtime
         private readonly Func<GrainReference, InvokeMethodRequest, InvokeMethodOptions, Task<object>> sendRequestDelegate;
         private readonly SerializationManager serializationManager;
         private readonly GrainReferenceActivator referenceActivator;
-        private readonly GrainInterfaceIdResolver interfaceIdResolver;
+        private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
         private readonly IOutgoingGrainCallFilter[] filters;
         private readonly InterfaceToImplementationMappingCache grainReferenceMethodCache;
@@ -26,7 +26,7 @@ namespace Orleans.Runtime
             SerializationManager serializationManager,
             IEnumerable<IOutgoingGrainCallFilter> outgoingCallFilters,
             GrainReferenceActivator referenceActivator,
-            GrainInterfaceIdResolver interfaceIdResolver)
+            GrainInterfaceTypeResolver interfaceTypeResolver)
         {
             this.grainReferenceMethodCache = new InterfaceToImplementationMappingCache();
             this.sendRequestDelegate = SendRequest;
@@ -34,7 +34,7 @@ namespace Orleans.Runtime
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.serializationManager = serializationManager;
             this.referenceActivator = referenceActivator;
-            this.interfaceIdResolver = interfaceIdResolver;
+            this.interfaceTypeResolver = interfaceTypeResolver;
             this.filters = outgoingCallFilters.ToArray();
         }
 
@@ -80,16 +80,16 @@ namespace Orleans.Runtime
             return resultTask.ToTypedTask<T>();
         }
 
-        public object Cast(IAddressable grain, Type interfaceType)
+        public object Cast(IAddressable grain, Type grainInterface)
         {
             var grainId = grain.GetGrainId();
-            if (grain is GrainReference && interfaceType.IsAssignableFrom(grain.GetType()))
+            if (grain is GrainReference && grainInterface.IsAssignableFrom(grain.GetType()))
             {
                 return grain;
             }
 
-            var interfaceId = this.interfaceIdResolver.GetGrainInterfaceId(interfaceType);
-            return this.referenceActivator.CreateReference(grainId, interfaceId);
+            var interfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(grainInterface);
+            return this.referenceActivator.CreateReference(grainId, interfaceType);
         }
 
         private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, InvokeMethodOptions options)

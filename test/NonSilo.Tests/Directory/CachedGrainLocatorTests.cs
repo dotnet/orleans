@@ -285,11 +285,11 @@ namespace UnitTests.Directory
             public ClusterManifest Current => new ClusterManifest(
                 MajorMinorVersion.Zero,
                 ImmutableDictionary<SiloAddress, GrainManifest>.Empty,
-                ImmutableArray.Create(new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, ImmutableDictionary<GrainInterfaceId, GrainInterfaceProperties>.Empty)));
+                ImmutableArray.Create(new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty)));
 
             public IAsyncEnumerable<ClusterManifest> Updates => this.GetUpdates();
 
-            public GrainManifest LocalGrainManifest { get; } = new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, ImmutableDictionary<GrainInterfaceId, GrainInterfaceProperties>.Empty);
+            public GrainManifest LocalGrainManifest { get; } = new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
 
             private async IAsyncEnumerable<ClusterManifest> GetUpdates()
             {

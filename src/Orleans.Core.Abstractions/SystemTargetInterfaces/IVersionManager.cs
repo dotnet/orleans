@@ -24,17 +24,17 @@ namespace Orleans
         /// <summary>
         /// Set the compatibility strategy for a specific interface
         /// </summary>
-        /// <param name="interfaceId">The ID of the interface</param>
+        /// <param name="interfaceType">The type of the interface</param>
         /// <param name="strategy">The strategy to set. Set to null to revert to the default strategy provided in configuration</param>
         /// <returns></returns>
-        Task SetCompatibilityStrategy(GrainInterfaceId interfaceId, CompatibilityStrategy strategy);
+        Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy);
 
         /// <summary>
         /// Set the selector strategy for a specific interface
         /// </summary>
-        /// <param name="interfaceId">The ID of the interface</param>
+        /// <param name="interfaceType">The type of the interface</param>
         /// <param name="strategy">The strategy to set. Set to null to revert to the default strategy provided in configuration</param>
         /// <returns></returns>
-        Task SetSelectorStrategy(GrainInterfaceId interfaceId, VersionSelectorStrategy strategy);
+        Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy);
     }
 }

@@ -3,19 +3,19 @@ using System;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Represents a <see cref="GrainInterfaceId"/> that is parameterized using type parameters.
+    /// Represents a <see cref="GrainInterfaceType"/> that is parameterized using type parameters.
     /// </summary>
-    public readonly struct GenericGrainInterfaceId
+    public readonly struct GenericGrainInterfaceType
     {
-        private GenericGrainInterfaceId(GrainInterfaceId value)
+        private GenericGrainInterfaceType(GrainInterfaceType value)
         {
             Value = value;
         }
 
         /// <summary>
-        /// The underlying <see cref="GrainInterfaceId"/>
+        /// The underlying <see cref="GrainInterfaceType"/>
         /// </summary>
-        public GrainInterfaceId Value { get; }
+        public GrainInterfaceType Value { get; }
 
         /// <summary>
         /// Returns <see langword="true" /> if this instance contains concrete type parameters.
@@ -25,11 +25,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns the generic interface id corresponding to the provided value.
         /// </summary>
-        public static bool TryParse(GrainInterfaceId grainType, out GenericGrainInterfaceId result)
+        public static bool TryParse(GrainInterfaceType grainType, out GenericGrainInterfaceType result)
         {
             if (!grainType.IsDefault && TypeConverterExtensions.IsGenericType(grainType.ToStringUtf8()))
             {
-                result = new GenericGrainInterfaceId(grainType);
+                result = new GenericGrainInterfaceType(grainType);
                 return true;
             }
 
@@ -40,20 +40,20 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns a non-constructed version of this instance.
         /// </summary>
-        public GenericGrainInterfaceId GetGenericGrainType()
+        public GenericGrainInterfaceType GetGenericGrainType()
         {
             var str = this.Value.ToStringUtf8();
             var generic = TypeConverterExtensions.GetDeconstructed(str);
-            return new GenericGrainInterfaceId(GrainInterfaceId.Create(generic));
+            return new GenericGrainInterfaceType(GrainInterfaceType.Create(generic));
         }
 
         /// <summary>
         /// Returns a constructed version of this instance.
         /// </summary>
-        public GenericGrainInterfaceId Construct(TypeConverter formatter, params Type[] typeArguments)
+        public GenericGrainInterfaceType Construct(TypeConverter formatter, params Type[] typeArguments)
         {
             var constructed = formatter.GetConstructed(this.Value.ToStringUtf8(), typeArguments);
-            return new GenericGrainInterfaceId(GrainInterfaceId.Create(constructed));
+            return new GenericGrainInterfaceType(GrainInterfaceType.Create(constructed));
         }
 
         /// <summary>

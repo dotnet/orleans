@@ -208,18 +208,18 @@ namespace Orleans.Runtime
 
             var grainType = target.GrainIdentity.Type;
             var silos = target.InterfaceVersion > 0
-                ? versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceId, target.InterfaceVersion).SuitableSilos
+                ? versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
                 : grainInterfaceVersions.GetSupportedSilos(grainType).Result;
 
             var compatibleSilos = silos.Intersect(AllActiveSilos).ToArray();
             if (compatibleSilos.Length == 0)
             {
                 var allWithType = grainInterfaceVersions.GetSupportedSilos(grainType).Result;
-                var versions = grainInterfaceVersions.GetSupportedSilos(target.InterfaceId, target.InterfaceVersion).Result;
+                var versions = grainInterfaceVersions.GetSupportedSilos(target.InterfaceType, target.InterfaceVersion).Result;
                 var allWithTypeString = string.Join(", ", allWithType.Select(s => s.ToString())) is string withGrain && !string.IsNullOrWhiteSpace(withGrain) ? withGrain : "none";
                 var allWithInterfaceString = string.Join(", ", versions.Select(s => s.ToString())) is string withIface && !string.IsNullOrWhiteSpace(withIface) ? withIface : "none";
                 throw new OrleansException(
-                    $"No active nodes are compatible with grain {grainType} and interface {target.InterfaceId} version {target.InterfaceVersion}. "
+                    $"No active nodes are compatible with grain {grainType} and interface {target.InterfaceType} version {target.InterfaceVersion}. "
                     + $"Known nodes with grain type: {allWithTypeString}. "
                     + $"All known nodes compatible with interface version: {allWithTypeString}");
             }
@@ -236,7 +236,7 @@ namespace Orleans.Runtime
 
             var grainType = target.GrainIdentity.Type;
             var silos = versionSelectorManager
-                .GetSuitableSilos(grainType, target.InterfaceId, target.InterfaceVersion)
+                .GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion)
                 .SuitableSilosByVersion;
 
             return silos;

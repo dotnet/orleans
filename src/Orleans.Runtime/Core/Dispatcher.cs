@@ -133,7 +133,7 @@ namespace Orleans.Runtime
                     var nea = ex as Catalog.NonExistentActivationException;
                     if (nea == null)
                     {
-                        var str = $"Error creating activation for grain {message.TargetGrain} (interface: {message.InterfaceId}). Message {message}";
+                        var str = $"Error creating activation for grain {message.TargetGrain} (interface: {message.InterfaceType}). Message {message}";
                         logger.Error(ErrorCode.Dispatcher_ErrorCreatingActivation, str, ex);
                         throw new OrleansException(str, ex);
                     }
@@ -345,8 +345,8 @@ namespace Orleans.Runtime
 
                 if (message.InterfaceVersion > 0)
                 {
-                    var compatibilityDirector = compatibilityDirectorManager.GetDirector(message.InterfaceId);
-                    var currentVersion = _versionManifest.GetLocalVersion(message.InterfaceId);
+                    var compatibilityDirector = compatibilityDirectorManager.GetDirector(message.InterfaceType);
+                    var currentVersion = _versionManifest.GetLocalVersion(message.InterfaceType);
                     if (!compatibilityDirector.IsCompatible(message.InterfaceVersion, currentVersion))
                     {
                         catalog.DeactivateActivationOnIdle(targetActivation);
@@ -662,7 +662,7 @@ namespace Orleans.Runtime
             var target = new PlacementTarget(
                 message.TargetGrain,
                 message.RequestContextData,
-                message.InterfaceId,
+                message.InterfaceType,
                 message.InterfaceVersion);
 
             var placementTask = placementService.GetOrPlaceActivation(target, this.catalog);

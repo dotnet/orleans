@@ -15,7 +15,7 @@ namespace Orleans.Metadata
         /// </summary>
         public GrainManifest(
             ImmutableDictionary<GrainType, GrainProperties> grains,
-            ImmutableDictionary<GrainInterfaceId, GrainInterfaceProperties> interfaces)
+            ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> interfaces)
         {
             this.Interfaces = interfaces;
             this.Grains = grains;
@@ -24,7 +24,7 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the interfaces available on this silo.
         /// </summary>
-        public ImmutableDictionary<GrainInterfaceId, GrainInterfaceProperties> Interfaces { get; }
+        public ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> Interfaces { get; }
 
         /// <summary>
         /// Gets the grain types available on this silo.
