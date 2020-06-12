@@ -181,7 +181,7 @@ namespace Orleans.CodeGenerator
             }
 
             // Add and generate feature populators to tie everything together.
-            var (attributes, featurePopulators) = FeaturePopulatorGenerator.GenerateSyntax(this.wellKnownTypes, model);
+            var (attributes, featurePopulators) = FeaturePopulatorGenerator.GenerateSyntax(this.wellKnownTypes, model, this.compilation);
             compilationMembers.AddRange(featurePopulators);
 
             // Add some attributes detailing which assemblies this generated code targets.
