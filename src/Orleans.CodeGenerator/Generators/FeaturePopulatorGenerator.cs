@@ -17,7 +17,9 @@ namespace Orleans.CodeGenerator.Generators
         private const string ClassSuffix = "FeaturePopulator";
 
         public static (List<AttributeListSyntax>, List<MemberDeclarationSyntax>) GenerateSyntax(
-            WellKnownTypes wellKnownTypes, AggregatedModel model, Compilation compilation)
+            WellKnownTypes wellKnownTypes,
+            AggregatedModel model,
+            Compilation compilation)
         {
             var attributes = new List<AttributeListSyntax>();
             var members = new List<MemberDeclarationSyntax>();
