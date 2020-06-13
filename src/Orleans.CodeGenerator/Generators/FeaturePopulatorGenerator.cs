@@ -64,8 +64,6 @@ namespace Orleans.CodeGenerator.Generators
             return CodeGenerator.ToolName + partialClassName + ClassSuffix;
         }
 
-
-
         private static MemberDeclarationSyntax GeneratePopulateMethod(WellKnownTypes wellKnownTypes, List<GrainInterfaceDescription> grains)
         {
             var interfaceMethod = wellKnownTypes.IFeaturePopulator_1.Construct(wellKnownTypes.GrainInterfaceFeature).Method("Populate");
