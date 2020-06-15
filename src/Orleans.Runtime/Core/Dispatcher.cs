@@ -459,8 +459,7 @@ namespace Orleans.Runtime
                     break;
                 case ActivationData.EnqueueMessageResult.ErrorStuckActivation:
                     // Avoid any new call to this activation
-                    catalog.DeactivateStuckActivation(targetActivation);
-                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest - blocked grain");
+                    ProcessRequestToStuckActivation(message, targetActivation, "EnqueueRequest - blocked grain");
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -502,6 +501,21 @@ namespace Orleans.Runtime
                     () => TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc),
                     catalog);
             }
+        }
+
+        private void ProcessRequestToStuckActivation(
+            Message message,
+            ActivationData activationData,
+            string failedOperation)
+        {
+            scheduler.RunOrQueueTask(
+                   async () => 
+                   {
+                       await catalog.DeactivateStuckActivation(activationData);
+                       TryForwardRequest(message, activationData.Address, activationData.ForwardingAddress, failedOperation);
+                   },
+                   catalog)
+                .Ignore();
         }
 
         internal void ProcessRequestsToInvalidActivation(

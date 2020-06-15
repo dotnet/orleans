@@ -785,15 +785,12 @@ namespace Orleans.Runtime
 
         // To be called from within Activation context.
         // To be used only if an activation is stuck for a long time, since it can lead to a duplicate activation
-        internal void DeactivateStuckActivation(ActivationData activationData)
+        internal async Task DeactivateStuckActivation(ActivationData activationData)
         {
-            DeactivateActivationImpl(activationData, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_STUCK_ACTIVATION);
             // The unregistration is normally done in the regular deactivation process, but since this activation seems
             // stuck (it might never run the deactivation process), we remove it from the directory directly
-            scheduler.RunOrQueueTask(
-                () => this.grainLocator.Unregister(activationData.Address, UnregistrationCause.Force),
-                this)
-                .Ignore();
+            await this.grainLocator.Unregister(activationData.Address, UnregistrationCause.Force);
+            DeactivateActivationImpl(activationData, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_STUCK_ACTIVATION);
         }
 
         private void DeactivateActivationImpl(ActivationData data, StatisticName statisticName)
