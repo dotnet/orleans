@@ -246,7 +246,7 @@ namespace OrleansBasics
             // example of calling grains from the initialized client
             var friend = client.GetGrain<IHello>(0);
             var response = await friend.SayHello("Good morning, HelloGrain!");
-            Console.WriteLine("\n\n{0}\n\n", response);
+            Console.WriteLine($"\n\n{response}\n\n");
         }
     }
 }
