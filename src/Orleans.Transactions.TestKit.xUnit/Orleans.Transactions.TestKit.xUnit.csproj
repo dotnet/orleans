@@ -13,7 +13,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.extensibility.core" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.extensibility.execution" Version="$(xUnitVersion)" />
+    <PackageReference Include="xunit.assert" Version="$(xUnitVersion)" />
     <PackageReference Include="Xunit.SkippableFact" Version="$(XunitSkippableFactVersion)" />
   </ItemGroup>
 
