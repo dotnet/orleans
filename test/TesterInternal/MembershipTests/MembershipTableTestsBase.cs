@@ -418,15 +418,17 @@ namespace UnitTests.MembershipTests
             oldEntryDead.StartTime = oldEntryDead.StartTime.AddDays(-10);
             oldEntryDead.Status = SiloStatus.Dead;
             bool ok = await membershipTable.InsertRow(oldEntryDead, newTableVersion);
-            
+            var table = await membershipTable.ReadAll();
+
             Assert.True(ok, "InsertRow Dead failed");
 
+            newTableVersion = table.Version.Next();
             var oldEntryJoining = CreateMembershipEntryForTest();
             oldEntryJoining.IAmAliveTime = oldEntryJoining.IAmAliveTime.AddDays(-10);
             oldEntryJoining.StartTime = oldEntryJoining.StartTime.AddDays(-10);
             oldEntryJoining.Status = SiloStatus.Joining;
             ok = await membershipTable.InsertRow(oldEntryJoining, newTableVersion);
-            var table = await membershipTable.ReadAll();
+            table = await membershipTable.ReadAll();
 
             Assert.True(ok, "InsertRow Joining failed");
 
