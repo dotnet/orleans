@@ -21,6 +21,7 @@ namespace Orleans.AzureUtils
         private readonly string INSTANCE_STATUS_CREATED = SiloStatus.Created.ToString();  //"Created";
         private readonly string INSTANCE_STATUS_ACTIVE = SiloStatus.Active.ToString();    //"Active";
         private readonly string INSTANCE_STATUS_DEAD = SiloStatus.Dead.ToString();        //"Dead";
+        private readonly string INSTANCE_STATUS_JOINING = SiloStatus.Joining.ToString();        //"Joining";
 
         private readonly AzureTableDataManager<SiloInstanceTableEntry> storage;
         private readonly ILogger logger;
@@ -198,7 +199,7 @@ namespace Orleans.AzureUtils
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             var entriesList = (await FindAllSiloEntries())
-                .Where(entry => entry.Item1.Status == INSTANCE_STATUS_DEAD && entry.Item1.Timestamp < beforeDate)
+                .Where(entry => (entry.Item1.Status == INSTANCE_STATUS_DEAD || entry.Item1.Status == INSTANCE_STATUS_JOINING) && entry.Item1.Timestamp < beforeDate)
                 .ToList();
 
             await DeleteEntriesBatch(entriesList);
