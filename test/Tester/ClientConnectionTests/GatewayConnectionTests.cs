@@ -46,7 +46,7 @@ namespace Tester
 
     public class GatewayConnectionTests : TestClusterPerTest
     {
-        private readonly OutsideRuntimeClient runtimeClient;
+        private OutsideRuntimeClient runtimeClient;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
@@ -98,8 +98,9 @@ namespace Tester
             }
         }
 
-        public GatewayConnectionTests()
+        public override async Task InitializeAsync()
         {
+            await base.InitializeAsync();
             this.runtimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
         }
 

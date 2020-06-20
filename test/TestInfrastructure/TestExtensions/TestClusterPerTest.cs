@@ -8,7 +8,7 @@ using Orleans.TestingHost;
 
 namespace TestExtensions
 {
-    public abstract class TestClusterPerTest : OrleansTestingBase, IDisposable, Xunit.IAsyncLifetime
+    public abstract class TestClusterPerTest : OrleansTestingBase, Xunit.IAsyncLifetime
     {
         private readonly ExceptionDispatchInfo preconditionsException;
         static TestClusterPerTest()
@@ -38,18 +38,6 @@ namespace TestExtensions
                 this.preconditionsException = ExceptionDispatchInfo.Capture(ex);
                 return;
             }
-
-            var builder = new TestClusterBuilder();
-            TestDefaultConfiguration.ConfigureTestCluster(builder);
-            this.ConfigureTestCluster(builder);
-
-            var testCluster = builder.Build();
-            if (testCluster.Primary == null)
-            {
-                testCluster.Deploy();
-            }
-            this.HostedCluster = testCluster;
-            this.logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
         public void EnsurePreconditionsMet()
@@ -63,28 +51,34 @@ namespace TestExtensions
         {
         }
 
-        public virtual void Dispose()
+        public virtual async Task InitializeAsync()
         {
-            this.HostedCluster?.StopAllSilos();
-        }
+            var builder = new TestClusterBuilder();
+            TestDefaultConfiguration.ConfigureTestCluster(builder);
+            this.ConfigureTestCluster(builder);
 
-        public virtual Task InitializeAsync()
-        {
-            return Task.CompletedTask;
+            var testCluster = builder.Build();
+            if (testCluster.Primary == null)
+            {
+                await testCluster.DeployAsync().ConfigureAwait(false);
+            }
+
+            this.HostedCluster = testCluster;
+            this.logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
         public virtual async Task DisposeAsync()
         {
+            var cluster = this.HostedCluster;
+            if (cluster is null) return;
+
             try
             {
-                if (this.HostedCluster is TestCluster cluster)
-                {
-                    await cluster.StopAllSilosAsync();
-                }
+                await cluster.StopAllSilosAsync().ConfigureAwait(false);
             }
             finally
             {
-                this.HostedCluster?.Dispose();
+                await cluster.DisposeAsync().ConfigureAwait(false);
             }
         }
     }

@@ -152,6 +152,12 @@ namespace Orleans.TestingHost
             }
         }
 
+        public override ValueTask DisposeAsync()
+        {
+            this.Dispose(true);
+            return default;
+        }
+
         private void WriteLog(object value)
         {
             // TODO: replace

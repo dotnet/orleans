@@ -1,10 +1,7 @@
 using AWSUtils.Tests.StorageTests;
-using Orleans.Providers.Streams;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Tester.StreamingTests;
@@ -15,7 +12,6 @@ using OrleansAWSUtils.Streams;
 using Orleans.Hosting;
 using Microsoft.Extensions.Configuration;
 using Orleans;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
@@ -27,11 +23,16 @@ namespace AWSUtils.Tests.Streaming
         private string StorageConnectionString = AWSTestConstants.DefaultSQSConnectionString;
 
         private readonly ITestOutputHelper output;
-        private readonly ClientStreamTestRunner runner;
+        private ClientStreamTestRunner runner;
 
         public SQSClientStreamTests(ITestOutputHelper output)
         {
             this.output = output;
+        }
+
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
@@ -72,11 +73,14 @@ namespace AWSUtils.Tests.Streaming
             }
         }
 
-        public override void Dispose()
+        public override async Task DisposeAsync()
         {
             var clusterId = HostedCluster.Options.ClusterId;
-            base.Dispose();
-            SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, clusterId, StorageConnectionString, NullLoggerFactory.Instance).Wait();
+            await base.DisposeAsync();
+            if (!string.IsNullOrWhiteSpace(StorageConnectionString))
+            {
+                await SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, clusterId, StorageConnectionString, NullLoggerFactory.Instance);
+            }
         }
 
         [SkippableFact, TestCategory("AWS")]

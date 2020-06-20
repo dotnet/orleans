@@ -34,6 +34,16 @@ namespace Orleans.TestingHost
         public void Start() => this.host.StartAsync().GetAwaiter().GetResult();
 
         /// <summary>Gracefully shuts down the silo</summary>
-        public void Shutdown() => this.host.StopAsync().GetAwaiter().GetResult();
+        public void Shutdown()
+        {
+            try
+            {
+                this.host.StopAsync().GetAwaiter().GetResult();
+            }
+            finally
+            {
+                this.host.Dispose();
+            }
+        }
     }
 }

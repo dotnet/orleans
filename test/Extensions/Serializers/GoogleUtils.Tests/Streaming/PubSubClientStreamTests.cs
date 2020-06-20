@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
@@ -23,12 +21,17 @@ namespace GoogleUtils.Tests.Streaming
         private const string STREAM_NAMESPACE = "PubSubSubscriptionMultiplicityTestsNamespace";
 
         private readonly ITestOutputHelper output;
-        private readonly ClientStreamTestRunner runner;
+        private ClientStreamTestRunner runner;
 
         public PubSubClientStreamTests(ITestOutputHelper output)
         {
             this.output = output;
-            runner = new ClientStreamTestRunner(HostedCluster);
+        }
+
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
+            runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

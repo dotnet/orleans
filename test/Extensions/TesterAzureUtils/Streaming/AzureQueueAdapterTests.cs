@@ -24,7 +24,7 @@ namespace Tester.AzureUtils.Streaming
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     [TestCategory("Azure"), TestCategory("Streaming")]
-    public class AzureQueueAdapterTests : AzureStorageBasicTests, IDisposable
+    public class AzureQueueAdapterTests : AzureStorageBasicTests, IAsyncLifetime
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
@@ -43,11 +43,13 @@ namespace Tester.AzureUtils.Streaming
             BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
         }
 
-        public void Dispose()
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        public async Task DisposeAsync()
         {
             if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, TestDefaultConfiguration.DataConnectionString).Wait();
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, TestDefaultConfiguration.DataConnectionString);
             }
         }
 

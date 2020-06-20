@@ -114,13 +114,18 @@ namespace UnitTests.Streaming.Reliability
         public StreamReliabilityTests(ITestOutputHelper output)
         {
             this.output = output;
-            CheckSilosRunning("Initially", numExpectedSilos);
 #if DELETE_AFTER_TEST
             _usedGrains = new HashSet<IStreamReliabilityTestGrain>();
 #endif
         }
 
-        public override void Dispose()
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
+            CheckSilosRunning("Initially", numExpectedSilos);
+        }
+
+        public override async Task DisposeAsync()
         {
 #if DELETE_AFTER_TEST
             List<Task> promises = new List<Task>();
@@ -128,18 +133,19 @@ namespace UnitTests.Streaming.Reliability
             {
                 promises.Add(g.ClearGrain());
             }
-            Task.WhenAll(promises).Wait();
-#endif
-            base.Dispose();
 
-            if (this.HostedCluster != null)
+            await Task.WhenAll(promises);
+#endif
+            await base.DisposeAsync();
+
+            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                    TestDefaultConfiguration.DataConnectionString).Wait();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    TestDefaultConfiguration.DataConnectionString);
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
-                    TestDefaultConfiguration.DataConnectionString).Wait();
+                    TestDefaultConfiguration.DataConnectionString);
             }
         }
 
