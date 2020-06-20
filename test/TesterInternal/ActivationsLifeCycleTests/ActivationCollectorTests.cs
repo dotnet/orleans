@@ -18,7 +18,7 @@ using Xunit;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
-    public class ActivationCollectorTests : OrleansTestingBase, IDisposable
+    public class ActivationCollectorTests : OrleansTestingBase, IAsyncLifetime
     {
         private static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan DEFAULT_IDLE_TIMEOUT = DEFAULT_COLLECTION_QUANTUM + TimeSpan.FromSeconds(1);
@@ -28,14 +28,14 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private ILogger logger;
 
-        private void Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum)
+        private async Task Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum)
         {
             var builder = new TestClusterBuilder(1);
             builder.Properties["CollectionQuantum"] = quantum.ToString();
             builder.Properties["DefaultCollectionAgeLimit"] = collectionAgeLimit.ToString();
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             testCluster = builder.Build();
-            testCluster.Deploy();
+            await testCluster.DeployAsync();
             this.logger = this.testCluster.Client.ServiceProvider.GetRequiredService<ILogger<ActivationCollectorTests>>();
         }
 
@@ -63,25 +63,25 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
-        private void Initialize(TimeSpan collectionAgeLimit)
+
+        Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
+
+        private async Task Initialize(TimeSpan collectionAgeLimit)
         {
-            Initialize(collectionAgeLimit, DEFAULT_COLLECTION_QUANTUM);
+            await Initialize(collectionAgeLimit, DEFAULT_COLLECTION_QUANTUM);
         }
 
-        private void Initialize()
+        public async Task DisposeAsync()
         {
-            Initialize(TimeSpan.Zero, DEFAULT_COLLECTION_QUANTUM);
-        }
+            if (testCluster is null) return;
 
-        public void Dispose()
-        {
             try
             {
-                testCluster?.StopAllSilos();
+                await testCluster.StopAllSilosAsync();
             }
             finally
             {
-                testCluster?.Dispose();
+                await testCluster.DisposeAsync();
                 testCluster = null;
             }
         }
@@ -89,7 +89,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorForceCollection()
         {
-            Initialize(DEFAULT_IDLE_TIMEOUT);
+            await Initialize(DEFAULT_IDLE_TIMEOUT);
 
             const int grainCount = 1000;
             var fullGrainTypeName = typeof(IdleActivationGcTestGrain1).FullName;
@@ -118,7 +118,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectIdleActivations()
         {
-            Initialize(DEFAULT_IDLE_TIMEOUT);
+            await Initialize(DEFAULT_IDLE_TIMEOUT);
 
             const int grainCount = 1000;
             var fullGrainTypeName = typeof(IdleActivationGcTestGrain1).FullName;
@@ -145,7 +145,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivations()
         {
-            Initialize(DEFAULT_IDLE_TIMEOUT);
+            await Initialize(DEFAULT_IDLE_TIMEOUT);
 
             const int idleGrainCount = 500;
             const int busyGrainCount = 500;
@@ -204,7 +204,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ManualCollectionShouldNotCollectBusyActivations()
         {
-            Initialize(DEFAULT_IDLE_TIMEOUT);
+            await Initialize(DEFAULT_IDLE_TIMEOUT);
 
             TimeSpan shortIdleTimeout = TimeSpan.FromSeconds(1);
             const int idleGrainCount = 500;
@@ -275,7 +275,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             //make sure default value won't cause activation collection during wait time
             var defaultCollectionAgeLimit = WAIT_TIME.Multiply(2);
-            Initialize(defaultCollectionAgeLimit);
+            await Initialize(defaultCollectionAgeLimit);
 
             const int grainCount = 1000;
             var fullGrainTypeName = typeof(IdleActivationGcTestGrain2).FullName;
@@ -304,7 +304,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             //make sure default value won't cause activation collection during wait time
             var defaultCollectionAgeLimit = WAIT_TIME.Multiply(2);
-            Initialize(defaultCollectionAgeLimit);
+            await Initialize(defaultCollectionAgeLimit);
 
             const int idleGrainCount = 500;
             const int busyGrainCount = 500;
@@ -363,7 +363,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact(Skip = "Flaky test. Needs to be investigated."), TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyStatelessWorkers()
         {
-            Initialize(DEFAULT_IDLE_TIMEOUT);
+            await Initialize(DEFAULT_IDLE_TIMEOUT);
 
             // the purpose of this test is to determine whether idle stateless worker activations are properly identified by the activation collector.
             // in this test, we:
@@ -478,7 +478,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Performance"), TestCategory("CorePerf")]
         public async Task ActivationCollectorShouldNotCauseMessageLoss()
         {
-            Initialize(DEFAULT_IDLE_TIMEOUT);
+            await Initialize(DEFAULT_IDLE_TIMEOUT);
 
             const int idleGrainCount = 0;
             const int busyGrainCount = 500;
@@ -526,7 +526,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             var waitTime = TimeSpan.FromSeconds(30);
             var defaultCollectionAge = waitTime.Multiply(2);
             //make sure defaultCollectionAge value won't cause activation collection in wait time
-            Initialize(defaultCollectionAge);
+            await Initialize(defaultCollectionAge);
 
             const int grainCount = 1000;
 

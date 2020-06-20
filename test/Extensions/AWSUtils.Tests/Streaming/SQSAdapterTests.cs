@@ -23,7 +23,7 @@ namespace AWSUtils.Tests.Streaming
 {
     [TestCategory("AWS"), TestCategory("SQS")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class SQSAdapterTests : IDisposable
+    public class SQSAdapterTests : IAsyncLifetime
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
@@ -46,9 +46,18 @@ namespace AWSUtils.Tests.Streaming
             this.clusterId = MakeClusterId();
         }
 
-        public void Dispose()
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        public async Task DisposeAsync()
         {
-            SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, this.clusterId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
+            if (!string.IsNullOrWhiteSpace(AWSTestConstants.DefaultSQSConnectionString))
+            {
+                await SQSStreamProviderUtils.DeleteAllUsedQueues(
+                    SQS_STREAM_PROVIDER_NAME,
+                    this.clusterId,
+                    AWSTestConstants.DefaultSQSConnectionString,
+                    NullLoggerFactory.Instance);
+            }
         }
 
         [SkippableFact]

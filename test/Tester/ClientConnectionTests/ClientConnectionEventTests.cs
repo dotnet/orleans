@@ -16,16 +16,17 @@ namespace Tester
 {
     public class ClientConnectionEventTests : TestClusterPerTest
     {
-        private readonly OutsideRuntimeClient runtimeClient;
-
-        public ClientConnectionEventTests()
-        {
-            this.runtimeClient = this.HostedCluster.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
-        }
+        private OutsideRuntimeClient runtimeClient;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.AddClientBuilderConfigurator<Configurator>();
+        }
+
+        public override async Task InitializeAsync()
+        {
+           await base.InitializeAsync();
+           this.runtimeClient = this.HostedCluster.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
         }
 
         public class Configurator : IClientBuilderConfigurator

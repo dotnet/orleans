@@ -14,11 +14,18 @@ namespace Orleans.Transactions.AzureStorage.Tests
     [TestCategory("Azure"), TestCategory("Transactions"), TestCategory("Functional")]
     public class TransactionRecoveryTests : TestClusterPerTest
     {
-        private readonly TransactionRecoveryTestsRunnerxUnit testRunner;
+        private TransactionRecoveryTestsRunnerxUnit testRunner;
+        private ITestOutputHelper helper;
 
         public TransactionRecoveryTests(ITestOutputHelper helper)
         {
             this.EnsurePreconditionsMet();
+            this.helper = helper;
+        }
+
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
             this.testRunner = new TransactionRecoveryTestsRunnerxUnit(this.HostedCluster, helper);
         }
 
