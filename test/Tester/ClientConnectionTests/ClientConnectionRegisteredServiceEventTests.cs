@@ -15,12 +15,13 @@ namespace Tester
 {
     public class ClientConnectionRegisteredServiceEventTests : TestClusterPerTest
     {
-        private readonly EventNotifier<EventArgs> clusterConnectionLostNotifier;
+        private EventNotifier<EventArgs> clusterConnectionLostNotifier;
 
-        private readonly EventNotifier<GatewayCountChangedEventArgs> gatewayCountChangedNotifier;
+        private EventNotifier<GatewayCountChangedEventArgs> gatewayCountChangedNotifier;
 
-        public ClientConnectionRegisteredServiceEventTests()
+        public override async Task InitializeAsync()
         {
+            await base.InitializeAsync();
             this.clusterConnectionLostNotifier = this.HostedCluster.ServiceProvider.GetRequiredService<EventNotifier<EventArgs>>();
             this.gatewayCountChangedNotifier = this.HostedCluster.ServiceProvider.GetRequiredService<EventNotifier<GatewayCountChangedEventArgs>>();
         }

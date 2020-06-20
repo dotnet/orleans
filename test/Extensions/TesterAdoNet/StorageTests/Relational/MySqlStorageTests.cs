@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Tests.SqlUtils;
 using System;

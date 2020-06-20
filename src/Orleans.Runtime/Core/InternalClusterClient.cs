@@ -57,6 +57,9 @@ namespace Orleans.Runtime
         void IDisposable.Dispose() { }
 
         /// <inheritdoc />
+        ValueTask IAsyncDisposable.DisposeAsync() => default;
+
+        /// <inheritdoc />
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidKey
         {

@@ -2,18 +2,15 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 using AWSUtils.Tests.StorageTests;
 using Xunit;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using OrleansAWSUtils.Streams;
 using Orleans.Hosting;
 using TestExtensions;
 using UnitTests.StreamingTests;
-using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -22,7 +19,7 @@ namespace AWSUtils.Tests.Streaming
         private const string SQSStreamProviderName = "SQSProvider";
         private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
         private string StreamConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-        private readonly SubscriptionMultiplicityTestRunner runner;
+        private SubscriptionMultiplicityTestRunner runner;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
@@ -60,16 +57,20 @@ namespace AWSUtils.Tests.Streaming
             }
         }
 
-        public SQSSubscriptionMultiplicityTests()
+        public override async Task InitializeAsync()
         {
+            await base.InitializeAsync();
             runner = new SubscriptionMultiplicityTestRunner(SQSStreamProviderName, this.HostedCluster);
         }
 
-        public override void Dispose()
+        public override async Task DisposeAsync()
         {
             var clusterId = HostedCluster.Options.ClusterId;
-            base.Dispose();
-            SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, clusterId, StreamConnectionString, NullLoggerFactory.Instance).Wait();
+            await base.DisposeAsync();
+            if (!string.IsNullOrWhiteSpace(StreamConnectionString))
+            {
+                await SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, clusterId, StreamConnectionString, NullLoggerFactory.Instance);
+            }
         }
 
         [SkippableFact, TestCategory("AWS")]

@@ -82,22 +82,26 @@ namespace UnitTests.StreamingTests
         {
             this.output = output;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
+        }
+
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
             this.mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
         }
 
-        public override void Dispose()
+        public override async Task DisposeAsync()
         {
-            if (this.HostedCluster != null)
+            await base.DisposeAsync();
+            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                    TestDefaultConfiguration.DataConnectionString).Wait();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    TestDefaultConfiguration.DataConnectionString);
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
-                    TestDefaultConfiguration.DataConnectionString).Wait();
+                    TestDefaultConfiguration.DataConnectionString);
             }
-
-            base.Dispose();
         }
         [SkippableFact]
         public async Task SMS_Limits_FindMax_Consumers()
