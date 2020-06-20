@@ -5,6 +5,8 @@
   href: silo_lifecycle.md
 - name: Heterogeneous Silos
   href: heterogeneous_silos.md
+- name: Grain Directory
+  href: grain_directory.md
 - name: Configuration Guide
   href: configuration_guide/toc.yml
 - name: Monitoring
