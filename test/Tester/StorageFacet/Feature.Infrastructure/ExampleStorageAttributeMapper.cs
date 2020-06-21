@@ -10,7 +10,7 @@ namespace Tester.StorageFacet.Infrastructure
     {
         private static readonly MethodInfo create = typeof(INamedExampleStorageFactory).GetMethod("Create");
 
-        public Factory<IGrainActivationContext, object> GetFactory(ParameterInfo parameter, ExampleStorageAttribute attribute)
+        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, ExampleStorageAttribute attribute)
         {
             IExampleStorageConfig config = attribute;
             // set state name to parameter name, if not already specified
@@ -24,7 +24,7 @@ namespace Tester.StorageFacet.Infrastructure
             return context => Create(context, genericCreate, args);
         }
 
-        private object Create(IGrainActivationContext context, MethodInfo genericCreate, object[] args)
+        private object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
         {
             INamedExampleStorageFactory factory = context.ActivationServices.GetRequiredService<INamedExampleStorageFactory>();
             return genericCreate.Invoke(factory, args);

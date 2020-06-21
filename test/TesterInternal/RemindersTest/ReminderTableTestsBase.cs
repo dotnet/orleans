@@ -92,8 +92,11 @@ namespace UnitTests.RemindersTest
 
             string etagTemp = reminder.ETag = readReminder.ETag;
 
-            Assert.Equal(JsonConvert.SerializeObject(readReminder), JsonConvert.SerializeObject(reminder));
-
+            Assert.Equal(readReminder.ETag, reminder.ETag);
+            Assert.Equal(readReminder.GrainRef.GrainId, reminder.GrainRef.GrainId);
+            Assert.Equal(readReminder.Period, reminder.Period);
+            Assert.Equal(readReminder.ReminderName, reminder.ReminderName);
+            Assert.Equal(readReminder.StartAt, reminder.StartAt);
             Assert.NotNull(etagTemp);
 
             reminder.ETag = await remindersTable.UpsertRow(reminder);
@@ -169,7 +172,7 @@ namespace UnitTests.RemindersTest
         private GrainReference MakeTestGrainReference()
         {
             GrainId regularGrainId = LegacyGrainId.GetGrainId(12345, Guid.NewGuid(), "foo/bar\\#baz?");
-            GrainReference grainRef = this.ClusterFixture.InternalGrainFactory.GetGrain(regularGrainId);
+            GrainReference grainRef = (GrainReference)this.ClusterFixture.InternalGrainFactory.GetGrain(regularGrainId);
             return grainRef;
         }
     }

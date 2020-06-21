@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Timers.Internal;
 
+#nullable enable
 namespace Orleans
 {
     /// <summary>
@@ -17,27 +18,26 @@ namespace Orleans
     {
         private readonly object lockable = new object();
 
-        private bool startingCurrentWorkCycle;
-
         private DateTime? scheduledNotify;
 
         // Task for the current work cycle, or null if idle
-        private volatile Task currentWorkCycle;
+        private Task? currentWorkCycle;
 
         // Flag is set to indicate that more work has arrived during execution of the task
-        private volatile bool moreWork;
+        private bool moreWork;
 
         // Used to communicate the task for the next work cycle to waiters.
         // This value is non-null only if there are waiters.
-        private TaskCompletionSource<Task> nextWorkCyclePromise;
-        
+        private TaskCompletionSource<Task>? nextWorkCyclePromise;
+        private Task? nextWorkCycle;
+
         /// <summary>Implement this member in derived classes to define what constitutes a work cycle</summary>
         protected abstract Task Work();
 
         /// <summary>
         /// The cancellation used to cancel this batch worker.
         /// </summary>
-        protected CancellationToken CancellationToken { get; set; } = CancellationToken.None;
+        protected CancellationToken CancellationToken { get; set; }
 
         /// <summary>
         /// Notify the worker that there is more work.
@@ -46,7 +46,7 @@ namespace Orleans
         {
             lock (lockable)
             {
-                if (currentWorkCycle != null || startingCurrentWorkCycle)
+                if (currentWorkCycle != null)
                 {
                     // lets the current work cycle know that there is more work
                     moreWork = true;
@@ -96,27 +96,18 @@ namespace Orleans
             }
         }
 
-        private void Start()
+        private Task Start()
         {
-            // Indicate that we are starting the worker (to prevent double-starts)
-            startingCurrentWorkCycle = true;
-
             // Clear any scheduled runs
             scheduledNotify = null;
 
-            try
-            {
-                // Start the task that is doing the work
-                currentWorkCycle = Work();
-            }
-            finally
-            {
-                // By now we have started, and stored the task in currentWorkCycle
-                startingCurrentWorkCycle = false;
+            // Queue a task that is doing the work
+            var task = Task.Factory.StartNew(s => ((BatchWorker)s!).Work(), this, default, default, TaskScheduler.Current).Unwrap();
+            currentWorkCycle = task;
 
-                // chain a continuation that checks for more work, on the same scheduler
-                currentWorkCycle.ContinueWith(t => this.CheckForMoreWork(), TaskScheduler.Current);
-            }
+            // chain a continuation that checks for more work, on the same scheduler
+            task.ContinueWith((_, s) => ((BatchWorker)s!).CheckForMoreWork(), this);
+            return task;
         }
 
         /// <summary>
@@ -124,8 +115,8 @@ namespace Orleans
         /// </summary>
         private void CheckForMoreWork()
         {
-            TaskCompletionSource<Task> signal = null;
-            Task taskToSignal = null;
+            TaskCompletionSource<Task>? signal;
+            Task taskToSignal;
 
             lock (lockable)
             {
@@ -137,16 +128,15 @@ namespace Orleans
                     // if so, take it and remove it
                     signal = this.nextWorkCyclePromise;
                     this.nextWorkCyclePromise = null;
+                    this.nextWorkCycle = null;
 
                     // start the next work cycle
-                    Start();
-
-                    // the current cycle is what we need to signal
-                    taskToSignal = currentWorkCycle;
+                    taskToSignal = Start();
                 }
                 else
                 {
                     currentWorkCycle = null;
+                    return;
                 }
             }
 
@@ -157,87 +147,53 @@ namespace Orleans
         /// <summary>
         /// Check if this worker is idle.
         /// </summary>
-        public bool IsIdle()
-        {
-            // no lock needed for reading volatile field
-            return currentWorkCycle == null;
-        }
+        public bool IsIdle() => currentWorkCycle == null;
 
         /// <summary>
         /// Wait for the current work cycle, and also the next work cycle if there is currently unserviced work.
         /// </summary>
-        /// <returns></returns>
-        public async Task WaitForCurrentWorkToBeServiced()
+        public Task WaitForCurrentWorkToBeServiced()
         {
-            Task<Task> waitfortasktask = null;
-            Task waitfortask = null;
-
             // Figure out exactly what we need to wait for
             lock (lockable)
             {
                 if (!moreWork)
                 {
                     // Just wait for current work cycle
-                    waitfortask = currentWorkCycle;
+                    return currentWorkCycle ?? Task.CompletedTask;
                 }
                 else
                 {
                     // we need to wait for the next work cycle
                     // but that task does not exist yet, so we use a promise that signals when the next work cycle is launched
-                    if (nextWorkCyclePromise == null)
-                    {
-                        nextWorkCyclePromise = new TaskCompletionSource<Task>();
-                    }
-
-                    waitfortasktask = nextWorkCyclePromise.Task;
+                    return nextWorkCycle ?? CreateNextWorkCyclePromise();
                 }
             }
+        }
 
-            // Do the actual waiting outside of the lock
-            if (waitfortasktask != null)
-            {
-                await await waitfortasktask;
-            }
-            else if (waitfortask != null)
-            {
-                await waitfortask;
-            }
+        private Task CreateNextWorkCyclePromise()
+        {
+            // it's OK to run any continuations synchrnously because this promise only gets signaled at the very end of CheckForMoreWork
+            nextWorkCyclePromise = new TaskCompletionSource<Task>();
+            return nextWorkCycle = nextWorkCyclePromise.Task.Unwrap();
         }
 
         /// <summary>
         /// Notify the worker that there is more work, and wait for the current work cycle, and also the next work cycle if there is currently unserviced work.
         /// </summary>
-        public async Task NotifyAndWaitForWorkToBeServiced()
+        public Task NotifyAndWaitForWorkToBeServiced()
         {
-            Task<Task> waitForTaskTask = null;
-            Task waitForTask = null;
-
             lock (lockable)
             {
-                if (currentWorkCycle != null || startingCurrentWorkCycle)
+                if (currentWorkCycle != null)
                 {
                     moreWork = true;
-                    if (nextWorkCyclePromise == null)
-                    {
-                        nextWorkCyclePromise = new TaskCompletionSource<Task>();
-                    }
-
-                    waitForTaskTask = nextWorkCyclePromise.Task;
+                    return nextWorkCycle ?? CreateNextWorkCyclePromise();
                 }
                 else
                 {
-                    Start();
-                    waitForTask = currentWorkCycle;
+                    return Start();
                 }
-            }
-
-            if (waitForTaskTask != null)
-            {
-                await await waitForTaskTask;
-            }
-            else if (waitForTask != null)
-            {
-                await waitForTask;
             }
         }
     }

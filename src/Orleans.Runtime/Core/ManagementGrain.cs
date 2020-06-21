@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.Extensions.Logging;
+using Orleans.Metadata;
 using Orleans.Runtime.MembershipService;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
@@ -18,22 +19,22 @@ namespace Orleans.Runtime.Management
     {
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
-        private readonly GrainTypeManager grainTypeManager;
         private readonly IVersionStore versionStore;
         private readonly MembershipTableManager membershipTableManager;
+        private readonly GrainManifest siloManifest;
         private readonly ILogger logger;
         public ManagementGrain(
             IInternalGrainFactory internalGrainFactory,
             ISiloStatusOracle siloStatusOracle,
-            GrainTypeManager grainTypeManager, 
             IVersionStore versionStore,
             ILogger<ManagementGrain> logger,
-            MembershipTableManager membershipTableManager)
+            MembershipTableManager membershipTableManager,
+            IClusterManifestProvider clusterManifestProvider)
         {
             this.membershipTableManager = membershipTableManager;
+            this.siloManifest = clusterManifestProvider.LocalGrainManifest;
             this.internalGrainFactory = internalGrainFactory;
             this.siloStatusOracle = siloStatusOracle;
-            this.grainTypeManager = grainTypeManager;
             this.versionStore = versionStore;
             this.logger = logger;
         }
@@ -155,19 +156,6 @@ namespace Orleans.Runtime.Management
             return tasks.Select(s => s.Result).Select(r => r.LocalActivations.Count).Sum();
         }
 
-        public async Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null)
-        {
-            if (hostsIds == null)
-            {
-                Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
-                SiloAddress[] silos = hosts.Keys.ToArray();
-            }
-            var all = GetSiloAddresses(hostsIds).Select(s => GetSiloControlReference(s).GetGrainTypeList()).ToArray();
-            await Task.WhenAll(all);
-            return all.SelectMany(s => s.Result).Distinct().ToArray();
-
-        }
-
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
         {
             await SetStrategy(
@@ -182,20 +170,20 @@ namespace Orleans.Runtime.Management
                 siloControl => siloControl.SetSelectorStrategy(strategy));
         }
 
-        public async Task SetCompatibilityStrategy(int interfaceId, CompatibilityStrategy strategy)
+        public async Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy)
         {
-            CheckIfIsExistingInterface(interfaceId);
+            CheckIfIsExistingInterface(interfaceType);
             await SetStrategy(
-                store => store.SetCompatibilityStrategy(interfaceId, strategy),
-                siloControl => siloControl.SetCompatibilityStrategy(interfaceId, strategy));
+                store => store.SetCompatibilityStrategy(interfaceType, strategy),
+                siloControl => siloControl.SetCompatibilityStrategy(interfaceType, strategy));
         }
 
-        public async Task SetSelectorStrategy(int interfaceId, VersionSelectorStrategy strategy)
+        public async Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
         {
-            CheckIfIsExistingInterface(interfaceId);
+            CheckIfIsExistingInterface(interfaceType);
             await SetStrategy(
-                store => store.SetSelectorStrategy(interfaceId, strategy),
-                siloControl => siloControl.SetSelectorStrategy(interfaceId, strategy));
+                store => store.SetSelectorStrategy(interfaceType, strategy),
+                siloControl => siloControl.SetSelectorStrategy(interfaceType, strategy));
         }
 
         public async Task<int> GetTotalActivationCount()
@@ -220,13 +208,21 @@ namespace Orleans.Runtime.Management
                 String.Format("SendControlCommandToProvider of type {0} and name {1} command {2}.", providerTypeFullName, providerName, command));
         }
 
-        private void CheckIfIsExistingInterface(int interfaceId)
+        private void CheckIfIsExistingInterface(GrainInterfaceType interfaceType)
         {
-            Type unused;
-            var interfaceMap = this.grainTypeManager.ClusterGrainInterfaceMap;
-            if (!interfaceMap.TryGetServiceInterface(interfaceId, out unused))
+            GrainInterfaceType lookupId;
+            if (GenericGrainInterfaceType.TryParse(interfaceType, out var generic))
             {
-                throw new ArgumentException($"Interface code '{interfaceId} not found", nameof(interfaceId));
+                lookupId = generic.Value;
+            }
+            else
+            {
+                lookupId = interfaceType;
+            }
+
+            if (!this.siloManifest.Interfaces.TryGetValue(lookupId, out _))
+            { 
+                throw new ArgumentException($"Interface '{interfaceType} not found", nameof(interfaceType));
             }
         }
 

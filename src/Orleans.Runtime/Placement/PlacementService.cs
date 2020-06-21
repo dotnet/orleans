@@ -52,16 +52,6 @@ namespace Orleans.Runtime.Placement
 
             var siloAddress = await director.OnAddActivation(strategy, target, placementRuntime);
 
-            string grainTypeName;
-            if (LegacyGrainId.TryConvertFromGrainId(target.GrainIdentity, out var legacyId))
-            {
-                grainTypeName = placementRuntime.GetGrainTypeName(legacyId.TypeCode);
-            }
-            else
-            {
-                grainTypeName = null;
-            }
-
             ActivationId activationId;
             if (strategy.IsDeterministicActivationId)
             {
@@ -76,8 +66,7 @@ namespace Orleans.Runtime.Placement
             return PlacementResult.SpecifyCreation(
                 siloAddress,
                 activationId,
-                strategy,
-                grainTypeName);
+                strategy);
         }
     }
 }

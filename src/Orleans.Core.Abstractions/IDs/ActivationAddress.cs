@@ -3,7 +3,7 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal class ActivationAddress
+    public class ActivationAddress
     {
         public GrainId Grain { get; private set; }
         public ActivationId Activation { get; private set; }
@@ -48,10 +48,7 @@ namespace Orleans.Runtime
                 (Activation != null ? Activation.GetHashCode() : 0);
         }
 
-        public override string ToString()
-        {
-            return String.Format("{0}{1}{2}", Silo, Grain, Activation);
-        }
+        public override string ToString() => $"[{Silo} {Grain} {Activation}]";
 
         public string ToFullString()
         {

@@ -99,6 +99,23 @@ namespace Orleans.TestingHost
             }
         }
 
+        public override async ValueTask DisposeAsync()
+        {
+            if (!this.IsActive) return;
+
+            try
+            {
+                await StopSiloAsync(true).ConfigureAwait(false);
+            }
+            finally
+            {
+                if (this.SiloHost is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                }
+            }
+        }
+
         private void WriteLog(object value)
         {
             Console.WriteLine(value?.ToString());

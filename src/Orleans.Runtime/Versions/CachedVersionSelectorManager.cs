@@ -2,42 +2,38 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.Metadata;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
-using Orleans.Utilities;
 
 namespace Orleans.Runtime.Versions
 {
     internal class CachedVersionSelectorManager
     {
-        internal struct CachedEntry
+        private readonly ConcurrentDictionary<(GrainType Type, GrainInterfaceType Interface, ushort Version), CachedEntry> suitableSilosCache;
+        private readonly GrainVersionManifest grainInterfaceVersions;
+
+        public CachedVersionSelectorManager(GrainVersionManifest grainInterfaceVersions, VersionSelectorManager versionSelectorManager, CompatibilityDirectorManager compatibilityDirectorManager)
         {
-            public List<SiloAddress> SuitableSilos { get; set; }
-
-            public IReadOnlyDictionary<ushort, IReadOnlyList<SiloAddress>> SuitableSilosByVersion { get; set; }
+            this.grainInterfaceVersions = grainInterfaceVersions;
+            this.VersionSelectorManager = versionSelectorManager;
+            this.CompatibilityDirectorManager = compatibilityDirectorManager;
+            this.suitableSilosCache = new ConcurrentDictionary<(GrainType Type, GrainInterfaceType Interface, ushort Version), CachedEntry>();
         }
-
-        private readonly GrainTypeManager grainTypeManager;
-        private readonly Func<Tuple<int, int, ushort>, CachedEntry> getSilosFunc;
-        private readonly CachedReadConcurrentDictionary<Tuple<int,int,ushort>, CachedEntry> suitableSilosCache;
 
         public VersionSelectorManager VersionSelectorManager { get; }
 
         public CompatibilityDirectorManager CompatibilityDirectorManager { get; }
 
-        public CachedVersionSelectorManager(GrainTypeManager grainTypeManager, VersionSelectorManager versionSelectorManager, CompatibilityDirectorManager compatibilityDirectorManager)
+        public CachedEntry GetSuitableSilos(GrainType grainType, GrainInterfaceType interfaceId, ushort requestedVersion)
         {
-            this.grainTypeManager = grainTypeManager;
-            this.VersionSelectorManager = versionSelectorManager;
-            this.CompatibilityDirectorManager = compatibilityDirectorManager;
-            this.getSilosFunc = GetSuitableSilosImpl;
-            this.suitableSilosCache = new CachedReadConcurrentDictionary<Tuple<int, int, ushort>, CachedEntry>();
-        }
+            var key = ValueTuple.Create(grainType, interfaceId, requestedVersion);
+            if (!suitableSilosCache.TryGetValue(key, out var entry) || entry.Version < this.grainInterfaceVersions.LatestVersion)
+            {
+                entry = suitableSilosCache[key] = GetSuitableSilosImpl(key);
+            }
 
-        public CachedEntry GetSuitableSilos(int typeCode, int ifaceId, ushort requestedVersion)
-        {
-            var key = Tuple.Create(typeCode, ifaceId, requestedVersion);
-            return suitableSilosCache.GetOrAdd(key, getSilosFunc);
+            return entry;
         }
 
         public void ResetCache()
@@ -45,26 +41,37 @@ namespace Orleans.Runtime.Versions
             this.suitableSilosCache.Clear();
         }
 
-        private CachedEntry GetSuitableSilosImpl(Tuple<int, int, ushort> key)
+        private CachedEntry GetSuitableSilosImpl((GrainType Type, GrainInterfaceType Interface, ushort Version) key)
         {
-            var typeCode = key.Item1;
-            var ifaceId = key.Item2;
-            var requestedVersion = key.Item3;
+            var grainType = key.Type;
+            var interfaceType = key.Interface;
+            var requestedVersion = key.Version;
 
-            var placementDirector = this.VersionSelectorManager.GetSelector(ifaceId);
-            var compatibilityDirector = this.CompatibilityDirectorManager.GetDirector(ifaceId);
-            var versions = placementDirector.GetSuitableVersion(
+            var versionSelector = this.VersionSelectorManager.GetSelector(interfaceType);
+            var compatibilityDirector = this.CompatibilityDirectorManager.GetDirector(interfaceType);
+            (var version, var available) = this.grainInterfaceVersions.GetAvailableVersions(interfaceType);
+            var versions = versionSelector.GetSuitableVersion(
                 requestedVersion, 
-                this.grainTypeManager.GetAvailableVersions(ifaceId), 
+                available, 
                 compatibilityDirector);
 
-            var result = this.grainTypeManager.GetSupportedSilos(typeCode, ifaceId, versions);
+            (_, var result) = this.grainInterfaceVersions.GetSupportedSilos(grainType, interfaceType, versions);
 
             return new CachedEntry
             {
-                SuitableSilos = result.SelectMany(sv => sv.Value).OrderBy(addr => addr).ToList(),
+                Version = version,
+                SuitableSilos = result.SelectMany(sv => sv.Value).Distinct().OrderBy(addr => addr).ToArray(),
                 SuitableSilosByVersion = result,
             };
+        }
+
+        internal struct CachedEntry
+        {
+            public MajorMinorVersion Version { get; set; }
+
+            public SiloAddress[] SuitableSilos { get; set; }
+
+            public Dictionary<ushort, SiloAddress[]> SuitableSilosByVersion { get; set; }
         }
     }
 }

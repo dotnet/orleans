@@ -16,9 +16,10 @@ namespace UnitTests.Grains
         private readonly IGrainFactory injectedGrainFactory;
         private readonly long grainFactoryId;
         public static readonly ObjectIDGenerator ObjectIdGenerator = new ObjectIDGenerator();
-        private readonly IGrainActivationContext grainActivationContext;
+        private readonly IGrainContextAccessor grainContextAccessor;
+        private IGrainContext originalGrainContext;
 
-        public DIGrainWithInjectedServices(IInjectedService injectedService, IInjectedScopedService injectedScopedService,  IGrainFactory injectedGrainFactory, IGrainActivationContext grainActivationContext)
+        public DIGrainWithInjectedServices(IInjectedService injectedService, IInjectedScopedService injectedScopedService,  IGrainFactory injectedGrainFactory, IGrainContextAccessor grainContextAccessor)
         {
             this.injectedService = injectedService;
             this.injectedGrainFactory = injectedGrainFactory;
@@ -28,7 +29,13 @@ namespace UnitTests.Grains
             // object Id will be the same if the underlying object is the same,
             // this is one way to prove that this GrainFactory is injected from DI
             this.grainFactoryId = ObjectIdGenerator.GetId(this.injectedGrainFactory, out set);
-            this.grainActivationContext = grainActivationContext;
+            this.grainContextAccessor = grainContextAccessor;
+        }
+
+        public override Task OnActivateAsync()
+        {
+            this.originalGrainContext = this.grainContextAccessor.GrainContext;
+            return base.OnActivateAsync();
         }
 
         public Task<long> GetLongValue()
@@ -38,7 +45,7 @@ namespace UnitTests.Grains
 
         public Task<string> GetStringValue()
         {
-            return Task.FromResult(this.grainActivationContext.GrainId.ToString());
+            return Task.FromResult(this.grainContextAccessor.GrainContext.GrainId.ToString());
         }
 
         public Task<string> GetInjectedSingletonServiceValue()
@@ -66,12 +73,13 @@ namespace UnitTests.Grains
         {
             if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IInjectedService>(), this.injectedService)) throw new Exception("singleton not equal");
             if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IInjectedScopedService>(), this.injectedScopedService)) throw new Exception("scoped not equal");
-            if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IGrainActivationContext>(), this.grainActivationContext)) throw new Exception("scoped grain activation context not equal");
+            if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IGrainContextAccessor>().GrainContext, this.originalGrainContext)) throw new Exception("scoped grain activation context not equal");
 
             return Task.CompletedTask;
         }
     }
 
+    [GrainType("explicitly-registered")]
     public class ExplicitlyRegisteredSimpleDIGrain : Grain, ISimpleDIGrain
     {
         private readonly IInjectedService injectedService;

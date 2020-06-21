@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using Orleans.Concurrency;
 using Orleans.EventSourcing;
 using Orleans.Providers;
@@ -16,6 +16,7 @@ namespace TestGrains
     /// 
     /// For configuration options, see derived classes in CountersGrainVariations.cs
     /// </summary>
+    [GrainType("simple-counters-grain")]
     public class CountersGrain : JournaledGrain<CountersGrain.GrainState>, ICountersGrain
     {
         /// <summary>

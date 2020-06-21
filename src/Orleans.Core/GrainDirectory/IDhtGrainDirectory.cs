@@ -90,7 +90,7 @@ namespace Orleans.GrainDirectory
     /// Indicates the reason for removing activations from the directory.
     /// This influences the conditions that are applied when determining whether or not to remove an entry.
     /// </summary>
-    internal enum UnregistrationCause : byte
+    public enum UnregistrationCause : byte
     {
         /// <summary>
         /// Remove the directory entry forcefully, without any conditions

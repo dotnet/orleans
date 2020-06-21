@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
+using Orleans.Configuration;
 using Orleans.Runtime;
 
 namespace Orleans.Metadata
@@ -14,57 +16,70 @@ namespace Orleans.Metadata
         public SiloManifestProvider(
             IEnumerable<IGrainPropertiesProvider> grainPropertiesProviders,
             IEnumerable<IGrainInterfacePropertiesProvider> grainInterfacePropertiesProviders,
+            IOptions<GrainClassOptions> grainClassOptions,
             IApplicationPartManager applicationPartManager,
             GrainTypeResolver typeProvider,
-            GrainInterfaceIdResolver interfaceIdProvider)
+            GrainInterfaceTypeResolver interfaceIdProvider,
+            TypeConverter typeConverter)
         {
-            var grains = CreateGrainManifest(grainPropertiesProviders, applicationPartManager, typeProvider);
+            var (grainProperties, grainTypes) = CreateGrainManifest(grainClassOptions.Value, grainPropertiesProviders, applicationPartManager, typeProvider);
             var interfaces = CreateInterfaceManifest(grainInterfacePropertiesProviders, applicationPartManager, interfaceIdProvider);
-            this.SiloManifest = new SiloManifest(grains, interfaces);
+            this.SiloManifest = new GrainManifest(grainProperties, interfaces);
+            this.GrainTypeMap = new GrainClassMap(typeConverter, grainTypes);
         }
 
-        public SiloManifest SiloManifest { get; }
+        public GrainManifest SiloManifest { get; }
 
-        private static ImmutableDictionary<GrainInterfaceId, GrainInterfaceProperties> CreateInterfaceManifest(
+        public GrainClassMap GrainTypeMap { get; }
+
+        private static ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> CreateInterfaceManifest(
             IEnumerable<IGrainInterfacePropertiesProvider> propertyProviders,
             IApplicationPartManager applicationPartManager,
-            GrainInterfaceIdResolver grainInterfaceIdProvider)
+            GrainInterfaceTypeResolver grainInterfaceIdProvider)
         {
             var feature = applicationPartManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
-            var builder = ImmutableDictionary.CreateBuilder<GrainInterfaceId, GrainInterfaceProperties>();
+            var builder = ImmutableDictionary.CreateBuilder<GrainInterfaceType, GrainInterfaceProperties>();
             foreach (var value in feature.Interfaces)
             {
-                var interfaceId = grainInterfaceIdProvider.GetGrainInterfaceId(value.InterfaceType);
+                var interfaceType = grainInterfaceIdProvider.GetGrainInterfaceType(value.InterfaceType);
                 var properties = new Dictionary<string, string>();
                 foreach (var provider in propertyProviders)
                 {
-                    provider.Populate(value.InterfaceType, interfaceId, properties);
+                    provider.Populate(value.InterfaceType, interfaceType, properties);
                 }
 
                 var result = new GrainInterfaceProperties(properties.ToImmutableDictionary());
-                if (builder.ContainsKey(interfaceId))
+                if (builder.ContainsKey(interfaceType))
                 {
-                    throw new InvalidOperationException($"An entry with the key {interfaceId} is already present."
-                        + $"\nExisting: {builder[interfaceId].ToDetailedString()}\nTrying to add: {result.ToDetailedString()}"
-                        + "\nConsider using the [GrainInterfaceId(\"name\")] attribute to give these interfaces unique names.");
+                    throw new InvalidOperationException($"An entry with the key {interfaceType} is already present."
+                        + $"\nExisting: {builder[interfaceType].ToDetailedString()}\nTrying to add: {result.ToDetailedString()}"
+                        + "\nConsider using the [GrainInterfaceType(\"name\")] attribute to give these interfaces unique names.");
                 }
 
-                builder.Add(interfaceId, result);
+                builder.Add(interfaceType, result);
             }
 
             return builder.ToImmutable();
         }
 
-        private static ImmutableDictionary<GrainType, GrainProperties> CreateGrainManifest(
+        private static (ImmutableDictionary<GrainType, GrainProperties>, ImmutableDictionary<GrainType, Type>) CreateGrainManifest(
+            GrainClassOptions grainClassOptions,
             IEnumerable<IGrainPropertiesProvider> grainMetadataProviders,
             IApplicationPartManager applicationPartManager,
             GrainTypeResolver grainTypeProvider)
         {
             var feature = applicationPartManager.CreateAndPopulateFeature<GrainClassFeature>();
-            var builder = ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
+            var propertiesMap = ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
+            var typeMap = ImmutableDictionary.CreateBuilder<GrainType, Type>();
             foreach (var value in feature.Classes)
             {
                 var grainClass = value.ClassType;
+                if (grainClassOptions.ExcludedGrainTypes.Contains(grainClass.FullName))
+                {
+                    // Explicitly excluded.
+                    continue;
+                }
+
                 var grainType = grainTypeProvider.GetGrainType(grainClass);
                 var properties = new Dictionary<string, string>();
                 foreach (var provider in grainMetadataProviders)
@@ -73,17 +88,18 @@ namespace Orleans.Metadata
                 }
 
                 var result = new GrainProperties(properties.ToImmutableDictionary());
-                if (builder.ContainsKey(grainType))
+                if (propertiesMap.ContainsKey(grainType))
                 {
                     throw new InvalidOperationException($"An entry with the key {grainType} is already present."
-                        + $"\nExisting: {builder[grainType].ToDetailedString()}\nTrying to add: {result.ToDetailedString()}"
+                        + $"\nExisting: {propertiesMap[grainType].ToDetailedString()}\nTrying to add: {result.ToDetailedString()}"
                         + "\nConsider using the [GrainType(\"name\")] attribute to give these classes unique names.");
                 }
 
-                builder.Add(grainType, result);
+                propertiesMap.Add(grainType, result);
+                typeMap.Add(grainType, grainClass);
             }
 
-            return builder.ToImmutable();
+            return (propertiesMap.ToImmutable(), typeMap.ToImmutable());
         }
     }
 }

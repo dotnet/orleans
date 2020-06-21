@@ -45,17 +45,18 @@ namespace Tester.StorageFacet.Implementations
 
     public class TableExampleStorageFactory : IExampleStorageFactory
     {
-        private readonly IGrainActivationContext context;
-        public TableExampleStorageFactory(IGrainActivationContext context)
+        private readonly IGrainContextAccessor contextAccessor;
+        public TableExampleStorageFactory(IGrainContextAccessor context)
         {
-            this.context = context;
+            this.contextAccessor = context;
         }
 
         public IExampleStorage<TState> Create<TState>(IExampleStorageConfig config)
         {
-            var storage = this.context.ActivationServices.GetRequiredService<TableExampleStorage<TState>>();
+            var context = this.contextAccessor.GrainContext;
+            var storage = context.ActivationServices.GetRequiredService<TableExampleStorage<TState>>();
             storage.Configure(config);
-            storage.Participate(this.context.ObservableLifecycle);
+            storage.Participate(context.ObservableLifecycle);
             return storage;
         }
     }

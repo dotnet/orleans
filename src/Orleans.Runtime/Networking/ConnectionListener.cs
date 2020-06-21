@@ -121,14 +121,13 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 var cycles = 0;
-                var exception = new ConnectionAbortedException("Shutting down");
                 while (this.ConnectionCount > 0)
                 {
                     foreach (var connection in this.connections.Keys.ToImmutableList())
                     {
                         try
                         {
-                            connection.Close(exception);
+                            connection.Close();
                         }
                         catch
                         {

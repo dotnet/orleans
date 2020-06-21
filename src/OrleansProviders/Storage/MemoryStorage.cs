@@ -120,7 +120,7 @@ namespace Orleans.Storage
             return new[]
             {
                 Tuple.Create("GrainType", grainType),
-                Tuple.Create("GrainId", grain.ToKeyString())
+                Tuple.Create("GrainId", grain.GrainId.ToString())
             };
         }
 

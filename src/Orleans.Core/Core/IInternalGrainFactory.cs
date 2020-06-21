@@ -47,14 +47,6 @@ namespace Orleans
         TGrainInterface Cast<TGrainInterface>(IAddressable grain);
 
         /// <summary>
-        /// Gets a reference to the grain with the provided id.
-        /// </summary>
-        /// <param name="grainId">The grain id.</param>
-        /// <param name="genericArguments">The generic type arguments.</param>
-        /// <returns>A reference to the grain with the provided id.</returns>
-        GrainReference GetGrain(GrainId grainId, string genericArguments = null);
-
-        /// <summary>
         /// Casts the provided <paramref name="grain"/> to the provided <paramref name="interfaceType"/>.
         /// </summary>
         /// <param name="grain">The grain.</param>

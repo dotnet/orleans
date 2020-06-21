@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,7 @@ namespace Orleans.GrainDirectory.Redis
 
         private ConnectionMultiplexer redis;
         private IDatabase database;
+        private LuaScript deleteScript;
 
         public RedisGrainDirectory(
             RedisGrainDirectoryOptions directoryOptions,
@@ -32,47 +34,81 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task<GrainAddress> Lookup(string grainId)
         {
-            var result = (string) await this.database.StringGetAsync(GetKey(grainId));
+            try
+            {
+                var result = (string)await this.database.StringGetAsync(GetKey(grainId));
 
-            if (this.logger.IsEnabled(LogLevel.Debug))
-                this.logger.LogDebug("Lookup {GrainId}: {Result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
+                if (this.logger.IsEnabled(LogLevel.Debug))
+                    this.logger.LogDebug("Lookup {GrainId}: {Result}", grainId, string.IsNullOrWhiteSpace(result) ? "null" : result);
 
-            if (string.IsNullOrWhiteSpace(result))
-                return default;
+                if (string.IsNullOrWhiteSpace(result))
+                    return default;
 
-            return JsonConvert.DeserializeObject<GrainAddress>(result);
+                return JsonConvert.DeserializeObject<GrainAddress>(result);
+            }
+            catch (Exception ex)
+            {
+                this.logger.LogError(ex, "Lookup failed for {GrainId}", grainId);
+
+                if (IsRedisException(ex))
+                    throw new OrleansException($"Lookup failed for {grainId} : {ex.ToString()}");
+                else
+                    throw;
+            }
         }
 
         public async Task<GrainAddress> Register(GrainAddress address)
         {
             var value = JsonConvert.SerializeObject(address);
-            var success = await this.database.StringSetAsync(
-                this.GetKey(address.GrainId),
-                value,
-                this.directoryOptions.EntryExpiry,
-                When.NotExists);
 
-            if (this.logger.IsEnabled(LogLevel.Debug))
-                this.logger.LogDebug("Register {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK": "Conflict");
+            try
+            {
+                var success = await this.database.StringSetAsync(
+                    this.GetKey(address.GrainId),
+                    value,
+                    this.directoryOptions.EntryExpiry,
+                    When.NotExists);
 
-            if (success)
-                return address;
+                if (this.logger.IsEnabled(LogLevel.Debug))
+                    this.logger.LogDebug("Register {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK" : "Conflict");
 
-            return await Lookup(address.GrainId);
+                if (success)
+                    return address;
+
+                return await Lookup(address.GrainId);
+            }
+            catch (Exception ex)
+            {
+                this.logger.LogError(ex, "Register failed for {GrainId} ({Address})", address.GrainId, value);
+
+                if (IsRedisException(ex))
+                    throw new OrleansException($"Register failed for {address.GrainId} ({value}) : {ex.ToString()}");
+                else
+                    throw;
+            }
         }
 
         public async Task Unregister(GrainAddress address)
         {
             var key = GetKey(address.GrainId);
-
-            var tx = this.database.CreateTransaction();
             var value = JsonConvert.SerializeObject(address);
-            tx.AddCondition(Condition.StringEqual(key, value));
-            tx.KeyDeleteAsync(key).Ignore();
-            var success = await tx.ExecuteAsync();
 
-            if (this.logger.IsEnabled(LogLevel.Debug))
-                this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, value, success ? "OK" : "Conflict");
+            try
+            {
+                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = JsonConvert.SerializeObject(address) });
+
+                if (this.logger.IsEnabled(LogLevel.Debug))
+                    this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, value, (result != 0) ? "OK" : "Conflict");
+            }
+            catch (Exception ex)
+            {
+                this.logger.LogError(ex, "Unregister failed for {GrainId} ({Address})", address.GrainId, value);
+
+                if (IsRedisException(ex))
+                    throw new OrleansException($"Unregister failed for {address.GrainId} ({value}) : {ex.ToString()}");
+                else
+                    throw;
+            }
         }
 
         public Task UnregisterSilos(List<string> siloAddresses)
@@ -97,6 +133,16 @@ namespace Orleans.GrainDirectory.Redis
             this.redis.IncludeDetailInExceptions = true;
 
             this.database = this.redis.GetDatabase();
+
+            this.deleteScript = LuaScript.Prepare(
+    @"	
+local cur = redis.call('GET', @key)	
+if cur == @val  then	
+  return redis.call('DEL', @key)	
+else	
+  return 0	
+end	
+                ");
         }
 
         private async Task Uninitialize(CancellationToken arg)
@@ -125,5 +171,8 @@ namespace Orleans.GrainDirectory.Redis
         private void LogInternalError(object sender, InternalErrorEventArgs e)
             => this.logger.LogError(e.Exception, "Internal error");
         #endregion
+
+        // These exceptions are not serializable by the client
+        private static bool IsRedisException(Exception ex) => ex is RedisException || ex is RedisTimeoutException || ex is RedisCommandException;
     }
 }

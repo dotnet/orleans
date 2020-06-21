@@ -24,11 +24,16 @@ namespace Tester.AzureUtils.Streaming
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
 
         private readonly ITestOutputHelper output;
-        private readonly ClientStreamTestRunner runner;
+        private ClientStreamTestRunner runner;
 
         public AQClientStreamTests(ITestOutputHelper output)
         {
             this.output = output;
+        }
+
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
@@ -67,15 +72,15 @@ namespace Tester.AzureUtils.Streaming
             }
         }
 
-        public override void Dispose()
+        public override async Task DisposeAsync()
         {
-            base.Dispose();
-            if (this.HostedCluster != null)
+            await base.DisposeAsync();
+            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
                 var serviceId = this.HostedCluster.Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
-                    TestDefaultConfiguration.DataConnectionString).Wait();
-                TestAzureTableStorageStreamFailureHandler.DeleteAll().Wait();
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
+                    TestDefaultConfiguration.DataConnectionString);
+                await TestAzureTableStorageStreamFailureHandler.DeleteAll();
             }
         }
 

@@ -320,7 +320,7 @@ namespace Orleans.EventSourcing.Common
 
             Services.Log(LogLevel.Trace, "TryAppend");
 
-            var promise = new TaskCompletionSource<bool>();
+            var promise = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             SubmitInternal(DateTime.UtcNow, logEntry, GetConfirmedVersion() + pending.Count, promise);
 
@@ -339,7 +339,7 @@ namespace Orleans.EventSourcing.Common
 
             Services.Log(LogLevel.Trace, "TryAppendRange");
 
-            var promise = new TaskCompletionSource<bool>();
+            var promise = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var time = DateTime.UtcNow;
             var pos = GetConfirmedVersion() + pending.Count;
 

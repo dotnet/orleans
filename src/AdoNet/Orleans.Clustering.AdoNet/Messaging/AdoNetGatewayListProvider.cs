@@ -15,11 +15,11 @@ namespace Orleans.Runtime.Membership
         private string clusterId;
         private readonly AdoNetClusteringClientOptions options;
         private RelationalOrleansQueries orleansQueries;
-        private readonly IGrainReferenceConverter grainReferenceConverter;
+        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private readonly TimeSpan maxStaleness;
         public AdoNetGatewayListProvider(
             ILogger<AdoNetGatewayListProvider> logger, 
-            IGrainReferenceConverter grainReferenceConverter,
+            GrainReferenceKeyStringConverter grainReferenceConverter,
             IOptions<AdoNetClusteringClientOptions> options,
             IOptions<GatewayOptions> gatewayOptions,
             IOptions<ClusterOptions> clusterOptions)

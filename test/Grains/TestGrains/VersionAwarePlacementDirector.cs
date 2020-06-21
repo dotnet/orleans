@@ -1,7 +1,6 @@
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace UnitTests.Grains
@@ -12,10 +11,10 @@ namespace UnitTests.Grains
 
         public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            IReadOnlyList<SiloAddress> silos;
+            SiloAddress[] silos;
             if (target.InterfaceVersion == 0)
             {
-                silos = (IReadOnlyList<SiloAddress>)context.GetCompatibleSilos(target);
+                silos = context.GetCompatibleSilos(target);
             }
             else
             {
@@ -24,16 +23,16 @@ namespace UnitTests.Grains
                 ushort version = 0;
                 foreach (var kvp in silosByVersion)
                 {
-                    if (kvp.Value.Count > maxSiloCount)
+                    if (kvp.Value.Length > maxSiloCount)
                     {
                         version = kvp.Key;
-                        maxSiloCount = kvp.Value.Count;
+                        maxSiloCount = kvp.Value.Length;
                     }
                 }
                 silos = silosByVersion[version];
             }
 
-            return Task.FromResult(silos[random.Next(silos.Count)]);
+            return Task.FromResult(silos[random.Next(silos.Length)]);
         }
     }
 

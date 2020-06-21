@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
@@ -28,7 +28,7 @@ namespace Orleans.Transactions.State
             record.WaitCount = totalResources - 1;
             record.WaitingSince = DateTime.UtcNow;
             record.WriteParticipants = writeResources;
-            record.PromiseForTA = new TaskCompletionSource<TransactionalStatus>();
+            record.PromiseForTA = new TaskCompletionSource<TransactionalStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             if (!valid)
             {

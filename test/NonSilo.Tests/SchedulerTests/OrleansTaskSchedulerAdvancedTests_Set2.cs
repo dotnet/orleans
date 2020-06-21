@@ -678,6 +678,7 @@ namespace UnitTests.SchedulerTests
             await Run_ActivationSched_Test1(scheduler, true);
         }
 
+
         internal async Task Run_ActivationSched_Test1(TaskScheduler scheduler, bool bounceToThreadPool)
         {
             var grainId = LegacyGrainId.GetGrainId(0, Guid.NewGuid());
@@ -685,7 +686,7 @@ namespace UnitTests.SchedulerTests
             {
                 SiloAddress = SiloAddressUtils.NewLocalSiloAddress(23)
             };
-            var grain = NonReentrentStressGrainWithoutState.Create(grainId, new GrainRuntime(Options.Create(new ClusterOptions()), silo, null, null, null, null, null, NullLoggerFactory.Instance));
+            var grain = new NonReentrentStressGrainWithoutState(null);
 
             await Task.Factory.StartNew(() => grain.OnActivateAsync(), CancellationToken.None, TaskCreationOptions.None, scheduler).Unwrap();
 

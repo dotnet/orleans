@@ -11,7 +11,11 @@ using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Scheduler;
+using Orleans.Runtime.Utilities;
 using TestExtensions;
+using UnitTests.SchedulerTests;
+using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -25,9 +29,7 @@ namespace UnitTests.Directory
 
         private readonly IGrainDirectory grainDirectory;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
-        private readonly ILocalGrainDirectory localGrainDirectory;
         private readonly MockClusterMembershipService mockMembershipService;
-
         private readonly CachedGrainLocator grainLocator;
 
         public CachedGrainLocatorTests(ITestOutputHelper output)
@@ -45,11 +47,10 @@ namespace UnitTests.Directory
                 services,
                 new GrainPropertiesResolver(new NoOpClusterManifestProvider()),
                 Array.Empty<IGrainDirectoryResolver>());
-            this.localGrainDirectory = Substitute.For<ILocalGrainDirectory>();
             this.mockMembershipService = new MockClusterMembershipService();
 
             this.grainLocator = new CachedGrainLocator(
-                this.grainDirectoryResolver,
+                this.grainDirectoryResolver, 
                 this.mockMembershipService.Target);
 
             this.grainLocator.Participate(this.lifecycle);
@@ -282,9 +283,14 @@ namespace UnitTests.Directory
 
         private class NoOpClusterManifestProvider : IClusterManifestProvider
         {
-            public ClusterManifest Current => new ClusterManifest(MajorMinorVersion.Zero, ImmutableDictionary<SiloAddress, SiloManifest>.Empty);
+            public ClusterManifest Current => new ClusterManifest(
+                MajorMinorVersion.Zero,
+                ImmutableDictionary<SiloAddress, GrainManifest>.Empty,
+                ImmutableArray.Create(new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty)));
 
             public IAsyncEnumerable<ClusterManifest> Updates => this.GetUpdates();
+
+            public GrainManifest LocalGrainManifest { get; } = new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
 
             private async IAsyncEnumerable<ClusterManifest> GetUpdates()
             {

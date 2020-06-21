@@ -1,59 +1,96 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
-using System.Reflection;
+using Orleans.Metadata;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    [Serializable]
     internal class ImplicitStreamSubscriberTable
     {
-        [NonSerialized]
-        private readonly ConcurrentDictionary<string, HashSet<int>> table;
+        private readonly object _lockObj = new object();
+        private readonly GrainBindingsResolver _bindings;
+        private readonly IStreamNamespacePredicateProvider[] _providers;
+        private Cache _cache;
 
-        private readonly HashSet<int> grainsWithKeyExtensions;
-        private readonly List<Tuple<IStreamNamespacePredicate, int>> predicates;
-
-        public ImplicitStreamSubscriberTable()
+        public ImplicitStreamSubscriberTable(
+            GrainBindingsResolver bindings,
+            IEnumerable<IStreamNamespacePredicateProvider> providers)
         {
-            table = new ConcurrentDictionary<string, HashSet<int>>();
-            grainsWithKeyExtensions = new HashSet<int>();
-            predicates = new List<Tuple<IStreamNamespacePredicate, int>>();
+            _bindings = bindings;
+            var initialBindings = bindings.GetAllBindings();
+            _providers = providers.ToArray();
+            _cache = BuildCache(initialBindings.Version, initialBindings.Bindings);
         }
 
-        /// <summary>Initializes any implicit stream subscriptions specified for a grain class type. If the grain class specified does not have any associated namespaces, then nothing is done.</summary>
-        /// <param name="grainClasses">A grain class type.</param>
-        /// <exception cref="System.ArgumentException">
-        /// Duplicate specification of namespace "...".
-        /// </exception>
-        internal void InitImplicitStreamSubscribers(IEnumerable<Type> grainClasses)
+        private Cache GetCache()
         {
-            foreach (var grainClass in grainClasses)
+            var cache = _cache;
+            var bindings = _bindings.GetAllBindings();
+            if (bindings.Version == cache.Version)
             {
-                if (!TypeUtils.IsGrainClass(grainClass))
+                return cache;
+            }
+
+            lock (_lockObj)
+            {
+                bindings = _bindings.GetAllBindings();
+                if (bindings.Version == cache.Version)
                 {
-                    continue;
+                    return cache;
                 }
 
-                // we collect all predicates that the specified grain class should implicitly subscribe to.
+                return _cache = BuildCache(bindings.Version, bindings.Bindings);
+            }
+        }
 
-                IList<IStreamNamespacePredicate> grainPredicates = GetPredicatesFromAttributes(grainClass);
-                if (grainPredicates.Any())
+        private Cache BuildCache(MajorMinorVersion version, ImmutableDictionary<GrainType, GrainBindings> bindings)
+        {
+            var newPredicates = new List<StreamSubscriberPredicate>();
+
+            foreach (var binding in bindings.Values)
+            {
+                foreach (var grainBinding in binding.Bindings)
                 {
-                    // we'll need the class type code.
-                    int implTypeCode = CodeGeneration.GrainInterfaceUtils.GetGrainClassTypeCode(grainClass);
-                    if (typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(grainClass))
+                    if (!grainBinding.TryGetValue(WellKnownGrainTypeProperties.BindingTypeKey, out var type)
+                        || !string.Equals(type, WellKnownGrainTypeProperties.StreamBindingTypeValue, StringComparison.Ordinal))
                     {
-                        grainsWithKeyExtensions.Add(implTypeCode);
+                        continue;
                     }
-                    foreach (var predicate in grainPredicates)
+
+                    if (!grainBinding.TryGetValue(WellKnownGrainTypeProperties.StreamBindingPatternKey, out var pattern))
                     {
-                        predicates.Add(Tuple.Create(predicate, implTypeCode));
+                        throw new KeyNotFoundException(
+                           $"Stream binding for grain type {binding.GrainType} is missing a \"{WellKnownGrainTypeProperties.StreamBindingPatternKey}\" value");
                     }
+
+                    IStreamNamespacePredicate predicate = null;
+                    foreach (var provider in _providers)
+                    {
+                        if (provider.TryGetPredicate(pattern, out predicate)) break;
+                    }
+
+                    if (predicate is null)
+                    {
+                        throw new KeyNotFoundException(
+                            $"Could not find an {nameof(IStreamNamespacePredicate)} for the pattern \"{pattern}\"."
+                            + $" Ensure that a corresponding {nameof(IStreamNamespacePredicateProvider)} is registered");
+                    }
+
+                    bool includeNamespaceInGrainId = false;
+                    if (grainBinding.TryGetValue(WellKnownGrainTypeProperties.StreamBindingIncludeNamespaceKey, out var value)
+                        && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+                    {
+                        includeNamespaceInGrainId = true;
+                    }
+
+                    newPredicates.Add(new StreamSubscriberPredicate(new StreamSubscriber(binding.GrainType, includeNamespaceInGrainId), predicate));
                 }
             }
+
+            return new Cache(version, newPredicates);
         }
 
         /// <summary>
@@ -71,13 +108,13 @@ namespace Orleans.Streams
                 throw new ArgumentException("The stream ID doesn't have an associated namespace.", nameof(streamId));
             }
 
-            HashSet<int> entry = GetOrAddImplicitSubscriberTypeCodes(streamId.Namespace);
+            var entries = GetOrAddImplicitSubscribers(streamId.Namespace);
 
             var result = new Dictionary<Guid, IStreamConsumerExtension>();
-            foreach (var i in entry)
+            foreach (var entry in entries)
             {
-                IStreamConsumerExtension consumer = MakeConsumerReference(grainFactory, streamId, i);
-                Guid subscriptionGuid = MakeSubscriptionGuid(i, streamId);
+                var consumer = MakeConsumerReference(grainFactory, streamId, entry);
+                Guid subscriptionGuid = MakeSubscriptionGuid(entry.GrainType, streamId);
                 if (result.ContainsKey(subscriptionGuid))
                 {
                     throw new InvalidOperationException(
@@ -88,9 +125,15 @@ namespace Orleans.Streams
             return result;
         }
 
-        private HashSet<int> GetOrAddImplicitSubscriberTypeCodes(string streamNamespace)
+        private HashSet<StreamSubscriber> GetOrAddImplicitSubscribers(string streamNamespace)
         {
-            return table.GetOrAdd(streamNamespace, FindImplicitSubscriberTypeCodes);
+            var cache = GetCache();
+            if (cache.Namespaces.TryGetValue(streamNamespace, out var result))
+            {
+                return result;
+            }
+
+            return cache.Namespaces[streamNamespace] = FindImplicitSubscribers(streamNamespace, cache.Predicates);
         }
 
         /// <summary>
@@ -101,7 +144,7 @@ namespace Orleans.Streams
         /// <returns>true if the grain id describes an implicit subscriber of the stream described by the stream id.</returns>
         internal bool IsImplicitSubscriber(GrainId grainId, StreamId streamId)
         {
-            return grainId.IsLegacyGrain() && HasImplicitSubscription(streamId.Namespace, LegacyGrainId.FromGrainId(grainId).TypeCode);
+            return HasImplicitSubscription(streamId.Namespace, grainId.Type);
         }
 
         /// <summary>
@@ -122,7 +165,7 @@ namespace Orleans.Streams
             }
 
             // make subscriptionId
-            subscriptionId = MakeSubscriptionGuid(grainId, streamId);
+            subscriptionId = MakeSubscriptionGuid(grainId.Type, streamId);
 
             return true;
         }
@@ -130,26 +173,9 @@ namespace Orleans.Streams
         /// <summary>
         /// Create a subscriptionId that is unique per grainId, grainType, namespace combination.
         /// </summary>
-        /// <param name="grainId"></param>
-        /// <param name="streamId"></param>
-        /// <returns></returns>
-        private Guid MakeSubscriptionGuid(GrainId grainId, StreamId streamId)
+        private Guid MakeSubscriptionGuid(GrainType grainType, StreamId streamId)
         {
-            // first int in guid is grain type code
-            int grainIdTypeCode = LegacyGrainId.FromGrainId(grainId).TypeCode;
-
-            return MakeSubscriptionGuid(grainIdTypeCode, streamId);
-        }
-
-        /// <summary>
-        /// Create a subscriptionId that is unique per grainId, grainType, namespace combination.
-        /// </summary>
-        /// <param name="grainIdTypeCode"></param>
-        /// <param name="streamId"></param>
-        /// <returns></returns>
-        private Guid MakeSubscriptionGuid(int grainIdTypeCode, StreamId streamId)
-        {
-            // next 2 shorts ing guid are from namespace hash
+            // next 2 shorts inc guid are from namespace hash
             uint namespaceHash = JenkinsHash.ComputeHash(streamId.Namespace);
             byte[] namespaceHashByes = BitConverter.GetBytes(namespaceHash);
             short s1 = BitConverter.ToInt16(namespaceHashByes, 0);
@@ -170,7 +196,9 @@ namespace Orleans.Streams
             // - First int is grain type
             // - Two shorts from namespace hash
             // - 8 byte tail from streamId Guid and provider name hash.
-            return SubscriptionMarker.MarkAsImplictSubscriptionId(new Guid(grainIdTypeCode, s1, s2, tail.ToArray()));
+            var id = new Guid((int)JenkinsHash.ComputeHash(grainType.ToString()), s1, s2, tail.ToArray());
+            var result = SubscriptionMarker.MarkAsImplictSubscriptionId(id);
+            return result;
         }
 
         internal static bool IsImplicitSubscribeEligibleNameSpace(string streamNameSpace)
@@ -178,30 +206,28 @@ namespace Orleans.Streams
             return !string.IsNullOrWhiteSpace(streamNameSpace);
         }
 
-        private bool HasImplicitSubscription(string streamNamespace, int grainIdTypeCode)
+        private bool HasImplicitSubscription(string streamNamespace, GrainType grainType)
         {
             if (!IsImplicitSubscribeEligibleNameSpace(streamNamespace))
             {
                 return false;
             }
 
-            HashSet<int> entry = GetOrAddImplicitSubscriberTypeCodes(streamNamespace);
-            return entry.Contains(grainIdTypeCode);
+            var entry = GetOrAddImplicitSubscribers(streamNamespace);
+            return entry.Any(e => e.GrainType == grainType);
         }
 
         /// <summary>
-        /// Finds all implicit subscribed for the given stream namespace.
+        /// Finds all implicit subscribers for the given stream namespace.
         /// </summary>
-        /// <param name="streamNamespace">The stream namespace to find subscribers too.</param>
-        /// <returns></returns>
-        private HashSet<int> FindImplicitSubscriberTypeCodes(string streamNamespace)
+        private static HashSet<StreamSubscriber> FindImplicitSubscribers(string streamNamespace, List<StreamSubscriberPredicate> predicates)
         {
-            HashSet<int> result = new HashSet<int>();
-            foreach (Tuple<IStreamNamespacePredicate, int> predicate in predicates)
+            var result = new HashSet<StreamSubscriber>();
+            foreach (var predicate in predicates)
             {
-                if (predicate.Item1.IsMatch(streamNamespace))
+                if (predicate.Predicate.IsMatch(streamNamespace))
                 {
-                    result.Add(predicate.Item2);
+                    result.Add(predicate.Subscriber);
                 }
             }
 
@@ -213,36 +239,64 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="grainFactory">The grain factory used to get consumer references.</param>
         /// <param name="streamId">The stream ID to use for the grain ID construction.</param>
-        /// <param name="implTypeCode">The type code of the grain interface.</param>
+        /// <param name="subscriber">The subscriber prototype.</param>
         /// <returns></returns>
-        private IStreamConsumerExtension MakeConsumerReference(IInternalGrainFactory grainFactory, StreamId streamId,
-            int implTypeCode)
+        private IStreamConsumerExtension MakeConsumerReference(
+            IInternalGrainFactory grainFactory,
+            StreamId streamId,
+            StreamSubscriber subscriber)
         {
-            var keyExtension = grainsWithKeyExtensions.Contains(implTypeCode)
-                ? streamId.Namespace
-                : null;
-            GrainId grainId = LegacyGrainId.GetGrainId(implTypeCode, streamId.Guid, keyExtension);
+            var keyExtension = subscriber.IncludeNamespaceInGrainId ? streamId.Namespace : null;
+            var grainId = GrainId.Create(subscriber.GrainType, GrainIdKeyExtensions.CreateGuidKey(streamId.Guid, keyExtension));
             return grainFactory.GetGrain<IStreamConsumerExtension>(grainId);
         }
 
-        /// <summary>
-        /// Collects the namespace predicates associated with a grain class type through the use of
-        /// <see cref="ImplicitStreamSubscriptionAttribute"/>.
-        /// </summary>
-        /// <param name="grainClass">A grain class type that might have
-        /// attributes of type <see cref="ImplicitStreamSubscriptionAttribute"/>  associated with it.</param>
-        /// <returns>The list of stream namespace predicates.</returns>
-        /// <exception cref="System.ArgumentException"><paramref name="grainClass"/> does not describe a grain class.</exception>
-        private static IList<IStreamNamespacePredicate> GetPredicatesFromAttributes(Type grainClass)
+        private class StreamSubscriberPredicate
         {
-            if (!TypeUtils.IsGrainClass(grainClass))
+            public StreamSubscriberPredicate(StreamSubscriber subscriber, IStreamNamespacePredicate predicate)
             {
-                throw new ArgumentException($"{grainClass.FullName} is not a grain class.", nameof(grainClass));
+                this.Subscriber = subscriber;
+                this.Predicate = predicate;
             }
 
-            var attribs = grainClass.GetCustomAttributes<ImplicitStreamSubscriptionAttribute>(true);
+            public StreamSubscriber Subscriber { get; }
+            public IStreamNamespacePredicate Predicate { get; }
+        }
 
-            return attribs.Select(attrib => attrib.Predicate).ToList();
+        private class StreamSubscriber
+        {
+            public StreamSubscriber(GrainType grainType, bool includeNamespaceInGrainId)
+            {
+                this.GrainType = grainType;
+                this.IncludeNamespaceInGrainId = includeNamespaceInGrainId;
+            }
+
+            public GrainType GrainType { get; }
+
+            public bool IncludeNamespaceInGrainId { get; }
+
+            public override bool Equals(object obj)
+            {
+                return obj is StreamSubscriber subscriber &&
+                       this.GrainType.Equals(subscriber.GrainType) &&
+                       this.IncludeNamespaceInGrainId == subscriber.IncludeNamespaceInGrainId;
+            }
+
+            public override int GetHashCode() => HashCode.Combine(this.GrainType, this.IncludeNamespaceInGrainId);
+        }
+
+        private class Cache
+        {
+            public Cache(MajorMinorVersion version, List<StreamSubscriberPredicate> predicates)
+            {
+                this.Version = version;
+                this.Predicates = predicates;
+                this.Namespaces = new ConcurrentDictionary<string, HashSet<StreamSubscriber>>(); 
+            }
+
+            public MajorMinorVersion Version { get; }
+            public ConcurrentDictionary<string, HashSet<StreamSubscriber>> Namespaces { get; }
+            public List<StreamSubscriberPredicate> Predicates { get; }
         }
     }
 }

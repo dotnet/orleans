@@ -18,9 +18,7 @@ namespace TestVersionGrains
         {
             var cfg = hostBuilder.GetConfiguration();
             var siloCount = int.Parse(cfg["SiloCount"]);
-            var refreshInterval = TimeSpan.Parse(cfg["RefreshInterval"]);
             hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
-            hostBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = refreshInterval);
             hostBuilder.Configure<GrainVersioningOptions>(options =>
             {
                 options.DefaultCompatibilityStrategy = cfg["CompatibilityStrategy"];

@@ -21,7 +21,7 @@ namespace Tester.AzureUtils.Streaming
     {
         private const string AQStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
-        private readonly SubscriptionMultiplicityTestRunner runner;
+        private SubscriptionMultiplicityTestRunner runner;
         private const int queueCount = 8;
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
@@ -59,17 +59,21 @@ namespace Tester.AzureUtils.Streaming
             }
         }
 
-        public AQSubscriptionMultiplicityTests()
+        public override async Task InitializeAsync()
         {
+            await base.InitializeAsync();
             runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, this.HostedCluster);
         }
 
-        public override void Dispose()
+        public override async Task DisposeAsync()
         {
-            base.Dispose();
-            if (this.HostedCluster != null)
+            await base.DisposeAsync();
+            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), TestDefaultConfiguration.DataConnectionString).Wait();
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(
+                    NullLoggerFactory.Instance,
+                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                    TestDefaultConfiguration.DataConnectionString);
             }
         }
 

@@ -879,14 +879,6 @@ namespace UnitTests.Grains
             this.scheduler = scheduler;
         }
 
-        private NonReentrentStressGrainWithoutState(GrainId identity, IGrainRuntime runtime)
-            : base(identity, runtime)
-        {
-        }
-
-        public static NonReentrentStressGrainWithoutState Create(GrainId identity, IGrainRuntime runtime)
-            => new NonReentrentStressGrainWithoutState(identity, runtime);
-
         public override Task OnActivateAsync()
         {
 

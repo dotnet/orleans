@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Scheduler
 
         internal static Task QueueActionAsync(this OrleansTaskScheduler scheduler, Action action, IGrainContext targetContext)
         {
-            var resolver = new TaskCompletionSource<bool>();
+            var resolver = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             Action syncFunc =
                 () =>
                 {
@@ -73,7 +73,7 @@ namespace Orleans.Runtime.Scheduler
                 }
                 catch (Exception exc)
                 {
-                    var resolver = new TaskCompletionSource<T>();
+                    var resolver = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
                     resolver.TrySetException(exc);
                     return resolver.Task; 
                 }

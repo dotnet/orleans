@@ -11,7 +11,7 @@ namespace Orleans.Runtime.ReminderService
 {
     public class AzureBasedReminderTable : IReminderTable
     {
-        private readonly IGrainReferenceConverter grainReferenceConverter;
+        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly ClusterOptions clusterOptions;
@@ -19,7 +19,7 @@ namespace Orleans.Runtime.ReminderService
         private RemindersTableManager remTableManager;
 
         public AzureBasedReminderTable(
-            IGrainReferenceConverter grainReferenceConverter,
+            GrainReferenceKeyStringConverter grainReferenceConverter,
             ILoggerFactory loggerFactory,
             IOptions<ClusterOptions> clusterOptions,
             IOptions<AzureTableReminderStorageOptions> storageOptions)
@@ -64,7 +64,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 return new ReminderEntry
                 {
-                    GrainRef = this.grainReferenceConverter.GetGrainFromKeyString(tableEntry.GrainReference),
+                    GrainRef = this.grainReferenceConverter.FromKeyString(tableEntry.GrainReference),
                     ReminderName = tableEntry.ReminderName,
                     StartAt = LogFormatter.ParseDate(tableEntry.StartAt),
                     Period = TimeSpan.Parse(tableEntry.Period),

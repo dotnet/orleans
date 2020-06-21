@@ -1,5 +1,7 @@
-﻿using System;
-using System.Text.RegularExpressions;
+using System;
+using System.Collections.Generic;
+using Orleans.Metadata;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans
@@ -8,7 +10,7 @@ namespace Orleans
     /// The [Orleans.ImplicitStreamSubscription] attribute is used to mark grains as implicit stream subscriptions.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-    public class ImplicitStreamSubscriptionAttribute : Attribute
+    public class ImplicitStreamSubscriptionAttribute : Attribute, IGrainBindingsProviderAttribute
     {
         /// <summary>
         /// Gets the stream namespace filter predicate.
@@ -42,7 +44,6 @@ namespace Orleans
             Predicate = (IStreamNamespacePredicate) Activator.CreateInstance(predicateType);
         }
 
-
         /// <summary>
         /// Allows to pass an instance of the stream namespace predicate. To be used mainly as an extensibility point
         /// via inheriting attributes.
@@ -51,6 +52,23 @@ namespace Orleans
         public ImplicitStreamSubscriptionAttribute(IStreamNamespacePredicate predicate)
         {
             Predicate = predicate;
+        }
+
+        /// <inheritdoc />
+        public IEnumerable<Dictionary<string, string>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType)
+        {
+            var binding = new Dictionary<string, string>
+            {
+                [WellKnownGrainTypeProperties.BindingTypeKey] = WellKnownGrainTypeProperties.StreamBindingTypeValue,
+                [WellKnownGrainTypeProperties.StreamBindingPatternKey] = this.Predicate.PredicatePattern,
+            };
+
+            if (LegacyGrainId.IsLegacyKeyExtGrainType(grainClass))
+            {
+                binding[WellKnownGrainTypeProperties.StreamBindingIncludeNamespaceKey] = "true";
+            }
+
+            yield return binding;
         }
     }
 
@@ -66,7 +84,7 @@ namespace Orleans
         /// </summary>
         /// <param name="pattern">The stream namespace regular expression filter.</param>
         public RegexImplicitStreamSubscriptionAttribute(string pattern)
-            : base(new RegexStreamNamespacePredicate(new Regex(pattern)))
+            : base(new RegexStreamNamespacePredicate(pattern))
         {
         }
     }

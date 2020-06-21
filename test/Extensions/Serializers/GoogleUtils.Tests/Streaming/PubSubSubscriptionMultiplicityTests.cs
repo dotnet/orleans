@@ -18,7 +18,7 @@ namespace GoogleUtils.Tests.Streaming
     {
         private const string PROVIDER_NAME = "PubSubProvider";
         private const string STREAM_NAMESPACE = "PubSubSubscriptionMultiplicityTestsNamespace";
-        private readonly SubscriptionMultiplicityTestRunner runner;
+        private SubscriptionMultiplicityTestRunner runner;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
@@ -61,8 +61,9 @@ namespace GoogleUtils.Tests.Streaming
             }
         }
 
-        public PubSubSubscriptionMultiplicityTests()
+        public override async Task InitializeAsync()
         {
+            await base.InitializeAsync();
             runner = new SubscriptionMultiplicityTestRunner(PROVIDER_NAME, HostedCluster);
         }
 

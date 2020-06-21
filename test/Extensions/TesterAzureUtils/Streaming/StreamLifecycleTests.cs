@@ -94,6 +94,11 @@ namespace UnitTests.StreamingTests
         public StreamLifecycleTests(ITestOutputHelper output)
         {
             this.output = output;
+        }
+
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
             this.watcher = this.GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             StreamId = Guid.NewGuid();
             StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
@@ -110,21 +115,16 @@ namespace UnitTests.StreamingTests
             {
                 await base.DisposeAsync();
             }
-        }
 
-        public override void Dispose()
-        {
-            if (this.HostedCluster != null)
+            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                    TestDefaultConfiguration.DataConnectionString).Wait();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    TestDefaultConfiguration.DataConnectionString);
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
-                    TestDefaultConfiguration.DataConnectionString).Wait();
+                    TestDefaultConfiguration.DataConnectionString);
             }
-
-            base.Dispose();
         }
 
         [SkippableFact, TestCategory("Functional")]

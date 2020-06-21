@@ -1,6 +1,11 @@
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
+using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -10,10 +15,19 @@ namespace Orleans.Runtime.GrainDirectory
     internal class DhtGrainLocator : IGrainLocator
     {
         private readonly ILocalGrainDirectory localGrainDirectory;
+        private readonly OrleansTaskScheduler taskScheduler;
+        private readonly IGrainContext grainContext;
+        private readonly ConcurrentQueue<(TaskCompletionSource<object> tcs, ActivationAddress address, UnregistrationCause cause)> unregistrationQueue = new ConcurrentQueue<(TaskCompletionSource<object> tcs, ActivationAddress address, UnregistrationCause cause)>();
+        private int isWorking = 0;
 
-        public DhtGrainLocator(ILocalGrainDirectory localGrainDirectory)
+        public DhtGrainLocator(
+            ILocalGrainDirectory localGrainDirectory,
+            OrleansTaskScheduler taskScheduler,
+            IGrainContext grainContext)
         {
             this.localGrainDirectory = localGrainDirectory;
+            this.taskScheduler = taskScheduler;
+            this.grainContext = grainContext;
         }
 
         public async Task<List<ActivationAddress>> Lookup(GrainId grainId)
@@ -34,9 +48,68 @@ namespace Orleans.Runtime.GrainDirectory
             => (await this.localGrainDirectory.RegisterAsync(address, singleActivation: true)).Address;
 
         public Task Unregister(ActivationAddress address, UnregistrationCause cause)
-            => this.localGrainDirectory.UnregisterAsync(address, cause);
+        {
+            var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            this.unregistrationQueue.Enqueue((tcs, address, cause));
+            // Make sure to not run the loop on the Grain Activation context
+            this.taskScheduler.RunOrQueueTask(() => this.UnregisterExecute(), this.grainContext).Ignore();
+            return tcs.Task;
+        }
 
-        public Task UnregisterMany(List<ActivationAddress> addresses, UnregistrationCause cause)
-            => this.localGrainDirectory.UnregisterManyAsync(addresses, cause);
+        public static DhtGrainLocator FromLocalGrainDirectory(LocalGrainDirectory localGrainDirectory)
+            => new DhtGrainLocator(localGrainDirectory, localGrainDirectory.Scheduler, localGrainDirectory.RemoteGrainDirectory);
+
+        private async Task UnregisterExecute()
+        {
+            while (!this.unregistrationQueue.IsEmpty)
+            {
+                if (Interlocked.CompareExchange(ref this.isWorking, 1, 0) == 1)
+                {
+                    // Someone is already working
+                    return;
+                }
+
+                var operations = new List<(TaskCompletionSource<object> tcs, ActivationAddress address, UnregistrationCause cause)>();
+                UnregistrationCause? cause = default;
+
+                try
+                {
+                    while (this.unregistrationQueue.TryPeek(out var op))
+                    {
+                        if (cause == default)
+                        {
+                            cause = op.cause;
+                        }
+                        else if (cause != op.cause)
+                        {
+                            break;
+                        }
+                        this.unregistrationQueue.TryDequeue(out op);
+                        operations.Add(op);
+                    }
+
+                    if (operations.Any())
+                    {
+                        await this.localGrainDirectory.UnregisterManyAsync(operations.Select(op => op.address).ToList(), cause.Value);
+                        foreach (var op in operations)
+                        {
+                            op.tcs.SetResult(null);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    foreach (var op in operations)
+                    {
+                        op.tcs.SetException(ex);
+                    }
+                }
+                finally
+                {
+                    // Now we are not working anymore
+                    Interlocked.Exchange(ref this.isWorking, 0);
+                }
+            }
+        }
     }
 }

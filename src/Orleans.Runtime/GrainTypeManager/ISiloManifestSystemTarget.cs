@@ -5,6 +5,6 @@ namespace Orleans.Runtime
 {
     internal interface ISiloManifestSystemTarget : ISystemTarget
     {
-        ValueTask<SiloManifest> GetSiloManifest();
+        ValueTask<GrainManifest> GetSiloManifest();
     }
 }

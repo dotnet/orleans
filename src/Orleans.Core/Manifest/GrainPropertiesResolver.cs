@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using Orleans.Runtime;
 
 namespace Orleans.Metadata
@@ -25,7 +26,8 @@ namespace Orleans.Metadata
         {
             if (!TryGetGrainProperties(grainType, out var result))
             {
-                ThrowNotFoundException(grainType);
+                //ThrowNotFoundException(grainType);
+                result = new GrainProperties(ImmutableDictionary<string, string>.Empty);
             }
 
             return result;
@@ -38,11 +40,19 @@ namespace Orleans.Metadata
         {
             var clusterManifest = _clusterManifestProvider.Current;
 
-            foreach (var entry in clusterManifest.Silos)
+            GrainType lookupKey;
+            if (GenericGrainType.TryParse(grainType, out var generic))
             {
-                var manifest = entry.Value;
+                lookupKey = generic.GetUnconstructedGrainType().GrainType;
+            }
+            else
+            {
+                lookupKey = grainType;
+            }
 
-                if (manifest.Grains.TryGetValue(grainType, out properties))
+            foreach (var manifest in clusterManifest.AllGrainManifests)
+            {
+                if (manifest.Grains.TryGetValue(lookupKey, out properties))
                 {
                     return true;
                 }
