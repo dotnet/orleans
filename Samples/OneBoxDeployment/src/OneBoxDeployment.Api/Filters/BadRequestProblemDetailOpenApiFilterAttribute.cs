@@ -9,15 +9,11 @@ namespace OneBoxDeployment.Api.Filters
     /// <summary>
     /// OpenAPI (Swagger) filter to have calls resulting to
     /// <see cref="StatusCodes.Status400BadRequest"/> to return
-    /// <see cref="ProblemDetailJsonMimeType"/>.
+    /// <see cref="MimeTypes.ProblemDetailJsonMimeType"/>.
     /// </summary>
     public class BadRequestProblemDetailOpenApiFilterAttribute: IOperationFilter
     {
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="operation"></param>
-        /// <param name="context"></param>
+        /// <inheritdoc />
         public void Apply(OpenApiOperation operation, OperationFilterContext context)
         {
             const string BadRequestHttpCode = "400";
@@ -25,7 +21,7 @@ namespace OneBoxDeployment.Api.Filters
             {
                 operation.Responses.Clear();
             }
-            
+
             var data = new OpenApiResponse
             {
                 Description = "Bad Request",
