@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.ClientObservers;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Internal;
@@ -62,7 +63,8 @@ namespace Orleans
             get;
             private set;
         }
-        
+        public ClientGatewayObserver gatewayObserver { get; private set; }
+
         public string CurrentActivationIdentity
         {
             get { return CurrentActivationAddress.ToString(); }
@@ -205,6 +207,9 @@ namespace Orleans
             MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
             MessageCenter.Start();
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, clientId);
+
+            this.gatewayObserver = new ClientGatewayObserver(gatewayManager);
+            this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver);
 
             await ExecuteWithRetries(
                 async () => this.GrainTypeResolver = await MessageCenter.GetGrainTypeResolver(this.InternalGrainFactory),
@@ -449,7 +454,13 @@ namespace Orleans
             if (obj is Grain)
                 throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
-            GrainReference gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId(), this.GrainReferenceRuntime);
+            GrainReference gr;
+
+            if (obj is ClientObserver clientObserver)
+                gr = GrainReference.NewObserverGrainReference(GrainId.NewClientId(Guid.Empty), clientObserver.ObserverId, this.GrainReferenceRuntime);
+            else
+                gr = GrainReference.NewObserverGrainReference(clientId, GuidId.GetNewGuidId(), this.GrainReferenceRuntime);
+
             if (!localObjects.TryRegister(obj, gr.ObserverId, invoker))
             {
                 throw new ArgumentException(String.Format("Failed to add new observer {0} to localObjects collection.", gr), "gr");
