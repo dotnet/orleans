@@ -47,8 +47,7 @@ namespace OneBoxDeployment.Api.Filters
 
     /// <summary>
     /// Adds a convention to transform <em>null</em> values into <see cref="NotFoundResult"/>
-    /// to controllers that are marked with <see cref="ApiControllerAttribute"/> or
-    /// <see cref="IApiBehaviorMetadata"/>.
+    /// to controllers that are marked with <see cref="ApiControllerAttribute"/>.
     /// </summary>
     public class NotFoundResultFilterConvention: IControllerModelConvention
     {
