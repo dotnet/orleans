@@ -37,8 +37,8 @@ In a typical example below a device generates some data, which is sent as an HTT
 public async Task OnHttpCall(DeviceEvent deviceEvent)
 {
      // Post data directly into device's stream.
-     IStreamProvider streamProvider = GrainClient.GetStreamProvider("myStreamProvider");
-     IAsyncStream<DeviceEventData> deviceStream = streamProvider.GetStream<DeviceEventData>(deviceEvent.DeviceId);
+     IStreamProvider streamProvider = GrainClient.GetStreamProvider("MyStreamProvider");
+     IAsyncStream<DeviceEventData> deviceStream = streamProvider.GetStream<DeviceEventData>(deviceEvent.DeviceId, "MyNamespace");
      await deviceStream.OnNextAsync(deviceEvent.Data);
 }
 ```
@@ -48,11 +48,11 @@ In another example below a chat user (implemented as Orleans Grain) joins a chat
 ``` csharp
 public class ChatUser: Grain
 {
-    public async Task JoinChat(string chatGroupName)
+    public async Task JoinChat(Guid chatGroupId)
     {
-       IStreamProvider streamProvider = base.GetStreamProvider("myStreamProvider");
-       IAsyncStream<string> chatStream = streamProvider.GetStream<string>(chatGroupName);
-       await chatStream.SubscribeAsync((string chatEvent) => Console.Out.Write(chatEvent));
+       IStreamProvider streamProvider = base.GetStreamProvider("MyStreamProvider");
+       IAsyncStream<string> chatStream = streamProvider.GetStream<string>(chatGroupId, "MyNamespace");
+       await chatStream.SubscribeAsync(async (message, token) => Console.WriteLine(message))
     }
 }
 ```
