@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
+using System.Transactions;
 
 namespace Orleans.Transactions
 {
@@ -44,7 +45,7 @@ namespace Orleans.Transactions
             return Task.FromResult<ITransactionInfo>(new TransactionInfo(guid, ts, ts));
         }
 
-        public async Task<TransactionalStatus> Resolve(ITransactionInfo info)
+        public async Task<(TransactionalStatus, Exception)> Resolve(ITransactionInfo info)
         {
             var transactionInfo = (TransactionInfo)info;
 
@@ -56,7 +57,7 @@ namespace Orleans.Transactions
             if (transactionInfo.Participants.Count == 0)
             {
                 this.statistics.TrackTransactionSucceeded();
-                return TransactionalStatus.Ok;
+                return (TransactionalStatus.Ok, null);
             }
 
             List<ParticipantId> writeParticipants = null;
@@ -65,14 +66,14 @@ namespace Orleans.Transactions
             CollateParticipants(transactionInfo.Participants, out writeParticipants, out resources, out manager);
             try
             {
-                TransactionalStatus status = (writeParticipants == null)
+                var (status, exception) = (writeParticipants == null)
                     ? await CommitReadOnlyTransaction(transactionInfo, resources)
                     : await CommitReadWriteTransaction(transactionInfo, writeParticipants, resources, manager.Value);
                 if (status == TransactionalStatus.Ok)
                     this.statistics.TrackTransactionSucceeded();
                 else
                     this.statistics.TrackTransactionFailed();
-                return status;
+                return (status, exception);
             }
             catch (Exception)
             {
@@ -81,9 +82,11 @@ namespace Orleans.Transactions
             }
         }
 
-        private async Task<TransactionalStatus> CommitReadOnlyTransaction(TransactionInfo transactionInfo, List<KeyValuePair<ParticipantId, AccessCounter>> resources)
+        private async Task<(TransactionalStatus, Exception)> CommitReadOnlyTransaction(TransactionInfo transactionInfo, List<KeyValuePair<ParticipantId, AccessCounter>> resources)
         {
             TransactionalStatus status = TransactionalStatus.Ok;
+            Exception exception;
+
             var tasks = new List<Task<TransactionalStatus>>();
             try
             {
@@ -107,12 +110,15 @@ namespace Orleans.Transactions
                         break;
                     }
                 }
+
+                exception = null;
             }
-            catch (TimeoutException)
+            catch (TimeoutException ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} on CommitReadOnly");
                 status = TransactionalStatus.ParticipantResponseTimeout;
+                exception = ex;
             }
             catch (Exception ex)
             {
@@ -120,6 +126,7 @@ namespace Orleans.Transactions
                     logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure {transactionInfo.TransactionId} CommitReadOnly");
                 this.logger.LogWarning(ex, "Unknown error while commiting readonly transaction {TransactionId}", transactionInfo.TransactionId);
                 status = TransactionalStatus.PresumedAbort;
+                exception = ex;
             }
 
             if (status != TransactionalStatus.Ok)
@@ -140,12 +147,13 @@ namespace Orleans.Transactions
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish (reads only) {transactionInfo.TransactionId}");
 
-            return status;
+            return (status, exception);
         }
 
-        private async Task<TransactionalStatus> CommitReadWriteTransaction(TransactionInfo transactionInfo, List<ParticipantId> writeResources, List<KeyValuePair<ParticipantId, AccessCounter>> resources, KeyValuePair<ParticipantId, AccessCounter> manager)
+        private async Task<(TransactionalStatus, Exception)> CommitReadWriteTransaction(TransactionInfo transactionInfo, List<ParticipantId> writeResources, List<KeyValuePair<ParticipantId, AccessCounter>> resources, KeyValuePair<ParticipantId, AccessCounter> manager)
         {
             TransactionalStatus status = TransactionalStatus.Ok;
+            Exception exception;
 
             try
             {
@@ -162,19 +170,22 @@ namespace Orleans.Transactions
                 // wait for the TM to commit the transaction
                 status = await manager.Key.Reference.AsReference<ITransactionManagerExtension>()
                     .PrepareAndCommit(manager.Key.Name, transactionInfo.TransactionId, manager.Value, transactionInfo.TimeStamp, writeResources, resources.Count);
+                exception = null;
             }
-            catch (TimeoutException)
+            catch (TimeoutException ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} timeout {transactionInfo.TransactionId} on CommitReadWriteTransaction");
                 status = TransactionalStatus.TMResponseTimeout;
+                exception = ex;
             }
             catch (Exception ex)
             {
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure {transactionInfo.TransactionId} CommitReadWriteTransaction");
-                this.logger.LogWarning(ex, "Unknown error while commiting transaction {TransactionId}", transactionInfo.TransactionId);
+                this.logger.LogWarning(ex, "Unknown error while committing transaction {TransactionId}", transactionInfo.TransactionId);
                 status = TransactionalStatus.PresumedAbort;
+                exception = ex;
             }
 
             if (status != TransactionalStatus.Ok)
@@ -201,11 +212,10 @@ namespace Orleans.Transactions
                 }
             }
 
-
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish {transactionInfo.TransactionId}");
 
-            return status;
+            return (status, exception);
         }
 
         public async Task Abort(ITransactionInfo info)
