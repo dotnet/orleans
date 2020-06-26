@@ -362,10 +362,10 @@ namespace Orleans.Transactions.State
                             }
                             else
                             {
-                                if(this.logger.IsEnabled(LogLevel.Information)) this.logger.LogInformation($"notifying later (lock-work)");
+                                if(this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("notifying later (lock-work)");
                                 this.lockWorker.Notify(
                                     this.currentGroup.NextDeadline ?? this.currentGroup.DeadlockDeadline.Value);
-                                if(this.logger.IsEnabled(LogLevel.Information)) this.logger.LogInformation($"done notify later (lock-work)");
+                                if(this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("done notify later (lock-work)");
                             }
                         }
                         else if (currentGroup.Deadline.HasValue)
