@@ -413,17 +413,27 @@ namespace UnitTests.MembershipTests
 
             TableVersion newTableVersion = data.Version.Next();
 
-            MembershipEntry oldEntry = CreateMembershipEntryForTest();
-            oldEntry.IAmAliveTime = oldEntry.IAmAliveTime.AddDays(-10);
-            oldEntry.StartTime = oldEntry.StartTime.AddDays(-10);
-            oldEntry.Status = SiloStatus.Dead;
-            bool ok = await membershipTable.InsertRow(oldEntry, newTableVersion);
+            var oldEntryDead = CreateMembershipEntryForTest();
+            oldEntryDead.IAmAliveTime = oldEntryDead.IAmAliveTime.AddDays(-10);
+            oldEntryDead.StartTime = oldEntryDead.StartTime.AddDays(-10);
+            oldEntryDead.Status = SiloStatus.Dead;
+            bool ok = await membershipTable.InsertRow(oldEntryDead, newTableVersion);
             var table = await membershipTable.ReadAll();
 
-            Assert.True(ok, "InsertRow failed");
+            Assert.True(ok, "InsertRow Dead failed");
 
             newTableVersion = table.Version.Next();
-            MembershipEntry newEntry = CreateMembershipEntryForTest();
+            var oldEntryJoining = CreateMembershipEntryForTest();
+            oldEntryJoining.IAmAliveTime = oldEntryJoining.IAmAliveTime.AddDays(-10);
+            oldEntryJoining.StartTime = oldEntryJoining.StartTime.AddDays(-10);
+            oldEntryJoining.Status = SiloStatus.Joining;
+            ok = await membershipTable.InsertRow(oldEntryJoining, newTableVersion);
+            table = await membershipTable.ReadAll();
+
+            Assert.True(ok, "InsertRow Joining failed");
+
+            newTableVersion = table.Version.Next();
+            var  newEntry = CreateMembershipEntryForTest();
             ok = await membershipTable.InsertRow(newEntry, newTableVersion);
 
             Assert.True(ok, "InsertRow failed");
@@ -431,10 +441,10 @@ namespace UnitTests.MembershipTests
             data = await membershipTable.ReadAll();
             logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
-            Assert.Equal(2, data.Members.Count);
+            Assert.Equal(3, data.Members.Count);
 
 
-            await membershipTable.CleanupDefunctSiloEntries(oldEntry.IAmAliveTime.AddDays(3));
+            await membershipTable.CleanupDefunctSiloEntries(oldEntryDead.IAmAliveTime.AddDays(3));
 
             data = await membershipTable.ReadAll();
             logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
