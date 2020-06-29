@@ -1,4 +1,6 @@
 ﻿
+using System;
+
 namespace Orleans.Transactions
 {
 
@@ -21,7 +23,7 @@ namespace Orleans.Transactions
 
         PresumedAbort,     // TM never heard of this transaction
 
-        UnknownException,  // an unkown exception was caught
+        UnknownException,  // an unknown exception was caught
         AssertionFailed,   // an internal assertion was violated
         CommitFailure,     // Unable to commit transaction
     }
@@ -46,33 +48,33 @@ namespace Orleans.Transactions
             }
         }
 
-        public static OrleansTransactionException ConvertToUserException(this TransactionalStatus status, string TransactionId)
+        public static OrleansTransactionException ConvertToUserException(this TransactionalStatus status, string transactionId, Exception exception)
         {
             switch (status)
             {
                 case TransactionalStatus.PrepareTimeout:
-                    return new OrleansTransactionPrepareTimeoutException(TransactionId);
+                    return new OrleansTransactionPrepareTimeoutException(transactionId, exception);
 
                 case TransactionalStatus.CascadingAbort:
-                    return new OrleansCascadingAbortException(TransactionId);
+                    return new OrleansCascadingAbortException(transactionId, exception);
 
                 case TransactionalStatus.BrokenLock:
-                    return new OrleansBrokenTransactionLockException(TransactionId, "before prepare");
+                    return new OrleansBrokenTransactionLockException(transactionId, "before prepare", exception);
 
                 case TransactionalStatus.LockValidationFailed:
-                    return new OrleansBrokenTransactionLockException(TransactionId, "when validating accesses during prepare");
+                    return new OrleansBrokenTransactionLockException(transactionId, "when validating accesses during prepare", exception);
 
                 case TransactionalStatus.ParticipantResponseTimeout:
-                    return new OrleansTransactionTransientFailureException(TransactionId, $"transaction agent timed out waiting for read-only transaction participant responses ({status})");
+                    return new OrleansTransactionTransientFailureException(transactionId, $"transaction agent timed out waiting for read-only transaction participant responses ({status})", exception);
 
                 case TransactionalStatus.TMResponseTimeout:
-                    return new OrleansTransactionInDoubtException(TransactionId, $"transaction agent timed out waiting for read-only transaction participant responses ({status})");
+                    return new OrleansTransactionInDoubtException(transactionId, $"transaction agent timed out waiting for read-only transaction participant responses ({status})", exception);
 
                 case TransactionalStatus.CommitFailure:
-                    return new OrleansTransactionAbortedException(TransactionId, $"Unable to commit transaction ({status})");
+                    return new OrleansTransactionAbortedException(transactionId, $"Unable to commit transaction ({status})", exception);
 
                 default:
-                    return new OrleansTransactionInDoubtException(TransactionId, $"failure during transaction commit, status={status}");
+                    return new OrleansTransactionInDoubtException(transactionId, $"failure during transaction commit, status={status}", exception);
             }
         }
     }
