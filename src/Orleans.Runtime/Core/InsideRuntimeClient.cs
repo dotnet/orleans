@@ -365,7 +365,7 @@ namespace Orleans.Runtime
                     {
                         transactionInfo.ReconcilePending();
                         
-                        // Record reason for abort, if not alread set
+                        // Record reason for abort, if not already set.
                         transactionInfo.RecordException(exc1, serializationManager);
 
                         if (startNewTransaction)
@@ -414,12 +414,12 @@ namespace Orleans.Runtime
                         {
                             try
                             {
-                                if (transactionException == null)
+                                if (transactionException is null)
                                 {
-                                    var status = await this.transactionAgent.Resolve(transactionInfo);
+                                    var (status, exception) = await this.transactionAgent.Resolve(transactionInfo);
                                     if (status != TransactionalStatus.Ok)
                                     {
-                                        transactionException = status.ConvertToUserException(transactionInfo.Id);
+                                        transactionException = status.ConvertToUserException(transactionInfo.Id, exception);
                                     }
                                 }
                                 else

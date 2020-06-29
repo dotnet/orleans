@@ -190,21 +190,21 @@ namespace Orleans.Transactions.State
             return await result.Task;
         }
 
-        public async Task<Tuple<TransactionalStatus, TransactionRecord<TState>>> ValidateLock(Guid transactionId, AccessCounter accessCount)
+        public async Task<(TransactionalStatus Status, TransactionRecord<TState> State)> ValidateLock(Guid transactionId, AccessCounter accessCount)
         {
             if (currentGroup == null || !currentGroup.TryGetValue(transactionId, out TransactionRecord<TState> record))
             {
-                return Tuple.Create(TransactionalStatus.BrokenLock, new TransactionRecord<TState>());
+                return (TransactionalStatus.BrokenLock, new TransactionRecord<TState>());
             }
             else if (record.NumberReads != accessCount.Reads
                    || record.NumberWrites != accessCount.Writes)
             {
                 await Rollback(transactionId, true);
-                return Tuple.Create(TransactionalStatus.LockValidationFailed, record);
+                return (TransactionalStatus.LockValidationFailed, record);
             }
             else
             {
-                return Tuple.Create(TransactionalStatus.Ok, record);
+                return (TransactionalStatus.Ok, record);
             }
         }
 
@@ -218,23 +218,23 @@ namespace Orleans.Transactions.State
             return this.currentGroup.TryGetValue(transactionId, out record);
         }
 
-        public Task AbortExecutingTransactions()
+        public Task AbortExecutingTransactions(Exception exception)
         {
             if (currentGroup != null)
             {
-                Task[] pending = currentGroup.Select(g => BreakLock(g.Key, g.Value)).ToArray();
+                Task[] pending = currentGroup.Select(g => BreakLock(g.Key, g.Value, exception)).ToArray();
                 currentGroup.Reset();
                 return Task.WhenAll(pending);
             }
             return Task.CompletedTask;
         }
 
-        private Task BreakLock(Guid transactionId, TransactionRecord<TState> entry)
+        private Task BreakLock(Guid transactionId, TransactionRecord<TState> entry, Exception exception)
         {
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace("Break-lock for transaction {TransactionId}", transactionId);
 
-            return this.queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock);
+            return this.queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock, exception);
         }
 
         public void AbortQueuedTransactions()
@@ -271,7 +271,7 @@ namespace Orleans.Transactions.State
             // notify remote listeners
             if (notify)
             {
-                await this.queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock);
+                await this.queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock, exception: null);
             }
         }
 
@@ -314,7 +314,7 @@ namespace Orleans.Transactions.State
                                 string txlist = string.Join(",", currentGroup.Keys.Select(g => g.ToString()));
                                 TimeSpan late = now - currentGroup.Deadline.Value;
                                 logger.LogWarning("Break-lock timeout for transactions {TransactionIds}. {Late}ms late", txlist, Math.Floor(late.TotalMilliseconds));
-                                await AbortExecutingTransactions();
+                                await AbortExecutingTransactions(exception: null);
                                 lockWorker.Notify();
                             }
                             else

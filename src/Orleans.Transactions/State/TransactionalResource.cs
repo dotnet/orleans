@@ -17,9 +17,7 @@ namespace Orleans.Transactions.State
         public async Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
         {
             // validate the lock
-            var locked = await this.queue.RWLock.ValidateLock(transactionId, accessCount);
-            var status = locked.Item1;
-            var record = locked.Item2;
+            var (status, record) = await this.queue.RWLock.ValidateLock(transactionId, accessCount);
             var valid = status == TransactionalStatus.Ok;
 
             record.Timestamp = timeStamp;
@@ -28,7 +26,7 @@ namespace Orleans.Transactions.State
 
             if (!valid)
             {
-                await this.queue.NotifyOfAbort(record, status);
+                await this.queue.NotifyOfAbort(record, status, exception: null);
             }
             else
             {
