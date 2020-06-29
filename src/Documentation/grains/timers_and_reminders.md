@@ -95,7 +95,7 @@ var silo = new SiloHostBuilder()
 
 ## Reminder Usage
 
-A grain that uses reminders must implement the **IRemindable.RecieveReminder** method.
+A grain that uses reminders must implement the **IRemindable.ReceiveReminder** method.
 
 ``` csharp
 Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
