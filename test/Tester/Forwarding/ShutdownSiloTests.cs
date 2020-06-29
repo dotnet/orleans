@@ -56,7 +56,7 @@ namespace Tester.Forwarding
             this.EnsurePreconditionsMet();
         }
 
-        [Fact, TestCategory("Forward"), TestCategory("Functional")]
+        [SkippableFact, TestCategory("Forward"), TestCategory("Functional")]
         public async Task SiloGracefulShutdown_ForwardPendingRequest()
         {
             var grain = await GetLongRunningTaskGrainOnSecondary<bool>();
