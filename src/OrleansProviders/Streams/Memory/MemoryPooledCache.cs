@@ -194,6 +194,7 @@ namespace Orleans.Providers
             int readOffset = 0;
             ArraySegment<byte> payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
             MemoryMessageData message = MemoryMessageData.Create(cachedMessage.StreamGuid, cachedMessage.StreamNamespace, new ArraySegment<byte>(payload.ToArray()));
+            message.SequenceNumber = cachedMessage.SequenceNumber;
             return new MemoryBatchContainer<TSerializer>(message, this.serializer);
         }
 
