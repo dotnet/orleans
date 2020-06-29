@@ -35,26 +35,6 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact]
-        public void ReubensGenericGrainIdTest()
-        {
-            var genericType = GrainType.Create("foo`1");
-            var services = ((InProcessSiloHandle)this.Fixture.HostedCluster.Primary).SiloHost.Services;
-            var resolver = services.GetRequiredService<PlacementStrategyResolver>();
-
-            var t = resolver.GetPlacementStrategy(genericType);
-            Assert.NotNull(t);
-
-            Assert.True(GenericGrainType.TryParse(genericType, out var g));
-            Assert.False(g.IsConstructed);
-
-            var formatter = services.GetRequiredService<TypeConverter>();
-            var c = g.Construct(formatter, typeof(int));
-
-            var t2 = resolver.GetPlacementStrategy(c.GrainType);
-            Assert.NotNull(t2);
-        }
-
-        [Fact]
         public void GrainReferenceComparison_DifferentReference()
         {
             ISimpleGrain ref1 = this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
