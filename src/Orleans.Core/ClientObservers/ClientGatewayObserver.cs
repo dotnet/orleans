@@ -38,7 +38,7 @@ namespace Orleans.ClientObservers
                 Direction = Message.Directions.OneWay,
                 SendingSilo = gateway,
                 TargetObserverId = Id,
-                BodyObject = new InvokeMethodRequest(0x6C8D70A6, 0, unchecked((int)0xFD72F2DC), new object[] { gateway })
+                BodyObject = new InvokeMethodRequest(InterfaceId, 0, MethodId, new object[] { gateway })
             };
         }
     }
