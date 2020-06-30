@@ -15,7 +15,7 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly IConnectionListenerFactory listenerFactory;
         private readonly ConnectionManager connectionManager;
-        private readonly ConcurrentDictionary<Connection, Task> connections = new ConcurrentDictionary<Connection, Task>(ReferenceEqualsComparer.Instance);
+        protected readonly ConcurrentDictionary<Connection, Task> connections = new ConcurrentDictionary<Connection, Task>(ReferenceEqualsComparer.Instance);
         private readonly ConnectionCommon connectionShared;
         private TaskCompletionSource<object> acceptLoopTcs;
         private IConnectionListener listener;
