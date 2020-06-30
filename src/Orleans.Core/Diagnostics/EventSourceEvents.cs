@@ -13,45 +13,45 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                OnTimeout(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.OnTimeout();
+                }
             }
         }
 
-        [Event(1)]
-        public void OnTimeout(Guid activityId)
-        {
-            this.WriteEventWithRelatedActivityId(1, activityId);
-        }
+        [Event(1, Level = EventLevel.Warning)]
+        private void OnTimeout() => this.WriteEvent(1);
 
         [NonEvent]
         public void OnTargetSiloFail(Message message)
         {
             if (this.IsEnabled())
             {
-                OnTargetSiloFail(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.OnTargetSiloFail();
+                }
             }
         }
 
-        [Event(2)]
-        public void OnTargetSiloFail(Guid activityId)
-        {
-            this.WriteEventWithRelatedActivityId(2, activityId);
-        }
+        [Event(2, Level = EventLevel.Warning)]
+        private void OnTargetSiloFail() => this.WriteEvent(2);
 
         [NonEvent]
         public void DoCallback(Message message)
         {
             if (this.IsEnabled())
             {
-                DoCallback(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.DoCallback();
+                }
             }
         }
 
-        [Event(3)]
-        public void DoCallback(Guid activityId)
-        {
-            WriteEventWithRelatedActivityId(3, activityId);
-        }
+        [Event(3, Level = EventLevel.Verbose)]
+        private void DoCallback() => this.WriteEvent(3);
     }
 
     [EventSource(Name = "Microsoft-Orleans-OutsideRuntimeClient")]
@@ -64,45 +64,45 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                SendRequest(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.SendRequest();
+                }
             }
         }
 
-        [Event(1)]
-        public void SendRequest(Guid activityId)
-        {
-            WriteEventWithRelatedActivityId(1, activityId);
-        }
+        [Event(1, Level = EventLevel.Verbose)]
+        private void SendRequest() => this.WriteEvent(1);
 
         [NonEvent]
         public void ReceiveResponse(Message message)
         {
             if (this.IsEnabled())
             {
-                ReceiveResponse(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.ReceiveResponse();
+                }
             }
         }
 
-        [Event(2)]
-        public void ReceiveResponse(Guid activityId)
-        {
-            WriteEventWithRelatedActivityId(2, activityId);
-        }
+        [Event(2, Level = EventLevel.Verbose)]
+        private void ReceiveResponse() => this.WriteEvent(2);
 
         [NonEvent]
         public void SendResponse(Message message)
         {
             if (this.IsEnabled())
             {
-                SendResponse(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.SendResponse();
+                }
             }
         }
 
-        [Event(3)]
-        public void SendResponse(Guid activityId)
-        {
-            WriteEventWithRelatedActivityId(3, activityId);
-        }
+        [Event(3, Level = EventLevel.Verbose)]
+        private void SendResponse() => this.WriteEvent(3);
     }
 
     [EventSource(Name = "Microsoft-Orleans-Dispatcher")]
@@ -115,12 +115,15 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                ReceiveMessage(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.ReceiveMessage();
+                }
             }
         }
 
-        [Event(1)]
-        public void ReceiveMessage(Guid activityId) => WriteEventWithRelatedActivityId(1, activityId);
+        [Event(1, Level = EventLevel.Verbose)]
+        private void ReceiveMessage() => WriteEvent(1);
     }
 
     [EventSource(Name = "Microsoft-Orleans-InsideRuntimeClient")]
@@ -133,36 +136,45 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                SendRequest(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.SendRequest();
+                }
             }
         }
 
-        [Event(1)]
-        public void SendRequest(Guid activityId) => WriteEventWithRelatedActivityId(1, activityId);
+        [Event(1, Level = EventLevel.Verbose)]
+        private void SendRequest() => WriteEvent(1);
 
         [NonEvent]
         public void ReceiveResponse(Message message)
         {
             if (this.IsEnabled())
             {
-                ReceiveResponse(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.ReceiveResponse();
+                }
             }
         }
 
-        [Event(2)]
-        public void ReceiveResponse(Guid activityId) => WriteEventWithRelatedActivityId(2, activityId);
+        [Event(2, Level = EventLevel.Verbose)]
+        private void ReceiveResponse() => WriteEvent(2);
 
         [NonEvent]
         public void SendResponse(Message message)
         {
             if (this.IsEnabled())
             {
-                SendResponse(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.SendResponse();
+                }
             }
         }
 
-        [Event(3)]
-        public void SendResponse(Guid activityId) => WriteEventWithRelatedActivityId(3, activityId);
+        [Event(3, Level = EventLevel.Verbose)]
+        private void SendResponse() => WriteEvent(3);
     }
 
     [EventSource(Name = "Microsoft-Orleans-GatewayAcceptor")]
@@ -175,12 +187,15 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                HandleMessage(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.HandleMessage();
+                }
             }
         }
 
-        [Event(1)]
-        public void HandleMessage(Guid activityId) => WriteEventWithRelatedActivityId(1, activityId);
+        [Event(1, Level = EventLevel.Verbose)]
+        private void HandleMessage() => WriteEvent(1);
 
     }
 
@@ -194,12 +209,15 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                HandleMessage(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.HandleMessage();
+                }
             }
         }
 
-        [Event(1)]
-        public void HandleMessage(Guid activityId) => WriteEventWithRelatedActivityId(1, activityId);
+        [Event(1, Level = EventLevel.Verbose)]
+        private void HandleMessage() => WriteEvent(1);
     }
 
     [EventSource(Name = "Microsoft-Orleans-IncomingMessageAgent")]
@@ -212,11 +230,56 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                ReceiveMessage(message.TraceContext?.ActivityId ?? Guid.Empty);
+                using (message.SetThreadActivityId())
+                {
+                    this.ReceiveMessage();
+                }
             }
         }
 
-        [Event(1)]
-        public void ReceiveMessage(Guid activityId) => WriteEventWithRelatedActivityId(1, activityId);
+        [Event(1, Level = EventLevel.Verbose)]
+        private void ReceiveMessage() => WriteEvent(1);
+    }
+
+    internal static class EventSourceMessageExtensions
+    {
+        public static IDisposable SetThreadActivityId(this Message message)
+        {
+            var activityId = message?.TraceContext?.ActivityId;
+
+            if (activityId.GetValueOrDefault(Guid.Empty) == Guid.Empty)
+            {
+                return new UnchangedActivityId();
+            }
+
+            EventSource.SetCurrentThreadActivityId(activityId.Value, out var oldActivity);
+
+            if (activityId == oldActivity)
+            {
+                return new UnchangedActivityId();
+            }
+
+            return new ResetActivityId(oldActivity);
+
+        }
+
+        private struct UnchangedActivityId : IDisposable
+        {
+            public void Dispose()
+            {
+            }
+        }
+
+        private struct ResetActivityId : IDisposable
+        {
+            private Guid oldActivity;
+
+            public ResetActivityId(Guid oldActivity)
+            {
+                this.oldActivity = oldActivity;
+            }
+
+            public void Dispose() => EventSource.SetCurrentThreadActivityId(oldActivity);
+        }
     }
 }
