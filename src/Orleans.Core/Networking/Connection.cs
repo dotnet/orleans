@@ -36,6 +36,8 @@ namespace Orleans.Runtime.Messaging
         private readonly ChannelWriter<Message> outgoingMessageWriter;
         private readonly object lockObj = new object();
         private readonly List<Message> inflight = new List<Message>(4);
+        private Task _processIncomingTask;
+        private Task _processOutgoingTask;
 
         protected Connection(
             ConnectionContext connection,
@@ -108,9 +110,14 @@ namespace Orleans.Runtime.Messaging
             return connection.RunInternal();
         }
 
-        protected virtual Task RunInternal() => Task.WhenAll(this.ProcessIncoming(), this.ProcessOutgoing());
+        protected virtual async Task RunInternal()
+        {
+            _processIncomingTask = this.ProcessIncoming();
+            _processOutgoingTask = this.ProcessOutgoing();
+            await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
+        }
 
-        public void Close(ConnectionAbortedException exception = default) => this.CloseInternal(exception);
+        public void Abort(ConnectionAbortedException exception) => this.CloseInternal(exception);
 
         /// <summary>
         /// Called immediately prior to transporting a message.
@@ -120,6 +127,15 @@ namespace Orleans.Runtime.Messaging
         protected abstract bool PrepareMessageForSend(Message msg);
 
         protected abstract void RetryMessage(Message msg, Exception ex = null);
+
+        public void Close()
+        {
+            if (!this.IsValid) return;
+
+            // Stop processing incoming messages first.
+            // This signals the outgoing message processor to exit gracefully and terminate the connection.
+            this.outgoingMessageWriter.TryComplete();
+        }
 
         private void CloseInternal(Exception exception)
         {
@@ -151,9 +167,33 @@ namespace Orleans.Runtime.Messaging
                         }
                     }
 
-                    // Try to gracefully stop the reader/writer loops.
-                    this.Context.Transport.Input.CancelPendingRead();
-                    this.Context.Transport.Output.CancelPendingFlush();
+                    // Try to gracefully stop the reader/writer loops, if they are running.
+                    try
+                    {
+                        if (_processIncomingTask is Task task && !task.IsCompleted)
+                        {
+                            this.Context.Transport.Input.CancelPendingRead();
+                        }
+                    }
+                    catch (Exception cancelException)
+                    {
+                        // Swallow any exceptions here.
+                        this.Log.LogWarning(cancelException, "Exception canceling pending read with remote endpoint {EndPoint}: {Exception}", this.RemoteEndPoint, cancelException);
+                    }
+
+                    try
+                    {
+                        if (_processOutgoingTask is Task task && !task.IsCompleted)
+                        {
+                            this.Context.Transport.Output.CancelPendingFlush();
+                        }
+                    }
+                    catch (Exception cancelException)
+                    {
+                        // Swallow any exceptions here.
+                        this.Log.LogWarning(cancelException, "Exception canceling pending flush with remote endpoint {EndPoint}: {Exception}", this.RemoteEndPoint, cancelException);
+                    }
+
                     this.outgoingMessageWriter.TryComplete();
 
                     if (exception is null)
@@ -201,14 +241,6 @@ namespace Orleans.Runtime.Messaging
             var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
             try
             {
-                if (this.Log.IsEnabled(LogLevel.Information))
-                {
-                    this.Log.LogInformation(
-                        "Starting to process messages from remote endpoint {Remote} to local endpoint {Local}",
-                        this.RemoteEndPoint,
-                        this.LocalEndPoint);
-                }
-
                 input = this.Context.Transport.Input;
                 var requiredBytes = 0;
                 Message message = default;
@@ -260,14 +292,6 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 input?.Complete();
-
-                if (this.Log.IsEnabled(LogLevel.Information))
-                {
-                    this.Log.LogInformation(
-                        "Completed processing messages from remote endpoint {EndPoint}",
-                        this.RemoteEndPoint);
-                }
-
                 this.CloseInternal(error);
             }
         }
@@ -283,13 +307,6 @@ namespace Orleans.Runtime.Messaging
             {
                 output = this.Context.Transport.Output;
                 var reader = this.outgoingMessages.Reader;
-                if (this.Log.IsEnabled(LogLevel.Information))
-                {
-                    this.Log.LogInformation(
-                        "Starting to process messages from local endpoint {Local} to remote endpoint {Remote}",
-                        this.LocalEndPoint,
-                        this.RemoteEndPoint);
-                }
 
                 while (true)
                 {
@@ -335,14 +352,6 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 output?.Complete();
-
-                if (this.Log.IsEnabled(LogLevel.Information))
-                {
-                    this.Log.LogInformation(
-                        "Completed processing messages to remote endpoint {EndPoint}",
-                        this.RemoteEndPoint);
-                }
-
                 this.CloseInternal(error);
             }
         }
