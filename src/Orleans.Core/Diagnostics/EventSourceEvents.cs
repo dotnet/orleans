@@ -243,43 +243,38 @@ namespace Orleans.Runtime
 
     internal static class EventSourceMessageExtensions
     {
-        public static IDisposable SetThreadActivityId(this Message message)
+        public static ActivityIdScope SetThreadActivityId(this Message message)
         {
             var activityId = message?.TraceContext?.ActivityId;
 
-            if (activityId.GetValueOrDefault(Guid.Empty) == Guid.Empty)
+            if (!(activityId is Guid messageActivityId) || messageActivityId == Guid.Empty)
             {
-                return new UnchangedActivityId();
+                return new ActivityIdScope(Guid.Empty, shouldReset: false);
             }
 
-            EventSource.SetCurrentThreadActivityId(activityId.Value, out var oldActivity);
-
-            if (activityId == oldActivity)
-            {
-                return new UnchangedActivityId();
-            }
-
-            return new ResetActivityId(oldActivity);
+            EventSource.SetCurrentThreadActivityId(messageActivityId, out var oldActivity);
+            return new ActivityIdScope(oldActivity, shouldReset: messageActivityId != oldActivity);
 
         }
 
-        private struct UnchangedActivityId : IDisposable
+        internal readonly ref struct ActivityIdScope
         {
-            public void Dispose()
-            {
-            }
-        }
+            private readonly Guid oldActivity;
+            private readonly bool shouldReset;
 
-        private struct ResetActivityId : IDisposable
-        {
-            private Guid oldActivity;
-
-            public ResetActivityId(Guid oldActivity)
+            public ActivityIdScope(Guid oldActivity, bool shouldReset)
             {
                 this.oldActivity = oldActivity;
+                this.shouldReset = shouldReset;
             }
 
-            public void Dispose() => EventSource.SetCurrentThreadActivityId(oldActivity);
+            public void Dispose()
+            {
+                if (shouldReset)
+                {
+                    EventSource.SetCurrentThreadActivityId(oldActivity);
+                }
+            }
         }
     }
 }
