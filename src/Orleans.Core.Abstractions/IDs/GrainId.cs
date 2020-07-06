@@ -124,10 +124,21 @@ namespace Orleans.Runtime
         public bool Equals(GrainId other) => this.Type.Equals(other.Type) && this.Key.Equals(other.Key);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => HashCode.Combine(Type, Key);
+        public override int GetHashCode() => HashCode.Combine(this.Type, this.Key);
 
         /// <inheritdoc/>
-        public uint GetUniformHashCode() => unchecked((uint)this.GetHashCode());
+        public uint GetUniformHashCode()
+        {
+            // This value must be stable for a given id and equal for all nodes in a cluster.
+            // HashCode.Combine does not currently offer stability with respect to its inputs.
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + Type.GetHashCode();
+                hash = hash * 31 + Key.GetHashCode();
+                return (uint)hash;
+            }
+        }
 
         /// <inheritdoc/>
         public void GetObjectData(SerializationInfo info, StreamingContext context)

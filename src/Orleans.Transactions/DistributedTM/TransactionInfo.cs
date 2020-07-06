@@ -73,7 +73,6 @@ namespace Orleans.Transactions
 
         public OrleansTransactionAbortedException MustAbort(SerializationManager sm)
         {
-
             if (OriginalException != null)
             {
                 var reader = new BinaryTokenStreamReader(OriginalException);
@@ -87,7 +86,6 @@ namespace Orleans.Transactions
             {
                 return null;
             }
-
         }
 
         public void RecordException(Exception e, SerializationManager sm)

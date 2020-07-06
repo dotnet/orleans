@@ -1,4 +1,5 @@
 using System;
+
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -534,7 +535,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (hopCount >= HOP_LIMIT)
             {
                 // we are not forwarding because there were too many hops already
-                throw new OrleansException(string.Format("Silo {0} is not owner of {1}, cannot forward {2} to owner {3} because hop limit is reached", MyAddress, grainId, operationDescription, owner));
+                throw new OrleansException($"Silo {MyAddress} is not owner of {grainId}, cannot forward {operationDescription} to owner {owner} because hop limit is reached");
             }
 
             // forward to the silo that we think is the owner
@@ -559,7 +560,11 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 await Task.Delay(RETRY_DELAY);
                 forwardAddress = this.CheckIfShouldForward(address.Grain, hopCount, "RegisterAsync");
-                this.log.LogWarning($"RegisterAsync - It seems we are not the owner of activation {address}, trying to forward it to {forwardAddress} (hopCount={hopCount})");
+                if (forwardAddress is object)
+                {
+                    int hash = unchecked((int)address.Grain.GetUniformHashCode());
+                    this.log.LogWarning($"RegisterAsync - It seems we are not the owner of activation {address} (hash: {hash:X}), trying to forward it to {forwardAddress} (hopCount={hopCount})");
+                }
             }
 
             if (forwardAddress == null)
@@ -824,7 +829,11 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 await Task.Delay(RETRY_DELAY);
                 forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "LookUpAsync");
-                this.log.LogWarning($"LookupAsync - It seems we are not the owner of grain {grainId}, trying to forward it to {forwardAddress} (hopCount={hopCount})");
+                if (forwardAddress is object)
+                {
+                    int hash = unchecked((int)grainId.GetUniformHashCode());
+                    this.log.LogWarning($"LookupAsync - It seems we are not the owner of grain {grainId} (hash: {hash:X}), trying to forward it to {forwardAddress} (hopCount={hopCount})");
+                }
             }
 
             if (forwardAddress == null)

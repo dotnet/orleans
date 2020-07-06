@@ -567,7 +567,7 @@ namespace Orleans.Clustering.DynamoDB
         {
             return DateTimeOffset.TryParse(silo.IAmAliveTime, out var iAmAliveTime)
                     && iAmAliveTime < beforeDate
-                    && silo.Status == (int)SiloStatus.Dead;
+                    && silo.Status != (int)SiloStatus.Active;
         }
     }
 }

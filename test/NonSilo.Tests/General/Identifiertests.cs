@@ -14,7 +14,7 @@ using Xunit.Abstractions;
 namespace UnitTests.General
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class Identifiertests
+    public class IdentifierTests
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture environment;
@@ -23,10 +23,18 @@ namespace UnitTests.General
         class A { }
         class B : A { }
         
-        public Identifiertests(ITestOutputHelper output, TestEnvironmentFixture fixture)
+        public IdentifierTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.environment = fixture;
+        }
+
+        [Fact]
+        public void GrainIdUniformHashCodeIsStable()
+        {
+            var id = GrainId.Create("type", "key");
+            var hashCode = id.GetUniformHashCode();
+            Assert.Equal((uint)2618661990, hashCode);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
