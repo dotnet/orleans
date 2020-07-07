@@ -199,6 +199,7 @@ namespace Orleans.Storage
 
             //No errors found, the version of the state held by the grain can be updated and also the state.
             grainState.ETag = storageVersion;
+            grainState.RecordExists = false;
             if(logger.IsEnabled(LogLevel.Trace))
             {
                 logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderCleared, LogString("Cleared grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
@@ -309,6 +310,7 @@ namespace Orleans.Storage
 
                 object state = readRecords != null ? readRecords.Item1 : null;
                 string etag = readRecords != null ? readRecords.Item2 : null;
+                bool recordExists = readRecords != null;
                 if(state == null)
                 {
                     logger.Info((int)RelationalStorageProviderCodes.RelationalProviderNoStateFound, LogString("Null grain state read (default will be instantiated)", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
@@ -317,6 +319,7 @@ namespace Orleans.Storage
 
                 grainState.State = state;
                 grainState.ETag = etag;
+                grainState.RecordExists = recordExists;
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
                     logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderRead, LogString("Read grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
@@ -383,6 +386,7 @@ namespace Orleans.Storage
 
             //No errors found, the version of the state held by the grain can be updated.
             grainState.ETag = storageVersion;
+            grainState.RecordExists = true;
 
             if (logger.IsEnabled(LogLevel.Trace))
             {

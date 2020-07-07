@@ -42,6 +42,8 @@ namespace Orleans.EventSourcing.StateStorage
             }
         }
 
+        public bool RecordExists { get; set; }
+
         /// <summary>
         /// Initialize a new instance of GrainStateWithMetaDataAndETag class with an initialView
         /// </summary>

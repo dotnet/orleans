@@ -73,6 +73,7 @@ namespace Samples.StorageProviders
             if (entityData != null)
             {
                 ConvertFromStorageFormat(grainState, entityData);
+                grainState.RecordExists = true;
             }
         }
 
@@ -87,6 +88,7 @@ namespace Samples.StorageProviders
         {
             if (DataManager == null) throw new ArgumentException("DataManager property not initialized");
             var entityData = ConvertToStorageFormat(grainState);
+            grainState.RecordExists = true;
             return DataManager.Write(grainState.GetType().Name, grainReference.ToKeyString(), entityData);
         }
 
@@ -101,6 +103,7 @@ namespace Samples.StorageProviders
         {
             if (DataManager == null) throw new ArgumentException("DataManager property not initialized");
             DataManager.Delete(grainState.GetType().Name, grainReference.ToKeyString());
+            grainState.RecordExists = false;
             return Task.CompletedTask;
         }
 

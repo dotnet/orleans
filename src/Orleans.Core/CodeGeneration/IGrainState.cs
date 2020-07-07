@@ -13,6 +13,8 @@ namespace Orleans
 
         /// <summary>An e-tag that allows optimistic concurrency checks at the storage provider level.</summary>
         string ETag { get; set; }
+
+        bool RecordExists { get; set; }
     }
 
     /// <summary>
@@ -35,6 +37,7 @@ namespace Orleans
 
         /// <inheritdoc />
         public string ETag { get; set; }
+        public bool RecordExists { get; set; }
 
         /// <summary>Initializes a new instance of <see cref="GrainState{T}"/>.</summary>
         public GrainState()

@@ -80,6 +80,7 @@ namespace Orleans.Storage
                 if (entity != null)
                 {
                     var loadedState = ConvertFromStorageFormat(entity, grainState.Type);
+                    grainState.RecordExists = loadedState != null;
                     grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
                     grainState.ETag = record.ETag;
                 }
@@ -106,6 +107,7 @@ namespace Orleans.Storage
             {
                 await DoOptimisticUpdate(() => tableDataManager.Write(record), grainType, grainReference.GrainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 grainState.ETag = record.ETag;
+                grainState.RecordExists = true;
             }
             catch (Exception exc)
             {
@@ -145,6 +147,7 @@ namespace Orleans.Storage
                 }
 
                 grainState.ETag = record.ETag; // Update in-memory data to the new ETag
+                grainState.RecordExists = false;
             }
             catch (Exception exc)
             {
