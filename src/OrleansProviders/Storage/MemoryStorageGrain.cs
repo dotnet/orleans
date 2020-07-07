@@ -105,6 +105,7 @@ namespace Orleans.Storage
             public object State { get; set; }
             public Type Type => typeof(object);
             public string ETag { get; set; } = string.Empty;
+            public bool RecordExists { get; set; }
         }
         private readonly IGrainState deleted = new DeletedState();
     }
