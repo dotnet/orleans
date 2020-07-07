@@ -68,6 +68,8 @@ namespace Orleans.Runtime
 
             public string Etag => this.storage.Etag;
 
+            public bool RecordExists => this.storage.RecordExists;
+
             public Task ClearStateAsync()
             {
                 return this.storage.ClearStateAsync();
