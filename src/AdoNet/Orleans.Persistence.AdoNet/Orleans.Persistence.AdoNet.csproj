@@ -30,8 +30,4 @@
     <Compile Include="..\Shared\Storage\AdoNetFormatProvider.cs" Link="Storage\AdoNetFormatProvider.cs" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="System.Data.Common" Version="$(SystemDataCommonVersion)" />
-  </ItemGroup>
-
 </Project>

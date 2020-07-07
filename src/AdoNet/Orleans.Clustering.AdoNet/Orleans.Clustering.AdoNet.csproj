@@ -30,8 +30,4 @@
     <Compile Include="..\Shared\Storage\RelationalStorageExtensions.cs" Link="Storage\RelationalStorageExtensions.cs" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="System.Data.Common" Version="$(SystemDataCommonVersion)" />
-  </ItemGroup>
-
 </Project>
