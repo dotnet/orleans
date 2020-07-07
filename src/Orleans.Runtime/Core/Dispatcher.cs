@@ -736,6 +736,7 @@ namespace Orleans.Runtime
         private Task AddressMessage(Message message)
         {
             var targetAddress = message.TargetAddress;
+            if (targetAddress is null) throw new InvalidOperationException("Cannot address a message with a null TargetAddress");
             if (targetAddress.IsComplete) return Task.CompletedTask;
 
             // placement strategy is determined by searching for a specification. first, we check for a strategy associated with the grain reference,

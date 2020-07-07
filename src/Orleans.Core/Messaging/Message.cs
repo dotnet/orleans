@@ -168,7 +168,17 @@ namespace Orleans.Runtime
 
         public ActivationAddress TargetAddress
         {
-            get { return targetAddress ?? (targetAddress = ActivationAddress.GetAddress(TargetSilo, TargetGrain, TargetActivation)); }
+            get
+            {
+                if (targetAddress is object) return targetAddress;
+                if (!(TargetGrain is null))
+                {
+                    return targetAddress = ActivationAddress.GetAddress(TargetSilo, TargetGrain, TargetActivation);
+                }
+
+                return null;
+            }
+
             set
             {
                 TargetGrain = value.Grain;

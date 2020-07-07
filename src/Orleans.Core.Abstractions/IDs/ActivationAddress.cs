@@ -30,7 +30,7 @@ namespace Orleans.Runtime
         public static ActivationAddress GetAddress(SiloAddress silo, GrainId grain, ActivationId activation)
         {
             // Silo part is not mandatory
-            if (grain == null) throw new ArgumentNullException("grain");
+            if (grain is null) throw new ArgumentNullException("grain");
 
             return new ActivationAddress(silo, grain, activation);
         }
