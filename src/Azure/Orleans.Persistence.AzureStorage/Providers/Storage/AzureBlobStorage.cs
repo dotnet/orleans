@@ -85,7 +85,12 @@ namespace Orleans.Storage
                 if (contents == null || contents.Length == 0)
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_BlobEmpty, "BlobEmpty reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4}", grainType, grainId, grainState.ETag, blobName, container.Name);
+                    grainState.RecordExists = false;
                     return;
+                }
+                else
+                {
+                    grainState.RecordExists = true;
                 }
 
                 grainState.State = this.ConvertFromStorageFormat(contents);
@@ -151,6 +156,7 @@ namespace Orleans.Storage
                     blob, grainState.ETag).ConfigureAwait(false);
 
                 grainState.ETag = null;
+                grainState.RecordExists = false;
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace((int)AzureProviderErrorCode.AzureBlobProvider_Cleared, "Cleared: GrainType={0} Grainid={1} ETag={2} BlobName={3} in Container={4}", grainType, grainId, blob.Properties.ETag, blobName, container.Name);
             }
@@ -172,6 +178,7 @@ namespace Orleans.Storage
                     blob, grainState.ETag).ConfigureAwait(false);
 
                 grainState.ETag = blob.Properties.ETag;
+                grainState.RecordExists = true;
             }
             catch (StorageException exception) when (exception.IsContainerNotFound())
             {

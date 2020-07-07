@@ -56,6 +56,14 @@ namespace UnitTests.StorageTests
             : base(info, context)
         {
         }
+
+        protected StorageProviderInjectedError(string message) : base(message)
+        {
+        }
+
+        protected StorageProviderInjectedError(string message, Exception innerException) : base(message, innerException)
+        {
+        }
     }
 
     public class ErrorInjectionStorageProvider : MockStorageProvider, IControllable
