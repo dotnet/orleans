@@ -64,13 +64,14 @@ namespace Orleans.Runtime
                     if (delay > maxDelay)
                     {
                         delay -= maxDelay;
-                        await Task.Delay(maxDelay, cancellation.Token);
+                        await Task.Delay(maxDelay, cancellation.Token).ConfigureAwait(false);
                     }
 
-                    await Task.Delay(delay, cancellation.Token);
+                    await Task.Delay(delay, cancellation.Token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
+                    await Task.Yield();
                     return false;
                 }
             }
