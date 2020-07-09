@@ -670,6 +670,13 @@ namespace Orleans.Runtime
             if (this.isFastKilledNeeded || ct.IsCancellationRequested)
                 return;
 
+            if (this.messageCenter.Gateway != null)
+            {
+                await this.LocalScheduler
+                    .QueueTask(() => this.messageCenter.Gateway.SendStopSendMessages(this.grainFactory), this.lifecycleSchedulingSystemTarget)
+                    .WithCancellation(ct, "Sending gateway disconnection requests failed because the task was cancelled");
+            }
+
             if (reminderService != null)
             {
                 await this.LocalScheduler

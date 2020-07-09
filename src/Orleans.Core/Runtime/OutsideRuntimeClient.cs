@@ -409,7 +409,7 @@ namespace Orleans
                 throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
             var observerId = obj is ClientObserver clientObserver
-                ? ObserverGrainId.Create(ClientGrainId.Create("broadcast"), clientObserver.ObserverId)
+                ? clientObserver.GetObserverGrainId(this.clientId)
                 : ObserverGrainId.Create(this.clientId);
             var reference = this.InternalGrainFactory.GetGrain(observerId.GrainId);
 

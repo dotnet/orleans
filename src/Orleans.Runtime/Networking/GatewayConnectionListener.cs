@@ -74,7 +74,7 @@ namespace Orleans.Runtime.Messaging
             if (this.Endpoint is null) return;
 
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.RuntimeInitialize-1, this.OnRuntimeInitializeStart, this.OnRuntimeInitializeStop);
-            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, this.OnActive, this.OnActiveStop);
+            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, this.OnActive, _ => Task.CompletedTask);
         }
 
         private async Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
@@ -91,25 +91,6 @@ namespace Orleans.Runtime.Messaging
         {
             // Start accepting connections
             await Task.Run(() => this.Start());
-        }
-
-        private async Task OnActiveStop(CancellationToken cancellationToken)
-        {
-            // Start accepting connections
-            await Task.Run(() => SendDisconnectionRequest());
-
-            async Task SendDisconnectionRequest()
-            {
-                var msg = ClientGatewayObserver.CreateMessage(this.localSiloDetails.GatewayAddress);
-
-                foreach (var conn in this.connections)
-                {
-                    this.logger.LogInformation("Notify {RemoteEndPoint} that we are shutting down", conn.Key.RemoteEndPoint);
-                    conn.Key.Send(msg);
-                }
-
-                await Task.Delay(TimeSpan.FromSeconds(5));
-            }
         }
     }
 }
