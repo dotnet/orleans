@@ -63,6 +63,7 @@ namespace CodeGenerator.Tests
             typeof(IMyGenericGrainInterface2<>),
             typeof(IMyGenericGrainInterface2<int>),
             typeof(IMyGrainInterface),
+            typeof(IMyGrainInterfaceWithNamedTuple),
             typeof(IMyGenericGrainInterface<int>),
             typeof(IMyGrainInterfaceWithTypeCodeOverride),
             typeof(MyGrainClass),
@@ -274,6 +275,16 @@ namespace CodeGenerator.Tests
         {
             public Task One(int a, int b, int c) => throw new NotImplementedException();
             public Task<int> Two() => throw new NotImplementedException();
+        }
+
+        public interface IMyGrainInterfaceWithNamedTuple : IGrainWithGuidKey
+        {
+            Task<string> SomeMethod(IEnumerable<(string name, object obj)> list);
+        }
+
+        public class MyGrainInterfaceWithNamedTuple : Grain, IMyGrainInterfaceWithNamedTuple
+        {
+            public Task<string> SomeMethod(IEnumerable<(string name, object obj)> list) => throw new NotImplementedException();
         }
 
         public interface IMyGenericGrainInterface<T> : IGrainWithGuidKey
