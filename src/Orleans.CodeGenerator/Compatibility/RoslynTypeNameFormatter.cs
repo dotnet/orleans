@@ -45,6 +45,7 @@ namespace Orleans.CodeGenerator.Compatibility
                     AddArrayRank(builder, array);
                     break;
                 case INamedTypeSymbol named:
+                    named = named.TupleUnderlyingType ?? named;
                     AddNamespace(builder, type);
                     AddClassName(builder, named);
                     AddGenericParameters(builder, named, style, depth + 1);
