@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.ClientObservers;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Internal;
@@ -58,7 +59,8 @@ namespace Orleans
             get;
             private set;
         }
-        
+        public ClientGatewayObserver gatewayObserver { get; private set; }
+
         public string CurrentActivationIdentity
         {
             get { return CurrentActivationAddress.ToString(); }
@@ -194,6 +196,9 @@ namespace Orleans
             MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
             MessageCenter.Start();
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, clientId.GrainId);
+
+            this.gatewayObserver = new ClientGatewayObserver(gatewayManager);
+            this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver);
 
             await ExecuteWithRetries(
                 async () => await this.ServiceProvider.GetRequiredService<ClientClusterManifestProvider>().StartAsync(),
@@ -403,12 +408,16 @@ namespace Orleans
             if (obj is Grain)
                 throw new ArgumentException("Argument must not be a grain class.", nameof(obj));
 
-            var observerId = ObserverGrainId.Create(this.clientId);
+            var observerId = obj is ClientObserver clientObserver
+                ? ObserverGrainId.Create(ClientGrainId.Create("broadcast"), clientObserver.ObserverId)
+                : ObserverGrainId.Create(this.clientId);
             var reference = this.InternalGrainFactory.GetGrain(observerId.GrainId);
+
             if (!localObjects.TryRegister(obj, observerId, invoker))
             {
                 throw new ArgumentException($"Failed to add new observer {reference} to localObjects collection.", "reference");
             }
+
             return reference;
         }
 
