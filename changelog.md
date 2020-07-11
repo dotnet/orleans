@@ -7,6 +7,25 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+
+### [3.2.1] (changes since 3.2.0)
+
+- Non-breaking improvements
+  - Use "static" client observer to notify from the gateway when the silo is shutting down (#6613)
+  - More graceful termination of network connections (#6557) (#6625)
+  - Use TaskCompletionSource.RunContinuationsAsynchronously (#6573)
+  - Observe discarded ping task results (#6577)
+  - Constrain work done under a lock in BatchWorker (#6586)
+  - Support deterministic builds with CodeGenerator (#6592)
+  - Fix some xUnit test discovery issues (#6584)
+  - Delete old Joining records as part of cleanup of defunct entries (#6601, #6624)
+  - Propagate transaction exceptions in more cases (#6615)
+
+- Non-breaking bug fixes
+  - Fix SequenceNumber for MemoryStream (#6622) (#6623)
+  - When activation is stuck, make sure to unregister from the directory before forwarding messages (#6593)
+  - Fix call pattern that throws. (#6626)
+
 ### [3.2.0] (changes since 3.1.0)
 
 - Breaking changes
