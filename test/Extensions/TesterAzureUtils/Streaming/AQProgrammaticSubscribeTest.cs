@@ -31,13 +31,13 @@ namespace Tester.AzureUtils.Streaming
                         .AddAzureQueueStreams(StreamProviderName2, ob=>ob.Configure<IOptions<ClusterOptions>>(
                             (options, dep) =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.ConfigureTestDefaults();
                                 options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
                         }))
                         .AddAzureQueueStreams(StreamProviderName, ob => ob.Configure<IOptions<ClusterOptions>>(
                             (options, dep) =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.ConfigureTestDefaults();
                                 options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }));
                     hostBuilder
@@ -54,9 +54,9 @@ namespace Tester.AzureUtils.Streaming
                 if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
                 {
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), TestDefaultConfiguration.DataConnectionString);
+                        AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), new AzureQueueOptions().ConfigureTestDefaults());
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), TestDefaultConfiguration.DataConnectionString);
+                        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), new AzureQueueOptions().ConfigureTestDefaults());
                 }
             }
         }

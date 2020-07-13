@@ -52,7 +52,7 @@ namespace Tester.AzureUtils.Streaming
                     .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                         }))
                     .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
             }
@@ -66,7 +66,7 @@ namespace Tester.AzureUtils.Streaming
                     .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                         }))
                     .AddMemoryGrainStorage("PubSubStore");
             }
@@ -79,7 +79,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 var serviceId = this.HostedCluster.Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(serviceId, AQStreamProviderName),
-                    TestDefaultConfiguration.DataConnectionString);
+                    new AzureQueueOptions().ConfigureTestDefaults());
                 await TestAzureTableStorageStreamFailureHandler.DeleteAll();
             }
         }

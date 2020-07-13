@@ -32,10 +32,8 @@ namespace Tester.AzureUtils
                 ServiceId = Guid.NewGuid().ToString("N"),
             };
 
-            var directoryOptions = new AzureTableGrainDirectoryOptions
-            {
-                ConnectionString = TestDefaultConfiguration.DataConnectionString,
-            };
+            var directoryOptions = new AzureTableGrainDirectoryOptions();
+            directoryOptions.ConfigureTestDefaults();
 
             var loggerFactory = TestingUtils.CreateDefaultLoggerFactory("AzureGrainDirectoryTests.log");
 

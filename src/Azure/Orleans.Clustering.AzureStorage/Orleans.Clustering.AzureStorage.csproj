@@ -23,9 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="$(AzureIdentityVersion)" />
     <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="$(MicrosoftAzureCosmosTableVersion)" />
   </ItemGroup>
-
+  
   <ItemGroup>
     <Folder Include="Storage\" />
     <Folder Include="Utilities\" />

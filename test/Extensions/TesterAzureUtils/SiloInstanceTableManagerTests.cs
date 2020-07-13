@@ -55,7 +55,7 @@ namespace Tester.AzureUtils
             manager = OrleansSiloInstanceManager.GetManager(
                 this.clusterId,
                 fixture.LoggerFactory,
-                new AzureStorageClusteringOptions { ConnectionString = TestDefaultConfiguration.DataConnectionString, TableName = new AzureStorageClusteringOptions().TableName })
+                new AzureStorageClusteringOptions { TableName = new AzureStorageClusteringOptions().TableName }.ConfigureTestDefaults())
                 .WaitForResultWithThrow(SiloInstanceTableTestConstants.Timeout);
         }
 

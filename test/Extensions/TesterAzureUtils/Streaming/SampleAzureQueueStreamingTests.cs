@@ -33,7 +33,7 @@ namespace Tester.AzureUtils.Streaming
                     .AddAzureQueueStreams(StreamProvider, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }))
                     .AddMemoryGrainStorage("PubSubStore");
@@ -47,7 +47,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                    TestDefaultConfiguration.DataConnectionString);
+                    new AzureQueueOptions().ConfigureTestDefaults());
             }
         }
 

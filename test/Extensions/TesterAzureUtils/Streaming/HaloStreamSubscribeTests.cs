@@ -11,6 +11,7 @@ using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
+using Tester.AzureUtils;
 using Tester.AzureUtils.Streaming;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -42,7 +43,7 @@ namespace UnitTests.HaloTests.Streaming
                         .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.DeleteStateOnClear = true;
                         }))
                         .AddSimpleMessageStreamProvider(SmsStreamProviderName)
@@ -50,13 +51,13 @@ namespace UnitTests.HaloTests.Streaming
                         .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
                             options.DeleteStateOnClear = true;
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                         }))
                         .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>b
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
-                                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                    options.ConfigureTestDefaults();
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                             })));
                     hostBuilder
@@ -64,7 +65,7 @@ namespace UnitTests.HaloTests.Streaming
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
-                                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                    options.ConfigureTestDefaults();
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
                             })));
                 }
@@ -77,10 +78,10 @@ namespace UnitTests.HaloTests.Streaming
                 {
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                        TestDefaultConfiguration.DataConnectionString);
+                        new AzureQueueOptions().ConfigureTestDefaults());
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
-                        TestDefaultConfiguration.DataConnectionString);
+                        new AzureQueueOptions().ConfigureTestDefaults());
                 }
             }
         }

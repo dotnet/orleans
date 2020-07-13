@@ -402,11 +402,11 @@ namespace Orleans.Storage
             private readonly AzureTableDataManager<DynamicTableEntity> tableManager;
             private readonly ILogger logger;
 
-            public GrainStateTableDataManager(string tableName, string storageConnectionString, ILogger logger, AzureStoragePolicyOptions storagePolicyOptions)
+            public GrainStateTableDataManager(AzureStorageOperationOptions options, ILogger logger)
             {
                 this.logger = logger;
-                TableName = tableName;
-                tableManager = new AzureTableDataManager<DynamicTableEntity>(tableName, storageConnectionString, logger, storagePolicyOptions);
+                TableName = options.TableName;
+                tableManager = new AzureTableDataManager<DynamicTableEntity>(options, logger);
             }
 
             public Task InitTableAsync()
@@ -482,7 +482,7 @@ namespace Orleans.Storage
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, $"AzureTableGrainStorage {name} is using DataConnectionString: {ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)}");
                 this.JsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.services), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
                 this.options.ConfigureJsonSerializerSettings?.Invoke(this.JsonSettings);
-                this.tableDataManager = new GrainStateTableDataManager(this.options.TableName, this.options.ConnectionString, this.logger, this.options.StoragePolicyOptions);
+                this.tableDataManager = new GrainStateTableDataManager(this.options, this.logger);
                 await this.tableDataManager.InitTableAsync();
                 stopWatch.Stop();
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"Initializing provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");

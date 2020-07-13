@@ -33,7 +33,7 @@ namespace Tester.AzureUtils.Persistence
                     hostBuilder
                         .AddAzureTableGrainStorage("GrainStorageForTest", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.DeleteStateOnClear = true;
                         }));
                 }

@@ -1,8 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
+using Azure;
+using Azure.Core;
+using Azure.Core.Pipeline;
 using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
@@ -39,6 +46,8 @@ namespace Orleans.GrainDirectory.AzureStorage
     /// <typeparam name="T">Table data entry used by this table / manager.</typeparam>
     internal class AzureTableDataManager<T> where T : class, ITableEntity, new()
     {
+        private readonly AzureStorageOperationOptions options;
+
         /// <summary> Name of the table this instance is managing. </summary>
         public string TableName { get; }
 
@@ -46,28 +55,36 @@ namespace Orleans.GrainDirectory.AzureStorage
         protected internal ILogger Logger { get; }
 
         /// <summary> Connection string for the Azure storage account used to host this table. </summary>
-        protected string ConnectionString { get; set; }
+        private readonly string connectionString;
 
         public AzureStoragePolicyOptions StoragePolicyOptions { get; }
 
         public CloudTable Table { get; private set; }
 
+        private readonly SemaphoreSlim tokenLock;
+        private string accountKey;
 
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="tableName">Name of the table to be connected to.</param>
-        /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
+        /// <param name="options">Storage configuration.</param>
         /// <param name="logger">Logger to use.</param>
-        /// <param name="storagePolicyOptions">Optional Storage Policy Configuration.</param>
-        public AzureTableDataManager(string tableName, string storageConnectionString, ILogger logger, AzureStoragePolicyOptions storagePolicyOptions)
+        public AzureTableDataManager(AzureStorageOperationOptions options, ILogger logger)
         {
-            Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            TableName = tableName ?? throw new ArgumentNullException(nameof(tableName));
-            ConnectionString = storageConnectionString ?? throw new ArgumentNullException(nameof(storageConnectionString));
-            this.StoragePolicyOptions = storagePolicyOptions ?? throw new ArgumentNullException(nameof(storagePolicyOptions));
+            this.options = options ?? throw new ArgumentNullException(nameof(options));
 
-            AzureTableUtils.ValidateTableName(tableName);
+            connectionString = options.ConnectionString ?? throw new ArgumentNullException(nameof(options.ConnectionString));
+
+            Logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            TableName = options.TableName ?? throw new ArgumentNullException(nameof(options.TableName));
+            StoragePolicyOptions = options.StoragePolicyOptions ?? throw new ArgumentNullException(nameof(options.StoragePolicyOptions));
+
+            AzureTableUtils.ValidateTableName(TableName);
+
+            if (options.TokenCredential != null)
+            {
+                tokenLock = new SemaphoreSlim(1, 1);
+            }
         }
 
         /// <summary>
@@ -81,14 +98,14 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
-                CloudTableClient tableCreationClient = GetCloudTableCreationClient();
+                CloudTableClient tableCreationClient = await GetCloudTableCreationClientAsync();
                 CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
                 bool didCreate = await tableRef.CreateIfNotExistsAsync();
 
 
                 Logger.Info((int)Utilities.ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
 
-                CloudTableClient tableOperationsClient = GetCloudTableOperationsClient();
+                CloudTableClient tableOperationsClient = await GetCloudTableOperationsClientAsync();
                 Table = tableOperationsClient.GetTableReference(TableName);
             }
             catch (TimeoutException te)
@@ -119,7 +136,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
-                CloudTableClient tableCreationClient = GetCloudTableCreationClient();
+                CloudTableClient tableCreationClient = await GetCloudTableCreationClientAsync();
                 CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
 
                 bool didDelete = await tableRef.DeleteIfExistsAsync();
@@ -146,7 +163,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <returns>Completion promise for this operation.</returns>
         public async Task ClearTableAsync()
         {
-            IEnumerable<Tuple<T,string>> items = await ReadAllTableEntriesAsync();
+            IEnumerable<Tuple<T, string>> items = await ReadAllTableEntriesAsync();
             IEnumerable<Task> work = items.GroupBy(item => item.Item1.PartitionKey)
                                           .SelectMany(partition => partition.ToBatch(this.StoragePolicyOptions.MaxBulkUpdateRows))
                                           .Select(batch => DeleteTableEntriesAsync(batch.ToList()));
@@ -536,8 +553,8 @@ namespace Orleans.GrainDirectory.AzureStorage
                     // Data was read successfully if we got to here
                     return results.Select(i => Tuple.Create(i, i.ETag)).ToList();
 
-            }
-            catch (Exception exc)
+                }
+                catch (Exception exc)
                 {
                     // Out of retries...
                     var errorMsg = $"Failed to read Azure storage table {TableName}: {exc.Message}";
@@ -710,12 +727,11 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         // Utility methods
 
-        private CloudTableClient GetCloudTableOperationsClient()
+        private async ValueTask<CloudTableClient> GetCloudTableOperationsClientAsync()
         {
             try
             {
-                CloudStorageAccount storageAccount = AzureTableUtils.GetCloudStorageAccount(ConnectionString);
-                CloudTableClient operationsClient = storageAccount.CreateCloudTableClient();
+                CloudTableClient operationsClient = await GetCloudTableClientAsync();
                 operationsClient.DefaultRequestOptions.RetryPolicy = this.StoragePolicyOptions.OperationRetryPolicy;
                 operationsClient.DefaultRequestOptions.ServerTimeout = this.StoragePolicyOptions.OperationTimeout;
                 // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
@@ -729,12 +745,11 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        private CloudTableClient GetCloudTableCreationClient()
+        private async ValueTask<CloudTableClient> GetCloudTableCreationClientAsync()
         {
             try
             {
-                CloudStorageAccount storageAccount = AzureTableUtils.GetCloudStorageAccount(ConnectionString);
-                CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
+                CloudTableClient creationClient = await GetCloudTableClientAsync();
                 creationClient.DefaultRequestOptions.RetryPolicy = this.StoragePolicyOptions.CreationRetryPolicy;
                 creationClient.DefaultRequestOptions.ServerTimeout = this.StoragePolicyOptions.CreationTimeout;
                 // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
@@ -748,6 +763,73 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
+        private async ValueTask<CloudTableClient> GetCloudTableClientAsync()
+        {
+            CloudStorageAccount storageAccount = AzureTableUtils.GetCloudStorageAccount(connectionString);
+
+            if (options.TokenCredential != null)
+            {
+                var key = await GetAccountKeyUsingAad();
+                storageAccount = new CloudStorageAccount(new StorageCredentials(storageAccount.Credentials.AccountName, key), storageAccount.TableEndpoint);
+            }
+
+            CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
+            return creationClient;
+        }
+
+        /// <summary>
+        /// Cosmos DB does not support AAD auth directly. This method uses the Azure ARM API to fetch the key.
+        /// See https://docs.microsoft.com/en-us/azure/cosmos-db/managed-identity-based-authentication
+        /// </summary>
+        private async ValueTask<string> GetAccountKeyUsingAad()
+        {
+            if (accountKey != null)
+            {
+                return accountKey;
+            }
+
+            await tokenLock.WaitAsync();
+            try
+            {
+                // use HttpPipeline since it supports TokenCredential from the new Azure SDK (ARM API still not available in the new SDK)
+                var pipeline = HttpPipelineBuilder.Build(new TableClientOptions(), new BearerTokenAuthenticationPolicy(options.TokenCredential, options.TokenCredentialManagementUri.ToString() + "/user_impersonation"));
+                var message = pipeline.CreateMessage();
+                var request = message.Request;
+                request.Method = RequestMethod.Post;
+                request.Uri.Reset(options.TokenCredentialManagementUri);
+                request.Uri.AppendPath(options.TableResourceId, escape: false);
+                request.Uri.AppendPath("/listKeys", escape: false);
+                request.Uri.AppendQuery("api-version", "2020-04-01");
+                await pipeline.SendAsync(message, default);
+                if (message.Response.Status != (int)HttpStatusCode.OK)
+                {
+                    using var reader = new StreamReader(message.Response.ContentStream);
+                    var error = await reader.ReadToEndAsync();
+                    throw new RequestFailedException(message.Response.Status, $"Request failed: {request.Uri} {error}");
+                }
+
+                var keys = await JsonSerializer.DeserializeAsync<DatabaseAccountListKeysResult>(message.Response.ContentStream);
+
+                accountKey = options.TokenCredentialTableKey switch
+                {
+                    TokenCredentialTableKey.Primary => keys.PrimaryMasterKey,
+                    TokenCredentialTableKey.Secondary => keys.SecondaryMasterKey,
+                    _ => throw new ArgumentOutOfRangeException(nameof(TokenCredentialTableKey))
+                };
+
+                return accountKey;
+            }
+            catch (Exception exc)
+            {
+                Logger.Error((int)Utilities.ErrorCode.AzureTable_19, $"Unable to retrieve table keys for resource {options.TableResourceId}", exc);
+                throw;
+            }
+            finally
+            {
+                tokenLock.Release();
+            }
+        }
+
         private void CheckAlertWriteError(string operation, object data1, string data2, Exception exc)
         {
             HttpStatusCode httpStatusCode;
@@ -755,8 +837,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus) && AzureTableUtils.IsContentionError(httpStatusCode))
             {
                 // log at Verbose, since failure on conditional is not not an error. Will analyze and warn later, if required.
-                if(Logger.IsEnabled(LogLevel.Debug)) Logger.Debug((int)Utilities.ErrorCode.AzureTable_13,
-                    $"Intermediate Azure table write error {operation} to table {TableName} data1 {(data1 ?? "null")} data2 {(data2 ?? "null")}", exc);
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug((int)Utilities.ErrorCode.AzureTable_13,
+                     $"Intermediate Azure table write error {operation} to table {TableName} data1 {(data1 ?? "null")} data2 {(data2 ?? "null")}", exc);
 
             }
             else
@@ -811,6 +893,25 @@ namespace Orleans.GrainDirectory.AzureStorage
                 return TableQuery.CombineFilters(MatchPartitionKeyFilter(partitionKey), TableOperators.And,
                                           MatchRowKeyFilter(rowKey));
             }
+        }
+
+        /// <summary>
+        /// Used to deserialize the response of the <c>listKeys</c> operation.
+        /// https://docs.microsoft.com/en-us/rest/api/cosmos-db-resource-provider/databaseaccounts/listkeys
+        /// </summary>
+        private class DatabaseAccountListKeysResult
+        {
+            [JsonPropertyName("primaryMasterKey")]
+            public string PrimaryMasterKey { get; set; }
+            [JsonPropertyName("secondaryMasterKey")]
+            public string SecondaryMasterKey { get; set; }
+        }
+
+        /// <summary>
+        /// Required since ClientOptions is abstract
+        /// </summary>
+        private class TableClientOptions : ClientOptions
+        {
         }
     }
 

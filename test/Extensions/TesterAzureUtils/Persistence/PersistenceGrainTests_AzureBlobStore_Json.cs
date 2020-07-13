@@ -23,7 +23,7 @@ namespace Tester.AzureUtils.Persistence
                     hostBuilder
                         .AddAzureBlobGrainStorage("GrainStorageForTest", (AzureBlobStorageOptions options) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.UseJson = true;
                         });
                 }
