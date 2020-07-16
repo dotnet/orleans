@@ -21,11 +21,6 @@
     <DebugType>embedded</DebugType>
   </PropertyGroup>
 
-  <!-- Needed for to not to have failed tests because wrong binding redirects were generated for older packages -->
-  <ItemGroup>
-    <PackageReference Include="System.Net.Http" Version="$(SystemNetHttpVersion)" />
-  </ItemGroup>
-
   <!-- All .NET Framework projects should link to the reference assemblies package so that .NET Targeting Packs are not needed -->
   <ItemGroup Condition="$(TargetFramework.StartsWith('net')) and !$(TargetFramework.StartsWith('netcore')) and !$(TargetFramework.StartsWith('netstandard'))" >
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="All" Version="$(MicrosoftNETFrameworkReferenceAssembliesVersion)" />
