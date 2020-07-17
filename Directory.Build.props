@@ -43,16 +43,13 @@
   <!-- Shared Package Versions -->
   <PropertyGroup>
     <!-- System packages -->
-    <SystemRuntimeVersion>4.3.1</SystemRuntimeVersion>
     <SystemDataSqlClientVersion>4.8.0</SystemDataSqlClientVersion>
-    <SystemDataCommonVersion>4.3.0</SystemDataCommonVersion>
     <SystemDiagnosticsEventLogVersion>4.7.0</SystemDiagnosticsEventLogVersion>
     <SystemConfigurationConfigurationManagerVersion>4.7.0</SystemConfigurationConfigurationManagerVersion>
     <SystemCollectionsImmutableVersion>1.7.0</SystemCollectionsImmutableVersion>
     <SystemRuntimeCompilerServicesUnsafeVersion>4.7.0</SystemRuntimeCompilerServicesUnsafeVersion>
     <SystemManagementVersion>4.7.0</SystemManagementVersion>
     <SystemDiagnosticsPerformanceCounterVersion>4.7.0</SystemDiagnosticsPerformanceCounterVersion>
-    <SystemNetHttpVersion>4.3.4</SystemNetHttpVersion>
     <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
     <SystemReflectionMetadataVersion>1.8.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.7.0</SystemReflectionTypeExtensionsVersion>
