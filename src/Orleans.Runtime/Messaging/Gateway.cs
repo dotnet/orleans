@@ -436,16 +436,19 @@ namespace Orleans.Runtime.Messaging
 
             private bool Send(Message msg, ClientState client)
             {
+                var connection = client.Connection;
+                if (connection is null) return false;
+
                 try
                 {
-                    client.Connection.Send(msg);
+                    connection.Send(msg);
                     gatewaySends.Increment();
                     return true;
                 }
                 catch (Exception exception)
                 {
-                    gateway.RecordClosedConnection(client.Connection);
-                    client.Connection.Abort(new ConnectionAbortedException("Exception posting a message to sender. See InnerException for details.", exception));
+                    gateway.RecordClosedConnection(connection);
+                    connection.Abort(new ConnectionAbortedException("Exception posting a message to sender. See InnerException for details.", exception));
                     return false;
                 }
             }
