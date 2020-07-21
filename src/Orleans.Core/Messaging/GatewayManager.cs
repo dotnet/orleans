@@ -353,7 +353,7 @@ namespace Orleans.Messaging
                 // receive responses
                 var connectionsToKeepAlive = new List<SiloAddress>(live);
                 connectionsToKeepAlive.AddRange(knownMasked.Select(e => e.Key));
-                this.CloseEvictedGatewayConnections(live);
+                this.CloseEvictedGatewayConnections(connectionsToKeepAlive);
             }
         }
 
