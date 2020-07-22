@@ -7,6 +7,16 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.2.2] (changes since 3.2.1)
+
+- Non-breaking improvements
+  - SocketConnectionListener: allow address reuse (#6653)
+
+- Non-breaking bug fixes
+  - Avoid NullReferenceException in Message.TargetAddress (#6635)
+  - Fix unobserved ArgumentOutOfRangeException from Task.Delay (#6640)
+  - Fix bad merge (#6656)
+  - Avoid race in GatewaySender.Send (#6655)
 
 ### [3.2.1] (changes since 3.2.0)
 
