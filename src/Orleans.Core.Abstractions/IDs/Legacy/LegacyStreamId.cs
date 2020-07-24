@@ -35,20 +35,6 @@ namespace Orleans.Streams
             this.key = key;
         }
 
-        internal static LegacyStreamId FromStreamId(StreamId streamId, string providerName)
-        {
-            try
-            {
-                var guid = new Guid(streamId.Key.ToArray());
-                var ns = streamId.GetNamespace();
-                return GetStreamId(guid, providerName, ns);
-            }
-            catch (ArgumentException ex)
-            {
-                throw new InvalidOperationException($"Cannot convert StreamId {streamId} to a  LegacyStreamId", ex);
-            }
-        }
-
         // TODO BPETIT REMOVE
         public static implicit operator StreamId(LegacyStreamId legacyStreamId) => StreamId.Create(legacyStreamId);
         public static implicit operator InternalStreamId(LegacyStreamId legacyStreamId) => new InternalStreamId(legacyStreamId.ProviderName, legacyStreamId);

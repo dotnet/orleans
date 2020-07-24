@@ -53,7 +53,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         public IAsyncStream<T> GetStream<T>(StreamId streamId)
         {
-            var id = LegacyStreamId.FromStreamId(streamId, Name);
+            var id = new InternalStreamId(Name, streamId);
             return providerRuntime.GetStreamDirectory().GetOrAddStream<T>(
                 id,
                 () => new StreamImpl<T>(id, this, IsRewindable, this.runtimeClient));
