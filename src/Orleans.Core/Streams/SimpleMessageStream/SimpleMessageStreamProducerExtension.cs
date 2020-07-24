@@ -37,7 +37,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             this.logger = logger;
         }
 
-        internal void AddStream(LegacyStreamId streamId)
+        internal void AddStream(InternalStreamId streamId)
         {
             StreamConsumerExtensionCollection obs;
             // no need to lock on _remoteConsumers, since on the client we have one extension per stream (per StreamProducer)
@@ -48,12 +48,12 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             remoteConsumers.Add(streamId, obs);
         }
 
-        internal void RemoveStream(LegacyStreamId streamId)
+        internal void RemoveStream(InternalStreamId streamId)
         {
             remoteConsumers.Remove(streamId);
         }
 
-        internal void AddSubscribers(LegacyStreamId streamId, ICollection<PubSubSubscriptionState> newSubscribers)
+        internal void AddSubscribers(InternalStreamId streamId, ICollection<PubSubSubscriptionState> newSubscribers)
         {
             if (logger.IsEnabled(LogLevel.Debug))
                 logger.Debug("{0} AddSubscribers {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), Utils.EnumerableToString(newSubscribers), streamId);

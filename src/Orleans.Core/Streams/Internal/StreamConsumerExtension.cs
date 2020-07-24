@@ -53,7 +53,7 @@ namespace Orleans.Streams
 
             try
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.LegacyStreamId);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
                 var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, batchObserver, stream, filter, token);
@@ -62,7 +62,7 @@ namespace Orleans.Streams
             catch (Exception exc)
             {
                 logger.Error(ErrorCode.StreamProvider_AddObserverException,
-                    $"{providerRuntime.ExecutingEntityIdentity()} StreamConsumerExtension.AddObserver({stream.LegacyStreamId}) caugth exception.", exc);
+                    $"{providerRuntime.ExecutingEntityIdentity()} StreamConsumerExtension.AddObserver({stream.InternalStreamId}) caugth exception.", exc);
                 throw;
             }
         }
@@ -180,7 +180,7 @@ namespace Orleans.Streams
             return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.GetSequenceToken() : null);
         }
 
-        internal int DiagCountStreamObservers<T>(LegacyStreamId streamId)
+        internal int DiagCountStreamObservers<T>(InternalStreamId streamId)
         {
             return allStreamObservers.Values
                                      .OfType<StreamSubscriptionHandleImpl<T>>()

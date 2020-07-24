@@ -245,7 +245,7 @@ namespace UnitTests.Grains
             string extKey = providerName + "_" + Encoding.UTF8.GetString(State.Stream.StreamId.Namespace.ToArray());
             IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamIdGuid, extKey, null);
             GuidId subscriptionId = GuidId.GetNewGuidId();
-            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).LegacyStreamId, myExtensionReference, null);
+            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).InternalStreamId, myExtensionReference, null);
 
             myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null, null);
         }

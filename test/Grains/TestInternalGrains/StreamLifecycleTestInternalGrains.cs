@@ -75,10 +75,10 @@ namespace UnitTests.Grains
             var (myExtension, myExtensionReference) = this.streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
                 () => new StreamConsumerExtension(streamProviderRuntime));
 
-            string extKey = providerName + "_" + ((StreamImpl<int>)State.Stream).LegacyStreamId.Namespace;
+            string extKey = providerName + "_" + ((StreamImpl<int>)State.Stream).InternalStreamId.GetNamespace();
             IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamIdGuid, extKey, null);
             GuidId subscriptionId = GuidId.GetNewGuidId();
-            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).LegacyStreamId, myExtensionReference, null);
+            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).InternalStreamId, myExtensionReference, null);
 
             myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null, null);
         }

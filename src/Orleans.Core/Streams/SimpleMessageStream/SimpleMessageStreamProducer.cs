@@ -66,10 +66,10 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             (myExtension, myGrainReference) = providerRuntime.BindExtension<SimpleMessageStreamProducerExtension, IStreamProducerExtension>(
                 () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, this.logger, fireAndForgetDelivery, optimizeForImmutableData));
 
-            myExtension.AddStream(stream.LegacyStreamId);
+            myExtension.AddStream(stream.InternalStreamId);
 
             // Notify streamRendezvous about new stream streamProducer. Retreave the list of RemoteSubscribers.
-            return await pubSub.RegisterProducer(stream.LegacyStreamId, myGrainReference);
+            return await pubSub.RegisterProducer(stream.InternalStreamId, myGrainReference);
         }
 
         private async Task ConnectToRendezvous()
@@ -83,7 +83,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 if (!connectedToRendezvous) // need to re-check again.
                 {
                     var remoteSubscribers = await RegisterProducer();
-                    myExtension.AddSubscribers(stream.LegacyStreamId, remoteSubscribers);
+                    myExtension.AddSubscribers(stream.InternalStreamId, remoteSubscribers);
                     connectedToRendezvous = true;
                 }
             }
@@ -109,7 +109,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 await ConnectToRendezvous();
             }
 
-            await myExtension.DeliverItem(stream.LegacyStreamId, item);
+            await myExtension.DeliverItem(stream.InternalStreamId, item);
         }
 
         public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
@@ -126,7 +126,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             if (!connectedToRendezvous)
                 await ConnectToRendezvous();
 
-            await myExtension.CompleteStream(stream.LegacyStreamId);
+            await myExtension.CompleteStream(stream.InternalStreamId);
         }
 
         public async Task OnErrorAsync(Exception exc)
@@ -136,7 +136,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             if (!connectedToRendezvous)
                 await ConnectToRendezvous();
 
-            await myExtension.ErrorInStream(stream.LegacyStreamId, exc);
+            await myExtension.ErrorInStream(stream.InternalStreamId, exc);
         }
 
         internal Action OnDisposeTestHook { get; set; }
@@ -145,7 +145,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("Cleanup() called");
 
-            myExtension.RemoveStream(stream.LegacyStreamId);
+            myExtension.RemoveStream(stream.InternalStreamId);
 
             if (isDisposed) return;
 
@@ -153,7 +153,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             {
                 try
                 {
-                    await pubSub.UnregisterProducer(stream.LegacyStreamId, myGrainReference);
+                    await pubSub.UnregisterProducer(stream.InternalStreamId, myGrainReference);
                     connectedToRendezvous = false;
                 }
                 catch (Exception exc)

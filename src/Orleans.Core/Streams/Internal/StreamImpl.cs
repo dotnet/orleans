@@ -12,7 +12,7 @@ namespace Orleans.Streams
     [Immutable]
     internal class StreamImpl<T> : IAsyncStream<T>, IStreamControl, ISerializable, IOnDeserialized
     {
-        private readonly LegacyStreamId                               streamId;
+        private readonly InternalStreamId                       streamId;
         private readonly bool                                   isRewindable;
         [NonSerialized]
         private IInternalStreamProvider                         provider;
@@ -26,7 +26,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private IRuntimeClient                                  runtimeClient;
         
-        internal LegacyStreamId LegacyStreamId                              { get { return streamId; } }
+        internal InternalStreamId InternalStreamId              { get { return streamId; } }
         public StreamId StreamId => streamId;
 
         public bool IsRewindable                                { get { return isRewindable; } }
@@ -38,9 +38,9 @@ namespace Orleans.Streams
             initLock = new object();
         }
 
-        internal StreamImpl(LegacyStreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
+        internal StreamImpl(InternalStreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
         {
-            this.streamId = streamId ?? throw new ArgumentNullException(nameof(streamId));
+            this.streamId = streamId;
             this.provider = provider ?? throw new ArgumentNullException(nameof(provider));
             this.runtimeClient = runtimeClient ?? throw new ArgumentNullException(nameof(runtimeClient));
             producerInterface = null;
@@ -228,8 +228,5 @@ namespace Orleans.Streams
         {
             this.runtimeClient = context?.AdditionalContext as IRuntimeClient;
         }
-
-        // TODO BPETIT REMOVE
-        public static implicit operator StreamId(StreamImpl<T> streamImpl) => Orleans.Runtime.StreamId.Create(streamImpl.LegacyStreamId);
     }
 }
