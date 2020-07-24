@@ -13,7 +13,7 @@ namespace Orleans.Runtime
     public readonly struct StreamId : IEquatable<StreamId>, IComparable<StreamId>, ISerializable
     {
         private readonly ushort keyIndex;
-        private readonly uint hash;
+        private readonly int hash;
 
         public ReadOnlyMemory<byte> FullKey { get; }
 
@@ -21,7 +21,7 @@ namespace Orleans.Runtime
 
         public ReadOnlyMemory<byte> Key => FullKey.Slice(this.keyIndex, FullKey.Length - this.keyIndex);
 
-        internal StreamId(Memory<byte> fullKey, ushort keyIndex, uint hash)
+        internal StreamId(Memory<byte> fullKey, ushort keyIndex, int hash)
         {
             FullKey = fullKey;
             this.keyIndex = keyIndex;
@@ -29,7 +29,7 @@ namespace Orleans.Runtime
         }
 
         internal StreamId(Memory<byte> fullKey, ushort keyIndex)
-            : this(fullKey, keyIndex, JenkinsHash.ComputeHash(fullKey.ToArray()))
+            : this(fullKey, keyIndex, (int) JenkinsHash.ComputeHash(fullKey.ToArray()))
         {
         }
 
@@ -37,7 +37,7 @@ namespace Orleans.Runtime
         {
             FullKey = new Memory<byte>((byte[]) info.GetValue("fk", typeof(byte[])));
             this.keyIndex = (ushort) info.GetValue("ki", typeof(ushort));
-            this.hash = (uint) info.GetValue("fh", typeof(uint));
+            this.hash = (int) info.GetValue("fh", typeof(int));
         }
 
 
@@ -78,6 +78,8 @@ namespace Orleans.Runtime
             info.AddValue("fh", this.hash);
         }
 
+
+
         public override string ToString()
         {
             var sb = new StringBuilder();
@@ -93,6 +95,8 @@ namespace Orleans.Runtime
 
             return sb.ToString();
         }
+
+        public override int GetHashCode() => this.hash;
     }
 
     [Immutable]

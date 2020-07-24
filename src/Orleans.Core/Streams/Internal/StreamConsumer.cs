@@ -250,7 +250,7 @@ namespace Orleans.Streams
         {
             if (handle == null)
                 throw new ArgumentNullException("handle");
-            if (!handle.StreamId.Equals(stream))
+            if (!handle.StreamId.Equals(stream.StreamId))
                 throw new ArgumentException("Handle is not for this stream.", "handle");
             var handleImpl = handle as StreamSubscriptionHandleImpl<T>;
             if (handleImpl == null)
