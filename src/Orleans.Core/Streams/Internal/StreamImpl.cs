@@ -207,7 +207,7 @@ namespace Orleans.Streams
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             // Use the AddValue method to specify serialized values.
-            info.AddValue("StreamId", streamId, typeof(LegacyStreamId));
+            info.AddValue("StreamId", streamId, typeof(InternalStreamId));
             info.AddValue("IsRewindable", isRewindable, typeof(bool));
         }
 
@@ -215,7 +215,7 @@ namespace Orleans.Streams
         protected StreamImpl(SerializationInfo info, StreamingContext context)
         {
             // Reset the property value using the GetValue method.
-            streamId = (LegacyStreamId)info.GetValue("StreamId", typeof(LegacyStreamId));
+            streamId = (InternalStreamId)info.GetValue("StreamId", typeof(InternalStreamId));
             isRewindable = info.GetBoolean("IsRewindable");
             initLock = new object();
 

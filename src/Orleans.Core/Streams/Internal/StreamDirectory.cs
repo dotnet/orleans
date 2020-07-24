@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -12,14 +13,14 @@ namespace Orleans.Streams
     /// </summary>
     internal class StreamDirectory
     {
-        private readonly ConcurrentDictionary<LegacyStreamId, object> allStreams;
+        private readonly ConcurrentDictionary<InternalStreamId, object> allStreams;
 
         internal StreamDirectory()
         {
-            allStreams = new ConcurrentDictionary<LegacyStreamId, object>();
+            allStreams = new ConcurrentDictionary<InternalStreamId, object>();
         }
 
-        internal IAsyncStream<T> GetOrAddStream<T>(LegacyStreamId streamId, Func<IAsyncStream<T>> streamCreator)
+        internal IAsyncStream<T> GetOrAddStream<T>(InternalStreamId streamId, Func<IAsyncStream<T>> streamCreator)
         {
             var stream = allStreams.GetOrAdd(streamId, _ => streamCreator());
             var streamOfT = stream as IAsyncStream<T>;
@@ -34,8 +35,8 @@ namespace Orleans.Streams
         internal async Task Cleanup(bool cleanupProducers, bool cleanupConsumers)
         {
             var promises = new List<Task>();
-            List<LegacyStreamId> streamIds = GetUsedStreamIds();
-            foreach (LegacyStreamId s in streamIds)
+            List<InternalStreamId> streamIds = GetUsedStreamIds();
+            foreach (InternalStreamId s in streamIds)
             {
                 IStreamControl streamControl = GetStreamControl(s);
                 if (streamControl != null)
@@ -50,14 +51,14 @@ namespace Orleans.Streams
             allStreams.Clear();
         }
 
-        private IStreamControl GetStreamControl(LegacyStreamId streamId)
+        private IStreamControl GetStreamControl(InternalStreamId streamId)
         {
             object streamObj;
             bool ok = allStreams.TryGetValue(streamId, out streamObj);
             return ok ? streamObj as IStreamControl : null;
         }
 
-        private List<LegacyStreamId> GetUsedStreamIds()
+        private List<InternalStreamId> GetUsedStreamIds()
         {
             return allStreams.Select(kv => kv.Key).ToList();
         }
