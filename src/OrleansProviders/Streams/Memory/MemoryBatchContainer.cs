@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Orleans.Providers.Streams.Common;
@@ -17,8 +17,7 @@ namespace Orleans.Providers
 
         private readonly EventSequenceToken realToken;
 
-        public Guid StreamGuid => MessageData.StreamGuid;
-        public string StreamNamespace => MessageData.StreamNamespace;
+        public StreamId StreamId => MessageData.StreamId;
         public StreamSequenceToken SequenceToken => realToken;
         public MemoryMessageData MessageData { get; set; }
         public long SequenceNumber => realToken.SequenceNumber;
@@ -54,7 +53,7 @@ namespace Orleans.Providers
             return false;
         }
 
-        public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
+        public bool ShouldDeliver(StreamId stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
         {
             return true;
         }

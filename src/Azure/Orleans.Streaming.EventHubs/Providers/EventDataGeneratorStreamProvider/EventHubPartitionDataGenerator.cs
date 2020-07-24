@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Azure.EventHubs;
@@ -17,7 +17,7 @@ namespace Orleans.ServiceBus.Providers.Testing
     public class SimpleStreamEventDataGenerator : IStreamDataGenerator<EventData>
     {
         /// <inheritdoc />
-        public IStreamIdentity StreamId { get; set; }
+        public StreamId StreamId { get; set; }
 
         /// <inheritdoc />
         public IIntCounter SequenceNumberCounter { set; private get; }
@@ -33,7 +33,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// <param name="streamId"></param>
         /// <param name="logger"></param>
         /// <param name="serializationManager"></param>
-        public SimpleStreamEventDataGenerator(IStreamIdentity streamId, ILogger<SimpleStreamEventDataGenerator> logger, SerializationManager serializationManager)
+        public SimpleStreamEventDataGenerator(StreamId streamId, ILogger<SimpleStreamEventDataGenerator> logger, SerializationManager serializationManager)
         {
             this.StreamId = streamId;
             this.logger = logger;
@@ -54,22 +54,22 @@ namespace Orleans.ServiceBus.Providers.Testing
             while (count-- > 0)
             {
                 this.SequenceNumberCounter.Increment();
-                var eventData = EventHubBatchContainer.ToEventData<int>(this.serializationManager, this.StreamId.Guid, this.StreamId.Namespace,
+                var eventData = EventHubBatchContainer.ToEventData<int>(this.serializationManager, this.StreamId,
                     this.GenerateEvent(this.SequenceNumberCounter.Value), RequestContextExtensions.Export(this.serializationManager));
 
                 //set partition key
-                eventData.SetPartitionKey(this.StreamId.Guid.ToString());
+                eventData.SetPartitionKey(this.StreamId.GetGuid().ToString()); // TODO BPETIT REMOVE
 
                 //set offset
                 DateTime now = DateTime.UtcNow;
-                var offSet = this.StreamId.Guid.ToString() + now.ToString();
+                var offSet = this.StreamId.GetGuid().ToString() + now.ToString(); // TODO BPETIT REMOVE
                 eventData.SetOffset(offSet);
                 //set sequence number
                 eventData.SetSequenceNumber(this.SequenceNumberCounter.Value);
                 //set enqueue time
                 eventData.SetEnqueuedTimeUtc(now);
                 eventDataList.Add(eventData);
-                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} for stream {this.StreamId.Namespace}-{this.StreamId.Guid}");
+                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} for stream {this.StreamId.GetNamespace()}-{this.StreamId.GetGuid()}"); // TODO BPETIT REMOVE
             }
 
             events = eventDataList;
@@ -85,7 +85,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         
         public static Func<IStreamIdentity, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services)
         {
-            return (streamIdentity) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, streamIdentity);
+            return (streamIdentity) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, StreamId.Create(streamIdentity));
         }
     }
 

@@ -12,6 +12,7 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Hosting;
+using System.IO;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -210,9 +211,9 @@ namespace Orleans.ServiceBus.Providers
             return false;
         }
 
-        public IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
+        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
         {
-            return new Cursor(this.cache, streamIdentity, token);
+            return new Cursor(this.cache, streamId, token);
         }
 
         public bool IsUnderPressure()
@@ -318,8 +319,7 @@ namespace Orleans.ServiceBus.Providers
         private class StreamActivityNotificationBatch : IBatchContainer
         {
             public StreamPosition Position { get; }
-            public Guid StreamGuid => this.Position.StreamIdentity.Guid;
-            public string StreamNamespace => this.Position.StreamIdentity.Namespace;
+            public StreamId StreamId => this.Position.StreamId;
             public StreamSequenceToken SequenceToken => this.Position.SequenceToken;
 
             public StreamActivityNotificationBatch(StreamPosition position)
@@ -329,7 +329,7 @@ namespace Orleans.ServiceBus.Providers
 
             public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() { throw new NotSupportedException(); }
             public bool ImportRequestContext() { throw new NotSupportedException(); }
-            public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc) { throw new NotSupportedException(); }
+            public bool ShouldDeliver(StreamId stream, object filterData, StreamFilterPredicate shouldReceiveFunc) { throw new NotSupportedException(); }
         }
 
         private class Cursor : IQueueCacheCursor
@@ -338,10 +338,10 @@ namespace Orleans.ServiceBus.Providers
             private readonly object cursor;
             private IBatchContainer current;
 
-            public Cursor(IEventHubQueueCache cache, IStreamIdentity streamIdentity, StreamSequenceToken token)
+            public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSequenceToken token)
             {
                 this.cache = cache;
-                this.cursor = cache.GetCursor(streamIdentity, token);
+                this.cursor = cache.GetCursor(streamId, token);
             }
 
             public void Dispose()

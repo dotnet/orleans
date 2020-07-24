@@ -89,7 +89,7 @@ namespace AWSUtils.Tests.Streaming
             Guid streamId2 = Guid.NewGuid();
 
             int receivedBatches = 0;
-            var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<IStreamIdentity>>();
+            var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<StreamId>>();
 
             // reader threads (at most 2 active queues because only two streams)
             var work = new List<Task>();
@@ -110,14 +110,14 @@ namespace AWSUtils.Tests.Streaming
                         foreach (var message in messages.Cast<SQSBatchContainer>())
                         {
                             streamsPerQueue.AddOrUpdate(queueId,
-                                id => new HashSet<IStreamIdentity> { new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()) },
+                                id => new HashSet<StreamId> { message.StreamId },
                                 (id, set) =>
                                 {
-                                    set.Add(new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()));
+                                    set.Add(message.StreamId);
                                     return set;
                                 });
                             output.WriteLine("Queue {0} received message on stream {1}", queueId,
-                                message.StreamGuid);
+                                message.StreamId);
                             Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
                             Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
                         }
@@ -134,7 +134,7 @@ namespace AWSUtils.Tests.Streaming
                 .Select(i => i % 2 == 0 ? streamId1 : streamId2)
                 .ToList()
                 .ForEach(streamId =>
-                    adapter.QueueMessageBatchAsync(streamId, streamId.ToString(),
+                    adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
                         events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.SerializationManager)).Wait())));
             await Task.WhenAll(work);
 
@@ -143,12 +143,12 @@ namespace AWSUtils.Tests.Streaming
 
             // check to see if all the events are in the cache and we can enumerate through them
             StreamSequenceToken firstInCache = new EventSequenceTokenV2(0);
-            foreach (KeyValuePair<QueueId, HashSet<IStreamIdentity>> kvp in streamsPerQueue)
+            foreach (KeyValuePair<QueueId, HashSet<StreamId>> kvp in streamsPerQueue)
             {
                 var receiver = receivers[kvp.Key];
                 var qCache = caches[kvp.Key];
 
-                foreach (IStreamIdentity streamGuid in kvp.Value)
+                foreach (StreamId streamGuid in kvp.Value)
                 {
                     // read all messages in cache for stream
                     IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);

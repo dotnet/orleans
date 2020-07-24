@@ -10,9 +10,9 @@ namespace Orleans.Streams
 {
     [Serializable]
     [Immutable]
-    internal class StreamImpl<T> : IStreamIdentity, IAsyncStream<T>, IStreamControl, ISerializable, IOnDeserialized
+    internal class StreamImpl<T> : IAsyncStream<T>, IStreamControl, ISerializable, IOnDeserialized
     {
-        private readonly StreamId                               streamId;
+        private readonly LegacyStreamId                               streamId;
         private readonly bool                                   isRewindable;
         [NonSerialized]
         private IInternalStreamProvider                         provider;
@@ -26,11 +26,10 @@ namespace Orleans.Streams
         [NonSerialized]
         private IRuntimeClient                                  runtimeClient;
         
-        internal StreamId StreamId                              { get { return streamId; } }
+        internal LegacyStreamId LegacyStreamId                              { get { return streamId; } }
+        public StreamId StreamId => streamId;
 
         public bool IsRewindable                                { get { return isRewindable; } }
-        public Guid Guid                                        { get { return streamId.Guid; } }
-        public string Namespace                                 { get { return streamId.Namespace; } }
         public string ProviderName                              { get { return streamId.ProviderName; } }
 
         // IMPORTANT: This constructor needs to be public for Json deserialization to work.
@@ -39,7 +38,7 @@ namespace Orleans.Streams
             initLock = new object();
         }
 
-        internal StreamImpl(StreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
+        internal StreamImpl(LegacyStreamId streamId, IInternalStreamProvider provider, bool isRewindable, IRuntimeClient runtimeClient)
         {
             this.streamId = streamId ?? throw new ArgumentNullException(nameof(streamId));
             this.provider = provider ?? throw new ArgumentNullException(nameof(provider));
@@ -208,7 +207,7 @@ namespace Orleans.Streams
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             // Use the AddValue method to specify serialized values.
-            info.AddValue("StreamId", streamId, typeof(StreamId));
+            info.AddValue("StreamId", streamId, typeof(LegacyStreamId));
             info.AddValue("IsRewindable", isRewindable, typeof(bool));
         }
 
@@ -216,7 +215,7 @@ namespace Orleans.Streams
         protected StreamImpl(SerializationInfo info, StreamingContext context)
         {
             // Reset the property value using the GetValue method.
-            streamId = (StreamId)info.GetValue("StreamId", typeof(StreamId));
+            streamId = (LegacyStreamId)info.GetValue("StreamId", typeof(LegacyStreamId));
             isRewindable = info.GetBoolean("IsRewindable");
             initLock = new object();
 
@@ -229,5 +228,8 @@ namespace Orleans.Streams
         {
             this.runtimeClient = context?.AdditionalContext as IRuntimeClient;
         }
+
+        // TODO BPETIT REMOVE
+        public static implicit operator StreamId(StreamImpl<T> streamImpl) => Orleans.Runtime.StreamId.Create(streamImpl.LegacyStreamId);
     }
 }

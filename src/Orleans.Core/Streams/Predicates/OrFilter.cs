@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -46,7 +47,7 @@ namespace Orleans.Streams
             info.AddValue("Filters", this.filters, serializedType);
         }
 
-        public bool ShouldReceive(IStreamIdentity stream, object filterData, object item)
+        public bool ShouldReceive(StreamId stream, object filterData, object item)
         {
             if (filters == null || filters.Count == 0) return true;
 

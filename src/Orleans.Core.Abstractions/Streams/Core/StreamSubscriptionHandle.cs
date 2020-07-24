@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -11,9 +12,10 @@ namespace Orleans.Streams
     [Serializable]
     public abstract class StreamSubscriptionHandle<T> : IEquatable<StreamSubscriptionHandle<T>>
     {
-        public abstract IStreamIdentity StreamIdentity { get; }
+        public abstract StreamId StreamId { get; }
 
         public abstract string ProviderName { get; }
+
         /// <summary>
         /// Unique identifier for this StreamSubscriptionHandle
         /// </summary>

@@ -41,7 +41,7 @@ namespace UnitTests.StreamingTests
         public async Task RegisterConsumerFaultTest()
         {
             this.fixture.Logger.Info("************************ RegisterConsumerFaultTest *********************************");
-            var streamId = StreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
+            var streamId = LegacyStreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(
                 streamId.Guid,
                 keyExtension: streamId.ProviderName + "_" + streamId.Namespace);
@@ -69,7 +69,7 @@ namespace UnitTests.StreamingTests
         public async Task UnregisterConsumerFaultTest()
         {
             this.fixture.Logger.Info("************************ UnregisterConsumerFaultTest *********************************");
-            var streamId = StreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
+            var streamId = LegacyStreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(
                 streamId.Guid,
                 keyExtension: streamId.ProviderName + "_" + streamId.Namespace);
@@ -117,7 +117,7 @@ namespace UnitTests.StreamingTests
         public async Task RegisterProducerFaultTest()
         {
             this.fixture.Logger.Info("************************ RegisterProducerFaultTest *********************************");
-            var streamId = StreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
+            var streamId = LegacyStreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(
                 streamId.Guid,
                 keyExtension: streamId.ProviderName + "_" + streamId.Namespace);
@@ -149,7 +149,7 @@ namespace UnitTests.StreamingTests
         public async Task UnregisterProducerFaultTest()
         {
             this.fixture.Logger.Info("************************ UnregisterProducerFaultTest *********************************");
-            var streamId = StreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
+            var streamId = LegacyStreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(
                 streamId.Guid,
                 keyExtension: streamId.ProviderName + "_" + streamId.Namespace);
@@ -198,13 +198,13 @@ namespace UnitTests.StreamingTests
                 id = Guid.NewGuid();
             }
 
-            public Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer,
+            public Task AddSubscriber(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer,
                 IStreamFilterPredicateWrapper filter)
             {
                 return Task.CompletedTask;
             }
 
-            public Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId)
+            public Task RemoveSubscriber(GuidId subscriptionId, InternalStreamId streamId)
             {
                 return Task.CompletedTask;
             }

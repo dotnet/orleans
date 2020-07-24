@@ -101,14 +101,14 @@ namespace Orleans.Streams
         /// <returns>A set of references to implicitly subscribed grains. They are expected to support the streaming consumer extension.</returns>
         /// <exception cref="System.ArgumentException">The stream ID doesn't have an associated namespace.</exception>
         /// <exception cref="System.InvalidOperationException">Internal invariant violation.</exception>
-        internal IDictionary<Guid, IStreamConsumerExtension> GetImplicitSubscribers(StreamId streamId, IInternalGrainFactory grainFactory)
+        internal IDictionary<Guid, IStreamConsumerExtension> GetImplicitSubscribers(InternalStreamId streamId, IInternalGrainFactory grainFactory)
         {
-            if (!IsImplicitSubscribeEligibleNameSpace(streamId.Namespace))
+            if (!IsImplicitSubscribeEligibleNameSpace(streamId.GetNamespace()))
             {
                 throw new ArgumentException("The stream ID doesn't have an associated namespace.", nameof(streamId));
             }
 
-            var entries = GetOrAddImplicitSubscribers(streamId.Namespace);
+            var entries = GetOrAddImplicitSubscribers(streamId.GetNamespace());
 
             var result = new Dictionary<Guid, IStreamConsumerExtension>();
             foreach (var entry in entries)
@@ -142,9 +142,9 @@ namespace Orleans.Streams
         /// <param name="grainId">The grain identifier.</param>
         /// <param name="streamId">The stream identifier.</param>
         /// <returns>true if the grain id describes an implicit subscriber of the stream described by the stream id.</returns>
-        internal bool IsImplicitSubscriber(GrainId grainId, StreamId streamId)
+        internal bool IsImplicitSubscriber(GrainId grainId, InternalStreamId streamId)
         {
-            return HasImplicitSubscription(streamId.Namespace, grainId.Type);
+            return HasImplicitSubscription(streamId.GetNamespace(), grainId.Type);
         }
 
         /// <summary>
@@ -155,7 +155,7 @@ namespace Orleans.Streams
         /// <param name="streamId"></param>
         /// <param name="subscriptionId"></param>
         /// <returns></returns>
-        internal bool TryGetImplicitSubscriptionGuid(GrainId grainId, StreamId streamId, out Guid subscriptionId)
+        internal bool TryGetImplicitSubscriptionGuid(GrainId grainId, InternalStreamId streamId, out Guid subscriptionId)
         {
             subscriptionId = Guid.Empty;
 
@@ -173,17 +173,17 @@ namespace Orleans.Streams
         /// <summary>
         /// Create a subscriptionId that is unique per grainId, grainType, namespace combination.
         /// </summary>
-        private Guid MakeSubscriptionGuid(GrainType grainType, StreamId streamId)
+        private Guid MakeSubscriptionGuid(GrainType grainType, InternalStreamId streamId)
         {
             // next 2 shorts inc guid are from namespace hash
-            uint namespaceHash = JenkinsHash.ComputeHash(streamId.Namespace);
+            uint namespaceHash = JenkinsHash.ComputeHash(streamId.GetNamespace());
             byte[] namespaceHashByes = BitConverter.GetBytes(namespaceHash);
             short s1 = BitConverter.ToInt16(namespaceHashByes, 0);
             short s2 = BitConverter.ToInt16(namespaceHashByes, 2);
 
             // Tailing 8 bytes of the guid are from the hash of the streamId Guid and a hash of the provider name.
             // get streamId guid hash code
-            uint streamIdGuidHash = JenkinsHash.ComputeHash(streamId.Guid.ToByteArray());
+            uint streamIdGuidHash = JenkinsHash.ComputeHash(streamId.StreamId.Key.ToArray());
             // get provider name hash code
             uint providerHash = JenkinsHash.ComputeHash(streamId.ProviderName);
 
@@ -243,11 +243,11 @@ namespace Orleans.Streams
         /// <returns></returns>
         private IStreamConsumerExtension MakeConsumerReference(
             IInternalGrainFactory grainFactory,
-            StreamId streamId,
+            InternalStreamId streamId,
             StreamSubscriber subscriber)
         {
-            var keyExtension = subscriber.IncludeNamespaceInGrainId ? streamId.Namespace : null;
-            var grainId = GrainId.Create(subscriber.GrainType, GrainIdKeyExtensions.CreateGuidKey(streamId.Guid, keyExtension));
+            var keyExtension = subscriber.IncludeNamespaceInGrainId ? streamId.GetNamespace() : null;
+            var grainId = GrainId.Create(subscriber.GrainType, GrainIdKeyExtensions.CreateGuidKey(streamId.GetGuid(), keyExtension));
             return grainFactory.GetGrain<IStreamConsumerExtension>(grainId);
         }
 

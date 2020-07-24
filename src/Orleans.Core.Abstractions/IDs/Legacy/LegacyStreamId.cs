@@ -11,11 +11,11 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [Immutable]
-    internal class StreamId : IStreamIdentity, IRingIdentifier<StreamId>, IEquatable<StreamId>, IComparable<StreamId>, ISerializable
+    internal class LegacyStreamId : IStreamIdentity, IRingIdentifier<LegacyStreamId>, IEquatable<LegacyStreamId>, IComparable<LegacyStreamId>, ISerializable
     {
         [NonSerialized]
-        private static readonly Lazy<Interner<StreamIdInternerKey, StreamId>> streamIdInternCache = new Lazy<Interner<StreamIdInternerKey, StreamId>>(
-            () => new Interner<StreamIdInternerKey, StreamId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq));
+        private static readonly Lazy<Interner<StreamIdInternerKey, LegacyStreamId>> streamIdInternCache = new Lazy<Interner<StreamIdInternerKey, LegacyStreamId>>(
+            () => new Interner<StreamIdInternerKey, LegacyStreamId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq));
 
         [NonSerialized]
         private uint uniformHashCache;
@@ -30,34 +30,52 @@ namespace Orleans.Streams
         public string ProviderName { get { return key.ProviderName; } }
 
         // TODO: need to integrate with Orleans serializer to really use Interner.
-        private StreamId(StreamIdInternerKey key)
+        private LegacyStreamId(StreamIdInternerKey key)
         {
             this.key = key;
         }
 
-        internal static StreamId GetStreamId(Guid guid, string providerName, string streamNamespace)
+        internal static LegacyStreamId FromStreamId(StreamId streamId, string providerName)
+        {
+            try
+            {
+                var guid = new Guid(streamId.Key.ToArray());
+                var ns = streamId.GetNamespace();
+                return GetStreamId(guid, providerName, ns);
+            }
+            catch (ArgumentException ex)
+            {
+                throw new InvalidOperationException($"Cannot convert StreamId {streamId} to a  LegacyStreamId", ex);
+            }
+        }
+
+        // TODO BPETIT REMOVE
+        public static implicit operator StreamId(LegacyStreamId legacyStreamId) => StreamId.Create(legacyStreamId);
+        public static implicit operator InternalStreamId(LegacyStreamId legacyStreamId) => new InternalStreamId(legacyStreamId.ProviderName, legacyStreamId);
+
+        internal static LegacyStreamId GetStreamId(Guid guid, string providerName, string streamNamespace)
         {
             return FindOrCreateStreamId(new StreamIdInternerKey(guid, providerName, streamNamespace));
         }
 
-        private static StreamId FindOrCreateStreamId(StreamIdInternerKey key)
+        private static LegacyStreamId FindOrCreateStreamId(StreamIdInternerKey key)
         {
-            return streamIdInternCache.Value.FindOrCreate(key, k => new StreamId(k));
+            return streamIdInternCache.Value.FindOrCreate(key, k => new LegacyStreamId(k));
         }
 
-        public int CompareTo(StreamId other)
+        public int CompareTo(LegacyStreamId other)
         {
             return key.CompareTo(other.key);
         }
 
-        public bool Equals(StreamId other)
+        public bool Equals(LegacyStreamId other)
         {
             return other != null && key.Equals(other.key);
         }
 
         public override bool Equals(object obj)
         {
-            return Equals(obj as StreamId);
+            return Equals(obj as LegacyStreamId);
         }
 
         public override int GetHashCode()
@@ -107,7 +125,7 @@ namespace Orleans.Streams
         }
 
         // The special constructor is used to deserialize values. 
-        protected StreamId(SerializationInfo info, StreamingContext context)
+        protected LegacyStreamId(SerializationInfo info, StreamingContext context)
         {
             // Reset the property value using the GetValue method.
             var guid = (Guid) info.GetValue("Guid", typeof(Guid));

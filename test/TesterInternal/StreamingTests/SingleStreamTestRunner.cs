@@ -479,12 +479,13 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private async Task AssertProducerCount(int expectedCount, string providerName, Guid streamId)
+        private async Task AssertProducerCount(int expectedCount, string providerName, Guid streamIdGuid)
         {
             // currently, we only support checking the producer count on the SMS rendezvous grain.
             if (providerName == SMS_STREAM_PROVIDER_NAME)
             {
-                var actualCount = await StreamTestUtils.GetStreamPubSub(this.client).ProducerCount(streamId, providerName, StreamTestsConstants.DefaultStreamNamespace);
+                var streamId = StreamId.Create(StreamTestsConstants.DefaultStreamNamespace, streamIdGuid);
+                var actualCount = await StreamTestUtils.GetStreamPubSub(this.client).ProducerCount(new InternalStreamId(providerName, streamId));
                 logger.Info("StreamingTestRunner.AssertProducerCount: expected={0} actual (SMSStreamRendezvousGrain.ProducerCount)={1} streamId={2}", expectedCount, actualCount, streamId);
                 Assert.Equal(expectedCount, actualCount);
             }

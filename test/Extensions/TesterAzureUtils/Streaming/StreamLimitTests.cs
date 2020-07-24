@@ -763,11 +763,12 @@ namespace UnitTests.StreamingTests
             var pubSub = StreamTestUtils.GetStreamPubSub(this.InternalClient);
 
             // Check Consumer counts
-            int consumerCount = await pubSub.ConsumerCount(streamId, streamProviderName, StreamNamespace);
+            var streamId1 = new InternalStreamId(streamProviderName, StreamId.Create(StreamNamespace, streamId));
+            int consumerCount = await pubSub.ConsumerCount(streamId1);
             Assert.Equal(numConsumers,  consumerCount);  //  "ConsumerCount for Stream {0}", streamId
 
             // Check Producer counts
-            int producerCount = await pubSub.ProducerCount(streamId, streamProviderName, StreamNamespace);
+            int producerCount = await pubSub.ProducerCount(streamId1);
             Assert.Equal(numProducers,  producerCount);  //  "ProducerCount for Stream {0}", streamId
 
             // Check message counts received by consumers

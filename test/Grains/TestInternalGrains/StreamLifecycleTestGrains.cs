@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -124,7 +125,7 @@ namespace UnitTests.Grains
             if (streamNamespace == null) throw new ArgumentNullException("streamNamespace", "Can't have null stream namespace values");
             if (providerToUse == null) throw new ArgumentNullException("providerToUse", "Can't have null stream provider name");
 
-            if (State.Stream != null && State.Stream.Guid != streamId)
+            if (State.Stream != null && new Guid(State.Stream.StreamId.Key.ToArray()) != streamId)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Stream already exists for StreamId={0} StreamProvider={1} - Resetting", State.Stream, providerToUse);
 
@@ -241,10 +242,10 @@ namespace UnitTests.Grains
             var context = this.Data;
             var (myExtension, myExtensionReference) = this.streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
                 () => new StreamConsumerExtension(streamProviderRuntime));
-            string extKey = providerName + "_" + State.Stream.Namespace;
+            string extKey = providerName + "_" + Encoding.UTF8.GetString(State.Stream.StreamId.Namespace.ToArray());
             IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamIdGuid, extKey, null);
             GuidId subscriptionId = GuidId.GetNewGuidId();
-            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).StreamId, myExtensionReference, null);
+            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).LegacyStreamId, myExtensionReference, null);
 
             myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null, null);
         }
@@ -337,7 +338,7 @@ namespace UnitTests.Grains
             await State.Stream.SubscribeAsync(observer, null, filterFunc);
         }
 
-        public static bool FilterIsEven(IStreamIdentity stream, object filterData, object item)
+        public static bool FilterIsEven(StreamId stream, object filterData, object item)
         {
             if (!FilterDataEven.Equals(filterData))
             {
@@ -349,7 +350,7 @@ namespace UnitTests.Grains
             return result;
         }
 
-        public static bool FilterIsOdd(IStreamIdentity stream, object filterData, object item)
+        public static bool FilterIsOdd(StreamId stream, object filterData, object item)
         {
             if (!FilterDataOdd.Equals(filterData))
             {
@@ -362,7 +363,7 @@ namespace UnitTests.Grains
         }
 
         // Function is not static, so cannot be used as a filter predicate function.
-        public bool BadFunc(IStreamIdentity stream, object filterData, object item)
+        public bool BadFunc(StreamId stream, object filterData, object item)
         {
             return true;
         }

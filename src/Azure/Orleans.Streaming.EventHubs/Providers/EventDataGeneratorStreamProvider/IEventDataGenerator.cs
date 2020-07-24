@@ -1,4 +1,4 @@
-﻿using Microsoft.Azure.EventHubs;
+using Microsoft.Azure.EventHubs;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -53,7 +53,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// <summary>
         /// Stream identity for this data generator
         /// </summary>
-        IStreamIdentity StreamId { get; }
+        StreamId StreamId { get; }
         /// <summary>
         ///
         /// </summary>

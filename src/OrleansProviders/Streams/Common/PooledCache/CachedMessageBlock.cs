@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -179,15 +180,15 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Tries to find the first message in the block that is part of the provided stream.
         /// </summary>
-        public bool TryFindFirstMessage(IStreamIdentity streamIdentity, ICacheDataAdapter dataAdapter, out int index)
+        public bool TryFindFirstMessage(StreamId streamId, ICacheDataAdapter dataAdapter, out int index)
         {
-            return TryFindNextMessage(readIndex, streamIdentity, dataAdapter, out index);
+            return TryFindNextMessage(readIndex, streamId, dataAdapter, out index);
         }
 
         /// <summary>
         /// Tries to get the next message from the provided stream, starting at the start index.
         /// </summary>
-        public bool TryFindNextMessage(int start, IStreamIdentity streamIdentity, ICacheDataAdapter dataAdapter, out int index)
+        public bool TryFindNextMessage(int start, StreamId streamId, ICacheDataAdapter dataAdapter, out int index)
         {
             if (start < readIndex)
             {
@@ -196,7 +197,7 @@ namespace Orleans.Providers.Streams.Common
 
             for (int i = start; i < writeIndex; i++)
             {
-                if (cachedMessages[i].CompareStreamId(streamIdentity))
+                if (cachedMessages[i].CompareStreamId(streamId))
                 {
                     index = i;
                     return true;

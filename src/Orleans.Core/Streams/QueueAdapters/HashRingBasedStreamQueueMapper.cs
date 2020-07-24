@@ -44,9 +44,9 @@ namespace Orleans.Streams
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
-        public QueueId GetQueueForStream(Guid streamGuid, String streamNamespace)
+        public QueueId GetQueueForStream(StreamId streamId)
         {
-            return hashRing.CalculateResponsible(streamGuid);
+            return hashRing.CalculateResponsible(streamId.GetGuid()); // TODO BPETIT REMOVE
         }
 
         public override string ToString()

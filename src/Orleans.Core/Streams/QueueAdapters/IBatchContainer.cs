@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -11,12 +12,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Stream identifier for the stream this batch is part of.
         /// </summary>
-        Guid StreamGuid { get; }
-
-        /// <summary>
-        /// Stream namespace for the stream this batch is part of.
-        /// </summary>
-        String StreamNamespace { get; }
+        StreamId StreamId { get; }
 
         /// <summary>
         /// Gets events of a specific type from the batch.
@@ -40,6 +36,6 @@ namespace Orleans.Streams
         /// <summary>
         /// Decide whether this batch should be sent to the specified target.
         /// </summary>
-        bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc);
+        bool ShouldDeliver(StreamId stream, object filterData, StreamFilterPredicate shouldReceiveFunc);
     }
 }

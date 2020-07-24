@@ -1,6 +1,7 @@
 #define USE_STORAGE
 
 using System;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -74,10 +75,10 @@ namespace UnitTests.Grains
             var (myExtension, myExtensionReference) = this.streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
                 () => new StreamConsumerExtension(streamProviderRuntime));
 
-            string extKey = providerName + "_" + State.Stream.Namespace;
+            string extKey = providerName + "_" + ((StreamImpl<int>)State.Stream).LegacyStreamId.Namespace;
             IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamIdGuid, extKey, null);
             GuidId subscriptionId = GuidId.GetNewGuidId();
-            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).StreamId, myExtensionReference, null);
+            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).LegacyStreamId, myExtensionReference, null);
 
             myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null, null);
         }

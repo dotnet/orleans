@@ -1,5 +1,6 @@
 
 using System;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -13,11 +14,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Guid of streamId this event is part of
         /// </summary>
-        public Guid StreamGuid;
-        /// <summary>
-        /// Interned Namespace string of streamId this event is part of
-        /// </summary>
-        public string StreamNamespace;
+        public StreamId StreamId;
         /// <summary>
         /// Sequence number.  Position of event in queue
         /// </summary>
@@ -49,12 +46,6 @@ namespace Orleans.Providers.Streams.Common
                 : cachedMessage.EventIndex - token.EventIndex;
         }
 
-        public static bool CompareStreamId(this ref CachedMessage cachedMessage, IStreamIdentity streamIdentity)
-        {
-            int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-            if (result != 0) return false;
-
-            return string.Compare(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal) == 0;
-        }
+        public static bool CompareStreamId(this ref CachedMessage cachedMessage, StreamId streamId) => cachedMessage.StreamId.Equals(streamId);
     }
 }

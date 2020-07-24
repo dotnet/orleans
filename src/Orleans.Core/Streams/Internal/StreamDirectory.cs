@@ -12,14 +12,14 @@ namespace Orleans.Streams
     /// </summary>
     internal class StreamDirectory
     {
-        private readonly ConcurrentDictionary<StreamId, object> allStreams;
+        private readonly ConcurrentDictionary<LegacyStreamId, object> allStreams;
 
         internal StreamDirectory()
         {
-            allStreams = new ConcurrentDictionary<StreamId, object>();
+            allStreams = new ConcurrentDictionary<LegacyStreamId, object>();
         }
 
-        internal IAsyncStream<T> GetOrAddStream<T>(StreamId streamId, Func<IAsyncStream<T>> streamCreator)
+        internal IAsyncStream<T> GetOrAddStream<T>(LegacyStreamId streamId, Func<IAsyncStream<T>> streamCreator)
         {
             var stream = allStreams.GetOrAdd(streamId, _ => streamCreator());
             var streamOfT = stream as IAsyncStream<T>;
@@ -34,8 +34,8 @@ namespace Orleans.Streams
         internal async Task Cleanup(bool cleanupProducers, bool cleanupConsumers)
         {
             var promises = new List<Task>();
-            List<StreamId> streamIds = GetUsedStreamIds();
-            foreach (StreamId s in streamIds)
+            List<LegacyStreamId> streamIds = GetUsedStreamIds();
+            foreach (LegacyStreamId s in streamIds)
             {
                 IStreamControl streamControl = GetStreamControl(s);
                 if (streamControl != null)
@@ -50,14 +50,14 @@ namespace Orleans.Streams
             allStreams.Clear();
         }
 
-        private IStreamControl GetStreamControl(StreamId streamId)
+        private IStreamControl GetStreamControl(LegacyStreamId streamId)
         {
             object streamObj;
             bool ok = allStreams.TryGetValue(streamId, out streamObj);
             return ok ? streamObj as IStreamControl : null;
         }
 
-        private List<StreamId> GetUsedStreamIds()
+        private List<LegacyStreamId> GetUsedStreamIds()
         {
             return allStreams.Select(kv => kv.Key).ToList();
         }

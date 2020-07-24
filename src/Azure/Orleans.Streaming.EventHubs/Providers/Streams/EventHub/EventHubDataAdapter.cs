@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 
@@ -54,18 +56,17 @@ namespace Orleans.ServiceBus.Providers
             return new EventHubSequenceTokenV2("", cachedMessage.SequenceNumber, 0);
         }
 
-        public virtual EventData ToQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public virtual EventData ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
             if (token != null) throw new ArgumentException("EventHub streams currently does not support non-null StreamSequenceToken.", nameof(token));
-            return EventHubBatchContainer.ToEventData(this.serializationManager, streamGuid, streamNamespace, events, requestContext);
+            return EventHubBatchContainer.ToEventData(this.serializationManager, streamId, events, requestContext);
         }
 
         public virtual CachedMessage FromQueueMessage(StreamPosition streamPosition, EventData queueMessage, DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
         {
             return new CachedMessage()
             {
-                StreamGuid = streamPosition.StreamIdentity.Guid,
-                StreamNamespace = streamPosition.StreamIdentity.Namespace != null ? string.Intern(streamPosition.StreamIdentity.Namespace) : null,
+                StreamId = streamPosition.StreamId, 
                 SequenceNumber = queueMessage.SystemProperties.SequenceNumber,
                 EventIndex = streamPosition.SequenceToken.EventIndex,
                 EnqueueTimeUtc = queueMessage.SystemProperties.EnqueuedTimeUtc,
@@ -76,10 +77,10 @@ namespace Orleans.ServiceBus.Providers
 
         public virtual StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            IStreamIdentity streamIdentity = this.GetStreamIdentity(queueMessage);
+            StreamId streamId = this.GetStreamIdentity(queueMessage);
             StreamSequenceToken token =
                 new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
-            return new StreamPosition(streamIdentity, token);
+            return new StreamPosition(streamId, token);
         }
 
         /// <summary>
@@ -95,21 +96,20 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Get the Event Hub partition key to use for a stream.
         /// </summary>
-        /// <param name="streamGuid">The stream Guid.</param>
-        /// <param name="streamNamespace">The stream Namespace.</param>
+        /// <param name="streamId">The stream Guid.</param>
         /// <returns>The partition key to use for the stream.</returns>
-        public virtual string GetPartitionKey(Guid streamGuid, string streamNamespace) => streamGuid.ToString();
+        public virtual string GetPartitionKey(StreamId streamId) => streamId.GetGuid().ToString(); // TODO BPETIT
 
         /// <summary>
         /// Get the <see cref="IStreamIdentity"/> for an event message.
         /// </summary>
         /// <param name="queueMessage">The event message.</param>
         /// <returns>The stream identity.</returns>
-        public virtual IStreamIdentity GetStreamIdentity(EventData queueMessage)
+        public virtual StreamId GetStreamIdentity(EventData queueMessage)
         {
-            Guid streamGuid = Guid.Parse(queueMessage.SystemProperties.PartitionKey);
+            string streamGuid = queueMessage.SystemProperties.PartitionKey;
             string streamNamespace = queueMessage.GetStreamNamespaceProperty();
-            return new StreamIdentity(streamGuid, streamNamespace);
+            return StreamId.Create(streamNamespace, streamGuid);
         }
 
         // Placed object message payload into a segment.

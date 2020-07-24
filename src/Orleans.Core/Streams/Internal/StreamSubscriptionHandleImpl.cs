@@ -25,7 +25,7 @@ namespace Orleans.Streams
         internal bool IsRewindable { get { return isRewindable; } }
 
         public override string ProviderName { get { return this.streamImpl.ProviderName; } }
-        public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
+        public override StreamId StreamId { get { return streamImpl; } }
         public override Guid HandleId { get { return subscriptionId.Guid; } }
 
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
@@ -224,9 +224,9 @@ namespace Orleans.Streams
                 : this.observer.OnErrorAsync(ex);
         }
 
-        internal bool SameStreamId(StreamId streamId)
+        internal bool SameStreamId(LegacyStreamId streamId)
         {
-            return IsValid && streamImpl.StreamId.Equals(streamId);
+            return IsValid && streamImpl.LegacyStreamId.Equals(streamId);
         }
 
         public override bool Equals(StreamSubscriptionHandle<T> other)
@@ -247,7 +247,7 @@ namespace Orleans.Streams
 
         public override string ToString()
         {
-            return String.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.StreamId.ToString() : "null", HandleId);
+            return String.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.LegacyStreamId.ToString() : "null", HandleId);
         }
     }
 }

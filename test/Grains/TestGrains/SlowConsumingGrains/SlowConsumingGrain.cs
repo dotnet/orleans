@@ -44,6 +44,7 @@ namespace UnitTests.Grains
             IStreamProvider streamProvider = base.GetStreamProvider(providerToUse);
             var consumer = streamProvider.GetStream<int>(streamId, streamNamespace);
             ConsumerHandle = await consumer.SubscribeAsync(ConsumerObserver);
+            // streamProvider.Subscribe<int>(streamId, ConsumerObserver)
         }
 
         public async Task StopConsuming()

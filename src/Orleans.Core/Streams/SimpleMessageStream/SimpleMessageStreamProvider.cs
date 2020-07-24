@@ -51,12 +51,12 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             return this.streamSubscriptionManager;
         }
 
-        public IAsyncStream<T> GetStream<T>(Guid id, string streamNamespace)
+        public IAsyncStream<T> GetStream<T>(StreamId streamId)
         {
-            var streamId = StreamId.GetStreamId(id, Name, streamNamespace);
+            var id = LegacyStreamId.FromStreamId(streamId, Name);
             return providerRuntime.GetStreamDirectory().GetOrAddStream<T>(
-                streamId,
-                () => new StreamImpl<T>(streamId, this, IsRewindable, this.runtimeClient));
+                id,
+                () => new StreamImpl<T>(id, this, IsRewindable, this.runtimeClient));
         }
 
         IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)

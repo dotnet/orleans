@@ -4,6 +4,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
 using System.Linq;
+using Orleans.Runtime;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -16,7 +17,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Constructor
         /// </summary>
-        /// <param name="streamIdentity">Stream Identity</param>
+        /// <param name="streamId">Stream Identity</param>
         /// <param name="partitionKey">EventHub partition key for message</param>
         /// <param name="offset">Offset into the EventHub partition where this message was from</param>
         /// <param name="sequenceNumber">Offset into the EventHub partition where this message was from</param>
@@ -24,10 +25,10 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="dequeueTimeUtc">Time in UTC when this message was read from EventHub into the current service</param>
         /// <param name="properties">User properties from EventData object</param>
         /// <param name="payload">Binary data from EventData object</param>
-        public EventHubMessage(IStreamIdentity streamIdentity, string partitionKey, string offset, long sequenceNumber,
+        public EventHubMessage(StreamId streamId, string partitionKey, string offset, long sequenceNumber,
             DateTime enqueueTimeUtc, DateTime dequeueTimeUtc, IDictionary<string, object> properties, byte[] payload)
         {
-            StreamIdentity = streamIdentity;
+            StreamId = streamId;
             PartitionKey = partitionKey;
             Offset = offset;
             SequenceNumber = sequenceNumber;
@@ -45,7 +46,7 @@ namespace Orleans.ServiceBus.Providers
         public EventHubMessage(CachedMessage cachedMessage, SerializationManager serializationManager)
         {
             int readOffset = 0;
-            StreamIdentity = new StreamIdentity(cachedMessage.StreamGuid, cachedMessage.StreamNamespace);
+            StreamId = cachedMessage.StreamId;
             Offset = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
             PartitionKey = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
             SequenceNumber = cachedMessage.SequenceNumber;
@@ -58,7 +59,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Stream identifier
         /// </summary>
-        public IStreamIdentity StreamIdentity { get; }
+        public StreamId StreamId { get; }
         /// <summary>
         /// EventHub partition key
         /// </summary>

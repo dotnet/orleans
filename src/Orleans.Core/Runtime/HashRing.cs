@@ -5,11 +5,6 @@ using System.Linq;
 
 namespace Orleans.Runtime
 {
-    internal interface IRingIdentifier<T> : IEquatable<T>
-    {
-        uint GetUniformHashCode();
-    }
-
     internal class HashRing<T>
     {
         private readonly List<IRingIdentifier<T>> sortedRingList;
