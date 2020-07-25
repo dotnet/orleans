@@ -60,11 +60,6 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            if (!msg.QueuedTime.HasValue)
-            {
-                msg.QueuedTime = DateTime.UtcNow;
-            }
-
             // First check to see if it's really destined for a proxied client, instead of a local grain.
             if (messageCenter.TryDeliverToProxy(msg))
             {

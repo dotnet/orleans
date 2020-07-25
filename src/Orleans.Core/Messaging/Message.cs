@@ -65,7 +65,8 @@ namespace Orleans.Runtime
         {
             Success,
             Error,
-            Rejection
+            Rejection,
+            Status
         }
 
         public enum RejectionTypes
@@ -447,6 +448,10 @@ namespace Orleans.Runtime
 
                     case ResponseTypes.Rejection:
                         response = string.Format("{0} Rejection (info: {1}) ", RejectionType, RejectionInfo);
+                        break;
+
+                    case ResponseTypes.Status:
+                        response = "Status ";
                         break;
 
                     default:

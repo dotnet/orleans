@@ -21,6 +21,7 @@ namespace Orleans.Runtime
     {
         internal MessageCenter Transport { get; }
 
+        private readonly IncomingRequestMonitor _activationWorkloadMonitor;
         private readonly OrleansTaskScheduler scheduler;
         private readonly Catalog catalog;
         private readonly ILogger logger;
@@ -39,7 +40,7 @@ namespace Orleans.Runtime
             OrleansTaskScheduler scheduler,
             MessageCenter transport, 
             Catalog catalog,
-            IOptions<SiloMessagingOptions> messagingOptions,
+            IOptionsMonitor<SiloMessagingOptions> messagingOptions,
             PlacementDirectorsManager placementDirectorsManager,
             ILocalGrainDirectory localGrainDirectory,
             IGrainLocator grainLocator,
@@ -48,12 +49,14 @@ namespace Orleans.Runtime
             CompatibilityDirectorManager compatibilityDirectorManager,
             ILoggerFactory loggerFactory,
             IOptions<SchedulingOptions> schedulerOptions,
-            RuntimeMessagingTrace messagingTrace)
+            RuntimeMessagingTrace messagingTrace,
+            IAsyncTimerFactory asyncTimerFactory)
         {
+            _activationWorkloadMonitor = new IncomingRequestMonitor(asyncTimerFactory, transport, messageFactory, messagingOptions);
             this.scheduler = scheduler;
             this.catalog = catalog;
             Transport = transport;
-            this.messagingOptions = messagingOptions.Value;
+            this.messagingOptions = messagingOptions.CurrentValue;
             this.invokeWorkItemLogger = loggerFactory.CreateLogger<InvokeWorkItem>();
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
@@ -120,6 +123,7 @@ namespace Orleans.Runtime
                     {
                         this.activationCollector.TryRescheduleCollection(target);
                     }
+
                     // Silo is always capable to accept a new request. It's up to the activation to handle its internal state.
                     // If activation is shutting down, it will queue and later forward this request.
                     ReceiveRequest(message, target);
@@ -265,6 +269,12 @@ namespace Orleans.Runtime
         {
             lock (targetActivation)
             {
+                // If the grain was previously inactive, schedule it for workload analysis
+                if (targetActivation.IsInactive)
+                {
+                    _activationWorkloadMonitor.MarkRecentlyUsed(targetActivation);
+                }
+
                 if (!ActivationMayAcceptRequest(targetActivation, message))
                 {
                     // Check for deadlock before Enqueueing.
