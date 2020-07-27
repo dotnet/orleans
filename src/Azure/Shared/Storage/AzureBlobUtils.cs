@@ -19,7 +19,7 @@ namespace Orleans.Streaming.AzureStorage
 
         internal static void ValidateContainerName(string containerName)
         {
-            if (containerName == null || containerName.Length < 3 || containerName.Length > 63 || !ContainerNameRegex.IsMatch(containerName))
+            if (string.IsNullOrWhiteSpace(containerName) || containerName.Length < 3 || containerName.Length > 63 || !ContainerNameRegex.IsMatch(containerName))
             {
                 throw new ArgumentException("Invalid container name", nameof(containerName));
             }
@@ -27,7 +27,7 @@ namespace Orleans.Streaming.AzureStorage
 
         internal static void ValidateBlobName(string blobName)
         {
-            if (blobName == null || blobName.Length < 1 || blobName.Length > 1024 || blobName.Count(c => c == '/') >= 254)
+            if (string.IsNullOrWhiteSpace(blobName) || blobName.Length > 1024 || blobName.Count(c => c == '/') >= 254)
             {
                 throw new ArgumentException("Invalid blob name", nameof(blobName));
             }
