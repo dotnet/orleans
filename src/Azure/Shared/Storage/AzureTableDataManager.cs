@@ -792,7 +792,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             try
             {
                 // use HttpPipeline since it supports TokenCredential from the new Azure SDK (ARM API still not available in the new SDK)
-                var pipeline = HttpPipelineBuilder.Build(new TableClientOptions(), new BearerTokenAuthenticationPolicy(options.TokenCredential, options.TokenCredentialManagementUri.ToString() + "/user_impersonation"));
+                var pipeline = HttpPipelineBuilder.Build(new TableClientOptions(), new BearerTokenAuthenticationPolicy(options.TokenCredential, options.TokenCredentialManagementUri.ToString() + "/.default"));
                 var message = pipeline.CreateMessage();
                 var request = message.Request;
                 request.Method = RequestMethod.Post;
