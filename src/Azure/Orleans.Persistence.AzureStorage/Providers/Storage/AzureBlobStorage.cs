@@ -184,13 +184,12 @@ namespace Orleans.Storage
             try
             {
                 using var stream = new MemoryStream(contents);
-                await DoOptimisticUpdate(() => blob.UploadAsync(stream,
-                        conditions: new BlobRequestConditions { IfMatch = new ETag(grainState.ETag) },
+                var result = await DoOptimisticUpdate(() => blob.UploadAsync(stream,
+                        conditions: new BlobRequestConditions { IfMatch = grainState.ETag != null ? new ETag(grainState.ETag) : (ETag?)null },
                         httpHeaders: new BlobHttpHeaders { ContentType = mimeType }),
                     blob, grainState.ETag).ConfigureAwait(false);
 
-                var properties = await blob.GetPropertiesAsync();
-                grainState.ETag = properties.Value.ETag.ToString();
+                grainState.ETag = result.Value.ETag.ToString();
                 grainState.RecordExists = true;
             }
             catch (RequestFailedException exception) when (exception.IsContainerNotFound())
@@ -203,11 +202,11 @@ namespace Orleans.Storage
             }
         }
 
-        private static async Task DoOptimisticUpdate(Func<Task> updateOperation, BlobClient blob, string currentETag)
+        private static async Task<TResult> DoOptimisticUpdate<TResult>(Func<Task<TResult>> updateOperation, BlobClient blob, string currentETag)
         {
             try
             {
-                await updateOperation.Invoke().ConfigureAwait(false);
+                return await updateOperation.Invoke().ConfigureAwait(false);
             }
             catch (RequestFailedException ex) when (ex.IsPreconditionFailed() || ex.IsConflict())
             {
