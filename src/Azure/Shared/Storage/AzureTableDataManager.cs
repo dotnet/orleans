@@ -54,9 +54,6 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// <summary> Logger for this table manager instance. </summary>
         protected internal ILogger Logger { get; }
 
-        /// <summary> Connection string for the Azure storage account used to host this table. </summary>
-        private readonly string connectionString;
-
         public AzureStoragePolicyOptions StoragePolicyOptions { get; }
 
         public CloudTable Table { get; private set; }
@@ -72,8 +69,6 @@ namespace Orleans.GrainDirectory.AzureStorage
         public AzureTableDataManager(AzureStorageOperationOptions options, ILogger logger)
         {
             this.options = options ?? throw new ArgumentNullException(nameof(options));
-
-            connectionString = options.ConnectionString ?? throw new ArgumentNullException(nameof(options.ConnectionString));
 
             Logger = logger ?? throw new ArgumentNullException(nameof(logger));
             TableName = options.TableName ?? throw new ArgumentNullException(nameof(options.TableName));
@@ -765,13 +760,9 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         private async ValueTask<CloudTableClient> GetCloudTableClientAsync()
         {
-            CloudStorageAccount storageAccount = AzureTableUtils.GetCloudStorageAccount(connectionString);
-
-            if (options.TokenCredential != null)
-            {
-                var key = await GetAccountKeyUsingAad();
-                storageAccount = new CloudStorageAccount(new StorageCredentials(storageAccount.Credentials.AccountName, key), storageAccount.TableEndpoint);
-            }
+            CloudStorageAccount storageAccount = options.TokenCredential != null
+                ? new CloudStorageAccount(new StorageCredentials(accountName: "ignored", await GetAccountKeyUsingAad()), options.TableEndpoint)
+                : AzureTableUtils.GetCloudStorageAccount(options.ConnectionString);
 
             CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
             return creationClient;

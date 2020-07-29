@@ -57,11 +57,15 @@ namespace Tester.TestStreamProviders
     {
         public static AzureStorageOperationOptions ConfigureTestDefaults(this AzureStorageOperationOptions options)
         {
-            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
+                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
                 options.TableResourceId = TestDefaultConfiguration.TableResourceId;
                 options.TokenCredential = new DefaultAzureCredential();
+            }
+            else
+            {
+                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             }
 
             return options;

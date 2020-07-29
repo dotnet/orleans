@@ -44,6 +44,11 @@ namespace Orleans.GrainDirectory.AzureStorage
         public TokenCredential TokenCredential { get; set; }
 
         /// <summary>
+        /// The table endpoint (e.g. https://x.table.cosmos.azure.com.) Required for specifying <see cref="TokenCredential"/>.
+        /// </summary>
+        public Uri TableEndpoint { get; set; }
+
+        /// <summary>
         /// If <see cref="TokenCredential"/> is used, determines, sets the ID of the table storage account
         /// (e.g. <c>/subscriptions/88e5ceb6-26bd-4bf5-8933-f4e05fd9efa6/resourceGroups/rg1/providers/Microsoft.DocumentDB/databaseAccounts/ac1</c>)
         /// </summary>
@@ -78,16 +83,21 @@ namespace Orleans.GrainDirectory.AzureStorage
 
         public virtual void ValidateConfiguration()
         {
-            if (!CloudStorageAccount.TryParse(Options.ConnectionString, out _))
-                throw GetException($"{nameof(Options.ConnectionString)} is not valid.");
-
             if (Options.TokenCredential != null)
             {
+                if (Options.TableEndpoint == null)
+                    throw GetException($"{nameof(Options.TableEndpoint)} is required.");
+
                 if (string.IsNullOrEmpty(Options.TableResourceId))
                     throw GetException($"{nameof(Options.TableResourceId)} is required.");
 
                 if (Options.TokenCredentialManagementUri == null)
                     throw GetException($"{nameof(Options.TokenCredentialManagementUri)} is required.");
+            }
+            else
+            {
+                if (!CloudStorageAccount.TryParse(Options.ConnectionString, out _))
+                    throw GetException($"{nameof(Options.ConnectionString)} is not valid.");
             }
 
             try

@@ -7,11 +7,15 @@ namespace Tester.AzureUtils
     {
         public static Orleans.Clustering.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.Clustering.AzureStorage.AzureStorageOperationOptions options)
         {
-            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
+                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
                 options.TableResourceId = TestDefaultConfiguration.TableResourceId;
                 options.TokenCredential = new DefaultAzureCredential();
+            }
+            else
+            {
+                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             }
 
             return options;
@@ -19,11 +23,15 @@ namespace Tester.AzureUtils
 
         public static Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions options)
         {
-            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
+                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
                 options.TableResourceId = TestDefaultConfiguration.TableResourceId;
                 options.TokenCredential = new DefaultAzureCredential();
+            }
+            else
+            {
+                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             }
 
             return options;
@@ -31,11 +39,15 @@ namespace Tester.AzureUtils
 
         public static Orleans.Persistence.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.Persistence.AzureStorage.AzureStorageOperationOptions options)
         {
-            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
+                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
                 options.TableResourceId = TestDefaultConfiguration.TableResourceId;
                 options.TokenCredential = new DefaultAzureCredential();
+            }
+            else
+            {
+                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             }
 
             return options;
@@ -43,11 +55,15 @@ namespace Tester.AzureUtils
 
         public static Orleans.Reminders.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.Reminders.AzureStorage.AzureStorageOperationOptions options)
         {
-            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
+                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
                 options.TableResourceId = TestDefaultConfiguration.TableResourceId;
                 options.TokenCredential = new DefaultAzureCredential();
+            }
+            else
+            {
+                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             }
 
             return options;
