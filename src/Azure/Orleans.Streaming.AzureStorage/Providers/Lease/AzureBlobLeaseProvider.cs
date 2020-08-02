@@ -38,6 +38,8 @@ namespace Orleans.LeaseProviders
             }
         }
 
+        private BlobClient GetBlobClient(string category, string resourceKey) => this.container.GetBlobClient($"{category.ToLower()}-{resourceKey.ToLower()}.json");
+
         public async Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
         {
             await InitContainerIfNotExistsAsync();
@@ -50,19 +52,14 @@ namespace Orleans.LeaseProviders
             return await Task.WhenAll(tasks);
         }
 
-        private string GetBlobName(string category, string resourceKey)
-        {
-            return $"{category.ToLower()}-{resourceKey.ToLower()}.json";
-        }
-
         private async Task<AcquireLeaseResult> Acquire(string category, LeaseRequest leaseRequest)
         {
             try
             {
-                var blob = this.container.GetBlobClient(GetBlobName(category, leaseRequest.ResourceKey));
+                var blobClient = GetBlobClient(category, leaseRequest.ResourceKey);
                 //create this blob
-                await blob.UploadAsync(new MemoryStream(Encoding.UTF8.GetBytes("blob")), new BlobHttpHeaders { ContentType = "application/json" });
-                var leaseClient = blob.GetBlobLeaseClient();
+                await blobClient.UploadAsync(new MemoryStream(Encoding.UTF8.GetBytes("blob")), new BlobHttpHeaders { ContentType = "application/json" });
+                var leaseClient = blobClient.GetBlobLeaseClient();
                 var lease = await leaseClient.AcquireAsync(leaseRequest.Duration);
                 return new AcquireLeaseResult(new AcquiredLease(leaseRequest.ResourceKey, leaseRequest.Duration, lease.Value.LeaseId, DateTime.UtcNow), ResponseCode.OK, null);
             }
@@ -88,14 +85,14 @@ namespace Orleans.LeaseProviders
             var tasks = new List<Task>(acquiredLeases.Length);
             foreach (var acquiredLease in acquiredLeases)
             {
-                tasks.Add(Release(acquiredLease));
+                tasks.Add(Release(category, acquiredLease));
             }
             await Task.WhenAll(tasks);
         }
 
-        private Task Release(AcquiredLease acquiredLease)
+        private Task Release(string category, AcquiredLease acquiredLease)
         {
-            var leaseClient = this.container.GetBlobLeaseClient(acquiredLease.Token);
+            var leaseClient = GetBlobClient(category, acquiredLease.ResourceKey).GetBlobLeaseClient(acquiredLease.Token);
             return leaseClient.ReleaseAsync();
         }
 
@@ -105,15 +102,15 @@ namespace Orleans.LeaseProviders
             var tasks = new List<Task<AcquireLeaseResult>>(acquiredLeases.Length);
             foreach (var acquiredLease in acquiredLeases)
             {
-                tasks.Add(Renew(acquiredLease));
+                tasks.Add(Renew(category, acquiredLease));
             }
             //Task.WhenAll will return results for each task in an array, in the same order of supplied tasks
             return await Task.WhenAll(tasks);
         }
 
-        private async Task<AcquireLeaseResult> Renew(AcquiredLease acquiredLease)
+        private async Task<AcquireLeaseResult> Renew(string category, AcquiredLease acquiredLease)
         {
-            var leaseClient = this.container.GetBlobLeaseClient(acquiredLease.Token);
+            var leaseClient = GetBlobClient(category, acquiredLease.ResourceKey).GetBlobLeaseClient(acquiredLease.Token);
 
             try
             {
