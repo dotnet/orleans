@@ -22,17 +22,4 @@
     </Otherwise>
   </Choose>
 
-  <Choose>
-    <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansServiceFabricVersion)">
-      <ItemGroup>
-        <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="$(OrleansProvidersVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
 </Project>
