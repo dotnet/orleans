@@ -11,33 +11,33 @@ namespace Orleans.Streams.Core
     {
         private readonly string type;
         private readonly IStreamPubSub streamPubSub;
+
         public StreamSubscriptionManager(IStreamPubSub streamPubSub, string managerType)
         {
             this.streamPubSub = streamPubSub;
             this.type = managerType;
         }
 
-        public async Task<StreamSubscription> AddSubscription(string streamProviderName, IStreamIdentity streamIdentity, GrainReference grainRef)
+        public async Task<StreamSubscription> AddSubscription(string streamProviderName, StreamId streamId, GrainReference grainRef)
         {
             var consumer = grainRef.AsReference<IStreamConsumerExtension>();
-            var streamId = new InternalStreamId(streamProviderName, StreamId.Create(streamIdentity));
-            var subscriptionId = streamPubSub.CreateSubscriptionId(
-                streamId, consumer);
-            await streamPubSub.RegisterConsumer(subscriptionId, streamId, consumer, null);
-            var newSub = new StreamSubscription(subscriptionId.Guid, streamProviderName, streamId.StreamId, grainRef.GrainId);
+            var internalStreamId = new InternalStreamId(streamProviderName, streamId);
+            var subscriptionId = streamPubSub.CreateSubscriptionId(internalStreamId, consumer);
+            await streamPubSub.RegisterConsumer(subscriptionId, internalStreamId, consumer, null);
+            var newSub = new StreamSubscription(subscriptionId.Guid, streamProviderName, streamId, grainRef.GrainId);
             return newSub;
         }
 
-        public async Task RemoveSubscription(string streamProviderName, IStreamIdentity streamIdentity, Guid subscriptionId)
+        public async Task RemoveSubscription(string streamProviderName, StreamId streamId, Guid subscriptionId)
         {
-            var streamId = new InternalStreamId(streamProviderName, StreamId.Create(streamIdentity));
-            await streamPubSub.UnregisterConsumer(GuidId.GetGuidId(subscriptionId), streamId);
+            var internalStreamId = new InternalStreamId(streamProviderName, streamId);
+            await streamPubSub.UnregisterConsumer(GuidId.GetGuidId(subscriptionId), internalStreamId);
         }
 
-        public Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, IStreamIdentity streamIdentity)
+        public Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, StreamId streamId)
         {
-            var streamId = new InternalStreamId(streamProviderName, StreamId.Create(streamIdentity));
-            return streamPubSub.GetAllSubscriptions(streamId).ContinueWith(subs => subs.Result.AsEnumerable());
+            var internalStreamId = new InternalStreamId(streamProviderName, streamId);
+            return streamPubSub.GetAllSubscriptions(internalStreamId).ContinueWith(subs => subs.Result.AsEnumerable());
         }
     }
 

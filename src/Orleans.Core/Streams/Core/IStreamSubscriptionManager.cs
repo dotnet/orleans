@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,8 +9,8 @@ namespace Orleans.Streams.Core
 {
     public interface IStreamSubscriptionManager
     {
-        Task<StreamSubscription> AddSubscription(string streamProviderName, IStreamIdentity streamId, GrainReference grainRef);
-        Task RemoveSubscription(string streamProviderName, IStreamIdentity streamId, Guid subscriptionId);
-        Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, IStreamIdentity StreamId);
+        Task<StreamSubscription> AddSubscription(string streamProviderName, StreamId streamId, GrainReference grainRef);
+        Task RemoveSubscription(string streamProviderName, StreamId streamId, Guid subscriptionId);
+        Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, StreamId streamId);
     }
 }
