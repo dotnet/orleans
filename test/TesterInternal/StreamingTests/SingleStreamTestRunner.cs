@@ -455,7 +455,7 @@ namespace UnitTests.StreamingTests
         public async Task StopProxies()
         {
             await producer.StopBeingProducer();
-            await AssertProducerCount(0, producer.ProviderName, producer.StreamId);
+            await AssertProducerCount(0, producer.ProviderName, producer.StreamIdGuid);
             await consumer.StopBeingConsumer();
         }
 
@@ -491,9 +491,9 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private Task ValidatePubSub(Guid streamId, string providerName)
+        private Task ValidatePubSub(StreamId streamId, string providerName)
         {
-            var rendez = this.client.GetGrain<IPubSubRendezvousGrain>(streamId, providerName, null);
+            var rendez = this.client.GetGrain<IPubSubRendezvousGrain>(streamId.GetHashCode());
             return rendez.Validate();
         }
 

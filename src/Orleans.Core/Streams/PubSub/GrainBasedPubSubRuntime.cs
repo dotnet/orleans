@@ -10,6 +10,8 @@ namespace Orleans.Streams
     {
         private readonly IGrainFactory grainFactory;
 
+        private const int MaxNumberOfGrains = 100; // TODO: make this configurable?
+
         public GrainBasedPubSubRuntime(IGrainFactory grainFactory)
         {
             this.grainFactory = grainFactory;
@@ -59,9 +61,7 @@ namespace Orleans.Streams
 
         private IPubSubRendezvousGrain GetRendezvousGrain(InternalStreamId streamId)
         {
-            return grainFactory.GetGrain<IPubSubRendezvousGrain>(
-                primaryKey: streamId.GetGuid(),
-                keyExtension: streamId.ProviderName + "_" + streamId.GetNamespace());
+            return grainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.GetHashCode() % MaxNumberOfGrains);
         }
 
         public GuidId CreateSubscriptionId(InternalStreamId streamId, IStreamConsumerExtension streamConsumer)

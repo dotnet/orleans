@@ -69,14 +69,15 @@ namespace UnitTests.Grains
 
         public virtual async Task TestBecomeConsumerSlim(Guid streamIdGuid, string providerName)
         {
-            InitStream(StreamId.Create(null, streamIdGuid), providerName);
+            // TODO NOT SURE THIS FUNCTION MAKESE ANY SENSE
+            var streamId = StreamId.Create(null, streamIdGuid);
+            InitStream(streamId, providerName);
             var observer = new MyStreamObserver<int>(logger);
 
             var (myExtension, myExtensionReference) = this.streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
                 () => new StreamConsumerExtension(streamProviderRuntime));
 
-            string extKey = providerName + "_" + ((StreamImpl<int>)State.Stream).InternalStreamId.GetNamespace();
-            IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamIdGuid, extKey, null);
+            IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.GetHashCode());
             GuidId subscriptionId = GuidId.GetNewGuidId();
             await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).InternalStreamId, myExtensionReference, null);
 
