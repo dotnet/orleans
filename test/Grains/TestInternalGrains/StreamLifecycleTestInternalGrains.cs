@@ -69,7 +69,7 @@ namespace UnitTests.Grains
 
         public virtual async Task TestBecomeConsumerSlim(Guid streamIdGuid, string providerName)
         {
-            InitStream(streamIdGuid, null, providerName);
+            InitStream(StreamId.Create(null, streamIdGuid), providerName);
             var observer = new MyStreamObserver<int>(logger);
 
             var (myExtension, myExtensionReference) = this.streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(

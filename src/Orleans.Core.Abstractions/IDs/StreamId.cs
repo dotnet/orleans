@@ -78,8 +78,6 @@ namespace Orleans.Runtime
             info.AddValue("fh", this.hash);
         }
 
-
-
         public override string ToString()
         {
             var sb = new StringBuilder();
