@@ -29,9 +29,4 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Orleans.Transactions\Orleans.Transactions.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Storage\" />
-    <Folder Include="Utilities\" />
-  </ItemGroup>
 </Project>

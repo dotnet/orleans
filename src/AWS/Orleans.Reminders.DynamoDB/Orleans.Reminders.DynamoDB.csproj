@@ -22,8 +22,4 @@
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="$(AWSSDKDynamoDBv2Version)" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Storage" />
-  </ItemGroup>
-
 </Project>
