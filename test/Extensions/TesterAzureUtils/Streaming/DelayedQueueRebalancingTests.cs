@@ -57,7 +57,7 @@ namespace Tester.AzureUtils.Streaming
                     {
                         b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }));
                         b.UseDynamicClusterConfigDeploymentBalancer(SILO_IMMATURE_PERIOD);
@@ -77,7 +77,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                    TestDefaultConfiguration.DataConnectionString);
+                    new AzureQueueOptions().ConfigureTestDefaults());
             }
         }
 

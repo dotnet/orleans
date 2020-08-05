@@ -10,7 +10,6 @@ using System.Linq;
 using UnitTests.TimerTests;
 using Orleans.Hosting;
 using Orleans.Internal;
-using TestExtensions;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -34,7 +33,7 @@ namespace Tester.AzureUtils.TimerTests
             {
                 hostBuilder.UseAzureTableReminderService(options =>
                 {
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.ConfigureTestDefaults();
                 });
             }
         }

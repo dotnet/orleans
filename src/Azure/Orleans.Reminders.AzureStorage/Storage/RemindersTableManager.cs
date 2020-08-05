@@ -87,7 +87,7 @@ namespace Orleans.Runtime.ReminderService
 
         public static async Task<RemindersTableManager> GetManager(string serviceId, string clusterId, ILoggerFactory loggerFactory, AzureStorageOperationOptions options)
         {
-            var singleton = new RemindersTableManager(serviceId, clusterId, options.ConnectionString, options.TableName, loggerFactory, options.StoragePolicyOptions);
+            var singleton = new RemindersTableManager(serviceId, clusterId, options, loggerFactory);
             try
             {
                 singleton.Logger.Info("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
@@ -105,11 +105,9 @@ namespace Orleans.Runtime.ReminderService
         private RemindersTableManager(
             string serviceId,
             string clusterId,
-            string storageConnectionString,
-            string tableName,
-            ILoggerFactory loggerFactory,
-            AzureStoragePolicyOptions storagePolicyOptions)
-            : base(tableName, storageConnectionString, loggerFactory.CreateLogger<RemindersTableManager>(), storagePolicyOptions)
+            AzureStorageOperationOptions options,
+            ILoggerFactory loggerFactory)
+            : base(options, loggerFactory.CreateLogger<RemindersTableManager>())
         {
             ClusterId = clusterId;
             ServiceId = serviceId;

@@ -31,28 +31,40 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <param name="storageConnectionString"></param>
         /// <param name="createEntity"></param>
         public AzureTableStorageStreamFailureHandler(SerializationManager serializationManager, ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, string tableName, string storageConnectionString, Func<TEntity> createEntity = null)
+            : this (serializationManager, loggerFactory, faultOnFailure, clusterId, new AzureStorageOperationOptions { TableName = tableName, ConnectionString = storageConnectionString }, createEntity)
+        {
+        }
+
+        /// <summary>
+        /// Delivery failure handler that writes failures to azure table storage.
+        /// </summary>
+        /// <param name="serializationManager"></param>
+        /// <param name="loggerFactory">logger factory to use</param>
+        /// <param name="faultOnFailure"></param>
+        /// <param name="clusterId"></param>
+        /// <param name="azureStorageOptions"></param>
+        /// <param name="createEntity"></param>
+        public AzureTableStorageStreamFailureHandler(SerializationManager serializationManager, ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, AzureStorageOperationOptions azureStorageOptions, Func<TEntity> createEntity = null)
         {
             if (string.IsNullOrEmpty(clusterId))
             {
                 throw new ArgumentNullException(nameof(clusterId));
             }
-            if (string.IsNullOrEmpty(tableName))
+            if (string.IsNullOrEmpty(azureStorageOptions.TableName))
             {
-                throw new ArgumentNullException("tableName");
+                throw new ArgumentNullException(nameof(azureStorageOptions.TableName));
             }
-            if (string.IsNullOrEmpty(storageConnectionString))
+            if (string.IsNullOrEmpty(azureStorageOptions.ConnectionString))
             {
-                throw new ArgumentNullException("storageConnectionString");
+                throw new ArgumentNullException(nameof(azureStorageOptions.ConnectionString));
             }
             this.serializationManager = serializationManager;
             this.clusterId = clusterId;
             ShouldFaultSubsriptionOnError = faultOnFailure;
             this.createEntity = createEntity ?? DefaultCreateEntity;
             dataManager = new AzureTableDataManager<TEntity>(
-                tableName,
-                storageConnectionString,
-                loggerFactory.CreateLogger<AzureTableDataManager<TEntity>>(),
-                new AzureStoragePolicyOptions());
+                azureStorageOptions,
+                loggerFactory.CreateLogger<AzureTableDataManager<TEntity>>());
         }
 
         /// <summary>

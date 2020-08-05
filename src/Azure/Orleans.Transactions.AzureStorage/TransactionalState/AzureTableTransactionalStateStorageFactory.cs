@@ -59,10 +59,8 @@ namespace Orleans.Transactions.AzureStorage
         private async Task CreateTable()
         {
             var tableManager = new AzureTableDataManager<TableEntity>(
-                this.options.TableName,
-                this.options.ConnectionString,
-                this.loggerFactory.CreateLogger<AzureTableDataManager<TableEntity>>(),
-                this.options.StoragePolicyOptions);
+                this.options,
+                this.loggerFactory.CreateLogger<AzureTableDataManager<TableEntity>>());
             await tableManager.InitTableAsync();
             this.table = tableManager.Table;
         }

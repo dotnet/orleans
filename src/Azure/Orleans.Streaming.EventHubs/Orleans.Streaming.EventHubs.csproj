@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.OrleansServiceBus</PackageId>
     <Title>Microsoft Orleans EventHubs Provider</Title>
@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Core" Version="$(AzureCoreVersion)" />
     <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="$(MicrosoftAzureCosmosTableVersion)" />
     <PackageReference Include="Microsoft.Azure.EventHubs" Version="$(MicrosoftAzureEventHubsVersion)" />
   </ItemGroup>
