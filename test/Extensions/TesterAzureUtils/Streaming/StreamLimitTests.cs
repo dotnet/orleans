@@ -569,7 +569,7 @@ namespace UnitTests.StreamingTests
                 StreamId streamId = streamIds[i];
                 string extKey = streamProviderName + "_" + this.StreamNamespace;
 
-                IPubSubRendezvousGrain pubsub = this.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.GetHashCode());
+                IPubSubRendezvousGrain pubsub = this.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
 
                 Task promise = pubsub.Validate();
 

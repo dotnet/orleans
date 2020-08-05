@@ -61,7 +61,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public static StreamId Create(string ns, Guid key) => Create(ns != null ? Encoding.UTF8.GetBytes(ns) : null, key.ToByteArray());
+        public static StreamId Create(string ns, Guid key) => Create(ns, key.ToString("N"));
 
         public static StreamId Create(string ns, string key) => Create(ns != null ? Encoding.UTF8.GetBytes(ns) : null, Encoding.UTF8.GetBytes(key));
 
@@ -81,15 +81,13 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             var sb = new StringBuilder();
-            sb.Append("[NS: ");
 
             if (!Namespace.IsEmpty)
                 sb.Append(Encoding.UTF8.GetString(Namespace.ToArray()));
             else
                 sb.Append("null");
 
-            // TODO BPETIT REMOVE
-            sb.Append($", KEY: {new Guid(Key.ToArray())}]");
+            sb.Append($"/{Encoding.UTF8.GetString(Key.ToArray())}");
 
             return sb.ToString();
         }
@@ -129,12 +127,19 @@ namespace Orleans.Runtime
             info.AddValue("pvn", ProviderName);
             info.AddValue("sid", StreamId, typeof(StreamId));
         }
+
+        public override int GetHashCode() => HashCode.Combine(ProviderName, StreamId);
+
+        public override string ToString()
+        {
+            return $"{ProviderName}/{StreamId.ToString()}";
+        }
     }
 
     // TODO bpetit remove
     public static class StreamIdExtensions
     {
-        public static Guid GetGuid(this StreamId streamId) => new Guid(streamId.Key.ToArray());
+        public static Guid GetGuid(this StreamId streamId) => Guid.Parse(Encoding.UTF8.GetString(streamId.Key.ToArray()));
 
         public static string GetNamespace(this StreamId streamId)
         {
@@ -144,7 +149,7 @@ namespace Orleans.Runtime
             return Encoding.UTF8.GetString(streamId.Namespace.ToArray());
         }
 
-        internal static Guid GetGuid(this InternalStreamId internalStreamId) => new Guid(internalStreamId.StreamId.Key.ToArray());
+        internal static Guid GetGuid(this InternalStreamId internalStreamId) => ((StreamId)internalStreamId).GetGuid();
 
         internal static string GetNamespace(this InternalStreamId internalStreamId) => internalStreamId.StreamId.GetNamespace();
     }

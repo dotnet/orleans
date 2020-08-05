@@ -1,12 +1,14 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.Streaming;
@@ -34,6 +36,7 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
+                    .ConfigureLogging(builder => builder.AddFilter(typeof(PubSubRendezvousGrain).FullName, LogLevel.Debug))
                     .AddSimpleMessageStreamProvider(SmsStreamProviderName)
                     .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>
                     b.ConfigureAzureQueue(ob=>ob.Configure<IOptions<ClusterOptions>>(
