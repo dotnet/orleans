@@ -76,8 +76,9 @@ namespace Orleans.ServiceBus.Providers
 
         public virtual StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            Guid streamGuid =
-            Guid.Parse(queueMessage.SystemProperties.PartitionKey);
+            string partitionKey = queueMessage.SystemProperties.PartitionKey;
+            string streamGuidFromPartitionKey = partitionKey.Substring(0, 36);
+            Guid streamGuid = Guid.Parse(streamGuidFromPartitionKey);
             string streamNamespace = queueMessage.GetStreamNamespaceProperty();
             IStreamIdentity stremIdentity = new StreamIdentity(streamGuid, streamNamespace);
             StreamSequenceToken token =
