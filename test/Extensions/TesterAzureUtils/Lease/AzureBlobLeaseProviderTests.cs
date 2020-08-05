@@ -20,9 +20,8 @@ namespace Tester.AzureUtils.Lease
             TestUtils.CheckForAzureStorage();
             return new AzureBlobLeaseProvider(Options.Create(new AzureBlobLeaseProviderOptions()
             {
-                DataConnectionString = TestDefaultConfiguration.DataConnectionString,
                 BlobContainerName = "test-blob-container-name"
-            }));
+            }.ConfigureTestDefaults()));
         }
     }
 }

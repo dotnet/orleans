@@ -35,7 +35,7 @@ namespace Tester.AzureUtils.General
                     hostBuilder
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                         }));
                 }
             }
@@ -84,7 +84,7 @@ namespace Tester.AzureUtils.General
                 {
                     hostBuilder.AddAzureBlobGrainStorage("AzureStore", (AzureBlobStorageOptions options) =>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConfigureTestDefaults();
                     });
                 }
             }

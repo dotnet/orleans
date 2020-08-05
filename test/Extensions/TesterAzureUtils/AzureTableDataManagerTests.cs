@@ -27,7 +27,7 @@ namespace Tester.AzureUtils
         {
             TestingUtils.ConfigureThreadPoolSettingsForStorageTests();
             // Pre-create table, if required
-            manager = new UnitTestAzureTableDataManager(TestDefaultConfiguration.DataConnectionString, NullLoggerFactory.Instance);
+            manager = new UnitTestAzureTableDataManager();
             PartitionKey = "PK-AzureTableDataManagerTests-" + Guid.NewGuid();
         }
 

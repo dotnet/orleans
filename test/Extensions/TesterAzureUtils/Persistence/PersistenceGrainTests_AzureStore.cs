@@ -14,7 +14,6 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Providers;
-using Orleans.Persistence.AzureStorage;
 using Orleans.Internal;
 using TestExtensions;
 using TestExtensions.Runners;
@@ -47,7 +46,7 @@ namespace Tester.AzureUtils.Persistence
             {
                 hostBuilder.UseAzureStorageClustering(options =>
                 {
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.ConfigureTestDefaults();
                 });
             }
         }
@@ -56,7 +55,7 @@ namespace Tester.AzureUtils.Persistence
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseAzureStorageClustering(gatewayOptions => { gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
+                clientBuilder.UseAzureStorageClustering(gatewayOptions => { gatewayOptions.ConfigureTestDefaults(); });
             }
         }
 

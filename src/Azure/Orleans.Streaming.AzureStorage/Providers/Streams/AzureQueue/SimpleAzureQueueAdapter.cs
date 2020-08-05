@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Azure.Storage.Queue;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -12,8 +12,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 {
     internal class SimpleAzureQueueAdapter : IQueueAdapter
     {
-        protected readonly string DataConnectionString;
-        protected readonly string QueueName;
+        private readonly SimpleAzureQueueStreamOptions options;
         protected AzureQueueDataManager Queue;
         private readonly ILoggerFactory loggerFactory;
         public string Name { get; private set; }
@@ -21,14 +20,11 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public StreamProviderDirection Direction { get { return StreamProviderDirection.WriteOnly; } }
 
-        public SimpleAzureQueueAdapter(ILoggerFactory loggerFactory, string dataConnectionString, string providerName, string queueName)
+        public SimpleAzureQueueAdapter(ILoggerFactory loggerFactory, SimpleAzureQueueStreamOptions options, string providerName)
         {
-            if (String.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException("dataConnectionString");
-            if (String.IsNullOrEmpty(queueName)) throw new ArgumentNullException("queueName");
+            this.options = options ?? throw new ArgumentNullException(nameof(options));
             this.loggerFactory = loggerFactory;
-            DataConnectionString = dataConnectionString;
             Name = providerName;
-            QueueName = queueName;
         }
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
@@ -42,12 +38,6 @@ namespace Orleans.Providers.Streams.AzureQueue
             {
                 throw new ArgumentNullException("events", "Trying to QueueMessageBatchAsync null data.");
             }
-            //int count = events.Count();
-            //if (count != 1)
-            //{
-            //    throw new OrleansException("Trying to QueueMessageBatchAsync a batch of more than one event. " +
-            //                               "SimpleAzureQueueAdapter does not support batching. Instead, you can batch in your application code.");
-            //}
 
             object data = events.First();
             bool isBytes = data is byte[];
@@ -62,28 +52,25 @@ namespace Orleans.Providers.Streams.AzureQueue
 
             if (Queue == null)
             {
-                var tmpQueue = new AzureQueueDataManager(this.loggerFactory, QueueName, DataConnectionString);
+                var tmpQueue = new AzureQueueDataManager(this.loggerFactory, options.QueueName,
+                    new AzureQueueOptions { ConnectionString = options.ConnectionString, ServiceUri = options.ServiceUri, TokenCredential = options.TokenCredential });
                 await tmpQueue.InitQueueAsync();
                 if (Queue == null)
                 {
                     Queue = tmpQueue;
                 }
             }
-            CloudQueueMessage cloudMsg = null;
+
+            string cloudMsg = null;
             if (isBytes)
             {
-                //new CloudQueueMessage(byte[]) not supported in netstandard
-                cloudMsg = new CloudQueueMessage(null as string);
-                cloudMsg.SetMessageContent2(data as byte[]);
+                cloudMsg = Convert.ToBase64String(data as byte[]);
             }
             else if (isString)
             {
-                cloudMsg = new CloudQueueMessage(data as string);
-            }else if (data == null)
-            {
-                // It's OK to pass null data. why should I care?
-                cloudMsg = new CloudQueueMessage(null as string);
+                cloudMsg = data as string;
             }
+
             await Queue.AddQueueMessage(cloudMsg);
         }
     }
