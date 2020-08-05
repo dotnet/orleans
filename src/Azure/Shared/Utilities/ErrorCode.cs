@@ -46,6 +46,7 @@ namespace Orleans.GrainDirectory.AzureStorage.Utilities
         AzureTable_15 = AzureTableBase + 15,
         AzureTable_17 = AzureTableBase + 17,
         AzureTable_18 = AzureTableBase + 18,
+        AzureTable_19 = AzureTableBase + 19,
         AzureTable_37 = AzureTableBase + 37,
         // Azure storage provider related
         AzureTable_DataNotFound = AzureTableBase + 50,

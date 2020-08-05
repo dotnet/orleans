@@ -1,4 +1,5 @@
 using System;
+using Azure.Core;
 using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
@@ -10,6 +11,17 @@ namespace Orleans.Configuration
     {
         [RedactConnectionString]
         public string DataConnectionString { get; set; }
+
+        /// <summary>
+        /// The Service URI (e.g. https://x.blob.core.windows.net). Required for specifying <see cref="TokenCredential"/>.
+        /// </summary>
+        public Uri ServiceUri { get; set; }
+
+        /// <summary>
+        /// Use AAD to access the storage account
+        /// </summary>
+        public TokenCredential TokenCredential { get; set; }
+
         public string BlobContainerName { get; set; } = DefaultBlobContainerName;
         public const string DefaultBlobContainerName = "Leases";
     }
@@ -61,13 +73,23 @@ namespace Orleans.Configuration
             {
                 throw new OrleansConfigurationException($"Named option {nameof(AzureBlobLeaseProviderOptions)} of name {this.name} is invalid.  Name cannot be empty or whitespace.");
             }
-            if (!CloudStorageAccount.TryParse(this.options.DataConnectionString, out _))
+
+            if (this.options.ServiceUri == null)
             {
-                var errorStr = string.IsNullOrEmpty(this.name)
-                    ? $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} is invalid. {nameof(this.options.DataConnectionString)} is not valid."
-                    : $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} {this.name} is invalid. {nameof(this.options.DataConnectionString)} is not valid.";
-                throw new OrleansConfigurationException(errorStr);
+                if (this.options.TokenCredential != null)
+                {
+                    throw new OrleansConfigurationException($"Configuration for {nameof(AzureBlobLeaseProviderOptions)} of name {name} is invalid. {nameof(options.ServiceUri)} is required for {nameof(options.TokenCredential)}");
+                }
+
+                if (!CloudStorageAccount.TryParse(this.options.DataConnectionString, out _))
+                {
+                    var errorStr = string.IsNullOrEmpty(this.name)
+                        ? $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} is invalid. {nameof(this.options.DataConnectionString)} is not valid."
+                        : $"Configuration for {nameof(AzureBlobLeaseProviderOptions)} {this.name} is invalid. {nameof(this.options.DataConnectionString)} is not valid.";
+                    throw new OrleansConfigurationException(errorStr);
+                }
             }
+
             try
             {
                 AzureBlobUtils.ValidateContainerName(this.options.BlobContainerName);

@@ -1,5 +1,5 @@
 using System;
-using Microsoft.Azure.Storage;
+using Microsoft.Azure.Cosmos.Table;
 using TestExtensions;
 using Xunit;
 

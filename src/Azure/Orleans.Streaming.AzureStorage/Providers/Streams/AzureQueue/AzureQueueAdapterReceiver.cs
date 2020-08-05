@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Azure.Storage.Queue;
+using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
 using Orleans.AzureUtils.Utilities;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -22,23 +23,23 @@ namespace Orleans.Providers.Streams.AzureQueue
         private long lastReadMessage;
         private Task outstandingTask;
         private readonly ILogger logger;
-        private readonly IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter;
+        private readonly IQueueDataAdapter<string, IBatchContainer> dataAdapter;
         private readonly List<PendingDelivery> pending;
 
         private readonly string azureQueueName;
 
-        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, string azureQueueName, string dataConnectionString, IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter, TimeSpan? messageVisibilityTimeout = null)
+        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, string azureQueueName, AzureQueueOptions queueOptions, IQueueDataAdapter<string, IBatchContainer> dataAdapter)
         {
             if (azureQueueName == null) throw new ArgumentNullException(nameof(azureQueueName));
-            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
+            if (queueOptions == null) throw new ArgumentNullException(nameof(queueOptions));
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
             if (serializationManager == null) throw new ArgumentNullException(nameof(serializationManager));
 
-            var queue = new AzureQueueDataManager(loggerFactory, azureQueueName, dataConnectionString, messageVisibilityTimeout);
+            var queue = new AzureQueueDataManager(loggerFactory, azureQueueName, queueOptions);
             return new AzureQueueAdapterReceiver(serializationManager, azureQueueName, loggerFactory, queue, dataAdapter);
         }
 
-        private AzureQueueAdapterReceiver(SerializationManager serializationManager, string azureQueueName, ILoggerFactory loggerFactory, AzureQueueDataManager queue, IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter)
+        private AzureQueueAdapterReceiver(SerializationManager serializationManager, string azureQueueName, ILoggerFactory loggerFactory, AzureQueueDataManager queue, IQueueDataAdapter<string, IBatchContainer> dataAdapter)
         {
             this.azureQueueName = azureQueueName ?? throw new ArgumentNullException(nameof(azureQueueName));
             this.serializationManager = serializationManager;
@@ -74,22 +75,24 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
+            const int MaxNumberOfMessagesToPeek = 32;
+
             try
             {
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (queueRef == null) return new List<IBatchContainer>();
 
                 int count = maxCount < 0 || maxCount == QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG ?
-                    CloudQueueMessage.MaxNumberOfMessagesToPeek : Math.Min(maxCount, CloudQueueMessage.MaxNumberOfMessagesToPeek);
+                    MaxNumberOfMessagesToPeek : Math.Min(maxCount, MaxNumberOfMessagesToPeek) ;
 
                 var task = queueRef.GetQueueMessages(count);
                 outstandingTask = task;
-                IEnumerable<CloudQueueMessage> messages = await task;
+                IEnumerable<QueueMessage> messages = await task;
 
                 List<IBatchContainer> azureQueueMessages = new List<IBatchContainer>();
                 foreach (var message in messages)
                 {
-                    IBatchContainer container = this.dataAdapter.FromQueueMessage(message, lastReadMessage++);
+                    IBatchContainer container = this.dataAdapter.FromQueueMessage(message.MessageText, lastReadMessage++);
                     azureQueueMessages.Add(container);
                     this.pending.Add(new PendingDelivery(container.SequenceToken, message));
                 }
@@ -120,7 +123,7 @@ namespace Orleans.Providers.Streams.AzureQueue
                 // remove all finalized deliveries from pending, regardless of if it was delivered or not.
                 pending.RemoveRange(0, finalizedDeliveries.Count);
                 // get the queue messages for all finalized deliveries that were delivered.
-                List<CloudQueueMessage> deliveredCloudQueueMessages = finalizedDeliveries
+                List<QueueMessage> deliveredCloudQueueMessages = finalizedDeliveries
                     .Where(finalized => deliveredTokens.Contains(finalized.Token))
                     .Select(finalized => finalized.Message)
                     .ToList();
@@ -145,13 +148,13 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         private class PendingDelivery
         {
-            public PendingDelivery(StreamSequenceToken token, CloudQueueMessage message)
+            public PendingDelivery(StreamSequenceToken token, QueueMessage message)
             {
                 this.Token = token;
                 this.Message = message;
             }
 
-            public CloudQueueMessage Message { get; }
+            public QueueMessage Message { get; }
 
             public StreamSequenceToken Token { get; }
         }

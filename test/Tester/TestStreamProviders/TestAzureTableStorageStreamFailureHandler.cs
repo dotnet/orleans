@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Identity;
 using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -32,10 +33,8 @@ namespace Tester.TestStreamProviders
         public static async Task<int> GetDeliveryFailureCount(string streamProviderName, ILoggerFactory loggerFactory)
         {
             var dataManager = new AzureTableDataManager<TableEntity>(
-                TableName,
-                TestDefaultConfiguration.DataConnectionString,
-                loggerFactory.CreateLogger<AzureTableDataManager<TableEntity>>(),
-                new AzureStoragePolicyOptions());
+                new AzureStorageOperationOptions { TableName = TableName }.ConfigureTestDefaults(),
+                loggerFactory.CreateLogger<AzureTableDataManager<TableEntity>>());
             await dataManager.InitTableAsync();
             IEnumerable<Tuple<TableEntity, string>> deliveryErrors =
                 await
@@ -47,12 +46,29 @@ namespace Tester.TestStreamProviders
         public static async Task DeleteAll()
         {
             var dataManager = new AzureTableDataManager<TableEntity>(
-                TableName,
-                TestDefaultConfiguration.DataConnectionString,
-                NullLoggerFactory.Instance.CreateLogger<AzureTableDataManager<TableEntity>>(),
-                new AzureStoragePolicyOptions());
+                new AzureStorageOperationOptions { TableName = TableName }.ConfigureTestDefaults(),
+                NullLoggerFactory.Instance.CreateLogger<AzureTableDataManager<TableEntity>>());
             await dataManager.InitTableAsync();
             await dataManager.DeleteTableAsync();
+        }
+    }
+
+    internal static class AzureStorageOperationOptionsExtensions
+    {
+        public static AzureStorageOperationOptions ConfigureTestDefaults(this AzureStorageOperationOptions options)
+        {
+            if (TestDefaultConfiguration.UseAadAuthentication)
+            {
+                options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
+                options.TableResourceId = TestDefaultConfiguration.TableResourceId;
+                options.TokenCredential = new DefaultAzureCredential();
+            }
+            else
+            {
+                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+            }
+
+            return options;
         }
     }
 }
