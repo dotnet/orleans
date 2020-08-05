@@ -31,3 +31,5 @@ title: Orleans Presentations
 * [Orleans with YAMS - Virtual Meetup #9 Part 2 - February 2016](http://dotnet.github.io/orleans/Presentations/VM-9%20-%20Part.2%20Orleans-with-YAMS.pptx)
 
 * [Walk In Distributed Systems Park With Orleans](http://dotnet.github.io/orleans/Presentations/(FWDAYSKIEV2016)%20Walk.In.Distributed.Systems.Park.With.Orleans.pptx)
+
+* [Orleans at Microsoft by Reuben Bond - August 2020 (video)](https://www.youtube.com/watch?v=KhgYlvGLv9c)
