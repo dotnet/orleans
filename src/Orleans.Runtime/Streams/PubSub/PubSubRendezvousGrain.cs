@@ -46,6 +46,7 @@ namespace Orleans.Streams
 
         public override Task OnActivateAsync()
         {
+            this.logger.LogError($"PubSubRendezvousGrain {this.IdentityString}: OnActivateAsync");
             LogPubSubCounts("OnActivateAsync");
             return Task.CompletedTask;
         }

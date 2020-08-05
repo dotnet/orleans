@@ -566,7 +566,7 @@ namespace UnitTests.StreamingTests
             // Warm up PubSub for the appropriate streams
             for (int i = 0; i < numStreams; i++)
             {
-                StreamId streamId = streamIds[i];
+                var streamId = new InternalStreamId(streamProviderName, streamIds[i]);
                 string extKey = streamProviderName + "_" + this.StreamNamespace;
 
                 IPubSubRendezvousGrain pubsub = this.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());

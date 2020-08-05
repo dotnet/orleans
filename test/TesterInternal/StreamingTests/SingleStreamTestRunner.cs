@@ -493,7 +493,8 @@ namespace UnitTests.StreamingTests
 
         private Task ValidatePubSub(StreamId streamId, string providerName)
         {
-            var rendez = this.client.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
+            var intStreamId = new InternalStreamId(providerName, streamId);
+            var rendez = this.client.GetGrain<IPubSubRendezvousGrain>(intStreamId.ToString());
             return rendez.Validate();
         }
 
