@@ -31,11 +31,11 @@ namespace Tester.AzureUtils.Streaming
                 {
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}{StreamProviderName}", queueCount),
-                        TestDefaultConfiguration.DataConnectionString);
+                        new AzureQueueOptions().ConfigureTestDefaults());
 
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}{StreamProviderName2}", queueCount),
-                        TestDefaultConfiguration.DataConnectionString);
+                        new AzureQueueOptions().ConfigureTestDefaults());
                 }
             }
         }
@@ -49,7 +49,7 @@ namespace Tester.AzureUtils.Streaming
                     {
                         sb.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}{StreamProviderName}", queueCount);
                         }));
                         sb.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
@@ -58,7 +58,7 @@ namespace Tester.AzureUtils.Streaming
                     {
                         sb.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}{StreamProviderName2}", queueCount);
                         }));
                         sb.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);

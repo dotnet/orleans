@@ -30,12 +30,12 @@ namespace Tester.AzureUtils
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
+                hostBuilder.UseAzureStorageClustering(options => options.ConfigureTestDefaults());
             }
 
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
+                clientBuilder.UseAzureStorageClustering(options => options.ConfigureTestDefaults());
             }
         }
 

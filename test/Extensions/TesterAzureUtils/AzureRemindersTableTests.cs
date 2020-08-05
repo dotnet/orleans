@@ -11,6 +11,7 @@ using Tester;
 using TestExtensions;
 using Xunit;
 using Orleans.Reminders.AzureStorage;
+using Tester.AzureUtils;
 
 namespace UnitTests.RemindersTest
 {
@@ -42,11 +43,8 @@ namespace UnitTests.RemindersTest
         protected override IReminderTable CreateRemindersTable()
         {
             TestUtils.CheckForAzureStorage();
-            var options = new OptionsWrapper<AzureTableReminderStorageOptions>(
-                new AzureTableReminderStorageOptions
-                    {
-                        ConnectionString = this.connectionStringFixture.ConnectionString
-                    });
+            var options = Options.Create(new AzureTableReminderStorageOptions());
+            options.Value.ConfigureTestDefaults();
             return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), loggerFactory, this.clusterOptions, options);
         }
 

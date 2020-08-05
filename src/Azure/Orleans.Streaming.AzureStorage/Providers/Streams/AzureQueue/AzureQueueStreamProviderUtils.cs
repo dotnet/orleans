@@ -34,10 +34,21 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="storageConnectionString">The azure storage connection string.</param>
         public static async Task DeleteAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, string storageConnectionString)
         {
+            await DeleteAllUsedAzureQueues(loggerFactory, azureQueueNames, new AzureQueueOptions { ConnectionString = storageConnectionString });
+        }
+
+        /// <summary>
+        /// Helper method for testing. Deletes all the queues used by the specified stream provider.
+        /// </summary>
+        /// <param name="loggerFactory">logger factory to use</param>
+        /// <param name="azureQueueNames">azure queue names to be deleted.</param>
+        /// <param name="queueOptions">The azure storage options.</param>
+        public static async Task DeleteAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, AzureQueueOptions queueOptions)
+        {
             var deleteTasks = new List<Task>();
             foreach (var queueName in azureQueueNames)
             {
-                var manager = new AzureQueueDataManager(loggerFactory, queueName, storageConnectionString);
+                var manager = new AzureQueueDataManager(loggerFactory, queueName, queueOptions);
                 deleteTasks.Add(manager.DeleteQueue());
             }
 
@@ -52,10 +63,21 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <param name="storageConnectionString">The azure storage connection string.</param>
         public static async Task ClearAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, string storageConnectionString)
         {
+            await ClearAllUsedAzureQueues(loggerFactory, azureQueueNames, new AzureQueueOptions { ConnectionString = storageConnectionString });
+        }
+
+        /// <summary>
+        /// Helper method for testing. Clears all messages in all the queues used by the specified stream provider.
+        /// </summary>
+        /// <param name="loggerFactory">logger factory to use</param>
+        /// <param name="azureQueueNames">The deployment ID hosting the stream provider.</param>
+        /// <param name="queueOptions">The azure storage options.</param>
+        public static async Task ClearAllUsedAzureQueues(ILoggerFactory loggerFactory, List<string> azureQueueNames, AzureQueueOptions queueOptions)
+        {
             var deleteTasks = new List<Task>();
             foreach (var queueName in azureQueueNames)
             {
-                var manager = new AzureQueueDataManager(loggerFactory, queueName, storageConnectionString);
+                var manager = new AzureQueueDataManager(loggerFactory, queueName, queueOptions);
                 deleteTasks.Add(manager.ClearQueue());
             }
 

@@ -12,6 +12,7 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester;
+using Tester.AzureUtils;
 using Tester.AzureUtils.Streaming;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -54,24 +55,24 @@ namespace UnitTests.StreamingTests
                     .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)
                     .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConfigureTestDefaults();
                         options.DeleteStateOnClear = true;
                     }))
                     .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                     {
                         options.DeleteStateOnClear = true;
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConfigureTestDefaults();
                     }))
                     .AddAzureQueueStreams(AzureQueueStreamProviderName, ob => ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }))
                     .AddAzureQueueStreams("AzureQueueProvider2", ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
                         }))
                     .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1);
@@ -97,10 +98,10 @@ namespace UnitTests.StreamingTests
             {
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                    TestDefaultConfiguration.DataConnectionString);
+                    new AzureQueueOptions().ConfigureTestDefaults());
                 await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
-                    TestDefaultConfiguration.DataConnectionString);
+                    new AzureQueueOptions().ConfigureTestDefaults());
             }
         }
         [SkippableFact]

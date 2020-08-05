@@ -47,7 +47,8 @@ namespace Tester.AzureUtils.TimerTests
         public async Task Reminders_AzureTable_InsertRate()
         {
             var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = this.serviceId });
-            var storageOptions = Options.Create(new AzureTableReminderStorageOptions { ConnectionString = TestDefaultConfiguration.DataConnectionString });
+            var storageOptions = Options.Create(new AzureTableReminderStorageOptions());
+            storageOptions.Value.ConfigureTestDefaults();
 
             IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, clusterOptions, storageOptions);
             await table.Init();
@@ -61,7 +62,8 @@ namespace Tester.AzureUtils.TimerTests
         {
             string clusterId = NewClusterId();
             var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = this.serviceId });
-            var storageOptions = Options.Create(new AzureTableReminderStorageOptions { ConnectionString = TestDefaultConfiguration.DataConnectionString });
+            var storageOptions = Options.Create(new AzureTableReminderStorageOptions());
+            storageOptions.Value.ConfigureTestDefaults();
             IReminderTable table = new AzureBasedReminderTable(this.fixture.Services.GetRequiredService<IGrainReferenceConverter>(), this.loggerFactory, clusterOptions, storageOptions);
             await table.Init();
 
@@ -74,9 +76,9 @@ namespace Tester.AzureUtils.TimerTests
 
             Assert.Single(rows); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, clusterId);
             ReminderEntry actual = rows[0];
-            Assert.Equal(expected.GrainRef,  actual.GrainRef); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the expected grain reference.", ServiceId, clusterId);
-            Assert.Equal(expected.ReminderName,  actual.ReminderName); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected reminder name.", ServiceId, clusterId);
-            Assert.Equal(expected.Period,  actual.Period); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected period.", ServiceId, clusterId);
+            Assert.Equal(expected.GrainRef, actual.GrainRef); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the expected grain reference.", ServiceId, clusterId);
+            Assert.Equal(expected.ReminderName, actual.ReminderName); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected reminder name.", ServiceId, clusterId);
+            Assert.Equal(expected.Period, actual.Period); // "The newly inserted reminder table (sid={0}, did={1}) row did not have the expected period.", ServiceId, clusterId);
             // the following assertion fails but i don't know why yet-- the timestamps appear identical in the error message. it's not really a priority to hunt down the reason, however, because i have high confidence it is working well enough for the moment.
             /*Assert.Equal(expected.StartAt,  actual.StartAt); // "The newly inserted reminder table (sid={0}, did={1}) row did not contain the correct start time.", ServiceId, clusterId);*/
             Assert.False(string.IsNullOrWhiteSpace(actual.ETag), $"The newly inserted reminder table (sid={this.serviceId}, did={clusterId}) row contains an invalid etag.");
@@ -128,12 +130,12 @@ namespace Tester.AzureUtils.TimerTests
         {
             Guid guid = Guid.NewGuid();
             return new ReminderEntry
-                {
-                    GrainRef = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId()),
-                    ReminderName = string.Format("TestReminder.{0}", guid),
-                    Period = TimeSpan.FromSeconds(5),
-                    StartAt = DateTime.UtcNow
-                };
+            {
+                GrainRef = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId()),
+                ReminderName = string.Format("TestReminder.{0}", guid),
+                Period = TimeSpan.FromSeconds(5),
+                StartAt = DateTime.UtcNow
+            };
         }
 
         private string NewClusterId()

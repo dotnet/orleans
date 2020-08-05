@@ -38,7 +38,7 @@ namespace Tester.AzureUtils.Streaming
                             b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
-                                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                    options.ConfigureTestDefaults();
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                                 }));
                             b.ConfigurePullingAgent(ob => ob.Configure(options =>
@@ -60,7 +60,7 @@ namespace Tester.AzureUtils.Streaming
                             b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
-                                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                    options.ConfigureTestDefaults();
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                                 }));
                             b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
@@ -75,10 +75,10 @@ namespace Tester.AzureUtils.Streaming
                 {
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                        TestDefaultConfiguration.DataConnectionString);
+                        new AzureQueueOptions().ConfigureTestDefaults());
                     await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
-                        TestDefaultConfiguration.DataConnectionString);
+                        new AzureQueueOptions().ConfigureTestDefaults());
                 }
             }
         }

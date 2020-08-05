@@ -16,7 +16,6 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\Storage\AzureBlobUtils.cs" Link="Utilities\AzureBlobUtils.cs" />
-    <Compile Include="..\Shared\Storage\AzureQueueUtils.cs" Link="Storage\AzureQueueUtils.cs" />
     <Compile Include="..\Shared\Storage\AzureStorageOperationOptions.cs" Link="Storage\AzureStorageOperationOptions.cs" />
     <Compile Include="..\Shared\Storage\AzureStoragePolicyOptions.cs" Link="Storage\AzureStoragePolicyOptions.cs" />
     <Compile Include="..\Shared\Storage\AzureTableDataManager.cs" Link="Storage\AzureTableDataManager.cs" />
@@ -25,9 +24,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Core" Version="$(AzureCoreVersion)" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="$(AzureStorageBlobsVersion)" />
+    <PackageReference Include="Azure.Storage.Queues" Version="$(AzureStorageQueuesVersion)" />
     <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="$(MicrosoftAzureCosmosTableVersion)" />
-    <PackageReference Include="Microsoft.Azure.Storage.Blob" Version="$(MicrosoftAzureStorageBlobVersion)" />
-    <PackageReference Include="Microsoft.Azure.Storage.Queue" Version="$(MicrosoftAzureStorageQueueVersion)" />
   </ItemGroup>
 
   <ItemGroup>

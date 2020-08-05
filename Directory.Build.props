@@ -92,8 +92,10 @@
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
     <MicrosoftAzureCosmosTableVersion>1.0.5</MicrosoftAzureCosmosTableVersion>
     <MicrosoftAzureEventHubsVersion>4.1.0</MicrosoftAzureEventHubsVersion>
-    <MicrosoftAzureStorageBlobVersion>11.1.0</MicrosoftAzureStorageBlobVersion>
-    <MicrosoftAzureStorageQueueVersion>11.1.0</MicrosoftAzureStorageQueueVersion>
+    <AzureCoreVersion>1.3.0</AzureCoreVersion>
+    <AzureIdentityVersion>1.1.1</AzureIdentityVersion>
+    <AzureStorageBlobsVersion>12.4.4</AzureStorageBlobsVersion>
+    <AzureStorageQueuesVersion>12.3.2</AzureStorageQueuesVersion>
     <MicrosoftDataSQLiteVersion>3.1.0</MicrosoftDataSQLiteVersion>
     <MicrosoftServiceFabricServicesVersion>3.4.664</MicrosoftServiceFabricServicesVersion>
 
