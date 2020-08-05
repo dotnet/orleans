@@ -69,14 +69,10 @@ namespace Orleans.Storage
                 byte[] contents;
                 try
                 {
-                    var properties = await blob.GetPropertiesAsync();
-                    grainState.ETag = properties.Value.ETag.ToString();
-
-                    using (var stream = new MemoryStream())
-                    {
-                        await blob.DownloadToAsync(stream).ConfigureAwait(false);
-                        contents = stream.ToArray();
-                    }
+                    using var stream = new MemoryStream();
+                    var response = await blob.DownloadToAsync(stream).ConfigureAwait(false);
+                    grainState.ETag = response.Headers.ETag.ToString();
+                    contents = stream.ToArray();
                 }
                 catch (RequestFailedException exception) when (exception.IsBlobNotFound())
                 {
