@@ -136,10 +136,9 @@ namespace Orleans.Runtime
         }
     }
 
-    // TODO bpetit remove
     public static class StreamIdExtensions
     {
-        public static Guid GetGuid(this StreamId streamId) => Guid.Parse(Encoding.UTF8.GetString(streamId.Key.ToArray()));
+        public static string GetKeyAsString(this StreamId streamId) => Encoding.UTF8.GetString(streamId.Key.ToArray());
 
         public static string GetNamespace(this StreamId streamId)
         {
@@ -149,7 +148,7 @@ namespace Orleans.Runtime
             return Encoding.UTF8.GetString(streamId.Namespace.ToArray());
         }
 
-        internal static Guid GetGuid(this InternalStreamId internalStreamId) => ((StreamId)internalStreamId).GetGuid();
+        internal static string GetKeyAsString(this InternalStreamId internalStreamId) => ((StreamId)internalStreamId).GetKeyAsString();
 
         internal static string GetNamespace(this InternalStreamId internalStreamId) => internalStreamId.StreamId.GetNamespace();
     }

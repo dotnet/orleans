@@ -124,8 +124,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
             var failureEntity = createEntity();
             failureEntity.SubscriptionId = subscriptionId.Guid;
             failureEntity.StreamProviderName = streamProviderName;
-            // TODO BPETIT REMOVE
-            failureEntity.StreamGuid = streamId.GetGuid();
+            failureEntity.StreamGuid = streamId.GetKeyAsString();
             failureEntity.StreamNamespace = streamId.GetNamespace();
             failureEntity.SetSequenceToken(this.serializationManager, sequenceToken);
             failureEntity.SetPartitionKey(this.clusterId);

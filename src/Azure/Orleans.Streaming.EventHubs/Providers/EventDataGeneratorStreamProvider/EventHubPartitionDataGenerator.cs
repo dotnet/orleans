@@ -58,18 +58,18 @@ namespace Orleans.ServiceBus.Providers.Testing
                     this.GenerateEvent(this.SequenceNumberCounter.Value), RequestContextExtensions.Export(this.serializationManager));
 
                 //set partition key
-                eventData.SetPartitionKey(this.StreamId.GetGuid().ToString()); // TODO BPETIT REMOVE
+                eventData.SetPartitionKey(this.StreamId.GetKeyAsString()); 
 
                 //set offset
                 DateTime now = DateTime.UtcNow;
-                var offSet = this.StreamId.GetGuid().ToString() + now.ToString(); // TODO BPETIT REMOVE
+                var offSet = this.StreamId.GetKeyAsString() + now.ToString(); 
                 eventData.SetOffset(offSet);
                 //set sequence number
                 eventData.SetSequenceNumber(this.SequenceNumberCounter.Value);
                 //set enqueue time
                 eventData.SetEnqueuedTimeUtc(now);
                 eventDataList.Add(eventData);
-                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} for stream {this.StreamId.GetNamespace()}-{this.StreamId.GetGuid()}"); // TODO BPETIT REMOVE
+                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} for stream {this.StreamId.GetNamespace()}-{this.StreamId.GetKeyAsString()}"); 
             }
 
             events = eventDataList;

@@ -247,7 +247,8 @@ namespace Orleans.Streams
             StreamSubscriber subscriber)
         {
             var keyExtension = subscriber.IncludeNamespaceInGrainId ? streamId.GetNamespace() : null;
-            var grainId = GrainId.Create(subscriber.GrainType, GrainIdKeyExtensions.CreateGuidKey(streamId.GetGuid(), keyExtension));
+            // TODO BPETIT: CHANGE THIS TO STRING
+            var grainId = GrainId.Create(subscriber.GrainType, GrainIdKeyExtensions.CreateGuidKey(Guid.Parse(streamId.GetKeyAsString()), keyExtension));
             return grainFactory.GetGrain<IStreamConsumerExtension>(grainId);
         }
 

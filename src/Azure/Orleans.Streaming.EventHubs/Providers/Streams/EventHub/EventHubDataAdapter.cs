@@ -98,7 +98,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="streamId">The stream Guid.</param>
         /// <returns>The partition key to use for the stream.</returns>
-        public virtual string GetPartitionKey(StreamId streamId) => streamId.GetGuid().ToString(); // TODO BPETIT
+        public virtual string GetPartitionKey(StreamId streamId) => streamId.GetKeyAsString();
 
         /// <summary>
         /// Get the <see cref="IStreamIdentity"/> for an event message.

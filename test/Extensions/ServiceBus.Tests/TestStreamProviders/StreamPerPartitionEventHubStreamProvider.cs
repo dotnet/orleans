@@ -15,7 +15,6 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
 
         public override StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            //IStreamIdentity stremIdentity = new StreamIdentity(GetPartitionGuid(partition), null); // TODO BPETIT REMOVE
             var stremId = StreamId.Create(new StreamIdentity(GetPartitionGuid(partition), null));
             StreamSequenceToken token =
             new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);

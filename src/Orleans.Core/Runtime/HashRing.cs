@@ -71,7 +71,7 @@ namespace Orleans.Runtime
             return CalculateResponsible(uniformHashCode);   
         }
 
-        private T CalculateResponsible(uint uniformHashCode)
+        public T CalculateResponsible(uint uniformHashCode)
         {
             lock (lockable)
             {

@@ -23,7 +23,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <summary>
         /// Guid Id of the stream on which the failure occurred.
         /// </summary>
-        public Guid StreamGuid { get; set; }
+        public string StreamGuid { get; set; }
 
         /// <summary>
         /// Namespace of the stream on which the failure occurred.
