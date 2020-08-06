@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.ClientObservers;
 using Orleans.Configuration;
 using Orleans.Internal;
 
@@ -59,6 +60,22 @@ namespace Orleans.Runtime.Messaging
             this.clientRegistrar = clientRegistrar;
             this.clientRegistrar.SetGateway(this);
             dropper.Start();
+        }
+
+        internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory)
+        {
+            lock (lockable)
+            {
+                foreach (var clientState in this.clients.Values)
+                {
+                    if (clientState.IsConnected)
+                    {
+                        var observer = ClientGatewayObserver.GetObserver(grainFactory, clientState.Id);
+                        observer.StopSendingToGateway(this.gatewayAddress);
+                    }
+                }
+            }
+            await Task.Delay(TimeSpan.FromSeconds(5));
         }
 
         internal void Stop()
