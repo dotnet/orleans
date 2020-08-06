@@ -90,10 +90,8 @@ namespace Orleans.ServiceBus.Providers
             this.logger.LogInformation($"Creating EventHub checkpointer for partition {partition} of stream provider {streamProviderName} with serviceId {serviceId}.");
             persistInterval = options.PersistInterval;
             dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(
-                options.TableName,
-                options.ConnectionString,
-                loggerFactory.CreateLogger<EventHubPartitionCheckpointEntity>(),
-                options.StoragePolicyOptions);
+                options,
+                loggerFactory.CreateLogger<EventHubPartitionCheckpointEntity>());
             entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, serviceId, partition);
         }
 

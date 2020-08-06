@@ -268,10 +268,10 @@ namespace Tester.AzureUtils.Persistence
         {
             var options = new AzureTableStorageOptions
             {
-                ConnectionString = TestDefaultConfiguration.DataConnectionString,
                 UseJson = useJson,
                 TypeNameHandling = typeNameHandling
             };
+            options.ConfigureTestDefaults();
             return InitAzureTableGrainStorage(options);
         }
 
