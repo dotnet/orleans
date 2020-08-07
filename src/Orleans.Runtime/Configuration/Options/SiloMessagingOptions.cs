@@ -98,5 +98,20 @@ namespace Orleans.Configuration
             get { return Debugger.IsAttached ? ResponseTimeoutWithDebugger : this.systemResponseTimeout; }
             set { this.systemResponseTimeout = value; }
         }
+
+        /// <summary>
+        /// The period of time between analyzing currently executing activation workloads.
+        /// </summary>
+        public TimeSpan GrainWorkloadAnalysisPeriod { get; set; } = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// The period after which a currently executing request is deemed to be slow.
+        /// </summary>
+        public TimeSpan RequestProcessingWarningTime { get; set; } = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// The period after which an enqueued request is deemed to be delayed.
+        /// </summary>
+        public TimeSpan RequestQueueDelayWarningTime { get; set; } = TimeSpan.FromSeconds(10);
     }
 }
