@@ -25,6 +25,18 @@ On cluster client, where clientBuilder is an IClientBuilder
 clientBuilder.AddSimpleMessageStreamProvider("SMSProvider");
 ```
 
+---
+**NOTE**
+
+By default messages that are passed over the Simple Message Stream are considered immutable, and may be passed my reference to other grains.  To turn off this behavior, you must config the SMS provider to turn off `OptimizeForImmutableData`
+
+```
+siloBuilder
+    .AddSimpleMessageStreamProvider("SMSProvider", (options) => options.OptimizeForImmutableData = false);
+```
+
+---
+
 Now we can create streams, send data using them as producers and also receive data as subscribers.
 
 ## Producing Events
