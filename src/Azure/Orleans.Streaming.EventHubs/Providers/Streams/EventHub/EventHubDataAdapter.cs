@@ -76,13 +76,10 @@ namespace Orleans.ServiceBus.Providers
 
         public virtual StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            Guid streamGuid =
-            Guid.Parse(queueMessage.SystemProperties.PartitionKey);
-            string streamNamespace = queueMessage.GetStreamNamespaceProperty();
-            IStreamIdentity stremIdentity = new StreamIdentity(streamGuid, streamNamespace);
+            IStreamIdentity streamIdentity = this.GetStreamIdentity(queueMessage);
             StreamSequenceToken token =
                 new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
-            return new StreamPosition(stremIdentity, token);
+            return new StreamPosition(streamIdentity, token);
         }
 
         /// <summary>
@@ -93,6 +90,26 @@ namespace Orleans.ServiceBus.Providers
             // TODO figure out how to get this from the adapter
             int readOffset = 0;
             return SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset); // read offset
+        }
+
+        /// <summary>
+        /// Get the Event Hub partition key to use for a stream.
+        /// </summary>
+        /// <param name="streamGuid">The stream Guid.</param>
+        /// <param name="streamNamespace">The stream Namespace.</param>
+        /// <returns>The partition key to use for the stream.</returns>
+        public virtual string GetPartitionKey(Guid streamGuid, string streamNamespace) => streamGuid.ToString();
+
+        /// <summary>
+        /// Get the <see cref="IStreamIdentity"/> for an event message.
+        /// </summary>
+        /// <param name="queueMessage">The event message.</param>
+        /// <returns>The stream identity.</returns>
+        public virtual IStreamIdentity GetStreamIdentity(EventData queueMessage)
+        {
+            Guid streamGuid = Guid.Parse(queueMessage.SystemProperties.PartitionKey);
+            string streamNamespace = queueMessage.GetStreamNamespaceProperty();
+            return new StreamIdentity(streamGuid, streamNamespace);
         }
 
         // Placed object message payload into a segment.
