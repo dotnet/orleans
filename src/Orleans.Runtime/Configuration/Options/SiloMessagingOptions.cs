@@ -47,6 +47,13 @@ namespace Orleans.Configuration
         public static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
 
         /// <summary>
+        /// This is the period of time a gateway will wait after notifying connected client before continuing the
+        /// shutdown process
+        /// </summary>
+        public TimeSpan ClientGatewayShutdownNotificationTimeout { get; set; } = DEFAULT_CLIENT_GW_NOTIFICATION_TIMEOUT;
+        public static readonly TimeSpan DEFAULT_CLIENT_GW_NOTIFICATION_TIMEOUT = TimeSpan.FromSeconds(5);
+
+        /// <summary>
         /// Per grain threshold for pending requests.  Generated warning when exceeded.
         /// </summary>
         public int MaxEnqueuedRequestsSoftLimit { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_SOFT_LIMIT;

@@ -75,7 +75,7 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
             }
-            await Task.Delay(TimeSpan.FromSeconds(5));
+            await Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout);
         }
 
         internal void Stop()
