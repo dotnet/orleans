@@ -23,11 +23,13 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly OverloadDetector overloadDetector;
         private readonly Gateway gateway;
+        private readonly TimeSpan shutdownNotificationDelay;
 
         public GatewayConnectionListener(
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<SiloConnectionOptions> siloConnectionOptions,
+            IOptions<SiloMessagingOptions> siloMessagingOptions,
             OverloadDetector overloadDetector,
             ILocalSiloDetails localSiloDetails,
             IOptions<EndpointOptions> endpointOptions,
@@ -38,6 +40,7 @@ namespace Orleans.Runtime.Messaging
             : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
+            this.shutdownNotificationDelay = siloMessagingOptions.Value.ClientGatewayShutdownNotificationTimeout;
             this.overloadDetector = overloadDetector;
             this.gateway = messageCenter.Gateway;
             this.localSiloDetails = localSiloDetails;
@@ -108,7 +111,7 @@ namespace Orleans.Runtime.Messaging
                     conn.Key.Send(msg);
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(5));
+                await Task.Delay(this.shutdownNotificationDelay);
             }
         }
     }
