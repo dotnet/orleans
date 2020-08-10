@@ -306,12 +306,12 @@ namespace Orleans.ServiceBus.Providers
         /// For test purpose. ConfigureDataGeneratorForStream will configure a data generator for the stream
         /// </summary>
         /// <param name="streamId"></param>
-        internal void ConfigureDataGeneratorForStream(IStreamIdentity streamId)
+        internal void ConfigureDataGeneratorForStream(StreamId streamId)
         {
             (this.receiver as EventHubPartitionGeneratorReceiver)?.ConfigureDataGeneratorForStream(streamId);
         }
 
-        internal void StopProducingOnStream(IStreamIdentity streamId)
+        internal void StopProducingOnStream(StreamId streamId)
         {
             (this.receiver as EventHubPartitionGeneratorReceiver)?.StopProducingOnStream(streamId);
         }

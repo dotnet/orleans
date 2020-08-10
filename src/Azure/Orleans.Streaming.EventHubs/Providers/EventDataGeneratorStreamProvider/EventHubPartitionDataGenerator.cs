@@ -83,9 +83,9 @@ namespace Orleans.ServiceBus.Providers.Testing
             return events;
         }
         
-        public static Func<IStreamIdentity, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services)
+        public static Func<StreamId, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services)
         {
-            return (streamIdentity) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, StreamId.Create(streamIdentity));
+            return (streamId) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, streamId);
         }
     }
 
@@ -98,7 +98,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         private readonly EventDataGeneratorStreamOptions options;
         private readonly IntCounter sequenceNumberCounter = new IntCounter();
         private readonly ILogger logger;
-        private Func<IStreamIdentity, IStreamDataGenerator<EventData>> generatorFactory;
+        private Func<StreamId, IStreamDataGenerator<EventData>> generatorFactory;
         private List<IStreamDataGenerator<EventData>> generators;
 
         /// <summary>
@@ -107,7 +107,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// <param name="options"></param>
         /// <param name="generatorFactory"></param>
         /// <param name="logger"></param>
-        public EventHubPartitionDataGenerator(EventDataGeneratorStreamOptions options, Func<IStreamIdentity, IStreamDataGenerator<EventData>> generatorFactory, ILogger logger)
+        public EventHubPartitionDataGenerator(EventDataGeneratorStreamOptions options, Func<StreamId, IStreamDataGenerator<EventData>> generatorFactory, ILogger logger)
         {
             this.options = options;
             this.generatorFactory = generatorFactory;
@@ -115,21 +115,21 @@ namespace Orleans.ServiceBus.Providers.Testing
             this.logger = logger;
         }
         /// <inheritdoc />
-        public void AddDataGeneratorForStream(IStreamIdentity streamId)
+        public void AddDataGeneratorForStream(StreamId streamId)
         {
             var generator =  this.generatorFactory(streamId);
             generator.SequenceNumberCounter = sequenceNumberCounter;
-            this.logger.Info($"Data generator set up on stream {streamId.Namespace}-{streamId.Guid.ToString()}.");
+            this.logger.Info($"Data generator set up on stream {streamId}.");
             this.generators.Add(generator);
         }
         /// <inheritdoc />
-        public void StopProducingOnStream(IStreamIdentity streamId)
+        public void StopProducingOnStream(StreamId streamId)
         {
             this.generators.ForEach(generator => {
                 if (generator.StreamId.Equals(streamId))
                 {
                     generator.ShouldProduce = false;
-                    this.logger.Info($"Stop producing data on stream {streamId.Namespace}-{streamId.Guid.ToString()}.");
+                    this.logger.Info($"Stop producing data on stream {streamId}.");
                 }
             });
         }

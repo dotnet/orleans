@@ -32,12 +32,12 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// configure data generator for a stream
         /// </summary>
         /// <param name="streamId"></param>
-        void AddDataGeneratorForStream(IStreamIdentity streamId);
+        void AddDataGeneratorForStream(StreamId streamId);
         /// <summary>
         /// Ask one stream to stop producing
         /// </summary>
         /// <param name="streamId"></param>
-        void StopProducingOnStream(IStreamIdentity streamId);
+        void StopProducingOnStream(StreamId streamId);
     }
 
     /// <summary>
