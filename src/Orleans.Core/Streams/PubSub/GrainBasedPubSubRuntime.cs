@@ -10,8 +10,6 @@ namespace Orleans.Streams
     {
         private readonly IGrainFactory grainFactory;
 
-        private const int MaxNumberOfGrains = 100; // TODO: make this configurable?
-
         public GrainBasedPubSubRuntime(IGrainFactory grainFactory)
         {
             this.grainFactory = grainFactory;

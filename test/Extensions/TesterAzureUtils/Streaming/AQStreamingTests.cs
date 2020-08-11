@@ -36,7 +36,6 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .ConfigureLogging(builder => builder.AddFilter(typeof(PubSubRendezvousGrain).FullName, LogLevel.Debug))
                     .AddSimpleMessageStreamProvider(SmsStreamProviderName)
                     .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>
                     b.ConfigureAzureQueue(ob=>ob.Configure<IOptions<ClusterOptions>>(

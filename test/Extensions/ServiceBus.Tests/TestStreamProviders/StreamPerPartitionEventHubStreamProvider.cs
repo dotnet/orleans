@@ -15,11 +15,11 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
 
         public override StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            var stremId = StreamId.Create(new StreamIdentity(GetPartitionGuid(partition), null));
+            var streamId = StreamId.Create(new StreamIdentity(GetPartitionGuid(partition), null));
             StreamSequenceToken token =
             new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
 
-            return new StreamPosition(stremId, token);
+            return new StreamPosition(streamId, token);
         }
 
         public static Guid GetPartitionGuid(string partition)

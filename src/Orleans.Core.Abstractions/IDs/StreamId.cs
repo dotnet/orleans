@@ -7,6 +7,9 @@ using Orleans.Streams;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Identify a Stream within a provider
+    /// </summary>
     [Immutable]
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
@@ -83,11 +86,11 @@ namespace Orleans.Runtime
             var sb = new StringBuilder();
 
             if (!Namespace.IsEmpty)
-                sb.Append(Encoding.UTF8.GetString(Namespace.ToArray()));
+                sb.Append(this.GetNamespace());
             else
                 sb.Append("null");
 
-            sb.Append($"/{Encoding.UTF8.GetString(Key.ToArray())}");
+            sb.Append($"/{this.GetKeyAsString()}");
 
             return sb.ToString();
         }
@@ -128,7 +131,13 @@ namespace Orleans.Runtime
             info.AddValue("sid", StreamId, typeof(StreamId));
         }
 
-        public override int GetHashCode() => HashCode.Combine(ProviderName, StreamId);
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return ProviderName.GetHashCode() * 43 ^ StreamId.GetHashCode();
+            }
+        }
 
         public override string ToString()
         {
@@ -138,14 +147,26 @@ namespace Orleans.Runtime
 
     public static class StreamIdExtensions
     {
-        public static string GetKeyAsString(this StreamId streamId) => Encoding.UTF8.GetString(streamId.Key.ToArray());
+        public static string GetKeyAsString(this StreamId streamId)
+        {
+#if NETCOREAPP
+            var bytes = streamId.Key;
+#else
+            var bytes = streamId.Key.ToArray();
+#endif
+            return Encoding.UTF8.GetString(bytes);
+        }
 
         public static string GetNamespace(this StreamId streamId)
         {
             if (streamId.Namespace.IsEmpty)
                 return null;
-
-            return Encoding.UTF8.GetString(streamId.Namespace.ToArray());
+#if NETCOREAPP 
+            var bytes = streamId.Namespace;
+#else
+            var bytes = streamId.Namespace.ToArray();
+#endif
+            return Encoding.UTF8.GetString(bytes);
         }
 
         internal static string GetKeyAsString(this InternalStreamId internalStreamId) => ((StreamId)internalStreamId).GetKeyAsString();

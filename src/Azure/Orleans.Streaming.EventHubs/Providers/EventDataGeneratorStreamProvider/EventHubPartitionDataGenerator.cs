@@ -69,7 +69,7 @@ namespace Orleans.ServiceBus.Providers.Testing
                 //set enqueue time
                 eventData.SetEnqueuedTimeUtc(now);
                 eventDataList.Add(eventData);
-                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} for stream {this.StreamId.GetNamespace()}-{this.StreamId.GetKeyAsString()}"); 
+                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} for stream {this.StreamId}"); 
             }
 
             events = eventDataList;

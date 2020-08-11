@@ -107,9 +107,9 @@ namespace Orleans.ServiceBus.Providers
         /// <returns>The stream identity.</returns>
         public virtual StreamId GetStreamIdentity(EventData queueMessage)
         {
-            string streamGuid = queueMessage.SystemProperties.PartitionKey;
+            string streamKey = queueMessage.SystemProperties.PartitionKey;
             string streamNamespace = queueMessage.GetStreamNamespaceProperty();
-            return StreamId.Create(streamNamespace, streamGuid);
+            return StreamId.Create(streamNamespace, streamKey);
         }
 
         // Placed object message payload into a segment.
