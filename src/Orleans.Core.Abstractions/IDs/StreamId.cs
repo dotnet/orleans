@@ -74,7 +74,7 @@ namespace Orleans.Runtime
 
         public bool Equals(StreamId other) => FullKey.Span.SequenceEqual(other.FullKey.Span);
 
-        public override bool Equals(object obj) => obj is StreamId ? Equals((StreamId)obj) : false;
+        public override bool Equals(object obj) => obj is StreamId other ? this.Equals(other) : false;
 
         public static bool operator ==(StreamId s1, StreamId s2) => s1.Equals(s2);
 
@@ -129,7 +129,7 @@ namespace Orleans.Runtime
 
         public bool Equals(InternalStreamId other) => StreamId.Equals(other) && ProviderName.Equals(other.ProviderName);
 
-        public override bool Equals(object obj) => obj is InternalStreamId ? Equals((InternalStreamId)obj) : false;
+        public override bool Equals(object obj) => obj is InternalStreamId other ? this.Equals(other) : false;
 
         public static bool operator ==(InternalStreamId s1, InternalStreamId s2) => s1.Equals(s2);
 
