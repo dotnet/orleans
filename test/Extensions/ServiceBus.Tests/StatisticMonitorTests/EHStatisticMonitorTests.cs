@@ -55,7 +55,7 @@ namespace ServiceBus.Tests.MonitorTests
                     hostBuilder
                         .ConfigureServices(services =>
                         {
-                            services.AddTransientNamedService<Func<IStreamIdentity, IStreamDataGenerator<EventData>>>(StreamProviderName, (s, n) => SimpleStreamEventDataGenerator.CreateFactory(s));
+                            services.AddTransientNamedService<Func<StreamId, IStreamDataGenerator<EventData>>>(StreamProviderName, (s, n) => SimpleStreamEventDataGenerator.CreateFactory(s));
                         })
                         .AddMemoryGrainStorage("PubSubStore");
                 }

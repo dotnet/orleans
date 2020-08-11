@@ -52,7 +52,7 @@ namespace Orleans.Streams
             info.AddValue(SER_FIELD_CLASS,  className);
         }
 
-        public bool ShouldReceive(IStreamIdentity stream, object filterData, object item)
+        public bool ShouldReceive(StreamId stream, object filterData, object item)
         {
             if (predicateFunc == null)
             {

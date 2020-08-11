@@ -1,4 +1,4 @@
-﻿using Orleans.Streams;
+using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -7,6 +7,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
 using Orleans.Streams.PubSub;
+using System.IO;
 
 namespace UnitTests.Grains.ProgrammaticSubscribe
 {
@@ -44,5 +45,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         /// Stream namespace.
         /// </summary>
         public string Namespace { get; }
+
+        public static implicit operator StreamId(FullStreamIdentity identity) => StreamId.Create(identity);
     }
 }

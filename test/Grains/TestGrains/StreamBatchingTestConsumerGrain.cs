@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 using UnitTests.GrainInterfaces;
@@ -19,7 +21,7 @@ namespace UnitTests.Grains.Batching
         public Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
         {
             StreamSubscriptionHandle<string> handle = handleFactory.Create<string>();
-            return (handle.StreamIdentity.Namespace == StreamBatchingTestConst.BatchingNameSpace)
+            return (handle.StreamId.GetNamespace() == StreamBatchingTestConst.BatchingNameSpace)
                 ? handle.ResumeAsync(OnNextBatch)
                 : handle.ResumeAsync(OnNext);
         }

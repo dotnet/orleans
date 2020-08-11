@@ -1,4 +1,4 @@
-﻿using Microsoft.Azure.EventHubs;
+using Microsoft.Azure.EventHubs;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -32,12 +32,12 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// configure data generator for a stream
         /// </summary>
         /// <param name="streamId"></param>
-        void AddDataGeneratorForStream(IStreamIdentity streamId);
+        void AddDataGeneratorForStream(StreamId streamId);
         /// <summary>
         /// Ask one stream to stop producing
         /// </summary>
         /// <param name="streamId"></param>
-        void StopProducingOnStream(IStreamIdentity streamId);
+        void StopProducingOnStream(StreamId streamId);
     }
 
     /// <summary>
@@ -53,7 +53,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// <summary>
         /// Stream identity for this data generator
         /// </summary>
-        IStreamIdentity StreamId { get; }
+        StreamId StreamId { get; }
         /// <summary>
         ///
         /// </summary>

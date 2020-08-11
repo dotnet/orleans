@@ -1,4 +1,6 @@
-﻿namespace Orleans.Streams
+using Orleans.Runtime;
+
+namespace Orleans.Streams
 {
     /// <summary>
     /// Filter predicate for streams. 
@@ -15,6 +17,6 @@
         /// <param name="filterData"></param>
         /// <param name="item">Item sent through the stream.</param>
         /// <returns>Return <c>true</c> if this item should be delivered to the intended recipient.</returns>
-        bool ShouldReceive(IStreamIdentity stream, object filterData, object item);
+        bool ShouldReceive(StreamId stream, object filterData, object item);
     }
 }

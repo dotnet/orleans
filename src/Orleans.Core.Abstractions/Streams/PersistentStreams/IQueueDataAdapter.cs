@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -12,7 +13,7 @@ namespace Orleans.Streams
         /// <summary>
         /// Creates a cloud queue message from stream event data.
         /// </summary>
-        TQueueMessage ToQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext);
+        TQueueMessage ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext);
     }
 
     /// <summary>

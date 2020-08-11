@@ -86,13 +86,13 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// </summary>
         /// <param name="subscriptionId"></param>
         /// <param name="streamProviderName"></param>
-        /// <param name="streamIdentity"></param>
+        /// <param name="streamId"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
             StreamSequenceToken sequenceToken)
         {
-            return OnFailure(subscriptionId, streamProviderName, streamIdentity, sequenceToken);
+            return OnFailure(subscriptionId, streamProviderName, streamId, sequenceToken);
         }
 
         /// <summary>
@@ -100,16 +100,16 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// </summary>
         /// <param name="subscriptionId"></param>
         /// <param name="streamProviderName"></param>
-        /// <param name="streamIdentity"></param>
+        /// <param name="streamId"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
             StreamSequenceToken sequenceToken)
         {
-            return OnFailure(subscriptionId, streamProviderName, streamIdentity, sequenceToken);
+            return OnFailure(subscriptionId, streamProviderName, streamId, sequenceToken);
         }
 
-        private async Task OnFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+        private async Task OnFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
                 StreamSequenceToken sequenceToken)
         {
             if (subscriptionId == null)
@@ -120,16 +120,12 @@ namespace Orleans.Providers.Streams.PersistentStreams
             {
                 throw new ArgumentNullException("streamProviderName");
             }
-            if (streamIdentity == null)
-            {
-                throw new ArgumentNullException("streamIdentity");
-            }
 
             var failureEntity = createEntity();
             failureEntity.SubscriptionId = subscriptionId.Guid;
             failureEntity.StreamProviderName = streamProviderName;
-            failureEntity.StreamGuid = streamIdentity.Guid;
-            failureEntity.StreamNamespace = streamIdentity.Namespace;
+            failureEntity.StreamGuid = streamId.GetKeyAsString();
+            failureEntity.StreamNamespace = streamId.GetNamespace();
             failureEntity.SetSequenceToken(this.serializationManager, sequenceToken);
             failureEntity.SetPartitionKey(this.clusterId);
             failureEntity.SetRowkey();

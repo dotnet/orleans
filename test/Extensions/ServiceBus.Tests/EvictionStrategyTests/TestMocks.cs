@@ -6,6 +6,7 @@ using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -38,7 +39,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         public override StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            var steamIdentity = new StreamIdentity(Guid.NewGuid(), "EmptySpace");
+            var steamIdentity = StreamId.Create("EmptySpace", Guid.NewGuid());
             var sequenceToken = new EventHubSequenceTokenV2(this.eventHubOffset, this.sequenceNumberCounter++, this.eventIndex);
             return new StreamPosition(steamIdentity, sequenceToken);
         }

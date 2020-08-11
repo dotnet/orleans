@@ -20,13 +20,13 @@ namespace Orleans.Streams
         /// <summary>
         /// Should be called when an event could not be delivered to a consumer, after exhausting retry attempts.
         /// </summary>
-        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
             StreamSequenceToken sequenceToken)
         {
             return Task.CompletedTask;
         }
 
-        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
+        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
             StreamSequenceToken sequenceToken)
         {
             return Task.CompletedTask;

@@ -164,19 +164,18 @@ namespace Orleans.Providers
         /// Writes a set of events to the queue as a single batch associated with the provided streamId.
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="streamGuid"></param>
-        /// <param name="streamNamespace"></param>
+        /// <param name="streamId"></param>
         /// <param name="events"></param>
         /// <param name="token"></param>
         /// <param name="requestContext"></param>
         /// <returns></returns>
-        public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
             try
             {
-                var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
+                var queueId = streamQueueMapper.GetQueueForStream(streamId);
                 ArraySegment<byte> bodyBytes = serializer.Serialize(new MemoryMessageBody(events.Cast<object>(), requestContext));
-                var messageData = MemoryMessageData.Create(streamGuid, streamNamespace, bodyBytes);
+                var messageData = MemoryMessageData.Create(streamId, bodyBytes);
                 IMemoryStreamQueueGrain queueGrain = GetQueueGrain(queueId);
                 await queueGrain.Enqueue(messageData);
             }

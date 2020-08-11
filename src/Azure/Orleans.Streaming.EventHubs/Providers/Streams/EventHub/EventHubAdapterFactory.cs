@@ -215,17 +215,16 @@ namespace Orleans.ServiceBus.Providers
         /// Writes a set of events to the queue as a single batch associated with the provided streamId.
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="streamGuid"></param>
-        /// <param name="streamNamespace"></param>
+        /// <param name="streamId"></param>
         /// <param name="events"></param>
         /// <param name="token"></param>
         /// <param name="requestContext"></param>
         /// <returns></returns>
-        public virtual Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
+        public virtual Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
-            EventData eventData = this.dataAdapter.ToQueueMessage(streamGuid, streamNamespace, events, token, requestContext);
-            string partitionKey = this.dataAdapter.GetPartitionKey(streamGuid, streamNamespace);
+            EventData eventData = this.dataAdapter.ToQueueMessage(streamId, events, token, requestContext);
+            string partitionKey = this.dataAdapter.GetPartitionKey(streamId);
             return this.client.SendAsync(eventData, partitionKey);
         }
 

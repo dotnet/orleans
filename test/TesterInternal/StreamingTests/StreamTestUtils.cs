@@ -34,16 +34,17 @@ namespace UnitTests.StreamingTests
             return client.StreamProviderRuntime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit);
         }
 
-        internal static async Task CheckPubSubCounts(IInternalClusterClient client, ITestOutputHelper output, string when, int expectedPublisherCount, int expectedConsumerCount, Guid streamId, string streamProviderName, string streamNamespace)
+        internal static async Task CheckPubSubCounts(IInternalClusterClient client, ITestOutputHelper output, string when, int expectedPublisherCount, int expectedConsumerCount, Guid streamIdGuid, string streamProviderName, string streamNamespace)
         {
             var pubSub = GetStreamPubSub(client);
+            var streamId = new InternalStreamId(streamProviderName, StreamId.Create(streamNamespace, streamIdGuid));
 
-            int consumerCount = await pubSub.ConsumerCount(streamId, streamProviderName, streamNamespace);
+            int consumerCount = await pubSub.ConsumerCount(streamId);
 
             Assert_AreEqual(output, expectedConsumerCount, consumerCount, "{0} - ConsumerCount for stream {1} = {2}",
                 when, streamId, consumerCount);
 
-            int publisherCount = await pubSub.ProducerCount(streamId, streamProviderName, streamNamespace);
+            int publisherCount = await pubSub.ProducerCount(streamId);
 
             Assert_AreEqual(output, expectedPublisherCount, publisherCount, "{0} - PublisherCount for stream {1} = {2}",
                 when, streamId, publisherCount);

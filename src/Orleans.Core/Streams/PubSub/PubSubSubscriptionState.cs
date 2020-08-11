@@ -20,7 +20,7 @@ namespace Orleans.Streams
         [JsonProperty]
         public GuidId SubscriptionId;
         [JsonProperty]
-        public StreamId Stream;
+        public InternalStreamId Stream;
         [JsonProperty]
         public GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
         [JsonProperty]
@@ -40,7 +40,7 @@ namespace Orleans.Streams
         // Implement ISerializable if changing it to non-public
         public PubSubSubscriptionState(
             GuidId subscriptionId,
-            StreamId streamId,
+            InternalStreamId streamId,
             IStreamConsumerExtension streamConsumer)
         {
             SubscriptionId = subscriptionId;
