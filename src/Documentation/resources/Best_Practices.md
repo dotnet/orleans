@@ -154,7 +154,7 @@ This document is intended to capture some of the tried and proven application pa
 
 -   Inheritance
 
-    -   Grain classes inherit fromt he Grain base class. Grain intrerfaces (one or more) can be added to each grain.
+    -   Grain classes inherit from the Grain base class. Grain intrerfaces (one or more) can be added to each grain.
 
     -   Disambiguation may be needed to implement the same interface in multiple
         grain classes
