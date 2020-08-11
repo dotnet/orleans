@@ -74,6 +74,12 @@ namespace Orleans.Runtime
 
         public bool Equals(StreamId other) => FullKey.Span.SequenceEqual(other.FullKey.Span);
 
+        public override bool Equals(object obj) => obj is StreamId ? Equals((StreamId)obj) : false;
+
+        public static bool operator ==(StreamId s1, StreamId s2) => s1.Equals(s2);
+
+        public static bool operator !=(StreamId s1, StreamId s2) => !s2.Equals(s1);
+
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("fk", FullKey.ToArray());
@@ -123,7 +129,13 @@ namespace Orleans.Runtime
 
         public bool Equals(InternalStreamId other) => StreamId.Equals(other) && ProviderName.Equals(other.ProviderName);
 
-        public int CompareTo(InternalStreamId other) => throw new NotImplementedException();
+        public override bool Equals(object obj) => obj is InternalStreamId ? Equals((InternalStreamId)obj) : false;
+
+        public static bool operator ==(InternalStreamId s1, InternalStreamId s2) => s1.Equals(s2);
+
+        public static bool operator !=(InternalStreamId s1, InternalStreamId s2) => !s2.Equals(s1);
+
+        public int CompareTo(InternalStreamId other) => StreamId.CompareTo(other.StreamId);
 
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
