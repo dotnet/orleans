@@ -73,6 +73,7 @@ namespace Orleans
             services.TryAddSingleton<ImplicitStreamSubscriberTable>();
             services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
             services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
+            services.TryAddSingleton<IStreamIdMapper, DefaultStreamIdMapper>();
             services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
             services.TryAddFromExisting<IClusterClient, IInternalClusterClient>();
 

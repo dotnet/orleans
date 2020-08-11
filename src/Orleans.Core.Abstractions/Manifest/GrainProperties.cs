@@ -122,6 +122,11 @@ namespace Orleans.Metadata
         public const string StreamBindingIncludeNamespaceKey = "include-namespace";
 
         /// <summary>
+        /// Key type of the grain, if it implement a legacy interface. Valid values are nameof(String), nameof(Int32) and nameof(Guid)
+        /// </summary>
+        public const string LegacyGrainKeyType = "legacy-grain-key-type";
+
+        /// <summary>
         /// Whether a grain is reentrant or not.
         /// </summary>
         public const string Reentrant = "reentrant";

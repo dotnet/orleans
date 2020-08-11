@@ -193,6 +193,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IConfigureGrainContext, StreamConsumerGrainContextAction>();
             services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
             services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
+            services.TryAddSingleton<IStreamIdMapper, DefaultStreamIdMapper>();
             services.AddTransientKeyedService<Type, IGrainExtension>(typeof(IStreamConsumerExtension), (sp, _) =>
             {
                 var runtime = sp.GetRequiredService<IStreamProviderRuntime>();
