@@ -11,6 +11,6 @@ namespace Orleans.Streams
         /// <summary>
         /// Get the corresponding GrainId from the StreamId
         /// </summary>
-        GrainId GetGrainId(GrainBindings grainBindings, StreamId streamId);
+        IdSpan GetGrainKeyId(GrainBindings grainBindings, StreamId streamId);
     }
 }

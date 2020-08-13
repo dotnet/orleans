@@ -17,6 +17,8 @@ namespace Orleans
         /// </summary>
         public IStreamNamespacePredicate Predicate { get; }
 
+        public string StreamIdMapper { get; }
+
         /// <summary>
         /// Used to subscribe to all stream namespaces.
         /// </summary>
@@ -29,9 +31,11 @@ namespace Orleans
         /// Used to subscribe to the specified stream namespace.
         /// </summary>
         /// <param name="streamNamespace">The stream namespace to subscribe.</param>
-        public ImplicitStreamSubscriptionAttribute(string streamNamespace)
+        /// <param name="streamIdMapper"></param>
+        public ImplicitStreamSubscriptionAttribute(string streamNamespace, string streamIdMapper = null)
         {
             Predicate = new ExactMatchStreamNamespacePredicate(streamNamespace.Trim());
+            StreamIdMapper = streamIdMapper;
         }
 
         /// <summary>
@@ -39,9 +43,11 @@ namespace Orleans
         /// must have a constructor without parameters.
         /// </summary>
         /// <param name="predicateType">The stream namespace predicate type.</param>
-        public ImplicitStreamSubscriptionAttribute(Type predicateType)
+        /// <param name="streamIdMapper"></param>
+        public ImplicitStreamSubscriptionAttribute(Type predicateType, string streamIdMapper = null)
         {
             Predicate = (IStreamNamespacePredicate) Activator.CreateInstance(predicateType);
+            StreamIdMapper = streamIdMapper;
         }
 
         /// <summary>
@@ -49,9 +55,11 @@ namespace Orleans
         /// via inheriting attributes.
         /// </summary>
         /// <param name="predicate">The stream namespace predicate.</param>
-        public ImplicitStreamSubscriptionAttribute(IStreamNamespacePredicate predicate)
+        /// <param name="streamIdMapper"></param>
+        public ImplicitStreamSubscriptionAttribute(IStreamNamespacePredicate predicate, string streamIdMapper = null)
         {
             Predicate = predicate;
+            StreamIdMapper = streamIdMapper;
         }
 
         /// <inheritdoc />
@@ -61,6 +69,7 @@ namespace Orleans
             {
                 [WellKnownGrainTypeProperties.BindingTypeKey] = WellKnownGrainTypeProperties.StreamBindingTypeValue,
                 [WellKnownGrainTypeProperties.StreamBindingPatternKey] = this.Predicate.PredicatePattern,
+                [WellKnownGrainTypeProperties.StreamIdMapperKey] = this.StreamIdMapper,
             };
 
             if (LegacyGrainId.IsLegacyGrainType(grainClass))
@@ -70,7 +79,7 @@ namespace Orleans
                 if (typeof(IGrainWithGuidKey).IsAssignableFrom(grainClass) || typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(grainClass))
                     keyType = nameof(Guid);
                 else if (typeof(IGrainWithIntegerKey).IsAssignableFrom(grainClass) || typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(grainClass))
-                    keyType = nameof(Int32);
+                    keyType = nameof(Int64);
                 else // fallback to string
                     keyType = nameof(String);
 

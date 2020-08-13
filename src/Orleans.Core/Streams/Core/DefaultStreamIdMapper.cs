@@ -1,21 +1,14 @@
 using System;
 using Orleans.Metadata;
 using Orleans.Runtime;
-using Orleans.Utilities;
 
 namespace Orleans.Streams
 {
     public class DefaultStreamIdMapper : IStreamIdMapper
     {
-        private CachedReadConcurrentDictionary<GrainBindings, Func<StreamId, IdSpan>> mappers = new CachedReadConcurrentDictionary<GrainBindings, Func<StreamId, IdSpan>>();
+        public const string Name = "default";
 
-        public GrainId GetGrainId(GrainBindings grainBindings, StreamId streamId)
-        {
-            var func = this.mappers.GetOrAdd(grainBindings, MapperFactory);
-            return GrainId.Create(grainBindings.GrainType, func(streamId));
-        }
-
-        private Func<StreamId, IdSpan> MapperFactory(GrainBindings grainBindings)
+        public IdSpan GetGrainKeyId(GrainBindings grainBindings, StreamId streamId)
         {
             string keyType = null;
             bool includeNamespaceInGrainId = false;
@@ -38,45 +31,28 @@ namespace Orleans.Streams
                 }
             }
 
-            switch (keyType)
+            return keyType switch
             {
-                case nameof(Guid):
-                    if (includeNamespaceInGrainId)
-                        return GetGuidCompoundKey;
-                    else
-                        return GetGuidKey;
-                case nameof(Int32):
-                    if (includeNamespaceInGrainId)
-                        return GetIntegerCompoundKey;
-                    else
-                        return GetIntegerKey;
-                default: // null or string
-                    return GetKey;
-            }
+                nameof(Guid) => GetGuidKey(streamId, includeNamespaceInGrainId),
+                nameof(Int64) => GetIntegerKey(streamId, includeNamespaceInGrainId),
+                _ => GetKey(streamId), // null or string
+            };
         }
 
-        private static IdSpan GetGuidKey(StreamId streamId)
+        private static IdSpan GetGuidKey(StreamId streamId, bool includeNamespaceInGrainId)
         {
             var guidKey = Guid.Parse(streamId.GetKeyAsString());
-            return GrainIdKeyExtensions.CreateGuidKey(guidKey);
+            return includeNamespaceInGrainId
+                ? GrainIdKeyExtensions.CreateGuidKey(guidKey, streamId.GetNamespace())
+                : GrainIdKeyExtensions.CreateGuidKey(guidKey);
         }
 
-        private static IdSpan GetGuidCompoundKey(StreamId streamId)
-        {
-            var guidKey = Guid.Parse(streamId.GetKeyAsString());
-            return GrainIdKeyExtensions.CreateGuidKey(guidKey, streamId.GetNamespace());
-        }
-
-        private static IdSpan GetIntegerKey(StreamId streamId)
+        private static IdSpan GetIntegerKey(StreamId streamId, bool includeNamespaceInGrainId)
         {
             var intKey = int.Parse(streamId.GetKeyAsString());
-            return GrainIdKeyExtensions.CreateIntegerKey(intKey);
-        }
-
-        private static IdSpan GetIntegerCompoundKey(StreamId streamId)
-        {
-            var intKey = int.Parse(streamId.GetKeyAsString());
-            return GrainIdKeyExtensions.CreateIntegerKey(intKey, streamId.GetNamespace());
+            return includeNamespaceInGrainId
+                ? GrainIdKeyExtensions.CreateIntegerKey(intKey, streamId.GetNamespace())
+                : GrainIdKeyExtensions.CreateIntegerKey(intKey);
         }
 
         private static IdSpan GetKey(StreamId streamId) => new IdSpan(streamId.Key.ToArray());

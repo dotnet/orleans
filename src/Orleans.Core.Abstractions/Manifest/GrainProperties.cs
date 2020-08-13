@@ -117,12 +117,17 @@ namespace Orleans.Metadata
         public const string StreamBindingPatternKey = "pattern";
 
         /// <summary>
+        /// The key to specify a stream id mapper 
+        /// </summary>
+        public const string StreamIdMapperKey = "streamid-mapper";
+
+        /// <summary>
         /// Whether to include the namespace name in the grain id.
         /// </summary>
         public const string StreamBindingIncludeNamespaceKey = "include-namespace";
 
         /// <summary>
-        /// Key type of the grain, if it implement a legacy interface. Valid values are nameof(String), nameof(Int32) and nameof(Guid)
+        /// Key type of the grain, if it implement a legacy interface. Valid values are nameof(String), nameof(Int64) and nameof(Guid)
         /// </summary>
         public const string LegacyGrainKeyType = "legacy-grain-key-type";
 
