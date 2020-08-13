@@ -13,15 +13,18 @@ namespace Orleans.Streams
         private readonly object _lockObj = new object();
         private readonly GrainBindingsResolver _bindings;
         private readonly IStreamNamespacePredicateProvider[] _providers;
+        private readonly IServiceProvider _serviceProvider;
         private Cache _cache;
 
         public ImplicitStreamSubscriberTable(
             GrainBindingsResolver bindings,
-            IEnumerable<IStreamNamespacePredicateProvider> providers)
+            IEnumerable<IStreamNamespacePredicateProvider> providers,
+            IServiceProvider serviceProvider)
         {
             _bindings = bindings;
             var initialBindings = bindings.GetAllBindings();
             _providers = providers.ToArray();
+            _serviceProvider = serviceProvider;
             _cache = BuildCache(initialBindings.Version, initialBindings.Bindings);
         }
 
@@ -79,14 +82,15 @@ namespace Orleans.Streams
                             + $" Ensure that a corresponding {nameof(IStreamNamespacePredicateProvider)} is registered");
                     }
 
-                    bool includeNamespaceInGrainId = false;
-                    if (grainBinding.TryGetValue(WellKnownGrainTypeProperties.StreamBindingIncludeNamespaceKey, out var value)
-                        && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+                    if (!grainBinding.TryGetValue(WellKnownGrainTypeProperties.StreamIdMapperKey, out var mapperName))
                     {
-                        includeNamespaceInGrainId = true;
+                        throw new KeyNotFoundException(
+                           $"Stream binding for grain type {binding.GrainType} is missing a \"{WellKnownGrainTypeProperties.StreamIdMapperKey}\" value");
                     }
+                    var streamIdMapper = _serviceProvider.GetServiceByName<IStreamIdMapper>(string.IsNullOrWhiteSpace(mapperName) ? DefaultStreamIdMapper.Name : mapperName);
 
-                    newPredicates.Add(new StreamSubscriberPredicate(new StreamSubscriber(binding.GrainType, includeNamespaceInGrainId), predicate));
+                    var subscriber = new StreamSubscriber(binding, streamIdMapper);
+                    newPredicates.Add(new StreamSubscriberPredicate(subscriber, predicate));
                 }
             }
 
@@ -239,16 +243,14 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="grainFactory">The grain factory used to get consumer references.</param>
         /// <param name="streamId">The stream ID to use for the grain ID construction.</param>
-        /// <param name="subscriber">The subscriber prototype.</param>
+        /// <param name="streamSubscriber">The GrainBindings for the grain to create</param>
         /// <returns></returns>
         private IStreamConsumerExtension MakeConsumerReference(
             IInternalGrainFactory grainFactory,
             InternalStreamId streamId,
-            StreamSubscriber subscriber)
+            StreamSubscriber streamSubscriber)
         {
-            var keyExtension = subscriber.IncludeNamespaceInGrainId ? streamId.GetNamespace() : null;
-            // TODO BPETIT: CHANGE THIS TO STRING
-            var grainId = GrainId.Create(subscriber.GrainType, GrainIdKeyExtensions.CreateGuidKey(Guid.Parse(streamId.GetKeyAsString()), keyExtension));
+            var grainId = streamSubscriber.GetGrainId(streamId);
             return grainFactory.GetGrain<IStreamConsumerExtension>(grainId);
         }
 
@@ -266,24 +268,31 @@ namespace Orleans.Streams
 
         private class StreamSubscriber
         {
-            public StreamSubscriber(GrainType grainType, bool includeNamespaceInGrainId)
+            public StreamSubscriber(GrainBindings grainBindings, IStreamIdMapper streamIdMapper)
             {
-                this.GrainType = grainType;
-                this.IncludeNamespaceInGrainId = includeNamespaceInGrainId;
+                this.grainBindings = grainBindings;
+                this.streamIdMapper = streamIdMapper;
             }
 
-            public GrainType GrainType { get; }
+            public GrainType GrainType => this.grainBindings.GrainType;
 
-            public bool IncludeNamespaceInGrainId { get; }
+            private GrainBindings grainBindings { get; }
+
+            private IStreamIdMapper streamIdMapper { get; }
 
             public override bool Equals(object obj)
             {
                 return obj is StreamSubscriber subscriber &&
-                       this.GrainType.Equals(subscriber.GrainType) &&
-                       this.IncludeNamespaceInGrainId == subscriber.IncludeNamespaceInGrainId;
+                       this.GrainType.Equals(subscriber.GrainType);
             }
 
-            public override int GetHashCode() => HashCode.Combine(this.GrainType, this.IncludeNamespaceInGrainId);
+            public override int GetHashCode() => GrainType.GetHashCode();
+
+            internal GrainId GetGrainId(InternalStreamId streamId)
+            {
+                var grainKeyId = this.streamIdMapper.GetGrainKeyId(this.grainBindings, streamId);
+                return GrainId.Create(this.GrainType, grainKeyId);
+            }
         }
 
         private class Cache

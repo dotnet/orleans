@@ -417,8 +417,7 @@ namespace Orleans.Runtime
 
         public static bool IsLegacyKeyExtGrainType(Type type)
         {
-            return typeof(IGrainWithStringKey).IsAssignableFrom(type)
-                || typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(type)
+            return typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(type)
                 || typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(type);
         }
 
