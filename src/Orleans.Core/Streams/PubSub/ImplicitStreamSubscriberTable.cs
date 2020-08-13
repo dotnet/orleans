@@ -82,13 +82,6 @@ namespace Orleans.Streams
                             + $" Ensure that a corresponding {nameof(IStreamNamespacePredicateProvider)} is registered");
                     }
 
-                    bool includeNamespaceInGrainId = false;
-                    if (grainBinding.TryGetValue(WellKnownGrainTypeProperties.StreamBindingIncludeNamespaceKey, out var value)
-                        && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
-                    {
-                        includeNamespaceInGrainId = true;
-                    }
-
                     if (!grainBinding.TryGetValue(WellKnownGrainTypeProperties.StreamIdMapperKey, out var mapperName))
                     {
                         throw new KeyNotFoundException(
@@ -96,7 +89,7 @@ namespace Orleans.Streams
                     }
                     var streamIdMapper = _serviceProvider.GetServiceByName<IStreamIdMapper>(string.IsNullOrWhiteSpace(mapperName) ? DefaultStreamIdMapper.Name : mapperName);
 
-                    var subscriber = new StreamSubscriber(binding, streamIdMapper, includeNamespaceInGrainId);
+                    var subscriber = new StreamSubscriber(binding, streamIdMapper);
                     newPredicates.Add(new StreamSubscriberPredicate(subscriber, predicate));
                 }
             }
@@ -275,16 +268,13 @@ namespace Orleans.Streams
 
         private class StreamSubscriber
         {
-            public StreamSubscriber(GrainBindings grainBindings, IStreamIdMapper streamIdMapper, bool includeNamespaceInGrainId)
+            public StreamSubscriber(GrainBindings grainBindings, IStreamIdMapper streamIdMapper)
             {
                 this.grainBindings = grainBindings;
                 this.streamIdMapper = streamIdMapper;
-                this.IncludeNamespaceInGrainId = includeNamespaceInGrainId;
             }
 
             public GrainType GrainType => this.grainBindings.GrainType;
-
-            public bool IncludeNamespaceInGrainId { get; }
 
             private GrainBindings grainBindings { get; }
 
@@ -293,11 +283,10 @@ namespace Orleans.Streams
             public override bool Equals(object obj)
             {
                 return obj is StreamSubscriber subscriber &&
-                       this.GrainType.Equals(subscriber.GrainType) &&
-                       this.IncludeNamespaceInGrainId == subscriber.IncludeNamespaceInGrainId;
+                       this.GrainType.Equals(subscriber.GrainType);
             }
 
-            public override int GetHashCode() => HashCode.Combine(this.GrainType, this.IncludeNamespaceInGrainId);
+            public override int GetHashCode() => GrainType.GetHashCode();
 
             internal GrainId GetGrainId(InternalStreamId streamId)
             {
