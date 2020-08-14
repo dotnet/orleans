@@ -1,3 +1,4 @@
+using System;
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -40,6 +41,7 @@ namespace AspNetCoreCohosting
                 {
                     siloBuilder
                     .UseLocalhostClustering()
+                    .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromMinutes(1))
                     .Configure<ClusterOptions>(opts =>
                     {
                         opts.ClusterId = "dev";
