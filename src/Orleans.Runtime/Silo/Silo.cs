@@ -54,8 +54,7 @@ namespace Orleans.Runtime
         private readonly LocalGrainDirectory localGrainDirectory;
         private readonly ActivationDirectory activationDirectory;
         private readonly ILogger logger;
-        private readonly TaskCompletionSource<int> siloTerminatedTask =
-            new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<int> siloTerminatedTask = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly SiloStatisticsManager siloStatistics;
         private readonly InsideRuntimeClient runtimeClient;
         private IReminderService reminderService;
@@ -87,12 +86,6 @@ namespace Orleans.Runtime
 
         /// <summary> SiloAddress for this silo. </summary>
         public SiloAddress SiloAddress => this.siloDetails.SiloAddress;
-
-        /// <summary>
-        ///  Silo termination event used to signal shutdown of this silo.
-        /// </summary>
-        public WaitHandle SiloTerminatedEvent // one event for all types of termination (shutdown, stop and fast kill).
-            => ((IAsyncResult)this.siloTerminatedTask.Task).AsyncWaitHandle;
 
         public Task SiloTerminated { get { return this.siloTerminatedTask.Task; } } // one event for all types of termination (shutdown, stop and fast kill).
 
@@ -576,19 +569,22 @@ namespace Orleans.Runtime
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
                     logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
-                    await Task.Delay(pause);
+                    await Task.Delay(pause).ConfigureAwait(false);
                 }
 
-                await this.SiloTerminated;
+                await this.SiloTerminated.ConfigureAwait(false);
                 return;
             }
 
             try
             {
-                await this.LocalScheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget);
+                await this.LocalScheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget).ConfigureAwait(false);
             }
             finally
             {
+                // Signal to all awaiters that the silo has terminated.
+                await Task.Run(() => this.siloTerminatedTask.TrySetResult(0)).ConfigureAwait(false);
+
                 SafeExecute(LocalScheduler.Stop);
                 SafeExecute(LocalScheduler.PrintStatistics);
             }
@@ -625,9 +621,6 @@ namespace Orleans.Runtime
 
             SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
 
-            // Setting the event should be the last thing we do.
-            // Do nothing after that!
-            this.siloTerminatedTask.SetResult(0);
             return Task.CompletedTask;
         }
 
