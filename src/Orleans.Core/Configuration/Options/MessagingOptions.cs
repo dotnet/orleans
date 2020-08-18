@@ -18,6 +18,7 @@ namespace Orleans.Configuration
             get { return Debugger.IsAttached ? ResponseTimeoutWithDebugger : responseTimeout; }
             set { this.responseTimeout = value; }
         }
+
         public static readonly TimeSpan DEFAULT_RESPONSE_TIMEOUT = TimeSpan.FromSeconds(30);
         private TimeSpan responseTimeout = DEFAULT_RESPONSE_TIMEOUT;
 
@@ -83,6 +84,7 @@ namespace Orleans.Configuration
         /// if the body size is greater than this value.
         /// </summary>
         public int MaxMessageBodySize { get; set; } = DEFAULT_MAX_MESSAGE_BODY_SIZE;
+
         public const int DEFAULT_MAX_MESSAGE_BODY_SIZE = 104857600; // 100MB
     }
 }

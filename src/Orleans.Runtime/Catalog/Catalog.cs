@@ -99,7 +99,7 @@ namespace Orleans.Runtime
         private readonly CachedVersionSelectorManager versionSelectorManager;
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
-        private readonly IOptions<SiloMessagingOptions> messagingOptions;
+        private readonly IOptionsMonitor<SiloMessagingOptions> messagingOptions;
         private readonly RuntimeMessagingTrace messagingTrace;
 
         public Catalog(
@@ -122,7 +122,7 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             IOptions<SchedulingOptions> schedulingOptions,
             IOptions<GrainCollectionOptions> collectionOptions,
-            IOptions<SiloMessagingOptions> messagingOptions,
+            IOptionsMonitor<SiloMessagingOptions> messagingOptions,
             RuntimeMessagingTrace messagingTrace,
             IAsyncTimerFactory timerFactory)
             : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
@@ -160,7 +160,8 @@ namespace Orleans.Runtime
                 versionSelectorManager.CompatibilityDirectorManager,
                 loggerFactory,
                 schedulingOptions,
-                messagingTrace);
+                messagingTrace,
+                timerFactory);
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
 // TODO: figure out how to read config change notification from options. - jbragg
@@ -183,8 +184,8 @@ namespace Orleans.Runtime
                 }
                 return counter;
             });
-            maxWarningRequestProcessingTime = this.messagingOptions.Value.ResponseTimeout.Multiply(5);
-            maxRequestProcessingTime = this.messagingOptions.Value.MaxRequestProcessingTime;
+            maxWarningRequestProcessingTime = this.messagingOptions.CurrentValue.ResponseTimeout.Multiply(5);
+            maxRequestProcessingTime = this.messagingOptions.CurrentValue.MaxRequestProcessingTime;
             grainDirectory.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
             this.gcTimer = timerFactory.Create(this.activationCollector.Quantum, "Catalog.GCTimer");
         }
@@ -198,7 +199,7 @@ namespace Orleans.Runtime
         {
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
-            if (this.messagingOptions.Value.AssumeHomogenousSilosForTesting)
+            if (this.messagingOptions.CurrentValue.AssumeHomogenousSilosForTesting)
                 return AllActiveSilos;
 
             var typeCode = target.GrainIdentity.TypeCode;
@@ -498,7 +499,7 @@ namespace Orleans.Runtime
                         placement,
                         this.activationCollector,
                         ageLimit,
-                        this.messagingOptions,
+                        this.messagingOptions.CurrentValue,
                         this.maxWarningRequestProcessingTime,
                         this.maxRequestProcessingTime,
                         this.RuntimeClient,

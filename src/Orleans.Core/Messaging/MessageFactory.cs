@@ -1,5 +1,6 @@
 
 using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
@@ -144,6 +145,17 @@ namespace Orleans.Runtime
             response.RejectionInfo = info;
             response.BodyObject = ex;
             if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
+            return response;
+        }
+
+        internal Message CreateDiagnosticResponseMessage(Message request, bool isExecuting, bool isWaiting, List<string> diagnostics)
+        {
+            var response = this.CreateResponseMessage(request);
+            response.Result = Message.ResponseTypes.Status;
+            response.BodyObject = new StatusResponse(isExecuting, isWaiting, diagnostics);
+
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMesssage} status update with diagnostics {Diagnostics}", request, diagnostics);
+
             return response;
         }
     }

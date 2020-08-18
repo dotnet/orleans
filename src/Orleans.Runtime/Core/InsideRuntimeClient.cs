@@ -626,6 +626,37 @@ namespace Orleans.Runtime
                         break;
                 }
             }
+            else if (message.Result == Message.ResponseTypes.Status)
+            {
+                var status = (StatusResponse)message.BodyObject;
+                callbacks.TryGetValue(message.Id, out var callback);
+                var request = callback?.Message;
+                if (!(request is null))
+                {
+                    callback.OnStatusUpdate(status);
+                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
+                    {
+                        var diagnosticsString = string.Join("\n", status.Diagnostics);
+                        using (request.SetThreadActivityId())
+                        {
+                            this.logger.LogInformation("Received status update for pending request, Request: {RequestMessage}. Status: {Diagnostics}", request, diagnosticsString);
+                        }
+                    }
+                }
+                else
+                {
+                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
+                    {
+                        var diagnosticsString = string.Join("\n", status.Diagnostics);
+                        using (message.SetThreadActivityId())
+                        {
+                            this.logger.LogInformation("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", message, diagnosticsString);
+                        }
+                    }
+                }
+
+                return;
+            }
 
             CallbackData callbackData;
             bool found = callbacks.TryRemove(message.Id, out callbackData);

@@ -45,7 +45,7 @@ namespace Orleans.Runtime
             PlacementStrategy placedUsing,
             IActivationCollector collector,
             TimeSpan ageLimit,
-            IOptions<SiloMessagingOptions> messagingOptions,
+            SiloMessagingOptions messagingOptions,
             TimeSpan maxWarningRequestProcessingTime,
 			TimeSpan maxRequestProcessingTime,
             IRuntimeClient runtimeClient,
@@ -59,7 +59,7 @@ namespace Orleans.Runtime
             this.lifecycle = new GrainLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
             this.maxRequestProcessingTime = maxRequestProcessingTime;
             this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
-            this.messagingOptions = messagingOptions.Value;
+            this.messagingOptions = messagingOptions;
             ResetKeepAliveRequest();
             Address = addr;
             State = ActivationState.Create;
@@ -286,10 +286,7 @@ namespace Orleans.Runtime
         internal bool IsUsingGrainDirectory => this.PlacedUsing.IsUsingGrainDirectory;
 
         public Message Blocking { get; private set; }
-
-        // the number of requests that are currently executing on this activation.
-        // includes reentrant and non-reentrant requests.
-        private int numRunning;
+        public Dictionary<Message, DateTime> RunningRequests { get; private set; } = new Dictionary<Message, DateTime>();
 
         private DateTime currentRequestStartTime;
         private DateTime becameIdle;
@@ -298,8 +295,9 @@ namespace Orleans.Runtime
         public void RecordRunning(Message message, bool isInterleavable)
         {
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
+            var now = DateTime.UtcNow;
+            RunningRequests.Add(message, now);
 
-            numRunning++;
             if (message.Direction != Message.Directions.OneWay 
                 && message.SendingActivation != null
                 && !message.SendingGrain?.IsClient == true)
@@ -312,15 +310,15 @@ namespace Orleans.Runtime
             // This logic only works for non-reentrant activations
             // Consider: Handle long request detection for reentrant activations.
             this.Blocking = message;
-            currentRequestStartTime = DateTime.UtcNow;
+            currentRequestStartTime = now;
         }
 
         public void ResetRunning(Message message)
         {
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
-            numRunning--;
-            RunningRequestsSenders.Remove(message.SendingActivation);
-            if (numRunning == 0)
+            RunningRequests.Remove(message);
+
+            if (RunningRequests.Count == 0)
             {
                 becameIdle = DateTime.UtcNow;
                 if (!IsExemptFromCollection)
@@ -409,7 +407,7 @@ namespace Orleans.Runtime
                     if (deactivatingTime > maxRequestProcessingTime)
                     {
                         logger.Error(ErrorCode.Dispatcher_StuckActivation,
-                            $"Current activation {ToDetailedString()} marked as Deactivating for {deactivatingTime}. Trying  to enqueue {message}.");
+                            $"Current activation {ToDetailedString()} marked as Deactivating for {deactivatingTime}. Trying to enqueue {message}.");
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }
                 }
@@ -419,7 +417,7 @@ namespace Orleans.Runtime
                     if (currentRequestActiveTime > maxRequestProcessingTime)
                     {
                         logger.Error(ErrorCode.Dispatcher_StuckActivation,
-                            $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {this.Blocking}.  Trying  to enqueue {message}.");
+                            $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {this.Blocking}. Trying to enqueue {message}.");
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }
                     // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
@@ -431,8 +429,14 @@ namespace Orleans.Runtime
                     }
                 }
 
-                waiting = waiting ?? new List<Message>();
+                if (!message.QueuedTime.HasValue)
+                {
+                    message.QueuedTime = DateTime.UtcNow;
+                }
+
+                waiting ??= new List<Message>();
                 waiting.Add(message);
+
                 return EnqueueMessageResult.Success;
             }
         }
@@ -524,7 +528,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                return numRunning > 0 ;
+                return RunningRequests.Count > 0;
             }
         }
 
@@ -661,15 +665,115 @@ namespace Orleans.Runtime
             }
         }
 
+        public void AnalyzeWorkload(DateTime now, IMessageCenter messageCenter, MessageFactory messageFactory, SiloMessagingOptions options)
+        {
+            var slowRunningRequestDuration = options.RequestProcessingWarningTime;
+            var longQueueTimeDuration = options.RequestQueueDelayWarningTime;
+
+            List<string> diagnostics = null;
+            lock (this)
+            {
+                if (State != ActivationState.Valid)
+                {
+                    return;
+                }
+
+                if (this.Blocking is object)
+                {
+                    var message = this.Blocking;
+                    var timeSinceQueued = now - message.QueuedTime;
+                    var executionTime = now - currentRequestStartTime;
+                    if (executionTime >= slowRunningRequestDuration)
+                    {
+                        GetStatusList(ref diagnostics);
+                        if (timeSinceQueued.HasValue)
+                        {
+                            diagnostics.Add($"Message {message} was enqueued {timeSinceQueued} ago and has now been executing for {executionTime}.");
+                        }
+                        else
+                        {
+                            diagnostics.Add($"Message {message} was has been executing for {executionTime}.");
+                        }
+
+                        var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
+                        messageCenter.SendMessage(response);
+                    }
+                }
+
+                foreach (var running in RunningRequests)
+                {
+                    var message = running.Key;
+                    var startTime = running.Value;
+                    if (ReferenceEquals(message, this.Blocking)) continue;
+
+                    // Check how long they've been executing.
+                    var executionTime = now - startTime;
+                    if (executionTime >= slowRunningRequestDuration)
+                    {
+                        // Interleaving message X has been executing for a long time
+                        GetStatusList(ref diagnostics);
+                        var messageDiagnostics = new List<string>(diagnostics)
+                        {
+                            $"Interleaving message {message} has been executing for {executionTime}."
+                        };
+
+                        var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
+                        messageCenter.SendMessage(response);
+                    }
+                }
+
+                if (waiting is object)
+                {
+                    var queueLength = 1;
+                    foreach (var message in waiting)
+                    {
+                        var waitTime = now - message.QueuedTime;
+                        if (waitTime >= longQueueTimeDuration)
+                        {
+                            // Message X has been enqueued on the target grain for Y and is currently position QueueLength in queue for processing.
+                            GetStatusList(ref diagnostics); 
+                            var messageDiagnostics = new List<string>(diagnostics)
+                            {
+                               $"Message {message} has been enqueued on the target grain for {waitTime} and is currently position {queueLength} in queue for processing."
+                            };
+
+                            var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
+                            messageCenter.SendMessage(response);
+                        }
+
+                        queueLength++;
+                    }
+                }
+            }
+
+            void GetStatusList(ref List<string> diagnostics)
+            {
+                if (diagnostics is object) return;
+
+                diagnostics = new List<string>
+                {
+                    this.ToDetailedString(),
+                    $"TaskScheduler status: {this.WorkItemGroup.DumpStatus()}"
+                };
+            }
+        }
+
         public string DumpStatus()
         {
             var sb = new StringBuilder();
             lock (this)
             {
                 sb.AppendFormat("   {0}", ToDetailedString());
+
                 if (this.Blocking != null)
                 {
                     sb.AppendFormat("   Processing message: {0}", this.Blocking);
+                }
+
+                foreach (var msg in RunningRequests)
+                {
+                    if (ReferenceEquals(msg, this.Blocking)) continue;
+                    sb.AppendFormat("   Processing message: {0}", msg);
                 }
 
                 if (waiting!=null && waiting.Count > 0)
@@ -703,7 +807,7 @@ namespace Orleans.Runtime
                     WaitingCount,                   // 5 NonReentrancyQueueSize
                     EnqueuedOnDispatcherCount,      // 6 EnqueuedOnDispatcher
                     InFlightCount,                  // 7 InFlightCount
-                    numRunning,                     // 8 NumRunning
+                    RunningRequests.Count,          // 8 NumRunning
                     GetIdleness(DateTime.UtcNow),   // 9 IdlenessTimeSpan
                     CollectionAgeLimit,             // 10 CollectionAgeLimit
                     (includeExtraDetails && this.Blocking != null) ? " CurrentlyExecuting=" + this.Blocking : "");  // 11: Running
