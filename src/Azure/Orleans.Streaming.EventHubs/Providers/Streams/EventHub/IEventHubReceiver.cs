@@ -1,8 +1,9 @@
-﻿using Microsoft.Azure.EventHubs;
+using Azure.Messaging.EventHubs;
+using Azure.Messaging.EventHubs.Consumer;
+using Azure.Messaging.EventHubs.Primitives;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Orleans.ServiceBus.Providers
@@ -33,21 +34,61 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     internal class EventHubReceiverProxy: IEventHubReceiver
     {
-        private PartitionReceiver receiver;
+        private readonly PartitionReceiver client;
 
-        public EventHubReceiverProxy(PartitionReceiver receiver)
+        public EventHubReceiverProxy(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
         {
-            this.receiver = receiver;
+            var receiverOptions = new PartitionReceiverOptions();
+            if (partitionSettings.ReceiverOptions.PrefetchCount != null)
+            {
+                receiverOptions.PrefetchCount = partitionSettings.ReceiverOptions.PrefetchCount.Value;
+            }
+
+            var options = partitionSettings.Hub;
+            this.client = options.TokenCredential != null
+                ? new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), options.FullyQualifiedNamespace, options.Path, options.TokenCredential, receiverOptions)
+                : new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), options.ConnectionString, options.Path, receiverOptions);
+
+            EventPosition GetEventPosition()
+            {
+                EventPosition eventPosition;
+
+                // If we have a starting offset, read from offset
+                if (offset != EventHubConstants.StartOfStream)
+                {
+                    if (!long.TryParse(offset, out var longOffset))
+                    {
+                        throw new InvalidOperationException("Offset must be a number.");
+                    }
+
+                    logger.LogInformation("Starting to read from EventHub partition {0}-{1} at offset {2}", options.Path, partitionSettings.Partition, offset);
+                    eventPosition = EventPosition.FromOffset(longOffset, true);
+                }
+                // else, if configured to start from now, start reading from most recent data
+                else if (partitionSettings.ReceiverOptions.StartFromNow)
+                {
+                    eventPosition = EventPosition.Latest;
+                    logger.LogInformation("Starting to read latest messages from EventHub partition {0}-{1}.", options.Path, partitionSettings.Partition);
+                }
+                else
+                // else, start reading from begining of the partition
+                {
+                    eventPosition = EventPosition.Earliest;
+                    logger.LogInformation("Starting to read messages from begining of EventHub partition {0}-{1}.", options.Path, partitionSettings.Partition);
+                }
+
+                return eventPosition;
+            }
         }
 
-        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {
-            return this.receiver.ReceiveAsync(maxCount, waitTime);
+            return await client.ReceiveBatchAsync(maxCount, waitTime);
         }
 
-        public Task CloseAsync()
+        public async Task CloseAsync()
         {
-            return this.receiver.CloseAsync();
+            await client.CloseAsync();
         }
     }
 }

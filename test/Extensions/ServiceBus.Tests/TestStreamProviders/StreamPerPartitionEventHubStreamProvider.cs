@@ -1,8 +1,8 @@
 using System;
 using System.IO;
 using System.Text;
-using Microsoft.Azure.EventHubs;
 using Orleans.Runtime;
+using Azure.Messaging.EventHubs;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
@@ -17,7 +17,7 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         {
             var streamId = StreamId.Create(new StreamIdentity(GetPartitionGuid(partition), null));
             StreamSequenceToken token =
-            new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
+            new EventHubSequenceTokenV2(queueMessage.Offset.ToString(), queueMessage.SequenceNumber, 0);
 
             return new StreamPosition(streamId, token);
         }

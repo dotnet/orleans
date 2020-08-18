@@ -1,5 +1,5 @@
-using Microsoft.Azure.EventHubs;
 using Orleans.Runtime;
+using Azure.Messaging.EventHubs;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;

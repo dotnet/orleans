@@ -1,6 +1,5 @@
 using System;
-using System.IO;
-using Microsoft.Azure.EventHubs;
+using Azure.Messaging.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
