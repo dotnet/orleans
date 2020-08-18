@@ -135,6 +135,16 @@ namespace Orleans.Runtime.Messaging
             // Stop processing incoming messages first.
             // This signals the outgoing message processor to exit gracefully and terminate the connection.
             this.outgoingMessageWriter.TryComplete();
+
+            lock (this.lockObj)
+            {
+                if (_processIncomingTask is null || _processOutgoingTask is null)
+                {
+                    // Connection has not started processing yet and may be stuck in a preparatory stage (eg, due to a misbehaved client).
+                    // This is not yet a functioning connection, so we should close it ungracefully.
+                    this.CloseInternal(new ConnectionAbortedException("Connection is being closed before handshake has completed"));
+                }
+            }
         }
 
         private void CloseInternal(Exception exception)
