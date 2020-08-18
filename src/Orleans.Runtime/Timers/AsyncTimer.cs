@@ -59,19 +59,21 @@ namespace Orleans.Runtime
             this.expected = dueTime;
             if (delay > TimeSpan.Zero)
             {
-                try
+                // for backwards compatibility, support timers with periods up to ReminderRegistry.MaxSupportedTimeout
+                var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
+                while (delay > maxDelay)
                 {
-                    // for backwards compatibility, support timers with periods up to ReminderRegistry.MaxSupportedTimeout
-                    var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
-                    while (delay > maxDelay)
+                    delay -= maxDelay;
+                    var task2 = await Task.WhenAny(Task.Delay(maxDelay, cancellation.Token)).ConfigureAwait(false);
+                    if (task2.IsCanceled)
                     {
-                        delay -= maxDelay;
-                        await Task.Delay(maxDelay, cancellation.Token).ConfigureAwait(false);
+                        await Task.Yield();
+                        return false;
                     }
-
-                    await Task.Delay(delay, cancellation.Token).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
+
+                var task = await Task.WhenAny(Task.Delay(delay, cancellation.Token)).ConfigureAwait(false);
+                if (task.IsCanceled)
                 {
                     await Task.Yield();
                     return false;
