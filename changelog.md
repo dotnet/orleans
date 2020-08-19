@@ -7,6 +7,17 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.3.0-rc1] (changes since 3.2.2)
+
+- Non-breaking improvements
+  - Improve ClusterClient disposal (#6583)
+  - Added 'RecordExists' flag to perisistent store so that grains can det… (#6580)
+  - AAD authentication for Azure providers (blob, queue & table) (#6648)
+  - Make delay after gw shutdown notification configurable (#6679)
+  - Tweak shutdown completion signalling (#6685) (#6696)
+  - Close some kinds of misbehaving connections during shutdown (#6684) (#6695)
+  - Send status messages for long-running and blocked requests (#6672) (#6694)
+
 ### [3.2.2] (changes since 3.2.1)
 
 - Non-breaking improvements
