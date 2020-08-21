@@ -17,7 +17,6 @@ namespace Orleans.Streams
         private static readonly IBackoffProvider DeliveryBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
         private static readonly IBackoffProvider ReadLoopBackoff = new ExponentialBackoff(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1));
         private const int ReadLoopRetryMax = 6;
-        private static readonly IStreamFilterPredicateWrapper DefaultStreamFilter = new DefaultStreamFilterPredicateWrapper();
         private const int StreamInactivityCheckFrequency = 10;
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
@@ -222,12 +221,11 @@ namespace Orleans.Streams
         public Task AddSubscriber(
             GuidId subscriptionId,
             InternalStreamId streamId,
-            IStreamConsumerExtension streamConsumer,
-            IStreamFilterPredicateWrapper filter)
+            IStreamConsumerExtension streamConsumer)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1}.", streamId, streamConsumer);
             // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
-            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null, filter)
+            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null)
                 .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
                     $"Failed to add subscription for stream {streamId}.")
                 .Ignore();
@@ -239,8 +237,7 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             InternalStreamId streamId,
             IStreamConsumerExtension streamConsumer,
-            StreamSequenceToken cacheToken,
-            IStreamFilterPredicateWrapper filter)
+            StreamSequenceToken cacheToken)
         {
             if (IsShutdown) return;
 
@@ -253,12 +250,12 @@ namespace Orleans.Streams
 
             StreamConsumerData data;
             if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
-                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, filter ?? DefaultStreamFilter);
+                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer);
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
                 if (data.State == StreamConsumerDataState.Inactive)
-                    RunConsumerCursor(data, data.Filter).Ignore(); // Start delivering events if not actively doing so
+                    RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
             }
         }
 
@@ -518,12 +515,12 @@ namespace Orleans.Streams
                 if (consumerData.State == StreamConsumerDataState.Inactive)
                 {
                     // wake up inactive consumers
-                    RunConsumerCursor(consumerData, consumerData.Filter).Ignore();
+                    RunConsumerCursor(consumerData).Ignore();
                 }
             }
         }
 
-        private async Task RunConsumerCursor(StreamConsumerData consumerData, IStreamFilterPredicateWrapper filterWrapper)
+        private async Task RunConsumerCursor(StreamConsumerData consumerData)
         {
             try
             {
@@ -538,7 +535,7 @@ namespace Orleans.Streams
                     Exception exceptionOccured = null;
                     try
                     {
-                        batch = GetBatchForConsumer(consumerData.Cursor, filterWrapper, consumerData.StreamId);
+                        batch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId);
                         if (batch == null)
                         {
                             break;
@@ -549,25 +546,6 @@ namespace Orleans.Streams
                         exceptionOccured = exc;
                         consumerData.SafeDisposeCursor(logger);
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null);
-                    }
-
-                    // Apply filtering to this batch, if applicable
-                    if (filterWrapper != null && batch != null)
-                    {
-                        try
-                        {
-                            // Apply batch filter to this input batch, to see whether we should deliver it to this consumer.
-                            if (!batch.ShouldDeliver(
-                                consumerData.StreamId,
-                                filterWrapper.FilterData,
-                                filterWrapper.ShouldReceive)) continue; // Skip this batch -- nothing to do
-                        }
-                        catch (Exception exc)
-                        {
-                            var message =
-                                $"Ignoring exception while trying to evaluate subscription filter function {filterWrapper} on stream {consumerData.StreamId} in PersistentStreamPullingAgentGrain.RunConsumerCursor";
-                            logger.Warn((int)ErrorCode.PersistentStreamPullingAgent_13, message, exc);
-                        }
                     }
 
                     try
@@ -618,7 +596,7 @@ namespace Orleans.Streams
             }
         }
 
-        private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor, IStreamFilterPredicateWrapper filterWrapper, StreamId streamId)
+        private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor, StreamId streamId)
         {
             if (this.options.BatchContainerBatchSize <= 1)
             {
@@ -645,10 +623,6 @@ namespace Orleans.Streams
                     }
 
                     var batchContainer = cursor.GetCurrent(out ignore);
-                    if (!batchContainer.ShouldDeliver(
-                                streamId,
-                                filterWrapper.FilterData,
-                                filterWrapper.ShouldReceive)) continue;
 
                     batchContainers.Add(batchContainer);
                     i++;
@@ -806,7 +780,7 @@ namespace Orleans.Streams
                 var addSubscriptionTasks = new List<Task>(streamData.Count);
                 foreach (PubSubSubscriptionState item in streamData)
                 {
-                    addSubscriptionTasks.Add(AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, streamStartToken, item.Filter));
+                    addSubscriptionTasks.Add(AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, streamStartToken));
                 }
                 await Task.WhenAll(addSubscriptionTasks);
             }

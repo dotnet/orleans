@@ -32,10 +32,5 @@ namespace Orleans.Providers.Streams.Generator
         {
             return false;
         }
-
-        public bool ShouldDeliver(StreamId stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
-        {
-            return true;
-        }
     }
 }

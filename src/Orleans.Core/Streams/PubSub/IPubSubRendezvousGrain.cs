@@ -11,7 +11,7 @@ namespace Orleans.Streams
 
         Task UnregisterProducer(InternalStreamId streamId, IStreamProducerExtension streamProducer);
 
-        Task RegisterConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter);
+        Task RegisterConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer);
 
         Task UnregisterConsumer(GuidId subscriptionId, InternalStreamId streamId);
 

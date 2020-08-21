@@ -297,7 +297,6 @@ namespace Orleans.ServiceBus.Providers
 
             public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() { throw new NotSupportedException(); }
             public bool ImportRequestContext() { throw new NotSupportedException(); }
-            public bool ShouldDeliver(StreamId stream, object filterData, StreamFilterPredicate shouldReceiveFunc) { throw new NotSupportedException(); }
         }
 
         private class Cursor : IQueueCacheCursor

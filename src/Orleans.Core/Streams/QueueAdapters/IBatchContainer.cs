@@ -32,10 +32,5 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns>True if the RequestContext was indeed modified, false otherwise.</returns>
         bool ImportRequestContext();
-
-        /// <summary>
-        /// Decide whether this batch should be sent to the specified target.
-        /// </summary>
-        bool ShouldDeliver(StreamId stream, object filterData, StreamFilterPredicate shouldReceiveFunc);
     }
 }
