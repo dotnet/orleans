@@ -111,8 +111,8 @@ namespace UnitTests.Directory
             var outdatedGrainAddr = outdatedAddr.ToGrainAddress();
 
             // Setup membership service
-            this.mockMembershipService.UpdateSiloStatus(expectedAddr.Silo, SiloStatus.Active);
-            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
+            this.mockMembershipService.UpdateSiloStatus(expectedAddr.Silo, SiloStatus.Active, "exp");
+            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead, "old");
             await this.lifecycle.OnStart();
             await WaitUntilClusterChangePropagated();
 
@@ -141,7 +141,7 @@ namespace UnitTests.Directory
             this.grainDirectory.Lookup(grainAddress.GrainId).Returns(grainAddress);
 
             // Cache should be empty
-            Assert.False(this.grainLocator.TryLocalLookup(expected.Grain, out var unused));
+            Assert.False(this.grainLocator.TryLocalLookup(expected.Grain, out _));
 
             // Do a remote lookup
             var results = await this.grainLocator.Lookup(expected.Grain);
@@ -161,7 +161,7 @@ namespace UnitTests.Directory
             var outdatedGrainAddr = outdatedAddr.ToGrainAddress();
 
             // Setup membership service
-            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
+            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead, "old");
             await this.lifecycle.OnStart();
             await WaitUntilClusterChangePropagated();
 
@@ -172,8 +172,7 @@ namespace UnitTests.Directory
 
             await this.grainDirectory.Received(1).Lookup(outdatedGrainAddr.GrainId);
             await this.grainDirectory.Received(1).Unregister(outdatedGrainAddr);
-
-            Assert.False(this.grainLocator.TryLocalLookup(outdatedAddr.Grain, out var unused));
+            Assert.False(this.grainLocator.TryLocalLookup(outdatedAddr.Grain, out _));
 
             await this.lifecycle.OnStop();
         }
@@ -185,13 +184,12 @@ namespace UnitTests.Directory
             var outdatedGrainAddr = outdatedAddr.ToGrainAddress();
 
             // Setup membership service
-            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
+            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead, "old");
             await this.lifecycle.OnStart();
             await WaitUntilClusterChangePropagated();
 
             this.grainDirectory.Lookup(outdatedGrainAddr.GrainId).Returns(outdatedGrainAddr);
-
-            Assert.False(this.grainLocator.TryLocalLookup(outdatedAddr.Grain, out var unused));
+            Assert.False(this.grainLocator.TryLocalLookup(outdatedAddr.Grain, out _));
 
             // Local lookup should never call the directory
             await this.grainDirectory.DidNotReceive().Lookup(outdatedGrainAddr.GrainId);
@@ -209,8 +207,8 @@ namespace UnitTests.Directory
             var outdatedGrainAddr = outdatedAddr.ToGrainAddress();
 
             // Setup membership service
-            this.mockMembershipService.UpdateSiloStatus(expectedAddr.Silo, SiloStatus.Active);
-            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Active);
+            this.mockMembershipService.UpdateSiloStatus(expectedAddr.Silo, SiloStatus.Active, "exp");
+            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Active, "old");
             await this.lifecycle.OnStart();
             await WaitUntilClusterChangePropagated();
 
@@ -222,7 +220,7 @@ namespace UnitTests.Directory
             await this.grainLocator.Register(outdatedAddr);
 
             // Simulate a dead silo
-            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead);
+            this.mockMembershipService.UpdateSiloStatus(outdatedAddr.Silo, SiloStatus.Dead, "old");
 
             // Wait a bit for the update to be processed
             await WaitUntilClusterChangePropagated();
@@ -256,7 +254,7 @@ namespace UnitTests.Directory
 
             // Unregister and check if cache was cleaned
             await this.grainLocator.Unregister(expectedAddr, UnregistrationCause.Force);
-            Assert.False(this.grainLocator.TryLocalLookup(expectedAddr.Grain, out var unused));
+            Assert.False(this.grainLocator.TryLocalLookup(expectedAddr.Grain, out _));
         }
 
 
