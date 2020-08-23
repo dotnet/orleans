@@ -5,12 +5,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Client" Version="3.0.2" />
-    <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="3.0.2" />
+    <PackageReference Include="Microsoft.Orleans.Client" Version="3.2.2" />
+    <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="3.2.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Sample.Grains.Interfaces\Sample.Grains.Interfaces.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="新文件夹\" />
+  </ItemGroup>
 </Project>
