@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Runtime.Utilities;
 
@@ -53,5 +51,7 @@ namespace UnitTests.Directory
         }
 
         public ValueTask Refresh(MembershipVersion minimumVersion = default) => new ValueTask();
+
+        public Task<bool> TryKill(SiloAddress siloAddress) => throw new NotImplementedException();
     }
 }
