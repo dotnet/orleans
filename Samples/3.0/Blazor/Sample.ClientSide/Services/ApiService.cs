@@ -5,6 +5,7 @@ using Sample.ClientSide.Models;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Threading.Tasks;
 
 namespace Sample.ClientSide.Services
@@ -21,13 +22,13 @@ namespace Sample.ClientSide.Services
         }
 
         public Task<WeatherInfo[]> GetWeatherForecastAsync() =>
-            client.GetJsonAsync<WeatherInfo[]>($"{options.BaseAddress}/Weather");
+            client.GetFromJsonAsync<WeatherInfo[]>($"{options.BaseAddress}/Weather");
 
         public Task<IEnumerable<TodoItem>> GetTodosAsync(Guid ownerKey) =>
-            client.GetJsonAsync<IEnumerable<TodoItem>>($"{options.BaseAddress}/todo/list/{ownerKey}");
+            client.GetFromJsonAsync<IEnumerable<TodoItem>>($"{options.BaseAddress}/todo/list/{ownerKey}");
 
         public Task SetTodoAsync(TodoItem item) =>
-            client.PostJsonAsync($"{options.BaseAddress}/todo", item);
+            client.PostAsJsonAsync($"{options.BaseAddress}/todo", item);
 
         public Task DeleteTodoAsync(Guid itemKey) =>
             client.DeleteAsync($"{options.BaseAddress}/todo/{itemKey}");
