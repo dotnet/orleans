@@ -44,7 +44,7 @@ namespace Orleans.Hosting
             // Configure defaults based on the current environment.
             services.AddSingleton<IConfigureOptions<ClusterOptions>, ConfigureKubernetesHostingOptions>();
             services.AddSingleton<IConfigureOptions<SiloOptions>, ConfigureKubernetesHostingOptions>();
-            services.AddSingleton<IConfigureOptions<EndpointOptions>, ConfigureKubernetesHostingOptions>();
+            services.AddSingleton<IPostConfigureOptions<EndpointOptions>, ConfigureKubernetesHostingOptions>();
             services.AddSingleton<IConfigureOptions<KubernetesHostingOptions>, ConfigureKubernetesHostingOptions>();
             services.AddSingleton<IValidateOptions<KubernetesHostingOptions>, KubernetesHostingOptionsValidator>();
 

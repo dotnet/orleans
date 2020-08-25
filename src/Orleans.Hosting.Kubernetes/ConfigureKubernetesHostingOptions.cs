@@ -1,3 +1,4 @@
+using AutoMapper.Configuration.Annotations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -9,7 +10,7 @@ namespace Orleans.Hosting.Kubernetes
     internal class ConfigureKubernetesHostingOptions :
         IConfigureOptions<ClusterOptions>,
         IConfigureOptions<SiloOptions>,
-        IConfigureOptions<EndpointOptions>,
+        IPostConfigureOptions<EndpointOptions>,
         IConfigureOptions<KubernetesHostingOptions>
     {
         private readonly IServiceProvider _serviceProvider;
@@ -37,8 +38,10 @@ namespace Orleans.Hosting.Kubernetes
             options.SiloName = Environment.GetEnvironmentVariable(KubernetesHostingOptions.PodNameEnvironmentVariable);
         }
 
-        public void Configure(EndpointOptions options)
+        public void PostConfigure(string name, EndpointOptions options)
         {
+            // Use PostConfigure to give the developer an opportunity to set SiloPort and GatewayPort using regular
+            // Configure methods without needing to worry about ordering with respect to the UseKubernetesHosting call.
             if (options.AdvertisedIPAddress is null)
             {
                 var hostingOptions = _serviceProvider.GetRequiredService<IOptions<KubernetesHostingOptions>>().Value;
