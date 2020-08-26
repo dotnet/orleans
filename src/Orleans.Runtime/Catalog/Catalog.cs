@@ -266,8 +266,18 @@ namespace Orleans.Runtime
             var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
-            logger.Info(ErrorCode.Catalog_BeforeCollection, "Before collection#{0}: memory={1}MB, #activations={2}, collector={3}.",
-                number, memBefore, activations.Count, this.activationCollector.ToString());
+
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(
+                    (int)ErrorCode.Catalog_BeforeCollection,
+                    "Before collection #{CollectionNumber}: memory: {MemoryBefore}MB, #activations: {ActivationCount}, collector: {CollectorStatus}",
+                    number,
+                    memBefore,
+                    activations.Count,
+                    this.activationCollector.ToString());
+            }
+
             List<ActivationData> list = scanStale ? this.activationCollector.ScanStale() : this.activationCollector.ScanAll(ageLimit);
             collectionCounter.Increment();
             var count = 0;
@@ -277,10 +287,22 @@ namespace Orleans.Runtime
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CollectActivations{0}", list.ToStrings(d => d.Grain.ToString() + d.ActivationId));
                 await DeactivateActivationsFromCollector(list);
             }
+            
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
             watch.Stop();
-            logger.Info(ErrorCode.Catalog_AfterCollection, "After collection#{0}: memory={1}MB, #activations={2}, collected {3} activations, collector={4}, collection time={5}.",
-                number, memAfter, activations.Count, count, this.activationCollector.ToString(), watch.Elapsed);
+
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(
+                    (int)ErrorCode.Catalog_AfterCollection,
+                    "After collection #{CollectionNumber} memory: {MemoryAfter}MB, #activations: {ActivationCount}, collected {CollectedCount} activations, collector: {CollectorStatus}, collection time: {CollectionTime}",
+                    number,
+                    memAfter,
+                    activations.Count,
+                    count,
+                    this.activationCollector.ToString(),
+                    watch.Elapsed);
+            }
         }
 
         public List<Tuple<GrainId, string, int>> GetGrainStatistics()
