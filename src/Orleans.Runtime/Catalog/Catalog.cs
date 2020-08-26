@@ -126,7 +126,8 @@ namespace Orleans.Runtime
             PlacementService placementService,
             GrainContextActivator grainActivator,
             GrainVersionManifest grainInterfaceVersions,
-            GrainPropertiesResolver grainPropertiesResolver)
+            GrainPropertiesResolver grainPropertiesResolver,
+            IncomingRequestMonitor incomingRequestMonitor)
             : base(Constants.CatalogType, messageCenter.MyAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
@@ -166,7 +167,8 @@ namespace Orleans.Runtime
                 loggerFactory,
                 messagingTrace,
                 grainInterfaceVersions,
-                timerFactory);
+                timerFactory,
+                incomingRequestMonitor);
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
 // TODO: figure out how to read config change notification from options. - jbragg

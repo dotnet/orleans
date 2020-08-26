@@ -47,9 +47,10 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             RuntimeMessagingTrace messagingTrace,
             GrainVersionManifest versionManifest,
-            IAsyncTimerFactory asyncTimerFactory)
+            IAsyncTimerFactory asyncTimerFactory,
+            IncomingRequestMonitor incomingRequestMonitor)
         {
-            _activationWorkloadMonitor = new IncomingRequestMonitor(asyncTimerFactory, transport, messageFactory, messagingOptions);
+            _activationWorkloadMonitor = incomingRequestMonitor;
             this.scheduler = scheduler;
             this.catalog = catalog;
             Transport = transport;
