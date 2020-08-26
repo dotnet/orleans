@@ -4,15 +4,14 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Azure.EventHubs;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers.Testing;
-using Orleans.Hosting;
-using System.IO;
+using Azure.Messaging.EventHubs.Consumer;
+using Azure.Messaging.EventHubs;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -176,8 +175,8 @@ namespace Orleans.ServiceBus.Providers
             // monitor message age
             var dequeueTimeUtc = DateTime.UtcNow;
 
-            DateTime oldestMessageEnqueueTime = messages[0].SystemProperties.EnqueuedTimeUtc;
-            DateTime newestMessageEnqueueTime = messages[messages.Count - 1].SystemProperties.EnqueuedTimeUtc;
+            DateTime oldestMessageEnqueueTime = messages[0].EnqueuedTime.UtcDateTime;
+            DateTime newestMessageEnqueueTime = messages[messages.Count - 1].EnqueuedTime.UtcDateTime;
 
             this.monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
 
@@ -189,7 +188,7 @@ namespace Orleans.ServiceBus.Providers
             if (!this.checkpointer.CheckpointExists)
             {
                 this.checkpointer.Update(
-                    messages[0].SystemProperties.Offset,
+                    messages[0].Offset.ToString(),
                     DateTime.UtcNow);
             }
             return batches;
@@ -268,38 +267,7 @@ namespace Orleans.ServiceBus.Providers
 
         private static IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
         {
-            var connectionStringBuilder = new EventHubsConnectionStringBuilder(partitionSettings.Hub.ConnectionString)
-            {
-                EntityPath = partitionSettings.Hub.Path
-            };
-            EventHubClient client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
-
-            EventPosition eventPosition;
-             
-            // If we have a starting offset, read from offset
-            if (offset != EventHubConstants.StartOfStream)
-            {
-                logger.Info("Starting to read from EventHub partition {0}-{1} at offset {2}", partitionSettings.Hub.Path, partitionSettings.Partition, offset);
-                eventPosition = EventPosition.FromOffset(offset, true);
-            }
-            // else, if configured to start from now, start reading from most recent data
-            else if (partitionSettings.ReceiverOptions.StartFromNow)
-            {
-                eventPosition = EventPosition.FromEnd();
-                logger.Info("Starting to read latest messages from EventHub partition {0}-{1}.", partitionSettings.Hub.Path, partitionSettings.Partition);
-            } else
-            // else, start reading from begining of the partition
-            {
-                eventPosition = EventPosition.FromStart();
-                logger.Info("Starting to read messages from begining of EventHub partition {0}-{1}.", partitionSettings.Hub.Path, partitionSettings.Partition);
-            }
-
-            PartitionReceiver receiver = client.CreateReceiver(partitionSettings.Hub.ConsumerGroup, partitionSettings.Partition, eventPosition);
-
-            if (partitionSettings.ReceiverOptions.PrefetchCount.HasValue)
-                receiver.PrefetchCount = partitionSettings.ReceiverOptions.PrefetchCount.Value;
-
-            return new EventHubReceiverProxy(receiver);
+            return new EventHubReceiverProxy(partitionSettings, offset, logger);
         }
 
         /// <summary>

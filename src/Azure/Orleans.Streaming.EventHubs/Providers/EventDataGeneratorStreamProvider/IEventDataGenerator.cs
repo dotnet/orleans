@@ -1,10 +1,6 @@
-using Microsoft.Azure.EventHubs;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Orleans.ServiceBus.Providers.Testing
 {
