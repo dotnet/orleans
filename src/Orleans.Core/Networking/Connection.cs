@@ -37,7 +37,6 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionDelegate middleware;
         private readonly Channel<Message> outgoingMessages;
         private readonly ChannelWriter<Message> outgoingMessageWriter;
-        private readonly object _closeLock = new object();
         private readonly List<Message> inflight = new List<Message>(4);
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private IDuplexPipe _transport;
@@ -113,12 +112,12 @@ namespace Orleans.Runtime.Messaging
             return connection.RunInternal();
         }
 
-        protected virtual async Task RunInternal()
+        protected virtual Task RunInternal()
         {
             _transport = this.Context.Transport;
             _processIncomingTask = this.ProcessIncoming();
             _processOutgoingTask = this.ProcessOutgoing();
-            await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
+            return Task.WhenAll(_processIncomingTask, _processOutgoingTask);
         }
 
         /// <summary>
@@ -130,13 +129,10 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void RetryMessage(Message msg, Exception ex = null);
 
-        public async Task CloseAsync(Exception exception)
+        public Task CloseAsync(Exception exception)
         {
             StartClosing(exception);
-            if (_closeTask is Task task && !task.IsCompleted)
-            {
-                await _closeTask;
-            }
+            return _closeTask;
         }
 
         private void OnTransportConnectionClosed()
@@ -152,18 +148,11 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            TaskCompletionSource<int> completion;
-            lock (_closeLock)
+            var task = new Task<Task>(FinishClosing);
+            if (Interlocked.CompareExchange(ref _closeTask, task.Unwrap(), null) is object)
             {
-                if (_closeTask is object)
-                {
-                    return;
-                }
-
-                completion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
-                _closeTask = completion.Task;
+                return;
             }
-
 
             if (this.Log.IsEnabled(LogLevel.Information))
             {
@@ -173,22 +162,7 @@ namespace Orleans.Runtime.Messaging
                     this);
             }
 
-            _ = WrapCloseAsync(this, completion);
-
-            // Propagate the result of the close method to the task completion source.
-            static async Task WrapCloseAsync(Connection self, TaskCompletionSource<int> completion)
-            {
-                try
-                {
-                    await Task.Yield();
-                    await self.FinishClosing().ConfigureAwait(false);
-                    completion.SetResult(0);
-                }
-                catch (Exception closeException)
-                {
-                    completion.SetException(closeException);
-                }
-            }
+            task.Start();
         }
 
         /// <summary>

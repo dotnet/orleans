@@ -256,12 +256,10 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 // Cancel pending connection attempts either when the host terminates or after the configured time limit.
-                openConnectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.shutdownCancellation.Token);
+                openConnectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.shutdownCancellation.Token, default);
                 openConnectionCancellation.CancelAfter(this.connectionOptions.OpenConnectionTimeout);
 
-                var connection = await this.connectionFactory.ConnectAsync(address, openConnectionCancellation.Token)
-                    .AsTask()
-                    .WithCancellation(openConnectionCancellation.Token);
+                var connection = await this.connectionFactory.ConnectAsync(address, openConnectionCancellation.Token);
 
                 if (this.trace.IsEnabled(LogLevel.Information))
                 {
@@ -283,6 +281,9 @@ namespace Orleans.Runtime.Messaging
                     "Connection attempt to endpoint {EndPoint} failed",
                     address);
 
+                if (exception is OperationCanceledException && openConnectionCancellation?.IsCancellationRequested == true && !shutdownCancellation.IsCancellationRequested)
+                    throw new ConnectionFailedException($"Connection attempt to endpoint {address} timed out after {connectionOptions.OpenConnectionTimeout}");
+
                 throw new ConnectionFailedException(
                     $"Unable to connect to endpoint {address}. See {nameof(exception.InnerException)}", exception);
             }
@@ -292,26 +293,23 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public async Task CloseAsync(SiloAddress endpoint)
+        public Task CloseAsync(SiloAddress endpoint)
         {
             ConnectionEntry entry;
             lock (this.lockObj)
             {
                 if (!this.connections.TryGetValue(endpoint, out entry))
                 {
-                    return;
+                    return Task.CompletedTask;
                 }
 
-                lock (this.lockObj)
+                if (entry.PendingConnection is null)
                 {
-                    if (entry.PendingConnection is null)
-                    {
-                        this.connections.TryRemove(endpoint, out _);
-                    }
+                    this.connections.TryRemove(endpoint, out _);
                 }
             }
 
-            if (entry is ConnectionEntry && !entry.Connections.IsDefault)
+            if (!entry.Connections.IsDefault)
             {
                 var closeTasks = new List<Task>();
                 foreach (var connection in entry.Connections)
@@ -325,8 +323,9 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
 
-                await Task.WhenAll(closeTasks);
+                return Task.WhenAll(closeTasks);
             }
+            return Task.CompletedTask;
         }
 
         public async Task Close(CancellationToken ct)

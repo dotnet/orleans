@@ -2,7 +2,6 @@ using System;
 using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,20 +34,23 @@ namespace Orleans.Networking.Shared
             };
 
             socket.EnableFastPath();
-            var completion = new SingleUseSocketAsyncEventArgs
+            using var completion = new SingleUseSocketAsyncEventArgs
             {
                 RemoteEndPoint = endpoint
             };
-            
-            if (!socket.ConnectAsync(completion))
-            {
-                completion.Complete();
-            }
 
-            await completion;
+            if (socket.ConnectAsync(completion))
+            {
+                using (cancellationToken.Register(s => Socket.CancelConnectAsync((SingleUseSocketAsyncEventArgs)s), completion))
+                {
+                    await completion.Task;
+                }
+            }
 
             if (completion.SocketError != SocketError.Success)
             {
+                if (completion.SocketError == SocketError.OperationAborted)
+                    cancellationToken.ThrowIfCancellationRequested();
                 throw new SocketConnectionException($"Unable to connect to {endpoint}. Error: {completion.SocketError}");
             }
 
@@ -58,20 +60,13 @@ namespace Orleans.Networking.Shared
             return connection;
         }
 
-        public class SingleUseSocketAsyncEventArgs : SocketAsyncEventArgs, ICriticalNotifyCompletion
+        private sealed class SingleUseSocketAsyncEventArgs : SocketAsyncEventArgs
         {
-            private readonly TaskCompletionSource<SingleUseSocketAsyncEventArgs> completion
-                = new TaskCompletionSource<SingleUseSocketAsyncEventArgs>();
+            private readonly TaskCompletionSource<object> completion = new();
 
-            public TaskAwaiter<SingleUseSocketAsyncEventArgs> GetAwaiter() => this.completion.Task.GetAwaiter();
+            public Task Task => completion.Task;
 
-            public void Complete() => this.completion.TrySetResult(this);
-
-            public void OnCompleted(Action continuation) => this.GetAwaiter().OnCompleted(continuation);
-
-            public void UnsafeOnCompleted(Action continuation) => this.GetAwaiter().UnsafeOnCompleted(continuation);
-
-            protected override void OnCompleted(SocketAsyncEventArgs _) => this.completion.TrySetResult(this);
+            protected override void OnCompleted(SocketAsyncEventArgs _) => this.completion.TrySetResult(null);
         }
     }
 
