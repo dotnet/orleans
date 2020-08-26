@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -29,16 +30,21 @@ namespace Orleans.Hosting.Kubernetes
         private readonly string _podLabelSelector;
         private readonly string _podNamespace;
         private readonly string _podName;
+        private readonly ILocalSiloDetails _localSiloDetails;
         private readonly ILogger<KubernetesClusterAgent> _logger;
         private readonly CancellationTokenSource _shutdownToken;
+        private readonly SemaphoreSlim _pauseMonitoringSemaphore = new SemaphoreSlim(0);
+        private volatile bool _enableMonitoring;
         private Task _runTask;
 
         public KubernetesClusterAgent(
             IClusterMembershipService clusterMembershipService,
             ILogger<KubernetesClusterAgent> logger,
             IOptionsMonitor<KubernetesHostingOptions> options,
-            IOptions<ClusterOptions> clusterOptions)
+            IOptions<ClusterOptions> clusterOptions,
+            ILocalSiloDetails localSiloDetails)
         {
+            _localSiloDetails = localSiloDetails;
             _logger = logger;
             _shutdownToken = new CancellationTokenSource();
             _options = options;
@@ -111,12 +117,14 @@ namespace Orleans.Hosting.Kubernetes
             }
 
             // Start monitoring loop
-            _runTask = Task.Run(Run);
+            ThreadPool.UnsafeQueueUserWorkItem(_ => _runTask = Task.WhenAll(Task.Run(MonitorOrleansClustering), Task.Run(MonitorKubernetesPods)), null);
         }
 
         public async Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
         {
             _shutdownToken.Cancel();
+            _enableMonitoring = false;
+            _pauseMonitoringSemaphore.Release();
 
             if (_runTask is object)
             {
@@ -124,7 +132,75 @@ namespace Orleans.Hosting.Kubernetes
             }
         }
 
-        private async Task Run()
+        private async Task MonitorOrleansClustering()
+        {
+            var previous = _clusterMembershipService.CurrentSnapshot;
+            while (!_shutdownToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await foreach (var update in _clusterMembershipService.MembershipUpdates.WithCancellation(_shutdownToken.Token))
+                    {
+                        // Determine which silos should be monitoring Kubernetes
+                        var chosenSilos = _clusterMembershipService.CurrentSnapshot.Members.Values
+                            .Where(s => s.Status == SiloStatus.Active)
+                            .OrderBy(s => s.SiloAddress)
+                            .Take(_options.CurrentValue.MaxAgents)
+                            .ToList();
+
+                        if (!_enableMonitoring && chosenSilos.Any(s => s.SiloAddress.Equals(_localSiloDetails.SiloAddress)))
+                        {
+                            _logger.LogInformation("Enabling Kubernetes monitoring");
+                            _enableMonitoring = true;
+                            _pauseMonitoringSemaphore.Release(1);
+                        }
+                        else if (_enableMonitoring)
+                        {
+                            _logger.LogInformation("Pausing Kubernetes monitoring");
+                            _enableMonitoring = false;
+                        }
+
+                        if (_enableMonitoring && _options.CurrentValue.DeleteDefunctSiloPods)
+                        {
+                            var delta = update.CreateUpdate(previous);
+                            foreach (var change in delta.Changes)
+                            {
+                                if (change.SiloAddress.Equals(_localSiloDetails.SiloAddress))
+                                {
+                                    // Ignore all changes for this silo
+                                    continue;
+                                }
+
+                                if (change.Status == SiloStatus.Dead)
+                                {
+                                    try
+                                    {
+                                        _logger.LogInformation("Silo {SiloAddress} is dead, proceeding to delete the corresponding pod, {PodName}, in namespace {PodNamespace}", change.SiloAddress, change.Name, _podNamespace);
+                                        await _client.DeleteNamespacedPodAsync(change.Name, _podNamespace);
+                                    }
+                                    catch (Exception exception)
+                                    {
+                                        _logger.LogError(exception, "Error deleting pod {PodName} in namespace {PodNamespace}", change.Name, _podNamespace);
+                                    }
+                                }
+                            }
+                        }
+
+                        previous = update;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Error monitoring cluster changes");
+                    if (!_shutdownToken.IsCancellationRequested)
+                    {
+                        await Task.Delay(5000);
+                    }
+                }
+            }
+        }
+
+        private async Task MonitorKubernetesPods()
         {
             var jsonSettings = new JsonSerializerSettings
             {
@@ -132,10 +208,26 @@ namespace Orleans.Hosting.Kubernetes
                 Formatting = Formatting.Indented,
                 NullValueHandling = NullValueHandling.Ignore,
             };
+
             while (!_shutdownToken.IsCancellationRequested)
             {
                 try
                 {
+                    if (!_enableMonitoring)
+                    {
+                        // Pulse the semaphore to avoid spinning in a tight loop.
+                        _logger.LogInformation("Waiting for Kubernetes monitoring to be enabled");
+                        await _pauseMonitoringSemaphore.WaitAsync();
+                        _logger.LogInformation("Woke up after slumber");
+                        continue;
+                    }
+
+                    if (_shutdownToken.IsCancellationRequested)
+                    {
+                        _logger.LogInformation("Shutdown1");
+                        break;
+                    }
+
                     var pods = await _client.ListNamespacedPodWithHttpMessagesAsync(
                         namespaceParameter: _podNamespace,
                         labelSelector: _podLabelSelector,
@@ -144,6 +236,11 @@ namespace Orleans.Hosting.Kubernetes
 
                     await foreach (var (eventType, pod) in pods.WatchAsync<V1PodList, V1Pod>(_shutdownToken.Token))
                     {
+                        if (!_enableMonitoring || _shutdownToken.IsCancellationRequested)
+                        {
+                            _logger.LogInformation("Break loop");
+                            break;
+                        }
 #if false
                         _logger.LogInformation(
                             "Event: {Event} Pod: {Pod}",
@@ -165,7 +262,7 @@ namespace Orleans.Hosting.Kubernetes
                         {
                             // TODO: Remember silo addresses for pods are restarting/terminating
                         }
-                        
+
                         if (eventType == WatchEventType.Deleted)
                         {
                             if (this.TryMatchSilo(pod, out var member) && member.Status != SiloStatus.Dead)
@@ -176,18 +273,18 @@ namespace Orleans.Hosting.Kubernetes
                         }
                     }
 
-                    if (!_shutdownToken.IsCancellationRequested)
+                    if (_enableMonitoring && !_shutdownToken.IsCancellationRequested)
                     {
                         _logger.LogDebug("Unexpected end of stream from Kubernetes API. Will try again.");
-                        await Task.Delay(1000);
+                        await Task.Delay(5000);
                     }
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogError(exception, "Error trying to watch pods");
+                    _logger.LogError(exception, "Error monitoring Kubernetes pods");
                     if (!_shutdownToken.IsCancellationRequested)
                     {
-                        await Task.Delay(1000);
+                        await Task.Delay(5000);
                     }
                 }
             }
