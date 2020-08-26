@@ -238,7 +238,8 @@ namespace Orleans.Hosting
             services.TryAddSingleton<IGrainActivator, DefaultGrainActivator>();
             services.TryAddScoped<ActivationData.GrainActivationContextFactory>();
             services.TryAddScoped<IGrainActivationContext>(sp => sp.GetRequiredService<ActivationData.GrainActivationContextFactory>().Context);
-            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
+            services.AddSingleton<IncomingRequestMonitor>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
 
             services.TryAddSingleton<IStreamSubscriptionManagerAdmin>(sp => new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
             services.TryAddSingleton<IConsistentRingProvider>(
