@@ -124,7 +124,8 @@ namespace Orleans.Runtime
             IOptions<GrainCollectionOptions> collectionOptions,
             IOptionsMonitor<SiloMessagingOptions> messagingOptions,
             RuntimeMessagingTrace messagingTrace,
-            IAsyncTimerFactory timerFactory)
+            IAsyncTimerFactory timerFactory,
+            IncomingRequestMonitor incomingRequestMonitor)
             : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
@@ -161,7 +162,8 @@ namespace Orleans.Runtime
                 loggerFactory,
                 schedulingOptions,
                 messagingTrace,
-                timerFactory);
+                timerFactory,
+                incomingRequestMonitor);
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
 // TODO: figure out how to read config change notification from options. - jbragg
