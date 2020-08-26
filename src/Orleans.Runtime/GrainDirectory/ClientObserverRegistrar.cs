@@ -120,7 +120,7 @@ namespace Orleans.Runtime
         internal void ClientAdded(GrainId clientId)
         {
             // Use a ActivationId that is hashed from clientId, and not random ActivationId.
-            // That way, when we refresh it in the directiry, it's the same one.
+            // That way, when we refresh it in the directory, it's the same one.
             var addr = GetClientActivationAddress(clientId);
             scheduler.QueueTask(
                 () => ExecuteWithRetries(() => grainDirectory.RegisterAsync(addr, singleActivation:false), ErrorCode.ClientRegistrarFailedToRegister, String.Format("Directory.RegisterAsync {0} failed.", addr)),
