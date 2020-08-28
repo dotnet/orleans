@@ -35,6 +35,16 @@ namespace Orleans.Hosting.Kubernetes
         /// </summary>
         public const string ServiceIdEnvironmentVariable = "ORLEANS_SERVICE_ID";
 
+        /// <summary>
+        /// The name of the <see cref="Orleans.Configuration.ClusterOptions.ServiceId"/> label on the pod.
+        /// </summary>
+        public const string ServiceIdLabel = "orleans/serviceId";
+
+        /// <summary>
+        /// The name of the <see cref="Orleans.Configuration.ClusterOptions.ClusterId"/> label on the pod.
+        /// </summary>
+        public const string ClusterIdLabel = "orleans/clusterId";
+
         public KubernetesHostingOptions()
         {
             _clientConfiguration = new Lazy<KubernetesClientConfiguration>(() => this.GetClientConfiguration());
