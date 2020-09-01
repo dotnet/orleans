@@ -62,7 +62,7 @@
     <MicrosoftBuildVersion>16.4.0</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>3.4.0</MicrosoftCodeAnalysisVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
-    <MicrosoftBclAsyncInterfacesVersion>1.1.0</MicrosoftBclAsyncInterfacesVersion>
+    <MicrosoftBclAsyncInterfacesVersion>1.1.1</MicrosoftBclAsyncInterfacesVersion>
     <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.0</MicrosoftNETFrameworkReferenceAssembliesVersion>
     <MicrosoftBclHashCodeVersion>1.0.0</MicrosoftBclHashCodeVersion>
 
@@ -76,6 +76,7 @@
     <MicrosoftExtensionsLoggingVersion>3.0.0</MicrosoftExtensionsLoggingVersion>
     <MicrosoftExtensionsObjectPoolVersion>3.0.0</MicrosoftExtensionsObjectPoolVersion>
     <MicrosoftExtensionsOptionsVersion>3.0.0</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsHttpVersion>3.0.0</MicrosoftExtensionsHttpVersion>
     <MicrosoftExtensionsHostingAbstractionsVersion>3.0.0</MicrosoftExtensionsHostingAbstractionsVersion>
     <MicrosoftExtensionsHostingVersion>3.0.0</MicrosoftExtensionsHostingVersion>
 
@@ -107,6 +108,7 @@
     <NSubstituteAnalyzersCSharpVersion>1.0.10</NSubstituteAnalyzersCSharpVersion>
     <ZooKeeperNetExVersion>3.4.12.1</ZooKeeperNetExVersion>
     <StackExchangeRedis>2.0.601</StackExchangeRedis>
+    <KubernetesClientVersion>2.0.29</KubernetesClientVersion>
 
     <!-- Test related packages -->
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
