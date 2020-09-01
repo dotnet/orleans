@@ -63,9 +63,9 @@ namespace Orleans.Runtime
             // Handle entries which were removed entirely.
             foreach (var entry in previous.Members)
             {
-                if (!this.Members.TryGetValue(entry.Key, out var newEntry))
+                if (!this.Members.TryGetValue(entry.Key, out _))
                 {
-                    changes.Add(new ClusterMember(entry.Key, SiloStatus.Dead));
+                    changes.Add(new ClusterMember(entry.Key, SiloStatus.Dead, entry.Value.Name));
                 }
             }
 
