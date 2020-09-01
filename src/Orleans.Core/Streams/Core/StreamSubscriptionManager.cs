@@ -23,7 +23,7 @@ namespace Orleans.Streams.Core
             var consumer = grainRef.AsReference<IStreamConsumerExtension>();
             var internalStreamId = new InternalStreamId(streamProviderName, streamId);
             var subscriptionId = streamPubSub.CreateSubscriptionId(internalStreamId, consumer);
-            await streamPubSub.RegisterConsumer(subscriptionId, internalStreamId, consumer);
+            await streamPubSub.RegisterConsumer(subscriptionId, internalStreamId, consumer, null);
             var newSub = new StreamSubscription(subscriptionId.Guid, streamProviderName, streamId, grainRef.GrainId);
             return newSub;
         }

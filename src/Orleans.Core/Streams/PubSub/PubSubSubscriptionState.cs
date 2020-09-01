@@ -27,7 +27,7 @@ namespace Orleans.Streams
         public GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
 
         [JsonProperty]
-        public object filterWrapper; // Serialized func info
+        public string FilterData; // Serialized func info
 
         [JsonProperty]
         public SubscriptionStates state;
@@ -49,6 +49,11 @@ namespace Orleans.Streams
             Stream = streamId;
             consumerReference = streamConsumer as GrainReference;
             state = SubscriptionStates.Active;
+        }
+
+        public void AddFilter(string filterData)
+        {
+            this.FilterData = filterData;
         }
 
         public override bool Equals(object obj)

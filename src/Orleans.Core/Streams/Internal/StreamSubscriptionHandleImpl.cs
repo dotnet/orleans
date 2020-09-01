@@ -10,6 +10,7 @@ namespace Orleans.Streams
     internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
     {
         private StreamImpl<T> streamImpl;
+        private readonly string filterData;
         private readonly GuidId subscriptionId;
         private readonly bool isRewindable;
 
@@ -28,16 +29,23 @@ namespace Orleans.Streams
         public override Guid HandleId { get { return subscriptionId.Guid; } }
 
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
-            : this(subscriptionId, null, null, streamImpl, null)
+            : this(subscriptionId, null, null, streamImpl, null, null)
         {
         }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, IAsyncBatchObserver<T> batchObserver, StreamImpl<T> streamImpl, StreamSequenceToken token)
+        public StreamSubscriptionHandleImpl(
+            GuidId subscriptionId,
+            IAsyncObserver<T> observer,
+            IAsyncBatchObserver<T> batchObserver,
+            StreamImpl<T> streamImpl,
+            StreamSequenceToken token,
+            string filterData)
         {
             this.subscriptionId = subscriptionId ?? throw new ArgumentNullException("subscriptionId");
             this.observer = observer;
             this.batchObserver = batchObserver;
             this.streamImpl = streamImpl ?? throw new ArgumentNullException("streamImpl");
+            this.filterData = filterData;
             this.isRewindable = streamImpl.IsRewindable;
             if (IsRewindable)
             {
