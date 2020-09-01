@@ -62,6 +62,8 @@ namespace Orleans.Runtime
             }
         }
 
+        public async Task<bool> TryKill(SiloAddress siloAddress) => await this.membershipTableManager.TryKill(siloAddress);
+
         private async Task ProcessMembershipUpdates(CancellationToken ct)
         {
             try
