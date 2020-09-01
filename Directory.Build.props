@@ -102,8 +102,8 @@
     <FSharpCoreVersion>4.7.0</FSharpCoreVersion>
 
     <!-- 3rd party packages -->
-    <AWSSDKDynamoDBv2Version>3.3.102.2</AWSSDKDynamoDBv2Version>
-    <AWSSDKSQSVersion>3.3.2.7</AWSSDKSQSVersion>
+    <AWSSDKDynamoDBv2Version>3.5.0.7</AWSSDKDynamoDBv2Version>
+    <AWSSDKSQSVersion>3.5.0.7</AWSSDKSQSVersion>
     <BondCoreCSharpVersion>5.3.1</BondCoreCSharpVersion>
     <ConsulVersion>0.7.2.3</ConsulVersion>
     <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
