@@ -10,5 +10,10 @@ namespace Orleans.Runtime
         IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates { get; }
 
         ValueTask Refresh(MembershipVersion minimumVersion = default);
+
+        /// <summary>
+        /// Unilaterally declares the specified silo defunct.
+        /// </summary>
+        Task<bool> TryKill(SiloAddress siloAddress);
     }
 }

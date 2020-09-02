@@ -202,9 +202,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Connections.Securit
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.GrainDirectory.AzureStorage", "src\Azure\Orleans.GrainDirectory.AzureStorage\Orleans.GrainDirectory.AzureStorage.csproj", "{16B9B850-ED3B-4B45-B0F2-3F802D44F382}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.GrainDirectory.Redis", "src\Orleans.GrainDirectory.Redis\Orleans.GrainDirectory.Redis.csproj", "{CCEF897C-F4F8-48F0-8F95-CC1487EE2936}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.GrainDirectory.Redis", "src\Orleans.GrainDirectory.Redis\Orleans.GrainDirectory.Redis.csproj", "{CCEF897C-F4F8-48F0-8F95-CC1487EE2936}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tester.Redis", "test\Extensions\Tester.Redis\Tester.Redis.csproj", "{F13247A0-70C9-4200-9CB1-2002CB8105E0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.Redis", "test\Extensions\Tester.Redis\Tester.Redis.csproj", "{F13247A0-70C9-4200-9CB1-2002CB8105E0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Hosting.Kubernetes", "src\Orleans.Hosting.Kubernetes\Orleans.Hosting.Kubernetes.csproj", "{D1214CD3-EB99-4420-9E30-A50ACFD66A48}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -1248,6 +1250,18 @@ Global
 		{F13247A0-70C9-4200-9CB1-2002CB8105E0}.Release|x64.Build.0 = Release|Any CPU
 		{F13247A0-70C9-4200-9CB1-2002CB8105E0}.Release|x86.ActiveCfg = Release|Any CPU
 		{F13247A0-70C9-4200-9CB1-2002CB8105E0}.Release|x86.Build.0 = Release|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Debug|x64.Build.0 = Debug|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Debug|x86.Build.0 = Debug|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Release|x64.ActiveCfg = Release|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Release|x64.Build.0 = Release|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Release|x86.ActiveCfg = Release|Any CPU
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1352,6 +1366,7 @@ Global
 		{16B9B850-ED3B-4B45-B0F2-3F802D44F382} = {4C5D66BF-EE1C-4DD8-8551-D1B7F3768A34}
 		{CCEF897C-F4F8-48F0-8F95-CC1487EE2936} = {FE2E08C6-9C3B-4AEE-AE07-CCA387580D7A}
 		{F13247A0-70C9-4200-9CB1-2002CB8105E0} = {082D25DB-70CA-48F4-93E0-EC3455F494B8}
+		{D1214CD3-EB99-4420-9E30-A50ACFD66A48} = {FE2E08C6-9C3B-4AEE-AE07-CCA387580D7A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}
