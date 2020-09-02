@@ -129,5 +129,10 @@ namespace Orleans
                 return result;
             }
         }
+
+        public void ReceiveMessage(object message)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

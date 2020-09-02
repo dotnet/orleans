@@ -51,6 +51,8 @@ namespace Orleans.Runtime
         /// Gets the component of the specified type.
         /// </summary>
         TComponent GetComponent<TComponent>();
+
+        void ReceiveMessage(object message);
     }
 
     internal interface IActivationData : IGrainContext

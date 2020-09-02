@@ -39,6 +39,8 @@ namespace UnitTests.SchedulerTests
 
         public TComponent GetComponent<TComponent>() => throw new NotImplementedException();
 
+        public void ReceiveMessage(object message) => throw new NotImplementedException();
+
         public void SetComponent<TComponent>(TComponent value) => throw new NotImplementedException();
 
         bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);

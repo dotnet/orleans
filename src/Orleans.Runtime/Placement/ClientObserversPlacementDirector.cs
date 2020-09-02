@@ -1,6 +1,4 @@
-using Orleans.GrainDirectory;
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Placement
@@ -13,20 +11,28 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal class ClientObserversPlacementDirector : RandomPlacementDirector
     {
-        public override async Task<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
+        public override ValueTask<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
-            // no need to check if we can find an activation for this client in the cache or local directory partition
-            // as TrySelectActivationSynchronously which checks for that should have been called before 
-            List<ActivationAddress> addresses;
-
-            // we need to look up the directory entry for this grain on a remote silo
             if (!ClientGrainId.TryParse(target, out var clientId))
             {
                 throw new InvalidOperationException($"Unsupported id format: {target}");
             }
+            
+            var grainId = clientId.GrainId;
+            
+            if (context.FastLookup(grainId, out var addresses))
+            {
+                var placementResult = ChooseRandomActivation(addresses, context);
+                return new ValueTask<PlacementResult>(placementResult);
+            }
 
-            addresses = await context.FullLookup(clientId.GrainId);
-            return ChooseRandomActivation(addresses, context);
+            return SelectActivationAsync(grainId, context);
+
+            async ValueTask<PlacementResult> SelectActivationAsync(GrainId target, IPlacementRuntime context)
+            {
+                var places = await context.FullLookup(target);
+                return ChooseRandomActivation(places, context);
+            }
         }
         
         public override Task<SiloAddress> OnAddActivation(

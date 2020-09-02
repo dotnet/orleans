@@ -153,10 +153,10 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     internal class StreamLifecycleConsumerGrain : StreamLifecycleTestGrainBase, IStreamLifecycleConsumerGrain
     {
-        protected readonly ISiloRuntimeClient runtimeClient;
+        protected readonly InsideRuntimeClient runtimeClient;
         protected readonly IStreamProviderRuntime streamProviderRuntime;
 
-        public StreamLifecycleConsumerGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime, ILoggerFactory loggerFactory) : base(loggerFactory)
+        public StreamLifecycleConsumerGrain(InsideRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime, ILoggerFactory loggerFactory) : base(loggerFactory)
         {
             this.runtimeClient = runtimeClient;
             this.streamProviderRuntime = streamProviderRuntime;
@@ -282,7 +282,7 @@ namespace UnitTests.Grains
         private const int FilterDataOdd = 1;
         private const int FilterDataEven = 2;
 
-        public FilteredStreamConsumerGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime, ILoggerFactory loggerFactory)
+        public FilteredStreamConsumerGrain(InsideRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime, ILoggerFactory loggerFactory)
             : base(runtimeClient, streamProviderRuntime, loggerFactory)
         {
             staticLogger = loggerFactory.CreateLogger<FilteredStreamConsumerGrain>();

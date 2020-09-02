@@ -29,6 +29,8 @@ namespace Orleans.Runtime
         private readonly IServiceScope serviceScope;
         public readonly TimeSpan CollectionAgeLimit;
         private readonly GrainTypeComponents _shared;
+        private readonly ActivationMessageScheduler _messageScheduler;
+        private readonly Action<object> _receiveMessageInScheduler;
         private HashSet<IGrainTimer> timers;
         private Dictionary<Type, object> _components;
 
@@ -39,18 +41,21 @@ namespace Orleans.Runtime
             TimeSpan ageLimit,
             IOptions<SiloMessagingOptions> messagingOptions,
             TimeSpan maxWarningRequestProcessingTime,
-			TimeSpan maxRequestProcessingTime,
+            TimeSpan maxRequestProcessingTime,
             ILoggerFactory loggerFactory,
             IServiceProvider applicationServices,
             IGrainRuntime grainRuntime,
             GrainReferenceActivator referenceActivator,
-            GrainTypeComponents sharedComponents)
+            GrainTypeComponents sharedComponents,
+            ActivationMessageScheduler messageScheduler)
         {
             if (null == addr) throw new ArgumentNullException(nameof(addr));
             if (null == placedUsing) throw new ArgumentNullException(nameof(placedUsing));
             if (null == collector) throw new ArgumentNullException(nameof(collector));
 
+            _receiveMessageInScheduler = state => this.ReceiveMessageInScheduler(state);
             _shared = sharedComponents;
+            _messageScheduler = messageScheduler;
             logger = loggerFactory.CreateLogger<ActivationData>();
             this.lifecycle = new GrainLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
             this.maxRequestProcessingTime = maxRequestProcessingTime;
@@ -77,6 +82,27 @@ namespace Orleans.Runtime
         public IServiceProvider ActivationServices => this.serviceScope.ServiceProvider;
 
         internal WorkItemGroup WorkItemGroup { get; set; }
+
+        public async ValueTask ActivateAsync(CancellationToken cancellation)
+        {
+            await this.Lifecycle.OnStart(cancellation);
+
+            lock (this)
+            {
+                if (this.State == ActivationState.Activating)
+                {
+                    this.SetState(ActivationState.Valid); // Activate calls on this activation are finished
+                }
+
+                if (!this.IsCurrentlyExecuting)
+                {
+                    this.RunOnInactive();
+                }
+
+                // Run message pump to see if there is a new request is queued to be processed
+                _messageScheduler.RunMessagePump(this);
+            }
+        }
 
         public TComponent GetComponent<TComponent>()
         {
@@ -407,9 +433,8 @@ namespace Orleans.Runtime
         /// Check whether this activation is overloaded. 
         /// Returns LimitExceededException if overloaded, otherwise <c>null</c>c>
         /// </summary>
-        /// <param name="log">Logger to use for reporting any overflow condition</param>
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
-        public LimitExceededException CheckOverloaded(ILogger log)
+        public LimitExceededException CheckOverloaded()
         {
             string limitName = LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
             int maxRequestsHardLimit = this.messagingOptions.MaxEnqueuedRequestsHardLimit;
@@ -427,17 +452,24 @@ namespace Orleans.Runtime
 
             if (maxRequestsHardLimit > 0 && count > maxRequestsHardLimit) // Hard limit
             {
-                log.Warn(ErrorCode.Catalog_Reject_ActivationTooManyRequests, 
-                    String.Format("Overload - {0} enqueued requests for activation {1}, exceeding hard limit rejection threshold of {2}",
-                        count, this, maxRequestsHardLimit));
+                this.logger.LogWarning(
+                    (int)ErrorCode.Catalog_Reject_ActivationTooManyRequests,
+                    "Overload - {Count} enqueued requests for activation {Activation}, exceeding hard limit rejection threshold of {HardLimit}",
+                    count,
+                    this,
+                    maxRequestsHardLimit);
 
                 return new LimitExceededException(limitName, count, maxRequestsHardLimit, this.ToString());
             }
+
             if (maxRequestsSoftLimit > 0 && count > maxRequestsSoftLimit) // Soft limit
             {
-                log.Warn(ErrorCode.Catalog_Warn_ActivationTooManyRequests,
-                    String.Format("Hot - {0} enqueued requests for activation {1}, exceeding soft limit warning threshold of {2}",
-                        count, this, maxRequestsSoftLimit));
+                this.logger.LogWarning(
+                    (int)ErrorCode.Catalog_Warn_ActivationTooManyRequests,
+                    "Hot - {Count} enqueued requests for activation {Activation}, exceeding soft limit warning threshold of {SoftLimit}",
+                    count,
+                    this,
+                    maxRequestsSoftLimit);
                 return null;
             }
 
@@ -866,6 +898,31 @@ namespace Orleans.Runtime
 
             this.SetComponent<TExtensionInterface>(typedResult);
             return typedResult;
+        }
+
+        public void ReceiveMessage(object message)
+        {
+            var msg = (Message)message;
+            lock (this)
+            {
+                this.IncrementEnqueuedOnDispatcherCount();
+
+                // Enqueue the handler on the activation's scheduler
+                var task = new Task(_receiveMessageInScheduler, msg);
+                task.Start(this.WorkItemGroup.TaskScheduler);
+            }
+        }
+
+        private void ReceiveMessageInScheduler(object state)
+        {
+            try
+            {
+                _messageScheduler.ReceiveMessage(this, (Message)state);
+            }
+            finally
+            {
+                this.DecrementEnqueuedOnDispatcherCount();
+            }
         }
     }
 
