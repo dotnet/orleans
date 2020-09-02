@@ -9,9 +9,12 @@ The idea is to track end-user facing changes as they occur.*
 
 ### [3.3.0-rc1] (changes since 3.2.2)
 
+- Potentially breaking change
+  - Added 'RecordExists' flag to perisistent store so that grains can det… (#6580)
+    (Implementations of `IStorage<TState>` and `IGrainState` need to be updated to add a RecordExists property.)
+
 - Non-breaking improvements
   - Improve ClusterClient disposal (#6583)
-  - Added 'RecordExists' flag to perisistent store so that grains can det… (#6580)
   - AAD authentication for Azure providers (blob, queue & table) (#6648)
   - Make delay after gw shutdown notification configurable (#6679)
   - Tweak shutdown completion signalling (#6685) (#6696)
