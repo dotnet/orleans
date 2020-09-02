@@ -59,7 +59,7 @@
         ]
       }
     ],
-    "dest": "../../_output",
+    "dest": "../_site",
     "template": [
       "default", "template"
     ],
@@ -69,7 +69,7 @@
       "_enableSearch": true,
       "_gitContribute": {
         "repo": "https://github.com/dotnet/orleans",
-        "branch": "docs",
+        "branch": "docs"
       },
 	  "_gitUrlPattern": "github",
     "_docfxVersion": "2"
