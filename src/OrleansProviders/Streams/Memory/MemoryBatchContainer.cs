@@ -53,11 +53,6 @@ namespace Orleans.Providers
             return false;
         }
 
-        public bool ShouldDeliver(StreamId stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
-        {
-            return true;
-        }
-
         void IOnDeserialized.OnDeserialized(ISerializerContext context)
         {
             this.serializer = MemoryMessageBodySerializerFactory<TSerializer>.GetOrCreateSerializer(context.ServiceProvider);

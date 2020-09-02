@@ -57,16 +57,6 @@ namespace Orleans.Providers.Streams.AzureQueue
             return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
         }
 
-        public bool ShouldDeliver(StreamId stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
-        {
-            foreach (object item in events)
-            {
-                if (shouldReceiveFunc(stream, filterData, item))
-                    return true; // There is something in this batch that the consumer is intereted in, so we should send it.
-            }
-            return false; // Consumer is not interested in any of these events, so don't send.
-        }
-
         public bool ImportRequestContext()
         {
             if (requestContext != null)

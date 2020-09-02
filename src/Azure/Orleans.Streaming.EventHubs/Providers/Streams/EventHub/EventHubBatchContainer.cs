@@ -86,14 +86,6 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Decide whether this batch should be sent to the specified target.
-        /// </summary>
-        public bool ShouldDeliver(StreamId stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
-        {
-            return true;
-        }
-
-        /// <summary>
         /// Put events list and its context into a EventData object
         /// </summary>
         /// <typeparam name="T"></typeparam>

@@ -19,20 +19,22 @@ namespace Orleans.Streams
         // Implement ISerializable if changing any of them to readonly
         [JsonProperty]
         public GuidId SubscriptionId;
+
         [JsonProperty]
         public InternalStreamId Stream;
+
         [JsonProperty]
         public GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
+
         [JsonProperty]
         public object filterWrapper; // Serialized func info
+
         [JsonProperty]
         public SubscriptionStates state;
 
         // This property does not need to be Json serialized, since we already have producerReference.
         [JsonIgnore]
         public IStreamConsumerExtension Consumer { get { return consumerReference as IStreamConsumerExtension; } }
-        [JsonIgnore]
-        public IStreamFilterPredicateWrapper Filter { get { return filterWrapper as IStreamFilterPredicateWrapper; } }
         [JsonIgnore]
         public bool IsFaulted { get { return state == SubscriptionStates.Faulted; } }
 
@@ -49,31 +51,13 @@ namespace Orleans.Streams
             state = SubscriptionStates.Active;
         }
 
-        internal void AddFilter(IStreamFilterPredicateWrapper newFilter)
-        {
-            if (filterWrapper == null)
-            {
-                // No existing filter - add single
-                filterWrapper = newFilter;
-            }
-            else if (filterWrapper is OrFilter)
-            {
-                // Existing multi-filter - add new filter to it
-                ((OrFilter)filterWrapper).AddFilter(newFilter);
-            }
-            else
-            {
-                // Exsiting single filter - convert to multi-filter
-                filterWrapper = new OrFilter(Filter, newFilter);
-            }
-        }
-
         public override bool Equals(object obj)
         {
             if (ReferenceEquals(null, obj)) return false;
             // Note: Can't use the 'as' operator on PubSubSubscriptionState because it is a struct.
             return obj is PubSubSubscriptionState && Equals((PubSubSubscriptionState) obj);
         }
+
         public bool Equals(PubSubSubscriptionState other)
         {
             if ((object)other == null)
@@ -81,6 +65,7 @@ namespace Orleans.Streams
             // Note: PubSubSubscriptionState is a struct, so 'other' can never be null.
             return Equals(other.SubscriptionId);
         }
+
         public bool Equals(GuidId subscriptionId)
         {
             if (ReferenceEquals(null, subscriptionId)) return false;

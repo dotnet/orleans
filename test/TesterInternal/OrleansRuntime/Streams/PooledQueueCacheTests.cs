@@ -45,11 +45,6 @@ namespace UnitTests.OrleansRuntime.Streams
             {
                 throw new NotImplementedException();
             }
-
-            public bool ShouldDeliver(StreamId stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
-            {
-                throw new NotImplementedException();
-            }
         }
 
 

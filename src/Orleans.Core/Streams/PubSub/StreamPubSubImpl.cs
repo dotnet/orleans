@@ -41,11 +41,11 @@ namespace Orleans.Streams
             return explicitPubSub.UnregisterProducer(streamId, streamProducer);
         }
 
-        public Task RegisterConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
+        public Task RegisterConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer)
         {
             return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
-                ? implicitPubSub.RegisterConsumer(subscriptionId, streamId, streamConsumer, filter)
-                : explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamConsumer, filter);
+                ? implicitPubSub.RegisterConsumer(subscriptionId, streamId, streamConsumer)
+                : explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamConsumer);
         }
 
         public Task UnregisterConsumer(GuidId subscriptionId, InternalStreamId streamId)

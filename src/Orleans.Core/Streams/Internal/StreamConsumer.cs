@@ -56,11 +56,9 @@ namespace Orleans.Streams
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
             IAsyncObserver<T> observer,
-            StreamSequenceToken token,
-            StreamFilterPredicate filterFunc = null,
-            object filterData = null)
+            StreamSequenceToken token)
         {
-            return SubscribeAsyncImpl(observer, null, token, filterFunc, filterData);
+            return SubscribeAsyncImpl(observer, null, token);
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver)
@@ -76,9 +74,7 @@ namespace Orleans.Streams
         private async Task<StreamSubscriptionHandle<T>> SubscribeAsyncImpl(
             IAsyncObserver<T> observer,
             IAsyncBatchObserver<T> batchObserver,
-            StreamSequenceToken token,
-            StreamFilterPredicate filterFunc = null,
-            object filterData = null)
+            StreamSequenceToken token)
         {
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
@@ -89,10 +85,6 @@ namespace Orleans.Streams
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Subscribe Token={Token}", token);
             await BindExtensionLazy();
-
-            IStreamFilterPredicateWrapper filterWrapper = null;
-            if (filterFunc != null)
-                filterWrapper = new FilterPredicateWrapperData(filterData, filterFunc);
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Subscribe - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
                 pubSub, myGrainReference, token);
@@ -111,10 +103,10 @@ namespace Orleans.Streams
             // and undo it in the case of failure. 
             // There is no problem with that we call myExtension.SetObserver too early before the handle is registered in pub sub,
             // since this subscriptionId is unique (random Guid) and no one knows it anyway, unless successfully subscribed in the pubsub.
-            var subriptionHandle = myExtension.SetObserver(subscriptionId, stream, observer, batchObserver, token, filterWrapper);
+            var subriptionHandle = myExtension.SetObserver(subscriptionId, stream, observer, batchObserver, token);
             try
             {
-                await pubSub.RegisterConsumer(subscriptionId, stream.InternalStreamId, myGrainReference, filterWrapper);
+                await pubSub.RegisterConsumer(subscriptionId, stream.InternalStreamId, myGrainReference);
                 return subriptionHandle;
             }
             catch (Exception)
@@ -158,7 +150,7 @@ namespace Orleans.Streams
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resume - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
                 pubSub, myGrainReference, token);
 
-            StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, batchObserver, token, null);
+            StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, batchObserver, token);
 
             // On failure caller should be able to retry using the original handle, so invalidate old handle only if everything succeeded.  
             oldHandleImpl.Invalidate();
