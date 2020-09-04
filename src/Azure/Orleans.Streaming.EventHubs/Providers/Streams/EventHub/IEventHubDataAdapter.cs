@@ -12,5 +12,9 @@ namespace Orleans.ServiceBus.Providers
         StreamPosition GetStreamPosition(string partition, EventData queueMessage);
 
         string GetOffset(CachedMessage cachedMessage);
+
+        string GetPartitionKey(Guid streamGuid, string streamNamespace);
+
+        IStreamIdentity GetStreamIdentity(EventData queueMessage);
     }
 }
