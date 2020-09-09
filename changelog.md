@@ -7,6 +7,42 @@ All notable end-user facing changes are documented in this file.
 *Here are all the changes in `master` branch, and will be moved to the appropriate release once they are included in a published nuget package.
 The idea is to track end-user facing changes as they occur.*
 
+### [3.3.0] (changes since 3.2.0)
+
+- Potentially breaking change
+  - Added 'RecordExists' flag to perisistent store so that grains can det… (#6580)
+    (Implementations of `IStorage<TState>` and `IGrainState` need to be updated to add a RecordExists property.)
+
+- Non-breaking improvements
+  - Use "static" client observer to notify from the gateway when the silo is shutting down (#6613)
+  - More graceful termination of network connections (#6557) (#6625)
+  - Use TaskCompletionSource.RunContinuationsAsynchronously (#6573)
+  - Observe discarded ping task results (#6577)
+  - Constrain work done under a lock in BatchWorker (#6586)
+  - Support deterministic builds with CodeGenerator (#6592)
+  - Fix some xUnit test discovery issues (#6584)
+  - Delete old Joining records as part of cleanup of defunct entries (#6601, #6624)
+  - Propagate transaction exceptions in more cases (#6615)
+  - SocketConnectionListener: allow address reuse (#6653)Improve ClusterClient disposal (#6583)
+  - AAD authentication for Azure providers (blob, queue & table) (#6648)
+  - Make delay after gw shutdown notification configurable (#6679)
+  - Tweak shutdown completion signalling (#6685) (#6696)
+  - Close some kinds of misbehaving connections during shutdown (#6684) (#6695)
+  - Send status messages for long-running and blocked requests (#6672) (#6694)
+  - Kubernetes hosting integration (#6707) (#6721)
+  - Reduce log noise (#6705)
+  - Upgrade AWS dependencies to their latest versions. (#6723)
+
+- Non-breaking bug fixes
+  - Fix SequenceNumber for MemoryStream (#6622) (#6623)
+  - When activation is stuck, make sure to unregister from the directory before forwarding messages (#6593)
+  - Fix call pattern that throws. (#6626)
+  - Avoid NullReferenceException in Message.TargetAddress (#6635)
+  - Fix unobserved ArgumentOutOfRangeException from Task.Delay (#6640)
+  - Fix bad merge (#6656)
+  - Avoid race in GatewaySender.Send (#6655)
+  - Ensure that only one instance of IncomingRequestMonitor is created (#6714)
+
 ### [3.3.0-rc2] (changes since 3.3.0-rc1)
 
 - Non-breaking improvements
