@@ -1,7 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <Configurations>Debug;Release;Production</Configurations>
     <AssemblyName>OneBoxDeployment.IntegrationTests</AssemblyName>
@@ -28,24 +28,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dapper" Version="2.0.35" />
+    <PackageReference Include="Dapper" Version="2.0.78" />
     <PackageReference Include="ErrorProne.NET.Structs" Version="$(ErrorProneNETStructsVersion)">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="IdentityModel.OidcClient" Version="3.1.2" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="3.1.5" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="3.1.5" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="3.1.5" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="3.1.5" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="3.1.5" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.1.5" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="3.1.5" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.6.1" />
-    <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="3.2.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
-    <PackageReference Include="refit" Version="5.1.67" />
-    <PackageReference Include="Refit.HttpClientFactory" Version="5.1.67" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="2.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="5.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.8.3" />
+    <PackageReference Include="Microsoft.Orleans.OrleansRuntime" Version="3.3.0" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="3.0.1" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="1.1.0" />
     <PackageReference Include="Serilog.Settings.AppSettings" Version="2.2.2" />
@@ -54,10 +50,9 @@
     <PackageReference Include="Serilog.Sinks.Literate" Version="3.0.0" />
     <PackageReference Include="Serilog.Sinks.RollingFile" Version="3.3.0" />
     <PackageReference Include="Serilog.Sinks.XUnit" Version="2.0.4" />
-    <PackageReference Include="System.Data.SqlClient" Version="4.8.1" />
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="Xunit.Extensions.Ordering" Version="1.4.5" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.2">
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
@@ -98,7 +93,4 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
-  <ProjectExtensions><VisualStudio><UserProperties __JSONSchema="" /></VisualStudio></ProjectExtensions>
-
 </Project>

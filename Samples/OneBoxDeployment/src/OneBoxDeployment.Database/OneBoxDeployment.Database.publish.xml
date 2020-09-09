@@ -15,7 +15,7 @@
       <Value>Debug</Value>
     </SqlCmdVariable>
     <SqlCmdVariable Include="ProjectDir">
-      <Value>C:\projektit\testit\orleans\Samples\OneBoxDeployment\src\OneBoxDeployment.Database</Value>
+      <Value></Value>
     </SqlCmdVariable>
   </ItemGroup>
 </Project>

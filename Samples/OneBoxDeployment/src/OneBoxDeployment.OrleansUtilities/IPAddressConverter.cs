@@ -1,24 +1,27 @@
-﻿using Newtonsoft.Json;
 using System;
 using System.Net;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace OneBoxDeployment.OrleansUtilities
 {
-    public class IPAddressConverter: JsonConverter
+    /// <summary>
+	/// Converts <see cref="IPAddress"/> to and from strings.
+	/// </summary>
+	public class IPAddressConverter: JsonConverter<IPAddress>
     {
-        public override bool CanConvert(Type objectType)
+        /// <inheritdoc/>
+        public override IPAddress Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            return (objectType == typeof(IPAddress));
+            if(reader.TokenType != JsonTokenType.String)
+            {
+                throw new JsonException();
+            }
+
+            return IPAddress.Parse(reader.GetString());
         }
 
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            writer.WriteValue(value.ToString());
-        }
-
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            return IPAddress.Parse((string)reader.Value);
-        }
+        /// <inheritdoc/>
+        public override void Write(Utf8JsonWriter writer, IPAddress value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToString());
     }
 }

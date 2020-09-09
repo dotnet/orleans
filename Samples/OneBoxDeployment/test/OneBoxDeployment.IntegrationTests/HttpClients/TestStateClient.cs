@@ -18,7 +18,7 @@ namespace OneBoxDeployment.IntegrationTests.HttpClients
         private IHttpClientFactory ClientFactory { get; }
 
         /// <summary>
-        /// The path fragment to the CSP report endpoint.
+        /// The path fragment to the Orleans stateful grain testing endpoint.
         /// </summary>
         public static string TestStatePathFragment = "api/OneBoxDeployment/increment";
 
