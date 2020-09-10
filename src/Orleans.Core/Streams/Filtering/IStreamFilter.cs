@@ -10,7 +10,7 @@ namespace Orleans.Streams.Filtering
         bool ShouldDeliver(StreamId streamId, object item, string filterData);
     }
 
-    internal class NoOpStreamFilter : IStreamFilter
+    internal sealed class NoOpStreamFilter : IStreamFilter
     {
         public bool ShouldDeliver(StreamId streamId, object item, string filterData) => true;
     }

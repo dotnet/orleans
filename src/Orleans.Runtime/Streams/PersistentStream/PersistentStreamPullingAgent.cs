@@ -809,6 +809,9 @@ namespace Orleans.Streams
 
         private bool ShouldDeliverBatch(StreamId streamId, IBatchContainer batchContainer, string filterData)
         {
+            if (this.streamFilter is NoOpStreamFilter)
+                return true;
+
             try
             {
                 foreach (var evt in batchContainer.GetEvents<object>())
