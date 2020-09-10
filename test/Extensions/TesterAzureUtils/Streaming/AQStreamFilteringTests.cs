@@ -21,6 +21,7 @@ namespace Tester.AzureUtils.Streaming
 
         public AQStreamFilteringTests(Fixture fixture) : base(fixture)
         {
+            fixture.EnsurePreconditionsMet();
         }
 
         public class Fixture : BaseAzureTestClusterFixture
@@ -63,19 +64,24 @@ namespace Tester.AzureUtils.Streaming
                         .AddStreamFilter<CustomStreamFilter>(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME);
                 }
             }
+
+            protected override void CheckPreconditionsOrThrow()
+            {
+                TestUtils.CheckForEventHub();
+            }
         }
 
         protected override string ProviderName => StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
 
         protected override TimeSpan WaitTime => TimeSpan.FromSeconds(2);
 
-        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
+        [SkippableFact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
         public async override Task IgnoreBadFilter() => await base.IgnoreBadFilter();
 
-        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
+        [SkippableFact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
         public async override Task OnlyEvenItems() => await base.OnlyEvenItems();
 
-        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
+        [SkippableFact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("Filters")]
         public async override Task MultipleSubscriptionsDifferentFilterData() => await base.MultipleSubscriptionsDifferentFilterData();
 
         public Task InitializeAsync() => Task.CompletedTask;
