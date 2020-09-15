@@ -31,12 +31,11 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="observer">The asynchronous observer to subscribe.</param>
         /// <param name="token">The stream sequence to be used as an offset to start the subscription from.</param>
+        /// <param name="filterData">Data object that will be passed in to the filter.</param>
         /// <returns>A promise for a StreamSubscriptionHandle that represents the subscription.
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitly unsubscribed.
         /// </returns>
-        /// <exception cref="ArgumentException">Thrown if the supplied stream filter function is not suitable. 
-        /// Usually this is because it is not a static method. </exception>
-        Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token);
+        Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token, string filterData = null);
     }
 }

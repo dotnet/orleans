@@ -6,6 +6,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Microsoft.Extensions.Logging;
+using Orleans.Streams.Filtering;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
@@ -19,7 +20,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         [NonSerialized]
         private readonly IStreamPubSub                  pubSub;
-
+        private readonly IStreamFilter streamFilter;
         [NonSerialized]
         private readonly IStreamProviderRuntime         providerRuntime;
         private SimpleMessageStreamProducerExtension    myExtension;
@@ -42,6 +43,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             bool fireAndForgetDelivery,
             bool optimizeForImmutableData,
             IStreamPubSub pubSub,
+            IStreamFilter streamFilter,
             bool isRewindable,
             SerializationManager serializationManager,
             ILogger<SimpleMessageStreamProducer<T>> logger)
@@ -50,6 +52,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
             this.pubSub = pubSub;
+            this.streamFilter = streamFilter;
             this.serializationManager = serializationManager;
             connectedToRendezvous = false;
             this.fireAndForgetDelivery = fireAndForgetDelivery;
@@ -64,7 +67,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private async Task<ISet<PubSubSubscriptionState>> RegisterProducer()
         {
             (myExtension, myGrainReference) = providerRuntime.BindExtension<SimpleMessageStreamProducerExtension, IStreamProducerExtension>(
-                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, this.logger, fireAndForgetDelivery, optimizeForImmutableData));
+                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, this.streamFilter, this.logger, fireAndForgetDelivery, optimizeForImmutableData));
 
             myExtension.AddStream(stream.InternalStreamId);
 

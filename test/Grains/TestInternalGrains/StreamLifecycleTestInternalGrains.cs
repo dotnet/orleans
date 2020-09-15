@@ -80,9 +80,9 @@ namespace UnitTests.Grains
             var id = new InternalStreamId(providerName, streamId);
             IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(id.ToString());
             GuidId subscriptionId = GuidId.GetNewGuidId();
-            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).InternalStreamId, myExtensionReference);
+            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).InternalStreamId, myExtensionReference, null);
 
-            myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null);
+            myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null, null);
         }
     }
 }

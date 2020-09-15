@@ -112,7 +112,8 @@ namespace Orleans.Streams
         public async Task RegisterConsumer(
             GuidId subscriptionId,
             InternalStreamId streamId,
-            IStreamConsumerExtension streamConsumer)
+            IStreamConsumerExtension streamConsumer,
+            string filterData)
         {
             counterConsumersAdded.Increment();
             PubSubSubscriptionState pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
@@ -125,6 +126,9 @@ namespace Orleans.Streams
                     pubSubState = new PubSubSubscriptionState(subscriptionId, streamId, streamConsumer);
                     State.Consumers.Add(pubSubState);
                 }
+
+                if (!string.IsNullOrWhiteSpace(filterData))
+                    pubSubState.AddFilter(filterData);
 
                 LogPubSubCounts("RegisterConsumer {0}", streamConsumer);
                 await WriteStateAsync();
@@ -155,7 +159,7 @@ namespace Orleans.Streams
             {
                 foreach (PubSubPublisherState producerState in producers)
                 {
-                    tasks.Add(ExecuteProducerTask(producerState, producerState.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer)));
+                    tasks.Add(ExecuteProducerTask(producerState, producerState.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData)));
                 }
 
                 Exception exception = null;

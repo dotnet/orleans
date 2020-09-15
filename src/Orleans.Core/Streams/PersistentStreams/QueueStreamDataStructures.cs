@@ -20,12 +20,14 @@ namespace Orleans.Streams
         public StreamConsumerDataState State = StreamConsumerDataState.Inactive;
         public IQueueCacheCursor Cursor;
         public StreamHandshakeToken LastToken;
+        public string FilterData;
 
-        public StreamConsumerData(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer)
+        public StreamConsumerData(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {
             SubscriptionId = subscriptionId;
             StreamId = streamId;
             StreamConsumer = streamConsumer;
+            FilterData = filterData;
         }
 
         internal void SafeDisposeCursor(ILogger logger)

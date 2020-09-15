@@ -8,6 +8,7 @@ using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
+using Orleans.Streams.Filtering;
 
 namespace Orleans.Streams
 {
@@ -20,6 +21,7 @@ namespace Orleans.Streams
         private const int StreamInactivityCheckFrequency = 10;
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
+        private readonly IStreamFilter streamFilter;
         private readonly Dictionary<InternalStreamId, StreamConsumerCollection> pubSubCache;
         private readonly SafeRandom safeRandom;
         private readonly StreamPullingAgentOptions options;
@@ -46,6 +48,7 @@ namespace Orleans.Streams
             IStreamProviderRuntime runtime,
             ILoggerFactory loggerFactory,
             IStreamPubSub streamPubSub,
+            IStreamFilter streamFilter,
             QueueId queueId,
             StreamPullingAgentOptions options,
             SiloAddress siloAddress)
@@ -57,6 +60,7 @@ namespace Orleans.Streams
             QueueId = queueId;
             streamProviderName = strProviderName;
             pubSub = streamPubSub;
+            this.streamFilter = streamFilter;
             pubSubCache = new Dictionary<InternalStreamId, StreamConsumerCollection>();
             safeRandom = new SafeRandom();
             this.options = options;
@@ -221,11 +225,12 @@ namespace Orleans.Streams
         public Task AddSubscriber(
             GuidId subscriptionId,
             InternalStreamId streamId,
-            IStreamConsumerExtension streamConsumer)
+            IStreamConsumerExtension streamConsumer,
+            string filterData)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1}.", streamId, streamConsumer);
             // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
-            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null)
+            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, filterData, null)
                 .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
                     $"Failed to add subscription for stream {streamId}.")
                 .Ignore();
@@ -237,6 +242,7 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             InternalStreamId streamId,
             IStreamConsumerExtension streamConsumer,
+            string filterData,
             StreamSequenceToken cacheToken)
         {
             if (IsShutdown) return;
@@ -250,7 +256,7 @@ namespace Orleans.Streams
 
             StreamConsumerData data;
             if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
-                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer);
+                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, filterData);
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
@@ -535,7 +541,7 @@ namespace Orleans.Streams
                     Exception exceptionOccured = null;
                     try
                     {
-                        batch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId);
+                        batch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId, consumerData.FilterData);
                         if (batch == null)
                         {
                             break;
@@ -546,6 +552,12 @@ namespace Orleans.Streams
                         exceptionOccured = exc;
                         consumerData.SafeDisposeCursor(logger);
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null);
+                    }
+
+                    if (batch != null)
+                    {
+                        if (!ShouldDeliverBatch(consumerData.StreamId, batch, consumerData.FilterData))
+                            continue;
                     }
 
                     try
@@ -596,7 +608,7 @@ namespace Orleans.Streams
             }
         }
 
-        private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor, StreamId streamId)
+        private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor, StreamId streamId, string filterData)
         {
             if (this.options.BatchContainerBatchSize <= 1)
             {
@@ -623,6 +635,9 @@ namespace Orleans.Streams
                     }
 
                     var batchContainer = cursor.GetCurrent(out ignore);
+
+                    if (!ShouldDeliverBatch(streamId, batchContainer, filterData))
+                        continue;
 
                     batchContainers.Add(batchContainer);
                     i++;
@@ -780,7 +795,7 @@ namespace Orleans.Streams
                 var addSubscriptionTasks = new List<Task>(streamData.Count);
                 foreach (PubSubSubscriptionState item in streamData)
                 {
-                    addSubscriptionTasks.Add(AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, streamStartToken));
+                    addSubscriptionTasks.Add(AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, item.FilterData, streamStartToken));
                 }
                 await Task.WhenAll(addSubscriptionTasks);
             }
@@ -790,6 +805,28 @@ namespace Orleans.Streams
                 logger.Error(ErrorCode.PersistentStreamPullingAgent_17, "Ignored RegisterAsStreamProducer Error", exc);
                 throw;
             }
+        }
+
+        private bool ShouldDeliverBatch(StreamId streamId, IBatchContainer batchContainer, string filterData)
+        {
+            if (this.streamFilter is NoOpStreamFilter)
+                return true;
+
+            try
+            {
+                foreach (var evt in batchContainer.GetEvents<object>())
+                {
+                    if (this.streamFilter.ShouldDeliver(streamId, evt.Item1, filterData))
+                        return true;
+                }
+                return false;
+            }
+            catch (Exception exc)
+            {
+                var message = $"Ignoring exception while trying to evaluate subscription filter '{this.streamFilter.GetType().Name}' with data '{filterData}' on stream {streamId}";
+                logger.Warn((int)ErrorCode.PersistentStreamPullingAgent_13, message, exc);
+            }
+            return true;
         }
     }
 }

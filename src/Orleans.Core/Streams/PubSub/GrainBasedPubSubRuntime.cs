@@ -27,10 +27,10 @@ namespace Orleans.Streams
             return streamRendezvous.UnregisterProducer(streamId, streamProducer);
         }
 
-        public Task RegisterConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer)
+        public Task RegisterConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
-            return streamRendezvous.RegisterConsumer(subscriptionId, streamId, streamConsumer);
+            return streamRendezvous.RegisterConsumer(subscriptionId, streamId, streamConsumer, filterData);
         }
 
         public Task UnregisterConsumer(GuidId subscriptionId, InternalStreamId streamId)

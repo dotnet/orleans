@@ -42,8 +42,9 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public Task RegisterConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer)
+        public Task RegisterConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {
+            // TODO BPETIT filter data?
             if (!IsImplicitSubscriber(streamConsumer, streamId))
             {
                 throw new ArgumentOutOfRangeException(streamId.ToString(), "Only implicit subscriptions are supported.");
