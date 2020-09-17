@@ -42,6 +42,7 @@ using Orleans.Networking.Shared;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime.Metadata;
 using Orleans.GrainReferences;
+using Orleans.Storage;
 
 namespace Orleans.Hosting
 {
@@ -299,6 +300,7 @@ namespace Orleans.Hosting
             services.AddSingleton<ILBasedSerializer>();
             services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
 #pragma warning restore CS0618 // Type or member is obsolete
+            services.TryAddSingleton<IGrainStateSerializer, OrleansGrainStateSerializer>();
 
             // Transactions
             services.TryAddSingleton<ITransactionAgent, DisabledTransactionAgent>();

@@ -1,9 +1,11 @@
 using System;
 using Azure.Core;
 using Microsoft.Azure.Cosmos.Table;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Configuration
 {
@@ -42,6 +44,10 @@ namespace Orleans.Configuration
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
         public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
+
+        public virtual Func<IServiceProvider, IGrainStateSerializer> GrainStorageSerializerFactory => GetDefaultSerializer;
+
+        private static IGrainStateSerializer GetDefaultSerializer(IServiceProvider sp) => sp.GetRequiredService<IGrainStateSerializer>();
     }
 
     /// <summary>

@@ -31,7 +31,7 @@ namespace Orleans.Storage
         private ILogger logger;
         private readonly string name;
         private AzureBlobStorageOptions options;
-        private SerializationManager serializationManager;
+        private IGrainStateSerializer grainStorageSerializer;
         private IGrainFactory grainFactory;
         private ITypeResolver typeResolver;
         private readonly IServiceProvider services;
@@ -40,7 +40,6 @@ namespace Orleans.Storage
         public AzureBlobGrainStorage(
             string name,
             AzureBlobStorageOptions options,
-            SerializationManager serializationManager,
             IGrainFactory grainFactory,
             ITypeResolver typeResolver,
             IServiceProvider services,
@@ -48,7 +47,7 @@ namespace Orleans.Storage
         {
             this.name = name;
             this.options = options;
-            this.serializationManager = serializationManager;
+            this.grainStorageSerializer = options.GrainStorageSerializerFactory(services);
             this.grainFactory = grainFactory;
             this.typeResolver = typeResolver;
             this.services = services;
@@ -262,7 +261,7 @@ namespace Orleans.Storage
             }
             else
             {
-                data = this.serializationManager.SerializeToByteArray(grainState);
+                data = this.grainStorageSerializer.Serialize(typeof(object), grainState).ToArray();
                 mimeType = "application/octet-stream";
             }
 
@@ -288,7 +287,7 @@ namespace Orleans.Storage
             }
             else
             {
-                result = this.serializationManager.DeserializeFromByteArray<object>(contents);
+                result = this.grainStorageSerializer.Deserialize(typeof(object), contents);
             }
 
             return result;
