@@ -45,6 +45,8 @@ namespace Orleans.Runtime.Messaging
 
         public NetworkProtocolVersion RemoteProtocolVersion { get; private set; }
 
+        public DateTime LastReceivedProbeRequest { get; private set; }
+
         protected override void OnReceivedMessage(Message msg)
         {
             // See it's a Ping message, and if so, short-circuit it
@@ -154,6 +156,7 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
+                this.LastReceivedProbeRequest = DateTime.UtcNow;
                 var response = this.MessageFactory.CreateResponseMessage(msg);
                 response.BodyObject = PingResponse;
                 this.Send(response);

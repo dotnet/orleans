@@ -2,6 +2,8 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Internal;
 using static Orleans.Runtime.MembershipService.SiloHealthMonitor;
 
@@ -10,43 +12,67 @@ namespace Orleans.Runtime.MembershipService
     /// <summary>
     /// Responsible for monitoring an individual remote silo.
     /// </summary>
-    internal class SiloHealthMonitor : ITestAccessor
+    internal class SiloHealthMonitor : ITestAccessor, IHealthCheckable
     {
-        private readonly ILogger log;
-        private readonly IRemoteSiloProber prober;
-        private readonly CancellationTokenSource stoppingCancellation = new CancellationTokenSource();
-        private readonly Task stopping;
-        private readonly object lockObj = new object();
+        private readonly ILogger _log;
+        private readonly ClusterMembershipOptions _clusterMembershipOptions;
+        private readonly IRemoteSiloProber _prober;
+        private readonly ILocalSiloHealthMonitor _localSiloHealthMonitor;
+        private readonly CancellationTokenSource _stoppingCancellation = new CancellationTokenSource();
+        private readonly object _lockObj = new object();
+        private readonly IAsyncTimer _pingTimer;
+        private Func<SiloHealthMonitor, ProbeResult, Task> _onProbeResult;
+        private Task _runTask;
 
         /// <summary>
         /// The id of the next probe.
         /// </summary>
-        private long nextProbeId;
+        private long _nextProbeId;
 
         /// <summary>
         /// The highest internal probe number which has completed.
         /// </summary>
-        private long highestCompletedProbeId = -1;
+        private long _highestCompletedProbeId = -1;
 
         /// <summary>
         /// The number of failed probes since the last successful probe.
         /// </summary>
-        private int missedProbes;
+        private int _failedProbes;
+
+        /// <summary>
+        /// The time that the last ping response was received from either the node being monitored or an intermediary.
+        /// </summary>
+        public DateTime LastResponse { get; private set; }
+
+        /// <summary>
+        /// The duration of time measured from just prior to sending the last probe which received a response until just after receiving and processing the response.
+        /// </summary>
+        public TimeSpan LastRoundTripTime { get; private set; }
 
         public SiloHealthMonitor(
             SiloAddress siloAddress,
+            Func<SiloHealthMonitor, ProbeResult, Task> onProbeResult,
+            IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             ILoggerFactory loggerFactory,
-            IRemoteSiloProber remoteSiloProber)
+            IRemoteSiloProber remoteSiloProber,
+            IAsyncTimerFactory asyncTimerFactory,
+            ILocalSiloHealthMonitor localSiloHealthMonitor)
         {
-            this.stopping = this.stoppingCancellation.Token.WhenCancelled();
-            this.SiloAddress = siloAddress;
-            this.prober = remoteSiloProber;
-            this.log = loggerFactory.CreateLogger<SiloHealthMonitor>();
+            SiloAddress = siloAddress;
+            _clusterMembershipOptions = clusterMembershipOptions.Value;
+            _prober = remoteSiloProber;
+            _localSiloHealthMonitor = localSiloHealthMonitor;
+            _log = loggerFactory.CreateLogger<SiloHealthMonitor>();
+            _pingTimer = asyncTimerFactory.Create(
+                _clusterMembershipOptions.ProbeTimeout,
+                nameof(SiloHealthMonitor));
+            _onProbeResult = onProbeResult;
         }
 
         internal interface ITestAccessor
         {
             int MissedProbes { get; }
+            Func<SiloHealthMonitor, ProbeResult, Task> OnProbeResult { get; set; }
         }
 
         /// <summary>
@@ -57,153 +83,242 @@ namespace Orleans.Runtime.MembershipService
         /// <summary>
         /// Whether or not this monitor is canceled.
         /// </summary>
-        public bool IsCanceled => this.stoppingCancellation.IsCancellationRequested;
+        public bool IsCanceled => _stoppingCancellation.IsCancellationRequested;
 
-        int ITestAccessor.MissedProbes => this.missedProbes;
+        int ITestAccessor.MissedProbes => _failedProbes;
 
-        public void Cancel() => this.stoppingCancellation.Cancel();
+        Func<SiloHealthMonitor, ProbeResult, Task> ITestAccessor.OnProbeResult { get => _onProbeResult; set => _onProbeResult = value; }
+
+        /// <summary>
+        /// Start the monitor.
+        /// </summary>
+        public void Start()
+        {
+            lock (_lockObj)
+            {
+                if (_stoppingCancellation.IsCancellationRequested)
+                {
+                    throw new InvalidOperationException("This instance has already been stopped and cannot be started again");
+                }
+
+                if (_runTask is Task)
+                {
+                    throw new InvalidOperationException("This instance has already been started");
+                }
+
+                _runTask = Task.Run(Run);
+            }
+        }
+
+        /// <summary>
+        /// Stop the monitor.
+        /// </summary>
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            lock (_lockObj)
+            {
+                if (_stoppingCancellation.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                _stoppingCancellation.Cancel();
+                _pingTimer.Dispose();
+            }
+
+            if (_runTask is Task task)
+            {
+                await Task.WhenAny(task, cancellationToken.WhenCancelled());
+            }
+        }
+
+        private async Task Run()
+        {
+            var random = new SafeRandom();
+            TimeSpan? overrideDelay = random.NextTimeSpan(_clusterMembershipOptions.ProbeTimeout);
+            while (await _pingTimer.NextTick(overrideDelay))
+            {
+                overrideDelay = default;
+            
+                try
+                {
+                    var localDegradationScore = _localSiloHealthMonitor.GetLocalHealthDegradationScore(DateTime.UtcNow);
+
+                    // Probe the silo directly.
+                    // Attempt to account for local health degradation by extending the timeout period.
+                    var timeout = _clusterMembershipOptions.ProbeTimeout.Multiply(1 + localDegradationScore);
+                    var cancellation = new CancellationTokenSource(timeout);
+
+                    var probeResult = await this.ProbeDirectly(cancellation.Token).ConfigureAwait(false);
+
+                    await _onProbeResult(this, probeResult).ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    _log.LogError(exception, "Exception monitoring silo {SiloAddress}", SiloAddress);
+                }
+            }
+        }
 
         /// <summary>
         /// Probes the remote silo.
         /// </summary>
-        /// <param name="diagnosticProbeNumber">The probe number, for diagnostic purposes.</param>
         /// <param name="cancellation">A token to cancel and fail the probe attempt.</param>
         /// <returns>The number of failed probes since the last successful probe.</returns>
-        public async Task<int> Probe(int diagnosticProbeNumber, CancellationToken cancellation)
+        private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation)
         {
-            var id = Interlocked.Increment(ref this.nextProbeId);
+            var id = (int)Interlocked.Increment(ref _nextProbeId);
 
-            if (this.log.IsEnabled(LogLevel.Trace))
+            if (_log.IsEnabled(LogLevel.Trace))
             {
-                this.log.LogTrace("Going to send Ping #{ProbeNumber}/{Id} to probe silo {Silo}", diagnosticProbeNumber, id, this.SiloAddress);
+                _log.LogTrace("Going to send Ping #{Id} to probe silo {Silo}", id, SiloAddress);
             }
 
-            bool probeResult;
+            var roundTripTimer = ValueStopwatch.StartNew();
+            ProbeResult probeResult;
+            Exception failureException;
             try
             {
                 var probeCancellation = cancellation.WhenCancelled();
-                var probeTask = prober.Probe(SiloAddress, diagnosticProbeNumber);
-                var task = await Task.WhenAny(stopping, probeCancellation, probeTask);
+                var probeTask = _prober.Probe(SiloAddress, id);
+                var task = await Task.WhenAny(probeCancellation, probeTask);
 
-                if (ReferenceEquals(task, stopping))
+                if (ReferenceEquals(task, probeCancellation))
                 {
                     probeTask.Ignore();
-                    probeResult = false;
-                }
-                else if (ReferenceEquals(task, probeCancellation))
-                {
-                    probeTask.Ignore();
-                    probeResult = this.RecordFailure(id, diagnosticProbeNumber, new OperationCanceledException($"The ping attempt was cancelled. Ping #{diagnosticProbeNumber}/{id}"));
+                    failureException = new OperationCanceledException($"The ping attempt was cancelled after {roundTripTimer.Elapsed}. Ping #{id}");
                 }
                 else
                 {
                     await probeTask;
-                    probeResult = this.RecordSuccess(id, diagnosticProbeNumber);
+                    failureException = null;
                 }
             }
             catch (Exception exception)
             {
-                probeResult = this.RecordFailure(id, diagnosticProbeNumber, exception);
+                failureException = exception;
+            }
+            finally
+            {
+                roundTripTimer.Stop();
             }
 
-            // If the probe finished and the result was valid then return the number of missed probes.
-            if (probeResult) return this.missedProbes;
-
-            // The probe was superseded or the monitor is being shutdown.
-            return -1;
-        }
-
-        private bool RecordSuccess(long id, int diagnosticProbeNumber)
-        {
-            if (this.log.IsEnabled(LogLevel.Trace))
+            if (failureException is null)
             {
-                this.log.LogTrace("Got successful ping response for ping #{ProbeNumber}/{Id} from {Silo}", diagnosticProbeNumber, id, this.SiloAddress);
-            }
+                MessagingStatisticsGroup.OnPingReplyReceived(SiloAddress);
 
-            MessagingStatisticsGroup.OnPingReplyReceived(this.SiloAddress);
-
-            lock (this.lockObj)
-            {
-                if (id <= this.highestCompletedProbeId)
+                lock (_lockObj)
                 {
-                    this.log.Info(
-                        "Ignoring success result for ping #{ProbeNumber}/{Id} from {Silo} since a later probe has already completed. Highest ({HighestCompletedProbeId}) > Current ({CurrentProbeId})",
-                        diagnosticProbeNumber,
-                        id,
-                        this.SiloAddress,
-                        this.highestCompletedProbeId,
-                        id);
-                    return false;
-                }
-                else if (this.stoppingCancellation.IsCancellationRequested)
-                {
-                    this.log.Info(
-                        "Ignoring success result for ping #{ProbeNumber}/{Id} from {Silo} since this monitor has been stopped",
-                        diagnosticProbeNumber,
-                        id,
-                        this.SiloAddress);
-                    return false;
-                }
-                else
-                {
-                    this.highestCompletedProbeId = id;
-                    Interlocked.Exchange(ref this.missedProbes, 0);
-                    return true;
-                }
-            }
-        }
-
-        private bool RecordFailure(long id, int diagnosticProbeNumber, Exception failureReason)
-        {
-            if (this.log.IsEnabled(LogLevel.Trace))
-            {
-                this.log.LogTrace("Got failed ping response for ping #{ProbeNumber}/{Id} from {Silo}: {Exception}", diagnosticProbeNumber, id, this.SiloAddress, failureReason);
-            }
-
-            MessagingStatisticsGroup.OnPingReplyMissed(this.SiloAddress);
-
-            lock (this.lockObj)
-            {
-                if (id <= this.highestCompletedProbeId)
-                {
-                    this.log.Info(
-                        "Ignoring failure result for ping #{ProbeNumber}/{Id} from {Silo} since a later probe has already completed. Highest completed id ({HighestCompletedProbeId})",
-                        diagnosticProbeNumber,
-                        id,
-                        this.SiloAddress,
-                        this.highestCompletedProbeId,
-                        id);
-                    return false;
-                }
-                else if (this.stoppingCancellation.IsCancellationRequested)
-                {
-                    this.log.Info(
-                        "Ignoring failure result for ping #{ProbeNumber}/{Id} from {Silo} since this monitor has been stopped",
-                        diagnosticProbeNumber,
-                        id,
-                        this.SiloAddress);
-                    return false;
-                }
-                else
-                {
-                    this.highestCompletedProbeId = id;
-                    var missed = Interlocked.Increment(ref this.missedProbes);
-
-                    this.log.LogWarning(
-                        (int)ErrorCode.MembershipMissedPing,
-                        "Did not get ping response for ping #{ProbeNumber}/{Id} from {Silo}: {Exception}",
-                        diagnosticProbeNumber,
-                        id,
-                        this.SiloAddress,
-                        failureReason);
-                    if (this.log.IsEnabled(LogLevel.Trace))
+                    if (id <= _highestCompletedProbeId)
                     {
-                        this.log.LogTrace("Current number of failed probes for {Silo}: {MissedProbes}", this.SiloAddress, missed);
+                        _log.LogInformation(
+                            "Ignoring success result for ping #{Id} from {Silo} in {RoundTripTime} since a later probe has already completed. Highest ({HighestCompletedProbeId}) > Current ({CurrentProbeId})",
+                            id,
+                            SiloAddress,
+                            roundTripTimer.Elapsed,
+                            _highestCompletedProbeId,
+                            id);
+                        probeResult = new ProbeResult(_failedProbes, ProbeResultStatus.Unknown);
                     }
+                    else if (_stoppingCancellation.IsCancellationRequested)
+                    {
+                        _log.LogInformation(
+                            "Ignoring success result for ping #{Id} from {Silo} in {RoundTripTime} since this monitor has been stopped",
+                            id,
+                            SiloAddress,
+                            roundTripTimer.Elapsed);
+                        probeResult = new ProbeResult(_failedProbes, ProbeResultStatus.Unknown);
+                    }
+                    else
+                    {
+                        if (_log.IsEnabled(LogLevel.Trace))
+                        {
+                            _log.LogTrace(
+                                "Got successful ping response for ping #{Id} from {Silo} with round trip time of {RoundTripTime}",
+                                id,
+                                SiloAddress,
+                                roundTripTimer.Elapsed);
+                        }
 
-                    return true;
+                        _highestCompletedProbeId = id;
+                        Interlocked.Exchange(ref _failedProbes, 0);
+                        LastResponse = DateTime.UtcNow;
+                        LastRoundTripTime = roundTripTimer.Elapsed;
+                        probeResult = new ProbeResult(0, ProbeResultStatus.Succeeded);
+                    }
                 }
             }
+            else
+            {
+                MessagingStatisticsGroup.OnPingReplyMissed(SiloAddress);
+
+                lock (_lockObj)
+                {
+                    if (id <= _highestCompletedProbeId)
+                    {
+                        _log.LogInformation(
+                            failureException,
+                            "Ignoring failure result for probe #{Id} to {Silo} since a later probe has already completed. Highest completed probe id is {HighestCompletedProbeId}",
+                            id,
+                            SiloAddress,
+                            _highestCompletedProbeId);
+                        probeResult = new ProbeResult(_failedProbes, ProbeResultStatus.Unknown);
+                    }
+                    else if (_stoppingCancellation.IsCancellationRequested)
+                    {
+                        _log.LogInformation(
+                            failureException,
+                            "Ignoring failure result for probe #{Id} to {Silo} since this monitor has been stopped",
+                            id,
+                            SiloAddress);
+                        probeResult = new ProbeResult(_failedProbes, ProbeResultStatus.Unknown);
+                    }
+                    else
+                    {
+                        _highestCompletedProbeId = id;
+                        var failedProbes = Interlocked.Increment(ref _failedProbes);
+
+                        _log.LogWarning(
+                            (int)ErrorCode.MembershipMissedPing,
+                            failureException,
+                            "Did not get response for probe # Current number of consecutive failed probes is {FailedProbeCount}",
+                            id,
+                            SiloAddress,
+                            roundTripTimer.Elapsed,
+                            failedProbes);
+
+                        probeResult = new ProbeResult(failedProbes, ProbeResultStatus.Failed);
+                    }
+                }
+            }
+
+            return probeResult;
+        }
+
+        /// <inheritdoc />
+        public bool CheckHealth(DateTime lastCheckTime) => _pingTimer.CheckHealth(lastCheckTime);
+
+        /// <summary>
+        /// Represents the result of probing a silo.
+        /// </summary>
+        public readonly struct ProbeResult
+        {
+            public ProbeResult(int failedProbeCount, ProbeResultStatus status)
+            {
+                this.FailedProbeCount = failedProbeCount;
+                this.Status = status;
+            }
+
+            public int FailedProbeCount { get; }
+
+            public ProbeResultStatus Status { get; }
+        }
+
+        public enum ProbeResultStatus
+        {
+            Unknown,
+            Failed,
+            Succeeded
         }
     }
 }

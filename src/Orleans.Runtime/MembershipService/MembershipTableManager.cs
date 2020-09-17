@@ -334,7 +334,9 @@ namespace Orleans.Runtime.MembershipService
                     if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Silo {0} Successfully updated my Status in the Membership table to {1}", myAddress, status);
 
                     var gossipTask = this.GossipToOthers(this.myAddress, status);
-                    var timeoutTask = Task.Delay(GossipTimeout);
+                    gossipTask.Ignore();
+                    var cancellation = new CancellationTokenSource();
+                    var timeoutTask = Task.Delay(GossipTimeout, cancellation.Token);
                     var task = await Task.WhenAny(gossipTask, timeoutTask);
                     if (ReferenceEquals(task, timeoutTask))
                     {
@@ -346,6 +348,10 @@ namespace Orleans.Runtime.MembershipService
                         {
                             this.log.LogDebug("Timed out while gossiping status to other silos after {Timeout}", GossipTimeout);
                         }
+                    }
+                    else
+                    {
+                        cancellation.Cancel();
                     }
                 }
                 else
@@ -599,7 +605,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception)
             {
-                this.log.LogWarning("Exception while gossiping status to other silos: {Exception}", exception);
+                this.log.LogWarning(exception, "Error while gossiping status to other silos");
             }
         }
 
@@ -788,7 +794,17 @@ namespace Orleans.Runtime.MembershipService
                 PrintSuspectList(freshVotes));
 
             // If we fail to update here we will retry later.
-            return await membershipTableProvider.UpdateRow(entry, eTag, table.Version.Next());
+            var ok = await membershipTableProvider.UpdateRow(entry, eTag, table.Version.Next());
+            if (ok)
+            {
+                table = await membershipTableProvider.ReadAll();
+                this.ProcessTableUpdate(table, "TrySuspectOrKill");
+
+                // Gossip using the local silo status, since this is just informational to propagate the suspicion vote.
+                GossipToOthers(localSiloEntry.SiloAddress, localSiloEntry.Status).Ignore();
+            }
+
+            return ok;
 
             string PrintSuspectList(IEnumerable<Tuple<SiloAddress, DateTime>> list)
             {

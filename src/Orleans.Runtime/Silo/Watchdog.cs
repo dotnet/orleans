@@ -6,7 +6,6 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
-
     internal class Watchdog
     {
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
@@ -54,7 +53,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    WatchdogHeartbeatTick(null);
+                    WatchdogHeartbeatTick();
                     Thread.Sleep(heartbeatPeriod);
                 }
                 catch (ThreadAbortException)
@@ -68,7 +67,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private void WatchdogHeartbeatTick(object state)
+        private void WatchdogHeartbeatTick()
         {
             try
             {

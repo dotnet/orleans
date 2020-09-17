@@ -347,7 +347,6 @@ namespace Orleans.Runtime
             return CompareTo((SiloAddress)obj);
         }
 
-
         public int CompareTo(SiloAddress other)
         {
             if (other == null) return 1;

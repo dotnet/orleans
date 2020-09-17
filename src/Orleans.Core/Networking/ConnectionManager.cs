@@ -83,6 +83,16 @@ namespace Orleans.Runtime.Messaging
             return false;
         }
 
+        public ImmutableArray<Connection> GetExistingConnections(SiloAddress endpoint)
+        {
+            if (this.connections.TryGetValue(endpoint, out var entry))
+            {
+                return entry.Connections;
+            }
+
+            return ImmutableArray<Connection>.Empty;
+        }
+
         private async Task<Connection> GetConnectionAsync(SiloAddress endpoint)
         {
             while (true)

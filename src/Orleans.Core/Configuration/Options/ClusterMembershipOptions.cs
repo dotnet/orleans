@@ -1,7 +1,6 @@
 
 using System;
 using Orleans.Internal;
-using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
@@ -108,5 +107,10 @@ namespace Orleans.Configuration
 
         internal TimeSpan AllowedIAmAliveMissPeriod => this.IAmAliveTablePublishTimeout.Multiply(this.NumMissedTableIAmAliveLimit);
         internal static TimeSpan ClusteringShutdownGracePeriod => TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// The period between self-tests to log local health degradation status.
+        /// </summary>
+        public TimeSpan LocalHealthDegradationMonitoringPeriod { get; set; } = TimeSpan.FromSeconds(10);
     }
 }

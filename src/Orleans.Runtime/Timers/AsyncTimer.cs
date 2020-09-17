@@ -61,7 +61,7 @@ namespace Orleans.Runtime
                 {
                     // for backwards compatibility, support timers with periods up to ReminderRegistry.MaxSupportedTimeout
                     var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
-                    if (delay > maxDelay)
+                    while (delay > maxDelay)
                     {
                         delay -= maxDelay;
                         await Task.Delay(maxDelay, cancellation.Token).ConfigureAwait(false);
