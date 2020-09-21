@@ -195,21 +195,21 @@ namespace Orleans.Storage
                 // each Unicode character takes 2 bytes
                 dataSize = data.Length * 2;
 
-                properties = SplitStringData(data).Select(t => new EntityProperty(t));
+                properties = SplitStringData(data.AsMemory()).Select(t => new EntityProperty(t.ToString()));
                 basePropertyName = STRING_DATA_PROPERTY_NAME;
             }
             else
             {
                 // Convert to binary format
 
-                byte[] data = this.stateSerializer.Serialize(grainState.GetType(), grainState).ToArray();
+                var data = this.stateSerializer.Serialize(grainState.GetType(), grainState).ToArray();
 
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
                     data.Length, entity.PartitionKey, entity.RowKey);
 
                 dataSize = data.Length;
 
-                properties = SplitBinaryData(data).Select(t => new EntityProperty(t));
+                properties = SplitBinaryData(data).Select(t => new EntityProperty(t.ToArray()));
                 basePropertyName = BINARY_DATA_PROPERTY_NAME;
             }
 
@@ -232,29 +232,27 @@ namespace Orleans.Storage
             }
         }
 
-        private static IEnumerable<string> SplitStringData(string stringData)
+        private static IEnumerable<ReadOnlyMemory<char>> SplitStringData(ReadOnlyMemory<char> stringData)
         {
             var startIndex = 0;
             while (startIndex < stringData.Length)
             {
                 var chunkSize = Math.Min(MAX_STRING_PROPERTY_LENGTH, stringData.Length - startIndex);
 
-                yield return stringData.Substring(startIndex, chunkSize);
+                yield return stringData.Slice(startIndex, chunkSize);
 
                 startIndex += chunkSize;
             }
         }
 
-        private static IEnumerable<byte[]> SplitBinaryData(byte[] binaryData)
+        private static IEnumerable<ReadOnlyMemory<byte>> SplitBinaryData(ReadOnlyMemory<byte> binaryData)
         {
             var startIndex = 0;
             while (startIndex < binaryData.Length)
             {
                 var chunkSize = Math.Min(MAX_DATA_CHUNK_SIZE, binaryData.Length - startIndex);
 
-                var chunk = new byte[chunkSize];
-                Array.Copy(binaryData, startIndex, chunk, 0, chunkSize);
-                yield return chunk;
+                yield return binaryData.Slice(startIndex, chunkSize);
 
                 startIndex += chunkSize;
             }

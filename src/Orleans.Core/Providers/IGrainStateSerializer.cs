@@ -21,6 +21,6 @@ namespace Orleans.Storage
 
         public ReadOnlyMemory<byte> Serialize(Type t, object value) => this.serializationManager.SerializeToByteArray(value);
 
-        public object Deserialize(Type expected, ReadOnlyMemory<byte> value) => this.serializationManager.DeserializeFromByteArray<object>(value.ToArray());
+        public object Deserialize(Type expected, ReadOnlyMemory<byte> value) => this.serializationManager.DeserializeFromMemoryByte(typeof(object), value);
     }
 }
