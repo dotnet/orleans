@@ -29,7 +29,7 @@ Instead, one should _always_ unwrap the returned task: `var task = Task.Factory.
 
 ### Example:
 
-Below is sample code that demonstrates the usage of `TaskScheduler.Current`, `Task.Run` and a special custom scheduler to escape from Orlean grain context and how to get back to it.
+Below is sample code that demonstrates the usage of `TaskScheduler.Current`, `Task.Run` and a special custom scheduler to escape from Orleans grain context and how to get back to it.
 
 ``` csharp
    public async Task MyGrainMethod()
