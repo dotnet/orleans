@@ -10,7 +10,7 @@ title: JournaledGrain Diagnostics
 
 By design, log consistency providers are resilient under connection errors (including both connections to storage, and connections between clusters). But just tolerating errors is not enough, as applications usually need to monitor any such issues, and bring them to the attention of an operator if they are serious.
 
-JournaledGrain subclasses can override the following methods to receive notifiations when there are connection errors observed, and when those errors are resolved:
+JournaledGrain subclasses can override the following methods to receive notifications when there are connection errors observed, and when those errors are resolved:
 
 ```csharp
 protected override void OnConnectionIssue(ConnectionIssue issue) 
