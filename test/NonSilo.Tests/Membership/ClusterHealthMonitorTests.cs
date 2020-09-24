@@ -116,7 +116,9 @@ namespace NonSilo.Tests.Membership
                 this.loggerFactory,
                 this.prober,
                 this.timerFactory,
-                this.localSiloHealthMonitor);
+                this.localSiloHealthMonitor,
+                this.manager,
+                this.localSiloDetails);
 
             await this.lifecycle.OnStart();
             Assert.Empty(testAccessor.MonitoredSilos);

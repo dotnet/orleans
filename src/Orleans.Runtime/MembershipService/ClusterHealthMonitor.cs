@@ -228,9 +228,24 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         private async Task OnProbeResultInternal(SiloHealthMonitor monitor, ProbeResult probeResult)
         {
-            if (probeResult.Status == ProbeResultStatus.Failed && probeResult.FailedProbeCount >= this.clusterMembershipOptions.NumMissedProbesLimit)
+            if (probeResult.IsDirectProbe)
             {
-                await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress);
+                if (probeResult.Status == ProbeResultStatus.Failed && probeResult.FailedProbeCount >= this.clusterMembershipOptions.NumMissedProbesLimit)
+                {
+                    await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress);
+                }
+            }
+            else if (probeResult.Status == ProbeResultStatus.Failed)
+            {
+                if (this.clusterMembershipOptions.NumVotesForDeathDeclaration <= 2)
+                {
+                    // Since both this silo and another silo were unable to probe the target silo, we declare it dead.
+                    await this.membershipService.TryKill(monitor.SiloAddress);
+                }
+                else
+                {
+                    await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress);
+                }
             }
         }
 
