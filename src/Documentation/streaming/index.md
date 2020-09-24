@@ -71,7 +71,7 @@ A [Streams Programming APIs](streams_programming_APIs.md) provides a detailed de
 ## Stream Providers
 
 Streams can come via physical channels of various shapes and forms and can have different semantics. Orleans Streaming is designed to support this diversity via the concept of **Stream Providers**, which is an extensibility point in the system. Orleans currently has implementations of two stream providers: TCP based **Simple Message Stream Provider** and Azure Queue based **Azure Queue Stream Provider**.
-More details on Steam Providers can be found at [Stream Providers](stream_providers.md).
+More details on Stream Providers can be found at [Stream Providers](stream_providers.md).
 
 
 ## Stream Semantics
