@@ -100,7 +100,14 @@ namespace Orleans.Runtime.MembershipService
         {
             var threadPoolDelaySeconds = _threadPoolMonitor.MeasureQueueDelay().TotalSeconds;
 
-            if (threadPoolDelaySeconds > 1)
+            if (threadPoolDelaySeconds > 10)
+            {
+                // Log as an error if the delay is massive.
+                _log.LogError(
+                    ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.",
+                    threadPoolDelaySeconds);
+            }
+            else if (threadPoolDelaySeconds > 1)
             {
                 _log.LogWarning(
                     ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.",
