@@ -41,6 +41,8 @@ namespace Orleans.Runtime.Messaging
         private readonly List<Message> inflight = new List<Message>(4);
         private Task _processIncomingTask;
         private Task _processOutgoingTask;
+        private bool outgoingCompleted = false;
+        private bool incomingCompleted = false;
 
         protected Connection(
             ConnectionContext connection,
@@ -183,9 +185,10 @@ namespace Orleans.Runtime.Messaging
                     // Try to gracefully stop the reader/writer loops, if they are running.
                     try
                     {
-                        if (_processIncomingTask is Task task && !task.IsCompleted)
+                        if (!incomingCompleted)
                         {
                             this.Context.Transport.Input.CancelPendingRead();
+                            incomingCompleted = true;
                         }
                     }
                     catch (Exception cancelException)
@@ -196,9 +199,10 @@ namespace Orleans.Runtime.Messaging
 
                     try
                     {
-                        if (_processOutgoingTask is Task task && !task.IsCompleted)
+                        if (!outgoingCompleted)
                         {
                             this.Context.Transport.Output.CancelPendingFlush();
+                            outgoingCompleted = true;
                         }
                     }
                     catch (Exception cancelException)
@@ -304,7 +308,15 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                input?.Complete();
+                lock (this.lockObj)
+                {
+                    if (!incomingCompleted)
+                    {
+                        input?.Complete();
+                        incomingCompleted = true;
+                    }
+                }
+
                 this.CloseInternal(error);
             }
         }
@@ -313,7 +325,7 @@ namespace Orleans.Runtime.Messaging
         {
             await Task.Yield();
 
-            Exception error = default;   
+            Exception error = default;
             PipeWriter output = default;
             var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
             try
@@ -364,7 +376,15 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                output?.Complete();
+                lock (this.lockObj)
+                {
+                    if (!outgoingCompleted)
+                    {
+                        output?.Complete();
+                        outgoingCompleted = true;
+                    }
+                }
+
                 this.CloseInternal(error);
             }
         }
