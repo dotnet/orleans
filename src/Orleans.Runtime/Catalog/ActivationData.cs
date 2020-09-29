@@ -22,7 +22,7 @@ namespace Orleans.Runtime
     /// MUST lock this object for any concurrent access
     /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
     /// </summary>
-    internal class ActivationData : IGrainActivationContext, IActivationData, IInvokable, IDisposable
+    internal class ActivationData : IGrainActivationContext, IActivationData, IInvokable, IAsyncDisposable
     {
         internal class GrainActivationContextFactory
         {
@@ -842,10 +842,18 @@ namespace Orleans.Runtime
                 String.Format(" #GrainType={0} Placement={1}", GrainInstanceType.FullName, placement);
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            IDisposable disposable = serviceScope;
-            if (disposable != null) disposable.Dispose();
+            switch (this.serviceScope)
+            {
+                case IAsyncDisposable asyncDisposable:
+                    await asyncDisposable.DisposeAsync();
+                    break;
+                case IDisposable disposable:
+                    disposable.Dispose();
+                    break;
+            }
+
             this.serviceScope = null;
         }
 
