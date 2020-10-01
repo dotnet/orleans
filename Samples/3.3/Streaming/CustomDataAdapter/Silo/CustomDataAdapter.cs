@@ -10,6 +10,7 @@ using Orleans.Streams;
 
 namespace Silo
 {
+    // Custom EventHubDataAdapter that serialize event using System.Text.Json
     public class CustomDataAdapter : EventHubDataAdapter
     {
         public CustomDataAdapter(SerializationManager serializationManager) : base(serializationManager)

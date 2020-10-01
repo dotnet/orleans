@@ -11,6 +11,11 @@ using Orleans.Streams.Core;
 
 namespace Grains
 {
+    // ImplicitStreamSubscription attribute here is to subscribe implicitely to all stream within
+    // a given namespace: whenever some data is pushed to the streams of namespace Constants.StreamNamespace,
+    // a grain of type ConsumerGrain with the same guid of the stream will receive the message.
+    // Even if no activations of the grain currently exist, the runtime will automatically
+    // create a new one and send the message to it.
     [ImplicitStreamSubscription(Constants.StreamNamespace)]
     public class ConsumerGrain : Grain, IConsumerGrain, IStreamSubscriptionObserver
     {

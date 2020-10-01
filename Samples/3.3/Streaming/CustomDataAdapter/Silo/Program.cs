@@ -45,6 +45,7 @@ namespace Silo
                         options.Path = Constants.EHPath;
 
                     }));
+                    // We plug here our custom DataAdapter for Event Hub
                     b.UseDataAdapter((sp, n) => ActivatorUtilities.CreateInstance<CustomDataAdapter>(sp));
                     b.UseAzureTableCheckpointer(ob => ob.Configure(options =>
                     {
