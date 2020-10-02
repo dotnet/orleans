@@ -1,4 +1,3 @@
-#if !NETCOREAPP
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -25,15 +24,12 @@ namespace Tester.HeterogeneousSilosTests
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromMilliseconds(200);
         private TestCluster cluster;
 
-        private void SetupAndDeployCluster(Type defaultPlacementStrategy, params Type[] blackListedTypes)
+        private void SetupAndDeployCluster(Type defaultPlacementStrategy, Type excludedType)
         {
             cluster?.StopAllSilos();
-            var builder = new TestClusterBuilder(1)
-            {
-                CreateSiloAsync = AppDomainSiloHandle.Create
-            };
+            var builder = new TestClusterBuilder(1);
             builder.Properties["DefaultPlacementStrategy"] = RuntimeTypeNameFormatter.Format(defaultPlacementStrategy);
-            builder.Properties["BlacklistedGrainTypes"] = string.Join("|", blackListedTypes.Select(t => t.FullName));
+            builder.Properties["ExcludedType"] = excludedType.FullName;
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             builder.AddClientBuilderConfigurator<ClientConfigurator>();
             cluster = builder.Build();
@@ -52,11 +48,10 @@ namespace Tester.HeterogeneousSilosTests
                     var siloOptions = new TestSiloSpecificOptions();
                     cfg.Bind(siloOptions);
 
-                    // The blacklist is only intended for the primary silo in these tests.
+                    // The ExcludedType is only intended for the primary silo in these tests.
                     if (string.Equals(siloOptions.SiloName, Silo.PrimarySiloName))
                     {
-                        var blacklistedTypesList = cfg["BlacklistedGrainTypes"].Split('|').ToList();
-                        options.ExcludedGrainTypes.AddRange(blacklistedTypesList);
+                        options.ExcludedGrainTypes.Add(cfg["ExcludedType"]);
                     }
                 });
                 hostBuilder.ConfigureServices(services =>
@@ -100,8 +95,6 @@ namespace Tester.HeterogeneousSilosTests
         {
             await MergeGrainResolverTestsImpl<ITestGrain>(typeof(RandomPlacement), true, this.CallITestGrainMethod, typeof(TestGrain));
             await MergeGrainResolverTestsImpl<ITestGrain>(typeof(PreferLocalPlacement), true, this.CallITestGrainMethod, typeof(TestGrain));
-            // TODO Check ActivationCountBasedPlacement in tests
-            //await MergeGrainResolverTestsImpl("ActivationCountBasedPlacement", typeof(TestGrain));
         }
 
         [Fact]
@@ -109,8 +102,6 @@ namespace Tester.HeterogeneousSilosTests
         {
             await MergeGrainResolverTestsImpl<ITestGrain>(typeof(RandomPlacement), false, this.CallITestGrainMethod, typeof(TestGrain));
             await MergeGrainResolverTestsImpl<ITestGrain>(typeof(PreferLocalPlacement), false, this.CallITestGrainMethod, typeof(TestGrain));
-            // TODO Check ActivationCountBasedPlacement in tests
-            //await MergeGrainResolverTestsImpl("ActivationCountBasedPlacement", typeof(TestGrain));
         }
 
         [Fact]
@@ -127,22 +118,14 @@ namespace Tester.HeterogeneousSilosTests
             await MergeGrainResolverTestsImpl<IStatelessWorkerGrain>(typeof(PreferLocalPlacement), false, this.CallIStatelessWorkerGrainMethod, typeof(StatelessWorkerGrain));
         }
 
-        private async Task CallITestGrainMethod(IGrain grain)
-        {
-            var g = grain.Cast<ITestGrain>();
-            await g.SetLabel("Hello world");
-        }
+        private async Task CallITestGrainMethod(ITestGrain grain) => await grain.SetLabel("Hello world");
 
-        private async Task CallIStatelessWorkerGrainMethod(IGrain grain)
-        {
-            var g = grain.Cast<IStatelessWorkerGrain>();
-            await g.GetCallStats();
-        }
+        private async Task CallIStatelessWorkerGrainMethod(IStatelessWorkerGrain grain) => await grain.GetCallStats();
 
-        private async Task MergeGrainResolverTestsImpl<T>(Type defaultPlacementStrategy, bool restartClient, Func<IGrain, Task> func, params Type[] blackListedTypes)
+        private async Task MergeGrainResolverTestsImpl<T>(Type defaultPlacementStrategy, bool restartClient, Func<T, Task> func, Type excludedType)
             where T : IGrainWithIntegerKey
         {
-            SetupAndDeployCluster(defaultPlacementStrategy, blackListedTypes);
+            SetupAndDeployCluster(defaultPlacementStrategy, excludedType);
 
             var delayTimeout = RefreshInterval.Add(RefreshInterval);
 
@@ -215,4 +198,3 @@ namespace Tester.HeterogeneousSilosTests
         }
     }
 }
-#endif
