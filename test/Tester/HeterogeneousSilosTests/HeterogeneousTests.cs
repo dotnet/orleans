@@ -98,6 +98,13 @@ namespace Tester.HeterogeneousSilosTests
         }
 
         [Fact]
+        public async Task MergeGrainResolverSameInterfaceTests()
+        {
+            await MergeGrainResolverTestsImpl<IHeterogeneousGrain>(typeof(RandomPlacement), true, this.CallHeterogeneousGrainMethod, typeof(UnitTests.Grains.B.HeterogeneousGrain), true);
+            await MergeGrainResolverTestsImpl<IHeterogeneousGrain>(typeof(PreferLocalPlacement), true, this.CallHeterogeneousGrainMethod, typeof(UnitTests.Grains.B.HeterogeneousGrain), true);
+        }
+
+        [Fact]
         public async Task MergeGrainResolverWithClientRefreshTests()
         {
             await MergeGrainResolverTestsImpl<ITestGrain>(typeof(RandomPlacement), false, this.CallITestGrainMethod, typeof(TestGrain));
@@ -122,16 +129,32 @@ namespace Tester.HeterogeneousSilosTests
 
         private async Task CallIStatelessWorkerGrainMethod(IStatelessWorkerGrain grain) => await grain.GetCallStats();
 
-        private async Task MergeGrainResolverTestsImpl<T>(Type defaultPlacementStrategy, bool restartClient, Func<T, Task> func, Type excludedType)
+        private async Task CallHeterogeneousGrainMethod(IHeterogeneousGrain grain) => await grain.Ping();
+
+        private async Task MergeGrainResolverTestsImpl<T>(Type defaultPlacementStrategy, bool restartClient, Func<T, Task> func, Type excludedType, bool useClassNamePrefix = false)
             where T : IGrainWithIntegerKey
         {
             SetupAndDeployCluster(defaultPlacementStrategy, excludedType);
 
             var delayTimeout = RefreshInterval.Add(RefreshInterval);
+            Exception exception;
 
-            // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
-            Assert.Contains("Cannot find an implementation class for grain interface", exception.Message);
+            if (useClassNamePrefix)
+            {
+                // Should fail
+                exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0, excludedType.FullName));
+                Assert.Contains("Cannot find an implementation class", exception.Message);
+
+                // Should be fine
+                var g = this.cluster.GrainFactory.GetGrain<T>(0);
+                await func(g);
+            }
+            else
+            {
+                // Should fail
+                exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
+                Assert.Contains("Cannot find an implementation class", exception.Message);
+            }
 
             // Start a new silo with TestGrain
             await cluster.StartAdditionalSiloAsync();
@@ -154,6 +177,13 @@ namespace Tester.HeterogeneousSilosTests
                 // Success
                 var g = this.cluster.GrainFactory.GetGrain<T>(i);
                 await func(g);
+
+                if (useClassNamePrefix)
+                {
+                    // Success too
+                    var g2 = this.cluster.GrainFactory.GetGrain<T>(i, excludedType.FullName);
+                    await func(g2);
+                }
             }
 
             // Stop the latest silos
@@ -172,9 +202,22 @@ namespace Tester.HeterogeneousSilosTests
                 await Task.Delay(ClientRefreshDelay.Multiply(3));
             }
 
-            // Should fail
-            exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
-            Assert.Contains("Cannot find an implementation class for grain interface", exception.Message);
+            if (useClassNamePrefix)
+            {
+                // Should fail
+                exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0, excludedType.FullName));
+                Assert.Contains("Cannot find an implementation class", exception.Message);
+
+                // Should be fine
+                var g = this.cluster.GrainFactory.GetGrain<T>(0);
+                await func(g);
+            }
+            else
+            {
+                // Should fail
+                exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory.GetGrain<T>(0));
+                Assert.Contains("Cannot find an implementation class", exception.Message);
+            }
         }        
 
         public Task InitializeAsync()
