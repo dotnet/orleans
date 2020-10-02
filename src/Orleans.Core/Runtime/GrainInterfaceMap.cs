@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 
@@ -61,17 +62,41 @@ namespace Orleans.Runtime
         {
             foreach (var kvp in map.typeToInterfaceData)
             {
-                if (!typeToInterfaceData.ContainsKey(kvp.Key))
+                var otherId = kvp.Key;
+                var otherGrainInterfaceData = kvp.Value;
+
+                if (typeToInterfaceData.TryGetValue(kvp.Key, out var localGrainInterfaceData))
                 {
-                    typeToInterfaceData.Add(kvp.Key, kvp.Value);
+                    // We already know this interface, let's merge the GrainInterfaceData
+                    foreach (var otherGrainClassData in otherGrainInterfaceData.Implementations)
+                    {
+                        localGrainInterfaceData.AddImplementation(otherGrainClassData);
+                    }
+                }
+                else
+                {
+                    // Interface unknown until now
+                    typeToInterfaceData.Add(kvp.Key, new GrainInterfaceData(kvp.Value));
                 }
             }
 
             foreach (var kvp in map.table)
             {
-                if (!table.ContainsKey(kvp.Key))
+                var otherId = kvp.Key;
+                var otherGrainInterfaceData = kvp.Value;
+
+                if (table.TryGetValue(kvp.Key, out var localGrainInterfaceData))
                 {
-                    table.Add(kvp.Key, kvp.Value);
+                    // We already know this interface, let's merge the GrainInterfaceData
+                    foreach (var otherGrainClassData in otherGrainInterfaceData.Implementations)
+                    {
+                        localGrainInterfaceData.AddImplementation(otherGrainClassData);
+                    }
+                }
+                else
+                {
+                    // Interface unknown until now
+                    table.Add(kvp.Key, new GrainInterfaceData(kvp.Value));
                 }
             }
 

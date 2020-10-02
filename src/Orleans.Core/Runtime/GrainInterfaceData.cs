@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -28,6 +28,16 @@ namespace Orleans.Runtime
             this.iface = iface;
             GrainInterface = grainInterface;
             implementations = new HashSet<GrainClassData>();
+        }
+
+        internal GrainInterfaceData(GrainInterfaceData other)
+        {
+            InterfaceId = other.InterfaceId;
+            InterfaceVersion = other.InterfaceVersion;
+            this.iface = other.iface;
+            GrainInterface = other.GrainInterface;
+            PrimaryImplementation = other.PrimaryImplementation;
+            implementations = new HashSet<GrainClassData>(other.implementations);
         }
 
         internal void AddImplementation(GrainClassData implementation, bool primaryImplemenation = false)
