@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -14,19 +15,13 @@ namespace Orleans.Streams
         /// Stream identifier for the stream this batch is part of.
         /// Derived from the first batch container in the batch.
         /// </summary>
-        public Guid StreamGuid { get; }
+        public StreamId StreamId { get; }
 
         /// <summary>
         /// Stream Sequence Token for the start of this batch.
         /// Derived from the first batch container in the batch.
         /// </summary>
         public StreamSequenceToken SequenceToken { get; }
-
-        /// <summary>
-        /// Stream namespace for the stream this batch is part of.
-        /// Derived from the first batch container in the batch.
-        /// </summary>
-        public string StreamNamespace { get; }
 
         /// <summary>
         /// Batch containers comprising this batch
@@ -44,8 +39,7 @@ namespace Orleans.Streams
 
             var containerDelegate = this.BatchContainers.First();
             this.SequenceToken = containerDelegate.SequenceToken;
-            this.StreamGuid = containerDelegate.StreamGuid;
-            this.StreamNamespace = containerDelegate.StreamNamespace;
+            this.StreamId = containerDelegate.StreamId;
         }
 
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
@@ -57,13 +51,5 @@ namespace Orleans.Streams
         {
             return this.BatchContainers.First().ImportRequestContext();
         }
-
-        public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
-        {
-            // ShouldDeliver is called on a per IBatchContainer basis for each IBatchContainer that composes this BatchContainerBatch.
-            // Therefore, no filtering is done on the BatchContainerBatch level.
-            return true;
-        }
-
     }
 }

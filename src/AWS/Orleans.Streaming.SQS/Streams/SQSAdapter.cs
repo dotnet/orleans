@@ -1,4 +1,4 @@
-﻿using Orleans.Streams;
+using Orleans.Streams;
 using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Concurrent;
@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
+using Orleans.Runtime;
 
 namespace OrleansAWSUtils.Streams
 {
@@ -39,13 +40,13 @@ namespace OrleansAWSUtils.Streams
             return SQSAdapterReceiver.Create(this.serializationManager, this.loggerFactory, queueId, DataConnectionString, this.ServiceId);
         }
 
-        public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
             if (token != null)
             {
                 throw new ArgumentException("SQSStream stream provider currently does not support non-null StreamSequenceToken.", "token");
             }
-            var queueId = streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
+            var queueId = streamQueueMapper.GetQueueForStream(streamId);
             SQSStorage queue;
             if (!Queues.TryGetValue(queueId, out queue))
             {
@@ -53,7 +54,7 @@ namespace OrleansAWSUtils.Streams
                 await tmpQueue.InitQueueAsync();
                 queue = Queues.GetOrAdd(queueId, tmpQueue);
             }
-            var msg = SQSBatchContainer.ToSQSMessage(this.serializationManager, streamGuid, streamNamespace, events, requestContext);
+            var msg = SQSBatchContainer.ToSQSMessage(this.serializationManager, streamId, events, requestContext);
             await queue.AddMessage(msg);
         }
     }

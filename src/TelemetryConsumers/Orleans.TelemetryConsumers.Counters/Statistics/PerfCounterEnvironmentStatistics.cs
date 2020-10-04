@@ -1,14 +1,14 @@
 #define LOG_MEMORY_PERF_COUNTERS
 
+using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
-using System;
-using System.Diagnostics;
-using System.Management;
-
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Orleans.Statistics
 {
@@ -105,17 +105,12 @@ namespace Orleans.Statistics
                 promotedFinalizationMemoryFromGen0PF = new PerformanceCounter(".NET CLR Memory", "Promoted Finalization-Memory from Gen 0", thisProcess, true);
 #endif
 
-                //.NET on Windows without mono
-                const string Query = "SELECT Capacity FROM Win32_PhysicalMemory";
-                var searcher = new ManagementObjectSearcher(Query);
-                long Capacity = 0;
-                foreach (ManagementObject WniPART in searcher.Get())
-                    Capacity += Convert.ToInt64(WniPART.Properties["Capacity"].Value);
+                // Could use GC.GetGCMemoryInfo().TotalAvailableMemoryBytes instead on .NET Core 3.0
+                var memoryStatus = new MEMORYSTATUSEX();
+                memoryStatus.Length = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+                if (GlobalMemoryStatusEx(ref memoryStatus) == 0) throw new Win32Exception();
+                TotalPhysicalMemory = (long)memoryStatus.TotalPhys;
 
-                if (Capacity == 0)
-                    throw new Exception("No physical ram installed on machine?");
-
-                TotalPhysicalMemory = Capacity;
                 countersAvailable = true;
             }
             catch (Exception ex)
@@ -125,6 +120,23 @@ namespace Orleans.Statistics
                     ex);
             }
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MEMORYSTATUSEX
+        {
+            public uint Length;
+            public uint MemoryLoad;
+            public ulong TotalPhys;
+            public ulong AvailPhys;
+            public ulong TotalPageFile;
+            public ulong AvailPageFile;
+            public ulong TotalVirtual;
+            public ulong AvailVirtual;
+            public ulong AvailExtendedVirtual;
+        }
+
+        [DllImport("Kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern int GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
 
         private void CheckCpuUsage(object m)
         {

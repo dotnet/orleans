@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Azure.EventHubs;
+using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -17,7 +17,7 @@ namespace Orleans.ServiceBus.Providers.Testing
     public class SimpleStreamEventDataGenerator : IStreamDataGenerator<EventData>
     {
         /// <inheritdoc />
-        public IStreamIdentity StreamId { get; set; }
+        public StreamId StreamId { get; set; }
 
         /// <inheritdoc />
         public IIntCounter SequenceNumberCounter { set; private get; }
@@ -33,7 +33,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// <param name="streamId"></param>
         /// <param name="logger"></param>
         /// <param name="serializationManager"></param>
-        public SimpleStreamEventDataGenerator(IStreamIdentity streamId, ILogger<SimpleStreamEventDataGenerator> logger, SerializationManager serializationManager)
+        public SimpleStreamEventDataGenerator(StreamId streamId, ILogger<SimpleStreamEventDataGenerator> logger, SerializationManager serializationManager)
         {
             this.StreamId = streamId;
             this.logger = logger;
@@ -54,22 +54,24 @@ namespace Orleans.ServiceBus.Providers.Testing
             while (count-- > 0)
             {
                 this.SequenceNumberCounter.Increment();
-                var eventData = EventHubBatchContainer.ToEventData<int>(this.serializationManager, this.StreamId.Guid, this.StreamId.Namespace,
-                    this.GenerateEvent(this.SequenceNumberCounter.Value), RequestContextExtensions.Export(this.serializationManager));
 
-                //set partition key
-                eventData.SetPartitionKey(this.StreamId.Guid.ToString());
+                var eventData = EventHubBatchContainer.ToEventData<int>(
+                    this.serializationManager,
+                    this.StreamId,
+                    this.GenerateEvent(this.SequenceNumberCounter.Value),
+                    RequestContextExtensions.Export(this.serializationManager));
 
-                //set offset
-                DateTime now = DateTime.UtcNow;
-                var offSet = this.StreamId.Guid.ToString() + now.ToString();
-                eventData.SetOffset(offSet);
-                //set sequence number
-                eventData.SetSequenceNumber(this.SequenceNumberCounter.Value);
-                //set enqueue time
-                eventData.SetEnqueuedTimeUtc(now);
-                eventDataList.Add(eventData);
-                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} for stream {this.StreamId.Namespace}-{this.StreamId.Guid}");
+               var wrapper = new WrappedEventData(
+                    eventData.Body,
+                    eventData.Properties,
+                    eventData.SystemProperties,
+                    partitionKey: StreamId.GetKeyAsString(),
+                    offset: DateTime.UtcNow.Ticks,
+                    sequenceNumber: this.SequenceNumberCounter.Value);
+
+                eventDataList.Add(wrapper);
+
+                this.logger.Info($"Generate data of SequemceNumber {SequenceNumberCounter.Value} for stream {this.StreamId}");
             }
 
             events = eventDataList;
@@ -83,9 +85,17 @@ namespace Orleans.ServiceBus.Providers.Testing
             return events;
         }
         
-        public static Func<IStreamIdentity, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services)
+        public static Func<StreamId, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services)
         {
-            return (streamIdentity) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, streamIdentity);
+            return (streamId) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, streamId);
+        }
+
+
+        private class WrappedEventData : EventData
+        {
+            public WrappedEventData(ReadOnlyMemory<byte> eventBody, IDictionary<string, object> properties = null, IReadOnlyDictionary<string, object> systemProperties = null, long sequenceNumber = long.MinValue, long offset = long.MinValue, DateTimeOffset enqueuedTime = default, string partitionKey = null) : base(eventBody, properties, systemProperties, sequenceNumber, offset, enqueuedTime, partitionKey)
+            {
+            }
         }
     }
 
@@ -98,7 +108,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         private readonly EventDataGeneratorStreamOptions options;
         private readonly IntCounter sequenceNumberCounter = new IntCounter();
         private readonly ILogger logger;
-        private Func<IStreamIdentity, IStreamDataGenerator<EventData>> generatorFactory;
+        private Func<StreamId, IStreamDataGenerator<EventData>> generatorFactory;
         private List<IStreamDataGenerator<EventData>> generators;
 
         /// <summary>
@@ -107,7 +117,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// <param name="options"></param>
         /// <param name="generatorFactory"></param>
         /// <param name="logger"></param>
-        public EventHubPartitionDataGenerator(EventDataGeneratorStreamOptions options, Func<IStreamIdentity, IStreamDataGenerator<EventData>> generatorFactory, ILogger logger)
+        public EventHubPartitionDataGenerator(EventDataGeneratorStreamOptions options, Func<StreamId, IStreamDataGenerator<EventData>> generatorFactory, ILogger logger)
         {
             this.options = options;
             this.generatorFactory = generatorFactory;
@@ -115,21 +125,21 @@ namespace Orleans.ServiceBus.Providers.Testing
             this.logger = logger;
         }
         /// <inheritdoc />
-        public void AddDataGeneratorForStream(IStreamIdentity streamId)
+        public void AddDataGeneratorForStream(StreamId streamId)
         {
             var generator =  this.generatorFactory(streamId);
             generator.SequenceNumberCounter = sequenceNumberCounter;
-            this.logger.Info($"Data generator set up on stream {streamId.Namespace}-{streamId.Guid.ToString()}.");
+            this.logger.Info($"Data generator set up on stream {streamId}.");
             this.generators.Add(generator);
         }
         /// <inheritdoc />
-        public void StopProducingOnStream(IStreamIdentity streamId)
+        public void StopProducingOnStream(StreamId streamId)
         {
             this.generators.ForEach(generator => {
                 if (generator.StreamId.Equals(streamId))
                 {
                     generator.ShouldProduce = false;
-                    this.logger.Info($"Stop producing data on stream {streamId.Namespace}-{streamId.Guid.ToString()}.");
+                    this.logger.Info($"Stop producing data on stream {streamId}.");
                 }
             });
         }

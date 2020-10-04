@@ -43,10 +43,10 @@ namespace Tester.AzureUtils.Lease
                 hostBuilder
                     .UseAzureBlobLeaseProvider(ob => ob.Configure<IOptions<ClusterOptions>>((options, cluster) =>
                     {
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConfigureTestDefaults();
                         options.BlobContainerName = "cluster-" + cluster.Value.ClusterId + "-leases";
                     }))
-                    .UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString)
+                    .UseAzureStorageClustering(options => options.ConfigureTestDefaults())
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>
                     {
                         b.ConfigurePartitioning(totalQueueCount);

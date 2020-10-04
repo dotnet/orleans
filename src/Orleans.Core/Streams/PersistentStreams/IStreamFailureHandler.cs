@@ -15,7 +15,7 @@ namespace Orleans.Streams
         /// <param name="streamIdentity"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken);
+        Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken);
 
 
         /// <summary>
@@ -26,6 +26,6 @@ namespace Orleans.Streams
         /// <param name="streamIdentity"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken);
+        Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity, StreamSequenceToken sequenceToken);
     }
 }

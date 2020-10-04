@@ -13,7 +13,7 @@ namespace Orleans.Streams.Core
     [Immutable]
     public class StreamSubscription
     {
-        public StreamSubscription(Guid subscriptionId, string streamProviderName, IStreamIdentity streamId, GrainId grainId)
+        public StreamSubscription(Guid subscriptionId, string streamProviderName, StreamId streamId, GrainId grainId)
         {
             this.SubscriptionId = subscriptionId;
             this.StreamProviderName = streamProviderName;
@@ -22,7 +22,7 @@ namespace Orleans.Streams.Core
         }
         public Guid SubscriptionId { get; set; }
         public string StreamProviderName { get; set; }
-        public IStreamIdentity StreamId { get; set; }
+        public StreamId StreamId { get; set; }
         public GrainId GrainId { get; set; }
     }
 }

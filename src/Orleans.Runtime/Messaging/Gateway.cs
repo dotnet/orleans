@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.ClientObservers;
 using Orleans.Configuration;
 using Orleans.Internal;
 
@@ -59,6 +60,22 @@ namespace Orleans.Runtime.Messaging
             this.clientRegistrar = clientRegistrar;
             this.clientRegistrar.SetGateway(this);
             dropper.Start();
+        }
+
+        internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory)
+        {
+            lock (lockable)
+            {
+                foreach (var clientState in this.clients.Values)
+                {
+                    if (clientState.IsConnected)
+                    {
+                        var observer = ClientGatewayObserver.GetObserver(grainFactory, clientState.Id);
+                        observer.StopSendingToGateway(this.gatewayAddress);
+                    }
+                }
+            }
+            await Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout);
         }
 
         internal void Stop()
@@ -446,16 +463,19 @@ namespace Orleans.Runtime.Messaging
 
             private bool Send(Message msg, ClientState client)
             {
+                var connection = client.Connection;
+                if (connection is null) return false;
+
                 try
                 {
-                    client.Connection.Send(msg);
+                    connection.Send(msg);
                     gatewaySends.Increment();
                     return true;
                 }
                 catch (Exception exception)
                 {
-                    gateway.RecordClosedConnection(client.Connection);
-                    client.Connection.Abort(new ConnectionAbortedException("Exception posting a message to sender. See InnerException for details.", exception));
+                    gateway.RecordClosedConnection(connection);
+                    connection.Abort(new ConnectionAbortedException("Exception posting a message to sender. See InnerException for details.", exception));
                     return false;
                 }
             }

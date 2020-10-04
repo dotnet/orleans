@@ -1,4 +1,5 @@
-using Microsoft.Azure.EventHubs;
+using Orleans.Runtime;
+using Azure.Messaging.EventHubs;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
@@ -37,13 +38,13 @@ namespace Orleans.ServiceBus.Providers.Testing
         }
 
         /// <inheritdoc />
-        public void StopProducingOnStream(IStreamIdentity streamId)
+        public void StopProducingOnStream(StreamId streamId)
         {
             (this.generator as IStreamDataGeneratingController)?.StopProducingOnStream(streamId);
         }
 
         /// <inheritdoc />
-        public void ConfigureDataGeneratorForStream(IStreamIdentity streamId)
+        public void ConfigureDataGeneratorForStream(StreamId streamId)
         {
             (this.generator as IStreamDataGeneratingController)?.AddDataGeneratorForStream(streamId);
         }

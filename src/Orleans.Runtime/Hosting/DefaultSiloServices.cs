@@ -59,7 +59,7 @@ namespace Orleans.Hosting
 
             // Register system services.
             services.TryAddSingleton<ILocalSiloDetails, LocalSiloDetails>();
-            services.TryAddSingleton<ISiloHost, SiloWrapper>();
+            services.TryAddSingleton<ISiloHost, SiloHost>();
             services.TryAddTransient<ILifecycleSubject, LifecycleSubject>();
             services.TryAddSingleton<SiloLifecycleSubject>();
             services.TryAddFromExisting<ISiloLifecycleSubject, SiloLifecycleSubject>();
@@ -149,9 +149,9 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);
             services.TryAddSingleton<Dispatcher>(sp => sp.GetRequiredService<Catalog>().Dispatcher);
+            services.TryAddSingleton<ActivationMessageScheduler>(sp => sp.GetRequiredService<Catalog>().ActivationMessageScheduler);
             services.TryAddSingleton<InsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
-            services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
             services.TryAddSingleton<IGrainServiceFactory, GrainServiceFactory>();
 
@@ -193,6 +193,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IConfigureGrainContext, StreamConsumerGrainContextAction>();
             services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
             services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
+            services.AddSingletonKeyedService<string, IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
             services.AddTransientKeyedService<Type, IGrainExtension>(typeof(IStreamConsumerExtension), (sp, _) =>
             {
                 var runtime = sp.GetRequiredService<IStreamProviderRuntime>();
@@ -265,6 +266,8 @@ namespace Orleans.Hosting
             services.TryAddSingleton<GrainReferenceActivator>();
             services.TryAddSingleton<IGrainContextActivatorProvider, ActivationDataActivatorProvider>();
             services.TryAddSingleton<IGrainContextAccessor, GrainContextAccessor>();
+            services.AddSingleton<IncomingRequestMonitor>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
 
             services.TryAddSingleton<IStreamSubscriptionManagerAdmin>(sp => new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
             services.TryAddSingleton<IConsistentRingProvider>(

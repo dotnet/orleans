@@ -1,5 +1,6 @@
 using System;
-using Microsoft.Azure.Storage;
+using Azure.Core;
+using Microsoft.Azure.Cosmos.Table;
 using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
@@ -13,6 +14,16 @@ namespace Orleans.Configuration
         /// </summary>
         [RedactConnectionString]
         public string ConnectionString { get; set; }
+
+        /// <summary>
+        /// The Service URI (e.g. https://x.blob.core.windows.net). Required for specifying <see cref="TokenCredential"/>.
+        /// </summary>
+        public Uri ServiceUri { get; set; }
+
+        /// <summary>
+        /// Use AAD to access the storage account
+        /// </summary>
+        public TokenCredential TokenCredential { get; set; }
 
         /// <summary>
         /// Container name where grain stage is stored
@@ -54,9 +65,24 @@ namespace Orleans.Configuration
 
         public void ValidateConfiguration()
         {
-            if (!CloudStorageAccount.TryParse(this.options.ConnectionString, out var ignore))
-                throw new OrleansConfigurationException(
-                    $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ConnectionString)} is not valid.");
+            if (this.options.ServiceUri == null)
+            {
+                if (this.options.TokenCredential != null)
+                {
+                    throw new OrleansConfigurationException($"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(options.ServiceUri)} is required for {nameof(options.TokenCredential)}");
+                }
+
+                if (!CloudStorageAccount.TryParse(this.options.ConnectionString, out var ignore))
+                    throw new OrleansConfigurationException(
+                        $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ConnectionString)} is not valid.");
+            }
+            else
+            {
+                if (this.options.TokenCredential == null)
+                    throw new OrleansConfigurationException(
+                        $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.TokenCredential)} is missing.");
+            }
+
             try
             {
                 AzureBlobUtils.ValidateContainerName(options.ContainerName);

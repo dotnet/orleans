@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Serialization;
-using Microsoft.Azure.EventHubs;
+using Azure.Messaging.EventHubs;
 using Newtonsoft.Json;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -29,12 +28,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Stream identifier for the stream this batch is part of.
         /// </summary>
-        public Guid StreamGuid => eventHubMessage.StreamIdentity.Guid;
-
-        /// <summary>
-        /// Stream namespace for the stream this batch is part of.
-        /// </summary>
-        public string StreamNamespace => eventHubMessage.StreamIdentity.Namespace;
+        public StreamId StreamId => eventHubMessage.StreamId;
 
         /// <summary>
         /// Stream Sequence Token for the start of this batch.
@@ -92,24 +86,15 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <summary>
-        /// Decide whether this batch should be sent to the specified target.
-        /// </summary>
-        public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
-        {
-            return true;
-        }
-
-        /// <summary>
         /// Put events list and its context into a EventData object
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="serializationManager"></param>
-        /// <param name="streamGuid"></param>
-        /// <param name="streamNamespace"></param>
+        /// <param name="streamId"></param>
         /// <param name="events"></param>
         /// <param name="requestContext"></param>
         /// <returns></returns>
-        public static EventData ToEventData<T>(SerializationManager serializationManager, Guid streamGuid, String streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        public static EventData ToEventData<T>(SerializationManager serializationManager, StreamId streamId, IEnumerable<T> events, Dictionary<string, object> requestContext)
         {
             var payload = new Body
             {
@@ -119,10 +104,7 @@ namespace Orleans.ServiceBus.Providers
             var bytes = serializationManager.SerializeToByteArray(payload);
             var eventData = new EventData(bytes);
 
-            if (!string.IsNullOrWhiteSpace(streamNamespace))
-            {
-                eventData.SetStreamNamespaceProperty(streamNamespace);
-            }
+            eventData.SetStreamNamespaceProperty(streamId.GetNamespace());
             return eventData;
         }
 

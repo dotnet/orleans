@@ -62,22 +62,22 @@ namespace Orleans.Streams
 
     internal interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
     {
-        Task<ISet<PubSubSubscriptionState>> RegisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer);
+        Task<ISet<PubSubSubscriptionState>> RegisterProducer(InternalStreamId streamId, IStreamProducerExtension streamProducer);
 
-        Task UnregisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer);
+        Task UnregisterProducer(InternalStreamId streamId, IStreamProducerExtension streamProducer);
 
-        Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter);
+        Task RegisterConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData);
 
-        Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider);
+        Task UnregisterConsumer(GuidId subscriptionId, InternalStreamId streamId);
 
-        Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace);
+        Task<int> ProducerCount(InternalStreamId streamId);
 
-        Task<int> ConsumerCount(Guid streamId, string streamProvider, string streamNamespace);
+        Task<int> ConsumerCount(InternalStreamId streamId);
 
-        Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null);
+        Task<List<StreamSubscription>> GetAllSubscriptions(InternalStreamId streamId, IStreamConsumerExtension streamConsumer = null);
 
-        GuidId CreateSubscriptionId(StreamId streamId, IStreamConsumerExtension streamConsumer);
+        GuidId CreateSubscriptionId(InternalStreamId streamId, IStreamConsumerExtension streamConsumer);
 
-        Task<bool> FaultSubscription(StreamId streamId, GuidId subscriptionId);
+        Task<bool> FaultSubscription(InternalStreamId streamId, GuidId subscriptionId);
     }
 }

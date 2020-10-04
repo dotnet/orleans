@@ -29,6 +29,8 @@ namespace Orleans.Runtime
         private readonly IServiceScope serviceScope;
         public readonly TimeSpan CollectionAgeLimit;
         private readonly GrainTypeComponents _shared;
+        private readonly ActivationMessageScheduler _messageScheduler;
+        private readonly Action<object> _receiveMessageInScheduler;
         private HashSet<IGrainTimer> timers;
         private Dictionary<Type, object> _components;
 
@@ -39,18 +41,21 @@ namespace Orleans.Runtime
             TimeSpan ageLimit,
             IOptions<SiloMessagingOptions> messagingOptions,
             TimeSpan maxWarningRequestProcessingTime,
-			TimeSpan maxRequestProcessingTime,
+            TimeSpan maxRequestProcessingTime,
             ILoggerFactory loggerFactory,
             IServiceProvider applicationServices,
             IGrainRuntime grainRuntime,
             GrainReferenceActivator referenceActivator,
-            GrainTypeComponents sharedComponents)
+            GrainTypeComponents sharedComponents,
+            ActivationMessageScheduler messageScheduler)
         {
             if (null == addr) throw new ArgumentNullException(nameof(addr));
             if (null == placedUsing) throw new ArgumentNullException(nameof(placedUsing));
             if (null == collector) throw new ArgumentNullException(nameof(collector));
 
+            _receiveMessageInScheduler = state => this.ReceiveMessageInScheduler(state);
             _shared = sharedComponents;
+            _messageScheduler = messageScheduler;
             logger = loggerFactory.CreateLogger<ActivationData>();
             this.lifecycle = new GrainLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
             this.maxRequestProcessingTime = maxRequestProcessingTime;
@@ -77,6 +82,27 @@ namespace Orleans.Runtime
         public IServiceProvider ActivationServices => this.serviceScope.ServiceProvider;
 
         internal WorkItemGroup WorkItemGroup { get; set; }
+
+        public async ValueTask ActivateAsync(CancellationToken cancellation)
+        {
+            await this.Lifecycle.OnStart(cancellation);
+
+            lock (this)
+            {
+                if (this.State == ActivationState.Activating)
+                {
+                    this.SetState(ActivationState.Valid); // Activate calls on this activation are finished
+                }
+
+                if (!this.IsCurrentlyExecuting)
+                {
+                    this.RunOnInactive();
+                }
+
+                // Run message pump to see if there is a new request is queued to be processed
+                _messageScheduler.RunMessagePump(this);
+            }
+        }
 
         public TComponent GetComponent<TComponent>()
         {
@@ -122,8 +148,6 @@ namespace Orleans.Runtime
             if (_components is null) _components = new Dictionary<Type, object>();
             _components[typeof(TComponent)] = instance;
         }
-
-        public HashSet<ActivationId> RunningRequestsSenders { get; } = new HashSet<ActivationId>();
 
         internal void SetGrainInstance(Grain grainInstance)
         {
@@ -257,10 +281,7 @@ namespace Orleans.Runtime
         internal bool IsUsingGrainDirectory => this.PlacedUsing.IsUsingGrainDirectory;
 
         public Message Blocking { get; private set; }
-
-        // the number of requests that are currently executing on this activation.
-        // includes reentrant and non-reentrant requests.
-        private int numRunning;
+        public Dictionary<Message, DateTime> RunningRequests { get; private set; } = new Dictionary<Message, DateTime>();
 
         private DateTime currentRequestStartTime;
         private DateTime becameIdle;
@@ -269,29 +290,23 @@ namespace Orleans.Runtime
         public void RecordRunning(Message message, bool isInterleavable)
         {
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
-
-            numRunning++;
-            if (message.Direction != Message.Directions.OneWay 
-                && !(message.SendingActivation is null)
-                && !message.SendingGrain.IsClient())
-            {
-                RunningRequestsSenders.Add(message.SendingActivation);
-            }
+            var now = DateTime.UtcNow;
+            RunningRequests.Add(message, now);
 
             if (this.Blocking != null || isInterleavable) return;
 
             // This logic only works for non-reentrant activations
             // Consider: Handle long request detection for reentrant activations.
             this.Blocking = message;
-            currentRequestStartTime = DateTime.UtcNow;
+            currentRequestStartTime = now;
         }
 
         public void ResetRunning(Message message)
         {
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
-            numRunning--;
-            RunningRequestsSenders.Remove(message.SendingActivation);
-            if (numRunning == 0)
+            RunningRequests.Remove(message);
+
+            if (RunningRequests.Count == 0)
             {
                 becameIdle = DateTime.UtcNow;
                 if (!IsExemptFromCollection)
@@ -380,7 +395,7 @@ namespace Orleans.Runtime
                     if (deactivatingTime > maxRequestProcessingTime)
                     {
                         logger.Error(ErrorCode.Dispatcher_StuckActivation,
-                            $"Current activation {ToDetailedString()} marked as Deactivating for {deactivatingTime}. Trying  to enqueue {message}.");
+                            $"Current activation {ToDetailedString()} marked as Deactivating for {deactivatingTime}. Trying to enqueue {message}.");
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }
                 }
@@ -390,7 +405,7 @@ namespace Orleans.Runtime
                     if (currentRequestActiveTime > maxRequestProcessingTime)
                     {
                         logger.Error(ErrorCode.Dispatcher_StuckActivation,
-                            $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {this.Blocking}.  Trying  to enqueue {message}.");
+                            $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {this.Blocking}. Trying to enqueue {message}.");
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }
                     // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
@@ -402,8 +417,14 @@ namespace Orleans.Runtime
                     }
                 }
 
-                waiting = waiting ?? new List<Message>();
+                if (!message.QueuedTime.HasValue)
+                {
+                    message.QueuedTime = DateTime.UtcNow;
+                }
+
+                waiting ??= new List<Message>();
                 waiting.Add(message);
+
                 return EnqueueMessageResult.Success;
             }
         }
@@ -412,9 +433,8 @@ namespace Orleans.Runtime
         /// Check whether this activation is overloaded. 
         /// Returns LimitExceededException if overloaded, otherwise <c>null</c>c>
         /// </summary>
-        /// <param name="log">Logger to use for reporting any overflow condition</param>
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
-        public LimitExceededException CheckOverloaded(ILogger log)
+        public LimitExceededException CheckOverloaded()
         {
             string limitName = LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
             int maxRequestsHardLimit = this.messagingOptions.MaxEnqueuedRequestsHardLimit;
@@ -432,17 +452,24 @@ namespace Orleans.Runtime
 
             if (maxRequestsHardLimit > 0 && count > maxRequestsHardLimit) // Hard limit
             {
-                log.Warn(ErrorCode.Catalog_Reject_ActivationTooManyRequests, 
-                    String.Format("Overload - {0} enqueued requests for activation {1}, exceeding hard limit rejection threshold of {2}",
-                        count, this, maxRequestsHardLimit));
+                this.logger.LogWarning(
+                    (int)ErrorCode.Catalog_Reject_ActivationTooManyRequests,
+                    "Overload - {Count} enqueued requests for activation {Activation}, exceeding hard limit rejection threshold of {HardLimit}",
+                    count,
+                    this,
+                    maxRequestsHardLimit);
 
                 return new LimitExceededException(limitName, count, maxRequestsHardLimit, this.ToString());
             }
+
             if (maxRequestsSoftLimit > 0 && count > maxRequestsSoftLimit) // Soft limit
             {
-                log.Warn(ErrorCode.Catalog_Warn_ActivationTooManyRequests,
-                    String.Format("Hot - {0} enqueued requests for activation {1}, exceeding soft limit warning threshold of {2}",
-                        count, this, maxRequestsSoftLimit));
+                this.logger.LogWarning(
+                    (int)ErrorCode.Catalog_Warn_ActivationTooManyRequests,
+                    "Hot - {Count} enqueued requests for activation {Activation}, exceeding soft limit warning threshold of {SoftLimit}",
+                    count,
+                    this,
+                    maxRequestsSoftLimit);
                 return null;
             }
 
@@ -495,7 +522,7 @@ namespace Orleans.Runtime
         {
             get
             {
-                return numRunning > 0 ;
+                return RunningRequests.Count > 0;
             }
         }
 
@@ -632,15 +659,115 @@ namespace Orleans.Runtime
             }
         }
 
+        public void AnalyzeWorkload(DateTime now, IMessageCenter messageCenter, MessageFactory messageFactory, SiloMessagingOptions options)
+        {
+            var slowRunningRequestDuration = options.RequestProcessingWarningTime;
+            var longQueueTimeDuration = options.RequestQueueDelayWarningTime;
+
+            List<string> diagnostics = null;
+            lock (this)
+            {
+                if (State != ActivationState.Valid)
+                {
+                    return;
+                }
+
+                if (this.Blocking is object)
+                {
+                    var message = this.Blocking;
+                    var timeSinceQueued = now - message.QueuedTime;
+                    var executionTime = now - currentRequestStartTime;
+                    if (executionTime >= slowRunningRequestDuration)
+                    {
+                        GetStatusList(ref diagnostics);
+                        if (timeSinceQueued.HasValue)
+                        {
+                            diagnostics.Add($"Message {message} was enqueued {timeSinceQueued} ago and has now been executing for {executionTime}.");
+                        }
+                        else
+                        {
+                            diagnostics.Add($"Message {message} was has been executing for {executionTime}.");
+                        }
+
+                        var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
+                        messageCenter.SendMessage(response);
+                    }
+                }
+
+                foreach (var running in RunningRequests)
+                {
+                    var message = running.Key;
+                    var startTime = running.Value;
+                    if (ReferenceEquals(message, this.Blocking)) continue;
+
+                    // Check how long they've been executing.
+                    var executionTime = now - startTime;
+                    if (executionTime >= slowRunningRequestDuration)
+                    {
+                        // Interleaving message X has been executing for a long time
+                        GetStatusList(ref diagnostics);
+                        var messageDiagnostics = new List<string>(diagnostics)
+                        {
+                            $"Interleaving message {message} has been executing for {executionTime}."
+                        };
+
+                        var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
+                        messageCenter.SendMessage(response);
+                    }
+                }
+
+                if (waiting is object)
+                {
+                    var queueLength = 1;
+                    foreach (var message in waiting)
+                    {
+                        var waitTime = now - message.QueuedTime;
+                        if (waitTime >= longQueueTimeDuration)
+                        {
+                            // Message X has been enqueued on the target grain for Y and is currently position QueueLength in queue for processing.
+                            GetStatusList(ref diagnostics); 
+                            var messageDiagnostics = new List<string>(diagnostics)
+                            {
+                               $"Message {message} has been enqueued on the target grain for {waitTime} and is currently position {queueLength} in queue for processing."
+                            };
+
+                            var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
+                            messageCenter.SendMessage(response);
+                        }
+
+                        queueLength++;
+                    }
+                }
+            }
+
+            void GetStatusList(ref List<string> diagnostics)
+            {
+                if (diagnostics is object) return;
+
+                diagnostics = new List<string>
+                {
+                    this.ToDetailedString(),
+                    $"TaskScheduler status: {this.WorkItemGroup.DumpStatus()}"
+                };
+            }
+        }
+
         public string DumpStatus()
         {
             var sb = new StringBuilder();
             lock (this)
             {
                 sb.AppendFormat("   {0}", ToDetailedString());
+
                 if (this.Blocking != null)
                 {
                     sb.AppendFormat("   Processing message: {0}", this.Blocking);
+                }
+
+                foreach (var msg in RunningRequests)
+                {
+                    if (ReferenceEquals(msg, this.Blocking)) continue;
+                    sb.AppendFormat("   Processing message: {0}", msg);
                 }
 
                 if (waiting!=null && waiting.Count > 0)
@@ -674,7 +801,7 @@ namespace Orleans.Runtime
                     WaitingCount,                   // 5 NonReentrancyQueueSize
                     EnqueuedOnDispatcherCount,      // 6 EnqueuedOnDispatcher
                     InFlightCount,                  // 7 InFlightCount
-                    numRunning,                     // 8 NumRunning
+                    RunningRequests.Count,          // 8 NumRunning
                     GetIdleness(DateTime.UtcNow),   // 9 IdlenessTimeSpan
                     CollectionAgeLimit,             // 10 CollectionAgeLimit
                     (includeExtraDetails && this.Blocking != null) ? " CurrentlyExecuting=" + this.Blocking : "");  // 11: Running
@@ -771,6 +898,34 @@ namespace Orleans.Runtime
 
             this.SetComponent<TExtensionInterface>(typedResult);
             return typedResult;
+        }
+
+        public void ReceiveMessage(object message)
+        {
+            var msg = (Message)message;
+            lock (this)
+            {
+                // Get the activation's scheduler or the default task scheduler if the activation is not valid.
+                // Requests to an invalid activation are handled later.
+                var scheduler = this.WorkItemGroup?.TaskScheduler ?? TaskScheduler.Default;
+                this.IncrementEnqueuedOnDispatcherCount();
+
+                // Enqueue the handler on the activation's scheduler
+                var task = new Task(_receiveMessageInScheduler, msg);
+                task.Start(scheduler);
+            }
+        }
+
+        private void ReceiveMessageInScheduler(object state)
+        {
+            try
+            {
+                _messageScheduler.ReceiveMessage(this, (Message)state);
+            }
+            finally
+            {
+                this.DecrementEnqueuedOnDispatcherCount();
+            }
         }
     }
 

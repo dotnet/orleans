@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -11,7 +12,7 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public class SimpleQueueCacheCursor : IQueueCacheCursor
     {
-        private readonly IStreamIdentity streamIdentity;
+        private readonly StreamId streamId;
         private readonly SimpleQueueCache cache;
         private readonly ILogger logger;
         private IBatchContainer current; // this is a pointer to the current element in the cache. It is what will be returned by GetCurrent().
@@ -45,19 +46,19 @@ namespace Orleans.Providers.Streams.Common
         /// Cursor into a simple queue cache
         /// </summary>
         /// <param name="cache"></param>
-        /// <param name="streamIdentity"></param>
+        /// <param name="streamId"></param>
         /// <param name="logger"></param>
-        public SimpleQueueCacheCursor(SimpleQueueCache cache, IStreamIdentity streamIdentity, ILogger logger)
+        public SimpleQueueCacheCursor(SimpleQueueCache cache, StreamId streamId, ILogger logger)
         {
             if (cache == null)
             {
                 throw new ArgumentNullException(nameof(cache));
             }
             this.cache = cache;
-            this.streamIdentity = streamIdentity;
+            this.streamId = streamId;
             this.logger = logger;
             current = null;
-            SimpleQueueCache.Log(logger, "SimpleQueueCacheCursor New Cursor for {Guid}, {NameSpace}", streamIdentity.Guid, streamIdentity.Namespace);
+            SimpleQueueCache.Log(logger, "SimpleQueueCacheCursor New Cursor for {StreamId}, {NameSpace}", streamId);
         }
 
         /// <summary>
@@ -131,8 +132,7 @@ namespace Orleans.Providers.Streams.Common
         private bool IsInStream(IBatchContainer batchContainer)
         {
             return batchContainer != null &&
-                    batchContainer.StreamGuid.Equals(streamIdentity.Guid) &&
-                    string.Equals(batchContainer.StreamNamespace, streamIdentity.Namespace);
+                    batchContainer.StreamId.Equals(this.streamId);
         }
 
         /// <summary>

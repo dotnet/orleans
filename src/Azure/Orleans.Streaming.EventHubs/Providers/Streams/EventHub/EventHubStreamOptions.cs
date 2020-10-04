@@ -1,4 +1,4 @@
-﻿
+using Azure.Core;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System;
@@ -23,6 +23,15 @@ namespace Orleans.Configuration
         /// Hub path.
         /// </summary>
         public string Path { get; set; }
+        /// <summary>
+        /// The token credential.
+        /// </summary>
+        public TokenCredential TokenCredential { get; set; }
+        /// <summary>
+        /// The fully qualified Event Hubs namespace to connect to. This is likely to be similar to {yournamespace}.servicebus.windows.net.
+        /// Required when <see cref="TokenCredential"/> is specified.
+        /// </summary>
+        public string FullyQualifiedNamespace { get; set; }
     }
 
     public class EventHubOptionsValidator : IConfigurationValidator
@@ -36,8 +45,17 @@ namespace Orleans.Configuration
         }
         public void ValidateConfiguration()
         {
-            if (String.IsNullOrEmpty(options.ConnectionString))
-                throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.ConnectionString)} is invalid");
+            if (options.TokenCredential != null)
+            {
+                if (String.IsNullOrEmpty(options.FullyQualifiedNamespace))
+                    throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.FullyQualifiedNamespace)} is invalid");
+            }
+            else
+            {
+                if (String.IsNullOrEmpty(options.ConnectionString))
+                    throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.ConnectionString)} is invalid");
+            }
+
             if (String.IsNullOrEmpty(options.ConsumerGroup))
                 throw new OrleansConfigurationException($"{nameof(EventHubOptions)} on stream provider {this.name} is invalid. {nameof(EventHubOptions.ConsumerGroup)} is invalid");
             if (String.IsNullOrEmpty(options.Path))
@@ -63,7 +81,7 @@ namespace Orleans.Configuration
     }
 
     public class EventHubReceiverOptions
-    { 
+    {
         /// <summary>
         /// Optional parameter that configures the receiver prefetch count.
         /// </summary>

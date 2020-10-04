@@ -1,4 +1,4 @@
-﻿using Amazon.SQS.Model;
+using Amazon.SQS.Model;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Providers.Streams.Common;
@@ -30,9 +30,7 @@ namespace OrleansAWSUtils.Streams
         // Don't need to serialize it, since we are never interested in sending it to stream consumers.
         internal SQSMessage Message;
         
-        public Guid StreamGuid { get; private set; }
-
-        public string StreamNamespace { get; private set; }
+        public StreamId StreamId { get; private set; }
 
         public StreamSequenceToken SequenceToken
         {
@@ -41,22 +39,20 @@ namespace OrleansAWSUtils.Streams
 
         [JsonConstructor]
         private SQSBatchContainer(
-            Guid streamGuid,
-            String streamNamespace,
+            StreamId streamId,
             List<object> events,
             Dictionary<string, object> requestContext,
             EventSequenceTokenV2 sequenceToken)
-            : this(streamGuid, streamNamespace, events, requestContext)
+            : this(streamId, events, requestContext)
         {
             this.sequenceToken = sequenceToken;
         }
 
-        private SQSBatchContainer(Guid streamGuid, String streamNamespace, List<object> events, Dictionary<string, object> requestContext)
+        private SQSBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
         {
             if (events == null) throw new ArgumentNullException("events", "Message contains no events");
 
-            StreamGuid = streamGuid;
-            StreamNamespace = streamNamespace;
+            StreamId = streamId;
             this.events = events;
             this.requestContext = requestContext;
         }
@@ -66,24 +62,13 @@ namespace OrleansAWSUtils.Streams
             return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
         }
 
-        public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
-        {
-            foreach (object item in events)
-            {
-                if (shouldReceiveFunc(stream, filterData, item))
-                    return true; // There is something in this batch that the consumer is intereted in, so we should send it.
-            }
-            return false; // Consumer is not interested in any of these events, so don't send.
-        }
-
         internal static SendMessageRequest ToSQSMessage<T>(
             SerializationManager serializationManager,
-            Guid streamGuid,
-            string streamNamespace,
+            StreamId streamId,
             IEnumerable<T> events,
             Dictionary<string, object> requestContext)
         {
-            var sqsBatchMessage = new SQSBatchContainer(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
+            var sqsBatchMessage = new SQSBatchContainer(streamId, events.Cast<object>().ToList(), requestContext);
             var rawBytes = serializationManager.SerializeToByteArray(sqsBatchMessage);
             var payload = new JObject();
             payload.Add("payload", JToken.FromObject(rawBytes));
@@ -114,7 +99,7 @@ namespace OrleansAWSUtils.Streams
 
         public override string ToString()
         {
-            return string.Format("[SQSBatchContainer:Stream={0},#Items={1}]", StreamGuid, events.Count);
+            return string.Format("[SQSBatchContainer:Stream={0},#Items={1}]", StreamId, events.Count);
         }
     }
 }

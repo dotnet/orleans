@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -93,12 +94,12 @@ namespace Orleans.Providers.Streams.Common
         /// Acquires a cursor to enumerate through the messages in the cache at the provided sequenceToken, 
         ///   filtered on the specified stream.
         /// </summary>
-        /// <param name="streamIdentity">stream identity</param>
+        /// <param name="streamId">stream identity</param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public object GetCursor(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)
+        public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken)
         {
-            var cursor = new Cursor(streamIdentity);
+            var cursor = new Cursor(streamId);
             SetCursor(cursor, sequenceToken);
             return cursor;
         }
@@ -259,17 +260,17 @@ namespace Orleans.Providers.Streams.Common
                     if (cursor.IsNewestInBlock)
                     {
                         cursor.CurrentBlock = cursor.CurrentBlock.Previous;
-                        cursor.CurrentBlock.Value.TryFindFirstMessage(cursor.StreamIdentity, this.cacheDataAdapter, out index);
+                        cursor.CurrentBlock.Value.TryFindFirstMessage(cursor.StreamId, this.cacheDataAdapter, out index);
                     }
                     else
                     {
-                        cursor.CurrentBlock.Value.TryFindNextMessage(cursor.Index + 1, cursor.StreamIdentity, this.cacheDataAdapter, out index);
+                        cursor.CurrentBlock.Value.TryFindNextMessage(cursor.Index + 1, cursor.StreamId, this.cacheDataAdapter, out index);
                     }
                     cursor.Index = index;
                 }
 
                 // check if this message is in the cursor's stream
-                if (currentMessage.CompareStreamId(cursor.StreamIdentity))
+                if (currentMessage.CompareStreamId(cursor.StreamId))
                 {
                     message = cacheDataAdapter.GetBatchContainer(ref currentMessage);
                     cursor.SequenceToken = cursor.CurrentBlock.Value.GetSequenceToken(cursor.Index, cacheDataAdapter);
@@ -332,11 +333,11 @@ namespace Orleans.Providers.Streams.Common
 
         private class Cursor
         {
-            public readonly IStreamIdentity StreamIdentity;
+            public readonly StreamId StreamId;
 
-            public Cursor(IStreamIdentity streamIdentity)
+            public Cursor(StreamId streamId)
             {
-                StreamIdentity = streamIdentity;
+                StreamId = streamId;
                 State = CursorStates.Unset;
             }
 

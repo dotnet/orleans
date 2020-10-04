@@ -10,7 +10,7 @@ namespace Orleans.Streams
     internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
     {
         private StreamImpl<T> streamImpl;
-        private readonly IStreamFilterPredicateWrapper filterWrapper;
+        private readonly string filterData;
         private readonly GuidId subscriptionId;
         private readonly bool isRewindable;
 
@@ -25,7 +25,7 @@ namespace Orleans.Streams
         internal bool IsRewindable { get { return isRewindable; } }
 
         public override string ProviderName { get { return this.streamImpl.ProviderName; } }
-        public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
+        public override StreamId StreamId { get { return streamImpl.StreamId; } }
         public override Guid HandleId { get { return subscriptionId.Guid; } }
 
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
@@ -33,13 +33,19 @@ namespace Orleans.Streams
         {
         }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, IAsyncBatchObserver<T> batchObserver, StreamImpl<T> streamImpl, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
+        public StreamSubscriptionHandleImpl(
+            GuidId subscriptionId,
+            IAsyncObserver<T> observer,
+            IAsyncBatchObserver<T> batchObserver,
+            StreamImpl<T> streamImpl,
+            StreamSequenceToken token,
+            string filterData)
         {
             this.subscriptionId = subscriptionId ?? throw new ArgumentNullException("subscriptionId");
             this.observer = observer;
             this.batchObserver = batchObserver;
             this.streamImpl = streamImpl ?? throw new ArgumentNullException("streamImpl");
-            this.filterWrapper = filterWrapper;
+            this.filterData = filterData;
             this.isRewindable = streamImpl.IsRewindable;
             if (IsRewindable)
             {
@@ -185,9 +191,6 @@ namespace Orleans.Streams
             if (this.observer == null || !IsValid)
                 return Task.CompletedTask;
 
-            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, item))
-                return Task.CompletedTask;
-
             return this.observer.OnNextAsync(item, token);
         }
 
@@ -199,7 +202,6 @@ namespace Orleans.Streams
                 return Task.CompletedTask;
 
             IList<SequentialItem<T>> batch = items
-                .Where(item => filterWrapper == null || !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, item))
                 .Select(item => new SequentialItem<T>(item.Item1, item.Item2))
                 .ToList();
 
@@ -224,9 +226,9 @@ namespace Orleans.Streams
                 : this.observer.OnErrorAsync(ex);
         }
 
-        internal bool SameStreamId(StreamId streamId)
+        internal bool SameStreamId(InternalStreamId streamId)
         {
-            return IsValid && streamImpl.StreamId.Equals(streamId);
+            return IsValid && streamImpl.InternalStreamId.Equals(streamId);
         }
 
         public override bool Equals(StreamSubscriptionHandle<T> other)
@@ -247,7 +249,7 @@ namespace Orleans.Streams
 
         public override string ToString()
         {
-            return String.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.StreamId.ToString() : "null", HandleId);
+            return String.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.InternalStreamId.ToString() : "null", HandleId);
         }
     }
 }

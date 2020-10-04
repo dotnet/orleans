@@ -1,3 +1,4 @@
+using System;
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -12,8 +13,23 @@ namespace AspNetCoreCohosting
 {
     public class Program
     {
-        public static Task Main(string[] args) => 
+        public static Task Main(string[] args) =>
             Host.CreateDefaultBuilder(args)
+                .UseOrleans(siloBuilder =>
+                {
+                    siloBuilder
+                    .UseLocalhostClustering()
+                    .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromMinutes(1))
+                    .Configure<ClusterOptions>(opts =>
+                    {
+                        opts.ClusterId = "dev";
+                        opts.ServiceId = "HellowWorldAPIService";
+                    })
+                    .Configure<EndpointOptions>(opts =>
+                    {
+                        opts.AdvertisedIPAddress = IPAddress.Loopback;
+                    });
+                })
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.Configure((ctx, app) =>
@@ -35,20 +51,6 @@ namespace AspNetCoreCohosting
                 .ConfigureServices(services =>
                 {
                     services.AddControllers();
-                })
-                .UseOrleans(siloBuilder =>
-                {
-                    siloBuilder
-                    .UseLocalhostClustering()
-                    .Configure<ClusterOptions>(opts =>
-                    {
-                        opts.ClusterId = "dev";
-                        opts.ServiceId = "HellowWorldAPIService";
-                    })
-                    .Configure<EndpointOptions>(opts =>
-                    {
-                        opts.AdvertisedIPAddress = IPAddress.Loopback;
-                    });
                 })
             .RunConsoleAsync();
     }

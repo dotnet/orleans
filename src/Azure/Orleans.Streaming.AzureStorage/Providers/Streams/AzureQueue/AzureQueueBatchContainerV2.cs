@@ -23,9 +23,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         [JsonProperty]
         private readonly Dictionary<string, object> requestContext;
 
-        public Guid StreamGuid { get; }
-
-        public String StreamNamespace { get; }
+        public StreamId StreamId { get; }
 
         public StreamSequenceToken SequenceToken => sequenceToken;
 
@@ -36,22 +34,20 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         [JsonConstructor]
         public AzureQueueBatchContainerV2(
-            Guid streamGuid,
-            String streamNamespace,
+            StreamId streamId,
             List<object> events,
             Dictionary<string, object> requestContext,
             EventSequenceTokenV2 sequenceToken)
-            : this(streamGuid, streamNamespace, events, requestContext)
+            : this(streamId, events, requestContext)
         {
             this.sequenceToken = sequenceToken;
         }
 
-        public AzureQueueBatchContainerV2(Guid streamGuid, String streamNamespace, List<object> events, Dictionary<string, object> requestContext)
+        public AzureQueueBatchContainerV2(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
         {
             if (events == null) throw new ArgumentNullException(nameof(events), "Message contains no events");
 
-            StreamGuid = streamGuid;
-            StreamNamespace = streamNamespace;
+            StreamId = streamId;
             this.events = events;
             this.requestContext = requestContext;
         }
@@ -59,16 +55,6 @@ namespace Orleans.Providers.Streams.AzureQueue
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
             return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
-        }
-
-        public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
-        {
-            foreach (object item in events)
-            {
-                if (shouldReceiveFunc(stream, filterData, item))
-                    return true; // There is something in this batch that the consumer is intereted in, so we should send it.
-            }
-            return false; // Consumer is not interested in any of these events, so don't send.
         }
 
         public bool ImportRequestContext()
@@ -83,7 +69,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public override string ToString()
         {
-            return $"[AzureQueueBatchContainerV2:Stream={StreamGuid},#Items={events.Count}]";
+            return $"[AzureQueueBatchContainerV2:Stream={StreamId},#Items={events.Count}]";
         }
     }
 }

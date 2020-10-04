@@ -9,19 +9,7 @@ namespace Orleans.Runtime.Placement
     {
         private static readonly SafeRandom random = new SafeRandom();
 
-        public Task<PlacementResult> OnSelectActivation(
-            PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
-        {
-            return Task.FromResult(SelectActivationCore(strategy, target, context));
-        }
-
-        public bool TrySelectActivationSynchronously(
-            PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult)
-        {
-            placementResult = SelectActivationCore(strategy, target, context);
-            return placementResult != null;
-        }
-
+        public ValueTask<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementRuntime context) => new ValueTask<PlacementResult>(SelectActivationCore(strategy, target, context));
 
         public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {

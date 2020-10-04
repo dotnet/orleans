@@ -8,6 +8,8 @@ using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Streams.Filtering;
+using System.IO;
 
 namespace Orleans.Runtime.Providers
 {
@@ -16,7 +18,7 @@ namespace Orleans.Runtime.Providers
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activationDirectory;
         private readonly IConsistentRingProvider consistentRingProvider;
-        private readonly ISiloRuntimeClient runtimeClient;
+        private readonly InsideRuntimeClient runtimeClient;
         private readonly IStreamPubSub grainBasedPubSub;
         private readonly IStreamPubSub implictPubSub;
         private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
@@ -29,7 +31,7 @@ namespace Orleans.Runtime.Providers
 
         public SiloProviderRuntime(
             IConsistentRingProvider consistentRingProvider,
-            ISiloRuntimeClient runtimeClient,
+            InsideRuntimeClient runtimeClient,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
             OrleansTaskScheduler scheduler,
             ActivationDirectory activationDirectory,
@@ -97,6 +99,7 @@ namespace Orleans.Runtime.Providers
             var managerId = SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, this.siloDetails.SiloAddress, streamProviderName);
             var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
             var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
+            var filter = this.ServiceProvider.GetServiceByName<IStreamFilter>(streamProviderName) ?? new NoOpStreamFilter();
             var manager = new PersistentStreamPullingManager(
                 managerId,
                 streamProviderName,
@@ -104,6 +107,7 @@ namespace Orleans.Runtime.Providers
                 this.PubSub(pubsubOptions.PubSubType),
                 adapterFactory,
                 queueBalancer,
+                filter,
                 pullingAgentOptions,
                 this.loggerFactory,
                 this.siloDetails.SiloAddress);

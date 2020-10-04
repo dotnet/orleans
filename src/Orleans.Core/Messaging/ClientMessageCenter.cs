@@ -223,7 +223,7 @@ namespace Orleans.Messaging
         private ValueTask<Connection> GetGatewayConnection(Message msg)
         {
             // If there's a specific gateway specified, use it
-            if (msg.TargetSilo != null && gatewayManager.GetLiveGateways().Contains(msg.TargetSilo))
+            if (msg.TargetSilo != null && gatewayManager.IsGatewayAvailable(msg.TargetSilo))
             {
                 var siloAddress = SiloAddress.New(msg.TargetSilo.Endpoint, 0);
                 var connectionTask = this.connectionManager.GetConnection(siloAddress);
@@ -269,7 +269,10 @@ namespace Orleans.Messaging
             // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
             WeakReference<Connection> weakRef = grainBuckets[index];
 
-            if (weakRef != null && weakRef.TryGetTarget(out var existingConnection) && existingConnection.IsValid)
+            if (weakRef != null
+                && weakRef.TryGetTarget(out var existingConnection)
+                && existingConnection.IsValid
+                && gatewayManager.IsGatewayAvailable(msg.TargetSilo))
             {
                 return new ValueTask<Connection>(existingConnection);
             }

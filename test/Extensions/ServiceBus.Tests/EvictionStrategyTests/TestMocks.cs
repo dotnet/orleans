@@ -1,4 +1,3 @@
-using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
@@ -6,6 +5,8 @@ using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
+using Azure.Messaging.EventHubs;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -38,7 +39,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
         public override StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            var steamIdentity = new StreamIdentity(Guid.NewGuid(), "EmptySpace");
+            var steamIdentity = StreamId.Create("EmptySpace", Guid.NewGuid());
             var sequenceToken = new EventHubSequenceTokenV2(this.eventHubOffset, this.sequenceNumberCounter++, this.eventIndex);
             return new StreamPosition(steamIdentity, sequenceToken);
         }

@@ -6,6 +6,7 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 
 namespace Orleans.Providers.Streams.Generator
 {
@@ -45,7 +46,7 @@ namespace Orleans.Providers.Streams.Generator
             ArraySegment<byte> payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
             var stream = new BinaryTokenStreamReader(payload);
             object payloadObject = this.serializationManager.Deserialize(stream);
-            return new GeneratedBatchContainer(cachedMessage.StreamGuid, cachedMessage.StreamNamespace,
+            return new GeneratedBatchContainer(cachedMessage.StreamId,
                 payloadObject, new EventSequenceTokenV2(cachedMessage.SequenceNumber));
         }
 
@@ -59,8 +60,7 @@ namespace Orleans.Providers.Streams.Generator
             StreamPosition streamPosition = GetStreamPosition(queueMessage);
             return new CachedMessage()
             {
-                StreamGuid = streamPosition.StreamIdentity.Guid,
-                StreamNamespace = streamPosition.StreamIdentity.Namespace != null ? string.Intern(streamPosition.StreamIdentity.Namespace) : null,
+                StreamId = streamPosition.StreamId,
                 SequenceNumber = queueMessage.RealToken.SequenceNumber,
                 EnqueueTimeUtc = queueMessage.EnqueueTimeUtc,
                 DequeueTimeUtc = dequeueTimeUtc,
@@ -100,7 +100,7 @@ namespace Orleans.Providers.Streams.Generator
 
         private StreamPosition GetStreamPosition(GeneratedBatchContainer queueMessage)
         {
-            return new StreamPosition(new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace), queueMessage.RealToken);
+            return new StreamPosition(queueMessage.StreamId, queueMessage.RealToken);
         }
 
         private class Cursor : IQueueCacheCursor
@@ -109,10 +109,10 @@ namespace Orleans.Providers.Streams.Generator
             private readonly object cursor;
             private IBatchContainer current;
 
-            public Cursor(PooledQueueCache cache, IStreamIdentity streamIdentity, StreamSequenceToken token)
+            public Cursor(PooledQueueCache cache, StreamId streamId, StreamSequenceToken token)
             {
                 this.cache = cache;
-                cursor = cache.GetCursor(streamIdentity, token);
+                cursor = cache.GetCursor(streamId, token);
             }
 
             public void Dispose()
@@ -181,12 +181,12 @@ namespace Orleans.Providers.Streams.Generator
         /// Acquire a stream message cursor.  This can be used to retrieve messages from the
         ///   cache starting at the location indicated by the provided token.
         /// </summary>
-        /// <param name="streamIdentity"></param>
+        /// <param name="streamId"></param>
         /// <param name="token"></param>
         /// <returns></returns>
-        public IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
+        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
         {
-            return new Cursor(cache, streamIdentity, token);
+            return new Cursor(cache, streamId, token);
         }
 
         /// <summary>

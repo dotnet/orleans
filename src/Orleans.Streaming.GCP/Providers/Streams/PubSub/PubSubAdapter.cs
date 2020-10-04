@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 using System;
@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using System.IO;
 
 namespace Orleans.Providers.GCP.Streams.PubSub
 {
@@ -61,10 +62,10 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             return PubSubAdapterReceiver.Create(_serializationManager, this.loggerFactory, queueId, ProjectId, TopicId, ServiceId, _dataAdapter, Deadline, _customEndpoint);
         }
 
-        public async Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
             if (token != null) throw new ArgumentException("Google PubSub stream provider currently does not support non-null StreamSequenceToken.", nameof(token));
-            var queueId = _streamQueueMapper.GetQueueForStream(streamGuid, streamNamespace);
+            var queueId = _streamQueueMapper.GetQueueForStream(streamId);
 
             PubSubDataManager pubSub;
             if (!Subscriptions.TryGetValue(queueId, out pubSub))
@@ -74,7 +75,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
                 pubSub = Subscriptions.GetOrAdd(queueId, tmpPubSub);
             }
 
-            var msg = _dataAdapter.ToPubSubMessage(streamGuid, streamNamespace, events, requestContext);
+            var msg = _dataAdapter.ToPubSubMessage(streamId, events, requestContext);
             await pubSub.PublishMessages(new[] { msg });
         }
     }
