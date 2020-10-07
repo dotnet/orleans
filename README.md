@@ -165,7 +165,7 @@ On Linux and macOS, run the `build.sh` script or `dotnet build` to build Orleans
 
 The latest stable, production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
 
-Nightly builds are published to https://dotnet.myget.org/gallery/orleans-ci. These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds published to NuGet.
+Nightly builds are published to [a NuGet feed](https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json). These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds published to NuGet.
 
 <details>
 <summary>
@@ -179,7 +179,7 @@ To use nightly builds in your project, add the MyGet feed using either of the fo
 ```xml
   <RestoreSources>
     $(RestoreSources);
-    https://dotnet.myget.org/F/orleans-ci/api/v3/index.json;
+    https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json;
   </RestoreSources>
 ```
 
@@ -192,7 +192,7 @@ or
 <configuration>
  <packageSources>
   <clear />
-  <add key="orleans-ci" value="https://dotnet.myget.org/F/orleans-ci/api/v3/index.json" />
+  <add key="orleans-ci" value="https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json" />
   <add key="nuget" value="https://api.nuget.org/v3/index.json" />
  </packageSources>
 </configuration>
