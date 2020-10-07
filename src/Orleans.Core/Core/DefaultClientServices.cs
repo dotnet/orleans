@@ -114,6 +114,11 @@ namespace Orleans
             services.AddSingleton<GatewayManager>();
             services.AddSingleton<NetworkingTrace>();
             services.AddSingleton<MessagingTrace>();
+
+            // Logging helpers
+            services.AddSingleton<ClientLoggingHelper>();
+            services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientLoggingHelper>();
+            services.AddFromExisting<IGrainIdLoggingHelper, ClientLoggingHelper>();
         }
     }
 }

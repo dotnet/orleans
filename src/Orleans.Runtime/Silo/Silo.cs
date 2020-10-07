@@ -72,7 +72,7 @@ namespace Orleans.Runtime
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly IMembershipService membershipService;
-        private List<GrainService> grainServices = new List<GrainService>();
+        internal List<GrainService> grainServices = new List<GrainService>();
 
         private readonly ILoggerFactory loggerFactory;
         /// <summary>
@@ -83,6 +83,7 @@ namespace Orleans.Runtime
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal IConsistentRingProvider RingProvider { get; private set; }
         internal ICatalog Catalog => catalog;
+        internal List<GrainService> GrainServices => grainServices;
 
         internal SystemStatus SystemStatus { get; set; }
 
@@ -311,6 +312,7 @@ namespace Orleans.Runtime
                 // Start the reminder service system target
                 var timerFactory = this.Services.GetRequiredService<IAsyncTimerFactory>();
                 reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory, timerFactory);
+                this.Services.GetService<SiloLoggingHelper>()?.RegisterGrainService(reminderService);
                 RegisterSystemTarget((SystemTarget)reminderService);
             }
 
@@ -473,8 +475,10 @@ namespace Orleans.Runtime
         private async Task CreateGrainServices()
         {
             var grainServices = this.Services.GetServices<IGrainService>();
+            var loggingHelper = this.Services.GetService<SiloLoggingHelper>();
             foreach (var grainService in grainServices)
             {
+                loggingHelper?.RegisterGrainService(grainService);
                 await RegisterGrainService(grainService);
             }
         }

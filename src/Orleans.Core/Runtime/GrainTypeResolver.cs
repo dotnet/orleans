@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -12,15 +13,21 @@ namespace Orleans.Runtime
         bool TryGetGrainClassData(string grainImplementationClassName, out GrainClassData implementation);
         bool IsUnordered(int grainTypeCode);
         string GetLoadedGrainAssemblies();
+        string GetGrainTypeName(int typeCode);
     }
 
     [Serializable]
-    internal class GrainTypeResolver : IGrainTypeResolver
+    internal class GrainTypeResolver : IGrainTypeResolver, IOnDeserialized
     {
         private readonly Dictionary<string, GrainInterfaceData> typeToInterfaceData;
         private readonly Dictionary<int, GrainInterfaceData> table;
         private readonly HashSet<string> loadedGrainAsemblies;
         private readonly HashSet<int> unordered;
+
+        // Not serialized for backward compatibility, will be rebuilt from other available
+        // data during deserialization
+        [NonSerialized]
+        private Dictionary<int, string> grainTypeToTypeName;
 
         public GrainTypeResolver(
             Dictionary<string, GrainInterfaceData> typeToInterfaceData,
@@ -32,6 +39,7 @@ namespace Orleans.Runtime
             this.table = table;
             this.loadedGrainAsemblies = loadedGrainAsemblies;
             this.unordered = unordered;
+            BuildGrainTypeToTypeName();
         }
 
         public bool TryGetGrainClassData(Type interfaceType, out GrainClassData implementation, string grainClassNamePrefix)
@@ -150,6 +158,24 @@ namespace Orleans.Runtime
                 interfaceData.InterfaceId,
                 grainClassNamePrefix,
                 Utils.EnumerableToString(matches, d => d.GrainClass, ",", false)));
+        }
+
+        public string GetGrainTypeName(int typeCode)
+        {
+            return this.grainTypeToTypeName.TryGetValue(typeCode, out var grainTypeName)
+                ? grainTypeName
+                : string.Empty;
+        }
+
+        public void OnDeserialized(ISerializerContext context) => BuildGrainTypeToTypeName();
+
+        private void BuildGrainTypeToTypeName()
+        {
+            this.grainTypeToTypeName = new Dictionary<int, string>();
+            foreach (var classData in this.table.Values.SelectMany(interfaceData => interfaceData.Implementations))
+            {
+                this.grainTypeToTypeName[classData.GrainTypeCode] = classData.GrainClass;
+            }
         }
     }
 }

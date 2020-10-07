@@ -7,6 +7,9 @@ namespace Orleans.Runtime
     [Serializable]
     internal class GrainId : UniqueIdentifier, IEquatable<GrainId>, IGrainIdentity
     {
+        // Ugly static that is here only for nice logging
+        internal static IGrainIdLoggingHelper GrainTypeNameMapper { get; set; }
+
         private static readonly object lockable = new object();
         private const int INTERN_CACHE_INITIAL_SIZE = InternerConstants.SIZE_LARGE;
         private static readonly TimeSpan internCacheCleanupInterval = InternerConstants.DefaultCacheCleanupFreq;
@@ -214,40 +217,39 @@ namespace Orleans.Runtime
         // same as ToString, just full primary key and type code
         private string ToStringImpl(bool detailed)
         {
-            // TODO Get name of system/target grain + name of the grain type
-
-            var keyString = Key.ToString();
-            // this should grab the least-significant half of n1, suffixing it with the key extension.
-            string idString = keyString;
-            if (!detailed)
+            string GetKeyString(bool isDetailed)
             {
-                if (keyString.Length >= 48)
-                    idString = keyString.Substring(24, 8) + keyString.Substring(48);
-                else
-                    idString = keyString.Substring(24, 8);
+                var keyString = Key.ToString();
+
+                if (isDetailed)
+                    return keyString;
+
+                return keyString.Length >= 48
+                    ? keyString.Substring(24, 8) + keyString.Substring(48)
+                    : keyString.Substring(24, 8);
             }
 
-            string fullString = null;
+            string fullString;
             switch (Category)
             {
                 case UniqueKey.Category.Grain:
                 case UniqueKey.Category.KeyExtGrain:
-                    var typeString = TypeCode.ToString("X");
-                    if (!detailed) typeString = typeString.Substring(Math.Max(0, typeString.Length - 8));
-                    fullString = $"*grn/{typeString}/{idString}";
+                    var typeString = GrainTypeNameMapper?.GetGrainTypeName(TypeCode) ?? TypeCode.ToString("X");
+                    fullString = $"*grn/{typeString}/{Key.ToGrainKeyString()}";
                     break;
                 case UniqueKey.Category.Client:
-                    fullString = $"*cli/{idString}";
+                    fullString = $"*cli/{GetKeyString(detailed)}";
                     break;
                 case UniqueKey.Category.SystemTarget:
                 case UniqueKey.Category.KeyExtSystemTarget:
-                    fullString = $"*stg/{Key.N1}/{idString}";
+                    var name = GrainTypeNameMapper?.GetSystemTargetName(this);
+                    fullString = $"*stg/{(string.IsNullOrEmpty(name) ? Key.N1.ToString() : name)}/{GetKeyString(detailed)}";
                     break;
                 case UniqueKey.Category.SystemGrain:
-                    fullString = $"*sgn/{Key.PrimaryKeyToGuid()}/{idString}";
+                    fullString = $"*sgn/{Key.PrimaryKeyToGuid()}/{GetKeyString(detailed)}";
                     break;
                 default:
-                    fullString = "???/" + idString;
+                    fullString = "???/" + GetKeyString(detailed);
                     break;
             }
             return detailed ? String.Format("{0}-0x{1, 8:X8}", fullString, GetUniformHashCode()) : fullString;

@@ -74,11 +74,17 @@ namespace Orleans.Runtime
             {ClientObserverRegistrarId,"ClientObserverRegistrar"},
             {CatalogId,"Catalog"},
             {MembershipOracleId,"MembershipOracle"},
+            {TypeManagerId,"TypeManager"},
+            {FallbackSystemTargetId, "Fallback"},
+            {LifecycleSchedulingSystemTargetId, "LifecycleScheduling"},
+            {DeploymentLoadPublisherSystemTargetId, "DeploymentLoadPublisher"},
             {MultiClusterOracleId,"MultiClusterOracle"},
-            {TypeManagerId,"TypeManagerId"},
+            {ClusterDirectoryServiceId,"ClusterDirectoryService"},
+            {StreamProviderManagerAgentSystemTargetId,"StreamProviderManagerAgent"},
+            {TestHooksSystemTargetId,"TestHooks"},
             {ProtocolGatewayId,"ProtocolGateway"},
-            {FallbackSystemTargetId, "FallbackSystemTarget"},
-            {DeploymentLoadPublisherSystemTargetId, "DeploymentLoadPublisherSystemTarget"},
+            {TransactionAgentSystemTargetId,"TransactionAgent"},
+            {SystemMembershipTableId,"SystemMembershipTable"},
         };
 
         private static readonly Dictionary<int, string> nonSingletonSystemTargetNames = new Dictionary<int, string>
