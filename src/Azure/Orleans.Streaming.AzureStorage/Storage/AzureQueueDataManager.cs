@@ -1,13 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Queue;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Orleans.Runtime;
-using Orleans.AzureUtils.Utilities;
 using System.Linq;
-using Orleans.Streaming.AzureStorage;
+using System.Net;
+using System.Threading.Tasks;
+using Azure;
+using Azure.Core;
+using Azure.Storage.Queues;
+using Azure.Storage.Queues.Models;
+using Microsoft.Extensions.Logging;
+using Orleans.AzureUtils.Utilities;
+using Orleans.Configuration;
+using Orleans.Internal;
+using Orleans.Runtime;
 
 namespace Orleans.AzureUtils
 {
@@ -21,20 +25,18 @@ namespace Orleans.AzureUtils
     /// http://blogs.msdn.com/b/windowsazurestorage/archive/tags/scalability/
     /// http://blogs.msdn.com/b/windowsazurestorage/archive/2010/12/30/windows-azure-storage-architecture-overview.aspx
     /// http://blogs.msdn.com/b/windowsazurestorage/archive/2010/11/06/how-to-get-most-out-of-windows-azure-tables.aspx
-    /// 
+    ///
     /// </summary>
     internal static class AzureQueueDefaultPolicies
     {
         public static int MaxQueueOperationRetries;
         public static TimeSpan PauseBetweenQueueOperationRetries;
         public static TimeSpan QueueOperationTimeout;
-        public static IRetryPolicy QueueOperationRetryPolicy;
 
         static AzureQueueDefaultPolicies()
         {
             MaxQueueOperationRetries = 5;
             PauseBetweenQueueOperationRetries = TimeSpan.FromMilliseconds(100);
-            QueueOperationRetryPolicy = new LinearRetry(PauseBetweenQueueOperationRetries, MaxQueueOperationRetries); // 5 x 100ms
             QueueOperationTimeout = PauseBetweenQueueOperationRetries.Multiply(MaxQueueOperationRetries).Multiply(6);    // 3 sec
         }
     }
@@ -50,12 +52,10 @@ namespace Orleans.AzureUtils
         /// <summary> Name of the table queue instance is managing. </summary>
         public string QueueName { get; private set; }
 
-        private string connectionString { get; set; }
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly ILogger logger;
         private readonly TimeSpan? messageVisibilityTimeout;
-        private readonly CloudQueueClient queueOperationsClient;
-        private CloudQueue queue;
+        private readonly QueueClient queueClient;
 
         /// <summary>
         /// Constructor.
@@ -65,20 +65,26 @@ namespace Orleans.AzureUtils
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         /// <param name="visibilityTimeout">A TimeSpan specifying the visibility timeout interval</param>
         public AzureQueueDataManager(ILoggerFactory loggerFactory, string queueName, string storageConnectionString, TimeSpan? visibilityTimeout = null)
+            : this (loggerFactory, queueName, new AzureQueueOptions { ConnectionString = storageConnectionString, MessageVisibilityTimeout = visibilityTimeout })
+        {
+        }
+
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        /// <param name="loggerFactory">logger factory to use</param>
+        /// <param name="queueName">Name of the queue to be connected to.</param>
+        /// <param name="options">Queue connection options.</param>
+        public AzureQueueDataManager(ILoggerFactory loggerFactory, string queueName, AzureQueueOptions options)
         {
             queueName = SanitizeQueueName(queueName);
             ValidateQueueName(queueName);
 
             logger = loggerFactory.CreateLogger<AzureQueueDataManager>();
             QueueName = queueName;
-            connectionString = storageConnectionString;
-            messageVisibilityTimeout = visibilityTimeout;
+            messageVisibilityTimeout = options.MessageVisibilityTimeout;
 
-            queueOperationsClient = GetCloudQueueClient(
-                connectionString,
-                AzureQueueDefaultPolicies.QueueOperationRetryPolicy,
-                AzureQueueDefaultPolicies.QueueOperationTimeout,
-                logger);
+            queueClient = GetCloudQueueClient(options, logger);
         }
 
         /// <summary>
@@ -90,14 +96,9 @@ namespace Orleans.AzureUtils
 
             try
             {
-                // Retrieve a reference to a queue.
-                // Not sure if this is a blocking call or not. Did not find an alternative async API. Should probably use BeginListQueuesSegmented.
-                var myQueue = queueOperationsClient.GetQueueReference(QueueName);
-
                 // Create the queue if it doesn't already exist.
-                bool didCreate = await myQueue.CreateIfNotExistsAsync();
-                queue = myQueue;
-                logger.Info((int)AzureQueueErrorCode.AzureQueue_01, "{0} Azure storage queue {1}", (didCreate ? "Created" : "Attached to"), QueueName);
+                var response = await queueClient.CreateIfNotExistsAsync();
+                logger.Info((int)AzureQueueErrorCode.AzureQueue_01, "Connected to Azure storage queue {0}", QueueName);
             }
             catch (Exception exc)
             {
@@ -119,8 +120,7 @@ namespace Orleans.AzureUtils
             try
             {
                 // that way we don't have first to create the queue to be able later to delete it.
-                CloudQueue queueRef = queue ?? queueOperationsClient.GetQueueReference(QueueName);
-                if (await queueRef.DeleteIfExistsAsync())
+                if (await queueClient.DeleteIfExistsAsync())
                 {
                     logger.Info((int)AzureQueueErrorCode.AzureQueue_03, "Deleted Azure Queue {0}", QueueName);
                 }
@@ -145,9 +145,15 @@ namespace Orleans.AzureUtils
             try
             {
                 // that way we don't have first to create the queue to be able later to delete it.
-                CloudQueue queueRef = queue ?? queueOperationsClient.GetQueueReference(QueueName);
-                await queueRef.ClearAsync();
+                await queueClient.ClearMessagesAsync();
                 logger.Info((int)AzureQueueErrorCode.AzureQueue_05, "Cleared Azure Queue {0}", QueueName);
+            }
+            catch (RequestFailedException exc)
+            {
+                if (exc.Status != (int)HttpStatusCode.NotFound)
+                {
+                    ReportErrorAndRethrow(exc, "ClearQueue", AzureQueueErrorCode.AzureQueue_06);
+                }
             }
             catch (Exception exc)
             {
@@ -163,13 +169,13 @@ namespace Orleans.AzureUtils
         /// Adds a new message to the queue.
         /// </summary>
         /// <param name="message">Message to be added to the queue.</param>
-        public async Task AddQueueMessage(CloudQueueMessage message)
+        public async Task AddQueueMessage(string message)
         {
             var startTime = DateTime.UtcNow;
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Adding message {0} to queue: {1}", message, QueueName);
             try
             {
-                await queue.AddMessageAsync(message);
+                await queueClient.SendMessageAsync(message);
             }
             catch (Exception exc)
             {
@@ -184,13 +190,14 @@ namespace Orleans.AzureUtils
         /// <summary>
         /// Peeks in the queue for latest message, without dequeuing it.
         /// </summary>
-        public async Task<CloudQueueMessage> PeekQueueMessage()
+        public async Task<PeekedMessage> PeekQueueMessage()
         {
             var startTime = DateTime.UtcNow;
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Peeking a message from queue: {0}", QueueName);
             try
             {
-                return await queue.PeekMessageAsync();
+                var messages = await queueClient.PeekMessagesAsync(maxMessages: 1);
+                return messages.Value.FirstOrDefault();
 
             }
             catch (Exception exc)
@@ -208,16 +215,17 @@ namespace Orleans.AzureUtils
         /// <summary>
         /// Gets a new message from the queue.
         /// </summary>
-        public async Task<CloudQueueMessage> GetQueueMessage()
+        public async Task<QueueMessage> GetQueueMessage()
         {
-            var startTime = DateTime.UtcNow;
+               var startTime = DateTime.UtcNow;
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Getting a message from queue: {0}", QueueName);
             try
             {
                 //BeginGetMessage and EndGetMessage is not supported in netstandard, may be use GetMessageAsync
                 // http://msdn.microsoft.com/en-us/library/ee758456.aspx
                 // If no messages are visible in the queue, GetMessage returns null.
-                return await queue.GetMessageAsync(messageVisibilityTimeout, options: null, operationContext: null);
+                var messages = await queueClient.ReceiveMessagesAsync(maxMessages: 1, messageVisibilityTimeout);
+                return messages.Value.FirstOrDefault();
             }
             catch (Exception exc)
             {
@@ -234,17 +242,19 @@ namespace Orleans.AzureUtils
         /// Gets a number of new messages from the queue.
         /// </summary>
         /// <param name="count">Number of messages to get from the queue.</param>
-        public async Task<IEnumerable<CloudQueueMessage>> GetQueueMessages(int count = -1)
+        public async Task<IEnumerable<QueueMessage>> GetQueueMessages(int? count = null)
         {
             var startTime = DateTime.UtcNow;
             if (count == -1)
             {
-                count = CloudQueueMessage.MaxNumberOfMessagesToPeek;
+                count = null;
             }
+
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Getting up to {0} messages from queue: {1}", count, QueueName);
             try
             {
-                return await queue.GetMessagesAsync(count, messageVisibilityTimeout, options: null, operationContext: null);
+                var messages = await queueClient.ReceiveMessagesAsync(count, messageVisibilityTimeout);
+                return messages.Value;
             }
             catch (Exception exc)
             {
@@ -261,13 +271,13 @@ namespace Orleans.AzureUtils
         /// Deletes a messages from the queue.
         /// </summary>
         /// <param name="message">A message to be deleted from the queue.</param>
-        public async Task DeleteQueueMessage(CloudQueueMessage message)
+        public async Task DeleteQueueMessage(QueueMessage message)
         {
             var startTime = DateTime.UtcNow;
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Deleting a message from queue: {0}", QueueName);
             try
             {
-                await queue.DeleteMessageAsync(message.Id, message.PopReceipt);
+                await queueClient.DeleteMessageAsync(message.MessageId, message.PopReceipt);
 
             }
             catch (Exception exc)
@@ -282,7 +292,7 @@ namespace Orleans.AzureUtils
 
         internal async Task GetAndDeleteQueueMessage()
         {
-            CloudQueueMessage message = await GetQueueMessage();
+            var message = await GetQueueMessage();
             await DeleteQueueMessage(message);
         }
 
@@ -295,8 +305,8 @@ namespace Orleans.AzureUtils
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("GetApproximateMessageCount a message from queue: {0}", QueueName);
             try
             {
-                await queue.FetchAttributesAsync();
-                return queue.ApproximateMessageCount.HasValue ? queue.ApproximateMessageCount.Value : 0;
+                var properties = await queueClient.GetPropertiesAsync();
+                return properties.Value.ApproximateMessagesCount;
 
             }
             catch (Exception exc)
@@ -322,25 +332,31 @@ namespace Orleans.AzureUtils
         private void ReportErrorAndRethrow(Exception exc, string operation, AzureQueueErrorCode errorCode)
         {
             var errMsg = String.Format(
-                "Error doing {0} for Azure storage queue {1} " + Environment.NewLine 
+                "Error doing {0} for Azure storage queue {1} " + Environment.NewLine
                 + "Exception = {2}", operation, QueueName, exc);
             logger.Error((int)errorCode, errMsg, exc);
             throw new AggregateException(errMsg, exc);
         }
 
-        private CloudQueueClient GetCloudQueueClient(
-        string storageConnectionString,
-        IRetryPolicy retryPolicy,
-        TimeSpan timeout,
-        ILogger logger)
+        private QueueClient GetCloudQueueClient(AzureQueueOptions options, ILogger logger)
         {
             try
             {
-                var storageAccount = AzureStorageUtils.GetCloudStorageAccount(storageConnectionString);
-                CloudQueueClient operationsClient = storageAccount.CreateCloudQueueClient();
-                operationsClient.DefaultRequestOptions.RetryPolicy = retryPolicy;
-                operationsClient.DefaultRequestOptions.ServerTimeout = timeout;
-                return operationsClient;
+                var clientOptions = new QueueClientOptions
+                {
+                    Retry =
+                    {
+                        Mode = RetryMode.Fixed,
+                        Delay = AzureQueueDefaultPolicies.PauseBetweenQueueOperationRetries,
+                        MaxRetries = AzureQueueDefaultPolicies.MaxQueueOperationRetries,
+                        NetworkTimeout = AzureQueueDefaultPolicies.QueueOperationTimeout,
+                    }
+                };
+
+                var client = options.ServiceUri != null
+                    ? new QueueClient(new Uri(options.ServiceUri, QueueName), options.TokenCredential, clientOptions)
+                    : new QueueClient(options.ConnectionString, QueueName, clientOptions);
+                return client;
             }
             catch (Exception exc)
             {
@@ -408,4 +424,3 @@ namespace Orleans.AzureUtils
         }
     }
 }
-

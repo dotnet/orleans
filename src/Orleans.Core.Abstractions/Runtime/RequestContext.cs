@@ -111,10 +111,19 @@ namespace Orleans.Runtime
             {
                 return false;
             }
-            var newValues = new Dictionary<string, object>(values);
-            bool retValue = newValues.Remove(key);
-            CallContextData.Value = newValues;
-            return retValue;
+
+            if (values.Count == 1)
+            {
+                CallContextData.Value = null;
+                return true;
+            }
+            else
+            {
+                var newValues = new Dictionary<string, object>(values);
+                newValues.Remove(key);
+                CallContextData.Value = newValues;
+                return true;
+            }
         }
 
         public static void Clear()

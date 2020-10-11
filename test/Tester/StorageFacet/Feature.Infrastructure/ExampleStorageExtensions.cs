@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Tester.StorageFacet.Abstractions;
@@ -7,7 +7,7 @@ namespace Tester.StorageFacet.Infrastructure
 {
     public static class ExampleStorageExtensions
     {
-        public static void UseExampleStorage(this ISiloHostBuilder builder)
+        public static void UseExampleStorage(this ISiloBuilder builder)
         {
             builder.ConfigureServices(services =>
             {
@@ -19,7 +19,7 @@ namespace Tester.StorageFacet.Infrastructure
             });
         }
 
-        public static void UseAsDefaultExampleStorage<TFactoryType>(this ISiloHostBuilder builder)
+        public static void UseAsDefaultExampleStorage<TFactoryType>(this ISiloBuilder builder)
             where TFactoryType : class, IExampleStorageFactory
         {
             builder.ConfigureServices(services =>

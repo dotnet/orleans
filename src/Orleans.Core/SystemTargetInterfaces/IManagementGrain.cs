@@ -100,40 +100,5 @@ namespace Orleans.Runtime
         /// This is an opaque value to the Orleans runtime - the control protocol semantics are decided between the sender and provider.</param>
         /// <returns>Completion promise for this operation.</returns>
         Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg = null);
-
-        /// <summary>
-        /// Returns an array of all the active grain types in the system
-        /// </summary>
-        /// <param name="hostsIds">List of silos this command is to be sent to.</param>
-        /// <returns></returns>
-        Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null);
-
-        /// <summary>
-        /// Get the current list of multicluster gateways.
-        /// </summary>
-        /// <returns>A list of the currently known gateways</returns>
-        Task<List<IMultiClusterGatewayInfo>> GetMultiClusterGateways();
-
-        /// <summary>
-        /// Get the current multicluster configuration.
-        /// </summary>
-        /// <returns>The current multicluster configuration, or null if there is none</returns>
-        Task<MultiClusterConfiguration> GetMultiClusterConfiguration();
-
-        /// <summary>
-        /// Contact all silos in all clusters and return silos that do not have the latest multi-cluster configuration. 
-        /// If some clusters and/or silos cannot be reached, an exception is thrown.
-        /// </summary>
-        /// <returns>A list of silo addresses of silos that do not have the latest configuration</returns>
-        Task<List<SiloAddress>> FindLaggingSilos();
- 
-        /// <summary>
-        /// Configure the active multi-cluster, by injecting a multicluster configuration.
-        /// </summary>
-        /// <param name="clusters">the clusters that should be part of the active configuration</param>
-        /// <param name="comment">a comment to store alongside the configuration</param>
-        /// <param name="checkForLaggingSilosFirst">if true, checks that all clusters are reachable and up-to-date before injecting the new configuration</param>
-        /// <returns> The task completes once information has propagated to the gossip channels</returns>
-        Task<MultiClusterConfiguration> InjectMultiClusterConfiguration(IEnumerable<string> clusters, string comment = "", bool checkForLaggingSilosFirst = true);
     }
 }

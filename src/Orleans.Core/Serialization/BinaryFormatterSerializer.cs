@@ -1,15 +1,33 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
     public class BinaryFormatterSerializer : IExternalSerializer
     {
+        private readonly IServiceProvider _serviceProvider;
+        private BinaryFormatterGrainReferenceSurrogateSelector _grainReferenceSurrogateSelector;
+
+        public BinaryFormatterSerializer(IServiceProvider serviceProvider)
+        {
+            _serviceProvider = serviceProvider;
+        }
+
+        private BinaryFormatter GetBinaryFormatter(object additionalContext)
+        {
+            return new BinaryFormatter
+            {
+                Context = new StreamingContext(StreamingContextStates.All, additionalContext),
+                SurrogateSelector = _grainReferenceSurrogateSelector ??= _serviceProvider.GetRequiredService<BinaryFormatterGrainReferenceSurrogateSelector>()
+            };
+        }
+
         public bool IsSupportedType(Type itemType)
         {
             return itemType.IsSerializable;
@@ -22,10 +40,7 @@ namespace Orleans.Serialization
                 return null;
             }
 
-            var formatter = new BinaryFormatter
-            {
-                Context = new StreamingContext(StreamingContextStates.All, context)
-            };
+            var formatter = this.GetBinaryFormatter(context); 
             object ret = null;
             using (var memoryStream = new MemoryStream())
             {
@@ -53,10 +68,7 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var formatter = new BinaryFormatter
-            {
-                Context = new StreamingContext(StreamingContextStates.All, context)
-            };
+            var formatter = this.GetBinaryFormatter(context);
             byte[] bytes;
             using (var memoryStream = new MemoryStream())
             {
@@ -79,10 +91,7 @@ namespace Orleans.Serialization
 
             var n = reader.ReadInt();
             var bytes = reader.ReadBytes(n);
-            var formatter = new BinaryFormatter
-            {
-                Context = new StreamingContext(StreamingContextStates.All, context)
-            };
+            var formatter = this.GetBinaryFormatter(context);
 
             object retVal = null;
             using (var memoryStream = new MemoryStream(bytes))

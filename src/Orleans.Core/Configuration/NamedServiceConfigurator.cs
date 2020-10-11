@@ -1,9 +1,10 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
 
-namespace Orleans.Configuration
+namespace Orleans.Hosting
 {
     public interface INamedServiceConfigurator
     {

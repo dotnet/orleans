@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -256,11 +257,11 @@ namespace Orleans.Runtime.GrainDirectory
         /// Returns all entries stored in the partition as an enumerable collection
         /// </summary>
         /// <returns></returns>
-        public Dictionary<GrainId, IGrainInfo> GetItems()
+        public List<KeyValuePair<GrainId, IGrainInfo>> GetItems()
         {
             lock (lockable)
             {
-                return partitionData.Copy();
+                return partitionData.ToList();
             }
         }
 
@@ -621,15 +622,15 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (lockable)
             {
-                foreach (GrainId grain in newPartitionDelta.Keys)
+                foreach (var kv in newPartitionDelta)
                 {
-                    if (newPartitionDelta[grain] != null)
+                    if (kv.Value != null)
                     {
-                        partitionData[grain] = newPartitionDelta[grain];
+                        partitionData[kv.Key] = kv.Value;
                     }
                     else
                     {
-                        partitionData.Remove(grain);
+                        partitionData.Remove(kv.Key);
                     }
                 }
             }
@@ -659,9 +660,9 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (lockable)
             {
-                if (partitionData.ContainsKey(grain))
+                if (partitionData.TryGetValue(grain, out var graininfo))
                 {
-                    partitionData[grain].CacheOrUpdateRemoteClusterRegistration(grain, oldActivation,
+                    graininfo.CacheOrUpdateRemoteClusterRegistration(grain, oldActivation,
                         otherClusterAddress.Activation, otherClusterAddress.Silo);
 
                 }
@@ -677,8 +678,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (lockable)
             {
-                IGrainInfo graininfo;
-                if (partitionData.TryGetValue(grain, out graininfo))
+                if (partitionData.TryGetValue(grain, out var graininfo))
                 {
                     return graininfo.UpdateClusterRegistrationStatus(activationId, registrationStatus, compareWith);
                 }

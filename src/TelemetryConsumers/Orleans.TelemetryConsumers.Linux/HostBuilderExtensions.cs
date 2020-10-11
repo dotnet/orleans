@@ -4,7 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
+using Microsoft.Extensions.Logging;
+using Orleans.Configuration.Internal;
 using Orleans.Hosting;
 using Orleans.Runtime;
 
@@ -21,7 +22,6 @@ namespace Orleans.Statistics
         public void ValidateConfiguration()
         {
             var isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
-
             if (!isLinux)
             {
                 throw new OrleansConfigurationException(InvalidOS);
@@ -40,6 +40,29 @@ namespace Orleans.Statistics
         }
     }
 
+    internal static class LinuxEnvironmentStatisticsServices
+    {
+        /// <summary>
+        /// Registers <see cref="LinuxEnvironmentStatistics"/> services.
+        /// </summary>
+        internal static void RegisterServices<TLifecycleObservable>(IServiceCollection services) where TLifecycleObservable : ILifecycleObservable
+        {
+            var isLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+            if (!isLinux)
+            {
+                var logger = services.BuildServiceProvider().GetService<ILogger<LinuxEnvironmentStatistics>>();
+                logger?.LogWarning((int)ErrorCode.OS_InvalidOS, LinuxEnvironmentStatisticsValidator.InvalidOS);
+
+                return;
+            }
+
+            services.AddTransient<IConfigurationValidator, LinuxEnvironmentStatisticsValidator>();
+            services.AddSingleton<LinuxEnvironmentStatistics>();
+            services.AddFromExisting<IHostEnvironmentStatistics, LinuxEnvironmentStatistics>();
+            services.AddFromExisting(typeof(ILifecycleParticipant<TLifecycleObservable>), typeof(LinuxEnvironmentStatistics));
+        }
+    }
+
     public static class SiloHostBuilderExtensions
     {
         /// <summary>
@@ -47,13 +70,7 @@ namespace Orleans.Statistics
         /// </summary>
         public static ISiloHostBuilder UseLinuxEnvironmentStatistics(this ISiloHostBuilder builder)
         {
-            return builder.ConfigureServices(services =>
-            {
-                services.AddTransient<IConfigurationValidator, LinuxEnvironmentStatisticsValidator>();
-                services.AddSingleton<LinuxEnvironmentStatistics>();
-                services.AddFromExisting<IHostEnvironmentStatistics, LinuxEnvironmentStatistics>();
-                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LinuxEnvironmentStatistics>();
-            });
+            return builder.ConfigureServices(LinuxEnvironmentStatisticsServices.RegisterServices<ISiloLifecycle>);
         }
 
         /// <summary>
@@ -61,13 +78,7 @@ namespace Orleans.Statistics
         /// </summary>
         public static ISiloBuilder UseLinuxEnvironmentStatistics(this ISiloBuilder builder)
         {
-            return builder.ConfigureServices(services =>
-            {
-                services.AddTransient<IConfigurationValidator, LinuxEnvironmentStatisticsValidator>();
-                services.AddSingleton<LinuxEnvironmentStatistics>();
-                services.AddFromExisting<IHostEnvironmentStatistics, LinuxEnvironmentStatistics>();
-                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LinuxEnvironmentStatistics>();
-            });
+            return builder.ConfigureServices(LinuxEnvironmentStatisticsServices.RegisterServices<ISiloLifecycle>);
         }
     }
 
@@ -78,13 +89,7 @@ namespace Orleans.Statistics
         /// </summary>
         public static IClientBuilder UseLinuxEnvironmentStatistics(this IClientBuilder builder)
         {
-            return builder.ConfigureServices(services =>
-            {
-                services.AddTransient<IConfigurationValidator, LinuxEnvironmentStatisticsValidator>();
-                services.AddSingleton<LinuxEnvironmentStatistics>();
-                services.AddFromExisting<IHostEnvironmentStatistics, LinuxEnvironmentStatistics>();
-                services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, LinuxEnvironmentStatistics>();
-            });
+            return builder.ConfigureServices(LinuxEnvironmentStatisticsServices.RegisterServices<IClusterClientLifecycle>);
         }
     }
 }

@@ -31,8 +31,12 @@ namespace Orleans.TestingHost
             string siloName,
             IList<IConfigurationSource> configurationSources)
         {
-            var host = TestClusterHostFactory.CreateSiloHost(siloName, configurationSources);
-            await host.StartAsync();
+            var host = await Task.Run(async () =>
+            {
+                var result = TestClusterHostFactory.CreateSiloHost(siloName, configurationSources);
+                await result.StartAsync();
+                return result;
+            });
 
             var retValue = new InProcessSiloHandle
             {
@@ -63,7 +67,7 @@ namespace Orleans.TestingHost
 
             try
             {
-                await this.SiloHost.StopAsync(ct);
+                await Task.Run(() => this.SiloHost.StopAsync(ct));
             }
             catch (Exception exc)
             {
@@ -92,6 +96,23 @@ namespace Orleans.TestingHost
                 }
 
                 this.SiloHost?.Dispose();
+            }
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            if (!this.IsActive) return;
+
+            try
+            {
+                await StopSiloAsync(true).ConfigureAwait(false);
+            }
+            finally
+            {
+                if (this.SiloHost is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                }
             }
         }
 

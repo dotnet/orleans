@@ -1,7 +1,5 @@
-using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -10,6 +8,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
+using Orleans.Metadata;
 
 namespace UnitTests.General
 {
@@ -26,12 +25,14 @@ namespace UnitTests.General
                 builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
             }
 
-            private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class TestSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.ConfigureServices(services =>
-                        services.Replace(ServiceDescriptor.Singleton(typeof(IGrainActivator), typeof(HardcodedGrainActivator))));
+                    {
+                        services.AddSingleton<IConfigureGrainTypeComponents, HardcodedGrainActivator>();
+                    });
                 }
             }
         }
@@ -41,7 +42,7 @@ namespace UnitTests.General
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task CanUseCustomGrainActivatorToCreateGrains()
         {
             ISimpleDIGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
@@ -49,7 +50,7 @@ namespace UnitTests.General
             Assert.Equal(HardcodedGrainActivator.HardcodedValue, actual);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task CanUseCustomGrainActivatorToReleaseGrains()
         {
             ISimpleDIGrain grain1 = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
@@ -68,34 +69,34 @@ namespace UnitTests.General
             Assert.Equal(initialReleasedInstances + 1, finalReleasedInstances);
         }
 
-        private class HardcodedGrainActivator : DefaultGrainActivator, IGrainActivator
+        private class HardcodedGrainActivator : IGrainActivator, IConfigureGrainTypeComponents
         {
             public const string HardcodedValue = "Hardcoded Test Value";
-            private int numberOfReleasedInstances;
-            public HardcodedGrainActivator(IServiceProvider service) : base(service)
+            private readonly GrainClassMap _grainClassMap;
+            private int _released;
+
+            public HardcodedGrainActivator(GrainClassMap grainClassMap)
             {
+                _grainClassMap = grainClassMap;
             }
 
-            public override object Create(IGrainActivationContext context)
+            public void Configure(GrainType grainType, GrainProperties properties, GrainTypeComponents shared)
             {
-                if (context.GrainType == typeof(ExplicitlyRegisteredSimpleDIGrain))
+                if (_grainClassMap.TryGetGrainClass(grainType, out var grainClass) && grainClass.IsAssignableFrom(typeof(ExplicitlyRegisteredSimpleDIGrain)))
                 {
-                    return new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(NullLoggerFactory.Instance), HardcodedValue, numberOfReleasedInstances);
+                    shared.SetComponent<IGrainActivator>(this);
                 }
-
-                return base.Create(context);
             }
 
-            public override void Release(IGrainActivationContext context, object grain)
+            public object CreateInstance(IGrainContext context)
             {
-                if (context.GrainType == typeof(ExplicitlyRegisteredSimpleDIGrain))
-                {
-                    numberOfReleasedInstances++;
-                }
-                else
-                {
-                    base.Release(context, grain);
-                }
+                return new ExplicitlyRegisteredSimpleDIGrain(new InjectedService(NullLoggerFactory.Instance), HardcodedValue, _released);
+            }
+
+            public ValueTask DisposeInstance(IGrainContext context, object instance)
+            {
+                ++_released;
+                return default;
             }
         }
     }

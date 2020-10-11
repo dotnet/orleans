@@ -150,7 +150,8 @@ namespace Orleans.Statistics
 
             var cpuNumbers = cpuNumberStrings.Select(long.Parse).ToArray();
             var idleTime = cpuNumbers[3];
-            var totalTime = cpuNumbers.Sum();
+            var iowait = cpuNumbers[4]; // Iowait is not real cpu time
+            var totalTime = cpuNumbers.Sum() - iowait;
 
             if (i > 0)
             {
@@ -173,8 +174,12 @@ namespace Orleans.Statistics
 
             if (string.IsNullOrWhiteSpace(memAvailableLine))
             {
-                _logger.LogWarning($"Couldn't read 'MemAvailable' line from '{MEMINFO_FILEPATH}'");
-                return;
+                memAvailableLine = await ReadLineStartingWithAsync(MEMINFO_FILEPATH, "MemFree");
+                if (string.IsNullOrWhiteSpace(memAvailableLine))
+                {
+                    _logger.LogWarning($"Couldn't read 'MemAvailable' or 'MemFree' line from '{MEMINFO_FILEPATH}'");
+                    return;
+                }
             }
 
             if (!long.TryParse(new string(memAvailableLine.Where(char.IsDigit).ToArray()), out var availableMemInKb))
@@ -255,9 +260,10 @@ namespace Orleans.Statistics
             using (var r = new StreamReader(fs, Encoding.ASCII))
             {
                 string line;
-                while ((line = await r.ReadLineAsync()) != null && line.StartsWith(lineStartsWith))
+                while ((line = await r.ReadLineAsync()) != null)
                 {
-                    return line;
+                    if (line.StartsWith(lineStartsWith))
+                        return line;
                 }
             }
 

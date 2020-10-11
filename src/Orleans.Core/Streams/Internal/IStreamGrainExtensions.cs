@@ -8,9 +8,9 @@ namespace Orleans.Streams
     // This is the extension interface for stream consumers
     internal interface IStreamConsumerExtension : IGrainExtension
     {
-        Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, StreamId streamId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
-        Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, StreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
-        Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, StreamId streamId, Immutable<IBatchContainer> item, StreamHandshakeToken handshakeToken);
+        Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, InternalStreamId streamId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
+        Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, InternalStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken);
+        Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, InternalStreamId streamId, Immutable<IBatchContainer> item, StreamHandshakeToken handshakeToken);
         Task CompleteStream(GuidId subscriptionId);
         Task ErrorInStream(GuidId subscriptionId, Exception exc);
         Task<StreamHandshakeToken> GetSequenceToken(GuidId subscriptionId);
@@ -20,9 +20,9 @@ namespace Orleans.Streams
     internal interface IStreamProducerExtension : IGrainExtension
     {
         [AlwaysInterleave]
-        Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter);
+        Task AddSubscriber(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData);
 
         [AlwaysInterleave]
-        Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId);
+        Task RemoveSubscriber(GuidId subscriptionId, InternalStreamId streamId);
     }
 }

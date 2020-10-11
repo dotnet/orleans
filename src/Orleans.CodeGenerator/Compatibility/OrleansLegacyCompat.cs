@@ -83,7 +83,7 @@ namespace Orleans.CodeGenerator.Compatibility
             var attrs = type.GetAttributes();
             foreach (var attr in attrs)
             {
-                if (attr.AttributeClass.Equals(attributeType))
+                if (SymbolEqualityComparer.Default.Equals(attr.AttributeClass, attributeType))
                 {
                     return attr;
                 }
@@ -144,16 +144,18 @@ namespace Orleans.CodeGenerator.Compatibility
 
             bool IsGrainMarkerInterface(WellKnownTypes l, INamedTypeSymbol t)
             {
-                return Equals(t, l.IGrainObserver) ||
-                       Equals(t, l.IAddressable) ||
-                       Equals(t, l.IGrainExtension) ||
-                       Equals(t, l.IGrain) ||
-                       Equals(t, l.IGrainWithGuidKey) ||
-                       Equals(t, l.IGrainWithIntegerKey) ||
-                       Equals(t, l.IGrainWithStringKey) ||
-                       Equals(t, l.IGrainWithGuidCompoundKey) ||
-                       Equals(t, l.IGrainWithIntegerCompoundKey) ||
-                       Equals(t, l.ISystemTarget);
+                return Eq(t, l.IGrainObserver) ||
+                       Eq(t, l.IAddressable) ||
+                       Eq(t, l.IGrainExtension) ||
+                       Eq(t, l.IGrain) ||
+                       Eq(t, l.IGrainWithGuidKey) ||
+                       Eq(t, l.IGrainWithIntegerKey) ||
+                       Eq(t, l.IGrainWithStringKey) ||
+                       Eq(t, l.IGrainWithGuidCompoundKey) ||
+                       Eq(t, l.IGrainWithIntegerCompoundKey) ||
+                       Eq(t, l.ISystemTarget);
+
+                static bool Eq(ISymbol left, ISymbol right) => SymbolEqualityComparer.Default.Equals(left, right);
             }
         }
 
@@ -169,12 +171,12 @@ namespace Orleans.CodeGenerator.Compatibility
 
             bool IsMarkerType(WellKnownTypes l, INamedTypeSymbol t)
             {
-                return Equals(t, l.Grain) || Equals(t, l.GrainOfT);
+                return SymbolEqualityComparer.Default.Equals(t, l.Grain) || SymbolEqualityComparer.Default.Equals(t, l.GrainOfT);
             }
 
             bool HasBase(INamedTypeSymbol t, INamedTypeSymbol baseType)
             {
-                if (Equals(t.BaseType, baseType)) return true;
+                if (SymbolEqualityComparer.Default.Equals(t.BaseType, baseType)) return true;
                 if (t.BaseType != null) return HasBase(t.BaseType, baseType);
                 return false;
             }
@@ -241,10 +243,9 @@ namespace Orleans.CodeGenerator.Compatibility
         private static void GetBaseTypeKey(ITypeSymbol type, StringBuilder sb)
         {
             var namespacePrefix = "";
-            var ns = type.ContainingNamespace?.ToString();
-            if (ns != null && !ns.StartsWith("System.") && !ns.Equals("System"))
+            if (!RoslynTypeHelper.IsSystemNamespace(type.ContainingNamespace))
             {
-                namespacePrefix = ns + '.';
+                namespacePrefix = type.ContainingNamespace.ToString() + '.';
             }
 
             if (type.DeclaredAccessibility == Accessibility.Public && type.ContainingType != null)
@@ -414,7 +415,7 @@ namespace Orleans.CodeGenerator.Compatibility
                 return true;
             }
 
-            if (type.IsGenericType && type.GetNestedHierarchy().All(t => t.ConstructedFrom == t))
+            if (type.IsGenericType && type.GetNestedHierarchy().All(t => SymbolEqualityComparer.Default.Equals(t.ConstructedFrom, t)))
             {
                 typeParamsLength = type.GetHierarchyTypeArguments().Count();
                 return true;

@@ -5,9 +5,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-namespace Orleans
+namespace Orleans.Internal
 {
-    internal static class OrleansTaskExtentions
+    public static class OrleansTaskExtentions
     {
         internal static readonly Task<object> CanceledTask = TaskFromCanceled<object>();
         internal static readonly Task<object> CompletedTask = Task.FromResult(default(object));
@@ -102,7 +102,7 @@ namespace Orleans
 
                 if (result is null)
                 {
-                    if (typeof(T).IsValueType)
+                    if (!NullabilityHelper<T>.IsNullableType)
                     {
                         ThrowInvalidTaskResultType(typeof(T));
                     }
@@ -112,6 +112,14 @@ namespace Orleans
 
                 return (T)result;
             }
+        }
+
+        private static class NullabilityHelper<T>
+        {
+            /// <summary>
+            /// True if <typeparamref name="T" /> is an instance of a nullable type (a reference type or <see cref="Nullable{T}"/>), otherwise false.
+            /// </summary>
+            public static readonly bool IsNullableType = !typeof(T).IsValueType || typeof(T).IsConstructedGenericType && typeof(T).GetGenericTypeDefinition() == typeof(Nullable<>);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -132,21 +140,21 @@ namespace Orleans
         
         private static Task<object> TaskFromFaulted(Task task)
         {
-            var completion = new TaskCompletionSource<object>();
+            var completion = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             completion.SetException(task.Exception.InnerExceptions);
             return completion.Task;
         }
 
         private static Task<T> TaskFromFaulted<T>(Task task)
         {
-            var completion = new TaskCompletionSource<T>();
+            var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
             completion.SetException(task.Exception.InnerExceptions);
             return completion.Task;
         }
 
         private static Task<T> TaskFromCanceled<T>()
         {
-            var completion = new TaskCompletionSource<T>();
+            var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
             completion.SetCanceled();
             return completion.Task;
         }
@@ -194,7 +202,7 @@ namespace Orleans
         }
 
 
-        internal static void WaitWithThrow(this Task task, TimeSpan timeout)
+        public static void WaitWithThrow(this Task task, TimeSpan timeout)
         {
             if (!task.Wait(timeout))
             {
@@ -324,7 +332,7 @@ namespace Orleans
 
         private static async Task MakeCancellable(Task task, CancellationToken cancellationToken)
         {
-            var tcs = new TaskCompletionSource<object>();
+            var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             using (cancellationToken.Register(() =>
                       tcs.TrySetCanceled(cancellationToken), useSynchronizationContext: false))
             {
@@ -387,7 +395,7 @@ namespace Orleans
 
         private static async Task<T> MakeCancellable<T>(Task<T> task, CancellationToken cancellationToken)
         {
-            var tcs = new TaskCompletionSource<T>();
+            var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
             using (cancellationToken.Register(() =>
                       tcs.TrySetCanceled(cancellationToken), useSynchronizationContext: false))
             {
@@ -419,7 +427,7 @@ namespace Orleans
         {
             if (task == null) return Task.FromResult(default(T));
 
-            var resolver = new TaskCompletionSource<T>();
+            var resolver = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             if (task.Status == TaskStatus.RanToCompletion)
             {
@@ -465,6 +473,23 @@ namespace Orleans
         internal static void GetResult(this Task task)
         {
             task.GetAwaiter().GetResult();
+        }
+
+        internal static Task WhenCancelled(this CancellationToken token)
+        {
+            if (token.IsCancellationRequested)
+            {
+                return Task.CompletedTask;
+            }
+
+            var waitForCancellation = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(obj =>
+            {
+                var tcs = (TaskCompletionSource<object>)obj;
+                tcs.TrySetResult(null);
+            }, waitForCancellation);
+
+            return waitForCancellation.Task;
         }
     }
 }

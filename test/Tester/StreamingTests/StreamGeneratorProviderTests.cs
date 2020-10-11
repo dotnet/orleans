@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Generator;
@@ -37,11 +38,12 @@ namespace UnitTests.StreamingTests
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
-            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
+                        .ConfigureLogging(logging => logging.AddDebug())
                         .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(StreamProviderName, (s, n) => GeneratorConfig))
                         .AddPersistentStreams(
                             StreamProviderName,
@@ -63,9 +65,9 @@ namespace UnitTests.StreamingTests
             this.fixture = fixture;
         }
 
-        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
+        private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ValidateGeneratedStreamsTest()
         {
             this.fixture.Logger.Info("************************ ValidateGeneratedStreamsTest *********************************");

@@ -7,7 +7,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
-using Orleans.Transactions;
 using Orleans.Utilities;
 
 namespace Orleans.CodeGeneration
@@ -101,20 +100,20 @@ namespace Orleans.CodeGeneration
         /// <returns></returns>
         public static bool IsReadOnly(MethodInfo info)
         {
-            return info.GetCustomAttributes(typeof (ReadOnlyAttribute), true).Any();
+            return info.IsDefined(typeof(ReadOnlyAttribute), true);
         }
 
         public static bool IsAlwaysInterleave(MethodInfo methodInfo)
         {
-            return methodInfo.GetCustomAttributes(typeof (AlwaysInterleaveAttribute), true).Any();
+            return methodInfo.IsDefined(typeof(AlwaysInterleaveAttribute), true);
         }
 
         public static bool IsUnordered(MethodInfo methodInfo)
         {
             var declaringType = methodInfo.DeclaringType;
-            return declaringType.GetCustomAttributes(typeof(UnorderedAttribute), true).Any() 
+            return declaringType.IsDefined(typeof(UnorderedAttribute), true)
                 || (declaringType.GetInterfaces().Any(
-                    i => i.GetCustomAttributes(typeof(UnorderedAttribute), true).Any() 
+                    i => i.IsDefined(typeof(UnorderedAttribute), true)
                         && declaringType.GetTypeInfo().GetRuntimeInterfaceMap(i).TargetMethods.Contains(methodInfo)))
                 || IsStatelessWorker(methodInfo);
         }
@@ -122,9 +121,9 @@ namespace Orleans.CodeGeneration
         public static bool IsStatelessWorker(MethodInfo methodInfo)
         {
             var declaringType = methodInfo.DeclaringType;
-            return declaringType.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any() ||
+            return declaringType.IsDefined(typeof(StatelessWorkerAttribute), true) ||
                 (declaringType.GetInterfaces().Any(
-                    i => i.GetCustomAttributes(typeof(StatelessWorkerAttribute), true).Any()
+                    i => i.IsDefined(typeof(StatelessWorkerAttribute), true)
                         && declaringType.GetTypeInfo().GetRuntimeInterfaceMap(i).TargetMethods.Contains(methodInfo)));
         }
 
@@ -421,10 +420,7 @@ namespace Orleans.CodeGeneration
         private static int GetTypeCode(Type grainInterfaceOrClass)
         {
             var attr = grainInterfaceOrClass.GetCustomAttributes<TypeCodeOverrideAttribute>(false).FirstOrDefault();
-            if (attr != null && attr.TypeCode > 0)
-            {
-                return attr.TypeCode;
-            }
+            if (attr != null) return attr.TypeCode;
 
             var fullName = TypeUtils.GetTemplatedName(
                 TypeUtils.GetFullName(grainInterfaceOrClass), 

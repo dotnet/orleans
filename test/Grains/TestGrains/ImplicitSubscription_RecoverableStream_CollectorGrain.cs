@@ -1,6 +1,7 @@
-﻿
+
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Generator;
@@ -19,12 +20,16 @@ namespace TestGrains
         public const string StorageProviderName = "AzureStorage";
         
         // grain instance state
-        private Logger logger;
+        private ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
+
+        public ImplicitSubscription_RecoverableStream_CollectorGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger("ImplicitSubscription_RecoverableStream_CollectorGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             await ReadStateAsync();

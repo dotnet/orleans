@@ -5,6 +5,7 @@
     <ApplicationIcon />
     <OutputType>Exe</OutputType>
     <StartupObject />
+    <ServerGarbageCollection>false</ServerGarbageCollection> <!-- https://blog.markvincze.com/troubleshooting-high-memory-usage-with-asp-net-core-on-kubernetes/ -->
   </PropertyGroup>
 
   <ItemGroup>

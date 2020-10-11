@@ -43,8 +43,8 @@ namespace Orleans.Tests.SqlUtils
                                     isSynchronousAdoNetImplementation: true, //there are some intermittent PostgreSQL problems too, see more discussion at https://github.com/dotnet/orleans/pull/2949.
                                     supportsStreamNatively: true,
                                     supportsCommandCancellation: true, // See https://dev.mysql.com/doc/connector-net/en/connector-net-ref-mysqlclient-mysqlcommandmembers.html.
-                                    commandInterceptor: NoOpCommandInterceptor.Instance) 
-                                    
+                                    commandInterceptor: NoOpCommandInterceptor.Instance)
+
                 },
                 {AdoNetInvariants.InvariantNameOracleDatabase, new DbConstants(
                                     startEscapeIndicator: '\"',
@@ -53,9 +53,29 @@ namespace Orleans.Tests.SqlUtils
                                     isSynchronousAdoNetImplementation: true,
                                     supportsStreamNatively: false,
                                     supportsCommandCancellation: false, // Is supported but the remarks sound scary: https://docs.oracle.com/cd/E11882_01/win.112/e23174/OracleCommandClass.htm#DAFIEHHG.
-                                    commandInterceptor: OracleCommandInterceptor.Instance) 
-                    
-                }, 
+                                    commandInterceptor: OracleCommandInterceptor.Instance)
+
+                },
+                {
+                    AdoNetInvariants.InvariantNameSqlServerDotnetCore,
+                    new DbConstants(startEscapeIndicator: '[',
+                                    endEscapeIndicator: ']',
+                                    unionAllSelectTemplate: " UNION ALL SELECT ",
+                                    isSynchronousAdoNetImplementation: false,
+                                    supportsStreamNatively: true,
+                                    supportsCommandCancellation: true,
+                                    commandInterceptor: NoOpCommandInterceptor.Instance)
+                },
+                {
+                    AdoNetInvariants.InvariantNameMySqlConnector,
+                    new DbConstants(startEscapeIndicator: '[',
+                                    endEscapeIndicator: ']',
+                                    unionAllSelectTemplate: " UNION ALL SELECT ",
+                                    isSynchronousAdoNetImplementation: false,
+                                    supportsStreamNatively: true,
+                                    supportsCommandCancellation: true,
+                                    commandInterceptor: NoOpCommandInterceptor.Instance)
+                }
             };
 
         public static DbConstants GetDbConstants(string invariantName)
@@ -114,7 +134,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns></returns>
         public static bool IsSynchronousAdoNetImplementation(this IRelationalStorage storage)
         {
-            //Currently the assumption is all but MySQL are asynchronous.            
+            //Currently the assumption is all but MySQL are asynchronous.
             return IsSynchronousAdoNetImplementation(storage.InvariantName);
         }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans;
@@ -6,6 +6,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace UnitTests.StorageTests
 {
@@ -55,11 +56,29 @@ namespace UnitTests.StorageTests
             : base(info, context)
         {
         }
+
+        protected StorageProviderInjectedError(string message) : base(message)
+        {
+        }
+
+        protected StorageProviderInjectedError(string message, Exception innerException) : base(message, innerException)
+        {
+        }
     }
 
     public class ErrorInjectionStorageProvider : MockStorageProvider, IControllable
     {
         private ILogger logger;
+
+        public ErrorInjectionStorageProvider(
+            ILogger<ErrorInjectionStorageProvider> logger,
+            ILoggerFactory loggerFactory,
+            SerializationManager serializationManager) : base(loggerFactory, serializationManager)
+        {
+            this.logger = logger;
+            SetErrorInjection(ErrorInjectionBehavior.None);
+        }
+
         public static void SetErrorInjection(string providerName, ErrorInjectionBehavior errorInjectionBehavior, IGrainFactory grainFactory)
         {
             IManagementGrain mgmtGrain = grainFactory.GetGrain<IManagementGrain>(0);
@@ -80,23 +99,7 @@ namespace UnitTests.StorageTests
             ErrorInjection = errorInject;
             logger.Info(0, "Set ErrorInjection to {0}", ErrorInjection);
         }
-
-        public async override Task Init(string name, IProviderRuntime providerRuntime, IProviderConfiguration config)
-        {
-            this.logger = providerRuntime.ServiceProvider.GetRequiredService<ILogger<ErrorInjectionStorageProvider>>();
-            logger.Info(0, "Init ErrorInjection={0}", ErrorInjection);
-            try
-            {
-                SetErrorInjection(ErrorInjectionBehavior.None);
-                await base.Init(name, providerRuntime, config);
-            }
-            catch (Exception exc)
-            {
-                logger.Error(0, "Unexpected error during Init", exc);
-                throw;
-            }
-        }
-
+        
         public async override Task Close()
         {
             logger.Info(0, "Close ErrorInjection={0}", ErrorInjection);

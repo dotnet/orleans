@@ -1,4 +1,4 @@
-﻿using Orleans.Serialization.ProtobufNet;
+using Orleans.Serialization.ProtobufNet;
 using System;
 using System.Reflection;
 using TestExtensions;
@@ -86,7 +86,7 @@ namespace ProtoBuf.Serialization.Tests
             return book;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
         public void ProtoBufSerializationTest_3_RegularOrleansSerializationStillWorks()
         {
             var input = new OrleansType();
@@ -95,7 +95,7 @@ namespace ProtoBuf.Serialization.Tests
             input.ShouldBeEquivalentTo(output); //The serialization didn't preserve the proper value
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
         public void ProtoBufSerializationTest_4_OtherPersonProtoBufType()
         {
             var input = CreatePerson();
@@ -104,7 +104,7 @@ namespace ProtoBuf.Serialization.Tests
             input.ShouldBeEquivalentTo(output); //The serialization didn't preserve the proper value
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
         public void ProtoBufSerializationTest_5_CounterProtoBufSerialization()
         {
             var input = CreateCounter();
@@ -113,7 +113,7 @@ namespace ProtoBuf.Serialization.Tests
             input.ShouldBeEquivalentTo(output); //The serialization didn't preserve the proper value
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
         public void ProtoBufSerializationTest_6_DeepCopy()
         {
             var input = CreatePerson();
@@ -122,7 +122,7 @@ namespace ProtoBuf.Serialization.Tests
             input.ShouldBeEquivalentTo(output); ; //The serialization didn't preserve the proper value
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
         public void ProtoBufSerializationTest_7_DeepCopyImmutableType()
         {
             var input = CreateImmutablePerson();
@@ -130,7 +130,7 @@ namespace ProtoBuf.Serialization.Tests
             Assert.Same(input, output); //The serializer returned an instance of the same object
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization"), TestCategory("ProtoBuf")]
         public void ProtoBufSerializationTest_8_DefaultCounterMessageSerialization()
         {
             var input = CreateDefaultCounter();

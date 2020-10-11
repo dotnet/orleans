@@ -31,13 +31,13 @@ namespace Tester.AzureUtils.Persistence
                 builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
             }
 
-            private class StorageSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class StorageSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddAzureBlobGrainStorage("GrainStorageForTest", (AzureBlobStorageOptions options) =>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConfigureTestDefaults();
                     });
                 }
             }

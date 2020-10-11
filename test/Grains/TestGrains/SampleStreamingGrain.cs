@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -42,13 +43,17 @@ namespace UnitTests.Grains
         private IAsyncStream<int> producer;
         private int numProducedItems;
         private IDisposable producerTimer;
-        internal Logger logger;
+        internal ILogger logger;
         internal readonly static string RequestContextKey = "RequestContextField";
         internal readonly static string RequestContextValue = "JustAString";
 
+        public SampleStreaming_ProducerGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger("SampleStreaming_ProducerGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
             numProducedItems = 0;
             return Task.CompletedTask;
@@ -118,13 +123,17 @@ namespace UnitTests.Grains
     {
         private IAsyncObservable<int> consumer;
         internal int numConsumedItems;
-        internal Logger logger;
+        internal ILogger logger;
         private IAsyncObserver<int> consumerObserver;
         private StreamSubscriptionHandle<int> consumerHandle;
 
+        public SampleStreaming_ConsumerGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger("SampleStreaming_ConsumerGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
             numConsumedItems = 0;
             consumerHandle = null;
@@ -166,12 +175,16 @@ namespace UnitTests.Grains
     {
         private IAsyncObservable<int> consumer;
         internal int numConsumedItems;
-        internal Logger logger;
+        internal ILogger logger;
         private StreamSubscriptionHandle<int> consumerHandle;
+
+        public SampleStreaming_InlineConsumerGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger( "SampleStreaming_InlineConsumerGrain " + base.IdentityString );
             logger.Info( "OnActivateAsync" );
             numConsumedItems = 0;
             consumerHandle = null;

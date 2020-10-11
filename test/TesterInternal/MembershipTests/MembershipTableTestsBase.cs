@@ -8,13 +8,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 
 namespace UnitTests.MembershipTests
 {
@@ -44,7 +44,6 @@ namespace UnitTests.MembershipTests
         protected IOptions<ClusterOptions> clusterOptions;
         protected const string testDatabaseName = "OrleansMembershipTest";//for relational storage
         protected readonly IOptions<GatewayOptions> gatewayOptions;
-        protected readonly ClientConfiguration clientConfiguration;
 
         protected MembershipTableTestsBase(ConnectionStringFixture fixture, TestEnvironmentFixture environment, LoggerFilterOptions filters)
         {
@@ -64,13 +63,6 @@ namespace UnitTests.MembershipTests
             membershipTable = CreateMembershipTable(logger);
             membershipTable.InitializeMembershipTable(true).WithTimeout(TimeSpan.FromMinutes(1)).Wait();
 
-            clientConfiguration = new ClientConfiguration
-            {
-                ClusterId = this.clusterId,
-                AdoInvariant = adoVariant,
-                DataConnectionString = fixture.ConnectionString
-            };
-
             this.gatewayOptions = Options.Create(new GatewayOptions());
             gatewayListProvider = CreateGatewayListProvider(logger);
             gatewayListProvider.InitializeGatewayListProvider().WithTimeout(TimeSpan.FromMinutes(1)).Wait();
@@ -78,7 +70,7 @@ namespace UnitTests.MembershipTests
 
         public IGrainFactory GrainFactory => this.environment.GrainFactory;
 
-        public IGrainReferenceConverter GrainReferenceConverter => this.environment.Services.GetRequiredService<IGrainReferenceConverter>();
+        public GrainReferenceKeyStringConverter GrainReferenceConverter => this.environment.Services.GetRequiredService<GrainReferenceKeyStringConverter>();
 
         public IServiceProvider Services => this.environment.Services;
 
@@ -412,6 +404,54 @@ namespace UnitTests.MembershipTests
             Assert.True((amAliveTime - member.Item1.IAmAliveTime).Duration() < TimeSpan.FromMilliseconds(50), (amAliveTime - member.Item1.IAmAliveTime).Duration().ToString());
         }
 
+        protected async Task MembershipTable_CleanupDefunctSiloEntries(bool extendedProtocol = true)
+        {
+            MembershipTableData data = await membershipTable.ReadAll();
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+
+            Assert.Equal(0, data.Members.Count);
+
+            TableVersion newTableVersion = data.Version.Next();
+
+            var oldEntryDead = CreateMembershipEntryForTest();
+            oldEntryDead.IAmAliveTime = oldEntryDead.IAmAliveTime.AddDays(-10);
+            oldEntryDead.StartTime = oldEntryDead.StartTime.AddDays(-10);
+            oldEntryDead.Status = SiloStatus.Dead;
+            bool ok = await membershipTable.InsertRow(oldEntryDead, newTableVersion);
+            var table = await membershipTable.ReadAll();
+
+            Assert.True(ok, "InsertRow Dead failed");
+
+            newTableVersion = table.Version.Next();
+            var oldEntryJoining = CreateMembershipEntryForTest();
+            oldEntryJoining.IAmAliveTime = oldEntryJoining.IAmAliveTime.AddDays(-10);
+            oldEntryJoining.StartTime = oldEntryJoining.StartTime.AddDays(-10);
+            oldEntryJoining.Status = SiloStatus.Joining;
+            ok = await membershipTable.InsertRow(oldEntryJoining, newTableVersion);
+            table = await membershipTable.ReadAll();
+
+            Assert.True(ok, "InsertRow Joining failed");
+
+            newTableVersion = table.Version.Next();
+            var  newEntry = CreateMembershipEntryForTest();
+            ok = await membershipTable.InsertRow(newEntry, newTableVersion);
+
+            Assert.True(ok, "InsertRow failed");
+
+            data = await membershipTable.ReadAll();
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+
+            Assert.Equal(3, data.Members.Count);
+
+
+            await membershipTable.CleanupDefunctSiloEntries(oldEntryDead.IAmAliveTime.AddDays(3));
+
+            data = await membershipTable.ReadAll();
+            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+
+            Assert.Equal(1, data.Members.Count);
+        }
+
         private static int generation;
 
 
@@ -437,7 +477,7 @@ namespace UnitTests.MembershipTests
         private static DateTime GetUtcNowWithSecondsResolution()
         {
             var now = DateTime.UtcNow;
-            return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second);
+            return new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, DateTimeKind.Utc);
         }
 
         private static SiloAddress CreateSiloAddressForTest()

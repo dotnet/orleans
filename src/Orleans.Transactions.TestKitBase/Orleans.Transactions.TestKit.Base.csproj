@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Transactions.TestKit.Base</PackageId>
+    <Title>Microsoft Orleans Transactions test kit base</Title>
+    <Description>Testkit base library for transactions</Description>
+    <PackageTags>$(PackageTags) TransactionTestkKit</PackageTags>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Transactions.TestKit.Base</AssemblyName>
+    <RootNamespace>Orleans.Transactions.TestKit.Base</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />
+    <ProjectReference Include="..\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="..\Orleans.Transactions\Orleans.Transactions.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -3,6 +3,7 @@ using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
@@ -28,8 +29,7 @@ namespace Orleans.Reminders.DynamoDB
         private SafeRandom _random = new SafeRandom();
 
         private readonly ILogger logger;
-        private readonly IGrainReferenceConverter grainReferenceConverter;
-        private readonly ILoggerFactory loggerFactory;
+        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private readonly DynamoDBReminderStorageOptions options;
         private readonly string serviceId;
 
@@ -41,14 +41,13 @@ namespace Orleans.Reminders.DynamoDB
         /// <param name="clusterOptions"></param>
         /// <param name="storageOptions"></param>
         public DynamoDBReminderTable(
-            IGrainReferenceConverter grainReferenceConverter, 
+            GrainReferenceKeyStringConverter grainReferenceConverter, 
             ILoggerFactory loggerFactory, 
             IOptions<ClusterOptions> clusterOptions, 
             IOptions<DynamoDBReminderStorageOptions> storageOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
             this.logger = loggerFactory.CreateLogger<DynamoDBReminderTable>();
-            this.loggerFactory = loggerFactory;
             this.serviceId = clusterOptions.Value.ServiceId;
             this.options = storageOptions.Value;
         }
@@ -56,7 +55,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <summary>Initialize current instance with specific global configuration and logger</summary>
         public Task Init()
         {
-            this.storage = new DynamoDBStorage(this.loggerFactory, this.options.Service, this.options.AccessKey, this.options.SecretKey,
+            this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
                  this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
 
             this.logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
@@ -188,7 +187,7 @@ namespace Orleans.Reminders.DynamoDB
             return new ReminderEntry
             {
                 ETag = item[ETAG_PROPERTY_NAME].N,
-                GrainRef = this.grainReferenceConverter.GetGrainFromKeyString(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
+                GrainRef = this.grainReferenceConverter.FromKeyString(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
                 Period = TimeSpan.Parse(item[PERIOD_PROPERTY_NAME].S),
                 ReminderName = item[REMINDER_NAME_PROPERTY_NAME].S,
                 StartAt = DateTime.Parse(item[START_TIME_PROPERTY_NAME].S)

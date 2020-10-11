@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -19,6 +19,16 @@ namespace UnitTests.Grains
             {
                 ["result"] = await otherGrain.Echo(message)
             };
+        }
+
+        public Task<string> ThrowIfGreaterThanZero(int value)
+        {
+            if (value > 0)
+            {
+                throw new ArgumentOutOfRangeException($"{value} is greater than zero!");
+            }
+
+            return Task.FromResult("Thanks for nothing");
         }
     }
 
@@ -154,44 +164,89 @@ namespace UnitTests.Grains
     {
         private const string Key = GrainCallFilterTestConstants.Key;
 
-        // Note, this class misuses the context. It should not be stored for later use.
-        private IGrainCallContext context;
-
-        public async Task<string> CallWithBadInterceptors(bool early, bool mid, bool late)
+        public Task<string> ThrowIfGreaterThanZero(int value)
         {
-            if (late)
+            if (value > 0)
             {
-                this.context.Arguments[2] = false;
-                await this.context.Invoke();
+                throw new ArgumentOutOfRangeException($"{value} is greater than zero!");
             }
 
-            return $"I will {(early ? string.Empty : "not ")}misbehave!";
+            return Task.FromResult("Thanks for nothing");
         }
 
         public Task<string> GetRequestContext() => Task.FromResult((string)RequestContext.Get(Key) + "4");
 
         public async Task Invoke(IIncomingGrainCallContext ctx)
         {
-            //
-            // NOTE: this grain demonstrates incorrect usage of grain call interceptors and should not be used
-            // as an example of proper usage. Specifically, storing the context for later execution is invalid.
-            //
+            var attemptsRemaining = 2;
 
-            this.context = ctx;
-            if (string.Equals(ctx.ImplementationMethod.Name, nameof(CallWithBadInterceptors)) && (bool)ctx.Arguments[0])
+            while (attemptsRemaining > 0)
             {
-                await ctx.Invoke();
+                try
+                {
+                    var interfaceMethod = ctx.InterfaceMethod ?? throw new ArgumentException("InterfaceMethod is null!");
+                    var implementationMethod = ctx.ImplementationMethod ?? throw new ArgumentException("ImplementationMethod is null!");
+                    if (!string.Equals(implementationMethod.Name, interfaceMethod.Name))
+                    {
+                        throw new ArgumentException("InterfaceMethod.Name != ImplementationMethod.Name");
+                    }
+
+                    if (RequestContext.Get(Key) is string value) RequestContext.Set(Key, value + '3');
+                    await ctx.Invoke();
+                    return;
+                }
+                catch (ArgumentOutOfRangeException) when (attemptsRemaining > 1)
+                {
+                    if (string.Equals(ctx.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero)) && ctx.Arguments[0] is int value)
+                    {
+                        ctx.Arguments[0] = value - 1;
+                    }
+
+                    --attemptsRemaining;
+                }
             }
-
-            if (RequestContext.Get(Key) is string value) RequestContext.Set(Key, value + '3');
-            await ctx.Invoke();
-
-            if (string.Equals(ctx.ImplementationMethod?.Name, nameof(CallWithBadInterceptors)) && (bool)ctx.Arguments[1])
-            {
-                await ctx.Invoke();
-            }
-
-            this.context = null;
         }
+
+        public Task<int> SumSet(HashSet<int> numbers)
+        {
+            return Task.FromResult(numbers.Sum());
+        }
+    }
+
+    public class CaterpillarGrain : Grain, ICaterpillarGrain, IIncomingGrainCallFilter
+    {
+        Task IIncomingGrainCallFilter.Invoke(IIncomingGrainCallContext ctx)
+        {
+            if (ctx.InterfaceMethod is null) throw new Exception("InterfaceMethod is null");
+            if (!ctx.InterfaceMethod.DeclaringType.IsInterface) throw new Exception("InterfaceMethod is not an interface method");
+
+            if (ctx.ImplementationMethod is null) throw new Exception("ImplementationMethod is null");
+            if (ctx.ImplementationMethod.DeclaringType.IsInterface) throw new Exception("ImplementationMethod is an interface method");
+
+            if (RequestContext.Get("tag") is string tag)
+            {
+                var ifaceTag = ctx.InterfaceMethod.GetCustomAttribute<TestMethodTagAttribute>()?.Tag;
+                var implTag = ctx.ImplementationMethod.GetCustomAttribute<TestMethodTagAttribute>()?.Tag;
+                if (!string.Equals(tag, ifaceTag, StringComparison.Ordinal)
+                    || !string.Equals(tag, implTag, StringComparison.Ordinal))
+                {
+                    throw new Exception($"Expected method tags to be equal to request context tag: RequestContext: {tag} Interface: {ifaceTag} Implementation: {implTag}");
+                }
+            }
+
+            return ctx.Invoke();
+        }
+
+        [TestMethodTag("hungry-eat")]
+        public Task Eat(Apple food) => Task.CompletedTask;
+
+        [TestMethodTag("omnivore-eat")]
+        Task IOmnivoreGrain.Eat<T>(T food) => Task.CompletedTask;
+
+        [TestMethodTag("caterpillar-eat")]
+        public Task Eat<T>(T food) => Task.CompletedTask;
+
+        [TestMethodTag("hungry-eatwith")]
+        public Task EatWith<U>(Apple food, U condiment) => Task.CompletedTask;
     }
 }

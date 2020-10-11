@@ -8,6 +8,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
+    public interface IStatisticsManager
+    {
+        void Dump();
+    }
+    
     internal class LogStatistics : IDisposable
     {
         internal const string STATS_LOG_PREFIX = "Statistics: ^^^";
@@ -25,7 +30,7 @@ namespace Orleans.Runtime
             this.loggerFactory = loggerFactory;
             reportFrequency = writeInterval;
             this.serializationStatistics = serializationStatistics;
-            logger = loggerFactory.CreateLogger("Orleans.Runtime" + (isSilo ? "SiloLogStatistics" : "ClientLogStatistics"));
+            logger = loggerFactory.CreateLogger("Orleans.Runtime." + (isSilo ? "SiloLogStatistics" : "ClientLogStatistics"));
         }
 
         internal void Start()

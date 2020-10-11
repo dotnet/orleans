@@ -1,5 +1,5 @@
-using System.Reflection;
-using Orleans.Runtime.Configuration;
+using Orleans;
+using Orleans.Configuration;
 using TestExtensions;
 using UnitTests.Grains;
 using Xunit;
@@ -15,19 +15,12 @@ namespace UnitTests.Serialization
             FakeTypeToSerialize.Reset();
             FakeSerializer1.Reset();
             FakeSerializer2.Reset();
-            var config = new ClientConfiguration()
-            {
-                SerializationProviders =
-                {
-                    typeof(FakeSerializer1),
-                    typeof(FakeSerializer2)
-                }
-            };
-
-            this.environment = SerializationTestEnvironment.InitializeWithDefaults(config);
+            this.environment = SerializationTestEnvironment.InitializeWithDefaults(
+                 builder => builder.Configure<SerializationProviderOptions>(
+                     options => options.SerializationProviders.AddRange(new[] { typeof(FakeSerializer1), typeof(FakeSerializer2) })));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void SerializationOrder_VerifyThatExternalIsHigherPriorityThanAttributeDefined()
         {
             FakeSerializer1.SupportedTypes = FakeSerializer2.SupportedTypes = new[] { typeof(FakeTypeToSerialize) };
@@ -48,7 +41,7 @@ namespace UnitTests.Serialization
                 "Deserialize on the type should NOT have been called");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void SerializationOrder_VerifyThatAttributeDefinedCalledIfNoExternalSerializersSupportType()
         {
             var serializationItem = new FakeTypeToSerialize { SomeValue = 1 };
@@ -58,7 +51,7 @@ namespace UnitTests.Serialization
             Assert.True(FakeTypeToSerialize.DeserializeWasCalled, "FakeTypeToSerialize.Deserialize should have been called");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
         public void SerializationOrder_VerifyExternalSerializersInvokedInOrder()
         {
             FakeSerializer1.SupportedTypes = FakeSerializer2.SupportedTypes = new[] { typeof(FakeTypeToSerialize) };

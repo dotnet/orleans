@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Tester.StorageFacet.Abstractions;
@@ -31,15 +31,15 @@ namespace Tester.StorageFacet.Implementations
 
     public class BlobExampleStorageFactory : IExampleStorageFactory
     {
-        private readonly IGrainActivationContext context;
-        public BlobExampleStorageFactory(IGrainActivationContext context)
+        private readonly IGrainContextAccessor contextAccessor;
+        public BlobExampleStorageFactory(IGrainContextAccessor contextAccessor)
         {
-            this.context = context;
+            this.contextAccessor = contextAccessor;
         }
 
         public IExampleStorage<TState> Create<TState>(IExampleStorageConfig config)
         {
-            var storage = this.context.ActivationServices.GetRequiredService<BlobExampleStorage<TState>>();
+            var storage = this.contextAccessor.GrainContext.ActivationServices.GetRequiredService<BlobExampleStorage<TState>>();
             storage.Configure(config);
             return storage;
         }
@@ -47,7 +47,7 @@ namespace Tester.StorageFacet.Implementations
 
     public static class BlobExampleStorageExtensions
     {
-        public static void UseBlobExampleStorage(this ISiloHostBuilder builder, string name)
+        public static void UseBlobExampleStorage(this ISiloBuilder builder, string name)
         {
             builder.ConfigureServices(services =>
             {

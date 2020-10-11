@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -15,7 +15,7 @@ namespace DefaultCluster.Tests.General
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public async Task PrimaryKeyExtensionsShouldDifferentiateGrainsUsingTheSameBasePrimaryKey()
         {
             var baseKey = Guid.NewGuid();
@@ -35,7 +35,7 @@ namespace DefaultCluster.Tests.General
             Assert.NotEqual(activationId1, activationId2); // Mismatched key extensions should differentiate an identical base primary key.
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public async Task PrimaryKeyExtensionsShouldDifferentiateGrainsUsingDifferentBaseKeys()
         {
             var baseKey1 = Guid.NewGuid();
@@ -55,7 +55,7 @@ namespace DefaultCluster.Tests.General
             Assert.NotEqual(activationId1, activationId2); // Mismatched base keys should differentiate between identical extended keys.
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public void EmptyKeyExtensionsAreDisallowed()
         {
             Assert.Throws<ArgumentException>(() =>
@@ -66,7 +66,7 @@ namespace DefaultCluster.Tests.General
             });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public void WhiteSpaceKeyExtensionsAreDisallowed()
         {
             Assert.Throws<ArgumentException>(() =>
@@ -77,7 +77,7 @@ namespace DefaultCluster.Tests.General
             });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public void NullKeyExtensionsAreDisallowed()
         {
             Assert.Throws<ArgumentNullException>(() =>
@@ -88,7 +88,7 @@ namespace DefaultCluster.Tests.General
             });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public async Task PrimaryKeyExtensionsShouldPermitStringsLongerThan127BytesLong()
         {
             var baseKey = Guid.NewGuid();
@@ -101,7 +101,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(localGrainRef, remoteGrainRef); // Mismatched grain ID.
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public void GetPrimaryKeyStringOnGrainReference()
         {
             const string key = "foo";
@@ -112,10 +112,11 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(key, key2); // Unexpected key was returned.
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
+        [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
         public void KeysAllowPlusSymbols()
         {
             const string key = "foo+bar+zaz";
+            var converter = this.Client.ServiceProvider.GetRequiredService<GrainReferenceKeyStringConverter>();
 
             {
                 // Verify that grains with string keys can include + symbols in their key.
@@ -124,9 +125,7 @@ namespace DefaultCluster.Tests.General
                 var key2 = grainRef.GetPrimaryKeyString();
                 Assert.Equal(key, key2);
 
-                var grainRef2 = GrainReference.FromKeyString(
-                    grainRef.ToKeyString(),
-                    this.Client.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
+                var grainRef2 = converter.FromKeyString(grainRef.ToKeyString());
                 Assert.True(grainRef.Equals(grainRef2));
             }
 
@@ -140,19 +139,9 @@ namespace DefaultCluster.Tests.General
                 Assert.Equal(primaryKey, actualPrimaryKey);
                 Assert.Equal(key, keyExt);
 
-                var grainRef2 = GrainReference.FromKeyString(
-                    grainRef.ToKeyString(),
-                    this.Client.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
+                var grainRef2 = converter.FromKeyString(grainRef.ToKeyString());
                 Assert.True(grainRef.Equals(grainRef2));
             }
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("PrimaryKeyExtension")]
-        public void GetPrimaryKeyStringOnWrongGrainReference()
-        {
-            var grain = this.GrainFactory.GetGrain<ISimpleGrain>(0);
-            var key = ((GrainReference)grain).GetPrimaryKeyString();
-            Assert.Null(key);
         }
     }
 }

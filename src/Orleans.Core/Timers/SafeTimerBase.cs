@@ -2,20 +2,20 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// SafeTimerBase - an internal base class for implementing sync and async timers in Orleans.
-    /// 
     /// </summary>
     internal class SafeTimerBase : IDisposable
     {
-        private const string asyncTimerName ="Orleans.Runtime.asynTask.SafeTimerBase";
-        private const string syncTimerName = "Orleans.Runtime.sync.SafeTimerBase";
+        private const string asyncTimerName ="Orleans.Runtime.AsyncTaskSafeTimer";
+        private const string syncTimerName = "Orleans.Runtime.SafeTimerBase";
 
         private Timer               timer;
-        private Func<object, Task>  asynTaskCallback;
+        private Func<object, Task>  asyncTaskCallback;
         private TimerCallback       syncCallbackFunc;
         private TimeSpan            dueTime;
         private TimeSpan            timerFrequency;
@@ -24,14 +24,14 @@ namespace Orleans.Runtime
         private int                 totalNumTicks;
         private ILogger      logger;
 
-        internal SafeTimerBase(ILogger logger, Func<object, Task> asynTaskCallback, object state)
+        internal SafeTimerBase(ILogger logger, Func<object, Task> asyncTaskCallback, object state)
         {
-            Init(logger, asynTaskCallback, null, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
+            Init(logger, asyncTaskCallback, null, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
         }
 
-        internal SafeTimerBase(ILogger logger, Func<object, Task> asynTaskCallback, object state, TimeSpan dueTime, TimeSpan period)
+        internal SafeTimerBase(ILogger logger, Func<object, Task> asyncTaskCallback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            Init(logger, asynTaskCallback, null, state, dueTime, period);
+            Init(logger, asyncTaskCallback, null, state, dueTime, period);
             Start(dueTime, period);
         }
 
@@ -65,7 +65,7 @@ namespace Orleans.Runtime
             if (numNonNulls > 1) throw new ArgumentNullException("synCallback", "Cannot define more than one timer callbacks. Pick one.");
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, "Cannot use TimeSpan.Zero for timer period");
 
-            this.asynTaskCallback = asynCallback;
+            this.asyncTaskCallback = asynCallback;
             syncCallbackFunc = synCallback;
             timerFrequency = period;
             this.dueTime = due;
@@ -73,7 +73,7 @@ namespace Orleans.Runtime
             this.logger = logger;
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
 
-            timer = new Timer(HandleTimerCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
+            timer = NonCapturingTimer.Create(HandleTimerCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
         }
 
         public void Dispose()
@@ -118,7 +118,7 @@ namespace Orleans.Runtime
             // the type information is really useless and just too long. 
             if (syncCallbackFunc != null)
                 return syncTimerName;
-            if (asynTaskCallback != null)
+            if (asyncTaskCallback != null)
                 return asyncTimerName;
 
             throw new InvalidOperationException("invalid SafeTimerBase state");
@@ -198,7 +198,7 @@ namespace Orleans.Runtime
         {
             if (timer == null) return;
 
-            if (asynTaskCallback != null)
+            if (asyncTaskCallback != null)
             {
                 HandleAsyncTaskTimerCallback(state);
             }
@@ -245,7 +245,7 @@ namespace Orleans.Runtime
             try
             {
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerBeforeCallback, "About to make async task timer callback for timer {0}", GetFullName());
-                await asynTaskCallback(state);
+                await asyncTaskCallback(state);
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed async task timer callback for timer {0}", GetFullName());
             }
             catch (Exception exc)

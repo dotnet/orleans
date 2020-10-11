@@ -4,15 +4,14 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.Storage;
-using Orleans.AzureUtils;
+using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using LogLevel = Microsoft.Extensions.Logging.LogLevel;
-using Orleans.Runtime.Configuration;
+using Orleans.AzureUtils;
 using Orleans.Clustering.AzureStorage;
 using Orleans.Clustering.AzureStorage.Utilities;
+using Orleans.Configuration;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -25,30 +24,31 @@ namespace Orleans.Runtime.MembershipService
         private readonly string clusterId;
 
         public AzureBasedMembershipTable(
-            ILoggerFactory loggerFactory, 
-            IOptions<AzureStorageClusteringOptions> clusteringOptions, 
+            ILoggerFactory loggerFactory,
+            IOptions<AzureStorageClusteringOptions> clusteringOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
             this.loggerFactory = loggerFactory;
-            logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
+            this.logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
             this.options = clusteringOptions.Value;
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            AzureTableDefaultPolicies.MaxBusyRetries = options.MaxStorageBusyRetries;
-            LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureStorageUtils.PrintStorageException);
+            LogFormatter.SetExceptionDecoder(typeof(StorageException), AzureTableUtils.PrintStorageException);
 
-            tableManager = await OrleansSiloInstanceManager.GetManager(
-                this.clusterId, options.ConnectionString, options.TableName, this.loggerFactory);
+            this.tableManager = await OrleansSiloInstanceManager.GetManager(
+                this.clusterId,
+                this.loggerFactory,
+                this.options);
 
-            // even if I am not the one who created the table, 
+            // even if I am not the one who created the table,
             // try to insert an initial table version if it is not already there,
             // so we always have a first table version row, before this silo starts working.
             if (tryInitTableVersion)
             {
-                // ignore return value, since we don't care if I inserted it or not, as long as it is in there. 
+                // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
                 bool created = await tableManager.TryCreateTableVersionEntryAsync();
                 if(created) logger.Info("Created new table version row.");
             }
@@ -83,13 +83,13 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task<MembershipTableData> ReadAll()
         {
-             try
-             {
-                var entries = await tableManager.FindAllSiloEntries();   
+            try
+            {
+                var entries = await tableManager.FindAllSiloEntries();
                 MembershipTableData data = Convert(entries);
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
 
-                return data; 
+                return data;
             }
             catch (Exception exc)
             {
@@ -267,7 +267,7 @@ namespace Orleans.Runtime.MembershipService
 
             for (int i = 0; i < suspectingSilos.Count; i++)
                 parse.AddSuspector(suspectingSilos[i], suspectingTimes[i]);
-            
+
             return parse;
         }
 

@@ -1,16 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
 {
-    internal class ClientObserverRegistrar : SystemTarget, IClientObserverRegistrar, ISiloStatusListener
+    internal class ClientObserverRegistrar : SystemTarget, IClientObserverRegistrar, ILifecycleParticipant<ISiloLifecycle>
     {
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MIN = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan EXP_BACKOFF_ERROR_MAX = TimeSpan.FromSeconds(30);
@@ -19,76 +21,118 @@ namespace Orleans.Runtime
         private readonly ILocalGrainDirectory grainDirectory;
         private readonly SiloAddress myAddress;
         private readonly OrleansTaskScheduler scheduler;
+        private readonly IClusterMembershipService clusterMembershipService;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly ILogger logger;
-        private IHostedClient hostedClient;
+        private readonly IAsyncTimer refreshTimer;
+        private readonly CancellationTokenSource shutdownCancellation = new CancellationTokenSource();
+        private HostedClient hostedClient;
         private Gateway gateway;
-        private IDisposable refreshTimer;
+        private Task clientRefreshLoopTask;
         
         public ClientObserverRegistrar(
             ILocalSiloDetails siloDetails,
-            ILocalGrainDirectory dir,
+            ILocalGrainDirectory grainDirectory,
             OrleansTaskScheduler scheduler,
             IOptions<SiloMessagingOptions> messagingOptions,
-            ILoggerFactory loggerFactory)
-            : base(Constants.ClientObserverRegistrarId, siloDetails.SiloAddress, loggerFactory)
+            ILoggerFactory loggerFactory,
+            IClusterMembershipService clusterMembershipService,
+            IAsyncTimerFactory timerFactory)
+            : base(Constants.ClientObserverRegistrarType, siloDetails.SiloAddress, loggerFactory)
         {
-            grainDirectory = dir;
-            myAddress = siloDetails.SiloAddress;
+            this.grainDirectory = grainDirectory;
+            this.myAddress = siloDetails.SiloAddress;
             this.scheduler = scheduler;
+            this.clusterMembershipService = clusterMembershipService;
             this.messagingOptions = messagingOptions.Value;
-            logger = loggerFactory.CreateLogger<ClientObserverRegistrar>();
+            this.logger = loggerFactory.CreateLogger<ClientObserverRegistrar>();
+            this.refreshTimer = timerFactory.Create(this.messagingOptions.ClientRegistrationRefresh, "ClientObserverRegistrar.ClientRefreshTimer");
         }
 
-        internal void SetHostedClient(IHostedClient client)
+        internal void SetHostedClient(HostedClient client)
         {
             this.hostedClient = client;
             if (client != null)
             {
-                this.scheduler.QueueAction(Start, this.SchedulingContext).Ignore();
+                this.scheduler.QueueAction(Start, this);
             }
         }
 
         internal void SetGateway(Gateway gateway)
         {
             this.gateway = gateway;
+
             // Only start ClientRefreshTimer if this silo has a gateway.
             // Need to start the timer in the system target context.
-            scheduler.QueueAction(Start, this.SchedulingContext).Ignore();
+            scheduler.QueueAction(Start, this);
         }
 
         private void Start()
         {
-            if (this.refreshTimer != null) return;
-            var random = new SafeRandom();
-            var randomOffset = random.NextTimeSpan(this.messagingOptions.ClientRegistrationRefresh);
-            this.refreshTimer = this.RegisterTimer(
-                this.OnClientRefreshTimer,
-                null,
-                randomOffset,
-                this.messagingOptions.ClientRegistrationRefresh,
-                "ClientObserverRegistrar.ClientRefreshTimer");
+            if (clientRefreshLoopTask is object)
+            {
+                return;
+            }
+
+            clientRefreshLoopTask = RunClientRefreshLoop();
             if (logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Client registrar service started successfully."); }
         }
 
-        internal void ClientAdded(GrainId clientId)
+        private async Task RunClientRefreshLoop()
+        {
+            var membershipUpdates = this.clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(this.shutdownCancellation.Token);
+
+            Task<bool> membershipTask = null;
+            Task<bool> timerTask = this.refreshTimer.NextTick(new SafeRandom().NextTimeSpan(this.messagingOptions.ClientRegistrationRefresh));
+
+            while (true)
+            {
+                membershipTask ??= membershipUpdates.MoveNextAsync().AsTask();
+                timerTask ??= this.refreshTimer.NextTick();
+
+                // Wait for either of the tasks to complete.
+                await Task.WhenAny(membershipTask, timerTask);
+
+                if (timerTask.IsCompleted)
+                {
+                    if (!await timerTask)
+                    {
+                        break;
+                    }
+
+                    timerTask = null;
+                }
+
+                if (membershipTask.IsCompleted)
+                {
+                    if (!await membershipTask)
+                    {
+                        break;
+                    }
+
+                    membershipTask = null;
+                }
+
+                await OnRefreshClients();
+            }
+        }
+
+        internal void ClientAdded(ClientGrainId clientId)
         {
             // Use a ActivationId that is hashed from clientId, and not random ActivationId.
-            // That way, when we refresh it in the directiry, it's the same one.
+            // That way, when we refresh it in the directory, it's the same one.
             var addr = GetClientActivationAddress(clientId);
             scheduler.QueueTask(
                 () => ExecuteWithRetries(() => grainDirectory.RegisterAsync(addr, singleActivation:false), ErrorCode.ClientRegistrarFailedToRegister, String.Format("Directory.RegisterAsync {0} failed.", addr)),
-                this.SchedulingContext)
-                        .Ignore();
+                this).Ignore();
         }
 
-        internal void ClientDropped(GrainId clientId)
+        internal void ClientDropped(ClientGrainId clientId)
         {
             var addr = GetClientActivationAddress(clientId);
             scheduler.QueueTask(
                 () => ExecuteWithRetries(() => grainDirectory.UnregisterAsync(addr, Orleans.GrainDirectory.UnregistrationCause.Force), ErrorCode.ClientRegistrarFailedToUnregister, String.Format("Directory.UnRegisterAsync {0} failed.", addr)), 
-                this.SchedulingContext)
-                        .Ignore();
+                this).Ignore();
         }
 
         private async Task ExecuteWithRetries(Func<Task> functionToExecute, ErrorCode errorCode, string errorStr)
@@ -116,52 +160,74 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task OnClientRefreshTimer(object data)
+        private async Task OnRefreshClients()
         {
             try
             {
-                var clients = new List<GrainId>();
-                if (this.gateway != null) clients.AddRange(gateway.GetConnectedClients());
-                var hostedClientId = this.hostedClient?.ClientId;
-                if (hostedClientId != null) clients.Add(hostedClientId);
+                List<ClientGrainId> clients = null;
+                if (this.gateway is Gateway gw)
+                {
+                    var gatewayClients = gw.GetConnectedClients();
+                    clients = new List<ClientGrainId>(gatewayClients.Count + 1);
+                    clients.AddRange(gatewayClients);
+                }
+
+                if (this.hostedClient?.ClientId is ClientGrainId hostedClientId)
+                {
+                    clients ??= new List<ClientGrainId>(1);
+                    clients.Add(hostedClientId);
+                }
+
+                if (clients is null)
+                {
+                    return;
+                }
 
                 var tasks = new List<Task>();
-                foreach (GrainId clientId in clients)
+                foreach (ClientGrainId clientId in clients)
                 {
                     var addr = GetClientActivationAddress(clientId);
-                    Task task = grainDirectory.RegisterAsync(addr, singleActivation:false).
+                    Task task = grainDirectory.RegisterAsync(addr, singleActivation: false).
                         LogException(logger, ErrorCode.ClientRegistrarFailedToRegister_2, String.Format("Directory.RegisterAsync {0} failed.", addr));
                     tasks.Add(task);
                 }
+
                 await Task.WhenAll(tasks);
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.ClientRegistrarTimerFailed, 
+                logger.Error(ErrorCode.ClientRegistrarTimerFailed,
                     String.Format("OnClientRefreshTimer has thrown an exceptions."), exc);
             }
         }
 
-        private ActivationAddress GetClientActivationAddress(GrainId clientId)
+        private ActivationAddress GetClientActivationAddress(ClientGrainId clientId)
         {
             // Need to pick a unique deterministic ActivationId for this client.
             // We store it in the grain directory and there for every GrainId we use ActivationId as a key
             // so every GW needs to behave as a different "activation" with a different ActivationId (its not enough that they have different SiloAddress)
-            string stringToHash = clientId.ToParsableString() + myAddress.Endpoint + myAddress.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string stringToHash = clientId.ToString() + myAddress.Endpoint + myAddress.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
             Guid hash = Utils.CalculateGuidHash(stringToHash);
-            UniqueKey key = UniqueKey.NewKey(hash);
-            return ActivationAddress.GetAddress(myAddress, clientId, ActivationId.GetActivationId(key));
+            var activationId = ActivationId.GetActivationId(UniqueKey.NewKey(hash));
+            return ActivationAddress.GetAddress(myAddress, clientId.GrainId, activationId);
         }
 
-        public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
+        public void Participate(ISiloLifecycle lifecycle)
         {
-            if (status != SiloStatus.Dead)
-                return;
+            lifecycle.Subscribe(
+                nameof(ClientObserverRegistrar),
+                ServiceLifecycleStage.RuntimeServices,
+                _ => Task.CompletedTask,
+                async ct =>
+                {
+                    shutdownCancellation.Cancel();
+                    refreshTimer?.Dispose();
 
-            if (Equals(updatedSilo, this.Silo))
-                refreshTimer?.Dispose();
-
-            scheduler.QueueTask(() => OnClientRefreshTimer(null), SchedulingContext).Ignore();
+                    if (clientRefreshLoopTask is Task task)
+                    {
+                        await Task.WhenAny(ct.WhenCancelled(), task);
+                    }
+                });
         }
     }
 }

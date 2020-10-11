@@ -6,9 +6,10 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Logging;
 using Orleans.Serialization;
+using Orleans.TestingHost.Logging;
 
 namespace Orleans.TestingHost.Utils
 {
@@ -41,7 +42,7 @@ namespace Orleans.TestingHost.Utils
                 Directory.CreateDirectory(traceFileFolder);
             }
 
-            var traceFileName = $"{traceFileFolder}\\{clusterId}_{nodeName}.log";
+            var traceFileName = Path.Combine(traceFileFolder, $"{clusterId}_{nodeName}.log");
 
             return traceFileName;
         }
@@ -136,6 +137,7 @@ namespace Orleans.TestingHost.Utils
             IFormatter formatter = new BinaryFormatter();
             MemoryStream stream = new MemoryStream(new byte[100000], true);
             formatter.Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager));
+            formatter.SurrogateSelector = serializationManager.ServiceProvider.GetRequiredService<BinaryFormatterGrainReferenceSurrogateSelector>();
             formatter.Serialize(stream, input);
             stream.Position = 0;
             T output = (T)formatter.Deserialize(stream);

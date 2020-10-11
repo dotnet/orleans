@@ -4,8 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Host;
 using Orleans.Configuration;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     public static class SiloPersistentStreamConfiguratorExtension
     {
@@ -46,18 +47,6 @@ namespace Orleans.Streams
                     if (siloMaturityPeriod.HasValue)
                         op.SiloMaturityPeriod = siloMaturityPeriod.Value;
                 }));
-        }
-
-        /// <summary>
-        ///  Stream queue balancer that uses Azure deployment information for load balancing. 
-        /// Requires silo running in Azure.
-        /// This balancer supports queue balancing in cluster auto-scale scenario, unexpected server failure scenario, and try to support ideal distribution 
-        /// </summary>
-        public static void UseAzureDeploymentLeaseBasedBalancer(this ISiloPersistentStreamConfigurator configurator,
-           Action<OptionsBuilder<LeaseBasedQueueBalancerOptions>> configureOptions = null)
-        {
-            configurator.ConfigurePartitionBalancing(
-                (s,n)=>LeaseBasedQueueBalancer.Create(s,n, new ServiceRuntimeWrapper(s.GetService<ILoggerFactory>())), configureOptions);
         }
     }
 }

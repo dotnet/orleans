@@ -1,12 +1,12 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
-using Orleans.Hosting;
-using Orleans.Storage;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Providers;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Providers;
+using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Hosting
 {

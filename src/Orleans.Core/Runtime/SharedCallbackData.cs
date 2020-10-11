@@ -3,44 +3,39 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
     internal class SharedCallbackData
     {
-        private readonly SerializationManager serializationManager;
-        public readonly Func<Message, bool> ShouldResend;
         public readonly Action<Message> Unregister;
         public readonly ILogger Logger;
         public readonly MessagingOptions MessagingOptions;
+        private TimeSpan responseTimeout;
         public long ResponseTimeoutStopwatchTicks;
 
         public SharedCallbackData(
-            Func<Message, bool> resendFunc,
             Action<Message> unregister,
             ILogger logger,
             MessagingOptions messagingOptions,
-            SerializationManager serializationManager,
-            ApplicationRequestsStatisticsGroup requestStatistics)
+            ApplicationRequestsStatisticsGroup requestStatistics,
+            TimeSpan responseTimeout)
         {
             RequestStatistics = requestStatistics;
-            this.ShouldResend = resendFunc;
             this.Unregister = unregister;
-            this.serializationManager = serializationManager;
             this.Logger = logger;
             this.MessagingOptions = messagingOptions;
-            this.ResponseTimeout = messagingOptions.ResponseTimeout;
+            this.ResponseTimeout = responseTimeout;
         }
 
         public ApplicationRequestsStatisticsGroup RequestStatistics { get; }
 
         public TimeSpan ResponseTimeout
         {
-            get => this.MessagingOptions.ResponseTimeout;
+            get => this.responseTimeout;
             set
             {
-                this.MessagingOptions.ResponseTimeout = value;
+                this.responseTimeout = value;
                 this.ResponseTimeoutStopwatchTicks = (long)(value.TotalSeconds * Stopwatch.Frequency);
             }
         }
@@ -53,7 +48,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    response = (Response)message.GetDeserializedBody(this.serializationManager);
+                    response = (Response)message.BodyObject;
                 }
                 catch (Exception exc)
                 {
@@ -73,7 +68,7 @@ namespace Orleans.Runtime
                         return; // Ignore duplicates
 
                     default:
-                        rejection = message.GetDeserializedBody(this.serializationManager) as Exception;
+                        rejection = message.BodyObject as Exception;
                         if (rejection == null)
                         {
                             if (string.IsNullOrEmpty(message.RejectionInfo))

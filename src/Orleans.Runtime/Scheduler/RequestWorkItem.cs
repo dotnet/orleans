@@ -17,12 +17,22 @@ namespace Orleans.Runtime.Scheduler
 
         public override string Name
         {
-            get { return String.Format("RequestWorkItem:Id={0} {1}", request.Id, request.DebugContext); }
+            get { return $"RequestWorkItem:Id={request.Id}"; }
         }
+
+        public override IGrainContext GrainContext => this.target;
 
         public override void Execute()
         {
-            target.HandleNewRequest(request);
+            try
+            {
+                RuntimeContext.SetExecutionContext(this.target);
+                target.HandleNewRequest(request);
+            }
+            finally
+            {
+                RuntimeContext.ResetExecutionContext();
+            }
         }
 
         public override string ToString()

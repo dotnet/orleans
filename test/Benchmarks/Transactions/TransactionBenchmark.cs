@@ -16,7 +16,7 @@ using System.Text;
 
 namespace Benchmarks.Transactions
 {
-    public class TransactionBenchmark
+    public class TransactionBenchmark : IDisposable
     {
         private TestCluster host;
         private int runs;
@@ -68,17 +68,17 @@ namespace Benchmarks.Transactions
             this.host.Deploy();
         }
 
-        public class SiloMemoryStorageConfigurator : ISiloBuilderConfigurator
+        public class SiloMemoryStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddMemoryGrainStorageAsDefault();
             }
         }
 
-        public class SiloAzureStorageConfigurator : ISiloBuilderConfigurator
+        public class SiloAzureStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
                 {
@@ -87,9 +87,9 @@ namespace Benchmarks.Transactions
             }
         }
 
-        public class SiloTransactionThrottlingConfigurator : ISiloBuilderConfigurator
+        public class SiloTransactionThrottlingConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.Configure<TransactionRateLoadSheddingOptions>(options =>
                 {
@@ -147,9 +147,14 @@ namespace Benchmarks.Transactions
             host.StopAllSilos();
         }
 
-        public sealed class SiloTransactionConfigurator : ISiloBuilderConfigurator
+        public void Dispose()
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            host?.Dispose();
+        }
+
+        public sealed class SiloTransactionConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .UseTransactions()

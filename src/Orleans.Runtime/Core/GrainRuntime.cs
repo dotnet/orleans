@@ -10,7 +10,7 @@ namespace Orleans.Runtime
 {
     internal class GrainRuntime : IGrainRuntime
     {
-        private readonly ISiloRuntimeClient runtimeClient;
+        private readonly InsideRuntimeClient runtimeClient;
         private readonly ILoggerFactory loggerFactory;
         private readonly IServiceProvider serviceProvider;
         private readonly IReminderRegistry reminderRegistry;
@@ -24,7 +24,7 @@ namespace Orleans.Runtime
             ITimerRegistry timerRegistry,
             IReminderRegistry reminderRegistry,
             IServiceProvider serviceProvider,
-            ISiloRuntimeClient runtimeClient,
+            InsideRuntimeClient runtimeClient,
             ILoggerFactory loggerFactory)
         {
             this.runtimeClient = runtimeClient;
@@ -92,18 +92,30 @@ namespace Orleans.Runtime
             grain.Data.DelayDeactivation(timeSpan);
         }
 
-        public IStorage<TGrainState> GetStorage<TGrainState>(Grain grain) where TGrainState : new()
+        public IStorage<TGrainState> GetStorage<TGrainState>(Grain grain)
         {
             IGrainStorage grainStorage = grain.GetGrainStorage(ServiceProvider);
             string grainTypeName = grain.GetType().FullName;
             return new StateStorageBridge<TGrainState>(grainTypeName, grain.GrainReference, grainStorage, this.loggerFactory);
         }
 
-        private static void CheckRuntimeContext()
+        public static void CheckRuntimeContext()
         {
-            if (RuntimeContext.Current == null)
+            var context = RuntimeContext.CurrentGrainContext;
+
+            if (context is null)
             {
-                throw new InvalidOperationException("Activation access violation. A non-activation thread attempted to access activation services.");
+                // Move exceptions into local functions to help inlining this method.
+                ThrowMissingContext();
+                void ThrowMissingContext() => throw new InvalidOperationException("Activation access violation. A non-activation thread attempted to access activation services.");
+            }
+
+            if (context is ActivationData activation
+                && (activation.State == ActivationState.Invalid || activation.State == ActivationState.FailedToActivate))
+            {
+                // Move exceptions into local functions to help inlining this method.
+                ThrowInvalidActivation(activation);
+                void ThrowInvalidActivation(ActivationData activationData) => throw new InvalidOperationException($"Attempt to access an invalid activation: {activationData}");
             }
         }
     }

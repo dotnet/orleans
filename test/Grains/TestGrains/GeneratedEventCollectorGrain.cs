@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
@@ -11,18 +12,23 @@ using UnitTests.Grains;
 
 namespace TestGrains
 {
+    [RegexImplicitStreamSubscription("THIS.WONT.MATCH.ONLY.FOR.TESTING.SERIALIZATION")]
     [ImplicitStreamSubscription(StreamNamespace)]
     public class GeneratedEventCollectorGrain : Grain, IGeneratedEventCollectorGrain
     {
         public const string StreamNamespace = "Generated";
 
-        private Logger logger;
+        private ILogger logger;
         private IAsyncStream<GeneratedEvent> stream;
         private int accumulated;
 
+        public GeneratedEventCollectorGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger("GeneratedEvenCollectorGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             var streamProvider = GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);

@@ -11,30 +11,40 @@ namespace Orleans.Runtime
 
         public Response(object data)
         {
-            Exception = data as Exception;
-            if (Exception == null)
+            switch (data)
             {
-                Data = data;
-                ExceptionFlag = false;
+                case Exception exception:
+                    Exception = exception;
+                    ExceptionFlag = true;
+                    break;
+                default:
+                    Data = data;
+                    ExceptionFlag = false;
+                    break;
             }
-            else
-            {
-                Data = null;
-                ExceptionFlag = true;
-            }
+        }
+
+        private Response()
+        {
         }
 
         static public Response ExceptionResponse(Exception exc)
         {
-            return new Response(null) {ExceptionFlag = true, Exception = exc, Data = null};
+            return new Response
+            {
+                ExceptionFlag = true,
+                Exception = exc
+            };
         }
 
         public override string ToString()
         {
-            return String.Format("Response ExceptionFlag={0}", ExceptionFlag);
-        }
+            if (ExceptionFlag)
+            {
+                return $"Response Exception={Exception}";
+            }
 
-        private static readonly Response done = new Response(null);
-        public static Response Done { get { return done; } }
+            return $"Response Data={Data}";
+        }
     }
 }

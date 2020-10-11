@@ -1,6 +1,5 @@
 using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Options;
+using System.Diagnostics;
 using Orleans.Runtime;
 
 namespace Orleans.Configuration
@@ -10,6 +9,11 @@ namespace Orleans.Configuration
     /// </summary>
     public class SiloMessagingOptions : MessagingOptions
     {
+        /// <summary>
+        /// <see cref="SystemResponseTimeout"/>.
+        /// </summary>
+        private TimeSpan systemResponseTimeout = DEFAULT_RESPONSE_TIMEOUT;
+
         /// <summary>
         /// The SiloSenderQueues attribute specifies the number of parallel queues and attendant threads used by the silo to send outbound
         /// messages (requests, responses, and notifications) to other silos.
@@ -43,6 +47,13 @@ namespace Orleans.Configuration
         public static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
 
         /// <summary>
+        /// This is the period of time a gateway will wait after notifying connected client before continuing the
+        /// shutdown process
+        /// </summary>
+        public TimeSpan ClientGatewayShutdownNotificationTimeout { get; set; } = DEFAULT_CLIENT_GW_NOTIFICATION_TIMEOUT;
+        public static readonly TimeSpan DEFAULT_CLIENT_GW_NOTIFICATION_TIMEOUT = TimeSpan.FromSeconds(5);
+
+        /// <summary>
         /// Per grain threshold for pending requests.  Generated warning when exceeded.
         /// </summary>
         public int MaxEnqueuedRequestsSoftLimit { get; set; } = DEFAULT_MAX_ENQUEUED_REQUESTS_SOFT_LIMIT;
@@ -70,7 +81,7 @@ namespace Orleans.Configuration
         /// Specifies the maximum time that a request can take before the activation is reported as "blocked"
         /// </summary>
         public TimeSpan MaxRequestProcessingTime { get; set; } = DEFAULT_MAX_REQUEST_PROCESSING_TIME;
-        public static readonly TimeSpan DEFAULT_MAX_REQUEST_PROCESSING_TIME = GrainCollectionOptions.DEFAULT_COLLECTION_AGE_LIMIT;
+        public static readonly TimeSpan DEFAULT_MAX_REQUEST_PROCESSING_TIME = CollectionAgeLimitAttribute.DEFAULT_COLLECTION_AGE_LIMIT;
 
         /// <summary>
         /// For test only - Do not use in production
@@ -84,5 +95,30 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan ShutdownRerouteTimeout { get; set; } =
             DEFAULT_SHUTDOWN_REROUTE_TIMEOUT;
+
+        /// <summary>
+        /// The SystemResponseTimeout attribute specifies the default timeout before an internal system request is assumed to have failed.
+        /// <seealso cref="MessagingOptions.ResponseTimeoutWithDebugger"/>
+        /// </summary>
+        public TimeSpan SystemResponseTimeout
+        {
+            get { return Debugger.IsAttached ? ResponseTimeoutWithDebugger : this.systemResponseTimeout; }
+            set { this.systemResponseTimeout = value; }
+        }
+
+        /// <summary>
+        /// The period of time between analyzing currently executing activation workloads.
+        /// </summary>
+        public TimeSpan GrainWorkloadAnalysisPeriod { get; set; } = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// The period after which a currently executing request is deemed to be slow.
+        /// </summary>
+        public TimeSpan RequestProcessingWarningTime { get; set; } = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// The period after which an enqueued request is deemed to be delayed.
+        /// </summary>
+        public TimeSpan RequestQueueDelayWarningTime { get; set; } = TimeSpan.FromSeconds(10);
     }
 }

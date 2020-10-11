@@ -22,17 +22,15 @@ namespace Orleans.Serialization
         }
     }
 
-    public class DeserializationContext : SerializationContextBase, IDeserializationContext
+    public sealed class DeserializationContext : SerializationContextBase, IDeserializationContext
     {
-        private readonly Dictionary<int, object> taggedObjects;
+        private Dictionary<int, object> taggedObjects;
 
-        public DeserializationContext(SerializationManager serializationManager)
-            : base(serializationManager)
+        public DeserializationContext(SerializationManager serializationManager) : base(serializationManager)
         {
-            this.taggedObjects = new Dictionary<int, object>();
+            this.Reset();
         }
 
-        /// <inheritdoc />
         /// <inheritdoc />
         public IBinaryTokenStreamReader StreamReader { get; set; }
 
@@ -66,7 +64,15 @@ namespace Orleans.Serialization
 
         internal void Reset()
         {
-            this.taggedObjects.Clear();
+            if (this.taggedObjects is null || this.taggedObjects.Count > this.MaxSustainedSerializationContextCapacity)
+            {
+                this.taggedObjects = new Dictionary<int, object>();
+            }
+            else
+            {
+                this.taggedObjects.Clear();
+            }
+
             this.CurrentObjectOffset = 0;
         }
 

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 
@@ -65,7 +66,6 @@ namespace Orleans.Hosting
             });
 
             builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
-            builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
             builder.ConfigureServices(services =>
             {
                 // If the caller did not override service id or cluster id, configure default values as a fallback.
@@ -191,7 +191,6 @@ namespace Orleans.Hosting
             });
 
             builder.UseDevelopmentClustering(optionsBuilder => ConfigurePrimarySiloEndpoint(optionsBuilder, primarySiloEndpoint));
-            builder.Configure<ClusterMembershipOptions>(options => options.ExpectedClusterSize = 1);
             builder.ConfigureServices(services =>
             {
                 // If the caller did not override service id or cluster id, configure default values as a fallback.

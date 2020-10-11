@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Reminders DynamoDB</Title>
     <Description>Microsoft Orleans reminders provider for AWS DynamoDB</Description>
     <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -19,10 +20,6 @@
 
   <ItemGroup>
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="$(AWSSDKDynamoDBv2Version)" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Storage" />
   </ItemGroup>
 
 </Project>

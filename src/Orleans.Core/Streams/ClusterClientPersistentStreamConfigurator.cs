@@ -2,8 +2,9 @@ using System;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     public interface IPersistentStreamConfigurator : INamedServiceConfigurator { }
 

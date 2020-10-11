@@ -11,15 +11,19 @@
     <Copyright>© Microsoft Corporation. All rights reserved.</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/dotnet/Orleans</PackageProjectUrl>
-    <PackageIconUrl>https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_128.png</PackageIconUrl>
+    <PackageIcon>logo_128.png</PackageIcon>
     <PackageTags>Orleans Cloud-Computing Actor-Model Actors Distributed-Systems C# .NET</PackageTags>
     <PackageReleaseNotes></PackageReleaseNotes>
     <RepositoryUrl>https://github.com/dotnet/Orleans</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <IncludeSource>true</IncludeSource>
-    <LangVersion>7.3</LangVersion>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(SourceRoot)assets/logo_128.png" Pack="true" Visible="false" PackagePath="/" />
+  </ItemGroup>
 
   <!-- Common compile parameters -->
   <PropertyGroup>
@@ -36,82 +40,93 @@
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <TestProjectTargetFramework>net461</TestProjectTargetFramework>
-  </PropertyGroup>
-
   <!-- Shared Package Versions -->
   <PropertyGroup>
     <!-- System packages -->
-    <SystemRuntimeVersion>4.3.0</SystemRuntimeVersion>
-
-    <SystemCollectionsImmutableVersion>1.4.0</SystemCollectionsImmutableVersion>
-    <SystemNetHttpVersion>4.3.3</SystemNetHttpVersion>
-    <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
-    <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
-    <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
-    <SystemThreadingTasksExtensionsVersion>4.4.0</SystemThreadingTasksExtensionsVersion>
-    <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
+    <SystemDataSqlClientVersion>4.8.0</SystemDataSqlClientVersion>
+    <SystemDiagnosticsEventLogVersion>4.7.0</SystemDiagnosticsEventLogVersion>
+    <SystemCollectionsImmutableVersion>1.7.0</SystemCollectionsImmutableVersion>
+    <SystemRuntimeCompilerServicesUnsafeVersion>4.7.0</SystemRuntimeCompilerServicesUnsafeVersion>
+    <SystemDiagnosticsPerformanceCounterVersion>4.7.0</SystemDiagnosticsPerformanceCounterVersion>
+    <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
+    <SystemReflectionMetadataVersion>1.8.0</SystemReflectionMetadataVersion>
+    <SystemValueTupleVersion>4.5.0</SystemValueTupleVersion>
+    <SystemReflectionEmitVersion>4.7.0</SystemReflectionEmitVersion>
+    <SystemThreadingChannelsVersion>4.7.0</SystemThreadingChannelsVersion>
+    <SystemIOPipelinesVersion>4.7.0</SystemIOPipelinesVersion>
+    <SystemCodeDomVersion>4.7.0</SystemCodeDomVersion>
+    <SystemDiagnosticsDiagnosticsSourceVersion>4.7.0</SystemDiagnosticsDiagnosticsSourceVersion>
+    <SystemSecurityCryptographyVersion>4.7.0</SystemSecurityCryptographyVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>2.8.2</MicrosoftCodeAnalysisVersion>
+    <MicrosoftBuildVersion>16.4.0</MicrosoftBuildVersion>
+    <MicrosoftCodeAnalysisVersion>3.4.0</MicrosoftCodeAnalysisVersion>
+    <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
+    <MicrosoftBclAsyncInterfacesVersion>1.1.1</MicrosoftBclAsyncInterfacesVersion>
+    <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.0</MicrosoftNETFrameworkReferenceAssembliesVersion>
+    <MicrosoftBclHashCodeVersion>1.0.0</MicrosoftBclHashCodeVersion>
 
-    <MicrosoftExtensionsConfigurationBinderVersion>2.1.1</MicrosoftExtensionsConfigurationBinderVersion>
-    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>2.1.1</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
-    <MicrosoftExtensionsConfigurationJsonVersion>2.1.1</MicrosoftExtensionsConfigurationJsonVersion>
-    <MicrosoftExtensionsConfigurationVersion>2.1.1</MicrosoftExtensionsConfigurationVersion>
-    <MicrosoftExtensionsDependencyInjectionVersion>2.1.1</MicrosoftExtensionsDependencyInjectionVersion>
-    <MicrosoftExtensionsDependencyModelVersion>2.0.0</MicrosoftExtensionsDependencyModelVersion>
-    <MicrosoftExtensionsLoggingVersion>2.0.0</MicrosoftExtensionsLoggingVersion>
-    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>2.1.1</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
-    <MicrosoftExtensionsOptionsVersion>2.1.1</MicrosoftExtensionsOptionsVersion>
-    <MicrosoftExtensionsHostingAbstractionsVersion>2.1.0</MicrosoftExtensionsHostingAbstractionsVersion>
-    <MicrosoftExtensionsHostingVersion>2.1.0</MicrosoftExtensionsHostingVersion>
+    <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
+    <MicrosoftExtensionsConfigurationBinderVersion>3.0.0</MicrosoftExtensionsConfigurationBinderVersion>
+    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>3.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
+    <MicrosoftExtensionsConfigurationJsonVersion>3.0.0</MicrosoftExtensionsConfigurationJsonVersion>
+    <MicrosoftExtensionsConfigurationVersion>3.0.0</MicrosoftExtensionsConfigurationVersion>
+    <MicrosoftExtensionsDependencyInjectionVersion>3.0.0</MicrosoftExtensionsDependencyInjectionVersion>
+    <MicrosoftExtensionsDependencyModelVersion>3.0.0</MicrosoftExtensionsDependencyModelVersion>
+    <MicrosoftExtensionsLoggingVersion>3.0.0</MicrosoftExtensionsLoggingVersion>
+    <MicrosoftExtensionsObjectPoolVersion>3.0.0</MicrosoftExtensionsObjectPoolVersion>
+    <MicrosoftExtensionsOptionsVersion>3.0.0</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsHttpVersion>3.0.0</MicrosoftExtensionsHttpVersion>
+    <MicrosoftExtensionsHostingAbstractionsVersion>3.0.0</MicrosoftExtensionsHostingAbstractionsVersion>
+    <MicrosoftExtensionsHostingVersion>3.0.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
-    <MicrosoftAzureEventHubsVersion>2.2.1</MicrosoftAzureEventHubsVersion>
-    <MicrosoftDataSQLiteVersion>2.0.0</MicrosoftDataSQLiteVersion>
-    <MicrosoftPowerShell5ReferenceAssembliesVersion>1.1.0</MicrosoftPowerShell5ReferenceAssembliesVersion>
-    <MicrosoftServiceFabricServicesVersion>3.0.472</MicrosoftServiceFabricServicesVersion>
-    <WindowsAzureStorageVersion>8.2.1</WindowsAzureStorageVersion>
+    <MicrosoftAzureCosmosTableVersion>1.0.5</MicrosoftAzureCosmosTableVersion>
+    <AzureCoreVersion>1.3.0</AzureCoreVersion>
+    <AzureIdentityVersion>1.1.1</AzureIdentityVersion>
+    <AzureMessagingEventHubs>5.1.0</AzureMessagingEventHubs>
+    <AzureStorageBlobsVersion>12.4.4</AzureStorageBlobsVersion>
+    <AzureStorageQueuesVersion>12.3.2</AzureStorageQueuesVersion>
+    <MicrosoftDataSQLiteVersion>3.1.0</MicrosoftDataSQLiteVersion>
+    <MicrosoftServiceFabricServicesVersion>3.4.664</MicrosoftServiceFabricServicesVersion>
 
-    <FSharpCoreVersion>4.5.2</FSharpCoreVersion>
-
-    <SystemManagementAutomationdllVersion>10.0.10586</SystemManagementAutomationdllVersion>
+    <FSharpCoreVersion>4.7.0</FSharpCoreVersion>
 
     <!-- 3rd party packages -->
-    <AWSSDKDynamoDBv2Version>3.3.4.17</AWSSDKDynamoDBv2Version>
+    <AWSSDKDynamoDBv2Version>3.3.102.2</AWSSDKDynamoDBv2Version>
     <AWSSDKSQSVersion>3.3.2.7</AWSSDKSQSVersion>
     <BondCoreCSharpVersion>5.3.1</BondCoreCSharpVersion>
     <ConsulVersion>0.7.2.3</ConsulVersion>
     <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
     <GoogleProtobufVersion>3.4.0</GoogleProtobufVersion>
     <ProtobufNetVersion>2.3.7</ProtobufNetVersion>
-    <MySqlDataVersion>6.9.9</MySqlDataVersion>
+    <MySqlDataVersion>8.0.18</MySqlDataVersion>
     <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
-    <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
+    <NewtonsoftJsonVersion>11.0.1</NewtonsoftJsonVersion>
     <NpgsqlVersion>3.1.9</NpgsqlVersion>
-    <NSubstituteVersion>1.10.0</NSubstituteVersion>
+    <NSubstituteVersion>4.2.0</NSubstituteVersion>
+    <NSubstituteAnalyzersCSharpVersion>1.0.10</NSubstituteAnalyzersCSharpVersion>
     <ZooKeeperNetExVersion>3.4.12.1</ZooKeeperNetExVersion>
+    <StackExchangeRedis>2.0.601</StackExchangeRedis>
+    <KubernetesClientVersion>2.0.29</KubernetesClientVersion>
 
     <!-- Test related packages -->
-    <MicrosoftTestSdkVersion>15.5.0</MicrosoftTestSdkVersion>
-    <BenchmarkDotNetVersion>0.11.3</BenchmarkDotNetVersion>
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
-    <XunitSkippableFactVersion>1.3.3</XunitSkippableFactVersion>
-    <xUnitVersion>2.3.1</xUnitVersion>
-    <NodaTimeVersion>2.2.2</NodaTimeVersion>
+    <MicrosoftTestSdkVersion>16.4.0</MicrosoftTestSdkVersion>
+    <BenchmarkDotNetVersion>0.12.0</BenchmarkDotNetVersion>
+    <XunitSkippableFactVersion>1.3.12</XunitSkippableFactVersion>
+    <DotNetxUnitVersion>2.3.1</DotNetxUnitVersion>
+    <xUnitVersion>2.4.1</xUnitVersion>
+    <NodaTimeVersion>2.4.7</NodaTimeVersion>
 
     <!-- Tooling related packages -->
-    <SourceLinkVersion>2.7.6</SourceLinkVersion>
+    <SourceLinkVersion>2.8.3</SourceLinkVersion>
   </PropertyGroup>
 
   <!-- Versioning properties -->
   <PropertyGroup>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">2.3.0</VersionPrefix>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">3.0.0</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
@@ -130,8 +145,6 @@
     <OrleansRuntimeAbstractionsVersion>2.3.0</OrleansRuntimeAbstractionsVersion>
     <OrleansCoreVersion>2.3.0</OrleansCoreVersion>
     <OrleansRuntimeVersion>2.3.0</OrleansRuntimeVersion>
-    <OrleansCoreLegacyVersion>2.3.0</OrleansCoreLegacyVersion>
-    <OrleansRuntimeLegacyVersion>2.3.0</OrleansRuntimeLegacyVersion>
     <OrleansProvidersVersion>2.3.0</OrleansProvidersVersion>
     <OrleansExtensionsVersion>2.3.0</OrleansExtensionsVersion>
     <OrleansEventSourcingVersion>2.3.0</OrleansEventSourcingVersion>
@@ -162,8 +175,6 @@
     <OrleansRuntimeAbstractionsVersion>$(VersionPrefix)</OrleansRuntimeAbstractionsVersion>
     <OrleansCoreVersion>$(VersionPrefix)</OrleansCoreVersion>
     <OrleansRuntimeVersion>$(VersionPrefix)</OrleansRuntimeVersion>
-    <OrleansCoreLegacyVersion>$(VersionPrefix)</OrleansCoreLegacyVersion>
-    <OrleansRuntimeLegacyVersion>$(VersionPrefix)</OrleansRuntimeLegacyVersion>
     <OrleansProvidersVersion>$(VersionPrefix)</OrleansProvidersVersion>
     <OrleansExtensionsVersion>$(VersionPrefix)</OrleansExtensionsVersion>
     <OrleansEventSourcingVersion>$(VersionPrefix)</OrleansEventSourcingVersion>

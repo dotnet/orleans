@@ -4,9 +4,8 @@ using Amazon.Runtime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
-using Orleans.Clustering.DynamoDB;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
+using Orleans.Internal;
 using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
@@ -27,7 +26,7 @@ namespace AWSUtils.Tests.Liveness
                 Orleans.AWSUtils.Tests.DynamoDBStorage storage;
                 try
                 {
-                    storage = new Orleans.AWSUtils.Tests.DynamoDBStorage(NullLoggerFactory.Instance, "http://localhost:8000");
+                    storage = new Orleans.AWSUtils.Tests.DynamoDBStorage(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), "http://localhost:8000");
                 }
                 catch (AmazonServiceException)
                 {
@@ -61,18 +60,11 @@ namespace AWSUtils.Tests.Liveness
                 throw new SkipException("Unable to connect to DynamoDB simulator");
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.DataConnectionString = $"Service={Service}";
-                legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
-                legacy.ClusterConfiguration.PrimaryNode = null;
-                legacy.ClusterConfiguration.Globals.SeedNodes.Clear();
-            });
         }
 
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.UseDynamoDBClustering(options => { options.Service = Service; });
             }
@@ -82,10 +74,10 @@ namespace AWSUtils.Tests.Liveness
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseDynamoDBClustering(gatewayOptions =>
+                clientBuilder.UseDynamoDBClustering(ob => ob.Configure(gatewayOptions => 
                 {
-                    LegacyDynamoDBGatewayListProviderConfigurator.ParseDataConnectionString($"Service={Service}", gatewayOptions);
-                });
+                    gatewayOptions.Service = $"Service={Service}";
+                }));
             }
         }
 

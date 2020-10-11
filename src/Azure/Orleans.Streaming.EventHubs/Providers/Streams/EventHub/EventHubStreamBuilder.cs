@@ -5,8 +5,9 @@ using Orleans.Configuration;
 using Orleans.ServiceBus.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.ApplicationParts;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     public interface IEventHubStreamConfigurator : INamedServiceConfigurator {}
 
@@ -15,6 +16,11 @@ namespace Orleans.Streams
         public static void ConfigureEventHub(this IEventHubStreamConfigurator configurator, Action<OptionsBuilder<EventHubOptions>> configureOptions)
         {
             configurator.Configure(configureOptions);
+        }
+
+        public static void UseDataAdapter(this IEventHubStreamConfigurator configurator, Func<IServiceProvider, string, IEventHubDataAdapter> factory)
+        {
+            configurator.ConfigureComponent(factory);
         }
     }
 

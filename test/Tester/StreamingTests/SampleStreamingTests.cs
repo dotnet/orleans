@@ -2,11 +2,11 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -31,14 +31,15 @@ namespace UnitTests.StreamingTests
                 builder.AddClientBuilderConfigurator<ClientConfiguretor>();
             }
 
-            public class SiloConfigurator : ISiloBuilderConfigurator
+            public class SiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddSimpleMessageStreamProvider(StreamProvider)
                          .AddMemoryGrainStorage("PubSubStore");
                 }
             }
+
             public class ClientConfiguretor : IClientBuilderConfigurator
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
@@ -56,7 +57,7 @@ namespace UnitTests.StreamingTests
             logger = this.fixture.Logger;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void SampleStreamingTests_StreamTypeMismatch_ShouldThrowOrleansException()
         {
             var streamId = Guid.NewGuid();
@@ -67,7 +68,7 @@ namespace UnitTests.StreamingTests
                 });
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task SampleStreamingTests_1()
         {
             this.logger.Info("************************ SampleStreamingTests_1 *********************************");

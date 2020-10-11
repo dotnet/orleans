@@ -22,88 +22,73 @@ namespace Orleans.TelemetryConsumers.AI
         public AITelemetryConsumer(IOptions<ApplicationInsightsTelemetryConsumerOptions> options)
         {
             var instrumentationKey = options.Value.InstrumentationKey;
-            _client = instrumentationKey != null
+            this._client = instrumentationKey != null
                 ? new TelemetryClient(new Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration { InstrumentationKey = instrumentationKey })
                 : new TelemetryClient();
         }
 
         /// <inheritdoc />
-        public void DecrementMetric(string name)
-        {
-            _client.TrackMetric(name, -1, null);
-        }
+        public virtual void DecrementMetric(string name) =>
+            this._client.TrackMetric(name, -1, null);
 
         /// <inheritdoc />
-        public void DecrementMetric(string name, double value)
-        {
-            _client.TrackMetric(name, value * -1, null);
-        }
+        public virtual void DecrementMetric(string name, double value) =>
+            this._client.TrackMetric(name, value * -1, null);
 
         /// <inheritdoc />
-        public void IncrementMetric(string name)
-        {
-            _client.TrackMetric(name, 1, null);
-        }
+        public virtual void IncrementMetric(string name) =>
+            this._client.TrackMetric(name, 1, null);
 
         /// <inheritdoc />
-        public void IncrementMetric(string name, double value)
-        {
-            _client.TrackMetric(name, value, null);
-        }
+        public virtual void IncrementMetric(string name, double value) =>
+            this._client.TrackMetric(name, value, null);
 
-        public void TrackDependency(string dependencyName, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success)
-        {
-            _client.TrackDependency(dependencyName, commandName, startTime, duration, success);
-        }
+        /// <inheritdoc />
+        public virtual void TrackDependency(string dependencyName, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success) =>
+            this._client.TrackDependency(dependencyName, commandName, startTime, duration, success);
 
-        public void TrackEvent(string eventName, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
-        {
-            _client.TrackEvent(eventName, properties, metrics);
-        }
+        /// <inheritdoc />
+        public virtual void TrackEvent(string eventName, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null) =>
+            this._client.TrackEvent(eventName, properties, metrics);
 
-        public void TrackException(Exception exception, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null)
-        {
-            _client.TrackException(exception, properties, metrics);
-        }
+        /// <inheritdoc />
+        public virtual void TrackException(Exception exception, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null) =>
+            this._client.TrackException(exception, properties, metrics);
 
-        public void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null)
-        {
-            _client.TrackMetric(name, value.TotalMilliseconds, properties);
-        }
+        /// <inheritdoc />
+        public virtual void TrackMetric(string name, TimeSpan value, IDictionary<string, string> properties = null) =>
+            this._client.TrackMetric(name, value.TotalMilliseconds, properties);
 
-        public void TrackMetric(string name, double value, IDictionary<string, string> properties = null)
-        {
-            _client.TrackMetric(name, value, properties);
-        }
+        /// <inheritdoc />
+        public virtual void TrackMetric(string name, double value, IDictionary<string, string> properties = null) =>
+            this._client.TrackMetric(name, value, properties);
 
-        public void TrackRequest(string name, DateTimeOffset startTime, TimeSpan duration, string responseCode, bool success)
-        {
-            _client.TrackRequest(name, startTime, duration, responseCode, success);
-        }
+        /// <inheritdoc />
+        public virtual void TrackRequest(string name, DateTimeOffset startTime, TimeSpan duration, string responseCode, bool success) =>
+            this._client.TrackRequest(name, startTime, duration, responseCode, success);
 
-        public void TrackTrace(string message)
-        {
-            TrackTrace(message, null);
-        }
+        /// <inheritdoc />
+        public virtual void TrackTrace(string message) => this.TrackTrace(message, null);
 
-        public void TrackTrace(string message, IDictionary<string, string> properties)
+        /// <inheritdoc />
+        public virtual void TrackTrace(string message, IDictionary<string, string> properties)
         {
             if (properties != null)
             {
-                _client.TrackTrace(message, Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Information, properties);
+                this._client.TrackTrace(message, Microsoft.ApplicationInsights.DataContracts.SeverityLevel.Information, properties);
             }
             else
             {
-                _client.TrackTrace(message);
+                this._client.TrackTrace(message);
             }
         }
 
-        public void TrackTrace(string message, Severity severity)
-        {
-            TrackTrace(message, severity, null);
-        }
+        /// <inheritdoc />
+        public virtual void TrackTrace(string message, Severity severity) =>
+            this.TrackTrace(message, severity, null);
 
-        public void TrackTrace(string message, Severity severity, IDictionary<string, string> properties)
+        /// <inheritdoc />
+        public virtual void TrackTrace(string message, Severity severity, IDictionary<string, string> properties)
         {
             Microsoft.ApplicationInsights.DataContracts.SeverityLevel sev;
 
@@ -129,15 +114,18 @@ namespace Orleans.TelemetryConsumers.AI
 
             if (properties == null)
             {
-                _client.TrackTrace(message, sev);
+                this._client.TrackTrace(message, sev);
             }
             else
             {
-                _client.TrackTrace(message, sev, properties);
+                this._client.TrackTrace(message, sev, properties);
             }
         }
 
-        public void Flush() { }
-        public void Close() { }
+        /// <inheritdoc />
+        public virtual void Flush() { }
+
+        /// <inheritdoc />
+        public virtual void Close() { }
     }
 }

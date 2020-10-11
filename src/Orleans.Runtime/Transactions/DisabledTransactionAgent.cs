@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions
@@ -10,7 +10,7 @@ namespace Orleans.Transactions
             throw new OrleansTransactionsDisabledException();
         }
 
-        public Task<TransactionalStatus> Resolve(ITransactionInfo transactionInfo)
+        public Task<(TransactionalStatus Status, Exception exception)> Resolve(ITransactionInfo transactionInfo)
         {
             throw new OrleansTransactionsDisabledException();
         }

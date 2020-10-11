@@ -3,9 +3,9 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.StreamingTests;
@@ -19,31 +19,33 @@ namespace Tester.StreamingTests
         private const string SMSStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "SMSDeactivationTestsNamespace";
         private readonly ITestOutputHelper output;
-        private readonly ClientStreamTestRunner runner;
+        private ClientStreamTestRunner runner;
 
         public SMSClientStreamTests(ITestOutputHelper output)
         {
             this.output = output;
+        }
+
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 1;
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.ClientDropTimeout = TimeSpan.FromSeconds(5);
-            });
             builder.AddClientBuilderConfigurator<ClientConfiguretor>();
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddSimpleMessageStreamProvider(SMSStreamProviderName)
-                     .AddMemoryGrainStorage("PubSubStore");
+                     .AddMemoryGrainStorage("PubSubStore")
+                     .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
             }
         }
         public class ClientConfiguretor : IClientBuilderConfigurator

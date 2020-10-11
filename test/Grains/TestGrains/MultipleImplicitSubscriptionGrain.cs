@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -12,13 +13,17 @@ namespace UnitTests.Grains
     [ImplicitStreamSubscription("blue")]
     public class MultipleImplicitSubscriptionGrain : Grain, IMultipleImplicitSubscriptionGrain
     {
-        private Logger logger;
+        private ILogger logger;
         private IAsyncStream<int> redStream, blueStream;
         private int redCounter, blueCounter;
 
+        public MultipleImplicitSubscriptionGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger("MultipleImplicitSubscriptionGrain " + base.IdentityString);
+        }
+
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger("MultipleImplicitSubscriptionGrain " + base.IdentityString);
             logger.Info("OnActivateAsync");
 
             var streamProvider = GetStreamProvider("SMSProvider");

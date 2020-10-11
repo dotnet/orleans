@@ -1,16 +1,13 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Providers;
-using Orleans.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Streams
 {
@@ -21,45 +18,35 @@ namespace Orleans.Streams
     /// to expect and uses a silo status oracle to determine which of the silos are available.  With
     /// this information it tries to balance the queues using a best fit resource balancing algorithm.
     /// </summary>
-    public class DeploymentBasedQueueBalancer : QueueBalancerBase, ISiloStatusListener, IStreamQueueBalancer
+    public class DeploymentBasedQueueBalancer : QueueBalancerBase, IStreamQueueBalancer
     {
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IDeploymentConfiguration deploymentConfig;
-        private ReadOnlyCollection<QueueId> allQueues;
-        private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
         private readonly DeploymentBasedQueueBalancerOptions options;
+        private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
+        private List<QueueId> allQueues;
         private bool isStarting;
 
         public DeploymentBasedQueueBalancer(
             ISiloStatusOracle siloStatusOracle,
             IDeploymentConfiguration deploymentConfig,
-            DeploymentBasedQueueBalancerOptions options)
+            DeploymentBasedQueueBalancerOptions options,
+            IServiceProvider services,
+            ILogger<DeploymentBasedQueueBalancer> logger)
+            : base (services, logger)
         {
-            if (siloStatusOracle == null)
-            {
-                throw new ArgumentNullException("siloStatusOracle");
-            }
-            if (deploymentConfig == null)
-            {
-                throw new ArgumentNullException("deploymentConfig");
-            }
-
-            this.siloStatusOracle = siloStatusOracle;
-            this.deploymentConfig = deploymentConfig;
-            immatureSilos = new ConcurrentDictionary<SiloAddress, bool>();
+            this.siloStatusOracle = siloStatusOracle ?? throw new ArgumentNullException(nameof(siloStatusOracle));
+            this.deploymentConfig = deploymentConfig ?? throw new ArgumentNullException(nameof(deploymentConfig));
             this.options = options;
 
             isStarting = true;
 
-            // register for notification of changes to silo status for any silo in the cluster
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(this);
-
             // record all already active silos as already mature. 
             // Even if they are not yet, they will be mature by the time I mature myself (after I become !isStarting).
-            foreach (var silo in siloStatusOracle.GetApproximateSiloStatuses(true).Keys.Where(s => !s.Equals(siloStatusOracle.SiloAddress)))
-            {
-                immatureSilos[silo] = false;     // record as mature
-            }
+            immatureSilos = new ConcurrentDictionary<SiloAddress, bool>(
+                from s in siloStatusOracle.GetApproximateSiloStatuses(true).Keys
+                where !s.Equals(siloStatusOracle.SiloAddress)
+                select new KeyValuePair<SiloAddress, bool>(s, false));
         }
 
         public static IStreamQueueBalancer Create(IServiceProvider services, string name, IDeploymentConfiguration deploymentConfiguration)
@@ -74,9 +61,9 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("queueMapper");
             }
-            this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
+            this.allQueues = queueMapper.GetAllQueues().ToList();
             NotifyAfterStart().Ignore();
-            return Task.CompletedTask;
+            return base.Initialize(queueMapper);
         }
         
         private async Task NotifyAfterStart()
@@ -84,47 +71,6 @@ namespace Orleans.Streams
             await Task.Delay(this.options.SiloMaturityPeriod);
             isStarting = false;
             await NotifyListeners();
-        }
-
-        /// <summary>
-        /// Called when the status of a silo in the cluster changes.
-        /// - Notify listeners
-        /// </summary>
-        /// <param name="updatedSilo">Silo which status has changed</param>
-        /// <param name="status">new silo status</param>
-        public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
-        {
-            if (status == SiloStatus.Dead)
-            {
-                // just clean up garbage from immatureSilos.
-                bool ignore;
-                immatureSilos.TryRemove(updatedSilo, out ignore);
-            }
-            SiloStatusChangeNotification().Ignore();
-        }
-
-        private async Task SiloStatusChangeNotification()
-        {
-            List<Task> tasks = new List<Task>();
-            // look at all currently active silos not including myself
-            foreach (var silo in siloStatusOracle.GetApproximateSiloStatuses(true).Keys.Where(s => !s.Equals(siloStatusOracle.SiloAddress)))
-            {
-                bool ignore;
-                if (!immatureSilos.TryGetValue(silo, out ignore))
-                {
-                    tasks.Add(RecordImmatureSilo(silo));
-                }
-            }
-            if (!isStarting)
-            {
-                // notify, uncoditionaly, and deal with changes in GetMyQueues()
-                NotifyListeners().Ignore();
-            }
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks);
-                await NotifyListeners(); // notify, uncoditionaly, and deal with changes it in GetMyQueues()
-            }
         }
 
         private async Task RecordImmatureSilo(SiloAddress updatedSilo)
@@ -206,19 +152,32 @@ namespace Orleans.Streams
             return queuesOfImmatureSilos;
         }
 
-        private Task NotifyListeners()
+        protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
         {
-            List<IStreamQueueBalanceListener> queueBalanceListenersCopy;
-            lock (queueBalanceListeners)
+            SignalClusterChange(activeSilos).Ignore();
+        }
+
+        private async Task SignalClusterChange(HashSet<SiloAddress> activeSilos)
+        {
+            List<Task> tasks = new List<Task>();
+            // look at all currently active silos not including myself
+            foreach (var silo in activeSilos)
             {
-                queueBalanceListenersCopy = queueBalanceListeners.ToList(); // make copy
+                if (!silo.Equals(siloStatusOracle.SiloAddress) && !immatureSilos.ContainsKey(silo))
+                {
+                    tasks.Add(RecordImmatureSilo(silo));
+                }
             }
-            var notificatioTasks = new List<Task>(queueBalanceListenersCopy.Count);
-            foreach (IStreamQueueBalanceListener listener in queueBalanceListenersCopy)
+            if (!isStarting)
             {
-                notificatioTasks.Add(listener.QueueDistributionChangeNotification());
+                // notify, uncoditionaly, and deal with changes in GetMyQueues()
+                await NotifyListeners();
             }
-            return Task.WhenAll(notificatioTasks);
+            if (tasks.Count > 0)
+            {
+                await Task.WhenAll(tasks);
+                await this.NotifyListeners(); // notify, uncoditionaly, and deal with changes it in GetMyQueues()
+            }
         }
     }
 }

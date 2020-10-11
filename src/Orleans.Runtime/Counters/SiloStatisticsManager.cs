@@ -5,7 +5,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.Counters
 {
-    internal class SiloStatisticsManager
+    internal class SiloStatisticsManager : IStatisticsManager
     {
         private LogStatistics logStatistics;
         private CountersStatistics countersPublisher;
@@ -16,9 +16,9 @@ namespace Orleans.Runtime.Counters
             ITelemetryProducer telemetryProducer,
             ILoggerFactory loggerFactory)
         {
-            MessagingStatisticsGroup.Init(true);
+            MessagingStatisticsGroup.Init();
             MessagingProcessingStatisticsGroup.Init();
-            NetworkingStatisticsGroup.Init(true);
+            NetworkingStatisticsGroup.Init();
             StorageStatisticsGroup.Init();
             this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, true, serializationStatistics, loggerFactory);
             this.countersPublisher = new CountersStatistics(statisticsOptions.Value.PerfCountersWriteInterval, telemetryProducer, loggerFactory);
@@ -28,6 +28,11 @@ namespace Orleans.Runtime.Counters
         {
             countersPublisher.Start();
             logStatistics.Start();
+        }
+
+        public void Dump()
+        {
+            logStatistics?.DumpCounters();
         }
 
         internal void Stop()

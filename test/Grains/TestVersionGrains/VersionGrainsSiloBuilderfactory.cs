@@ -7,13 +7,24 @@ using UnitTests.GrainInterfaces;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using UnitTests.Grains;
+using Orleans.Configuration;
+using Microsoft.Extensions.Configuration;
 
 namespace TestVersionGrains
 {
-    public class VersionGrainsSiloBuilderConfigurator : ISiloBuilderConfigurator
+    public class VersionGrainsSiloBuilderConfigurator : ISiloConfigurator
     {
-        public void Configure(ISiloHostBuilder hostBuilder)
+        public void Configure(ISiloBuilder hostBuilder)
         {
+            var cfg = hostBuilder.GetConfiguration();
+            var siloCount = int.Parse(cfg["SiloCount"]);
+            hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
+            hostBuilder.Configure<GrainVersioningOptions>(options =>
+            {
+                options.DefaultCompatibilityStrategy = cfg["CompatibilityStrategy"];
+                options.DefaultVersionSelectorStrategy = cfg["VersionSelectorStrategy"];
+            });
+
             hostBuilder.ConfigureServices(this.ConfigureServices)
                  .AddMemoryGrainStorageAsDefault();
         }
@@ -22,6 +33,14 @@ namespace TestVersionGrains
         {
             services.AddSingletonNamedService<PlacementStrategy, VersionAwarePlacementStrategy>(nameof(VersionAwarePlacementStrategy));
             services.AddSingletonKeyedService<Type, IPlacementDirector, VersionAwarePlacementDirector>(typeof(VersionAwarePlacementStrategy));
+        }
+    }
+
+    public class VersionGrainsClientConfigurator : IClientBuilderConfigurator
+    {
+        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+        {
+            clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 0);
         }
     }
 }

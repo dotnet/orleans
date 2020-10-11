@@ -8,7 +8,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    internal class ClientStatisticsManager : IDisposable
+    internal class ClientStatisticsManager : IStatisticsManager, IDisposable
     {
         private readonly StatisticsOptions statisticsOptions;
         private readonly LogStatistics logStatistics;
@@ -20,13 +20,18 @@ namespace Orleans.Runtime
         {
             this.statisticsOptions = statisticsOptions.Value;
             this.logStatistics = new LogStatistics(this.statisticsOptions.LogWriteInterval, false, serializationStatistics, loggerFactory);
-            MessagingStatisticsGroup.Init(false);
-            NetworkingStatisticsGroup.Init(false);
+            MessagingStatisticsGroup.Init();
+            NetworkingStatisticsGroup.Init();
         }
 
         internal void Start(IMessageCenter transport, GrainId clientId)
         {
             this.logStatistics.Start();
+        }
+
+        public void Dump()
+        {
+            this.logStatistics.DumpCounters();
         }
 
         internal void Stop()

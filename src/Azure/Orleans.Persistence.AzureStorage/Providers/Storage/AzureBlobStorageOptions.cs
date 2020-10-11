@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Options;
-using Microsoft.WindowsAzure.Storage;
+using System;
+using Azure.Core;
+using Microsoft.Azure.Cosmos.Table;
 using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Configuration
 {
@@ -16,6 +14,16 @@ namespace Orleans.Configuration
         /// </summary>
         [RedactConnectionString]
         public string ConnectionString { get; set; }
+
+        /// <summary>
+        /// The Service URI (e.g. https://x.blob.core.windows.net). Required for specifying <see cref="TokenCredential"/>.
+        /// </summary>
+        public Uri ServiceUri { get; set; }
+
+        /// <summary>
+        /// Use AAD to access the storage account
+        /// </summary>
+        public TokenCredential TokenCredential { get; set; }
 
         /// <summary>
         /// Container name where grain stage is stored
@@ -33,6 +41,7 @@ namespace Orleans.Configuration
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
+        public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
     }
 
     /// <summary>
@@ -56,13 +65,28 @@ namespace Orleans.Configuration
 
         public void ValidateConfiguration()
         {
-            if (!CloudStorageAccount.TryParse(this.options.ConnectionString, out var ignore))
-                throw new OrleansConfigurationException(
-                    $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ConnectionString)} is not valid.");
+            if (this.options.ServiceUri == null)
+            {
+                if (this.options.TokenCredential != null)
+                {
+                    throw new OrleansConfigurationException($"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(options.ServiceUri)} is required for {nameof(options.TokenCredential)}");
+                }
+
+                if (!CloudStorageAccount.TryParse(this.options.ConnectionString, out var ignore))
+                    throw new OrleansConfigurationException(
+                        $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ConnectionString)} is not valid.");
+            }
+            else
+            {
+                if (this.options.TokenCredential == null)
+                    throw new OrleansConfigurationException(
+                        $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.TokenCredential)} is missing.");
+            }
+
             try
             {
-                AzureStorageUtils.ValidateContainerName(options.ContainerName);
-                AzureStorageUtils.ValidateBlobName(this.name);
+                AzureBlobUtils.ValidateContainerName(options.ContainerName);
+                AzureBlobUtils.ValidateBlobName(this.name);
             }
             catch(ArgumentException e)
             {

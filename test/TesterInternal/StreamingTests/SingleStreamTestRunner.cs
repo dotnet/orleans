@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
@@ -454,7 +455,7 @@ namespace UnitTests.StreamingTests
         public async Task StopProxies()
         {
             await producer.StopBeingProducer();
-            await AssertProducerCount(0, producer.ProviderName, producer.StreamId);
+            await AssertProducerCount(0, producer.ProviderName, producer.StreamIdGuid);
             await consumer.StopBeingConsumer();
         }
 
@@ -478,20 +479,22 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private async Task AssertProducerCount(int expectedCount, string providerName, Guid streamId)
+        private async Task AssertProducerCount(int expectedCount, string providerName, Guid streamIdGuid)
         {
             // currently, we only support checking the producer count on the SMS rendezvous grain.
             if (providerName == SMS_STREAM_PROVIDER_NAME)
             {
-                var actualCount = await StreamTestUtils.GetStreamPubSub(this.client).ProducerCount(streamId, providerName, StreamTestsConstants.DefaultStreamNamespace);
+                var streamId = StreamId.Create(StreamTestsConstants.DefaultStreamNamespace, streamIdGuid);
+                var actualCount = await StreamTestUtils.GetStreamPubSub(this.client).ProducerCount(new InternalStreamId(providerName, streamId));
                 logger.Info("StreamingTestRunner.AssertProducerCount: expected={0} actual (SMSStreamRendezvousGrain.ProducerCount)={1} streamId={2}", expectedCount, actualCount, streamId);
                 Assert.Equal(expectedCount, actualCount);
             }
         }
 
-        private Task ValidatePubSub(Guid streamId, string providerName)
+        private Task ValidatePubSub(StreamId streamId, string providerName)
         {
-            var rendez = this.client.GetGrain<IPubSubRendezvousGrain>(streamId, providerName, null);
+            var intStreamId = new InternalStreamId(providerName, streamId);
+            var rendez = this.client.GetGrain<IPubSubRendezvousGrain>(intStreamId.ToString());
             return rendez.Validate();
         }
 
@@ -548,7 +551,7 @@ namespace UnitTests.StreamingTests
 //    await BasicTestAsync(producer, consumer);
 //}
 
-//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Streaming")]
 //public async Task StreamTest_2_ProducerJoinsFirstConsumerLater()
 //{
 //    logger.Info("\n\n ************************ StreamTest_2_ProducerJoinsFirstConsumerLater ********************************* \n\n");
@@ -562,7 +565,7 @@ namespace UnitTests.StreamingTests
 
 
 
-//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Streaming")]
 //public async Task StreamTestProducerOnly()
 //{
 //    streamId = Guid.NewGuid();
@@ -570,7 +573,7 @@ namespace UnitTests.StreamingTests
 //    await TestGrainProducerOnlyAsync(streamId, this.streamProviderName);
 //}
 
-//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Streaming")]
 //public void AQProducerOnly()
 //{
 //    streamId = Guid.NewGuid();
@@ -598,7 +601,7 @@ namespace UnitTests.StreamingTests
 
 ////------------------------ MANY to One ----------------------//
 
-//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Streaming")]
 //public async Task StreamTest_Many_5_ManyProducerGrainsOneConsumerGrain()
 //{
 //    logger.Info("\n\n ************************ StreamTest_6_ManyProducerGrainsOneConsumerGrain ********************************* \n\n");
@@ -609,7 +612,7 @@ namespace UnitTests.StreamingTests
 //    await BasicTestAsync(producer, consumer);
 //}
 
-//[Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+//[Fact, TestCategory("BVT"), TestCategory("Streaming")]
 //public async Task StreamTest_Many6_OneProducerGrainManyConsumerGrains()
 //{
 //    logger.Info("\n\n ************************ StreamTest_7_OneProducerGrainManyConsumerGrains ********************************* \n\n");

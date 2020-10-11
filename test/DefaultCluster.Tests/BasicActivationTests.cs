@@ -23,7 +23,7 @@ namespace DefaultCluster.Tests.General
         private TimeSpan GetResponseTimeout() => this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().GetResponseTimeout();
         private void SetResponseTimeout(TimeSpan value) => this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>().SetResponseTimeout(value);
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_ActivateAndUpdate()
         {
             long g1Key = GetRandomGrainId();
@@ -44,7 +44,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("one", g1a.GetLabel().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_Guid_ActivateAndUpdate()
         {
             Guid guid1 = Guid.NewGuid();
@@ -66,7 +66,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal("one", g1a.GetLabel().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("ErrorHandling"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("ErrorHandling"), TestCategory("GetGrain")]
         public async Task BasicActivation_Fail()
         {
             bool failed;
@@ -86,7 +86,7 @@ namespace DefaultCluster.Tests.General
             if (!failed) Assert.True(false, "Should have failed, but instead returned " + key);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_ULong_MaxValue()
         {
             ulong key1AsUlong = UInt64.MaxValue; // == -1L
@@ -129,7 +129,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal((long)key1AsUlong, g1a.GetKey().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_Long_MaxValue()
         {
             long key1 = Int32.MaxValue;
@@ -150,7 +150,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal((long)key1AsUlong, g1a.GetKey().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_Long_MinValue()
         {
             long key1 = Int64.MinValue;
@@ -171,7 +171,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal((long)key1AsUlong, g1a.GetKey().Result);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate")]
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public void BasicActivation_MultipleGrainInterfaces()
         {
             ITestGrain simple = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());
@@ -232,7 +232,7 @@ namespace DefaultCluster.Tests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("RequestContext"), TestCategory("GetGrain")]
+        [Fact, TestCategory("BVT"), TestCategory("RequestContext"), TestCategory("GetGrain")]
         public void BasicActivation_TestRequestContext()
         {
             ITestGrain g1 = this.GrainFactory.GetGrain<ITestGrain>(GetRandomGrainId());

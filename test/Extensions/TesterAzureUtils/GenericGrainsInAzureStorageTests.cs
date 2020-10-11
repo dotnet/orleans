@@ -3,8 +3,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
-using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -30,14 +28,14 @@ namespace Tester.AzureUtils.General
                 StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
             }
 
-            private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class SiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                         }));
                 }
             }
@@ -80,13 +78,13 @@ namespace Tester.AzureUtils.General
                 builder.AddSiloBuilderConfigurator<StorageSiloBuilderConfigurator>();
             }
 
-            private class StorageSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class StorageSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddAzureBlobGrainStorage("AzureStore", (AzureBlobStorageOptions options) =>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConfigureTestDefaults();
                     });
                 }
             }

@@ -1,28 +1,24 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Linq;
-using System.Net;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
 using System.Text;
-using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
-using Orleans.Runtime;
+using Orleans.GrainReferences;
 using Orleans.Metadata;
+using Orleans.Runtime;
 using Orleans.Utilities;
-using System.Buffers;
 
 namespace Orleans.Serialization
 {
@@ -48,7 +44,7 @@ namespace Orleans.Serialization
 
         private readonly IExternalSerializer fallbackSerializer;
         private readonly ILogger logger;
-        
+
         // Semi-constants: type handles for simple types
         private static readonly RuntimeTypeHandle shortTypeHandle = typeof(short).TypeHandle;
         private static readonly RuntimeTypeHandle intTypeHandle = typeof(int).TypeHandle;
@@ -64,7 +60,7 @@ namespace Orleans.Serialization
         private static readonly RuntimeTypeHandle boolTypeHandle = typeof(bool).TypeHandle;
         private static readonly RuntimeTypeHandle objectTypeHandle = typeof(object).TypeHandle;
         private static readonly RuntimeTypeHandle byteArrayTypeHandle = typeof(byte[]).TypeHandle;
-        
+
         internal int LargeObjectSizeThreshold { get; }
 
         private readonly IServiceProvider serviceProvider;
@@ -101,12 +97,14 @@ namespace Orleans.Serialization
             deserializers = new Dictionary<Type, Deserializer>();
             grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
 
-            var options = serializationProviderOptions.Value;
+            this.SerializationProviderOptions = serializationProviderOptions.Value;
 
-            fallbackSerializer = GetFallbackSerializer(serviceProvider, options.FallbackSerializationProvider);
-            
-            RegisterSerializationProviders(options.SerializationProviders);
+            fallbackSerializer = GetFallbackSerializer(serviceProvider, SerializationProviderOptions.FallbackSerializationProvider);
+
+            RegisterSerializationProviders(SerializationProviderOptions.SerializationProviders);
         }
+
+        internal SerializationProviderOptions SerializationProviderOptions { get; }
 
         public void RegisterSerializers(IApplicationPartManager applicationPartManager)
         {
@@ -173,7 +171,7 @@ namespace Orleans.Serialization
                 return null;
 
             // If the type lacks a Serializer attribute then it's a self-serializing type and all serialization methods must be static
-            if (!serializerType.GetCustomAttributes(typeof(SerializerAttribute), true).Any())
+            if (!serializerType.IsDefined(typeof(SerializerAttribute), true))
                 return null;
 
             var constructors = serializerType.GetConstructors();
@@ -413,7 +411,7 @@ namespace Orleans.Serialization
                     type.Name,
                     serializerType.Assembly.GetName().Name);
         }
-        
+
         /// <summary>
         /// Registers <see cref="GrainReference"/> serializers for the provided <paramref name="type"/>.
         /// </summary>
@@ -428,60 +426,18 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var defaultCtorDelegate = CreateGrainRefConstructorDelegate(type, null);
+            var serializer = this.serviceProvider.GetRequiredService<GrainReferenceSerializer>();
 
             // Register GrainReference serialization methods.
             Register(
                 type,
-                GrainReferenceSerializer.CopyGrainReference,
-                GrainReferenceSerializer.SerializeGrainReference,
+                serializer.CopyGrainReference,
+                serializer.SerializeGrainReference,
                 (expected, context) =>
                 {
-                    Func<GrainReference, GrainReference> ctorDelegate;
-                    var deserialized = (GrainReference)GrainReferenceSerializer.DeserializeGrainReference(expected, context);
-                    if (expected.IsConstructedGenericType == false)
-                    {
-                        return defaultCtorDelegate(deserialized);
-                    }
-
-                    if (!grainRefConstructorDictionary.TryGetValue(expected, out ctorDelegate))
-                    {
-                        ctorDelegate = CreateGrainRefConstructorDelegate(type, expected.GenericTypeArguments);
-                        grainRefConstructorDictionary.TryAdd(expected, ctorDelegate);
-                    }
-
-                    return ctorDelegate(deserialized);
+                   return serializer.DeserializeGrainReference(expected, context);
                 });
         }
-
-        private static Func<GrainReference, GrainReference> CreateGrainRefConstructorDelegate(Type type, Type[] genericArgs)
-        {
-            if (type.IsGenericType)
-            {
-                if (type.IsConstructedGenericType == false && genericArgs == null)
-                {
-                    return null;
-                }
-
-                type = type.MakeGenericType(genericArgs);
-            }
-
-            var constructor = TypeUtils.GetConstructorThatMatches(type, new[] { typeof(GrainReference) });
-            var method = new DynamicMethod(
-                ".ctor_" + type.Name,
-                typeof(GrainReference),
-                new[] { typeof(GrainReference) },
-                typeof(SerializationManager).Module,
-                true);
-            var il = method.GetILGenerator();
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Newobj, constructor);
-            il.Emit(OpCodes.Ret);
-            return
-                (Func<GrainReference, GrainReference>)
-                method.CreateDelegate(typeof(Func<GrainReference, GrainReference>));
-        }
-
 
         private SerializerMethods RegisterConcreteSerializer(Type concreteType, Type genericSerializerType)
         {
@@ -491,12 +447,12 @@ namespace Orleans.Serialization
 
             var concreteSerializerType = genericSerializerType.MakeGenericType(concreteType.GetGenericArguments());
             var typeAlreadyRegistered = false;
-            
+
             lock (registeredTypes)
             {
                 typeAlreadyRegistered = registeredTypes.Contains(concreteSerializerType);
             }
-            
+
             if (typeAlreadyRegistered)
             {
                 return new SerializerMethods(
@@ -523,15 +479,15 @@ namespace Orleans.Serialization
             deserializer = null;
             foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
             {
-                if (method.GetCustomAttributes(typeof(CopierMethodAttribute), true).Any())
+                if (method.IsDefined(typeof(CopierMethodAttribute), true))
                 {
                     copier = method;
                 }
-                else if (method.GetCustomAttributes(typeof(SerializerMethodAttribute), true).Any())
+                else if (method.IsDefined(typeof(SerializerMethodAttribute), true))
                 {
                     serializer = method;
                 }
-                else if (method.GetCustomAttributes(typeof(DeserializerMethodAttribute), true).Any())
+                else if (method.IsDefined(typeof(DeserializerMethodAttribute), true))
                 {
                     deserializer = method;
                 }
@@ -574,7 +530,7 @@ namespace Orleans.Serialization
         public object DeepCopy(object original)
         {
             var context = new SerializationContext(this);
-            
+
             Stopwatch timer = null;
             if (this.serializationStatistics.CollectSerializationStats)
             {
@@ -591,7 +547,7 @@ namespace Orleans.Serialization
                 timer.Stop();
                 context.SerializationManager.serializationStatistics.CopyTimeStatistic.IncrementBy(timer.ElapsedTicks);
             }
-            
+
             return copy;
         }
 
@@ -608,7 +564,7 @@ namespace Orleans.Serialization
             }
 
             for (var i = 0; i < args.Length; i++) args[i] = DeepCopyInner(args[i], context);
-            
+
             if (timer != null)
             {
                 timer.Stop();
@@ -1083,25 +1039,44 @@ namespace Orleans.Serialization
 
             // Figure out the array size
             var rank = array.Rank;
-            var lengths = new int[rank];
-            for (var i = 0; i < rank; i++)
-            {
-                lengths[i] = array.GetLength(i);
-            }
+
+            var length1 = array.GetLength(0);
 
             if (rank == 1)
             {
-                for (int i = 0; i < lengths[0]; i++)
+                for (int i = 0; i < length1; i++)
                     SerializeInner(array.GetValue(i), context, et);
             }
             else if (rank == 2)
             {
-                for (int i = 0; i < lengths[0]; i++)
-                    for (int j = 0; j < lengths[1]; j++)
+                var length2 = array.GetLength(1);
+
+                for (int i = 0; i < length1; i++)
+                    for (int j = 0; j < length2; j++)
                         SerializeInner(array.GetValue(i, j), context, et);
             }
+            else if (rank == 3)
+            {
+                var length2 = array.GetLength(1);
+                var length3 = array.GetLength(2);
+
+                for (int i = 0; i < length1; i++)
+                    for (int j = 0; j < length2; j++)
+                        for (int k = 0; k < length3; k++)
+                            SerializeInner(array.GetValue(i, j, k), context, et);
+            }
+
             else
             {
+                var lengths = new int[rank];
+
+                lengths[0] = length1;
+
+                for (var i = 1; i < rank; i++)
+                {
+                    lengths[i] = array.GetLength(i);
+                }
+
                 var index = new int[rank];
                 var sizes = new int[rank];
                 sizes[rank - 1] = 1;
@@ -1333,112 +1308,146 @@ namespace Orleans.Serialization
         private static object DeserializeArray(Type resultType, IDeserializationContext context)
         {
             var reader = context.StreamReader;
-            var lengths = ReadArrayLengths(resultType.GetArrayRank(), reader);
-            var rank = lengths.Length;
+
+            var rank = resultType.GetArrayRank();
+
             var et = resultType.GetElementType();
+
+            int length1 = reader.ReadInt();
 
             // Optimized special cases
             if (rank == 1)
             {
                 if (et.TypeHandle.Equals(byteTypeHandle))
-                    return reader.ReadBytes(lengths[0]);
+                    return reader.ReadBytes(length1);
 
                 if (et.TypeHandle.Equals(sbyteTypeHandle))
                 {
-                    var result = new sbyte[lengths[0]];
+                    var result = new sbyte[length1];
                     var n = Buffer.ByteLength(result);
                     reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(shortTypeHandle))
                 {
-                    var result = new short[lengths[0]];
+                    var result = new short[length1];
                     var n = Buffer.ByteLength(result);
                     reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(intTypeHandle))
                 {
-                    var result = new int[lengths[0]];
+                    var result = new int[length1];
                     var n = Buffer.ByteLength(result);
                     reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(longTypeHandle))
                 {
-                    var result = new long[lengths[0]];
+                    var result = new long[length1];
                     var n = Buffer.ByteLength(result);
                     reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(ushortTypeHandle))
                 {
-                    var result = new ushort[lengths[0]];
+                    var result = new ushort[length1];
                     var n = Buffer.ByteLength(result);
                     reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(uintTypeHandle))
                 {
-                    var result = new uint[lengths[0]];
+                    var result = new uint[length1];
                     var n = Buffer.ByteLength(result);
                     reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(ulongTypeHandle))
                 {
-                    var result = new ulong[lengths[0]];
+                    var result = new ulong[length1];
                     var n = Buffer.ByteLength(result);
                     reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(doubleTypeHandle))
                 {
-                    var result = new double[lengths[0]];
+                    var result = new double[length1];
                     var n = Buffer.ByteLength(result);
                     reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(floatTypeHandle))
                 {
-                    var result = new float[lengths[0]];
+                    var result = new float[length1];
                     var n = Buffer.ByteLength(result);
                     reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(charTypeHandle))
                 {
-                    var result = new char[lengths[0]];
+                    var result = new char[length1];
                     var n = Buffer.ByteLength(result);
                     reader.ReadBlockInto(result, n);
                     return result;
                 }
                 if (et.TypeHandle.Equals(boolTypeHandle))
                 {
-                    var result = new bool[lengths[0]];
+                    var result = new bool[length1];
                     var n = Buffer.ByteLength(result);
                     reader.ReadBlockInto(result, n);
                     return result;
                 }
             }
 
-            var array = Array.CreateInstance(et, lengths);
+
+
+            Array array;
 
             if (rank == 1)
             {
-                for (int i = 0; i < lengths[0]; i++)
+                array = Array.CreateInstance(et, length1);
+                for (int i = 0; i < length1; i++)
                     array.SetValue(DeserializeInner(et, context), i);
             }
             else if (rank == 2)
             {
-                for (int i = 0; i < lengths[0]; i++)
-                    for (int j = 0; j < lengths[1]; j++)
+                int length2 = reader.ReadInt();
+
+                array = Array.CreateInstance(et, length1, length2);
+
+                for (int i = 0; i < length1; i++)
+                    for (int j = 0; j < length2; j++)
                         array.SetValue(DeserializeInner(et, context), i, j);
+            }
+            else if (rank == 3)
+            {
+                int length2 = reader.ReadInt();
+                int length3 = reader.ReadInt();
+
+                array = Array.CreateInstance(et, length1, length2, length3);
+
+                for (int i = 0; i < length1; i++)
+                    for (int j = 0; j < length2; j++)
+                        for (int k = 0; k < length3; k++)
+                            array.SetValue(DeserializeInner(et, context), i, j, k);
             }
             else
             {
+
+
+                var lengths = new int[rank];
+
+                lengths[0] = length1;
+
+                for (var i = 1; i < rank; i++)
+                    lengths[i] = reader.ReadInt();
+
+                array = Array.CreateInstance(et, lengths);
+
                 var index = new int[rank];
                 var sizes = new int[rank];
+
                 sizes[rank - 1] = 1;
                 for (var k = rank - 2; k >= 0; k--)
                     sizes[k] = sizes[k + 1] * lengths[k + 1];
@@ -1454,18 +1463,11 @@ namespace Orleans.Serialization
                     }
                     array.SetValue(DeserializeInner(et, context), index);
                 }
+
+
             }
 
             return array;
-        }
-
-        private static int[] ReadArrayLengths(int n, IBinaryTokenStreamReader stream)
-        {
-            var result = new int[n];
-            for (var i = 0; i < n; i++)
-                result[i] = stream.ReadInt();
-
-            return result;
         }
 
         internal Deserializer GetDeserializer(Type t)
@@ -1547,7 +1549,7 @@ namespace Orleans.Serialization
 
             return headers;
         }
-        
+
         private bool TryLookupExternalSerializer(Type t, out IExternalSerializer serializer)
         {
             // essentially a no-op if there are no external serializers registered
@@ -1579,7 +1581,7 @@ namespace Orleans.Serialization
                 // we need to register the type, otherwise exceptions are thrown about types not being found
                 Register(t, serializer.DeepCopy, serializer.Serialize, serializer.Deserialize, true);
             }
-   
+
             return serializer != null;
         }
 
@@ -1654,7 +1656,7 @@ namespace Orleans.Serialization
             }
             else
             {
-                serializer = new BinaryFormatterSerializer();
+                serializer = new BinaryFormatterSerializer(this.ServiceProvider);
             }
             return serializer;
         }
@@ -1741,7 +1743,7 @@ namespace Orleans.Serialization
                 var baseType = ResolveTypeName(baseName + typeArgs.Count);
                 return baseType.MakeGenericType(typeArgs.ToArray<Type>());
             }
-            
+
             throw new TypeAccessException("Type string \"" + typeName + "\" cannot be resolved.");
         }
 

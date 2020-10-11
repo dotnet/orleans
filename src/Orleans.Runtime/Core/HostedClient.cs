@@ -2,11 +2,15 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
+using Orleans.GrainReferences;
+using Orleans.Internal;
 using Orleans.Runtime.Messaging;
+using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Runtime
@@ -14,21 +18,21 @@ namespace Orleans.Runtime
     /// <summary>
     /// A client which is hosted within a silo.
     /// </summary>
-    internal sealed class HostedClient : IDisposable, IHostedClient, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly BlockingCollection<Message> incomingMessages = new BlockingCollection<Message>();
-        private readonly CancellationTokenSource listeningCts = new CancellationTokenSource();
-        private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> extensionsTable = new Dictionary<Type, Tuple<IGrainExtension, IAddressable>>();
-        private readonly AsyncLock lockable = new AsyncLock();
+        private readonly object lockObj = new object();
+        private readonly Channel<Message> incomingMessages;
         private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly InvokableObjectManager invokableObjects;
         private readonly IRuntimeClient runtimeClient;
         private readonly ClientObserverRegistrar clientObserverRegistrar;
         private readonly ILogger logger;
         private readonly IInternalGrainFactory grainFactory;
-        private readonly ISiloMessageCenter siloMessageCenter;
+        private readonly MessageCenter siloMessageCenter;
+        private readonly MessagingTrace messagingTrace;
+        private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new ConcurrentDictionary<Type, (object, IAddressable)>();
         private bool disposing;
-        private Thread messagePump;
+        private Task messagePump;
 
         public HostedClient(
             IRuntimeClient runtimeClient,
@@ -37,39 +41,68 @@ namespace Orleans.Runtime
             ILogger<HostedClient> logger,
             IGrainReferenceRuntime grainReferenceRuntime,
             IInternalGrainFactory grainFactory,
-            InvokableObjectManager invokableObjectManager,
-            ISiloMessageCenter messageCenter)
+            MessageCenter messageCenter,
+            MessagingTrace messagingTrace,
+            SerializationManager serializationManager,
+            GrainReferenceActivator referenceActivator)
         {
+            this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false,
+                AllowSynchronousContinuations = false,
+            });
+
             this.runtimeClient = runtimeClient;
             this.clientObserverRegistrar = clientObserverRegistrar;
             this.grainReferenceRuntime = grainReferenceRuntime;
             this.grainFactory = grainFactory;
-            this.invokableObjects = invokableObjectManager;
+            this.invokableObjects = new InvokableObjectManager(
+                this,
+                runtimeClient,
+                serializationManager,
+                messagingTrace,
+                logger);
             this.siloMessageCenter = messageCenter;
+            this.messagingTrace = messagingTrace;
             this.logger = logger;
 
-            this.ClientAddress = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, GrainId.NewClientId());
+            this.ClientId = ClientGrainId.Create($"hosted-{messageCenter.MyAddress.ToParsableString()}");
+            this.Address = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, this.ClientId.GrainId);
+            this.GrainReference = referenceActivator.CreateReference(this.ClientId.GrainId, default);
         }
 
         /// <inheritdoc />
-        public ActivationAddress ClientAddress { get; }
-
-        /// <inheritdoc />
-        public GrainId ClientId => this.ClientAddress.Grain;
+        public ClientGrainId ClientId { get; }
 
         /// <inheritdoc />
         public StreamDirectory StreamDirectory { get; } = new StreamDirectory();
-        
-        /// <inheritdoc />
-        public override string ToString() => $"{nameof(HostedClient)}_{this.ClientAddress}";
+
+        public GrainReference GrainReference { get; }
+
+        public GrainId GrainId => this.ClientId.GrainId;
+
+        public IAddressable GrainInstance => null;
+
+        public ActivationId ActivationId => this.Address.Activation;
+
+        public ActivationAddress Address { get; }
+
+        public IServiceProvider ActivationServices => this.runtimeClient.ServiceProvider;
+
+        public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
 
         /// <inheritdoc />
-        public GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
+        public override string ToString() => $"{nameof(HostedClient)}_{this.Address}";
+
+        /// <inheritdoc />
+        public IAddressable CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker)
         {
             if (obj is GrainReference) throw new ArgumentException("Argument obj is already a grain reference.");
 
-            var grainReference = GrainReference.NewObserverGrainReference(this.ClientAddress.Grain, GuidId.GetNewGuidId(), this.grainReferenceRuntime);
-            if (!this.invokableObjects.TryRegister(obj, grainReference.ObserverId, invoker))
+            var observerId = ObserverGrainId.Create(this.ClientId);
+            var grainReference = this.grainFactory.GetGrain(observerId.GrainId);
+            if (!this.invokableObjects.TryRegister(obj, observerId, invoker))
             {
                 throw new ArgumentException(
                     string.Format("Failed to add new observer {0} to localObjects collection.", grainReference),
@@ -82,70 +115,65 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public void DeleteObjectReference(IAddressable obj)
         {
-            if (!(obj is GrainReference reference)) throw new ArgumentException("Argument reference is not a grain reference.");
-
-            if (!this.invokableObjects.TryDeregister(reference.ObserverId))throw new ArgumentException("Reference is not associated with a local object.", nameof(obj));
-        }
-
-        /// <inheritdoc />
-        public async Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : IGrainExtension
-            where TExtensionInterface : IGrainExtension
-        {
-            IAddressable addressable;
-            TExtension extension;
-
-            using (await this.lockable.LockAsync())
+            if (!(obj is GrainReference reference))
             {
-                if (this.extensionsTable.TryGetValue(typeof(TExtensionInterface), out var entry))
-                {
-                    extension = (TExtension) entry.Item1;
-                    addressable = entry.Item2;
-                }
-                else
-                {
-                    extension = newExtensionFunc();
-                    var obj = this.grainFactory.CreateObjectReference<TExtensionInterface>(extension);
-
-                    addressable = obj;
-
-                    if (null == addressable)
-                    {
-                        throw new NullReferenceException("addressable");
-                    }
-                    entry = Tuple.Create((IGrainExtension) extension, addressable);
-                    this.extensionsTable.Add(typeof(TExtensionInterface), entry);
-                }
+                throw new ArgumentException("Argument reference is not a grain reference.");
             }
 
-            var typedAddressable = addressable.Cast<TExtensionInterface>();
-            // we have to return the extension as well as the IAddressable because the caller needs to root the extension
-            // to prevent it from being collected (the IAddressable uses a weak reference).
-            return Tuple.Create(extension, typedAddressable);
+            if (!ObserverGrainId.TryParse(reference.GrainId, out var observerId))
+            {
+                throw new ArgumentException($"Reference {reference.GrainId} is not an observer reference");
+            }
+
+            if (!invokableObjects.TryDeregister(observerId))
+            {
+                throw new ArgumentException("Reference is not associated with a local object.", "reference");
+            }
+        }
+
+        public TComponent GetComponent<TComponent>()
+        {
+            if (this is TComponent component) return component;
+            return default; 
+        }
+
+        public void SetComponent<TComponent>(TComponent instance)
+        {
+            throw new NotSupportedException($"Cannot set components on shared client instance. Extension contract: {typeof(TComponent)}. Component: {instance} (Type: {instance?.GetType()})");
         }
 
         /// <inheritdoc />
         public bool TryDispatchToClient(Message message)
         {
-            if (!this.ClientId.Equals(message.TargetGrain)) return false;
+            if (!ClientGrainId.TryParse(message.TargetGrain, out var targetClient) || !this.ClientId.Equals(targetClient))
+            {
+                return false;
+            }
+
             if (message.IsExpired)
             {
-                message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Receive);
+                this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Receive);
                 return true;
             }
 
-            if (message.Direction == Message.Directions.Response)
+            this.ReceiveMessage(message);
+            return true;
+        }
+
+        public void ReceiveMessage(object message)
+        {
+            var msg = (Message)message;
+
+            if (msg.Direction == Message.Directions.Response)
             {
                 // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
-                this.runtimeClient.ReceiveResponse(message);
+                this.runtimeClient.ReceiveResponse(msg);
             }
             else
             {
-                // Requests agrainst client objects are scheduled for execution on the client.
-                this.incomingMessages.Add(message);
+                // Requests against client objects are scheduled for execution on the client.
+                this.incomingMessages.Writer.TryWrite(msg);
             }
-
-            return true;
         }
 
         /// <inheritdoc />
@@ -156,43 +184,47 @@ namespace Orleans.Runtime
             Utils.SafeExecute(() => this.clientObserverRegistrar.ClientDropped(this.ClientId));
             Utils.SafeExecute(() => this.clientObserverRegistrar.SetHostedClient(null));
             Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
-            Utils.SafeExecute(() => this.listeningCts.Cancel(false));
-            Utils.SafeExecute(() => this.listeningCts.Dispose());
-            Utils.SafeExecute(() => this.messagePump?.Join());
+            Utils.SafeExecute(() => this.incomingMessages.Writer.TryComplete());
+            Utils.SafeExecute(() => this.messagePump?.GetAwaiter().GetResult());
         }
 
         private void Start()
         {
-            this.messagePump = new Thread(_ => this.RunClientMessagePump())
-            {
-                Name = nameof(HostedClient) + "." + nameof(RunClientMessagePump),
-                IsBackground = true,
-            };
-            this.messagePump.Start();
+            this.messagePump = Task.Run(this.RunClientMessagePump);
         }
 
-        private void RunClientMessagePump()
+        private async Task RunClientMessagePump()
         {
-            while (!this.listeningCts.IsCancellationRequested)
+            var reader = this.incomingMessages.Reader;
+            while (true)
             {
                 try
                 {
-                    var message = this.incomingMessages.Take(this.listeningCts.Token);
-                    if (message == null) continue;
-                    switch (message.Direction)
+                    var more = await reader.WaitToReadAsync();
+                    if (!more)
                     {
-                        case Message.Directions.OneWay:
-                        case Message.Directions.Request:
-                            this.invokableObjects.Dispatch(message);
-                            break;
-                        default:
-                            this.logger.Error(ErrorCode.Runtime_Error_100327, string.Format("Message not supported: {0}.", message));
-                            break;
+                        this.logger.LogInformation($"{nameof(HostedClient)} completed processing all messages. Shutting down.");
+                        break;
+                    }
+
+                    while (reader.TryRead(out var message))
+                    {
+                        if (message == null) continue;
+                        switch (message.Direction)
+                        {
+                            case Message.Directions.OneWay:
+                            case Message.Directions.Request:
+                                this.invokableObjects.Dispatch(message);
+                                break;
+                            default:
+                                this.logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}", message);
+                                break;
+                        }
                     }
                 }
-                catch (Exception exc)
+                catch (Exception exception)
                 {
-                    this.logger.Error(ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown exception", exc);
+                    this.logger.LogError((int)ErrorCode.Runtime_Error_100326, "RunClientMessagePump has thrown an exception: {Exception}. Continuing.", exception);
                 }
             }
         }
@@ -217,12 +249,106 @@ namespace Orleans.Runtime
                 return clusterClient.Connect();
             }
 
-            Task OnStop(CancellationToken cancellation)
+            async Task OnStop(CancellationToken cancellation)
             {
-                if (cancellation.IsCancellationRequested) return Task.CompletedTask;
+                this.incomingMessages.Writer.TryComplete();
+
+                if (this.messagePump != null)
+                {
+                    await Task.WhenAny(cancellation.WhenCancelled(), this.messagePump);
+                }
+
+                if (cancellation.IsCancellationRequested) return;
 
                 var clusterClient = this.runtimeClient.ServiceProvider.GetRequiredService<IClusterClient>();
-                return clusterClient.Close();
+                await clusterClient.Close();
+            }
+        }
+
+        public bool Equals(IGrainContext other) => ReferenceEquals(this, other);
+
+        public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
+            where TExtension : TExtensionInterface
+            where TExtensionInterface : IGrainExtension
+        {
+            (TExtension, TExtensionInterface) result;
+            if (this.TryGetExtension(out result))
+            {
+                return result;
+            }
+
+            lock (this.lockObj)
+            {
+                if (this.TryGetExtension(out result))
+                {
+                    return result;
+                }
+
+                var implementation = newExtensionFunc();
+                var reference = this.grainFactory.CreateObjectReference<TExtensionInterface>(implementation);
+                _extensions[typeof(TExtensionInterface)] = (implementation, reference);
+                result = (implementation, reference);
+                return result;
+            }
+        }
+
+        private bool TryGetExtension<TExtension, TExtensionInterface>(out (TExtension, TExtensionInterface) result)
+            where TExtension : TExtensionInterface
+            where TExtensionInterface : IGrainExtension
+        {
+            if (_extensions.TryGetValue(typeof(TExtensionInterface), out var existing))
+            {
+                if (existing.Implementation is TExtension typedResult)
+                {
+                    result = (typedResult, existing.Reference.AsReference<TExtensionInterface>());
+                    return true;
+                }
+
+                throw new InvalidCastException($"Cannot cast existing extension of type {existing.Implementation} to target type {typeof(TExtension)}");
+            }
+
+            result = default;
+            return false;
+        }
+
+        private bool TryGetExtension<TExtensionInterface>(out TExtensionInterface result)
+            where TExtensionInterface : IGrainExtension
+        {
+            if (_extensions.TryGetValue(typeof(TExtensionInterface), out var existing))
+            {
+                result = (TExtensionInterface)existing.Implementation;
+                return true;
+            }
+
+            result = default;
+            return false;
+        }
+
+        public TExtensionInterface GetExtension<TExtensionInterface>()
+            where TExtensionInterface : IGrainExtension
+        {
+            if (this.TryGetExtension<TExtensionInterface>(out var result))
+            {
+                return result;
+            }
+
+            lock (this.lockObj)
+            {
+                if (this.TryGetExtension(out result))
+                {
+                    return result;
+                }
+
+                var implementation = this.ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TExtensionInterface));
+                if (implementation is null)
+                {
+                    throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
+                }
+
+                var reference = this.GrainReference.Cast<TExtensionInterface>();
+                _extensions[typeof(TExtensionInterface)] = (implementation, reference);
+                result = (TExtensionInterface)implementation;
+                return result;
             }
         }
     }

@@ -13,7 +13,6 @@ namespace Orleans.Runtime.ConsistentRing
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
     internal class VirtualBucketsRingProvider :
-        MarshalByRefObject,
         IConsistentRingProvider, ISiloStatusListener
     {
         private readonly List<IRingRangeListener> statusListeners;
@@ -126,9 +125,8 @@ namespace Orleans.Runtime.ConsistentRing
                 List<uint> hashes = silo.GetUniformHashCodes(numBucketsPerSilo);
                 foreach (var hash in hashes)
                 {
-                    if (bucketsMap.ContainsKey(hash))
+                    if (bucketsMap.TryGetValue(hash, out var other))
                     {
-                        var other = bucketsMap[hash];
                         // If two silos conflict, take the lesser of the two (usually the older one; that is, the lower epoch)
                         if (silo.CompareTo(other) > 0) continue;
                     }

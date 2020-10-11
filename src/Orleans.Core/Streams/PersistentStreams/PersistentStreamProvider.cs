@@ -110,11 +110,11 @@ namespace Orleans.Providers.Streams.Common
             stateManager.CommitState();
         }
 
-        public IAsyncStream<T> GetStream<T>(Guid id, string streamNamespace)
+        public IAsyncStream<T> GetStream<T>(StreamId streamId)
         {
-            var streamId = StreamId.GetStreamId(id, Name, streamNamespace);
+            var id = new InternalStreamId(Name, streamId);
             return this.runtime.GetStreamDirectory().GetOrAddStream<T>(
-                streamId, () => new StreamImpl<T>(streamId, this, IsRewindable, this.runtimeClient));
+                id, () => new StreamImpl<T>(id, this, IsRewindable, this.runtimeClient));
         }
 
         IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)

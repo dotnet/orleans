@@ -27,16 +27,16 @@ namespace ServiceBus.Tests.Streaming
                 builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
             }
 
-            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddEventHubStreams(StreamBatchingTestConst.ProviderName, b =>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                options.ConfigureTestDefaults();
                                 options.ConsumerGroup = EHConsumerGroup;
                                 options.Path = EHPath;
                             }));
@@ -65,7 +65,7 @@ namespace ServiceBus.Tests.Streaming
                     {
                         b.ConfigureEventHub(ob => ob.Configure(options =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConfigureTestDefaults();
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                         }));

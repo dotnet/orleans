@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,7 +10,7 @@ using Orleans.TestingHost;
 
 namespace TestExtensions
 {
-    public abstract class BaseTestClusterFixture : IDisposable
+    public abstract class BaseTestClusterFixture : Xunit.IAsyncLifetime
     {
         private readonly ExceptionDispatchInfo preconditionsException;
 
@@ -29,19 +30,6 @@ namespace TestExtensions
                 this.preconditionsException = ExceptionDispatchInfo.Capture(ex);
                 return;
             }
-
-            var builder = new TestClusterBuilder();
-            TestDefaultConfiguration.ConfigureTestCluster(builder);
-            builder.ConfigureLegacyConfiguration();
-            ConfigureTestCluster(builder);
-
-            var testCluster = builder.Build();
-            if (testCluster?.Primary == null)
-            {
-                testCluster?.Deploy();
-            }
-            this.HostedCluster = testCluster;
-            this.Logger = this.Client?.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
         public void EnsurePreconditionsMet()
@@ -55,19 +43,46 @@ namespace TestExtensions
         {
         }
 
-        public TestCluster HostedCluster { get; }
+        public TestCluster HostedCluster { get; private set; }
 
         public IGrainFactory GrainFactory => this.HostedCluster?.GrainFactory;
 
         public IClusterClient Client => this.HostedCluster?.Client;
 
-        public ILogger Logger { get; }
+        public ILogger Logger { get; private set; }
         
-        public virtual void Dispose()
+        public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
+
+        public virtual async Task InitializeAsync()
         {
-            this.HostedCluster?.StopAllSilos();
+            this.EnsurePreconditionsMet();
+            var builder = new TestClusterBuilder();
+            TestDefaultConfiguration.ConfigureTestCluster(builder);
+            this.ConfigureTestCluster(builder);
+
+            var testCluster = builder.Build();
+            if (testCluster.Primary == null)
+            {
+                await testCluster.DeployAsync().ConfigureAwait(false);
+            }
+
+            this.HostedCluster = testCluster;
+            this.Logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
-        public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
+        public virtual async Task DisposeAsync()
+        {
+            var cluster = this.HostedCluster;
+            if (cluster is null) return;
+
+            try
+            {
+                await cluster.StopAllSilosAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                await cluster.DisposeAsync().ConfigureAwait(false);
+            }
+        }
     }
 }

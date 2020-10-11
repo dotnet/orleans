@@ -27,9 +27,9 @@ namespace Tests.GeoClusterTests
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }
 
-            private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class SiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddStateStorageBasedLogConsistencyProvider()
@@ -81,11 +81,6 @@ namespace Tests.GeoClusterTests
         public async Task CustomStorage()
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainCustomStorage");
-        }
-        [SkippableFact]
-        public async Task GsiStorage()
-        {
-            await DoBasicLogTestGrainTest("TestGrains.GsiLogTestGrain");
         }
 
         private int GetRandom()

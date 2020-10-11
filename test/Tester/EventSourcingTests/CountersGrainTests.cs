@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -10,6 +10,7 @@ using TestExtensions;
 using Xunit.Abstractions;
 using Orleans.Runtime;
 using System.Collections.Generic;
+using Orleans.Internal;
 
 namespace Tester.EventSourcingTests
 {
@@ -25,7 +26,7 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task Record()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain");
+            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(GrainId.Create("simple-counters-grain", "0"));
 
             var currentstate = await grain.GetTentativeState();
             Assert.NotNull(currentstate);
@@ -47,10 +48,9 @@ namespace Tester.EventSourcingTests
         [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task ConcurrentIncrements()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(0, "TestGrains.CountersGrain");
+            var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(GrainId.Create("simple-counters-grain", "0"));
             await ConcurrentIncrementsRunner(grain, 50, false);
         }
-
 
         private static string[] keys = { "a", "b", "c", "d", "e", "f", "g", "h" };
         private static readonly SafeRandom random = new SafeRandom();

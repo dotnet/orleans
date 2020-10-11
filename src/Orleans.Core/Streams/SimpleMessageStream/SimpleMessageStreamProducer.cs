@@ -6,6 +6,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Microsoft.Extensions.Logging;
+using Orleans.Streams.Filtering;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
@@ -19,7 +20,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         [NonSerialized]
         private readonly IStreamPubSub                  pubSub;
-
+        private readonly IStreamFilter streamFilter;
         [NonSerialized]
         private readonly IStreamProviderRuntime         providerRuntime;
         private SimpleMessageStreamProducerExtension    myExtension;
@@ -33,19 +34,25 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private readonly ILogger                         logger;
         [NonSerialized]
         private readonly AsyncLock                      initLock;
-        [NonSerialized]
-        private readonly ILoggerFactory loggerFactory;
         internal bool IsRewindable { get; private set; }
 
-        internal SimpleMessageStreamProducer(StreamImpl<T> stream, string streamProviderName,
-            IStreamProviderRuntime providerUtilities, bool fireAndForgetDelivery, bool optimizeForImmutableData,
-            IStreamPubSub pubSub, bool isRewindable, SerializationManager serializationManager,
-            ILoggerFactory loggerFactory)
+        internal SimpleMessageStreamProducer(
+            StreamImpl<T> stream,
+            string streamProviderName,
+            IStreamProviderRuntime providerUtilities,
+            bool fireAndForgetDelivery,
+            bool optimizeForImmutableData,
+            IStreamPubSub pubSub,
+            IStreamFilter streamFilter,
+            bool isRewindable,
+            SerializationManager serializationManager,
+            ILogger<SimpleMessageStreamProducer<T>> logger)
         {
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
             this.pubSub = pubSub;
+            this.streamFilter = streamFilter;
             this.serializationManager = serializationManager;
             connectedToRendezvous = false;
             this.fireAndForgetDelivery = fireAndForgetDelivery;
@@ -53,23 +60,19 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             IsRewindable = isRewindable;
             isDisposed = false;
             initLock = new AsyncLock();
-            this.loggerFactory = loggerFactory;
-            this.logger = loggerFactory.CreateLogger(this.GetType().FullName);
+            this.logger = logger;
             ConnectToRendezvous().Ignore();
         }
 
         private async Task<ISet<PubSubSubscriptionState>> RegisterProducer()
         {
-            var tup = await providerRuntime.BindExtension<SimpleMessageStreamProducerExtension, IStreamProducerExtension>(
-                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, this.loggerFactory, fireAndForgetDelivery, optimizeForImmutableData));
+            (myExtension, myGrainReference) = providerRuntime.BindExtension<SimpleMessageStreamProducerExtension, IStreamProducerExtension>(
+                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, this.streamFilter, this.logger, fireAndForgetDelivery, optimizeForImmutableData));
 
-            myExtension = tup.Item1;
-            myGrainReference = tup.Item2;
-
-            myExtension.AddStream(stream.StreamId);
+            myExtension.AddStream(stream.InternalStreamId);
 
             // Notify streamRendezvous about new stream streamProducer. Retreave the list of RemoteSubscribers.
-            return await pubSub.RegisterProducer(stream.StreamId, streamProviderName, myGrainReference);
+            return await pubSub.RegisterProducer(stream.InternalStreamId, myGrainReference);
         }
 
         private async Task ConnectToRendezvous()
@@ -83,7 +86,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 if (!connectedToRendezvous) // need to re-check again.
                 {
                     var remoteSubscribers = await RegisterProducer();
-                    myExtension.AddSubscribers(stream.StreamId, remoteSubscribers);
+                    myExtension.AddSubscribers(stream.InternalStreamId, remoteSubscribers);
                     connectedToRendezvous = true;
                 }
             }
@@ -109,7 +112,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 await ConnectToRendezvous();
             }
 
-            await myExtension.DeliverItem(stream.StreamId, item);
+            await myExtension.DeliverItem(stream.InternalStreamId, item);
         }
 
         public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
@@ -126,7 +129,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             if (!connectedToRendezvous)
                 await ConnectToRendezvous();
 
-            await myExtension.CompleteStream(stream.StreamId);
+            await myExtension.CompleteStream(stream.InternalStreamId);
         }
 
         public async Task OnErrorAsync(Exception exc)
@@ -136,7 +139,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             if (!connectedToRendezvous)
                 await ConnectToRendezvous();
 
-            await myExtension.ErrorInStream(stream.StreamId, exc);
+            await myExtension.ErrorInStream(stream.InternalStreamId, exc);
         }
 
         internal Action OnDisposeTestHook { get; set; }
@@ -145,7 +148,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("Cleanup() called");
 
-            myExtension.RemoveStream(stream.StreamId);
+            myExtension.RemoveStream(stream.InternalStreamId);
 
             if (isDisposed) return;
 
@@ -153,7 +156,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             {
                 try
                 {
-                    await pubSub.UnregisterProducer(stream.StreamId, streamProviderName, myGrainReference);
+                    await pubSub.UnregisterProducer(stream.InternalStreamId, myGrainReference);
                     connectedToRendezvous = false;
                 }
                 catch (Exception exc)

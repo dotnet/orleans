@@ -5,44 +5,42 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal static class GrainDirectoryCacheFactory<TValue>
+    internal static class GrainDirectoryCacheFactory
     {
-        internal static IGrainDirectoryCache<TValue> CreateGrainDirectoryCache(GrainDirectoryOptions options)
+        internal static IGrainDirectoryCache CreateGrainDirectoryCache(GrainDirectoryOptions options)
         {
             if (options.CacheSize <= 0)
-                return new NullGrainDirectoryCache<TValue>();
+                return new NullGrainDirectoryCache();
             
             switch (options.CachingStrategy)
             {
                 case GrainDirectoryOptions.CachingStrategyType.None:
-                    return new NullGrainDirectoryCache<TValue>();
+                    return new NullGrainDirectoryCache();
                 case GrainDirectoryOptions.CachingStrategyType.LRU:
-                    return new LRUBasedGrainDirectoryCache<TValue>(options.CacheSize, options.MaximumCacheTTL);
+                    return new LRUBasedGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL);
                 default:
-                    return new AdaptiveGrainDirectoryCache<TValue>(options.InitialCacheTTL, options.MaximumCacheTTL, options.CacheTTLExtensionFactor, options.CacheSize);
+                    return new AdaptiveGrainDirectoryCache(options.InitialCacheTTL, options.MaximumCacheTTL, options.CacheTTLExtensionFactor, options.CacheSize);
             }
         }
 
-        internal static DedicatedAsynchAgent CreateGrainDirectoryCacheMaintainer(
+        internal static AdaptiveDirectoryCacheMaintainer CreateGrainDirectoryCacheMaintainer(
             LocalGrainDirectory router,
-            IGrainDirectoryCache<TValue> cache,
-            Func<List<ActivationAddress>, TValue> updateFunc,
+            IGrainDirectoryCache cache,
             IInternalGrainFactory grainFactory,
-            ExecutorService executorService,
             ILoggerFactory loggerFactory)
         {
-            var adaptiveCache = cache as AdaptiveGrainDirectoryCache<TValue>;
+            var adaptiveCache = cache as AdaptiveGrainDirectoryCache;
             return adaptiveCache != null
-                ? new AdaptiveDirectoryCacheMaintainer<TValue>(router, adaptiveCache, updateFunc, grainFactory, executorService, loggerFactory)
+                ? new AdaptiveDirectoryCacheMaintainer(router, adaptiveCache, grainFactory, loggerFactory)
                 : null;
         }
     }
 
-    internal class NullGrainDirectoryCache<TValue> : IGrainDirectoryCache<TValue>
+    internal class NullGrainDirectoryCache : IGrainDirectoryCache
     {
-        private static readonly List<Tuple<GrainId, TValue, int>> EmptyList = new List<Tuple<GrainId, TValue, int>>();
+        private static readonly List<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> EmptyList = new List<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>>();
 
-        public void AddOrUpdate(GrainId key, TValue value, int version)
+        public void AddOrUpdate(GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int version)
         {
         }
 
@@ -55,14 +53,14 @@ namespace Orleans.Runtime.GrainDirectory
         {
         }
 
-        public bool LookUp(GrainId key, out TValue result, out int version)
+        public bool LookUp(GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result, out int version)
         {
-            result = default(TValue);
+            result = default(IReadOnlyList<Tuple<SiloAddress, ActivationId>>);
             version = default(int);
             return false;
         }
 
-        public IReadOnlyList<Tuple<GrainId, TValue, int>> KeyValues
+        public IReadOnlyList<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> KeyValues
         {
             get { return EmptyList; }
         }

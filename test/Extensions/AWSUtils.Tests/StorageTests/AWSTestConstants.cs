@@ -1,9 +1,9 @@
-﻿using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans;
 using Orleans.AWSUtils.Tests;
+using Orleans.Internal;
 using System;
 using System.Collections.Generic;
 
@@ -18,7 +18,7 @@ namespace AWSUtils.Tests.StorageTests
                 DynamoDBStorage storage;
                 try
                 {
-                    storage = new DynamoDBStorage(NullLoggerFactory.Instance, Service);
+                    storage = new DynamoDBStorage(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), Service);
                 }
                 catch (AmazonServiceException)
                 {

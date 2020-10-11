@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -27,17 +26,6 @@ namespace Orleans.Runtime
         IServiceProvider ServiceProvider { get; }
 
         /// <summary>
-        /// Global pre-call interceptor function
-        /// Synchronous callback made just before a message is about to be constructed and sent by a client to a grain.
-        /// This call will be made from the same thread that constructs the message to be sent, so any thread-local settings
-        /// such as <c>Orleans.RequestContext</c> will be picked up.
-        /// The action receives an <see cref="InvokeMethodRequest"/> with details of the method to be invoked, including InterfaceId and MethodId,
-        /// and a <see cref="IGrain"/> which is the GrainReference this request is being sent through
-        /// </summary>
-        /// <remarks>This callback method should return promptly and do a minimum of work, to avoid blocking calling thread or impacting throughput.</remarks>
-        ClientInvokeCallback ClientInvokeCallback { get; set; }
-
-        /// <summary>
         /// Get the current response timeout setting for this client.
         /// </summary>
         /// <returns>Response timeout value</returns>
@@ -49,7 +37,7 @@ namespace Orleans.Runtime
         /// <param name="timeout">New response timeout value</param>
         void SetResponseTimeout(TimeSpan timeout);
 
-        void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null);
+        void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, InvokeMethodOptions options);
 
         void SendResponse(Message request, Response response);
 
@@ -57,13 +45,11 @@ namespace Orleans.Runtime
 
         void Reset(bool cleanup);
 
-        GrainReference CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
+        IAddressable CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
 
         void DeleteObjectReference(IAddressable obj);
         
         Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
-
-        IGrainTypeResolver GrainTypeResolver { get; }
 
         IGrainReferenceRuntime GrainReferenceRuntime { get; }
 

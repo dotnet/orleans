@@ -22,6 +22,7 @@ namespace Orleans.Analyzers
 
         public override void Initialize(AnalysisContext context)
         {
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
             context.EnableConcurrentExecution();
             context.RegisterSyntaxNodeAction(
                 AnalyzeSyntax,
@@ -43,7 +44,7 @@ namespace Orleans.Analyzers
 
             foreach (var attribute in symbol.GetAttributes())
             {
-                if (!attribute.AttributeClass.Equals(alwaysInterleaveAttribute))
+                if (!SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, alwaysInterleaveAttribute))
                 {
                     return;
                 }

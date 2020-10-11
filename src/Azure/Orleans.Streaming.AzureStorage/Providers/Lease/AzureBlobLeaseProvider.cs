@@ -1,37 +1,44 @@
-﻿using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using System.Threading.Tasks;
+using Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs.Specialized;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.LeaseProviders
 {
-    public class AzureBlobLeaseProviderConfig
-    {
-        public string DataConnectionString { get; set; }
-        public string BlobContainerName { get; set; }
-    }
     public class AzureBlobLeaseProvider : ILeaseProvider
     {
-        private CloudBlobContainer container;
-        private AzureBlobLeaseProviderConfig providerConfig;
-        private CloudBlobClient blobClient;
-        public AzureBlobLeaseProvider(AzureBlobLeaseProviderConfig config)
+        private BlobContainerClient container;
+        private AzureBlobLeaseProviderOptions options;
+        private BlobServiceClient blobClient;
+        public AzureBlobLeaseProvider(IOptions<AzureBlobLeaseProviderOptions> options)
+            : this(options.Value)
         {
-            var account = CloudStorageAccount.Parse(config.DataConnectionString);
-            this.blobClient = account.CreateCloudBlobClient();
-            this.providerConfig = config;
+        }
+
+        private AzureBlobLeaseProvider(AzureBlobLeaseProviderOptions options)
+        {
+            this.blobClient = options.ServiceUri != null ? new BlobServiceClient(options.ServiceUri, options.TokenCredential) : new BlobServiceClient(options.DataConnectionString);
+            this.options = options;
         }
 
         private async Task InitContainerIfNotExistsAsync()
         {
             if (this.container == null)
             {
-                var tmpContainer = blobClient.GetContainerReference(this.providerConfig.BlobContainerName);
+                var tmpContainer = blobClient.GetBlobContainerClient(this.options.BlobContainerName);
                 await tmpContainer.CreateIfNotExistsAsync().ConfigureAwait(false);
                 this.container = tmpContainer;
             }
         }
+
+        private BlobClient GetBlobClient(string category, string resourceKey) => this.container.GetBlobClient($"{category.ToLower()}-{resourceKey.ToLower()}.json");
 
         public async Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
         {
@@ -45,31 +52,26 @@ namespace Orleans.LeaseProviders
             return await Task.WhenAll(tasks);
         }
 
-        private string GetBlobName(string category, string resourceKey)
-        {
-            return $"{category.ToLower()}-{resourceKey.ToLower()}.json";
-        }
-
         private async Task<AcquireLeaseResult> Acquire(string category, LeaseRequest leaseRequest)
         {
             try
             {
-                var blob = this.container.GetBlockBlobReference(GetBlobName(category, leaseRequest.ResourceKey));
-                blob.Properties.ContentType = "application/json";
+                var blobClient = GetBlobClient(category, leaseRequest.ResourceKey);
                 //create this blob
-                await blob.UploadTextAsync("blob");
-                var leaseId = await blob.AcquireLeaseAsync(leaseRequest.Duration);
-                return new AcquireLeaseResult(new AcquiredLease(leaseRequest.ResourceKey, leaseRequest.Duration, leaseId, DateTime.UtcNow), ResponseCode.OK, null);
+                await blobClient.UploadAsync(new MemoryStream(Encoding.UTF8.GetBytes("blob")), new BlobHttpHeaders { ContentType = "application/json" });
+                var leaseClient = blobClient.GetBlobLeaseClient();
+                var lease = await leaseClient.AcquireAsync(leaseRequest.Duration);
+                return new AcquireLeaseResult(new AcquiredLease(leaseRequest.ResourceKey, leaseRequest.Duration, lease.Value.LeaseId, DateTime.UtcNow), ResponseCode.OK, null);
             }
-            catch (StorageException e)
+            catch (RequestFailedException e)
             {
                 ResponseCode statusCode;
                 //This mapping is based on references : https://docs.microsoft.com/en-us/rest/api/storageservices/blob-service-error-codes
                 // https://docs.microsoft.com/en-us/rest/api/storageservices/Lease-Blob?redirectedfrom=MSDN
-                switch (e.RequestInformation.HttpStatusCode)
+                switch (e.Status)
                 {
                     case 404:
-                    case 409: 
+                    case 409:
                     case 412: statusCode = ResponseCode.LeaseNotAvailable; break;
                     default: statusCode = ResponseCode.TransientFailure; break;
                 }
@@ -90,8 +92,8 @@ namespace Orleans.LeaseProviders
 
         private Task Release(string category, AcquiredLease acquiredLease)
         {
-            var blob = this.container.GetBlobReference(GetBlobName(category, acquiredLease.ResourceKey));
-            return blob.ReleaseLeaseAsync(AccessCondition.GenerateLeaseCondition(acquiredLease.Token));
+            var leaseClient = GetBlobClient(category, acquiredLease.ResourceKey).GetBlobLeaseClient(acquiredLease.Token);
+            return leaseClient.ReleaseAsync();
         }
 
         public async Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] acquiredLeases)
@@ -108,20 +110,20 @@ namespace Orleans.LeaseProviders
 
         private async Task<AcquireLeaseResult> Renew(string category, AcquiredLease acquiredLease)
         {
-            var blob = this.container.GetBlobReference(GetBlobName(category, acquiredLease.ResourceKey));
+            var leaseClient = GetBlobClient(category, acquiredLease.ResourceKey).GetBlobLeaseClient(acquiredLease.Token);
 
             try
             {
-                await blob.RenewLeaseAsync(AccessCondition.GenerateLeaseCondition(acquiredLease.Token));
+                await leaseClient.RenewAsync();
                 return new AcquireLeaseResult(new AcquiredLease(acquiredLease.ResourceKey, acquiredLease.Duration, acquiredLease.Token, DateTime.UtcNow),
                     ResponseCode.OK, null);
             }
-            catch (StorageException e)
+            catch (RequestFailedException e)
             {
                 ResponseCode statusCode;
                 //This mapping is based on references : https://docs.microsoft.com/en-us/rest/api/storageservices/blob-service-error-codes
                 // https://docs.microsoft.com/en-us/rest/api/storageservices/Lease-Blob?redirectedfrom=MSDN
-                switch (e.RequestInformation.HttpStatusCode)
+                switch (e.Status)
                 {
                     case 404:
                     case 409:
@@ -130,6 +132,12 @@ namespace Orleans.LeaseProviders
                 }
                 return new AcquireLeaseResult(new AcquiredLease(acquiredLease.ResourceKey), statusCode, e);
             }
+        }
+
+        public static ILeaseProvider Create(IServiceProvider services, string name)
+        {
+            AzureBlobLeaseProviderOptions options = services.GetOptionsByName<AzureBlobLeaseProviderOptions>(name);
+            return new AzureBlobLeaseProvider(options);
         }
     }
 }

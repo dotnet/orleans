@@ -1,11 +1,11 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
-using Orleans.Configuration;
-using Orleans.Transactions.Abstractions;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Providers;
+using Orleans.Runtime;
+using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.AzureStorage;
 
 namespace Orleans.Hosting

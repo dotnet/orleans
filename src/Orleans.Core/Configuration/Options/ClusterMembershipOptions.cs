@@ -1,5 +1,7 @@
 
 using System;
+using Orleans.Internal;
+using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
@@ -29,7 +31,7 @@ namespace Orleans.Configuration
         /// The number of seconds to periodically probe other silos for their liveness or for the silo to send "I am alive" heartbeat  messages about itself.
         /// </summary>
         public TimeSpan ProbeTimeout { get; set; } = DEFAULT_LIVENESS_PROBE_TIMEOUT;
-        public static readonly TimeSpan DEFAULT_LIVENESS_PROBE_TIMEOUT = TimeSpan.FromSeconds(10);
+        public static readonly TimeSpan DEFAULT_LIVENESS_PROBE_TIMEOUT = TimeSpan.FromSeconds(5);
 
         /// <summary>
         /// The number of seconds to periodically fetch updates from the membership table.
@@ -54,13 +56,7 @@ namespace Orleans.Configuration
         /// </summary>
         public TimeSpan MaxJoinAttemptTime { get; set; } = DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
         public static readonly TimeSpan DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME = TimeSpan.FromMinutes(5); // 5 min
-
-        /// <summary>
-        /// The expected size of a cluster. Need not be very accurate, can be an overestimate.
-        /// </summary>
-        public int ExpectedClusterSize { get; set; } = DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE;
-        public static readonly int DEFAULT_LIVENESS_EXPECTED_CLUSTER_SIZE = 20;
-        
+                
         /// <summary>
         /// Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos.
         /// </summary>
@@ -103,11 +99,14 @@ namespace Orleans.Configuration
         /// entries older than <see cref="DefunctSiloExpiration" /> are removed. This value is per-silo.
         /// </summary>
         public TimeSpan? DefunctSiloCleanupPeriod { get; set; } = DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD;
-        public static readonly TimeSpan? DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD = null;
+        public static readonly TimeSpan? DEFAULT_DEFUNCT_SILO_CLEANUP_PERIOD = TimeSpan.FromHours(1);
 
         /// <summary>
         /// TEST ONLY - Do not modify in production environments
         /// </summary>
         public bool IsRunningAsUnitTest { get; set; } = false;
+
+        internal TimeSpan AllowedIAmAliveMissPeriod => this.IAmAliveTablePublishTimeout.Multiply(this.NumMissedTableIAmAliveLimit);
+        internal static TimeSpan ClusteringShutdownGracePeriod => TimeSpan.FromSeconds(5);
     }
 }

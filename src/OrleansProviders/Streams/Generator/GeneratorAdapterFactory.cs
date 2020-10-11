@@ -111,7 +111,7 @@ namespace Orleans.Providers.Streams.Generator
             generatorConfig = this.serviceProvider.GetServiceByName<IStreamGeneratorConfig>(this.Name);
             if(generatorConfig == null)
             {
-                this.logger.LogInformation("No generator configuration found for stream provider {0}.  Inactive until provided with configuration by command.", this.Name);
+                this.logger.LogInformation("No generator configuration found for stream provider {StreamProvider}.  Inactive until provided with configuration by command.", this.Name);
             }
         }
 
@@ -168,13 +168,12 @@ namespace Orleans.Providers.Streams.Generator
         /// Stores a batch of messages
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="streamGuid"></param>
-        /// <param name="streamNamespace"></param>
+        /// <param name="streamId"></param>
         /// <param name="events"></param>
         /// <param name="token"></param>
         /// <param name="requestContext"></param>
         /// <returns></returns>
-        public Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
+        public Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
             return Task.CompletedTask;
@@ -190,7 +189,7 @@ namespace Orleans.Providers.Streams.Generator
             var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
             var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
             Receiver receiver = receivers.GetOrAdd(queueId, qid => new Receiver(receiverMonitor));
-            SetGeneratorOnReciever(receiver);
+            SetGeneratorOnReceiver(receiver);
             return receiver;
         }
 
@@ -211,10 +210,10 @@ namespace Orleans.Providers.Streams.Generator
                 throw new ArgumentOutOfRangeException("arg", "Arg must by of type IStreamGeneratorConfig");
             }
 
-            // update generator on recievers
+            // update generator on receivers
             foreach (Receiver receiver in receivers.Values)
             {
-                SetGeneratorOnReciever(receiver);
+                SetGeneratorOnReceiver(receiver);
             }
 
             return Task.FromResult<object>(true);
@@ -270,7 +269,7 @@ namespace Orleans.Providers.Streams.Generator
             }
         }
 
-        private void SetGeneratorOnReciever(Receiver receiver)
+        private void SetGeneratorOnReceiver(Receiver receiver)
         {
             // if we don't have generator configuration, don't set generator
             if (generatorConfig == null)
@@ -297,8 +296,12 @@ namespace Orleans.Providers.Streams.Generator
             CreateBufferPoolIfNotCreatedYet();
             var dimensions = new CacheMonitorDimensions(queueId.ToString(), this.blockPoolMonitorDimensions.BlockPoolId);
             var cacheMonitor = this.CacheMonitorFactory(dimensions, this.telemetryProducer);
-            return new GeneratorPooledCache(bufferPool, this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.Name}.{queueId}"), serializationManager, 
-                cacheMonitor, this.statisticOptions.StatisticMonitorWriteInterval);
+            return new GeneratorPooledCache(
+                bufferPool,
+                this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.Name}.{queueId}"),
+                serializationManager,
+                cacheMonitor,
+                this.statisticOptions.StatisticMonitorWriteInterval);
         }
 
         public static GeneratorAdapterFactory Create(IServiceProvider services, string name)

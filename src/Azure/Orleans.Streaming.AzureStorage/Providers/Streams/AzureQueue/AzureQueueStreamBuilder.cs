@@ -1,14 +1,14 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orleans.Providers.Streams.AzureQueue;
-using Orleans.Streams;
-using Orleans.Providers.Streams.Common;
-using Orleans.ApplicationParts;
-using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+using Orleans.ApplicationParts;
+using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Providers.Streams.Common;
+using Orleans.Configuration;
+using Orleans.Streams;
 
-namespace Orleans.Configuration
+namespace Orleans.Hosting
 {
     public interface IAzureQueueStreamConfigurator : INamedServiceConfigurator { }
 
@@ -19,15 +19,15 @@ namespace Orleans.Configuration
             configurator.Configure(configureOptions);
         }
 
-        public static void ConfigureQueueDataAdapter(this IAzureQueueStreamConfigurator configurator, Func<IServiceProvider, string, IQueueDataAdapter<CloudQueueMessage, IBatchContainer>> factory)
+        public static void ConfigureQueueDataAdapter(this IAzureQueueStreamConfigurator configurator, Func<IServiceProvider, string, IQueueDataAdapter<string, IBatchContainer>> factory)
         {
             configurator.ConfigureComponent(factory);
         }
 
         public static void ConfigureQueueDataAdapter<TQueueDataAdapter>(this IAzureQueueStreamConfigurator configurator)
-            where TQueueDataAdapter : IQueueDataAdapter<CloudQueueMessage, IBatchContainer>
+            where TQueueDataAdapter : IQueueDataAdapter<string, IBatchContainer>
         {
-            configurator.ConfigureComponent<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>>((sp, n) => ActivatorUtilities.CreateInstance<TQueueDataAdapter>(sp));
+            configurator.ConfigureComponent<IQueueDataAdapter<string, IBatchContainer>>((sp, n) => ActivatorUtilities.CreateInstance<TQueueDataAdapter>(sp));
         }
     }
 
@@ -60,15 +60,11 @@ namespace Orleans.Configuration
                             this.Name);
                 }
             }));
-            this.ConfigureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>, AzureQueueDataAdapterV2>());
+            this.ConfigureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<string, IBatchContainer>, AzureQueueDataAdapterV2>());
         }
     }
 
     public interface IClusterClientAzureQueueStreamConfigurator : IAzureQueueStreamConfigurator, IClusterClientPersistentStreamConfigurator { }
-
-    public static class ClusterClientAzureQueueStreamConfiguratorExtensions
-    {
-    }
 
     public class ClusterClientAzureQueueStreamConfigurator : ClusterClientPersistentStreamConfigurator, IClusterClientAzureQueueStreamConfigurator
     {
@@ -87,7 +83,7 @@ namespace Orleans.Configuration
                         AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(clusterOp.Value.ServiceId, this.Name);
                 }
             }));
-            this.ConfigureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>, AzureQueueDataAdapterV2>());
+            this.ConfigureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<string, IBatchContainer>, AzureQueueDataAdapterV2>());
         }
     }
 

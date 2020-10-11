@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
@@ -59,7 +58,7 @@ namespace Orleans.Runtime.GrainDirectory
             return null;
         }
 
-        private async Task HandoffMyPartitionUponStop(Dictionary<GrainId, IGrainInfo> batchUpdate, List<SiloAddress> silosHoldingMyPartitionCopy, bool isFullCopy)
+        private async Task HandoffMyPartitionUponStop(List<KeyValuePair<GrainId, IGrainInfo>> batchUpdate, List<SiloAddress> silosHoldingMyPartitionCopy, bool isFullCopy)
         {
             if (batchUpdate.Count == 0 || silosHoldingMyPartitionCopy.Count == 0)
             {
@@ -109,7 +108,7 @@ namespace Orleans.Runtime.GrainDirectory
                                         localDirectory.MyAddress,
                                         captureChunk,
                                         captureIsFullCopy),
-                                localDirectory.RemoteGrainDirectory.SchedulingContext);
+                                localDirectory.RemoteGrainDirectory);
                     lastPromise[captureSilo] = task;
                     tasks.Add(task);
                 }
@@ -137,7 +136,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 // check if this is one of our successors (i.e., if I hold this silo's copy)
                 // (if yes, adjust local and/or handoffed directory partitions)
-                if (!directoryPartitionsMap.ContainsKey(removedSilo)) return;
+                if (!directoryPartitionsMap.TryGetValue(removedSilo, out var partition)) return;
 
                 // at least one predcessor should exist, which is me
                 SiloAddress predecessor = localDirectory.FindPredecessors(removedSilo, 1)[0];
@@ -146,7 +145,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging my partition with the copy of silo " + removedSilo);
                     // now I am responsible for this directory part
-                    duplicates = localDirectory.DirectoryPartition.Merge(directoryPartitionsMap[removedSilo]);
+                    duplicates = localDirectory.DirectoryPartition.Merge(partition);
                     // no need to send our new partition to all others, as they
                     // will realize the change and combine their copies without any additional communication (see below)
                 }
@@ -154,10 +153,9 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging partition of " + predecessor + " with the copy of silo " + removedSilo);
                     // adjust copy for the predecessor of the failed silo
-                    duplicates = directoryPartitionsMap[predecessor].Merge(directoryPartitionsMap[removedSilo]);
+                    duplicates = directoryPartitionsMap[predecessor].Merge(partition);
                 }
 
-                localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(directoryPartitionsMap[removedSilo].GetItems());
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removed copied partition of silo " + removedSilo);
                 directoryPartitionsMap.Remove(removedSilo);
                 DestroyDuplicateActivations(duplicates);
@@ -189,7 +187,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             // take a copy of the current directory partition
-            Dictionary<GrainId, IGrainInfo> batchUpdate = localDirectory.DirectoryPartition.GetItems();
+            var batchUpdate = localDirectory.DirectoryPartition.GetItems();
 
             await HandoffMyPartitionUponStop(batchUpdate, silosHoldingMyPartitionCopy, true);
         }
@@ -235,7 +233,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     // adjust partitions by splitting them accordingly between new and old silos
                     SiloAddress predecessorOfNewSilo = localDirectory.FindPredecessors(addedSilo, 1)[0];
-                    if (!directoryPartitionsMap.ContainsKey(predecessorOfNewSilo))
+                    if (!directoryPartitionsMap.TryGetValue(predecessorOfNewSilo, out var predecessorPartition))
                     {
                         // we should have the partition of the predcessor of our new successor
                         logger.Warn(ErrorCode.DirectoryPartitionPredecessorExpected, "This silo is expected to hold directory partition of " + predecessorOfNewSilo);
@@ -243,7 +241,7 @@ namespace Orleans.Runtime.GrainDirectory
                     else
                     {
                         if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Splitting partition of " + predecessorOfNewSilo + " and creating a copy for " + addedSilo);
-                        GrainDirectoryPartition splitPart = directoryPartitionsMap[predecessorOfNewSilo].Split(
+                        GrainDirectoryPartition splitPart = predecessorPartition.Split(
                             grain =>
                             {
                                 // Need to review the 2nd line condition.
@@ -401,7 +399,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Got request to register " + (isFullCopy ? "FULL" : "DELTA") + " directory partition with " + partition.Count + " elements from " + source);
 
-                if (!directoryPartitionsMap.ContainsKey(source))
+                if (!directoryPartitionsMap.TryGetValue(source, out var sourcePartition))
                 {
                     if (!isFullCopy)
                     {
@@ -411,19 +409,17 @@ namespace Orleans.Runtime.GrainDirectory
                                 this.siloStatusOracle.GetApproximateSiloStatuses(true).Count));
                     }
 
-                    directoryPartitionsMap[source] = this.createPartion();
+                    directoryPartitionsMap[source] = sourcePartition = this.createPartion();
                 }
 
                 if (isFullCopy)
                 {
-                    directoryPartitionsMap[source].Set(partition);
+                    sourcePartition.Set(partition);
                 }
                 else
                 {
-                    directoryPartitionsMap[source].Update(partition);
+                    sourcePartition.Update(partition);
                 }
-
-                localDirectory.GsiActivationMaintainer.TrackDoubtfulGrains(partition);
             }
         }
 
@@ -452,7 +448,7 @@ namespace Orleans.Runtime.GrainDirectory
             silosHoldingMyPartition.Remove(silo);
             localDirectory.Scheduler.QueueTask(() =>
                 localDirectory.GetDirectoryReference(silo).RemoveHandoffPartition(localDirectory.MyAddress),
-                localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
+                localDirectory.RemoteGrainDirectory).Ignore();
         }
 
         private void DestroyDuplicateActivations(Dictionary<SiloAddress, List<ActivationAddress>> duplicates)
@@ -476,7 +472,7 @@ namespace Orleans.Runtime.GrainDirectory
                             $"{nameof(DestroyDuplicateActivations)} will destroy {duplicates.Count} duplicate activations on silo {pair.Key}: {string.Join("\n * ", pair.Value.Select(_ => _))}");
                     }
 
-                    var remoteCatalog = this.grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogId, pair.Key);
+                    var remoteCatalog = this.grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogType, pair.Key);
                     await remoteCatalog.DeleteActivations(pair.Value);
                 }
 
@@ -491,7 +487,7 @@ namespace Orleans.Runtime.GrainDirectory
                 this.pendingOperations.Enqueue((name, action));
                 if (this.pendingOperations.Count <= 2)
                 {
-                    this.localDirectory.Scheduler.QueueTask(this.ExecutePendingOperations, this.localDirectory.RemoteGrainDirectory.SchedulingContext);
+                    this.localDirectory.Scheduler.QueueTask(this.ExecutePendingOperations, this.localDirectory.RemoteGrainDirectory);
                 }
             }
         }

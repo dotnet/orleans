@@ -1,9 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Collections.Immutable;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,38 +13,79 @@ namespace Orleans.Runtime
     /// </summary>
     public class SiloLifecycleSubject : LifecycleSubject, ISiloLifecycleSubject
     {
+        private static readonly ImmutableDictionary<int, string> StageNames = GetStageNames(typeof(ServiceLifecycleStage));
         private readonly ILogger<SiloLifecycleSubject> logger;
         private readonly List<MonitoredObserver> observers;
+        private int highestCompletedStage;
+        private int lowestStoppedStage;
 
-        public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger)
-            :base(logger)
+        /// <inheritdoc />
+        public int HighestCompletedStage => this.highestCompletedStage;
+
+        /// <inheritdoc />
+        public int LowestStoppedStage => this.lowestStoppedStage;
+
+        public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger) : base(logger)
         {
             this.logger = logger;
             this.observers = new List<MonitoredObserver>();
+            this.highestCompletedStage = int.MinValue;
+            this.lowestStoppedStage = int.MaxValue;
         }
 
         public override Task OnStart(CancellationToken ct)
         {
-            foreach(IGrouping<int,MonitoredObserver> stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
+            foreach(var stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
             {
-                this.logger?.Info(ErrorCode.LifecycleStagesReport, $"Stage {stage.Key}: {string.Join(", ", stage.Select(o => o.Name))}", stage.Key);
+                this.logger?.LogInformation(
+                    (int)ErrorCode.LifecycleStagesReport,
+                    "Stage {Stage}: {Observers}",
+                    this.GetStageName(stage.Key),
+                    string.Join(", ", stage.Select(o => o.Name)));
             }
+
             return base.OnStart(ct);
         }
 
-        protected override void PerfMeasureOnStop(int? stage, TimeSpan timelapsed)
+        protected override void OnStartStageCompleted(int stage)
         {
-            this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Stopping lifecycle stage {stage} took {timelapsed.TotalMilliseconds} Milliseconds");
+            Interlocked.Exchange(ref this.highestCompletedStage, stage);
+            base.OnStartStageCompleted(stage);
         }
 
-        protected override void PerfMeasureOnStart(int? stage, TimeSpan timelapsed)
+        protected override void OnStopStageCompleted(int stage)
         {
-            this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Starting lifecycle stage {stage} took {timelapsed.TotalMilliseconds} Milliseconds");
+            Interlocked.Exchange(ref this.lowestStoppedStage, stage);
+            base.OnStopStageCompleted(stage);
+        }
+
+        protected override string GetStageName(int stage)
+        {
+            if (StageNames.TryGetValue(stage, out var result)) return result;
+            return base.GetStageName(stage);
+        }
+
+        protected override void PerfMeasureOnStop(int stage, TimeSpan elapsed)
+        {
+            this.logger?.LogInformation(
+                    (int)ErrorCode.SiloStartPerfMeasure,
+                    "Stopping lifecycle stage {Stage} took {Elapsed} Milliseconds",
+                    this.GetStageName(stage),
+                    elapsed.TotalMilliseconds);
+        }
+
+        protected override void PerfMeasureOnStart(int stage, TimeSpan elapsed)
+        {
+            this.logger?.LogInformation(
+                (int)ErrorCode.SiloStartPerfMeasure,
+                    "Starting lifecycle stage {Stage} took {Elapsed} Milliseconds",
+                    this.GetStageName(stage),
+                    elapsed.TotalMilliseconds);
         }
 
         public override IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
-            var monitoredObserver = new MonitoredObserver(observerName, stage, observer, this.logger);
+            var monitoredObserver = new MonitoredObserver(observerName, stage, this.GetStageName(stage), observer, this.logger);
             this.observers.Add(monitoredObserver);
             return base.Subscribe(observerName, stage, monitoredObserver);
         }
@@ -55,30 +95,41 @@ namespace Orleans.Runtime
             private readonly ILifecycleObserver observer;
             private readonly ILogger<SiloLifecycleSubject> logger;
 
-            public MonitoredObserver(string name, int stage, ILifecycleObserver observer, ILogger<SiloLifecycleSubject> logger)
+            public MonitoredObserver(string name, int stage, string stageName, ILifecycleObserver observer, ILogger<SiloLifecycleSubject> logger)
             {
                 this.Name = name;
                 this.Stage = stage;
+                this.StageName = stageName;
                 this.observer = observer;
                 this.logger = logger;
             }
 
             public string Name { get; }
             public int Stage { get; }
+            public string StageName { get; }
 
             public async Task OnStart(CancellationToken ct)
             {
                 try
                 {
-                    Stopwatch stopWatch = Stopwatch.StartNew();
+                    var stopwatch = ValueStopwatch.StartNew();
                     await this.observer.OnStart(ct);
-                    stopWatch.Stop();
-                    this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Lifecycle observer {this.Name} started in stage {this.Stage} which took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                    stopwatch.Stop();
+                    this.logger?.LogInformation(
+                        (int)ErrorCode.SiloStartPerfMeasure,
+                        "{Name} started in stage {Stage} in {Elapsed} Milliseconds",
+                        this.Name,
+                        this.StageName,
+                        stopwatch.Elapsed.TotalMilliseconds);
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
-                    string error = $"Lifecycle observer {this.Name} failed to start due to errors at stage {this.Stage}.";
-                    this.logger?.Error(ErrorCode.LifecycleStartFailure, error, ex);
+                    this.logger?.LogError(
+                        (int)ErrorCode.LifecycleStartFailure,
+                        "{Name} failed to start due to errors at stage {Stage}: {Exception}",
+                        this.Name,
+                        this.StageName,
+                        exception);
                     throw;
                 }
             }
@@ -87,15 +138,24 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    Stopwatch stopWatch = Stopwatch.StartNew();
+                    var stopwatch = ValueStopwatch.StartNew();
                     await this.observer.OnStop(ct);
-                    stopWatch.Stop();
-                    this.logger?.Info(ErrorCode.SiloStartPerfMeasure, $"Lifecycle observer {this.Name} stopped in stage {this.Stage} which took {stopWatch.ElapsedMilliseconds} Milliseconds.");
+                    stopwatch.Stop();
+                    this.logger?.LogInformation(
+                        (int)ErrorCode.SiloStartPerfMeasure,
+                        "{Name} stopped in stage {Stage} in {Elapsed} Milliseconds.",
+                        this.Name,
+                        this.StageName,
+                        stopwatch.Elapsed.TotalMilliseconds);
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
-                    string error = $"Lifecycle observer {this.Name} failed to stop due to errors at stage {this.Stage}.";
-                    this.logger?.Error(ErrorCode.LifecycleStartFailure, error, ex);
+                    this.logger?.LogError(
+                        (int)ErrorCode.LifecycleStartFailure,
+                        "{Name} failed to stop due to errors at stage {Stage}: {Exception}",
+                        this.Name,
+                        this.StageName,
+                        exception);
                     throw;
                 }
             }

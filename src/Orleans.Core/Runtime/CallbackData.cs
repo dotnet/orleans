@@ -1,6 +1,6 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Orleans.Transactions;
 
 namespace Orleans.Runtime
@@ -9,6 +9,8 @@ namespace Orleans.Runtime
     {
         private readonly SharedCallbackData shared;
         private readonly TaskCompletionSource<object> context;
+        private int completed;
+        private StatusResponse lastKnownStatus;
         private ValueStopwatch stopwatch;
 
         public CallbackData(
@@ -25,111 +27,103 @@ namespace Orleans.Runtime
 
         public ITransactionInfo TransactionInfo { get; set; }
 
-        public Message Message { get; set; } // might hold metadata used by response pipeline
+        public Message Message { get; } // might hold metadata used by response pipeline
 
-        public bool IsCompleted { get; private set; }
+        public bool IsCompleted => this.completed == 1;
 
+        public void OnStatusUpdate(StatusResponse status)
+        {
+            this.lastKnownStatus = status;
+        }
+        
         public bool IsExpired(long currentTimestamp)
         {
-            return currentTimestamp - this.stopwatch.GetRawTimestamp() > this.shared.ResponseTimeoutStopwatchTicks;
+            var duration = currentTimestamp - this.stopwatch.GetRawTimestamp();
+            return duration > shared.ResponseTimeoutStopwatchTicks;
         }
 
         public void OnTimeout(TimeSpan timeout)
         {
             if (this.IsCompleted)
                 return;
+
+            OrleansCallBackDataEvent.Log.OnTimeout(this.Message);
+
             var msg = this.Message; // Local working copy
 
             string messageHistory = msg.GetTargetHistory();
-            string errorMsg = $"Response did not arrive on time in {timeout} for message: {msg}. Target History is: {messageHistory}.";
+            var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
+            string errorMsg = $"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}Target History is: {messageHistory}.";
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
             var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
-            OnFail(msg, error, "OnTimeout - Resend {0} for {1}", true);
+            OnFail(msg, error, isOnTimeout: true);
         }
 
         public void OnTargetSiloFail()
         {
             if (this.IsCompleted)
                 return;
-
+            OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
             var msg = this.Message;
             var messageHistory = msg.GetTargetHistory();
+            var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
             string errorMsg = 
-                $"The target silo became unavailable for message: {msg}. Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.";
+                $"The target silo became unavailable for message: {msg}. {statusMessage}Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.";
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
             var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
-            OnFail(msg, error, "On silo fail - Resend {0} for {1}");
+            OnFail(msg, error, isOnTimeout: false);
         }
 
         public void DoCallback(Message response)
         {
             if (this.IsCompleted)
                 return;
-            var requestStatistics = this.shared.RequestStatistics;
-            lock (this)
+
+            OrleansCallBackDataEvent.Log.DoCallback(this.Message);
+
+            if (Interlocked.CompareExchange(ref this.completed, 1, 0) == 0)
             {
-                if (this.IsCompleted)
-                    return;
-
-                if (response.Result == Message.ResponseTypes.Rejection && response.RejectionType == Message.RejectionTypes.Transient)
-                {
-                    if (this.shared.ShouldResend(this.Message))
-                    {
-                        return;
-                    }
-                }
-
-                this.IsCompleted = true;
+                var requestStatistics = this.shared.RequestStatistics;
                 if (requestStatistics.CollectApplicationRequestsStats)
                 {
                     this.stopwatch.Stop();
                 }
-            }
 
-            if (requestStatistics.CollectApplicationRequestsStats)
-            {
-                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-            }
-
-            // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-            this.shared.ResponseCallback(response, this.context);
-        }
-
-        private void OnFail(Message msg, Message error, string resendLogMessageFormat, bool isOnTimeout = false)
-        {
-            var requestStatistics = this.shared.RequestStatistics;
-            lock (this)
-            {
-                if (this.IsCompleted)
-                    return;
-
-                if (this.shared.MessagingOptions.ResendOnTimeout && this.shared.ShouldResend(msg))
+                if (requestStatistics.CollectApplicationRequestsStats)
                 {
-                    if (this.shared.Logger.IsEnabled(LogLevel.Debug)) this.shared.Logger.Debug(resendLogMessageFormat, msg.ResendCount, msg);
-                    return;
+                    requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
                 }
 
-                this.IsCompleted = true;
+                // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
+                this.shared.ResponseCallback(response, this.context);
+            }
+        }
+
+        private void OnFail(Message msg, Message error, bool isOnTimeout = false)
+        {
+            if (Interlocked.CompareExchange(ref this.completed, 1, 0) == 0)
+            {
+                var requestStatistics = this.shared.RequestStatistics;
                 if (requestStatistics.CollectApplicationRequestsStats)
                 {
                     this.stopwatch.Stop();
                 }
 
                 this.shared.Unregister(this.Message);
-            }
-            
-            if (requestStatistics.CollectApplicationRequestsStats)
-            {
-                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-                if (isOnTimeout)
-                {
-                    requestStatistics.OnAppRequestsTimedOut();
-                }
-            }
 
-            this.shared.ResponseCallback(error, this.context);
+                if (requestStatistics.CollectApplicationRequestsStats)
+                {
+                    requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
+                    if (isOnTimeout)
+                    {
+                        requestStatistics.OnAppRequestsTimedOut();
+                    }
+                }
+
+                this.shared.ResponseCallback(error, this.context);
+            }
         }
     }
 }

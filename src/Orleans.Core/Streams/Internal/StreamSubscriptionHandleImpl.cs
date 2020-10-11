@@ -10,7 +10,7 @@ namespace Orleans.Streams
     internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
     {
         private StreamImpl<T> streamImpl;
-        private readonly IStreamFilterPredicateWrapper filterWrapper;
+        private readonly string filterData;
         private readonly GuidId subscriptionId;
         private readonly bool isRewindable;
 
@@ -25,7 +25,7 @@ namespace Orleans.Streams
         internal bool IsRewindable { get { return isRewindable; } }
 
         public override string ProviderName { get { return this.streamImpl.ProviderName; } }
-        public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
+        public override StreamId StreamId { get { return streamImpl.StreamId; } }
         public override Guid HandleId { get { return subscriptionId.Guid; } }
 
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
@@ -33,13 +33,19 @@ namespace Orleans.Streams
         {
         }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, IAsyncBatchObserver<T> batchObserver, StreamImpl<T> streamImpl, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
+        public StreamSubscriptionHandleImpl(
+            GuidId subscriptionId,
+            IAsyncObserver<T> observer,
+            IAsyncBatchObserver<T> batchObserver,
+            StreamImpl<T> streamImpl,
+            StreamSequenceToken token,
+            string filterData)
         {
             this.subscriptionId = subscriptionId ?? throw new ArgumentNullException("subscriptionId");
             this.observer = observer;
             this.batchObserver = batchObserver;
             this.streamImpl = streamImpl ?? throw new ArgumentNullException("streamImpl");
-            this.filterWrapper = filterWrapper;
+            this.filterData = filterData;
             this.isRewindable = streamImpl.IsRewindable;
             if (IsRewindable)
             {
@@ -121,7 +127,20 @@ namespace Orleans.Streams
                     return this.expectedToken;
             }
 
-            await NextItem(item, currentToken);
+            T typedItem;
+            try
+            {
+                typedItem = (T)item;
+            }
+            catch (InvalidCastException)
+            {
+                // We got an illegal item on the stream -- close it with a Cast exception
+                throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
+            }
+
+            await ((this.observer != null)
+                ? NextItem(typedItem, currentToken)
+                : NextItems(new[] { Tuple.Create(typedItem, currentToken) }));
 
             // check again, in case the expectedToken was changed indiretly via ResumeAsync()
             if (this.expectedToken != null)
@@ -143,14 +162,19 @@ namespace Orleans.Streams
                 foreach (var batchContainer in batchContainerBatch.BatchContainers)
                 {
                     bool isRequestContextSet = batchContainer.ImportRequestContext();
-                    foreach (var itemTuple in batchContainer.GetEvents<T>())
+                    try
                     {
-                        await NextItem(itemTuple.Item1, itemTuple.Item2);
+                        foreach (var itemTuple in batchContainer.GetEvents<T>())
+                        {
+                            await NextItem(itemTuple.Item1, itemTuple.Item2);
+                        }
                     }
-
-                    if (isRequestContextSet)
+                    finally
                     {
-                        RequestContext.Clear();
+                        if (isRequestContextSet)
+                        {
+                            RequestContext.Clear();
+                        }
                     }
                 }
             }
@@ -160,28 +184,14 @@ namespace Orleans.Streams
             }
         }
 
-        private Task NextItem(object item, StreamSequenceToken token)
+        private Task NextItem(T item, StreamSequenceToken token)
         {
-            T typedItem;
-            try
-            {
-                typedItem = (T)item;
-            }
-            catch (InvalidCastException)
-            {
-                // We got an illegal item on the stream -- close it with a Cast exception
-                throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
-            }
-
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
             if (this.observer == null || !IsValid)
                 return Task.CompletedTask;
 
-            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, typedItem))
-                return Task.CompletedTask;
-
-            return this.observer.OnNextAsync(typedItem, token);
+            return this.observer.OnNextAsync(item, token);
         }
 
         private Task NextItems(IEnumerable<Tuple<T, StreamSequenceToken>> items)
@@ -192,7 +202,6 @@ namespace Orleans.Streams
                 return Task.CompletedTask;
 
             IList<SequentialItem<T>> batch = items
-                .Where(item => filterWrapper == null || !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, item))
                 .Select(item => new SequentialItem<T>(item.Item1, item.Item2))
                 .ToList();
 
@@ -201,17 +210,25 @@ namespace Orleans.Streams
 
         public Task CompleteStream()
         {
-            return this.observer == null ? Task.CompletedTask : this.observer.OnCompletedAsync();
+            return this.observer is null
+                ? this.batchObserver is null
+                    ? Task.CompletedTask
+                    : this.batchObserver.OnCompletedAsync()
+                : this.observer.OnCompletedAsync();
         }
 
         public Task ErrorInStream(Exception ex)
         {
-            return this.observer == null ? Task.CompletedTask : this.observer.OnErrorAsync(ex);
+            return this.observer is null
+                ? this.batchObserver is null
+                    ? Task.CompletedTask
+                    : this.batchObserver.OnErrorAsync(ex)
+                : this.observer.OnErrorAsync(ex);
         }
 
-        internal bool SameStreamId(StreamId streamId)
+        internal bool SameStreamId(InternalStreamId streamId)
         {
-            return IsValid && streamImpl.StreamId.Equals(streamId);
+            return IsValid && streamImpl.InternalStreamId.Equals(streamId);
         }
 
         public override bool Equals(StreamSubscriptionHandle<T> other)
@@ -232,7 +249,7 @@ namespace Orleans.Streams
 
         public override string ToString()
         {
-            return String.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.StreamId.ToString() : "null", HandleId);
+            return String.Format("StreamSubscriptionHandleImpl:Stream={0},HandleId={1}", IsValid ? streamImpl.InternalStreamId.ToString() : "null", HandleId);
         }
     }
 }

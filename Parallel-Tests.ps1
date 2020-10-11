@@ -1,11 +1,34 @@
 param(
     [string[]] $directories,
-    [string] $testFilter,
-    [string] $outDir,
+    [string] $testFilter = $null,
     [string] $dotnet)
 
-$maxDegreeOfParallelism = 4
+$maxDegreeOfParallelism = [math]::min($env:NUMBER_OF_PROCESSORS, 4)
+Write-Host "Max Job Parallelism = $maxDegreeOfParallelism"
+
 $failed = $false
+
+if( 
+    [Console]::InputEncoding -is [Text.UTF8Encoding] -and 
+    [Console]::InputEncoding.GetPreamble().Length -ne 0 
+) { 
+    Write-Host Setting [Console]::InputEncoding
+    [Console]::InputEncoding = New-Object Text.UTF8Encoding $false 
+} 
+else 
+{
+    Write-Host Not changing [Console]::InputEncoding
+}
+
+if ([string]::IsNullOrWhiteSpace($testFilter)) {
+    $testFilter = $env:TEST_FILTERS;
+}
+
+if ([string]::IsNullOrWhiteSpace($testFilter)) {
+    $testFilter = "Category=BVT|Category=SlowBVT";
+}
+
+Write-Host "Test filters: `"$testFilter`"";
 
 function Receive-CompletedJobs {
     $succeeded = $true
@@ -30,10 +53,15 @@ $ExecuteCmd =
 
     $cmdline = "& `"" + $dotnet1 + "`" " + $args1
 
-    Invoke-Expression $cmdline
-    if ($LASTEXITCODE -ne 0)
+    Invoke-Expression $cmdline;
+    $cmdExitCode = $LASTEXITCODE;
+    if ($cmdExitCode -ne 0)
     {
-        Throw "Error when running tests"
+        Throw "Error when running tests. Command: `"$cmdline`". Exit Code: $cmdExitCode"
+    }
+    else
+    {
+        Write-Host "Tests completed. Command: `"$cmdline`""
     }
 }
 
@@ -45,12 +73,14 @@ foreach ($d in $directories)
     }
 
     if (-not (Receive-CompletedJobs)) { $failed = $true }
+    
+    if (-not $testFilter.StartsWith('"')) { $testFilter = "`"$testFilter"; }
+    if (-not $testFilter.EndsWith('"')) { $testFilter = "$testFilter`""; }
 
-    $xmlName = 'xUnit-Results-' + [System.IO.Path]::GetFileName($d) + '.xml'
-    $outXml = $(Join-Path $outDir $xmlName)
-    $cmdLine = 'xunit ' + $testFilter + ' -xml ' + $outXml + ' -parallel none -noshadow -nobuild -configuration ' + $env:BuildConfiguration
-    Write-Host $dotnet $cmdLine
-    Start-Job $ExecuteCmd -ArgumentList @($dotnet, $cmdLine, $d) -Name $([System.IO.Path]::GetFileName($d)) | Out-Null
+    $jobName = $([System.IO.Path]::GetFileName($d))
+    $cmdLine = 'test --no-build --configuration "' + $env:BuildConfiguration + '" --filter ' + $testFilter + ' --logger "trx" -- -parallel none -noshadow'
+    Write-Host $jobName $dotnet $cmdLine
+    Start-Job $ExecuteCmd -ArgumentList @($dotnet, $cmdLine, $d) -Name $jobName | Out-Null
     Write-Host ''
 }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.LogConsistency;
@@ -33,10 +33,6 @@ namespace UnitTests.GrainInterfaces
         // version
 
         Task<int> GetConfirmedVersion();
-
-        // exception
-        Task<IEnumerable<ConnectionIssue>> GetUnresolvedConnectionIssues();
-
 
         // set or increment A
 

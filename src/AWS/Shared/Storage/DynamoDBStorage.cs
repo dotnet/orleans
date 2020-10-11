@@ -1,4 +1,4 @@
-﻿using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using Microsoft.Extensions.Logging;
@@ -38,22 +38,28 @@ namespace Orleans.Transactions.DynamoDB
         public const int DefaultWriteCapacityUnits = 5;
         private int readCapacityUnits = DefaultReadCapacityUnits;
         private int writeCapacityUnits = DefaultWriteCapacityUnits;
+        private readonly bool useProvisionedThroughput;
         private AmazonDynamoDBClient ddbClient;
         private ILogger Logger;
 
         /// <summary>
         /// Create a DynamoDBStorage instance
         /// </summary>
-        /// <param name="loggerFactory"></param>
+        /// <param name="logger"></param>
         /// <param name="accessKey"></param>
         /// <param name="secretKey"></param>
         /// <param name="service"></param>
         /// <param name="readCapacityUnits"></param>
         /// <param name="writeCapacityUnits"></param>
-        public DynamoDBStorage(ILoggerFactory loggerFactory, string service,
-            string accessKey = "", string secretKey = "",  
+        /// <param name="useProvisionedThroughput"></param>
+        public DynamoDBStorage(
+            ILogger logger,
+            string service,
+            string accessKey = "",
+            string secretKey = "",
             int readCapacityUnits = DefaultReadCapacityUnits,
-            int writeCapacityUnits = DefaultWriteCapacityUnits)
+            int writeCapacityUnits = DefaultWriteCapacityUnits,
+            bool useProvisionedThroughput = true)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             this.accessKey = accessKey;
@@ -61,7 +67,8 @@ namespace Orleans.Transactions.DynamoDB
             this.service = service;
             this.readCapacityUnits = readCapacityUnits;
             this.writeCapacityUnits = writeCapacityUnits;
-            Logger = loggerFactory.CreateLogger<DynamoDBStorage>();
+            this.useProvisionedThroughput = useProvisionedThroughput;
+            Logger = logger;
             CreateClient();
         }
 
@@ -72,13 +79,14 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="keys">The keys definitions</param>
         /// <param name="attributes">The attributes used on the key definition</param>
         /// <param name="secondaryIndexes">(optional) The secondary index definitions</param>
+        /// <param name="ttlAttributeName">(optional) The name of the item attribute that indicates the item TTL (if null, ttl won't be enabled)</param>
         /// <returns></returns>
-        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
+        public async Task InitializeTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
             try
             {
                 if (await GetTableDescription(tableName) == null)
-                    await CreateTable(tableName, keys, attributes, secondaryIndexes);
+                    await CreateTable(tableName, keys, attributes, secondaryIndexes, ttlAttributeName);
             }
             catch (Exception exc)
             {
@@ -89,23 +97,23 @@ namespace Orleans.Transactions.DynamoDB
 
         private void CreateClient()
         {
-            if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            if (this.service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                this.service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 // Local DynamoDB instance (for testing)
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
-                ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = service });
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this.service });
             }
-            else if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
+            else if (!string.IsNullOrEmpty(this.accessKey) && !string.IsNullOrEmpty(this.secretKey))
             {
                 // AWS DynamoDB instance (auth via explicit credentials)
-                var credentials = new BasicAWSCredentials(accessKey, secretKey);
-                ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                var credentials = new BasicAWSCredentials(this.accessKey, this.secretKey);
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
             }
             else
             {
                 // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig { ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(service) });
+                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
             }
         }
 
@@ -124,27 +132,32 @@ namespace Orleans.Transactions.DynamoDB
             return null;
         }
 
-        private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null)
+        private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
             var request = new CreateTableRequest
             {
                 TableName = tableName,
                 AttributeDefinitions = attributes,
                 KeySchema = keys,
-                ProvisionedThroughput = new ProvisionedThroughput
+                BillingMode = this.useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
+                ProvisionedThroughput = this.useProvisionedThroughput ? new ProvisionedThroughput
                 {
                     ReadCapacityUnits = readCapacityUnits,
                     WriteCapacityUnits = writeCapacityUnits
-                }
+                } : null
             };
 
             if (secondaryIndexes != null && secondaryIndexes.Count > 0)
             {
-                var indexThroughput = new ProvisionedThroughput { ReadCapacityUnits = readCapacityUnits, WriteCapacityUnits = writeCapacityUnits };
-                secondaryIndexes.ForEach(i =>
+                if (this.useProvisionedThroughput)
                 {
-                    i.ProvisionedThroughput = indexThroughput;
-                });
+                    var indexThroughput = new ProvisionedThroughput {ReadCapacityUnits = readCapacityUnits, WriteCapacityUnits = writeCapacityUnits};
+                    secondaryIndexes.ForEach(i =>
+                    {
+                        i.ProvisionedThroughput = indexThroughput;
+                    });
+                }
+
                 request.GlobalSecondaryIndexes = secondaryIndexes;
             }
 
@@ -160,6 +173,14 @@ namespace Orleans.Transactions.DynamoDB
 
                 } while (description.TableStatus == TableStatus.CREATING);
 
+                if (!string.IsNullOrEmpty(ttlAttributeName))
+                {
+                    await ddbClient.UpdateTimeToLiveAsync(new UpdateTimeToLiveRequest
+                    {
+                        TableName = tableName,
+                        TimeToLiveSpecification = new TimeToLiveSpecification { AttributeName = ttlAttributeName, Enabled = true }
+                    });
+                }
                 if (description.TableStatus != TableStatus.ACTIVE)
                     throw new InvalidOperationException($"Failure creating table {tableName}");
             }
@@ -242,47 +263,14 @@ namespace Orleans.Transactions.DynamoDB
                 {
                     TableName = tableName,
                     Key = keys,
-                    ExpressionAttributeValues = new Dictionary<string, AttributeValue>(),
                     ReturnValues = ReturnValue.UPDATED_NEW
                 };
 
-                var updateExpression = new StringBuilder();
-                foreach (var field in fields.Keys)
-                {
-                    var valueKey = ":" + field;
-                    request.ExpressionAttributeValues.Add(valueKey, fields[field]);
-                    updateExpression.Append($" {field} = {valueKey},");
-                }
-                updateExpression.Insert(0, "SET");
-
-                if (string.IsNullOrWhiteSpace(extraExpression))
-                {
-                    updateExpression.Remove(updateExpression.Length - 1, 1);
-                }
-                else
-                {
-                    updateExpression.Append($" {extraExpression}");
-                    if (extraExpressionValues != null && extraExpressionValues.Count > 0)
-                    {
-                        foreach (var key in extraExpressionValues.Keys)
-                        {
-                            request.ExpressionAttributeValues.Add(key, extraExpressionValues[key]);
-                        }
-                    }
-                }
-
-                request.UpdateExpression = updateExpression.ToString();
+                (request.UpdateExpression, request.ExpressionAttributeValues) = ConvertUpdate(fields, conditionValues,
+                    extraExpression, extraExpressionValues);
 
                 if (!string.IsNullOrWhiteSpace(conditionExpression))
                     request.ConditionExpression = conditionExpression;
-
-                if (conditionValues != null && conditionValues.Keys.Count > 0)
-                {
-                    foreach (var item in conditionValues)
-                    {
-                        request.ExpressionAttributeValues.Add(item.Key, item.Value);
-                    }
-                }
 
                 var result = await ddbClient.UpdateItemAsync(request);
 
@@ -304,6 +292,49 @@ namespace Orleans.Transactions.DynamoDB
                     $"Intermediate error upserting to the table {tableName}", exc);
                 throw;
             }
+        }
+
+        public (string updateExpression, Dictionary<string, AttributeValue> expressionAttributeValues)
+            ConvertUpdate(Dictionary<string, AttributeValue> fields,
+                Dictionary<string, AttributeValue> conditionValues = null,
+                string extraExpression = "", Dictionary<string, AttributeValue> extraExpressionValues = null)
+        {
+            var expressionAttributeValues = new Dictionary<string, AttributeValue>();
+
+            var updateExpression = new StringBuilder();
+            foreach (var field in fields.Keys)
+            {
+                var valueKey = ":" + field;
+                expressionAttributeValues.Add(valueKey, fields[field]);
+                updateExpression.Append($" {field} = {valueKey},");
+            }
+            updateExpression.Insert(0, "SET");
+
+            if (string.IsNullOrWhiteSpace(extraExpression))
+            {
+                updateExpression.Remove(updateExpression.Length - 1, 1);
+            }
+            else
+            {
+                updateExpression.Append($" {extraExpression}");
+                if (extraExpressionValues != null && extraExpressionValues.Count > 0)
+                {
+                    foreach (var key in extraExpressionValues.Keys)
+                    {
+                        expressionAttributeValues.Add(key, extraExpressionValues[key]);
+                    }
+                }
+            }
+
+            if (conditionValues != null && conditionValues.Keys.Count > 0)
+            {
+                foreach (var item in conditionValues)
+                {
+                    expressionAttributeValues.Add(item.Key, item.Value);
+                }
+            }
+
+            return (updateExpression.ToString(), expressionAttributeValues);
         }
 
         /// <summary>
@@ -467,6 +498,41 @@ namespace Orleans.Transactions.DynamoDB
         }
 
         /// <summary>
+        /// Query for multiple entries in a DynamoDB table by filtering its keys
+        /// </summary>
+        /// <typeparam name="TResult">The result type</typeparam>
+        /// <param name="tableName">The name of the table to search for the entries</param>
+        /// <param name="keys">The table entry keys to search for</param>
+        /// <param name="keyConditionExpression">the expression that will filter the keys</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null and will be called for each entry that match the query and added to the results list</param>
+        /// <param name="indexName">In case a secondary index is used in the keyConditionExpression</param>
+        /// <param name="scanIndexForward">In case an index is used, show if the seek order is ascending (true) or descending (false)</param>
+        /// <returns>The collection containing a list of objects translated by the resolver function</returns>
+        public async Task<List<TResult>> QueryAllAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys,
+                string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver,
+                string indexName = "", bool scanIndexForward = true) where TResult : class
+        {
+            List<TResult> resultList = null;
+            Dictionary<string, AttributeValue> lastEvaluatedKey = null;
+            do
+            {
+                List<TResult> results;
+                (results, lastEvaluatedKey) = await QueryAsync(tableName, keys, keyConditionExpression, resolver,
+                    indexName, scanIndexForward, lastEvaluatedKey);
+                if (resultList == null)
+                {
+                    resultList = results;
+                }
+                else
+                {
+                    resultList.AddRange(results);
+                }
+            } while (lastEvaluatedKey.Count != 0);
+
+            return resultList;
+        }
+
+        /// <summary>
         /// Scan a DynamoDB table by querying the entry fields.
         /// </summary>
         /// <typeparam name="TResult">The result type</typeparam>
@@ -477,24 +543,47 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns>The collection containing a list of objects translated by the resolver function</returns>
         public async Task<List<TResult>> ScanAsync<TResult>(string tableName, Dictionary<string, AttributeValue> attributes, string expression, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
         {
+            // From the Amazon documentation:
+            // "A single Scan operation will read up to the maximum number of items set
+            // (if using the Limit parameter) or a maximum of 1 MB of data and then apply
+            // any filtering to the results using FilterExpression."
+            // https://docs.aws.amazon.com/sdkfornet/v3/apidocs/items/DynamoDBv2/MDynamoDBScanAsyncStringDictionary!String,%20Condition!CancellationToken.html
+
             try
             {
-                var request = new ScanRequest
-                {
-                    TableName = tableName,
-                    ConsistentRead = true,
-                    FilterExpression = expression,
-                    ExpressionAttributeValues = attributes,
-                    Select = Select.ALL_ATTRIBUTES
-                };
-
-                var response = await ddbClient.ScanAsync(request);
-
                 var resultList = new List<TResult>();
-                foreach (var item in response.Items)
+
+                var exclusiveStartKey = new Dictionary<string, AttributeValue>();
+
+                while (true)
                 {
-                    resultList.Add(resolver(item));
+                    var request = new ScanRequest
+                    {
+                        TableName = tableName,
+                        ConsistentRead = true,
+                        FilterExpression = expression,
+                        ExpressionAttributeValues = attributes,
+                        Select = Select.ALL_ATTRIBUTES,
+                        ExclusiveStartKey = exclusiveStartKey
+                    };
+
+                    var response = await ddbClient.ScanAsync(request);
+
+                    foreach (var item in response.Items)
+                    {
+                        resultList.Add(resolver(item));
+                    }
+
+                    if (response.LastEvaluatedKey.Count == 0)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        exclusiveStartKey = response.LastEvaluatedKey;
+                    }
                 }
+
                 return resultList;
             }
             catch (Exception exc)
@@ -540,6 +629,85 @@ namespace Orleans.Transactions.DynamoDB
             {
                 Logger.Warn(ErrorCode.StorageProviderBase,
                     $"Intermediate error bulk inserting entries to table {tableName}.", exc);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Transactionally reads entries from a DynamoDB table
+        /// </summary>
+        /// <typeparam name="TResult">The result type</typeparam>
+        /// <param name="tableName">The name of the table to search for the entry</param>
+        /// <param name="keys">The table entry keys to search for</param>
+        /// <param name="resolver">Function that will be called to translate the returned fields into a concrete type. This Function is only called if the result is != null</param>
+        /// <returns>The object translated by the resolver function</returns>
+        public async Task<IEnumerable<TResult>> GetEntriesTxAsync<TResult>(string tableName, IEnumerable<Dictionary<string, AttributeValue>> keys, Func<Dictionary<string, AttributeValue>, TResult> resolver) where TResult : class
+        {
+            try
+            {
+                var request = new TransactGetItemsRequest
+                {
+                    TransactItems = keys.Select(key => new TransactGetItem
+                    {
+                        Get = new Get
+                        {
+                            TableName = tableName,
+                            Key = key
+                        }
+                    }).ToList()
+                };
+
+                var response = await ddbClient.TransactGetItemsAsync(request);
+
+                return response.Responses.Where(r => r?.Item?.Count > 0).Select(r => resolver(r.Item));
+            }
+            catch (Exception)
+            {
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to find table entry for Keys = {0}", Utils.EnumerableToString(keys, d => Utils.DictionaryToString(d)));
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Transactionally performs write requests
+        /// </summary>
+        /// <param name="puts">Any puts to be performed</param>
+        /// <param name="updates">Any updated to be performed</param>
+        /// <param name="deletes">Any deletes to be performed</param>
+        /// <param name="conditionChecks">Any condition checks to be performed</param>
+        /// <returns></returns>
+        public Task WriteTxAsync(IEnumerable<Put> puts = null, IEnumerable<Update> updates = null, IEnumerable<Delete> deletes = null, IEnumerable<ConditionCheck> conditionChecks = null)
+        {
+            try
+            {
+                var transactItems = new List<TransactWriteItem>();
+                if (puts != null)
+                {
+                    transactItems.AddRange(puts.Select(p => new TransactWriteItem{Put = p}));
+                }
+                if (updates != null)
+                {
+                    transactItems.AddRange(updates.Select(u => new TransactWriteItem{Update = u}));
+                }
+                if (deletes != null)
+                {
+                    transactItems.AddRange(deletes.Select(d => new TransactWriteItem{Delete = d}));
+                }
+                if (conditionChecks != null)
+                {
+                    transactItems.AddRange(conditionChecks.Select(c => new TransactWriteItem{ConditionCheck = c}));
+                }
+
+                var request = new TransactWriteItemsRequest
+                {
+                    TransactItems = transactItems
+                };
+
+                return ddbClient.TransactWriteItemsAsync(request);
+            }
+            catch (Exception)
+            {
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Unable to write tx");
                 throw;
             }
         }

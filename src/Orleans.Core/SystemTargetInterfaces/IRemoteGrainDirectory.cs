@@ -38,7 +38,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Per-silo system interface for managing the distributed, partitioned grain-silo-activation directory.
     /// </summary>
-    internal interface IRemoteGrainDirectory : ISystemTarget, IGrainDirectory
+    internal interface IRemoteGrainDirectory : ISystemTarget, IDhtGrainDirectory
     {        
         /// <summary>
         /// Records a bunch of new grain activations.

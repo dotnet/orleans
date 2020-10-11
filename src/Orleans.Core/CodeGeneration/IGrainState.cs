@@ -13,6 +13,8 @@ namespace Orleans
 
         /// <summary>An e-tag that allows optimistic concurrency checks at the storage provider level.</summary>
         string ETag { get; set; }
+
+        bool RecordExists { get; set; }
     }
 
     /// <summary>
@@ -20,21 +22,14 @@ namespace Orleans
     /// </summary>
     /// <typeparam name="T">The type of application level payload.</typeparam>
     [Serializable]
-    internal class GrainState<T> : IGrainState
+    public class GrainState<T> : IGrainState
     {
         public T State;
 
         object IGrainState.State
         {
-            get
-            {
-                return State;
-
-            }
-            set
-            {
-                State = (T)value;
-            }
+            get => State;
+            set => State = (T)value;
         }
 
         /// <inheritdoc />
@@ -42,6 +37,7 @@ namespace Orleans
 
         /// <inheritdoc />
         public string ETag { get; set; }
+        public bool RecordExists { get; set; }
 
         /// <summary>Initializes a new instance of <see cref="GrainState{T}"/>.</summary>
         public GrainState()

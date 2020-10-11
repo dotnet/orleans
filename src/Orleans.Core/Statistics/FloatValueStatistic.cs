@@ -6,10 +6,9 @@ using System.Linq;
 
 namespace Orleans.Runtime
 {
-    internal class FloatValueStatistic : ICounter<float>
+    public class FloatValueStatistic : ICounter<float>
     {
-        private static readonly Dictionary<string, FloatValueStatistic> registeredStatistics;
-        private static readonly object lockable;
+        private static readonly Dictionary<string, FloatValueStatistic> dict = new Dictionary<string, FloatValueStatistic>();
 
         public string Name { get; }
         public CounterStorage Storage { get; private set; }
@@ -17,12 +16,6 @@ namespace Orleans.Runtime
         private Func<float> fetcher;
         private Func<float, float> valueConverter;
         private readonly string currentName;
-
-        static FloatValueStatistic()
-        {
-            registeredStatistics = new Dictionary<string, FloatValueStatistic>();
-            lockable = new object();
-        }
 
         // Must be called while Lockable is locked
         private FloatValueStatistic(string n, Func<float> f)
@@ -34,16 +27,10 @@ namespace Orleans.Runtime
 
         public static FloatValueStatistic Find(StatisticName name)
         {
-            lock (lockable)
+            lock (dict)
             {
-                if (registeredStatistics.ContainsKey(name.Name))
-                {
-                    return registeredStatistics[name.Name];
-                }
-                else
-                {
-                    return null;
-                }
+                dict.TryGetValue(name.Name, out var stat);
+                return stat;
             }
         }
 
@@ -54,27 +41,25 @@ namespace Orleans.Runtime
 
         public static FloatValueStatistic FindOrCreate(StatisticName name, Func<float> f, CounterStorage storage)
         {
-            lock (lockable)
+            lock (dict)
             {
-                FloatValueStatistic stat;
-                if (registeredStatistics.TryGetValue(name.Name, out stat))
+                if (dict.TryGetValue(name.Name, out var stat))
                 {
                     return stat;
                 }
                 var ctr = new FloatValueStatistic(name.Name, f) { Storage = storage };
-                registeredStatistics[name.Name] = ctr;
+                dict[name.Name] = ctr;
                 return ctr;
             }
         }
 
         public static void Delete(StatisticName name)
         {
-            lock (lockable)
+            lock (dict)
             {
-                FloatValueStatistic stat;
-                if (registeredStatistics.TryGetValue(name.Name, out stat))
+                if (dict.TryGetValue(name.Name, out var stat))
                 {
-                    registeredStatistics.Remove(name.Name);
+                    dict.Remove(name.Name);
                     // Null the fetcher delegate to prevent memory leaks via undesirable reference capture by the fetcher lambda.
                     stat.fetcher = null;
                     stat.valueConverter = null;
@@ -122,9 +107,9 @@ namespace Orleans.Runtime
 
         public static void AddCounters(List<ICounter> list, Func<ICounter, bool> predicate)
         {
-            lock (lockable)
+            lock (dict)
             {
-                list.AddRange(registeredStatistics.Values.Where(predicate));
+                list.AddRange(dict.Values.Where(predicate));
             }
         }
 

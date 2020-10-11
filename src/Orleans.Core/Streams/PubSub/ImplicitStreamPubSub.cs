@@ -23,10 +23,10 @@ namespace Orleans.Streams
             this.implicitTable = implicitPubSubTable;
         }
 
-        public Task<ISet<PubSubSubscriptionState>> RegisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer)
+        public Task<ISet<PubSubSubscriptionState>> RegisterProducer(InternalStreamId streamId, IStreamProducerExtension streamProducer)
         {
             ISet<PubSubSubscriptionState> result = new HashSet<PubSubSubscriptionState>();
-            if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.Namespace)) return Task.FromResult(result);
+            if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.GetNamespace())) return Task.FromResult(result);
 
             IDictionary<Guid, IStreamConsumerExtension> implicitSubscriptions = implicitTable.GetImplicitSubscribers(streamId, this.grainFactory);
             foreach (var kvp in implicitSubscriptions)
@@ -37,13 +37,14 @@ namespace Orleans.Streams
             return Task.FromResult(result);
         }
 
-        public Task UnregisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer)
+        public Task UnregisterProducer(InternalStreamId streamId, IStreamProducerExtension streamProducer)
         {
             return Task.CompletedTask;
         }
 
-        public Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
+        public Task RegisterConsumer(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {
+            // TODO BPETIT filter data?
             if (!IsImplicitSubscriber(streamConsumer, streamId))
             {
                 throw new ArgumentOutOfRangeException(streamId.ToString(), "Only implicit subscriptions are supported.");
@@ -51,7 +52,7 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider)
+        public Task UnregisterConsumer(GuidId subscriptionId, InternalStreamId streamId)
         {
             if (!IsImplicitSubscriber(subscriptionId, streamId))
             {
@@ -60,19 +61,19 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace)
+        public Task<int> ProducerCount(InternalStreamId streamId)
         {
             return Task.FromResult(0);
         }
 
-        public Task<int> ConsumerCount(Guid streamId, string streamProvider, string streamNamespace)
+        public Task<int> ConsumerCount(InternalStreamId streamId)
         {
             return Task.FromResult(0);
         }
 
-        public Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null)
+        public Task<List<StreamSubscription>> GetAllSubscriptions(InternalStreamId streamId, IStreamConsumerExtension streamConsumer = null)
         {
-            if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.Namespace))
+            if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.GetNamespace()))
                 return Task.FromResult(new List<StreamSubscription>());
 
             if (streamConsumer != null)
@@ -95,17 +96,17 @@ namespace Orleans.Streams
             }   
         }
 
-        internal bool IsImplicitSubscriber(IAddressable addressable, StreamId streamId)
+        internal bool IsImplicitSubscriber(IAddressable addressable, InternalStreamId streamId)
         {
             return implicitTable.IsImplicitSubscriber(GrainExtensions.GetGrainId(addressable), streamId);
         }
 
-        internal bool IsImplicitSubscriber(GuidId subscriptionId, StreamId streamId)
+        internal bool IsImplicitSubscriber(GuidId subscriptionId, InternalStreamId streamId)
         {
             return SubscriptionMarker.IsImplicitSubscription(subscriptionId.Guid);
         }
 
-        public GuidId CreateSubscriptionId(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public GuidId CreateSubscriptionId(InternalStreamId streamId, IStreamConsumerExtension streamConsumer)
         {
             GrainId grainId = GrainExtensions.GetGrainId(streamConsumer);
             Guid subscriptionGuid;
@@ -116,7 +117,7 @@ namespace Orleans.Streams
             return GuidId.GetGuidId(subscriptionGuid);
         }
 
-        public Task<bool> FaultSubscription(StreamId streamId, GuidId subscriptionId)
+        public Task<bool> FaultSubscription(InternalStreamId streamId, GuidId subscriptionId)
         {
             return Task.FromResult(false);
         }

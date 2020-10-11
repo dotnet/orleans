@@ -9,14 +9,14 @@ namespace Orleans.Runtime.MembershipService
 { 
     public class AdoNetClusteringTable: IMembershipTable
     {
-        private readonly IGrainReferenceConverter grainReferenceConverter;
-        private string clusterId;        
+        private string clusterId;
+        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private ILogger logger;
         private RelationalOrleansQueries orleansQueries;
         private readonly AdoNetClusteringSiloOptions clusteringTableOptions;
 
         public AdoNetClusteringTable(
-            IGrainReferenceConverter grainReferenceConverter, 
+            GrainReferenceKeyStringConverter grainReferenceConverter, 
             IOptions<ClusterOptions> clusterOptions, 
             IOptions<AdoNetClusteringSiloOptions> clusteringOptions, 
             ILogger<AdoNetClusteringTable> logger)

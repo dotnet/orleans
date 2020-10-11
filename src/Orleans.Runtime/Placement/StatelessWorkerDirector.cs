@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-
+using Orleans.Internal;
 
 namespace Orleans.Runtime.Placement
 {
@@ -9,34 +9,31 @@ namespace Orleans.Runtime.Placement
     {
         private static readonly SafeRandom random = new SafeRandom();
 
-        public Task<PlacementResult> OnSelectActivation(
-            PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
-        {
-            return Task.FromResult(SelectActivationCore(strategy, target, context));
-        }
-
-        public bool TrySelectActivationSynchronously(
-            PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult)
-        {
-            placementResult = SelectActivationCore(strategy, target, context);
-            return placementResult != null;
-        }
-
+        public ValueTask<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementRuntime context) => new ValueTask<PlacementResult>(SelectActivationCore(strategy, target, context));
 
         public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
-            // If the current silo is not shutting down, place locally
+            var compatibleSilos = context.GetCompatibleSilos(target);
+
+            // If the current silo is not shutting down, place locally if we are compatible
             if (!context.LocalSiloStatus.IsTerminating())
-                return Task.FromResult(context.LocalSilo);
+            {
+                foreach (var silo in compatibleSilos)
+                {
+                    if (silo.Equals(context.LocalSilo))
+                    {
+                        return Task.FromResult(context.LocalSilo);
+                    }
+                }
+            }
 
             // otherwise, place somewhere else
-            var compatibleSilos = context.GetCompatibleSilos(target);
-            return Task.FromResult(compatibleSilos[random.Next(compatibleSilos.Count)]);
+            return Task.FromResult(compatibleSilos[random.Next(compatibleSilos.Length)]);
         }
 
         private PlacementResult SelectActivationCore(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
-            if (target.IsClient)
+            if (target.IsClient())
                 throw new InvalidOperationException("Cannot use StatelessWorkerStrategy to route messages to client grains.");
 
             // If there are available (not busy with a request) activations, it returns the first one.

@@ -5,7 +5,7 @@ CREATE TABLE OrleansRemindersTable
     GrainId varchar(150) NOT NULL,
     ReminderName varchar(150) NOT NULL,
     StartTime timestamp(3) NOT NULL,
-    Period integer NOT NULL,
+    Period bigint NOT NULL,
     GrainHash integer NOT NULL,
     Version integer NOT NULL,
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -15,14 +15,14 @@ namespace DefaultCluster.Tests.General
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
+        [Fact, TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]
         public async Task TakeSerializedDataNotRefOrleans()
         {
             var grain = this.GrainFactory.GetGrain<ISerializerPresenceTest>(Guid.NewGuid());
             await grain.TakeSerializedData(new UnitTests.Dtos.ClassNotReferencingOrleansTypeDto { MyProperty = "Test" });
         }
 
-        [Fact(Skip = "reproduces issue #1480"), TestCategory("BVT"), TestCategory("Functional"), TestCategory("CodeGen"), TestCategory("Serialization")]
+        [Fact(Skip = "reproduces issue #1480"), TestCategory("BVT"), TestCategory("CodeGen"), TestCategory("Serialization")]
         public async Task TakeSerializedDataRefOrleans()
         {
             var grain = this.GrainFactory.GetGrain<ISerializerPresenceTest>(Guid.NewGuid());

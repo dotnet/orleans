@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Orleans.Runtime;
+using Microsoft.Azure.Cosmos.Table;
 
 //
 // Number of #ifs can be reduced (or removed), once we separate test projects by feature/area, otherwise we are ending up with ambigous types and build errors.
@@ -23,6 +22,8 @@ namespace Orleans.Tests.AzureUtils
 namespace Orleans.Hosting.AzureCloudServices
 #elif ORLEANS_TRANSACTIONS
 namespace Orleans.Transactions.AzureStorage
+#elif ORLEANS_DIRECTORY
+namespace Orleans.GrainDirectory.AzureStorage
 #else
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
@@ -33,7 +34,7 @@ namespace Orleans.Transactions.AzureStorage
     /// <remarks>
     /// These functions are mostly intended for internal usage by Orleans runtime, but due to certain assembly packaging constraints this class needs to have public visibility.
     /// </remarks>
-    internal static class AzureTableDefaultPolicies
+    public static class AzureTableDefaultPolicies
     {
         public static int MaxTableCreationRetries { get; private set; }
         public static int MaxTableOperationRetries { get; private set; }

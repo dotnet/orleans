@@ -2,46 +2,52 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 using Orleans.Threading;
 
 namespace Orleans.Timers.Internal
 {
     public interface ITimerManager
     {
-        Task Delay(TimeSpan timeSpan);
+        Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default(CancellationToken));
     }
 
     internal class TimerManagerImpl : ITimerManager
     {
-        public Task Delay(TimeSpan timeSpan) => TimerManager.Delay(timeSpan);
+        public Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default(CancellationToken)) => TimerManager.Delay(timeSpan, cancellationToken);
     }
 
     internal static class TimerManager
     {
-        public static Task Delay(TimeSpan timeSpan) => DelayUntil(DateTime.UtcNow + timeSpan);
+        public static Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default(CancellationToken)) => DelayUntil(DateTime.UtcNow + timeSpan, cancellationToken);
 
-        public static Task DelayUntil(DateTime dueTime)
+        public static Task<bool> DelayUntil(DateTime dueTime, CancellationToken cancellationToken = default(CancellationToken))
         {
-            var result = new DelayTimer(dueTime);
+            var result = new DelayTimer(dueTime, cancellationToken);
             TimerManager<DelayTimer>.Register(result);
             return result.Completion;
         }
 
         private sealed class DelayTimer : ITimerCallback, ILinkedListElement<DelayTimer>
         {
-            private readonly TaskCompletionSource<int> completion =
-                new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly TaskCompletionSource<bool> completion =
+                new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            public DelayTimer(DateTime dueTime)
+            public DelayTimer(DateTime dueTime, CancellationToken cancellationToken)
             {
                 this.DueTime = dueTime;
+                this.CancellationToken = cancellationToken;
             }
 
-            public Task Completion => this.completion.Task;
+            public Task<bool> Completion => this.completion.Task;
 
             public DateTime DueTime { get; }
-            
-            public void OnTimeout() => this.completion.TrySetResult(0);
+
+            public CancellationToken CancellationToken { get; }
+
+            public void OnTimeout() => this.completion.TrySetResult(true);
+
+            public void OnCanceled() => this.completion.TrySetResult(false);
 
             DelayTimer ILinkedListElement<DelayTimer>.Next { get; set; }
         }
@@ -69,9 +75,9 @@ namespace Orleans.Timers.Internal
         // ReSharper disable once StaticMemberInGenericType
         private static readonly object AllQueuesLock = new object();
 
-        // ReSharper disable once StaticMemberInGenericType
-        // ReSharper disable once NotAccessedField.Local
+#pragma warning disable IDE0052 // Remove unread private members
         private static readonly Timer QueueChecker;
+#pragma warning restore IDE0052 // Remove unread private members
 
         /// <summary>
         /// Collection of all thread-local timer queues.
@@ -87,7 +93,7 @@ namespace Orleans.Timers.Internal
         static TimerManager()
         {
             var timerPeriod = TimeSpan.FromMilliseconds(TIMER_TICK_MILLISECONDS);
-            QueueChecker = new Timer(_ => CheckQueues(), null, timerPeriod, timerPeriod);
+            QueueChecker = NonCapturingTimer.Create(_ => CheckQueues(), null, timerPeriod, timerPeriod);
         }
 
         /// <summary>
@@ -172,7 +178,7 @@ namespace Orleans.Timers.Internal
 
             for (var current = queue.Head; current != null; current = current.Next)
             {
-                if (current.DueTime < now)
+                if (current.CancellationToken.IsCancellationRequested || current.DueTime < now)
                 {
                     // Dequeue and add to expired list for later execution.
                     queue.Remove(previous, current);
@@ -258,7 +264,14 @@ namespace Orleans.Timers.Internal
                 {
                     try
                     {
-                        current.OnTimeout();
+                        if (current.CancellationToken.IsCancellationRequested)
+                        {
+                            current.OnCanceled();
+                        }
+                        else
+                        {
+                            current.OnTimeout();
+                        }
                     }
                     catch
                     {
@@ -277,8 +290,12 @@ namespace Orleans.Timers.Internal
         /// The UTC time when this timer is due.
         /// </summary>
         DateTime DueTime { get; }
-        
+
+        CancellationToken CancellationToken { get; }
+
         void OnTimeout();
+
+        void OnCanceled();
     }
 
     /// <summary>

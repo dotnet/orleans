@@ -1,19 +1,13 @@
-﻿
+using Orleans.Transactions.AzureStorage;
 
 namespace Orleans.Configuration
 {
-    public class AzureTableTransactionalStateOptions
+    public class AzureTableTransactionalStateOptions : AzureStorageOperationOptions
     {
-        /// <summary>
-        /// Azure storage connection string
-        /// </summary>
-        [RedactConnectionString]
-        public string ConnectionString { get; set; }
-
         /// <summary>
         /// Azure table where transactional grain state will be stored
         /// </summary>
-        public string TableName { get; set; } = "TransactionalState";
+        public override string TableName { get; set; } = "TransactionalState";
 
         /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.

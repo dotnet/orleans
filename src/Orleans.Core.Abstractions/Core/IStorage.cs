@@ -1,13 +1,14 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 
 namespace Orleans.Core
 {
     public interface IStorage<TState>
-        where TState : new()
     {
         TState State { get; set; }
 
         string Etag { get; }
+
+        bool RecordExists { get; }
 
         /// <summary>
         /// Async method to cause the current grain state data to be cleared and reset. 

@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Hosting;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
@@ -21,14 +22,15 @@ namespace Tester
         [Fact]
         public async Task LocalhostSiloTest()
         {
-            var opts = TestSiloSpecificOptions.Create(new TestClusterOptions(), 1, true);
+            using var portAllocator = new TestClusterPortAllocator();
+            var (siloPort, gatewayPort) = portAllocator.AllocateConsecutivePortPairs(1);
             var silo = new SiloHostBuilder()
                 .AddMemoryGrainStorage("MemoryStore")
-                .UseLocalhostClustering(opts.SiloPort, opts.GatewayPort)
+                .UseLocalhostClustering(siloPort, gatewayPort)
                 .Build();
 
             var client = new ClientBuilder()
-                .UseLocalhostClustering(opts.GatewayPort)
+                .UseLocalhostClustering(gatewayPort)
                 .Build();
             try
             {
@@ -53,18 +55,20 @@ namespace Tester
         [Fact]
         public async Task LocalhostClusterTest()
         {
+            using var portAllocator = new TestClusterPortAllocator();
+            var (baseSiloPort, baseGatewayPort) = portAllocator.AllocateConsecutivePortPairs(2);
             var silo1 = new SiloHostBuilder()
                 .AddMemoryGrainStorage("MemoryStore")
-                .UseLocalhostClustering(12111, 30001)
+                .UseLocalhostClustering(baseSiloPort, baseGatewayPort)
                 .Build();
 
             var silo2 = new SiloHostBuilder()
                 .AddMemoryGrainStorage("MemoryStore")
-                .UseLocalhostClustering(12112, 30002, new IPEndPoint(IPAddress.Loopback, 12111))
+                .UseLocalhostClustering(baseSiloPort + 1, baseGatewayPort + 1, new IPEndPoint(IPAddress.Loopback, baseSiloPort))
                 .Build();
 
             var client = new ClientBuilder()
-                .UseLocalhostClustering(new[] {30001, 30002})
+                .UseLocalhostClustering(new[] { baseGatewayPort, baseGatewayPort + 1})
                 .Build();
 
             try

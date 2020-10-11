@@ -15,7 +15,6 @@ namespace Orleans.Runtime.ConsistentRing
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
     internal class ConsistentRingProvider :
-        MarshalByRefObject,
         IConsistentRingProvider, ISiloStatusListener // make the ring shutdown-able?
     {
         // internal, so that unit tests can access them

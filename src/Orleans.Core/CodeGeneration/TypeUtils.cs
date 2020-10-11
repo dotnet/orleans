@@ -47,7 +47,7 @@ namespace Orleans.Runtime
 
                 return GetTemplatedName(type.DeclaringType) + "." + GetUntemplatedTypeName(type.Name);
             }
-            
+
             if (type.IsGenericType) return GetSimpleTypeName(fullName != null && fullName(type) ? GetFullName(type) : type.Name);
 
             return fullName != null && fullName(type) ? GetFullName(type) : type.Name;
@@ -229,7 +229,7 @@ namespace Orleans.Runtime
 
             foreach (var innerType in innerTypes)
             {
-                if (innerType.StartsWith("[[")) // Resolve and load generic types recursively
+                if (innerType.StartsWith("[[", StringComparison.Ordinal)) // Resolve and load generic types recursively
                 {
                     InnerGenericTypeArgs(GenericTypeArgsString(innerType));
                     string genericTypeArg = className.Trim('[', ']');
@@ -258,7 +258,7 @@ namespace Orleans.Runtime
             int endTokensNeeded = 0;
             string curStartToken = "";
             string curEndToken = "";
-            var tokenPairs = new[] { new { Start = "[[", End = "]]" }, new { Start = "[", End = "]" } }; // Longer tokens need to come before shorter ones
+            var tokenPairs = new[] { (Start: "[[", End: "]]"), (Start: "[", End: "]") }; // Longer tokens need to come before shorter ones
 
             foreach (var candidate in candidatesWithPositions)
             {
@@ -266,7 +266,7 @@ namespace Orleans.Runtime
                 {
                     foreach (var token in tokenPairs)
                     {
-                        if (candidate.Str.StartsWith(token.Start))
+                        if (candidate.Str.StartsWith(token.Start, StringComparison.Ordinal))
                         {
                             curStartToken = token.Start;
                             curEndToken = token.End;
@@ -276,10 +276,10 @@ namespace Orleans.Runtime
                     }
                 }
 
-                if (curStartToken != "" && candidate.Str.StartsWith(curStartToken))
+                if (curStartToken != "" && candidate.Str.StartsWith(curStartToken, StringComparison.Ordinal))
                     endTokensNeeded++;
 
-                if (curEndToken != "" && candidate.Str.EndsWith(curEndToken))
+                if (curEndToken != "" && candidate.Str.EndsWith(curEndToken, StringComparison.Ordinal))
                 {
                     endPos = candidate.Pos;
                     endTokensNeeded--;
@@ -481,6 +481,9 @@ namespace Orleans.Runtime
 
         private static readonly Lazy<bool> canUseReflectionOnly = new Lazy<bool>(() =>
         {
+#if NETCOREAPP
+            return false;
+#else
             try
             {
                 ReflectionOnlyTypeResolver.TryResolveType(typeof(TypeUtils).AssemblyQualifiedName, out _);
@@ -495,6 +498,7 @@ namespace Orleans.Runtime
                 // if other exceptions not related to platform ocurr, assume that ReflectionOnly is supported
                 return true;
             }
+#endif
         });
 
         public static bool CanUseReflectionOnly => canUseReflectionOnly.Value;
@@ -521,7 +525,7 @@ namespace Orleans.Runtime
             return assembly.IsDynamic ? Enumerable.Empty<Type>() : GetDefinedTypes(assembly, logger).Where(type => !type.IsNestedPrivate && whereFunc(type));
         }
 
-        public static IEnumerable<Type> GetDefinedTypes(Assembly assembly, ILogger logger=null)
+        public static IEnumerable<Type> GetDefinedTypes(Assembly assembly, ILogger logger = null)
         {
             try
             {
@@ -576,7 +580,7 @@ namespace Orleans.Runtime
                         attrib => attribType.IsAssignableFrom(attrib.AttributeType));
             }
 
-            return type.GetCustomAttributes(attribType, true).Any();
+            return type.IsDefined(attribType, true);
         }
 
         /// <summary>
@@ -706,7 +710,7 @@ namespace Orleans.Runtime
                     builder.AppendFormat(
                         "{0}[{1}]",
                         elementType,
-                        string.Concat(Enumerable.Range(0, type.GetArrayRank() - 1).Select(_ => ',')));
+                        new string(',', type.GetArrayRank() - 1));
                 }
 
                 return;
@@ -751,7 +755,7 @@ namespace Orleans.Runtime
                 var unadornedTypeName = getNameFunc(type);
                 builder.Append(EscapeIdentifier(unadornedTypeName));
                 var generics =
-                    Enumerable.Range(0, Math.Min(type.GetGenericArguments().Count(), typeArguments.Count))
+                    Enumerable.Range(0, Math.Min(type.GetGenericArguments().Length, typeArguments.Count))
                         .Select(_ => typeArguments.Dequeue())
                         .ToList();
                 if (generics.Count > 0 && options.IncludeTypeParameters)
@@ -768,7 +772,7 @@ namespace Orleans.Runtime
                 var unadornedTypeName = getNameFunc(type);
                 builder.Append(EscapeIdentifier(unadornedTypeName));
                 var generics =
-                    Enumerable.Range(0, Math.Min(type.GetGenericArguments().Count(), typeArguments.Count))
+                    Enumerable.Range(0, Math.Min(type.GetGenericArguments().Length, typeArguments.Count))
                         .Select(_ => typeArguments.Dequeue())
                         .ToList();
                 if (generics.Count > 0 && options.IncludeTypeParameters)

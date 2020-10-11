@@ -59,7 +59,7 @@ namespace Orleans.Serialization
             if (t.IsPrimitive || t.IsEnum)
                 return true;
 
-            if (t.GetCustomAttributes(typeof(ImmutableAttribute), false).Length != 0)
+            if (t.IsDefined(typeof(ImmutableAttribute), false))
                 return true;
 
             if (t.IsConstructedGenericType)
@@ -165,7 +165,7 @@ namespace Orleans.Serialization
         private static string GetBaseTypeKey(Type t)
         {
             string namespacePrefix = "";
-            if ((t.Namespace != null) && !t.Namespace.StartsWith("System.") && !t.Namespace.Equals("System"))
+            if ((t.Namespace != null) && !t.Namespace.StartsWith("System.", StringComparison.Ordinal) && !t.Namespace.Equals("System"))
             {
                 namespacePrefix = t.Namespace + '.';
             }

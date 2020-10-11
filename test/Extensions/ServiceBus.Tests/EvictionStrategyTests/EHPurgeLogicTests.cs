@@ -1,6 +1,5 @@
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
@@ -8,7 +7,6 @@ using Orleans.TestingHost.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using Microsoft.Azure.EventHubs;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -18,6 +16,7 @@ using TestExtensions;
 using Xunit;
 using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Hosting;
+using Azure.Messaging.EventHubs;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -237,20 +236,19 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private EventData MakeEventData(long sequenceNumber)
         {
             byte[] ignore = { 12, 23 };
-            var eventData = new EventData(ignore);
-            DateTime now = DateTime.UtcNow;
-            var offSet = Guid.NewGuid().ToString() + now.ToString();
-            eventData.SetOffset(offSet);
-            //set sequence number
-            eventData.SetSequenceNumber(sequenceNumber);
-            //set enqueue time
-            eventData.SetEnqueuedTimeUtc(now);
+            var now = DateTime.UtcNow;
+            var eventData = new TestEventData(ignore,
+                offset: now.Ticks,
+                sequenceNumber: sequenceNumber,
+                enqueuedTime: now);
             return eventData;
         }
 
-        private NodeConfiguration GetNodeConfiguration()
+        private class TestEventData : EventData
         {
-            return new NodeConfiguration();
+            public TestEventData(ReadOnlyMemory<byte> eventBody, IDictionary<string, object> properties = null, IReadOnlyDictionary<string, object> systemProperties = null, long sequenceNumber = long.MinValue, long offset = long.MinValue, DateTimeOffset enqueuedTime = default, string partitionKey = null) : base(eventBody, properties, systemProperties, sequenceNumber, offset, enqueuedTime, partitionKey)
+            {
+            }
         }
 
         private Task<IStreamQueueCheckpointer<string>> CheckPointerFactory(string partition)
@@ -263,8 +261,12 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCacheForTesting)}.{partition}");
             var evictionStrategy = new EHEvictionStrategyForTesting(cacheLogger, null, null, this.purgePredicate);
             this.evictionStrategyList.Add(evictionStrategy);
-            var cache = new EventHubQueueCacheForTesting(checkpointer, new MockEventHubCacheAdaptor(this.serializationManager, this.bufferPool),
-                EventHubDataComparer.Instance, cacheLogger, evictionStrategy);
+            var cache = new EventHubQueueCacheForTesting(
+                this.bufferPool,
+                new MockEventHubCacheAdaptor(this.serializationManager),
+                evictionStrategy,
+                checkpointer,
+                cacheLogger);
             cache.AddCachePressureMonitor(this.cachePressureInjectionMonitor);
             this.cacheList.Add(cache);
             return cache;

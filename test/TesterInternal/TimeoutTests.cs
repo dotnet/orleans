@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -26,7 +27,7 @@ namespace UnitTests
             originalTimeout = this.runtimeClient.GetResponseTimeout();
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             this.runtimeClient.SetResponseTimeout(originalTimeout);
         }
@@ -63,7 +64,7 @@ namespace UnitTests
             output.WriteLine("Waited for " + stopwatch.Elapsed);
             Assert.True(!finished);
             Assert.True(stopwatch.Elapsed >= timeout.Multiply(0.9), "Waited less than " + timeout.Multiply(0.9) + ". Waited " + stopwatch.Elapsed);
-            Assert.True(stopwatch.Elapsed <= timeout.Multiply(2), "Waited longer than " + timeout.Multiply(2) + ". Waited " + stopwatch.Elapsed);
+            Assert.True(stopwatch.Elapsed <= timeout.Multiply(3.5), "Waited longer than " + timeout.Multiply(3.5) + ". Waited " + stopwatch.Elapsed);
             Assert.True(promise.Status == TaskStatus.Faulted);
 
             // try to re-use the promise and should fail immideately.

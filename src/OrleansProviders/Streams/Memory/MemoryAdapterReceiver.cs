@@ -1,19 +1,17 @@
-﻿
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Runtime;
-using Orleans.Streams;
-using Orleans.Providers.Streams.Common;
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Orleans.Providers.Streams.Common;
+using Orleans.Streams;
 
 namespace Orleans.Providers
 {
     internal class MemoryAdapterReceiver<TSerializer> : IQueueAdapterReceiver
         where TSerializer : class, IMemoryMessageBodySerializer
-    { 
+    {
         private readonly IMemoryStreamQueueGrain queueGrain;
         private readonly List<Task> awaitingTasks;
         private readonly ILogger logger;
@@ -52,12 +50,12 @@ namespace Orleans.Providers
                 {
                     var oldestMessage = eventData[0];
                     var newestMessage = eventData[eventData.Count - 1];
-                    this.receiverMonitor?.TrackMessagesReceived(eventData.Count(), oldestMessage.EnqueueTimeUtc, newestMessage.EnqueueTimeUtc);
+                    this.receiverMonitor?.TrackMessagesReceived(eventData.Count, oldestMessage.EnqueueTimeUtc, newestMessage.EnqueueTimeUtc);
                 }
             }
             catch (Exception exc)
             {
-                logger.Error((int)ProviderErrorCode.MemoryStreamProviderBase_GetQueueMessagesAsync, "Exception thrown in MemoryAdapterFactory.GetQueueMessagesAsync.", exc);
+                logger.LogError((int)ProviderErrorCode.MemoryStreamProviderBase_GetQueueMessagesAsync, exc, "Exception thrown in MemoryAdapterFactory.GetQueueMessagesAsync.");
                 watch.Stop();
                 this.receiverMonitor?.TrackRead(true, watch.Elapsed, exc);
                 throw;

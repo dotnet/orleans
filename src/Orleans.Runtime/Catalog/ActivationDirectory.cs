@@ -56,6 +56,7 @@ namespace Orleans.Runtime
             CounterStatistic ctr = FindGrainCounter(grainTypeName);
             ctr.Increment();
         }
+
         internal void DecrementGrainCounter(string grainTypeName)
         {
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Decrement Grain Counter {0}", grainTypeName);
@@ -87,7 +88,7 @@ namespace Orleans.Runtime
         {
             if (!activations.TryAdd(target.ActivationId, target))
                 return;
-            grainToActivationsMap.AddOrUpdate(target.Grain,
+            grainToActivationsMap.AddOrUpdate(target.GrainId,
                 g => new List<ActivationData> { target },
                 (g, list) => { lock (list) { list.Add(target); } return list; });
         }
@@ -96,9 +97,9 @@ namespace Orleans.Runtime
         {
             var systemTarget = (ISystemTargetBase) target;
             systemTargets.TryAdd(target.ActivationId, target);
-            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId))
+            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId)).Increment();
+                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId.Type)).Increment();
             }
         }
 
@@ -107,9 +108,9 @@ namespace Orleans.Runtime
             var systemTarget = (ISystemTargetBase) target;
             SystemTarget ignore;
             systemTargets.TryRemove(target.ActivationId, out ignore);
-            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId))
+            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId)).DecrementBy(1);
+                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId.Type)).DecrementBy(1);
             }
         }
 
@@ -119,7 +120,7 @@ namespace Orleans.Runtime
             if (!activations.TryRemove(target.ActivationId, out ignore))
                 return;
             List<ActivationData> list;
-            if (grainToActivationsMap.TryGetValue(target.Grain, out list))
+            if (grainToActivationsMap.TryGetValue(target.GrainId, out list))
             {
                 lock (list)
                 {
@@ -127,13 +128,13 @@ namespace Orleans.Runtime
                     if (list.Count == 0)
                     {
                         List<ActivationData> list2; // == list
-                        if (grainToActivationsMap.TryRemove(target.Grain, out list2))
+                        if (grainToActivationsMap.TryRemove(target.GrainId, out list2))
                         {
                             lock (list2)
                             {
                                 if (list2.Count > 0)
                                 {
-                                    grainToActivationsMap.AddOrUpdate(target.Grain,
+                                    grainToActivationsMap.AddOrUpdate(target.GrainId,
                                         g => list2,
                                         (g, list3) => { lock (list3) { list3.AddRange(list2); } return list3; });
                                 }

@@ -1,8 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Orleans.Runtime;
+using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -46,7 +46,7 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Parallel()
         {
             TimeSpan period = TimeSpan.Zero;
@@ -88,7 +88,7 @@ namespace DefaultCluster.Tests.TimerTests
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Timers")]
+        [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Migration()
         {
             ITimerGrain grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());

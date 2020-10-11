@@ -1,14 +1,14 @@
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
-using Orleans.Streams;
-using System;
+using Orleans.Providers;
 
-namespace Orleans.Providers
+namespace Orleans.Hosting
 {
     public interface IMemoryStreamConfigurator : INamedServiceConfigurator { }
 
-    public static class SiloRecoverableStreamConfiguratorExtensions
+    public static class MemoryStreamConfiguratorExtensions
     {
         public static void ConfigurePartitioning(this IMemoryStreamConfigurator configurator, int numOfQueues = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {

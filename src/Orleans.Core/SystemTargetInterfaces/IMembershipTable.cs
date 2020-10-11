@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -206,7 +207,7 @@ namespace Orleans
         }
 
         // return a copy of the table removing all dead appereances of dead nodes, except for the last one.
-        public MembershipTableData SupressDuplicateDeads()
+        public MembershipTableData WithoutDuplicateDeads()
         {
             var dead = new Dictionary<IPEndPoint, Tuple<MembershipEntry, string>>();
             // pick only latest Dead for each instance
@@ -229,6 +230,19 @@ namespace Orleans
             List<Tuple<MembershipEntry, string>> all = dead.Values.ToList();
             all.AddRange(Members.Where(item => item.Item1.Status != SiloStatus.Dead));
             return new MembershipTableData(all, Version);
+        }
+
+        internal Dictionary<SiloAddress, SiloStatus> GetSiloStatuses(Func<SiloStatus, bool> filter, bool includeMyself, SiloAddress myAddress)
+        {
+            var result = new Dictionary<SiloAddress, SiloStatus>();
+            foreach (var memberEntry in this.Members)
+            {
+                var entry = memberEntry.Item1;
+                if (!includeMyself && entry.SiloAddress.Equals(myAddress)) continue;
+                if (filter(entry.Status)) result[entry.SiloAddress] = entry.Status;
+            }
+
+            return result;
         }
     }
 
@@ -280,9 +294,6 @@ namespace Orleans
         /// </summary>
         public DateTime IAmAliveTime { get; set; }
         
-
-        private static readonly List<Tuple<SiloAddress, DateTime>> EmptyList = new List<Tuple<SiloAddress, DateTime>>(0);
-
         public void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)
         {
             if (SuspectTimes == null)
@@ -292,46 +303,51 @@ namespace Orleans
             SuspectTimes.Add(suspector);
         }
 
-        // partialUpdate arrivies via gossiping with other oracles. In such a case only take the status.
-        internal void Update(MembershipEntry updatedSiloEntry)
+        internal MembershipEntry Copy()
         {
-            SiloAddress = updatedSiloEntry.SiloAddress;
-            Status = updatedSiloEntry.Status;
-            //---
-            HostName = updatedSiloEntry.HostName;
-            ProxyPort = updatedSiloEntry.ProxyPort;
+            return new MembershipEntry
+            {
+                SiloAddress = this.SiloAddress,
+                Status = this.Status,
+                HostName = this.HostName,
+                ProxyPort = this.ProxyPort,
 
-            RoleName = updatedSiloEntry.RoleName;
-            SiloName = updatedSiloEntry.SiloName;
-            UpdateZone = updatedSiloEntry.UpdateZone;
-            FaultZone = updatedSiloEntry.FaultZone;
+                RoleName = this.RoleName,
+                SiloName = this.SiloName,
+                UpdateZone = this.UpdateZone,
+                FaultZone = this.FaultZone,
 
-            SuspectTimes = updatedSiloEntry.SuspectTimes;
-            StartTime = updatedSiloEntry.StartTime;
-            IAmAliveTime = updatedSiloEntry.IAmAliveTime;
+                SuspectTimes = this.SuspectTimes is null ? null : new List<Tuple<SiloAddress, DateTime>>(this.SuspectTimes),
+                StartTime = this.StartTime,
+                IAmAliveTime = this.IAmAliveTime,
+            };
         }
 
-        internal List<Tuple<SiloAddress, DateTime>> GetFreshVotes(TimeSpan expiration)
+        internal MembershipEntry WithStatus(SiloStatus status)
         {
-            if (SuspectTimes == null)
-                return EmptyList;
-            DateTime now = DateTime.UtcNow;
-            return SuspectTimes.FindAll(voter =>
+            var updated = this.Copy();
+            updated.Status = status;
+            return updated;
+        }
+
+        internal ImmutableList<Tuple<SiloAddress, DateTime>> GetFreshVotes(DateTime now, TimeSpan expiration)
+        {
+            if (this.SuspectTimes == null)
+                return ImmutableList<Tuple<SiloAddress, DateTime>>.Empty;
+
+            var result = ImmutableList.CreateBuilder<Tuple<SiloAddress, DateTime>>();
+            foreach (var voter in this.SuspectTimes)
+            {
+                // If now is smaller than otherVoterTime, than assume the otherVoterTime is fresh.
+                // This could happen if clocks are not synchronized and the other voter clock is ahead of mine.
+                var otherVoterTime = voter.Item2;
+                if (now < otherVoterTime || now.Subtract(otherVoterTime) < expiration)
                 {
-                    DateTime otherVoterTime = voter.Item2;
-                    // If now is smaller than otherVoterTime, than assume the otherVoterTime is fresh.
-                    // This could happen if clocks are not synchronized and the other voter clock is ahead of mine.
-                    if (now < otherVoterTime) 
-                        return true;
+                    result.Add(voter);
+                }
+            }
 
-                    return now.Subtract(otherVoterTime) < expiration;
-                });
-        }
-
-        internal void TryUpdateStartTime(DateTime startTime)
-        {
-            if (StartTime.Equals(default(DateTime)))
-                StartTime = startTime;
+            return result.ToImmutable();
         }
 
         public override string ToString()
@@ -339,7 +355,7 @@ namespace Orleans
             return string.Format("SiloAddress={0} SiloName={1} Status={2}", SiloAddress.ToLongString(), SiloName, Status);
         }
 
-        internal string ToFullString(bool full = false)
+        public string ToFullString(bool full = false)
         {
             if (!full)
                 return ToString();

@@ -80,7 +80,10 @@ namespace Orleans.Serialization
             }
 
             var innerList = new List<T>(collection.Count);
-            innerList.AddRange(collection.Select(element => (T)SerializationManager.DeepCopyInner(element, context)));
+            foreach (var element in collection)
+            {
+                innerList.Add((T)SerializationManager.DeepCopyInner(element, context));
+            }
 
             var retVal = new ReadOnlyCollection<T>(innerList);
             context.RecordCopy(original, retVal);
@@ -148,7 +151,11 @@ namespace Orleans.Serialization
             // set the list capacity, to avoid list resizing.
             var retVal = new List<T>(list.Count);
             context.RecordCopy(original, retVal);
-            retVal.AddRange(list.Select(element => (T)SerializationManager.DeepCopyInner(element, context)));
+            foreach (var element in list)
+            {
+                retVal.Add((T)SerializationManager.DeepCopyInner(element, context));
+            }
+
             return retVal;
         }
 
@@ -1905,7 +1912,7 @@ namespace Orleans.Serialization
         }
 
         [ThreadStatic]
-        static private TypeConverter uriConverter;
+        static private System.ComponentModel.TypeConverter uriConverter;
 
         internal static void SerializeUri(object obj, ISerializationContext context, Type expected)
         {
@@ -2062,8 +2069,7 @@ namespace Orleans.Serialization
         {
             var request = (InvokeMethodRequest)obj;
 
-            context.StreamWriter.Write(request.InterfaceId);
-            context.StreamWriter.Write(request.InterfaceVersion);
+            context.StreamWriter.Write(request.InterfaceTypeCode);
             context.StreamWriter.Write(request.MethodId);
             context.StreamWriter.Write(request.Arguments != null ? request.Arguments.Length : 0);
 
@@ -2079,7 +2085,6 @@ namespace Orleans.Serialization
         internal static object DeserializeInvokeMethodRequest(Type expected, IDeserializationContext context)
         {
             int iid = context.StreamReader.ReadInt();
-            ushort iVersion = context.StreamReader.ReadUShort();
             int mid = context.StreamReader.ReadInt();
 
             int argCount = context.StreamReader.ReadInt();
@@ -2094,7 +2099,7 @@ namespace Orleans.Serialization
                 }
             }
 
-            return new InvokeMethodRequest(iid, iVersion, mid, args);
+            return new InvokeMethodRequest(iid, mid, args);
         }
 
         internal static object CopyInvokeMethodRequest(object original, ICopyContext context)
@@ -2111,7 +2116,7 @@ namespace Orleans.Serialization
                 }
             }
 
-            var result = new InvokeMethodRequest(request.InterfaceId, request.InterfaceVersion, request.MethodId, args);
+            var result = new InvokeMethodRequest(request.InterfaceTypeCode, request.MethodId, args);
             context.RecordCopy(original, result);
             return result;
         }

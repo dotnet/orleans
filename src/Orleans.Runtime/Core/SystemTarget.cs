@@ -1,8 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.CodeGeneration;
+using Orleans.GrainReferences;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime
@@ -12,22 +13,25 @@ namespace Orleans.Runtime
     /// Made public for GrainSerive to inherit from it.
     /// Can be turned to internal after a refactoring that would remove the inheritance relation.
     /// </summary>
-    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IInvokable
+    public abstract class SystemTarget : ISystemTarget, ISystemTargetBase, IGrainContext, IGrainExtensionBinder
     {
-        private readonly GrainId grainId;
-        private readonly SchedulingContext schedulingContext;
-        private IGrainMethodInvoker lastInvoker;
+        private readonly SystemTargetGrainId id;
+        private GrainReference selfReference;
         private Message running;
+        private Dictionary<Type, object> _components = new Dictionary<Type, object>();
 
         /// <summary>Silo address of the system target.</summary>
         public SiloAddress Silo { get; }
-        GrainId ISystemTargetBase.GrainId => grainId;
-        internal SchedulingContext SchedulingContext => schedulingContext;
+        internal ActivationAddress ActivationAddress { get; }
+
+        GrainId ISystemTargetBase.GrainId => id.GrainId;
         internal ActivationId ActivationId { get; set; }
-        private ISiloRuntimeClient runtimeClient;
-        private readonly ILoggerFactory loggerFactory;
+        private InsideRuntimeClient runtimeClient;
+        private RuntimeMessagingTrace messagingTrace;
         private readonly ILogger timerLogger;
-        internal ISiloRuntimeClient RuntimeClient
+        private readonly ILogger logger;
+
+        internal InsideRuntimeClient RuntimeClient
         {
             get
             {
@@ -39,62 +43,93 @@ namespace Orleans.Runtime
             set { this.runtimeClient = value; }
         }
 
-        private ExtensionInvoker extensionInvoker;
-        internal ExtensionInvoker ExtensionInvoker
-        {
-            get
-            {
-                this.lastInvoker = null;
-                return this.extensionInvoker ?? (this.extensionInvoker = new ExtensionInvoker());
-            }
-        }
-
         IGrainReferenceRuntime ISystemTargetBase.GrainReferenceRuntime => this.RuntimeClient.GrainReferenceRuntime;
 
+        public GrainReference GrainReference => selfReference ??= this.RuntimeClient.ServiceProvider.GetRequiredService<GrainReferenceActivator>().CreateReference(this.id.GrainId, default);
+
+        GrainId IGrainContext.GrainId => this.id.GrainId;
+
+        IAddressable IGrainContext.GrainInstance => this;
+
+        ActivationId IGrainContext.ActivationId => this.ActivationId;
+
+        ActivationAddress IGrainContext.Address => this.ActivationAddress;
+        private RuntimeMessagingTrace MessagingTrace => this.messagingTrace ??= this.RuntimeClient.ServiceProvider.GetRequiredService<RuntimeMessagingTrace>();
+        
         /// <summary>Only needed to make Reflection happy.</summary>
         protected SystemTarget()
         {
         }
 
-        internal SystemTarget(GrainId grainId, SiloAddress silo, ILoggerFactory loggerFactory) 
-            : this(grainId, silo, false, loggerFactory)
+        internal SystemTarget(GrainType grainType, SiloAddress silo, ILoggerFactory loggerFactory)
+            : this(SystemTargetGrainId.Create(grainType, silo), silo, false, loggerFactory)
         {
         }
 
-        internal SystemTarget(GrainId grainId, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
+        internal SystemTarget(GrainType grainType, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
+            : this(SystemTargetGrainId.Create(grainType, silo), silo, lowPriority, loggerFactory)
         {
-            this.grainId = grainId;
-            Silo = silo;
-            this.loggerFactory = loggerFactory;
-            ActivationId = ActivationId.GetSystemActivation(grainId, silo);
-            schedulingContext = new SchedulingContext(this, lowPriority);
+        }
+
+        internal SystemTarget(SystemTargetGrainId grainId, SiloAddress silo, bool lowPriority, ILoggerFactory loggerFactory)
+        {
+            this.id = grainId;
+            this.Silo = silo;
+            this.ActivationAddress = ActivationAddress.GetAddress(this.Silo, this.id.GrainId, this.ActivationId);
+            this.IsLowPriority = lowPriority;
+            this.ActivationId = ActivationId.GetDeterministic(grainId.GrainId);
             this.timerLogger = loggerFactory.CreateLogger<GrainTimer>();
+            this.logger = loggerFactory.CreateLogger(this.GetType());
         }
 
-        IGrainMethodInvoker IInvokable.GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType)
-        {
-            // Return previous cached invoker, if applicable
-            if (lastInvoker != null && interfaceId == lastInvoker.InterfaceId) // extension invoker returns InterfaceId==0, so this condition will never be true if an extension is installed
-                return lastInvoker;
+        public bool IsLowPriority { get; }
 
-            if (extensionInvoker != null && extensionInvoker.IsExtensionInstalled(interfaceId))
+        internal WorkItemGroup WorkItemGroup { get; set; }
+
+        public IServiceProvider ActivationServices => this.RuntimeClient.ServiceProvider;
+
+        IGrainLifecycle IGrainContext.ObservableLifecycle => throw new NotImplementedException("IGrainContext.ObservableLifecycle is not implemented by SystemTarget");
+
+        public TComponent GetComponent<TComponent>()
+        {
+            TComponent result;
+            if (this is TComponent instanceResult)
             {
-                // Shared invoker for all extensions installed on this target
-                lastInvoker = extensionInvoker;
+                result = instanceResult;
+            }
+            else if (_components.TryGetValue(typeof(TComponent), out var resultObj))
+            {
+                result = (TComponent)resultObj;
             }
             else
             {
-                // Find the specific invoker for this interface / grain type
-                lastInvoker = typeManager.GetInvoker(interfaceId, genericGrainType);
+                result = default;
             }
 
-            return lastInvoker;
+            return result;
+        }
+
+        public void SetComponent<TComponent>(TComponent instance)
+        {
+            if (this is TComponent)
+            {
+                throw new ArgumentException("Cannot override a component which is implemented by this grain");
+            }
+
+            if (instance == null)
+            {
+                _components?.Remove(typeof(TComponent));
+                return;
+            }
+
+            if (_components is null) _components = new Dictionary<Type, object>();
+            _components[typeof(TComponent)] = instance;
         }
 
         internal void HandleNewRequest(Message request)
         {
             running = request;
-            this.RuntimeClient.Invoke(this, this, request).Ignore();
+            this.RuntimeClient.Invoke(this, request).Ignore();
         }
 
         internal void HandleResponse(Message response)
@@ -115,11 +150,11 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public IDisposable RegisterTimer(Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name = null)
         {
-            var ctxt = RuntimeContext.CurrentActivationContext;
+            var ctxt = RuntimeContext.CurrentGrainContext;
             this.RuntimeClient.Scheduler.CheckSchedulingContextValidity(ctxt);
-            name = name ?? ctxt.Name + "Timer";
+            name = name ?? ctxt.GrainId + "Timer";
 
-            var timer = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler,this.timerLogger, asyncCallback, state, dueTime, period, name);
+            var timer = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler, this.timerLogger, asyncCallback, state, dueTime, period, name);
             timer.Start();
             return timer;
         }
@@ -128,10 +163,10 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             return String.Format("[{0}SystemTarget: {1}{2}{3}]",
-                 SchedulingContext.IsSystemPriorityContext ? String.Empty : "LowPriority",
+                 IsLowPriority ? "LowPriority" : string.Empty,
                  Silo,
-                 this.grainId,
-                 ActivationId);
+                 this.id,
+                 this.ActivationId);
         }
 
         /// <summary>Adds details about message currently being processed</summary>
@@ -139,5 +174,80 @@ namespace Orleans.Runtime
         {
             return String.Format("{0} CurrentlyExecuting={1}", ToString(), running != null ? running.ToString() : "null");
         }
+
+        bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
+
+        public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
+            where TExtension : TExtensionInterface
+            where TExtensionInterface : IGrainExtension
+        {
+            TExtension implementation;
+            if (this.GetComponent<TExtensionInterface>() is object existing)
+            {
+                if (existing is TExtension typedResult)
+                {
+                    implementation = typedResult;
+                }
+                else
+                {
+                    throw new InvalidCastException($"Cannot cast existing extension of type {existing.GetType()} to target type {typeof(TExtension)}");
+                }
+            }
+            else
+            {
+                implementation = newExtensionFunc();
+                this.SetComponent<TExtensionInterface>(implementation);
+            }
+
+            var reference = this.GrainReference.Cast<TExtensionInterface>();
+            return (implementation, reference);
+        }
+
+        public TExtensionInterface GetExtension<TExtensionInterface>()
+            where TExtensionInterface : IGrainExtension
+        {
+            if (this.GetComponent<TExtensionInterface>() is TExtensionInterface result)
+            {
+                return result;
+            }
+
+            var implementation = this.ActivationServices.GetServiceByKey<Type, IGrainExtension>(typeof(TExtensionInterface));
+            if (!(implementation is TExtensionInterface typedResult))
+            {
+                throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
+            }
+
+            this.SetComponent<TExtensionInterface>(typedResult);
+            return typedResult;
+        }
+
+        public void ReceiveMessage(object message)
+        {
+            var msg = (Message)message;
+            switch (msg.Direction)
+            {
+                case Message.Directions.Request:
+                    {
+                        this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
+                        var workItem = new RequestWorkItem(this, msg);
+                        Task task = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
+                        task.Start(this.WorkItemGroup.TaskScheduler);
+                        break;
+                    }
+
+                case Message.Directions.Response:
+                    {
+                        this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
+                        var workItem = new ResponseWorkItem(this, msg);
+                        Task task = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
+                        task.Start(this.WorkItemGroup.TaskScheduler);
+                        break;
+                    }
+
+                default:
+                    this.logger.LogError((int)ErrorCode.Runtime_Error_100097, "Invalid message: {Message}", msg);
+                    break;
+            }
+        } 
     }
 }

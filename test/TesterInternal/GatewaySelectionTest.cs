@@ -5,13 +5,15 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
+using Orleans.Internal;
 using Xunit;
 using Xunit.Abstractions;
+using System.Threading;
 
 namespace UnitTests.MessageCenterTests
 {
@@ -32,46 +34,14 @@ namespace UnitTests.MessageCenterTests
             this.output = output;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Gateway")]
-        public void GatewaySelection()
+        [Fact, TestCategory("BVT"), TestCategory("Gateway")]
+        public async Task GatewaySelection()
         {
             var listProvider = new TestListProvider(gatewayAddressUris);
-            Test_GatewaySelection(listProvider);
+            await Test_GatewaySelection(listProvider);
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Gateway")]
-        public void GatewaySelection_ClientInit_EmptyList()
-        {
-            var cfg = new ClientConfiguration();
-            cfg.Gateways = null;
-            bool failed = false;
-            IDisposable client = null;
-            try
-            {
-                new ClientBuilder().UseConfiguration(cfg).Build();
-            }
-            catch (Exception exc)
-            {
-                output.WriteLine(exc.ToString());
-                failed = true;
-            }
-            finally
-            {
-                client?.Dispose();
-            }
-            Assert.True(failed, "GatewaySelection_EmptyList failed as GatewayManager did not throw on empty Gateway list.");
-
-            // Note: This part of the test case requires a silo local to be running in order to work successfully.
-
-            //var listProvider = new TestListProvider(gatewayAddressUris);
-            //cfg.Gateways = listProvider.GetGateways().Select(uri =>
-            //{
-            //    return new IPEndPoint(IPAddress.Parse(uri.Host), uri.Port);
-            //}).ToList();
-            //Client.Initialize(cfg);
-        }
-
-        protected void Test_GatewaySelection(IGatewayListProvider listProvider)
+        protected async Task Test_GatewaySelection(IGatewayListProvider listProvider)
         {
             IList<Uri> gatewayUris = listProvider.GetGateways().GetResult();
             Assert.True(gatewayUris.Count > 0, $"Found some gateways. Data = {Utils.EnumerableToString(gatewayUris)}");
@@ -81,26 +51,18 @@ namespace UnitTests.MessageCenterTests
                 return new IPEndPoint(IPAddress.Parse(uri.Host), uri.Port);
             }).ToList();
 
-            var cfg = new ClientConfiguration
-            {
-                Gateways = gatewayEndpoints
-            };
-            var gatewayOptions = new GatewayOptions()
-            {
-                GatewayListRefreshPeriod = cfg.GatewayListRefreshPeriod,
-                PreferedGatewayIndex = cfg.PreferedGatewayIndex
-            };
-            var gatewayManager = new GatewayManager(null, gatewayOptions, listProvider, NullLoggerFactory.Instance);
+            var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), listProvider, NullLoggerFactory.Instance, null);
+            await gatewayManager.StartAsync(CancellationToken.None);
 
             var counts = new int[4];
 
             for (int i = 0; i < 2300; i++)
             {
                 var ip = gatewayManager.GetLiveGateway();
-                var addr = IPAddress.Parse(ip.Host);
+                var addr = ip.Endpoint.Address;
                 Assert.Equal(IPAddress.Loopback, addr);  // "Incorrect IP address returned for gateway"
-                Assert.True((0 < ip.Port) && (ip.Port < 5), "Incorrect IP port returned for gateway");
-                counts[ip.Port - 1]++;
+                Assert.True((0 < ip.Endpoint.Port) && (ip.Endpoint.Port < 5), "Incorrect IP port returned for gateway");
+                counts[ip.Endpoint.Port - 1]++;
             }
 
             // The following needed to be changed as the gateway manager now round-robins through the available gateways, rather than

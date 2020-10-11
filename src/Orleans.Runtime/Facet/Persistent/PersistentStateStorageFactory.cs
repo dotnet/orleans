@@ -10,8 +10,7 @@ namespace Orleans.Runtime
 {
     public class PersistentStateFactory : IPersistentStateFactory
     {
-        public IPersistentState<TState> Create<TState>(IGrainActivationContext context, IPersistentStateConfiguration cfg)
-            where TState : new()
+        public IPersistentState<TState> Create<TState>(IGrainContext context, IPersistentStateConfiguration cfg)
         {
             IGrainStorage storageProvider = !string.IsNullOrWhiteSpace(cfg.StorageName)
                 ? context.ActivationServices.GetServiceByName<IGrainStorage>(cfg.StorageName)
@@ -26,36 +25,34 @@ namespace Orleans.Runtime
             return bridge;
         }
 
-        protected virtual string GetFullStateName(IGrainActivationContext context, IPersistentStateConfiguration cfg)
+        protected virtual string GetFullStateName(IGrainContext context, IPersistentStateConfiguration cfg)
         {
-            return $"{RuntimeTypeNameFormatter.Format(context.GrainType)}.{cfg.StateName}";
+            return $"{context.GrainId}.{cfg.StateName}";
         }
 
-        private static void ThrowMissingProviderException(IGrainActivationContext context, IPersistentStateConfiguration cfg)
+        private static void ThrowMissingProviderException(IGrainContext context, IPersistentStateConfiguration cfg)
         {
             string errMsg;
-            var grainTypeName = context.GrainType.GetParseableName(TypeFormattingOptions.LogFormat);
             if (string.IsNullOrEmpty(cfg.StorageName))
             {
-                errMsg = $"No default storage provider found loading grain type {grainTypeName}.";
+                errMsg = $"No default storage provider found loading grain type {context.GrainId.Type}.";
             }
             else
             {
-                errMsg = $"No storage provider named \"{cfg.StorageName}\" found loading grain type {grainTypeName}.";
+                errMsg = $"No storage provider named \"{cfg.StorageName}\" found loading grain type {context.GrainId.Type}.";
             }
 
             throw new BadGrainStorageConfigException(errMsg);
         }
 
         private class PersistentStateBridge<TState> : IPersistentState<TState>, ILifecycleParticipant<IGrainLifecycle>
-            where TState : new()
         {
             private readonly string fullStateName;
-            private readonly IGrainActivationContext context;
+            private readonly IGrainContext context;
             private readonly IGrainStorage storageProvider;
             private IStorage<TState> storage;
 
-            public PersistentStateBridge(string fullStateName, IGrainActivationContext context, IGrainStorage storageProvider)
+            public PersistentStateBridge(string fullStateName, IGrainContext context, IGrainStorage storageProvider)
             {
                 this.fullStateName = fullStateName;
                 this.context = context;
@@ -69,6 +66,8 @@ namespace Orleans.Runtime
             }
 
             public string Etag => this.storage.Etag;
+
+            public bool RecordExists => this.storage.RecordExists;
 
             public Task ClearStateAsync()
             {
@@ -94,7 +93,7 @@ namespace Orleans.Runtime
             {
                 if (ct.IsCancellationRequested)
                     return Task.CompletedTask;
-                this.storage = new StateStorageBridge<TState>(this.fullStateName, context.GrainInstance.GrainReference, this.storageProvider, context.ActivationServices.GetService<ILoggerFactory>());
+                this.storage = new StateStorageBridge<TState>(this.fullStateName, context.GrainReference, this.storageProvider, context.ActivationServices.GetService<ILoggerFactory>());
                 return this.ReadStateAsync();
             }
         }

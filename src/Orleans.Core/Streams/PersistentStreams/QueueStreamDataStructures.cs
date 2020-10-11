@@ -15,19 +15,19 @@ namespace Orleans.Streams
     internal class StreamConsumerData
     {
         public GuidId SubscriptionId;
-        public StreamId StreamId;
+        public InternalStreamId StreamId;
         public IStreamConsumerExtension StreamConsumer;
         public StreamConsumerDataState State = StreamConsumerDataState.Inactive;
         public IQueueCacheCursor Cursor;
-        public IStreamFilterPredicateWrapper Filter;
         public StreamHandshakeToken LastToken;
+        public string FilterData;
 
-        public StreamConsumerData(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
+        public StreamConsumerData(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {
             SubscriptionId = subscriptionId;
             StreamId = streamId;
             StreamConsumer = streamConsumer;
-            Filter = filter;
+            FilterData = filterData;
         }
 
         internal void SafeDisposeCursor(ILogger logger)

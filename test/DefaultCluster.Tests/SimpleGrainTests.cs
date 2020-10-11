@@ -20,14 +20,14 @@ namespace DefaultCluster.Tests.General
             return this.GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrain.SimpleGrainNamePrefix);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task SimpleGrainGetGrain()
         {
             ISimpleGrain grain = GetSimpleGrain();
             int ignored = await grain.GetAxB();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task SimpleGrainControlFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();
@@ -42,7 +42,7 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(6, await intPromise);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task SimpleGrainDataFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();
@@ -56,7 +56,7 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact(Skip = "Grains with multiple constructors are not supported without being explicitly registered.")]
-        [TestCategory("BVT"), TestCategory("Functional")]
+        [TestCategory("BVT")]
         public async Task GettingGrainWithMultipleConstructorsActivesViaDefaultConstructor()
         {
             ISimpleGrain grain = this.GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), grainClassNamePrefix: MultipleConstructorsSimpleGrain.MultipleConstructorsSimpleGrainPrefix);

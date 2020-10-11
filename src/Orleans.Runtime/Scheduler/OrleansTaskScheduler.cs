@@ -1,85 +1,54 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Statistics;
 
 namespace Orleans.Runtime.Scheduler
 {
-    [DebuggerDisplay("OrleansTaskScheduler RunQueueLength={" + nameof(RunQueueLength) + "}")]
-    internal class OrleansTaskScheduler : TaskScheduler, ITaskScheduler, IHealthCheckParticipant
+    internal class OrleansTaskScheduler
     {
+        private static readonly Action<IWorkItem> ExecuteWorkItemAction = workItem => workItem.Execute();
+        private static readonly WaitCallback ExecuteWorkItemCallback = obj => ((IWorkItem)obj).Execute();
         private readonly ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
         private readonly SchedulerStatisticsGroup schedulerStatistics;
         private readonly IOptions<StatisticsOptions> statisticsOptions;
-        private readonly ILogger taskWorkItemLogger;
-        private readonly ConcurrentDictionary<ISchedulingContext, WorkItemGroup> workgroupDirectory;
-        private bool applicationTurnsStopped;
-
+        private readonly ConcurrentDictionary<IGrainContext, WorkItemGroup> workgroupDirectory;
+        private readonly ILogger<WorkItemGroup> workItemGroupLogger;
+        private readonly ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger;
         private readonly CancellationTokenSource cancellationTokenSource;
-
-        private readonly OrleansSchedulerAsynchAgent systemAgent;
-        private readonly OrleansSchedulerAsynchAgent mainAgent;
-
-        private readonly int maximumConcurrencyLevel;
-
+        private bool applicationTurnsStopped;
+        
         internal static TimeSpan TurnWarningLengthThreshold { get; set; }
 
         // This is the maximum number of pending work items for a single activation before we write a warning log.
         internal int MaxPendingItemsSoftLimit { get; private set; }
-
-        public int RunQueueLength => systemAgent.Count + mainAgent.Count;
-        
+                
         public OrleansTaskScheduler(
             IOptions<SchedulingOptions> options,
-            ExecutorService executorService,
             ILoggerFactory loggerFactory,
             SchedulerStatisticsGroup schedulerStatistics,
             IOptions<StatisticsOptions> statisticsOptions)
         {
-            this.loggerFactory = loggerFactory;
             this.schedulerStatistics = schedulerStatistics;
             this.statisticsOptions = statisticsOptions;
             this.logger = loggerFactory.CreateLogger<OrleansTaskScheduler>();
-            cancellationTokenSource = new CancellationTokenSource();
-            WorkItemGroup.ActivationSchedulingQuantum = options.Value.ActivationSchedulingQuantum;
+            this.workItemGroupLogger = loggerFactory.CreateLogger<WorkItemGroup>();
+            this.activationTaskSchedulerLogger = loggerFactory.CreateLogger<ActivationTaskScheduler>();
+            this.cancellationTokenSource = new CancellationTokenSource();
+            this.SchedulingOptions = options.Value;
             applicationTurnsStopped = false;
             TurnWarningLengthThreshold = options.Value.TurnWarningLengthThreshold;
             this.MaxPendingItemsSoftLimit = options.Value.MaxPendingWorkItemsSoftLimit;
-            workgroupDirectory = new ConcurrentDictionary<ISchedulingContext, WorkItemGroup>();
-
-            const int maxSystemThreads = 2;
-            var maxActiveThreads = options.Value.MaxActiveThreads;
-            maximumConcurrencyLevel = maxActiveThreads + maxSystemThreads;
-
-            OrleansSchedulerAsynchAgent CreateSchedulerAsynchAgent(string agentName, bool drainAfterCancel, int degreeOfParallelism)
-            {
-                return new OrleansSchedulerAsynchAgent(
-                    agentName,
-                    executorService,
-                    degreeOfParallelism,
-                    options.Value.DelayWarningThreshold,
-                    options.Value.TurnWarningLengthThreshold,
-                    this,
-                    drainAfterCancel,
-                    loggerFactory);
-            }
-
-            mainAgent = CreateSchedulerAsynchAgent("Scheduler.LevelOne.MainQueue", false, maxActiveThreads);
-            systemAgent = CreateSchedulerAsynchAgent("Scheduler.LevelOne.SystemQueue", true, maxSystemThreads);
-
-            this.taskWorkItemLogger = loggerFactory.CreateLogger<TaskWorkItem>();
-            logger.Info("Starting OrleansTaskScheduler with {0} Max Active application Threads and 2 system thread.", maxActiveThreads);
+            this.StoppedWorkItemGroupWarningInterval = options.Value.StoppedActivationWarningInterval;
+            workgroupDirectory = new ConcurrentDictionary<IGrainContext, WorkItemGroup>();
+                        
             IntValueStatistic.FindOrCreate(StatisticNames.SCHEDULER_WORKITEMGROUP_COUNT, () => WorkItemGroupCount);
-            IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.QUEUES_QUEUE_SIZE_INSTANTANEOUS_PER_QUEUE, "Scheduler.LevelOne"), () => RunQueueLength);
 
             if (!schedulerStatistics.CollectShedulerQueuesStats) return;
 
@@ -93,6 +62,10 @@ namespace Orleans.Runtime.Scheduler
 
         public int WorkItemGroupCount => workgroupDirectory.Count;
 
+        public TimeSpan StoppedWorkItemGroupWarningInterval { get; }
+
+        public SchedulingOptions SchedulingOptions { get; }
+
         private float AverageRunQueueLengthLevelTwo
         {
             get
@@ -100,7 +73,7 @@ namespace Orleans.Runtime.Scheduler
                 if (workgroupDirectory.IsEmpty) 
                     return 0;
 
-                return (float)workgroupDirectory.Values.Sum(workgroup => workgroup.AverageQueueLenght) / (float)workgroupDirectory.Values.Count;
+                return (float)workgroupDirectory.Values.Sum(workgroup => workgroup.AverageQueueLength) / (float)workgroupDirectory.Values.Count;
             }
         }
 
@@ -130,7 +103,7 @@ namespace Orleans.Runtime.Scheduler
         {
             get
             {
-                return (float)workgroupDirectory.Values.Sum(workgroup => workgroup.AverageQueueLenght);
+                return (float)workgroupDirectory.Values.Sum(workgroup => workgroup.AverageQueueLength);
             }
         }
 
@@ -161,86 +134,68 @@ namespace Orleans.Runtime.Scheduler
             foreach (var group in workgroupDirectory.Values)
             {
                 if (!group.IsSystemGroup)
+                {
                     group.Stop();
+                }
             }
-        }
-
-        public void Start()
-        {
-            systemAgent.Start();
-            mainAgent.Start();
         }
 
         public void Stop()
         {
+            // Stop system work groups.
+            var stopAll = !this.applicationTurnsStopped;
+            foreach (var group in workgroupDirectory.Values)
+            {
+                if (stopAll || group.IsSystemGroup)
+                {
+                    group.Stop();
+                }
+            }
+
             cancellationTokenSource.Cancel();
-            mainAgent.Stop();
-            systemAgent.Stop();
         }
 
-        protected override IEnumerable<Task> GetScheduledTasks()
+        private static readonly Action<Action> ExecuteActionCallback = obj => obj.Invoke();
+        private static readonly WaitCallback ExecuteAction = obj => ((Action)obj).Invoke();
+        public void QueueAction(Action action, IGrainContext context)
         {
-            return Array.Empty<Task>();
-        }
-
-        protected override void QueueTask(Task task)
-        {
-            var contextObj = task.AsyncState;
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("QueueTask: Id={0} with Status={1} AsyncState={2} when TaskScheduler.Current={3}", task.Id, task.Status, task.AsyncState, Current);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("ScheduleTask on {Context}", context);
 #endif
-            var context = contextObj as ISchedulingContext;
             var workItemGroup = GetWorkItemGroup(context);
             if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystemGroup)
             {
                 // Drop the task on the floor if it's an application work item and application turns are stopped
-                logger.Warn(ErrorCode.SchedulerAppTurnsStopped_2, string.Format("Dropping Task {0} because application turns are stopped", task));
+                logger.LogWarning((int)ErrorCode.SchedulerAppTurnsStopped_1, "Dropping task item {Task} on context {Context} because application turns are stopped", action, context);
                 return;
             }
 
-            if (workItemGroup == null)
+            if (workItemGroup?.TaskScheduler is TaskScheduler scheduler)
             {
-                var todo = new TaskWorkItem(this, task, context, this.taskWorkItemLogger);
-                ScheduleExecution(todo);
+                // This will make sure the TaskScheduler.Current is set correctly on any task that is created implicitly in the execution of this workItem.
+                // We must wrap any work item in Task and enqueue it as a task to the right scheduler via Task.Start.
+                Task t = new Task(action);
+                t.Start(scheduler);
             }
             else
             {
-                var error = String.Format("QueueTask was called on OrleansTaskScheduler for task {0} on Context {1}."
-                    + " Should only call OrleansTaskScheduler.QueueTask with tasks on the null context.",
-                    task.Id, context);
-                logger.Error(ErrorCode.SchedulerQueueTaskWrongCall, error);
-                throw new InvalidOperationException(error);
-            }
-        }
-
-        public void ScheduleExecution(IWorkItem workItem)
-        {
-            if (workItem.IsSystemPriority)
-            {
-                systemAgent.QueueRequest(workItem);
-            }
-            else
-            {
-                mainAgent.QueueRequest(workItem);
+                // Note that we do not use UnsafeQueueUserWorkItem here because we typically want to propagate execution context,
+                // which includes async locals.
+#if NETCOREAPP
+                ThreadPool.QueueUserWorkItem(ExecuteActionCallback, action, preferLocal: true);
+#else
+                ThreadPool.QueueUserWorkItem(ExecuteAction, action);
+#endif
             }
         }
 
         // Enqueue a work item to a given context
-        public void QueueWorkItem(IWorkItem workItem, ISchedulingContext context)
+        public void QueueWorkItem(IWorkItem workItem)
         {
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("QueueWorkItem " + context);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("QueueWorkItem " + workItem);
 #endif
-            if (workItem is TaskWorkItem)
-            {
-                var error = String.Format("QueueWorkItem was called on OrleansTaskScheduler for TaskWorkItem {0} on Context {1}."
-                    + " Should only call OrleansTaskScheduler.QueueWorkItem on WorkItems that are NOT TaskWorkItem. Tasks should be queued to the scheduler via QueueTask call.",
-                    workItem.ToString(), context);
-                logger.Error(ErrorCode.SchedulerQueueWorkItemWrongCall, error);
-                throw new InvalidOperationException(error);
-            }
-
-            var workItemGroup = GetWorkItemGroup(context);
+            var workItemGroup = GetWorkItemGroup(workItem.GrainContext);
             if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystemGroup)
             {
                 // Drop the task on the floor if it's an application work item and application turns are stopped
@@ -249,154 +204,124 @@ namespace Orleans.Runtime.Scheduler
                 return;
             }
 
-            workItem.SchedulingContext = context;
-            
-            // We must wrap any work item in Task and enqueue it as a task to the right scheduler via Task.Start.
-            Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
-
-            // This will make sure the TaskScheduler.Current is set correctly on any task that is created implicitly in the execution of this workItem.
-            if (workItemGroup == null)
+            if (workItemGroup?.TaskScheduler is TaskScheduler scheduler)
             {
-                t.Start(this);
+                // This will make sure the TaskScheduler.Current is set correctly on any task that is created implicitly in the execution of this workItem.
+                // We must wrap any work item in Task and enqueue it as a task to the right scheduler via Task.Start.
+                Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
+                t.Start(scheduler);
             }
             else
             {
-                t.Start(workItemGroup.TaskRunner);
+                // Note that we do not use UnsafeQueueUserWorkItem here because we typically want to propagate execution context,
+                // which includes async locals.
+#if NETCOREAPP
+                ThreadPool.QueueUserWorkItem(ExecuteWorkItemAction, workItem, preferLocal: true);
+#else
+                ThreadPool.QueueUserWorkItem(ExecuteWorkItemCallback, workItem);
+#endif
             }
         }
 
         // Only required if you have work groups flagged by a context that is not a WorkGroupingContext
-        public WorkItemGroup RegisterWorkContext(ISchedulingContext context)
+        public WorkItemGroup RegisterWorkContext(IGrainContext context)
         {
-            if (context == null) return null;
+            if (context is null)
+            {
+                return null;
+            }
 
             var wg = new WorkItemGroup(
                 this,
                 context,
-                this.loggerFactory,
+                this.workItemGroupLogger,
+                this.activationTaskSchedulerLogger,
                 this.cancellationTokenSource.Token,
                 this.schedulerStatistics,
                 this.statisticsOptions);
+
+
+            if (context is SystemTarget systemTarget)
+            {
+                systemTarget.WorkItemGroup = wg;
+            }
+
+            if (context is ActivationData activation)
+            {
+                activation.WorkItemGroup = wg;
+            }
+
             workgroupDirectory.TryAdd(context, wg);
+            
             return wg;
         }
 
         // Only required if you have work groups flagged by a context that is not a WorkGroupingContext
-        public void UnregisterWorkContext(ISchedulingContext context)
+        public void UnregisterWorkContext(IGrainContext context)
         {
-            if (context == null) return;
+            if (context is null)
+            {
+                return;
+            }
 
             WorkItemGroup workGroup;
             if (workgroupDirectory.TryRemove(context, out workGroup))
+            {
                 workGroup.Stop();
+            }
+
+            if (context is SystemTarget systemTarget)
+            {
+                systemTarget.WorkItemGroup = null;
+            }
+
+            if (context is ActivationData activation)
+            {
+                activation.WorkItemGroup = null;
+            }
         }
 
         // public for testing only -- should be private, otherwise
-        public WorkItemGroup GetWorkItemGroup(ISchedulingContext context)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public WorkItemGroup GetWorkItemGroup(IGrainContext context)
         {
-            if (context == null)
-                return null;
-           
-            WorkItemGroup workGroup;
-            if(workgroupDirectory.TryGetValue(context, out workGroup))
-                return workGroup;
+            switch (context)
+            {
+                case null:
+                    return null;
+                case SystemTarget systemTarget when systemTarget.WorkItemGroup is WorkItemGroup wg:
+                    return wg;
+                case ActivationData activation when activation.WorkItemGroup is WorkItemGroup wg:
+                    return wg;
+                default:
+                    {
+                        if (this.workgroupDirectory.TryGetValue(context, out var workGroup)) return workGroup;
+                        this.ThrowNoWorkItemGroup(context);
+                        return null;
+                    }
+            }
+        }
 
-            var error = String.Format("QueueWorkItem was called on a non-null context {0} but there is no valid WorkItemGroup for it.", context);
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void ThrowNoWorkItemGroup(IGrainContext context)
+        {
+            var error = string.Format("QueueWorkItem was called on a non-null context {0} but there is no valid WorkItemGroup for it.", context);
             logger.Error(ErrorCode.SchedulerQueueWorkItemWrongContext, error);
             throw new InvalidSchedulingContextException(error);
         }
 
-        internal void CheckSchedulingContextValidity(ISchedulingContext context)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal void CheckSchedulingContextValidity(IGrainContext context)
         {
-            if (context == null)
+            if (context is null)
             {
                 throw new InvalidSchedulingContextException(
                     "CheckSchedulingContextValidity was called on a null SchedulingContext."
                      + "Please make sure you are not trying to create a Timer from outside Orleans Task Scheduler, "
                      + "which will be the case if you create it inside Task.Run.");
             }
+
             GetWorkItemGroup(context); // GetWorkItemGroup throws for Invalid context
-        }
-
-        public TaskScheduler GetTaskScheduler(ISchedulingContext context)
-        {
-            if (context == null)
-                return this;
-            
-            WorkItemGroup workGroup;
-            return workgroupDirectory.TryGetValue(context, out workGroup) ? (TaskScheduler) workGroup.TaskRunner : this;
-        }
-
-        public override int MaximumConcurrencyLevel => maximumConcurrencyLevel;
-
-        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
-        {
-            //bool canExecuteInline = WorkerPoolThread.CurrentContext != null;
-
-            var ctx = RuntimeContext.Current;
-            bool canExecuteInline = ctx == null || ctx.ActivationContext==null;
-
-#if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) 
-            {
-                logger.Trace("TryExecuteTaskInline Id={0} with Status={1} PreviouslyQueued={2} CanExecute={3}",
-                    task.Id, task.Status, taskWasPreviouslyQueued, canExecuteInline);
-            }
-#endif
-            if (!canExecuteInline) return false;
-
-            if (taskWasPreviouslyQueued)
-                canExecuteInline = TryDequeue(task);
-
-            if (!canExecuteInline) return false;  // We can't execute tasks in-line on non-worker pool threads
-
-            // We are on a worker pool thread, so can execute this task
-            bool done = TryExecuteTask(task);
-            if (!done)
-            {
-                logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete1, "TryExecuteTaskInline: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
-                    task.Id, task.Status);
-            }
-            return done;
-        }
-
-        /// <summary>
-        /// Run the specified task synchronously on the current thread
-        /// </summary>
-        /// <param name="task"><c>Task</c> to be executed</param>
-        public void RunTask(Task task)
-        {
-#if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("RunTask: Id={0} with Status={1} AsyncState={2} when TaskScheduler.Current={3}", task.Id, task.Status, task.AsyncState, Current);
-#endif
-            var context = RuntimeContext.CurrentActivationContext;
-            var workItemGroup = GetWorkItemGroup(context);
-
-            if (workItemGroup == null)
-            {
-                RuntimeContext.SetExecutionContext(null);
-                bool done = TryExecuteTask(task);
-                if (!done)
-                    logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete2, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
-                        task.Id, task.Status);
-            }
-            else
-            {
-                var error = String.Format("RunTask was called on OrleansTaskScheduler for task {0} on Context {1}. Should only call OrleansTaskScheduler.RunTask on tasks queued on a null context.", 
-                    task.Id, context);
-                logger.Error(ErrorCode.SchedulerTaskRunningOnWrongScheduler1, error);
-                throw new InvalidOperationException(error);
-            }
-
-#if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("RunTask: Completed Id={0} with Status={1} task.AsyncState={2} when TaskScheduler.Current={3}", task.Id, task.Status, task.AsyncState, Current);
-#endif
-        }
-
-        // Returns true if healthy, false if not
-        public bool CheckHealth(DateTime lastCheckTime)
-        {
-            return mainAgent.CheckHealth(lastCheckTime) && systemAgent.CheckHealth(lastCheckTime);
         }
 
         internal void PrintStatistics()
@@ -406,8 +331,7 @@ namespace Orleans.Runtime.Scheduler
             var stats = Utils.EnumerableToString(workgroupDirectory.Values.OrderBy(wg => wg.Name), wg => string.Format("--{0}", wg.DumpStatus()), Environment.NewLine);
             if (stats.Length > 0)
                 logger.Info(ErrorCode.SchedulerStatistics, 
-                    "OrleansTaskScheduler.PrintStatistics(): RunQueue={0}, WorkItems={1}, Directory:" + Environment.NewLine + "{2}",
-                    RunQueueLength, WorkItemGroupCount, stats);
+                    "OrleansTaskScheduler.PrintStatistics(): WorkItems={0}, Directory:" + Environment.NewLine + "{1}", WorkItemGroupCount, stats);
         }
 
         internal void DumpSchedulerStatus(bool alwaysOutput = true)
@@ -418,9 +342,8 @@ namespace Orleans.Runtime.Scheduler
 
             var sb = new StringBuilder();
             sb.AppendLine("Dump of current OrleansTaskScheduler status:");
-            sb.AppendFormat("CPUs={0} RunQueue={1}, WorkItems={2} {3}",
+            sb.AppendFormat("CPUs={0} WorkItems={1} {2}",
                 Environment.ProcessorCount,
-                RunQueueLength,
                 workgroupDirectory.Count,
                 applicationTurnsStopped ? "STOPPING" : "").AppendLine();
 

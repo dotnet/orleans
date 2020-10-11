@@ -30,26 +30,13 @@ namespace AWSUtils.Tests.Streaming
             {
                 throw new SkipException("Empty connection string");
             }
-
-            builder.ConfigureLegacyConfiguration(options =>
-            {
-                //previous silo creation
-                options.ClusterConfiguration.Globals.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                options.ClientConfiguration.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-
-                var storageConnectionString = new Dictionary<string, string>
-                {
-                    {"DataConnectionString", $"Service={AWSTestConstants.Service}"},
-                    {"DeleteStateOnClear", "true"}
-                };
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
 
-        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        private class MySiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .AddSimpleMessageStreamProvider("SMSProvider")
@@ -92,16 +79,20 @@ namespace AWSUtils.Tests.Streaming
             }
         }
         
-        public SQSStreamTests()
+        public override async Task InitializeAsync()
         {
+            await base.InitializeAsync();
             runner = new SingleStreamTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME);
         }
 
-        public override void Dispose()
+        public override async Task DisposeAsync()
         {
             var clusterId = HostedCluster.Options.ClusterId;
-            base.Dispose();
-            SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, clusterId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
+            await base.DisposeAsync();
+            if (!string.IsNullOrWhiteSpace(AWSTestConstants.DefaultSQSConnectionString))
+            {
+                SQSStreamProviderUtils.DeleteAllUsedQueues(SQS_STREAM_PROVIDER_NAME, clusterId, AWSTestConstants.DefaultSQSConnectionString, NullLoggerFactory.Instance).Wait();
+            }
         }
 
         ////------------------------ One to One ----------------------//

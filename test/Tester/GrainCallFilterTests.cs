@@ -8,6 +8,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -30,14 +31,14 @@ namespace UnitTests.General
                 builder.AddClientBuilderConfigurator<ClientConfigurator>();
             }
 
-            private class SiloInvokerTestSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class SiloInvokerTestSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddIncomingGrainCallFilter(context =>
                         {
-                            if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
+                            if (string.Equals(context.InterfaceMethod?.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
                             {
                                 if (RequestContext.Get(GrainCallFilterTestConstants.Key) != null) throw new InvalidOperationException();
                                 RequestContext.Set(GrainCallFilterTestConstants.Key, "1");
@@ -51,7 +52,7 @@ namespace UnitTests.General
                             if (ctx.InterfaceMethod?.Name == "Echo")
                             {
                                 // Concatenate the input to itself.
-                                var orig = (string) ctx.Arguments[0];
+                                var orig = (string)ctx.Arguments[0];
                                 ctx.Arguments[0] = orig + orig;
                             }
 
@@ -67,23 +68,50 @@ namespace UnitTests.General
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
                 {
-                    clientBuilder.AddOutgoingGrainCallFilter(async ctx =>
+                    clientBuilder
+                        .AddOutgoingGrainCallFilter(RetryCertainCalls)
+                        .AddOutgoingGrainCallFilter(async ctx =>
+                        {
+                            if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain)
+                                && ctx.InterfaceMethod?.Name == nameof(IOutgoingMethodInterceptionGrain.EchoViaOtherGrain))
+                            {
+                                ctx.Arguments[1] = ((string)ctx.Arguments[1]).ToUpperInvariant();
+                            }
+
+                            await ctx.Invoke();
+
+                            if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain)
+                                && ctx.InterfaceMethod?.Name == nameof(IOutgoingMethodInterceptionGrain.EchoViaOtherGrain))
+                            {
+                                var result = (Dictionary<string, object>)ctx.Result;
+                                result["orig"] = result["result"];
+                                result["result"] = "intercepted!";
+                            }
+                        })
+                        .AddSimpleMessageStreamProvider("SMSProvider");
+
+                    static async Task RetryCertainCalls(IOutgoingGrainCallContext ctx)
                     {
-                        if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain))
-                        {
-                            ctx.Arguments[1] = ((string) ctx.Arguments[1]).ToUpperInvariant();
-                        }
+                        var attemptsRemaining = 2;
 
-                        await ctx.Invoke();
-
-                        if (ctx.InterfaceMethod?.DeclaringType == typeof(IOutgoingMethodInterceptionGrain))
+                        while (attemptsRemaining > 0)
                         {
-                            var result = (Dictionary<string, object>) ctx.Result;
-                            result["orig"] = result["result"];
-                            result["result"] = "intercepted!";
+                            try
+                            {
+                                await ctx.Invoke();
+                                return;
+                            }
+                            catch (ArgumentOutOfRangeException) when (attemptsRemaining > 1 && ctx.Grain is IOutgoingMethodInterceptionGrain)
+                            {
+                                if (string.Equals(ctx.InterfaceMethod?.Name, nameof(IOutgoingMethodInterceptionGrain.ThrowIfGreaterThanZero)) && ctx.Arguments[0] is int value)
+                                {
+                                    ctx.Arguments[0] = value - 1;
+                                }
+
+                                --attemptsRemaining;
+                            }
                         }
-                    })
-                    .AddSimpleMessageStreamProvider("SMSProvider");
+                    }
                 }
             }
         }
@@ -104,7 +132,7 @@ namespace UnitTests.General
 
             public Task Invoke(IIncomingGrainCallContext context)
             {
-                if (string.Equals(context.ImplementationMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
+                if (string.Equals(context.ImplementationMethod?.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
                 {
                     if (RequestContext.Get(GrainCallFilterTestConstants.Key) is string value)
                     {
@@ -178,19 +206,43 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests that some invalid usages of invoker interceptors are denied.
+        /// Tests that an incoming call filter can retry calls.
         /// </summary>
         [Fact]
-        public async Task GrainCallFilter_Incoming_InvalidOrder_Test()
+        public async Task GrainCallFilter_Incoming_Retry_Test()
         {
             var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(0);
 
-            var result = await grain.CallWithBadInterceptors(false, false, false);
-            Assert.Equal("I will not misbehave!", result);
+            var result = await grain.ThrowIfGreaterThanZero(1);
+            Assert.Equal("Thanks for nothing", result);
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() => grain.CallWithBadInterceptors(true, false, false));
-            await Assert.ThrowsAsync<InvalidOperationException>(() => grain.CallWithBadInterceptors(false, false, true));
-            await Assert.ThrowsAsync<InvalidOperationException>(() => grain.CallWithBadInterceptors(false, true, false));
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => grain.ThrowIfGreaterThanZero(2));
+        }
+
+        /// <summary>
+        /// Tests that an incoming call filter works with HashSet.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_Incoming_HashSet_Test()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IGrainCallFilterTestGrain>(0);
+
+            var result = await grain.SumSet(new HashSet<int> { 1, 2, 3 });
+            Assert.Equal(6, result);
+        }
+
+        /// <summary>
+        /// Tests that an ougoing call filter can retry calls.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_Outgoing_Retry_Test()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IOutgoingMethodInterceptionGrain>(0);
+
+            var result = await grain.ThrowIfGreaterThanZero(1);
+            Assert.Equal("Thanks for nothing", result);
+
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => grain.ThrowIfGreaterThanZero(2));
         }
 
         /// <summary>
@@ -290,6 +342,34 @@ namespace UnitTests.General
             // This grain method throws, but the exception should be handled by one of the filters and converted
             // into a specific message.
             await Assert.ThrowsAsync<InvalidCastException>(() => grain.IncorrectResultType());
+        }
+
+        /// <summary>
+        /// Tests that <see cref="IIncomingGrainCallContext.ImplementationMethod"/> and <see cref="IGrainCallContext.InterfaceMethod"/> are non-null
+        /// for a call made to a grain and that they match the correct methods.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_Incoming_GenericInterface_ConcreteGrain_Test()
+        {
+            var id = random.Next();
+            var hungry = this.fixture.GrainFactory.GetGrain<IHungryGrain<Apple>>(id);
+            var caterpillar = this.fixture.GrainFactory.GetGrain<ICaterpillarGrain>(id);
+            var omnivore = this.fixture.GrainFactory.GetGrain<IOmnivoreGrain>(id);
+
+            RequestContext.Set("tag", "hungry-eat");
+            await hungry.Eat(new Apple());
+            await ((IHungryGrain<Apple>)caterpillar).Eat(new Apple());
+
+            RequestContext.Set("tag", "omnivore-eat");
+            await omnivore.Eat("string");
+            await ((IOmnivoreGrain)caterpillar).Eat("string");
+
+            RequestContext.Set("tag", "caterpillar-eat");
+            await caterpillar.Eat("string");
+
+            RequestContext.Set("tag", "hungry-eatwith");
+            await caterpillar.EatWith(new Apple(), "butter");
+            await hungry.EatWith(new Apple(), "butter");
         }
     }
 }

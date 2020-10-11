@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Linq;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Storage;
 using Xunit;
 
@@ -17,7 +16,6 @@ namespace UnitTests.StorageTests
             public Fixture()
             {
                 BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
-                ClientConfiguration cfg = ClientConfiguration.LoadFromFile("ClientConfigurationForTesting.xml");
             }
         }
 
@@ -29,93 +27,6 @@ namespace UnitTests.StorageTests
         private const string ValueName3 = "Value3";
 
         private static int _keyCounter = 1;
-
-        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
-        public void Comparer_InsideRange()
-        {
-            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
-
-            string rangeParamName = "Column1";
-            string fromValue = "Rem10";
-            string toValue = "Rem11";
-
-            var compareClause = MemoryGrainStorage.GetComparer(rangeParamName, fromValue, toValue);
-
-            var data = new Dictionary<string, object>();
-
-            data[rangeParamName] = "Rem09";
-            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = "Rem10";
-            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = "Rem11";
-            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = "Rem12";
-            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = testName;
-            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
-        public void Comparer_OutsideRange()
-        {
-            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
-
-            string rangeParamName = "Column1";
-            string toValue = "Rem10";
-            string fromValue = "Rem12";
-
-            var compareClause = MemoryGrainStorage.GetComparer(rangeParamName, fromValue, toValue);
-
-            var data = new Dictionary<string, object>();
-
-            data[rangeParamName] = "Rem09";
-            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = "Rem10";
-            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = "Rem11";
-            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = "Rem12";
-            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = testName;
-            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
-        public void Comparer_SameRange()
-        {
-            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
-
-            string rangeParamName = "Column1";
-            string fromValue = "Rem11";
-            string toValue = "Rem11";
-
-            var compareClause = MemoryGrainStorage.GetComparer(rangeParamName, fromValue, toValue);
-
-            var data = new Dictionary<string, object>();
-
-            data[rangeParamName] = "Rem09";
-            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = "Rem10";
-            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = "Rem11";
-            Assert.True(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = "Rem12";
-            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-
-            data[rangeParamName] = testName;
-            Assert.False(compareClause(data), $"From={fromValue} To={toValue} Compare Value={data[rangeParamName]}");
-        }
 
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_MakeKey()

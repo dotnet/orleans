@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -18,13 +19,17 @@ namespace UnitTests.Grains
 
         private Guid activationGuid;
         private readonly List<Tuple<DateTime, DateTime>> calls = new List<Tuple<DateTime, DateTime>>();
-        private Logger logger;
+        private ILogger logger;
         private static HashSet<Guid> allActivationIds = new HashSet<Guid>();
+
+        public StatelessWorkerGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
             activationGuid = Guid.NewGuid();
-            logger = this.GetLogger(String.Format("{0}", activationGuid));
             logger.Info("Activate.");
             return Task.CompletedTask;
         }

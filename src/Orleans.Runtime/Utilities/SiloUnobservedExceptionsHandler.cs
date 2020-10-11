@@ -5,6 +5,7 @@ using Orleans.Runtime.Scheduler;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
+using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
@@ -14,6 +15,15 @@ namespace Orleans.Runtime
         {
             //resolve handler from DI to initialize it
             var ignore = services.GetService<SiloUnobservedExceptionsHandler>();
+        }
+
+        /// <summary>
+        /// Configure silo with unobserved exception handler
+        /// </summary>
+        public static ISiloBuilder UseSiloUnobservedExceptionsHandler(this ISiloBuilder siloBuilder)
+        {
+            siloBuilder.ConfigureServices(services => services.TryAddSingleton<SiloUnobservedExceptionsHandler>());
+            return siloBuilder;
         }
 
         /// <summary>
@@ -29,7 +39,7 @@ namespace Orleans.Runtime
     internal class SiloUnobservedExceptionsHandler : IDisposable
     {
         private readonly ILogger logger;
-        
+
         public SiloUnobservedExceptionsHandler(ILogger<SiloUnobservedExceptionsHandler> logger)
         {
             this.logger = logger;
@@ -41,19 +51,17 @@ namespace Orleans.Runtime
         {
             var aggrException = e.Exception;
             var baseException = aggrException.GetBaseException();
-            var tplTask = (Task)sender;
-            var contextObj = tplTask.AsyncState;
-            var context = contextObj as ISchedulingContext;
+            var context = (sender as Task)?.AsyncState;
 
             try
             {
-                UnobservedExceptionHandler(context, baseException);
+                this.logger.LogError((int)ErrorCode.Runtime_Error_100104, baseException, "Silo caught an unobserved exception thrown from context {Context}: {Exception}", context, baseException);
             }
             finally
             {
                 if (e.Observed)
                 {
-                    logger.Info(ErrorCode.Runtime_Error_100311, "Silo caught an UnobservedTaskException which was successfully observed and recovered from. BaseException = {0}. Exception = {1}",
+                    logger.Info(ErrorCode.Runtime_Error_100311, "Silo caught an unobserved exception which was successfully observed and recovered from. BaseException = {0}. Exception = {1}",
                             baseException.Message, LogFormatter.PrintException(aggrException));
                 }
                 else
@@ -66,30 +74,10 @@ namespace Orleans.Runtime
             }
         }
 
-        private void UnobservedExceptionHandler(ISchedulingContext context, Exception exception)
-        {
-            var schedulingContext = context as SchedulingContext;
-            if (schedulingContext == null)
-            {
-                if (context == null)
-                    logger.Error(ErrorCode.Runtime_Error_100102, "Silo caught an UnobservedException with context==null.", exception);
-                else
-                    logger.Error(ErrorCode.Runtime_Error_100103, String.Format("Silo caught an UnobservedException with context of type different than OrleansContext. The type of the context is {0}. The context is {1}",
-                        context.GetType(), context), exception);
-            }
-            else
-            {
-                logger.Error(ErrorCode.Runtime_Error_100104, String.Format("Silo caught an UnobservedException thrown by {0}.", schedulingContext.Activation), exception);
-            }
-        }
-
         private void DomainUnobservedExceptionHandler(object context, UnhandledExceptionEventArgs args)
         {
             var exception = (Exception)args.ExceptionObject;
-            if (context is ISchedulingContext)
-                UnobservedExceptionHandler(context as ISchedulingContext, exception);
-            else
-                logger.Error(ErrorCode.Runtime_Error_100324, String.Format("Called DomainUnobservedExceptionHandler with context {0}.", context), exception);
+            logger.LogError((int)ErrorCode.Runtime_Error_100324, exception, "Silo caught an unobserved exception thrown from context {Context}: {Exception}", context, exception);
         }
 
         public void Dispose()

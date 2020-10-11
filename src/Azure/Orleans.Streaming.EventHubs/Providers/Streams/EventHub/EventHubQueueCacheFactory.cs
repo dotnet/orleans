@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
@@ -16,6 +16,7 @@ namespace Orleans.ServiceBus.Providers
     {
         private readonly EventHubStreamCachePressureOptions cacheOptions;
         private readonly StreamStatisticOptions statisticOptions;
+        private readonly IEventHubDataAdapter dataAdater;
         private readonly SerializationManager serializationManager;
         private readonly TimePurgePredicate timePurge;
         private readonly EventHubMonitorAggregationDimensions sharedDimensions;
@@ -37,23 +38,18 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Constructor for EventHubQueueCacheFactory
         /// </summary>
-        /// <param name="cacheOptions"></param>
-        /// <param name="evictionOptions"></param>
-        /// <param name="statisticOptions"></param>
-        /// <param name="serializationManager"></param>
-        /// <param name="sharedDimensions">shared dimensions between cache monitor and block pool monitor</param>
-        /// <param name="cacheMonitorFactory"></param>
-        /// <param name="blockPoolMonitorFactory"></param>
         public EventHubQueueCacheFactory(
             EventHubStreamCachePressureOptions cacheOptions,
             StreamCacheEvictionOptions evictionOptions, 
             StreamStatisticOptions statisticOptions,
+            IEventHubDataAdapter dataAdater,
             SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions,
             Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = null,
             Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = null)
         {
             this.cacheOptions = cacheOptions;
             this.statisticOptions = statisticOptions;
+            this.dataAdater = dataAdater;
             this.serializationManager = serializationManager;
             this.timePurge = new TimePurgePredicate(evictionOptions.DataMinTimeInCache, evictionOptions.DataMaxAgeInCache);
             this.sharedDimensions = sharedDimensions;
@@ -70,7 +66,7 @@ namespace Orleans.ServiceBus.Providers
         {
             string blockPoolId;
             var blockPool = CreateBufferPool(this.statisticOptions, loggerFactory, this.sharedDimensions, telemetryProducer, out blockPoolId);
-            var cache = CreateCache(partition, this.statisticOptions, checkpointer, loggerFactory, blockPool, blockPoolId, this.timePurge, this.serializationManager, this.sharedDimensions, telemetryProducer);
+            var cache = CreateCache(partition, dataAdater, this.statisticOptions, checkpointer, loggerFactory, blockPool, blockPoolId, this.timePurge, this.serializationManager, this.sharedDimensions, telemetryProducer);
             AddCachePressureMonitors(cache, this.cacheOptions, loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{this.sharedDimensions.EventHubPath}.{partition}"));
             return cache;
         }
@@ -131,13 +127,15 @@ namespace Orleans.ServiceBus.Providers
         /// Default function to be called to create an EventhubQueueCache in IEventHubQueueCacheFactory.CreateCache method. User can 
         /// override this method to add more customization.
         /// </summary>
-        protected virtual IEventHubQueueCache CreateCache(string partition, StreamStatisticOptions statisticOptions, IStreamQueueCheckpointer<string> checkpointer,
+        protected virtual IEventHubQueueCache CreateCache(string partition, IEventHubDataAdapter dataAdatper, StreamStatisticOptions statisticOptions, IStreamQueueCheckpointer<string> checkpointer,
             ILoggerFactory loggerFactory, IObjectPool<FixedSizeBuffer> bufferPool, string blockPoolId, TimePurgePredicate timePurge,
             SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions, ITelemetryProducer telemetryProducer)
         {
             var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
             var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory, telemetryProducer);
-            return new EventHubQueueCache(checkpointer, bufferPool, timePurge, loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{sharedDimensions.EventHubPath}.{partition}"), serializationManager, 
+            var logger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{sharedDimensions.EventHubPath}.{partition}");
+            var evictionStrategy = new ChronologicalEvictionStrategy(logger, timePurge, cacheMonitor, statisticOptions.StatisticMonitorWriteInterval);
+            return new EventHubQueueCache(partition, EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdatper, evictionStrategy, checkpointer, logger,  
                 cacheMonitor, statisticOptions.StatisticMonitorWriteInterval);
         }
     }

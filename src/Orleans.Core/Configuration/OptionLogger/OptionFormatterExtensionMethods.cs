@@ -1,5 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration.Internal;
 
 namespace Orleans.Configuration
 {
@@ -15,13 +16,13 @@ namespace Orleans.Configuration
             where TOptions : class
             where TOptionFormatter : class, IOptionFormatter<TOptions>
         {
-            var registration = services.FirstOrDefault(service => service.ServiceType == typeof(IOptionFormatter<TOptions>));
-            if (registration == null)
+            if (!services.Any(service => service.ServiceType == typeof(IOptionFormatter<TOptions>)))
             {
                 services
                     .AddSingleton<IOptionFormatter<TOptions>, TOptionFormatter>()
                     .AddFromExisting<IOptionFormatter, IOptionFormatter<TOptions>>();
-            } else
+            }
+            else
             {
                 // override IOptionFormatter<TOptions>
                 services.AddSingleton<IOptionFormatter<TOptions>, TOptionFormatter>();
@@ -49,8 +50,7 @@ namespace Orleans.Configuration
             where TOptions : class
             where TOptionFormatter : class, IOptionFormatter<TOptions>
         {
-            var registration = services.FirstOrDefault(service => service.ServiceType == typeof(IOptionFormatter<TOptions>));
-            if (registration == null)
+            if (!services.Any(service => service.ServiceType == typeof(IOptionFormatter<TOptions>)))
                 services.ConfigureFormatter<TOptions, TOptionFormatter>();
             return services;
         }
@@ -72,8 +72,7 @@ namespace Orleans.Configuration
             where TOptions : class
             where TOptionFormatterResolver : class, IOptionFormatterResolver<TOptions>
         {
-            var registration = services.FirstOrDefault(service => service.ServiceType == typeof(IOptionFormatterResolver<TOptions>));
-            if (registration == null)
+            if (!services.Any(service => service.ServiceType == typeof(IOptionFormatterResolver<TOptions>)))
                 return services.ConfigureFormatterResolver<TOptions, TOptionFormatterResolver>();
             return services;
         }

@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -11,11 +12,15 @@ namespace UnitTests.Grains
     {
         private IAsyncObserver<int> _producer;
         private int _numProducedItems;
-        private Logger _logger;
+        private ILogger _logger;
+
+        public ProducerEventCountingGrain(ILoggerFactory loggerFactory)
+        {
+            _logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            _logger = this.GetLogger("ProducerEventCountingGrain " + IdentityString);
             _logger.Info("Producer.OnActivateAsync");
             _numProducedItems = 0;
             return base.OnActivateAsync();

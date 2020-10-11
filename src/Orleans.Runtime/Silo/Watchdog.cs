@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-
+using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
 
-    internal class Watchdog : DedicatedAsynchAgent
+    internal class Watchdog
     {
+        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private static readonly TimeSpan heartbeatPeriod = TimeSpan.FromMilliseconds(1000);
         private readonly TimeSpan healthCheckPeriod;
         private DateTime lastHeartbeat;
@@ -17,28 +18,39 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly CounterStatistic watchdogChecks;
         private CounterStatistic watchdogFailedChecks;
+        private Thread thread;
 
-        public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> watchables, ExecutorService executorService, ILoggerFactory loggerFactory)
-            :base(executorService, loggerFactory)
+        public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> watchables, ILogger<Watchdog> logger)
         {
-            logger = loggerFactory.CreateLogger<Watchdog>();
+            this.logger = logger;
             healthCheckPeriod = watchdogPeriod;
             participants = watchables;
             watchdogChecks = CounterStatistic.FindOrCreate(StatisticNames.WATCHDOG_NUM_HEALTH_CHECKS);
         }
 
-        public override void Start()
+        public void Start()
         {
             logger.Info("Starting Silo Watchdog.");
             var now = DateTime.UtcNow;
             lastHeartbeat = now;
             lastWatchdogCheck = now;
-            base.Start();
+            if (thread is object) throw new InvalidOperationException("Watchdog.Start may not be called more than once");
+            this.thread = new Thread(this.Run)
+            {
+                IsBackground = true,
+                Name = "Orleans.Runtime.Watchdog",
+            };
+            this.thread.Start();
         }
 
-        protected override void Run()
+        public void Stop()
         {
-            while (!Cts.IsCancellationRequested)
+            cancellation.Cancel();
+        }
+
+        protected void Run()
+        {
+            while (!this.cancellation.IsCancellationRequested)
             {
                 try
                 {

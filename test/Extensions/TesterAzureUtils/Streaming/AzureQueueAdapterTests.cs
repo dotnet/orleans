@@ -5,25 +5,25 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Configuration;
-using Orleans.Serialization;
+using Orleans.Internal;
 
 namespace Tester.AzureUtils.Streaming
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     [TestCategory("Azure"), TestCategory("Streaming")]
-    public class AzureQueueAdapterTests : AzureStorageBasicTests, IDisposable
+    public class AzureQueueAdapterTests : AzureStorageBasicTests, IAsyncLifetime
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
@@ -41,12 +41,14 @@ namespace Tester.AzureUtils.Streaming
             this.loggerFactory = this.fixture.Services.GetService<ILoggerFactory>();
             BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
         }
-        
-        public void Dispose()
+
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        public async Task DisposeAsync()
         {
             if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, TestDefaultConfiguration.DataConnectionString).Wait();
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(this.loggerFactory, azureQueueNames, new AzureQueueOptions().ConfigureTestDefaults());
             }
         }
 
@@ -55,10 +57,10 @@ namespace Tester.AzureUtils.Streaming
         {
             var options = new AzureQueueOptions
             {
-                ConnectionString = TestDefaultConfiguration.DataConnectionString,
                 MessageVisibilityTimeout = TimeSpan.FromSeconds(30),
                 QueueNames = azureQueueNames
             };
+            options.ConfigureTestDefaults();
             var serializationManager = this.fixture.Services.GetService<SerializationManager>();
             var clusterOptions = this.fixture.Services.GetRequiredService<IOptions<ClusterOptions>>();
             var queueCacheOptions = new SimpleQueueCacheOptions();
@@ -93,7 +95,7 @@ namespace Tester.AzureUtils.Streaming
             Guid streamId2 = Guid.NewGuid();
 
             int receivedBatches = 0;
-            var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<IStreamIdentity>>();
+            var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<StreamId>>();
 
             // reader threads (at most 2 active queues because only two streams)
             var work = new List<Task>();
@@ -106,7 +108,7 @@ namespace Tester.AzureUtils.Streaming
                 {
                     while (receivedBatches < NumBatches)
                     {
-                        var messages = receiver.GetQueueMessagesAsync(CloudQueueMessage.MaxNumberOfMessagesToPeek).Result.ToArray();
+                        var messages = receiver.GetQueueMessagesAsync(QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG).Result.ToArray();
                         if (!messages.Any())
                         {
                             continue;
@@ -114,14 +116,14 @@ namespace Tester.AzureUtils.Streaming
                         foreach (IBatchContainer message in messages)
                         {
                             streamsPerQueue.AddOrUpdate(queueId,
-                                id => new HashSet<IStreamIdentity> { new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()) },
+                                id => new HashSet<StreamId> { message.StreamId },
                                 (id, set) =>
                                 {
-                                    set.Add(new StreamIdentity(message.StreamGuid, message.StreamGuid.ToString()));
+                                    set.Add(message.StreamId);
                                     return set;
                                 });
                             this.output.WriteLine("Queue {0} received message on stream {1}", queueId,
-                                message.StreamGuid);
+                                message.StreamId);
                             Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
                             Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
                         }
@@ -138,7 +140,7 @@ namespace Tester.AzureUtils.Streaming
                 .Select(i => i % 2 == 0 ? streamId1 : streamId2)
                 .ToList()
                 .ForEach(streamId =>
-                    adapter.QueueMessageBatchAsync(streamId, streamId.ToString(),
+                    adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
                         events.Take(NumMessagesPerBatch).ToArray(), null, RequestContextExtensions.Export(this.fixture.SerializationManager)).Wait())));
             await Task.WhenAll(work);
 
@@ -147,12 +149,12 @@ namespace Tester.AzureUtils.Streaming
 
             // check to see if all the events are in the cache and we can enumerate through them
             StreamSequenceToken firstInCache = new EventSequenceTokenV2(0);
-            foreach (KeyValuePair<QueueId, HashSet<IStreamIdentity>> kvp in streamsPerQueue)
+            foreach (KeyValuePair<QueueId, HashSet<StreamId>> kvp in streamsPerQueue)
             {
                 var receiver = receivers[kvp.Key];
                 var qCache = caches[kvp.Key];
 
-                foreach (IStreamIdentity streamGuid in kvp.Value)
+                foreach (StreamId streamGuid in kvp.Value)
                 {
                     // read all messages in cache for stream
                     IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);

@@ -154,6 +154,21 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// Parse a Uri as a Silo address, excluding the generation identifier.
+        /// </summary>
+        /// <param name="uri">The input Uri</param>
+        public static SiloAddress ToGatewayAddress(this Uri uri)
+        {
+            switch (uri.Scheme)
+            {
+                case "gwy.tcp":
+                    return SiloAddress.New(uri.ToIPEndPoint(), 0);
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Represent an IP end point in the gateway URI format..
         /// </summary>
         /// <param name="ep">The input IP end point</param>
@@ -362,11 +377,6 @@ namespace Orleans.Runtime
 #else
             return new System.Diagnostics.StackTrace(skipFrames).ToString();
 #endif
-        }
-
-        public static GrainReference FromKeyString(string key, IGrainReferenceRuntime runtime)
-        {
-            return GrainReference.FromKeyString(key, runtime);
         }
     }
 }

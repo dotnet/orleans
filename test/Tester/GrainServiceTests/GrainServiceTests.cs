@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Orleans;
 using Orleans.TestingHost;
@@ -18,26 +16,13 @@ namespace Tester
             {
                 builder.Options.InitialSilosCount = 1;
                 builder.AddSiloBuilderConfigurator<GrainServiceSiloBuilderConfigurator>();
-
-                // register LegacyGrainService the legacy way
-                builder.ConfigureLegacyConfiguration(legacy =>
-                {
-                    legacy.ClusterConfiguration.Globals.RegisterGrainService("LegacyGrainService",
-                        "Tester.LegacyGrainService, Tester",
-                        new Dictionary<string, string> {{"test-property", "xyz"}});
-                });
             }
 
-            private class GrainServiceSiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class GrainServiceSiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
-                    hostBuilder.ConfigureServices(services =>
-                        // register client for LegacyGrainService the legacy way
-                        services.AddSingleton<ILegacyGrainServiceClient, LegacyGrainServiceClient>())
-                    // register TestGrainService the modern way
-                    .AddTestGrainService("abc")
-                    .AddGrainExtension<IEchoExtension, EchoExtension>();
+                    hostBuilder.AddTestGrainService("abc").AddGrainExtension<IEchoExtension, EchoExtension>();
                 }
             }
         }
@@ -49,42 +34,7 @@ namespace Tester
 
         public IGrainFactory GrainFactory { get; set; }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
-        public async Task SimpleInvokeGrainService_Legacy()
-        {
-            IGrainServiceTestGrain grain = this.GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
-            var grainId = await grain.GetHelloWorldUsingCustomService_Legacy();
-            Assert.Equal("Hello World from Legacy Grain Service", grainId);
-            var prop = await grain.GetServiceConfigProperty_Legacy("test-property");
-            Assert.Equal("xyz", prop);
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
-        public async Task GrainServiceWasStarted_Legacy()
-        {
-            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
-            var prop = await grain.CallHasStarted_Legacy();
-            Assert.True(prop);
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
-        public async Task GrainServiceWasStartedInBackground_Legacy()
-        {
-            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
-            var prop = await grain.CallHasStartedInBackground_Legacy();
-            Assert.True(prop);
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
-        public async Task GrainServiceWasInit_Legacy()
-        {
-            IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
-            var prop = await grain.CallHasInit_Legacy();
-            Assert.True(prop);
-        }
-
-
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task SimpleInvokeGrainService()
         {
             IGrainServiceTestGrain grain = this.GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
@@ -94,7 +44,7 @@ namespace Tester
             Assert.Equal("abc", prop);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceWasStarted()
         {
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
@@ -102,7 +52,7 @@ namespace Tester
             Assert.True(prop);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceWasStartedInBackground()
         {
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
@@ -110,7 +60,7 @@ namespace Tester
             Assert.True(prop);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceWasInit()
         {
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);
@@ -118,7 +68,7 @@ namespace Tester
             Assert.True(prop);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("GrainServices")]
+        [Fact, TestCategory("BVT"), TestCategory("GrainServices")]
         public async Task GrainServiceExtensionTest()
         {
             IGrainServiceTestGrain grain = GrainFactory.GetGrain<IGrainServiceTestGrain>(0);

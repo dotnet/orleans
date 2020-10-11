@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -17,7 +17,8 @@ namespace Orleans.Streams
             return ActivatorUtilities.CreateInstance<ConsistentRingQueueBalancer>(services);
         }
 
-        public ConsistentRingQueueBalancer(IStreamProviderRuntime streamProviderRuntime)
+        public ConsistentRingQueueBalancer(IStreamProviderRuntime streamProviderRuntime, IServiceProvider services, ILogger<ConsistentRingQueueBalancer> logger)
+            : base(services,  logger)
         {
             if (streamProviderRuntime == null)
             {
@@ -39,28 +40,22 @@ namespace Orleans.Streams
                 throw new ArgumentException("queueMapper for ConsistentRingQueueBalancer should implement IConsistentRingStreamQueueMapper", "queueMapper");
             }
             streamQueueMapper = (IConsistentRingStreamQueueMapper)queueMapper;
-            return Task.CompletedTask;
+            return base.Initialize(queueMapper);
         }
 
         public Task RangeChangeNotification(IRingRange old, IRingRange now)
         {
             myRange = now;
-            List<IStreamQueueBalanceListener> queueBalanceListenersCopy;
-            lock (queueBalanceListeners)
-            {
-                queueBalanceListenersCopy = queueBalanceListeners.ToList();
-            }
-            var notificatioTasks = new List<Task>(queueBalanceListenersCopy.Count);
-            foreach (IStreamQueueBalanceListener listener in queueBalanceListenersCopy)
-            {
-                notificatioTasks.Add(listener.QueueDistributionChangeNotification());
-            }
-            return Task.WhenAll(notificatioTasks);
+            return base.NotifyListeners();
         }
 
         public override IEnumerable<QueueId> GetMyQueues()
         {
             return streamQueueMapper.GetQueuesForRange(myRange);
+        }
+
+        protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
+        {
         }
     }
 }

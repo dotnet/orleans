@@ -4,14 +4,14 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Azure.EventHubs;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers.Testing;
-using Orleans.Hosting;
+using Azure.Messaging.EventHubs.Consumer;
+using Azure.Messaging.EventHubs;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -56,7 +56,7 @@ namespace Orleans.ServiceBus.Providers
         private AggregatedQueueFlowController flowController;
 
         // Receiver life cycle
-        private int recieverState = ReceiverShutdown;
+        private int receiverState = ReceiverShutdown;
 
         private const int ReceiverShutdown = 0;
         private const int ReceiverRunning = 1;
@@ -75,21 +75,14 @@ namespace Orleans.ServiceBus.Providers
             ITelemetryProducer telemetryProducer,
             Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, IEventHubReceiver> eventHubReceiverFactory = null)
         {
-            if (settings == null) throw new ArgumentNullException(nameof(settings));
-            if (cacheFactory == null) throw new ArgumentNullException(nameof(cacheFactory));
-            if (checkpointerFactory == null) throw new ArgumentNullException(nameof(checkpointerFactory));
-            if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
-            if (monitor == null) throw new ArgumentNullException(nameof(monitor));
-            if (loadSheddingOptions == null) throw new ArgumentNullException(nameof(loadSheddingOptions));
-            if (telemetryProducer == null) throw new ArgumentNullException(nameof(telemetryProducer));
-            this.settings = settings;
-            this.cacheFactory = cacheFactory;
-            this.checkpointerFactory = checkpointerFactory;
-            this.loggerFactory = loggerFactory;
+            this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            this.cacheFactory = cacheFactory ?? throw new ArgumentNullException(nameof(cacheFactory));
+            this.checkpointerFactory = checkpointerFactory ?? throw new ArgumentNullException(nameof(checkpointerFactory));
+            this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{settings.Hub.Path}.{settings.Partition}");
-            this.monitor = monitor;
-            this.telemetryProducer = telemetryProducer;
-            this.loadSheddingOptions = loadSheddingOptions;
+            this.monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
+            this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
+            this.loadSheddingOptions = loadSheddingOptions ?? throw new ArgumentNullException(nameof(loadSheddingOptions));
 
             this.eventHubReceiverFactory = eventHubReceiverFactory == null ? EventHubAdapterReceiver.CreateReceiver : eventHubReceiverFactory;
         }
@@ -98,7 +91,7 @@ namespace Orleans.ServiceBus.Providers
         {
             this.logger.Info("Initializing EventHub partition {0}-{1}.", this.settings.Hub.Path, this.settings.Partition);
             // if receiver was already running, do nothing
-            return ReceiverRunning == Interlocked.Exchange(ref this.recieverState, ReceiverRunning)
+            return ReceiverRunning == Interlocked.Exchange(ref this.receiverState, ReceiverRunning)
                 ? Task.CompletedTask
                 : Initialize();
         }
@@ -135,7 +128,7 @@ namespace Orleans.ServiceBus.Providers
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
         {
-            if (this.recieverState == ReceiverShutdown || maxCount <= 0)
+            if (this.receiverState == ReceiverShutdown || maxCount <= 0)
             {
                 return new List<IBatchContainer>();
             }
@@ -182,21 +175,20 @@ namespace Orleans.ServiceBus.Providers
             // monitor message age
             var dequeueTimeUtc = DateTime.UtcNow;
 
-            DateTime oldestMessageEnqueueTime = messages[0].SystemProperties.EnqueuedTimeUtc;
-            DateTime newestMessageEnqueueTime = messages[messages.Count - 1].SystemProperties.EnqueuedTimeUtc;
+            DateTime oldestMessageEnqueueTime = messages[0].EnqueuedTime.UtcDateTime;
+            DateTime newestMessageEnqueueTime = messages[messages.Count - 1].EnqueuedTime.UtcDateTime;
 
             this.monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
 
             List<StreamPosition> messageStreamPositions = this.cache.Add(messages, dequeueTimeUtc);
             foreach (var streamPosition in messageStreamPositions)
             {
-                batches.Add(new StreamActivityNotificationBatch(streamPosition.StreamIdentity.Guid,
-                    streamPosition.StreamIdentity.Namespace, streamPosition.SequenceToken));
+                batches.Add(new StreamActivityNotificationBatch(streamPosition));
             }
             if (!this.checkpointer.CheckpointExists)
             {
                 this.checkpointer.Update(
-                    messages[0].SystemProperties.Offset,
+                    messages[0].Offset.ToString(),
                     DateTime.UtcNow);
             }
             return batches;
@@ -218,9 +210,9 @@ namespace Orleans.ServiceBus.Providers
             return false;
         }
 
-        public IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token)
+        public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token)
         {
-            return new Cursor(this.cache, streamIdentity, token);
+            return new Cursor(this.cache, streamId, token);
         }
 
         public bool IsUnderPressure()
@@ -239,7 +231,7 @@ namespace Orleans.ServiceBus.Providers
             try
             {
                 // if receiver was already shutdown, do nothing
-                if (ReceiverShutdown == Interlocked.Exchange(ref this.recieverState, ReceiverShutdown))
+                if (ReceiverShutdown == Interlocked.Exchange(ref this.receiverState, ReceiverShutdown))
                 {
                     return;
                 }
@@ -275,71 +267,36 @@ namespace Orleans.ServiceBus.Providers
 
         private static IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
         {
-            var connectionStringBuilder = new EventHubsConnectionStringBuilder(partitionSettings.Hub.ConnectionString)
-            {
-                EntityPath = partitionSettings.Hub.Path
-            };
-            EventHubClient client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
-
-            EventPosition eventPosition;
-             
-            // If we have a starting offset, read from offset
-            if (offset != EventHubConstants.StartOfStream)
-            {
-                logger.Info("Starting to read from EventHub partition {0}-{1} at offset {2}", partitionSettings.Hub.Path, partitionSettings.Partition, offset);
-                eventPosition = EventPosition.FromOffset(offset, true);
-            }
-            // else, if configured to start from now, start reading from most recent data
-            else if (partitionSettings.ReceiverOptions.StartFromNow)
-            {
-                eventPosition = EventPosition.FromEnd();
-                logger.Info("Starting to read latest messages from EventHub partition {0}-{1}.", partitionSettings.Hub.Path, partitionSettings.Partition);
-            } else
-            // else, start reading from begining of the partition
-            {
-                eventPosition = EventPosition.FromStart();
-                logger.Info("Starting to read messages from begining of EventHub partition {0}-{1}.", partitionSettings.Hub.Path, partitionSettings.Partition);
-            }
-
-            PartitionReceiver receiver = client.CreateReceiver(partitionSettings.Hub.ConsumerGroup, partitionSettings.Partition, eventPosition);
-
-            if (partitionSettings.ReceiverOptions.PrefetchCount.HasValue)
-                receiver.PrefetchCount = partitionSettings.ReceiverOptions.PrefetchCount.Value;
-
-            return new EventHubReceiverProxy(receiver);
+            return new EventHubReceiverProxy(partitionSettings, offset, logger);
         }
 
         /// <summary>
         /// For test purpose. ConfigureDataGeneratorForStream will configure a data generator for the stream
         /// </summary>
         /// <param name="streamId"></param>
-        internal void ConfigureDataGeneratorForStream(IStreamIdentity streamId)
+        internal void ConfigureDataGeneratorForStream(StreamId streamId)
         {
             (this.receiver as EventHubPartitionGeneratorReceiver)?.ConfigureDataGeneratorForStream(streamId);
         }
 
-        internal void StopProducingOnStream(IStreamIdentity streamId)
+        internal void StopProducingOnStream(StreamId streamId)
         {
             (this.receiver as EventHubPartitionGeneratorReceiver)?.StopProducingOnStream(streamId);
         }
 
         private class StreamActivityNotificationBatch : IBatchContainer
         {
-            public Guid StreamGuid { get; }
-            public string StreamNamespace { get; }
-            public StreamSequenceToken SequenceToken { get; }
+            public StreamPosition Position { get; }
+            public StreamId StreamId => this.Position.StreamId;
+            public StreamSequenceToken SequenceToken => this.Position.SequenceToken;
 
-            public StreamActivityNotificationBatch(Guid streamGuid, string streamNamespace,
-                StreamSequenceToken sequenceToken)
+            public StreamActivityNotificationBatch(StreamPosition position)
             {
-                this.StreamGuid = streamGuid;
-                this.StreamNamespace = streamNamespace;
-                this.SequenceToken = sequenceToken;
+                this.Position = position;
             }
 
             public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() { throw new NotSupportedException(); }
             public bool ImportRequestContext() { throw new NotSupportedException(); }
-            public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc) { throw new NotSupportedException(); }
         }
 
         private class Cursor : IQueueCacheCursor
@@ -348,10 +305,10 @@ namespace Orleans.ServiceBus.Providers
             private readonly object cursor;
             private IBatchContainer current;
 
-            public Cursor(IEventHubQueueCache cache, IStreamIdentity streamIdentity, StreamSequenceToken token)
+            public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSequenceToken token)
             {
                 this.cache = cache;
-                this.cursor = cache.GetCursor(streamIdentity, token);
+                this.cursor = cache.GetCursor(streamId, token);
             }
 
             public void Dispose()

@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+using System;
+using Newtonsoft.Json;
 using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
 
@@ -24,9 +25,14 @@ namespace Orleans.Configuration
         public string SecretKey { get; set; }
 
         /// <summary>
-        /// DynamoDB Service name 
+        /// DynamoDB Service name
         /// </summary>
         public string Service { get; set; }
+
+        /// <summary>
+        /// Use Provisioned Throughput for tables
+        /// </summary>
+        public bool UseProvisionedThroughput { get; set; } = true;
 
         /// <summary>
         /// Read capacity unit for DynamoDB storage
@@ -59,6 +65,13 @@ namespace Orleans.Configuration
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
         public TypeNameHandling? TypeNameHandling { get; set; }
+
+        /// <summary>
+        /// Specifies a time span in which the item would be expired in the future
+        /// every StateWrite will increase the TTL of the grain
+        /// </summary>
+        public TimeSpan? TimeToLive { get; set; }
+        public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
     }
 
     /// <summary>
@@ -86,13 +99,16 @@ namespace Orleans.Configuration
                 throw new OrleansConfigurationException(
                     $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.TableName)} is not valid.");
 
-            if (this.options.ReadCapacityUnits == 0)
-                throw new OrleansConfigurationException(
-                    $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.ReadCapacityUnits)} is not valid.");
+            if (this.options.UseProvisionedThroughput)
+            {
+                if (this.options.ReadCapacityUnits == 0)
+                    throw new OrleansConfigurationException(
+                        $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.ReadCapacityUnits)} is not valid.");
 
-            if (this.options.WriteCapacityUnits == 0)
-                throw new OrleansConfigurationException(
-                    $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.WriteCapacityUnits)} is not valid.");
+                if (this.options.WriteCapacityUnits == 0)
+                    throw new OrleansConfigurationException(
+                        $"Configuration for DynamoDBGrainStorage {this.name} is invalid. {nameof(this.options.WriteCapacityUnits)} is not valid.");
+            }
         }
     }
 }

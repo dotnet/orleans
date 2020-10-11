@@ -3,21 +3,21 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
-using Orleans.ApplicationParts;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Providers;
 using Orleans.Runtime.TestHooks;
 using Orleans.Configuration;
-using Orleans.Logging;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using Orleans.Statistics;
 using Orleans.TestingHost.Utils;
+using Orleans.TestingHost.Logging;
+using Orleans.Configuration.Internal;
 
 namespace Orleans.TestingHost
 {
@@ -43,13 +43,22 @@ namespace Orleans.TestingHost
 
             string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
 
-            var hostBuilder = new SiloHostBuilder()
+            var hostBuilder = new HostBuilder();
+            var siloBuilder = new SiloBuilder(hostBuilder);
+            var siloHostBuilder = new SiloHostBuilderAdaptor(hostBuilder, siloBuilder);
+
+            // Add the silo builder to the host builder so that it is executed during configuration time. 
+            hostBuilder.Properties[nameof(SiloBuilder)] = siloBuilder;
+            hostBuilder.ConfigureServices((context, services) =>
+            {
+                siloBuilder.Build(context, services);
+            });
+
+            siloBuilder
                 .Configure<ClusterOptions>(configuration)
-                .Configure<SiloOptions>(options => options.SiloName = siloName)
-                .Configure<ClusterMembershipOptions>(options =>
-                {
-                    options.ExpectedClusterSize = int.Parse(configuration["InitialSilosCount"]);
-                })
+                .Configure<SiloOptions>(options => options.SiloName = siloName);
+
+            hostBuilder
                 .ConfigureHostConfiguration(cb =>
                 {
                     // TODO: Instead of passing the sources individually, just chain the pre-built configuration once we upgrade to Microsoft.Extensions.Configuration 2.1
@@ -60,16 +69,16 @@ namespace Orleans.TestingHost
                 });
 
             hostBuilder.Properties["Configuration"] = configuration;
-            ConfigureAppServices(configuration, hostBuilder);
+            ConfigureAppServices(configuration, hostBuilder, siloBuilder, siloHostBuilder);
 
             hostBuilder.ConfigureServices((context, services) =>
             {
                 services.AddSingleton<TestHooksHostEnvironmentStatistics>();
                 services.AddFromExisting<IHostEnvironmentStatistics, TestHooksHostEnvironmentStatistics>();
                 services.AddSingleton<TestHooksSystemTarget>();
-                ConfigureListeningPorts(context, services);
+                ConfigureListeningPorts(context.Configuration, services);
 
-                TryConfigureTestClusterMembership(context, services);
+                TryConfigureClusterMembership(context.Configuration, services);
                 TryConfigureFileLogging(configuration, services, siloName);
 
                 if (Debugger.IsAttached)
@@ -79,11 +88,12 @@ namespace Orleans.TestingHost
                 }
             });
 
-            hostBuilder.GetApplicationPartManager().ConfigureDefaults();
+            siloBuilder.GetApplicationPartManager().ConfigureDefaults();
 
             var host = hostBuilder.Build();
-            InitializeTestHooksSystemTarget(host);
-            return host;
+            var silo = host.Services.GetRequiredService<ISiloHost>();
+            InitializeTestHooksSystemTarget(silo);
+            return silo;
         }
 
         public static IClusterClient CreateClusterClient(string hostName, IEnumerable<IConfigurationSource> configurationSources)
@@ -98,14 +108,14 @@ namespace Orleans.TestingHost
             var builder = new ClientBuilder();
             builder.Properties["Configuration"] = configuration;
             builder.Configure<ClusterOptions>(configuration);
-            ConfigureAppServices(configuration, builder);
 
             builder.ConfigureServices(services =>
             {
-                TryConfigureTestClusterMembership(configuration, services);
+                TryConfigureClientMembership(configuration, services);
                 TryConfigureFileLogging(configuration, services, hostName);
             });
 
+            ConfigureAppServices(configuration, builder);
             builder.GetApplicationPartManager().ConfigureDefaults();
             return builder.Build();
         }
@@ -132,20 +142,25 @@ namespace Orleans.TestingHost
             return JsonConvert.DeserializeObject<IList<IConfigurationSource>>(serializedSources, settings);
         }
 
-        private static void ConfigureListeningPorts(HostBuilderContext context, IServiceCollection services)
+        private static void ConfigureListeningPorts(IConfiguration configuration, IServiceCollection services)
         {
-            int siloPort = int.Parse(context.Configuration[nameof(TestSiloSpecificOptions.SiloPort)]);
-            int gatewayPort = int.Parse(context.Configuration[nameof(TestSiloSpecificOptions.GatewayPort)]);
+            int siloPort = int.Parse(configuration[nameof(TestSiloSpecificOptions.SiloPort)]);
+            int gatewayPort = int.Parse(configuration[nameof(TestSiloSpecificOptions.GatewayPort)]);
 
             services.Configure<EndpointOptions>(options =>
             {
                 options.AdvertisedIPAddress = IPAddress.Loopback;
                 options.SiloPort = siloPort;
                 options.GatewayPort = gatewayPort;
+                options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Loopback, siloPort);
+                if (gatewayPort != 0)
+                {
+                    options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Loopback, gatewayPort);
+                }
             });
         }
 
-        private static void ConfigureAppServices(IConfiguration configuration, ISiloHostBuilder hostBuilder)
+        private static void ConfigureAppServices(IConfiguration configuration, IHostBuilder hostBuilder, ISiloBuilder siloBuilder, ISiloHostBuilder siloHostBuilder)
         {
             var builderConfiguratorTypes = configuration.GetSection(nameof(TestClusterOptions.SiloBuilderConfiguratorTypes))?.Get<string[]>();
             if (builderConfiguratorTypes == null) return;
@@ -154,8 +169,13 @@ namespace Orleans.TestingHost
             {
                 if (!string.IsNullOrWhiteSpace(builderConfiguratorType))
                 {
-                    var builderConfigurator = (ISiloBuilderConfigurator)Activator.CreateInstance(Type.GetType(builderConfiguratorType, true));
-                    builderConfigurator.Configure(hostBuilder);
+                    var configurator = Activator.CreateInstance(Type.GetType(builderConfiguratorType, true));
+
+                    (configurator as IHostConfigurator)?.Configure(hostBuilder);
+                    (configurator as ISiloConfigurator)?.Configure(siloBuilder);
+#pragma warning disable CS0618 // Type or member is obsolete
+                    (configurator as ISiloBuilderConfigurator)?.Configure(siloHostBuilder);
+#pragma warning restore CS0618 // Type or member is obsolete
                 }
             }
         }
@@ -175,15 +195,15 @@ namespace Orleans.TestingHost
             }
         }
 
-        private static void TryConfigureTestClusterMembership(HostBuilderContext context, IServiceCollection services)
+        private static void TryConfigureClusterMembership(IConfiguration configuration, IServiceCollection services)
         {
-            bool.TryParse(context.Configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
+            bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
 
             // Configure test cluster membership if requested and if no membership table implementation has been registered.
             // If the test involves a custom membership oracle and no membership table, special care will be required
             if (useTestClusterMembership && services.All(svc => svc.ServiceType != typeof(IMembershipTable)))
             {
-                var primarySiloEndPoint = new IPEndPoint(IPAddress.Loopback, int.Parse(context.Configuration[nameof(TestSiloSpecificOptions.PrimarySiloPort)]));
+                var primarySiloEndPoint = new IPEndPoint(IPAddress.Loopback, int.Parse(configuration[nameof(TestSiloSpecificOptions.PrimarySiloPort)]));
 
                 services.Configure<DevelopmentClusterMembershipOptions>(options => options.PrimarySiloEndpoint = primarySiloEndPoint);
                 services
@@ -192,7 +212,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private static void TryConfigureTestClusterMembership(IConfiguration configuration, IServiceCollection services)
+        private static void TryConfigureClientMembership(IConfiguration configuration, IServiceCollection services)
         {
             bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
             if (useTestClusterMembership && services.All(svc => svc.ServiceType != typeof(IGatewayListProvider)))
@@ -201,10 +221,18 @@ namespace Orleans.TestingHost
                     {
                         int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
                         int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
+                        bool gatewayPerSilo = bool.Parse(configuration[nameof(TestClusterOptions.GatewayPerSilo)]);
 
-                        options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
-                            .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
-                            .ToList();
+                        if (gatewayPerSilo)
+                        {
+                            options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
+                                .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
+                                .ToList();
+                        }
+                        else
+                        {
+                            options.Gateways = new List<Uri> { new IPEndPoint(IPAddress.Loopback, baseGatewayPort).ToGatewayUri() };
+                        }
                     };
                 if (configureOptions != null)
                 {

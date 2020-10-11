@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
@@ -10,16 +11,20 @@ namespace UnitTests.Grains
 {
     internal class SimpleActivateDeactivateTestGrain : Grain, ISimpleActivateDeactivateTestGrain
     {
-        private Logger logger;
+        private ILogger logger;
 
         private IActivateDeactivateWatcherGrain watcher;
 
         private bool doingActivate;
         private bool doingDeactivate;
 
+        public SimpleActivateDeactivateTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             Assert.False(doingActivate, "Activate method should have finished");
@@ -61,16 +66,20 @@ namespace UnitTests.Grains
 
     internal class TailCallActivateDeactivateTestGrain : Grain, ITailCallActivateDeactivateTestGrain
     {
-        private Logger logger;
+        private ILogger logger;
 
         private IActivateDeactivateWatcherGrain watcher;
 
         private bool doingActivate;
         private bool doingDeactivate;
 
+        public TailCallActivateDeactivateTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             Assert.False(doingActivate, "Activate method should have finished");
@@ -120,16 +129,20 @@ namespace UnitTests.Grains
 
     internal class LongRunningActivateDeactivateTestGrain : Grain, ILongRunningActivateDeactivateTestGrain
     {
-        private Logger logger;
+        private ILogger logger;
 
         private IActivateDeactivateWatcherGrain watcher;
 
         private bool doingActivate;
         private bool doingDeactivate;
 
+        public LongRunningActivateDeactivateTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override async Task OnActivateAsync()
         {
-            logger = this.GetLogger();
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
 
             Assert.False(doingActivate, "Not doing Activate yet");
@@ -201,21 +214,28 @@ namespace UnitTests.Grains
 
     internal class TaskActionActivateDeactivateTestGrain : Grain, ITaskActionActivateDeactivateTestGrain
     {
-        private Logger logger;
+        private ILogger logger;
 
         private IActivateDeactivateWatcherGrain watcher;
 
         private bool doingActivate;
         private bool doingDeactivate;
 
-        public override Task OnActivateAsync()
+        public TaskActionActivateDeactivateTestGrain(ILoggerFactory loggerFactory)
         {
-            logger = this.GetLogger();
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
+        public override async Task OnActivateAsync()
+        {
+            Assert.NotNull(TaskScheduler.Current);
+            Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
             var startMe =
                 new Task(
                     () =>
                     {
+                        Assert.NotNull(TaskScheduler.Current);
+                        Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
                         logger.Info("OnActivateAsync");
 
                         watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
@@ -229,9 +249,11 @@ namespace UnitTests.Grains
             Func<Task> asyncCont =
                 async () =>
                 {
+                    Assert.NotNull(TaskScheduler.Current);
+                    Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
                     logger.Info("Started-OnActivateAsync");
 
-                    Assert.True(doingActivate, "Doing Activate");
+                    Assert.True(doingActivate, "Doing Activate 1");
                     Assert.False(doingDeactivate, "Not doing Deactivate");
 
                     try
@@ -247,7 +269,7 @@ namespace UnitTests.Grains
                         Assert.True(false, msg);
                     }
 
-                    Assert.True(doingActivate, "Doing Activate");
+                    Assert.True(doingActivate, "Doing Activate 2");
                     Assert.False(doingDeactivate, "Not doing Deactivate");
 
                     await Task.Delay(TimeSpan.FromSeconds(1));
@@ -258,7 +280,7 @@ namespace UnitTests.Grains
                 };
             var awaitMe = startMe.ContinueWith(_ => asyncCont()).Unwrap();
             startMe.Start();
-            return awaitMe;
+            await awaitMe;
         }
 
         public override Task OnDeactivateAsync()
@@ -302,11 +324,15 @@ namespace UnitTests.Grains
 
     public class BadActivateDeactivateTestGrain : Grain, IBadActivateDeactivateTestGrain
     {
-        private Logger logger;
+        private ILogger logger;
+
+        public BadActivateDeactivateTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             throw new ApplicationException("Thrown from Application-OnActivateAsync");
         }
@@ -333,8 +359,6 @@ namespace UnitTests.Grains
 
     internal class BadConstructorTestGrain : Grain, IBadConstructorTestGrain
     {
-        private Logger logger;
-
         public BadConstructorTestGrain()
         {
             throw new ApplicationException("Thrown from Constructor");
@@ -342,31 +366,31 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger();
-            logger.Info("OnActivateAsync");
             throw new NotImplementedException("OnActivateAsync should not have been called");
         }
 
         public override Task OnDeactivateAsync()
         {
-            logger.Info("OnDeactivateAsync");
             throw new NotImplementedException("OnDeactivateAsync() should not have been called");
         }
 
         public Task<string> DoSomething()
         {
-            logger.Info("DoSomething");
             throw new NotImplementedException("DoSomething should not have been called");
         }
     }
 
     internal class DeactivatingWhileActivatingTestGrain : Grain, IDeactivatingWhileActivatingTestGrain
     {
-        private Logger logger;
+        private ILogger logger;
+
+        public DeactivatingWhileActivatingTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger();
             logger.Info("OnActivateAsync");
             this.DeactivateOnIdle();
             return Task.CompletedTask;
@@ -387,14 +411,18 @@ namespace UnitTests.Grains
 
     internal class CreateGrainReferenceTestGrain : Grain, ICreateGrainReferenceTestGrain
     {
-        private Logger logger;
+        private ILogger logger;
 
         //private IEchoGrain orleansManagedGrain;
         private ITestGrain grain;
 
+        public CreateGrainReferenceTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
+
         public override Task OnActivateAsync()
         {
-            logger = this.GetLogger();
             grain = GrainFactory.GetGrain<ITestGrain>(1);
             logger.Info("OnActivateAsync");
             grain = GrainFactory.GetGrain<ITestGrain>(1);

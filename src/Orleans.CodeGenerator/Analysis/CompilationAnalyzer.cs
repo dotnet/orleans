@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -153,7 +153,7 @@ namespace Orleans.CodeGenerator.Analysis
             }
             else
             {
-                foreach (var field in type.GetAllMembers<IFieldSymbol>())
+                foreach (var field in type.GetInstanceMembers<IFieldSymbol>())
                 {
                     ExpandGenericArguments(field.Type);
                 }
@@ -180,8 +180,19 @@ namespace Orleans.CodeGenerator.Analysis
         {
             this.serializationTypesToProcess.Add(type);
             this.grainInterfacesToProcess.Add(type);
-            foreach (var method in type.GetAllMembers<IMethodSymbol>())
+            foreach (var method in type.GetInstanceMembers<IMethodSymbol>())
             {
+                var awaitable = IsAwaitable(method);
+
+                if (!awaitable && !method.ReturnsVoid)
+                {
+                    var message = $"Grain interface {type} has method {method} which returns a non-awaitable type {method.ReturnType}."
+                        + " All grain interface methods must return awaitable types."
+                        + $" Did you mean to return Task<{method.ReturnType}>?";
+                    this.log.LogError(message);
+                    throw new InvalidOperationException(message);
+                }
+
                 if (method.ReturnType is INamedTypeSymbol returnType)
                 {
                     foreach (var named in ExpandType(returnType).OfType<INamedTypeSymbol>())
@@ -203,26 +214,47 @@ namespace Orleans.CodeGenerator.Analysis
                     }
                 }
             }
+
+            bool IsAwaitable(IMethodSymbol method)
+            {
+                foreach (var member in method.ReturnType.GetMembers("GetAwaiter"))
+                {
+                    if (member.IsStatic) continue;
+                    if (member is IMethodSymbol m && HasZeroParameters(m))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+
+                bool HasZeroParameters(IMethodSymbol m) => m.Parameters.Length == 0 && m.TypeParameters.Length == 0;
+            }
         }
 
         private static IEnumerable<ITypeSymbol> ExpandType(ITypeSymbol symbol)
         {
-            yield return symbol;
-            switch (symbol)
+            return ExpandTypeInternal(symbol, new HashSet<ITypeSymbol>());
+            IEnumerable<ITypeSymbol> ExpandTypeInternal(ITypeSymbol s, HashSet<ITypeSymbol> emitted)
             {
-                case IArrayTypeSymbol array:
-                    foreach (var t in ExpandType(array.ElementType)) yield return t;
-                    break;
-                case INamedTypeSymbol named:
-                    foreach (var p in named.TypeArguments)
-                    foreach (var t in ExpandType(p))
-                        yield return t;
-                    break;
-            }
+                if (!emitted.Add(s)) yield break;
+                yield return s;
+                switch (s)
+                {
+                    case IArrayTypeSymbol array:
+                        foreach (var t in ExpandTypeInternal(array.ElementType, emitted)) yield return t;
+                        break;
+                    case INamedTypeSymbol named:
+                        foreach (var p in named.TypeArguments)
+                            foreach (var t in ExpandTypeInternal(p, emitted))
+                                yield return t;
+                        break;
+                }
 
-            if (symbol.BaseType != null)
-            {
-                foreach (var t in ExpandType(symbol.BaseType)) yield return t;
+                if (s.BaseType != null)
+                {
+                    foreach (var t in ExpandTypeInternal(s.BaseType, emitted)) yield return t;
+                }
             }
         }
 
@@ -271,7 +303,7 @@ namespace Orleans.CodeGenerator.Analysis
                     if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Known assembly {type.ContainingAssembly} from assembly {asm}");
 
                     // Check if the attribute has the TreatTypesAsSerializable property set.
-                    var prop = attr.NamedArguments.Where(a => a.Key.Equals("TreatTypesAsSerializable")).Select(a => a.Value).FirstOrDefault();
+                    var prop = attr.NamedArguments.FirstOrDefault(a => a.Key.Equals("TreatTypesAsSerializable")).Value;
                     if (prop.Type != null)
                     {
                         var treatAsSerializable = (bool)prop.Value;
@@ -305,7 +337,7 @@ namespace Orleans.CodeGenerator.Analysis
                         this.KnownTypes.Add(type);
 
                         var throwOnFailure = false;
-                        var throwOnFailureParam = attr.ConstructorArguments.Skip(1).FirstOrDefault();
+                        var throwOnFailureParam = attr.ConstructorArguments.ElementAtOrDefault(2);
                         if (throwOnFailureParam.Type != null)
                         {
                             throwOnFailure = (bool)throwOnFailureParam.Value;
@@ -390,7 +422,7 @@ namespace Orleans.CodeGenerator.Analysis
             if (named.IsGenericType && !named.IsUnboundGenericType)
             {
                 var unbound = named.ConstructUnboundGenericType();
-                if (unbound.Equals(this.wellKnownTypes.Task_1))
+                if (SymbolEqualityComparer.Default.Equals(unbound, this.wellKnownTypes.Task_1))
                 {
                     return;
                 }

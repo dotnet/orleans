@@ -43,7 +43,7 @@
 --
 -- 7. In the storage operations queries the columns need to be in the exact same order
 -- since the storage table operations support optionally streaming.
-CREATE TABLE Storage
+CREATE TABLE OrleansStorage
 (
     -- These are for the book keeping. Orleans calculates
     -- these hashes (see RelationalStorageProvide implementation),
@@ -84,12 +84,12 @@ CREATE TABLE Storage
     -- by using the fields. That is, after the indexed queries have pinpointed the right
     -- rows down to [0, n] relevant ones, n being the number of collided value pairs.
 ) ROW_FORMAT = COMPRESSED KEY_BLOCK_SIZE = 16;
-ALTER TABLE Storage ADD INDEX IX_Storage (GrainIdHash, GrainTypeHash);
+ALTER TABLE OrleansStorage ADD INDEX IX_OrleansStorage (GrainIdHash, GrainTypeHash);
 
 -- The following alters the column to JSON format if MySQL is at least of version 5.7.8.
 -- See more at https://dev.mysql.com/doc/refman/5.7/en/json.html for JSON and
 -- http://dev.mysql.com/doc/refman/5.7/en/comments.html for the syntax.
-/*!50708 ALTER TABLE Storage MODIFY COLUMN PayloadJson JSON */;
+/*!50708 ALTER TABLE OrleansStorage MODIFY COLUMN PayloadJson JSON */;
 
 DELIMITER $$
 
@@ -111,8 +111,10 @@ BEGIN
 
     SET _newGrainStateVersion = _GrainStateVersion;
 
+    -- Default level is REPEATABLE READ and may cause Gap Lock issues
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
     START TRANSACTION;
-    UPDATE Storage
+    UPDATE OrleansStorage
     SET
         PayloadBinary = NULL,
         PayloadJson = NULL,
@@ -161,6 +163,8 @@ BEGIN
 
     SET _newGrainStateVersion = _GrainStateVersion;
 
+    -- Default level is REPEATABLE READ and may cause Gap Lock issues
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
     START TRANSACTION;
 
     -- Grain state is not null, so the state must have been read from the storage before.
@@ -183,7 +187,7 @@ BEGIN
     -- See further information at https://dotnet.github.io/orleans/Documentation/Core-Features/Grain-Persistence.html.
     IF _GrainStateVersion IS NOT NULL
     THEN
-        UPDATE Storage
+        UPDATE OrleansStorage
         SET
             PayloadBinary = _PayloadBinary,
             PayloadJson = _PayloadJson,
@@ -212,7 +216,7 @@ BEGIN
     -- to ensure only on INSERT succeeds.
     IF _GrainStateVersion IS NULL
     THEN
-        INSERT INTO Storage
+        INSERT INTO OrleansStorage
         (
             GrainIdHash,
             GrainIdN0,
@@ -244,7 +248,7 @@ BEGIN
         (
             -- There should not be any version of this grain state.
             SELECT 1
-            FROM Storage
+            FROM OrleansStorage
             WHERE
                 GrainIdHash = _GrainIdHash AND _GrainIdHash IS NOT NULL
                 AND GrainTypeHash = _GrainTypeHash AND _GrainTypeHash IS NOT NULL
@@ -278,7 +282,7 @@ VALUES
         UTC_TIMESTAMP(),
         Version
     FROM
-        Storage
+        OrleansStorage
     WHERE
         GrainIdHash = @GrainIdHash
         AND GrainTypeHash = @GrainTypeHash AND @GrainTypeHash IS NOT NULL

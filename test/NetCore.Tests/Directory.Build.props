@@ -4,16 +4,16 @@
   </PropertyGroup>
 
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
-
+  
   <Choose>
-    <When Condition="$(OrleansRuntimeLegacyVersion) == $(VersionPrefix)">
+    <When Condition="$(OrleansRuntimeVersion) == $(VersionPrefix)">
       <ItemGroup>
-        <ProjectReference Include="..\..\src\Orleans.Runtime.Legacy\Orleans.Runtime.Legacy.csproj" />
+        <ProjectReference Include="..\..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Runtime.Legacy" Version="$(OrleansRuntimeLegacyVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.Runtime" Version="$(OrleansRuntimeVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>

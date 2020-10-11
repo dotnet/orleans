@@ -1,10 +1,9 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Net;
 using System.Text;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using Orleans.Runtime;
-
 
 namespace Orleans.AzureUtils
 {

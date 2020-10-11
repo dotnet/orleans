@@ -1,21 +1,18 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Orleans.Providers.Streams.AzureQueue;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.TestingHost;
-using TestExtensions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
+using Orleans.TestingHost;
+using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
-using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -24,7 +21,7 @@ namespace Tester.AzureUtils.Streaming
     {
         private const string AQStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
-        private readonly SubscriptionMultiplicityTestRunner runner;
+        private SubscriptionMultiplicityTestRunner runner;
         private const int queueCount = 8;
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
@@ -41,41 +38,45 @@ namespace Tester.AzureUtils.Streaming
                     .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount); 
+                            options.ConfigureTestDefaults();
+                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }));
             }
         }
 
-        private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+        private class MySiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                      .AddMemoryGrainStorage("PubSubStore")
                     .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount); 
+                            options.ConfigureTestDefaults();
+                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }));
             }
         }
 
-        public AQSubscriptionMultiplicityTests()
+        public override async Task InitializeAsync()
         {
+            await base.InitializeAsync();
             runner = new SubscriptionMultiplicityTestRunner(AQStreamProviderName, this.HostedCluster);
         }
 
-        public override void Dispose()
+        public override async Task DisposeAsync()
         {
-            base.Dispose();
-            if (this.HostedCluster != null)
+            await base.DisposeAsync();
+            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance, AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), TestDefaultConfiguration.DataConnectionString).Wait();
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(
+                    NullLoggerFactory.Instance,
+                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                    new AzureQueueOptions().ConfigureTestDefaults());
             }
         }
-        
+
         [SkippableFact, TestCategory("Functional")]
         public async Task AQMultipleParallelSubscriptionTest()
         {

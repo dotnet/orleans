@@ -1,28 +1,27 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Tester;
+using Tester.AzureUtils;
+using Tester.AzureUtils.Streaming;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StreamingTests;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
-using Orleans.Hosting;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Tester.AzureUtils.Streaming;
 
 namespace UnitTests.HaloTests.Streaming
 {
     [TestCategory("Streaming"), TestCategory("Halo")]
-    public class HaloStreamSubscribeTests : OrleansTestingBase, IClassFixture<HaloStreamSubscribeTests.Fixture>, IDisposable
+    public class HaloStreamSubscribeTests : OrleansTestingBase, IClassFixture<HaloStreamSubscribeTests.Fixture>
     {
         private readonly Fixture fixture;
         private const int queueCount = 8;
@@ -36,15 +35,15 @@ namespace UnitTests.HaloTests.Streaming
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }
 
-            private class SiloBuilderConfigurator : ISiloBuilderConfigurator
+            private class SiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder
                         .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.DeleteStateOnClear = true;
                         }))
                         .AddSimpleMessageStreamProvider(SmsStreamProviderName)
@@ -52,13 +51,13 @@ namespace UnitTests.HaloTests.Streaming
                         .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
                             options.DeleteStateOnClear = true;
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                         }))
                         .AddAzureQueueStreams(AzureQueueStreamProviderName, b=>b
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
-                                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                    options.ConfigureTestDefaults();
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                             })));
                     hostBuilder
@@ -66,23 +65,23 @@ namespace UnitTests.HaloTests.Streaming
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>
                                 {
-                                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                    options.ConfigureTestDefaults();
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
                             })));
                 }
             }
 
-            public override void Dispose()
+            public override async Task DisposeAsync()
             {
-                base.Dispose();
-                if (this.HostedCluster != null)
+                await base.DisposeAsync();
+                if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
                 {
-                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                        TestDefaultConfiguration.DataConnectionString).Wait();
-                    AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                        new AzureQueueOptions().ConfigureTestDefaults());
+                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                         AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
-                        TestDefaultConfiguration.DataConnectionString).Wait();
+                        new AzureQueueOptions().ConfigureTestDefaults());
                 }
             }
         }
@@ -102,16 +101,6 @@ namespace UnitTests.HaloTests.Streaming
             HostedCluster = fixture.HostedCluster;
             fixture.EnsurePreconditionsMet();
             this.loggerFactory = fixture.HostedCluster.ServiceProvider.GetService<ILoggerFactory>();
-        }
-
-        public void Dispose()
-        {
-            AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(NullLoggerFactory.Instance,
-                AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                TestDefaultConfiguration.DataConnectionString).Wait();
-            AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(NullLoggerFactory.Instance,
-                AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
-                TestDefaultConfiguration.DataConnectionString).Wait();
         }
 
         [SkippableFact, TestCategory("Functional")]

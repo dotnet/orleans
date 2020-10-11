@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -23,12 +24,11 @@ namespace UnitTests.Grains
     [StorageProvider(ProviderName = "MemoryStore")]
     public class ChainedGrain : Grain<ChainedGrainState>, IChainedGrain
     {
-        private Logger logger;
+        private ILogger logger;
 
-        public override Task OnActivateAsync()
+        public ChainedGrain(ILoggerFactory loggerFactory)
         {
-            logger = this.GetLogger("ChainedGrain-" + IdentityString);
-            return base.OnActivateAsync();
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
         Task<IChainedGrain> IChainedGrain.GetNext() { return Task.FromResult(State.Next); } 

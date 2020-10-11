@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -257,7 +256,7 @@ namespace Orleans.Runtime
 
                     sb.AppendLine();
                     sb.AppendLine("CPU usage by thread type:");
-                    foreach (var v in cpuBreakdown.OrderBy(key => (-1*key.Value)))
+                    foreach (var v in cpuBreakdown.OrderByDescending(key => key.Value))
                         sb.AppendLine("  " + v.Value.ToString("F3") + ", " + v.Key);
 
                     sb.AppendLine();
@@ -310,10 +309,10 @@ namespace Orleans.Runtime
                 return 1;
 
             double num = 0;
-            if (!stageGroups.ContainsKey(stageName))
+            if (!stageGroups.TryGetValue(stageName, out var groups))
                 return 0;
 
-            foreach (var tts in stageGroups[stageName])
+            foreach (var tts in groups)
                 num += tts.NumRequests;
 
             return num;
@@ -327,10 +326,10 @@ namespace Orleans.Runtime
         private double GetWallClockPerStagePerRequest(string stageName)
         {
             double sum = 0;
-            if (!stageGroups.ContainsKey(stageName))
+            if (!stageGroups.TryGetValue(stageName, out var groups))
                 return 0;
 
-            foreach (var statistics in stageGroups[stageName])
+            foreach (var statistics in groups)
                 if (stageName == "ThreadPoolThread")
                 {
                     sum += statistics.ProcessingWallClockTime.Elapsed.TotalMilliseconds;
@@ -366,10 +365,10 @@ namespace Orleans.Runtime
                 return sum;
             }
 
-            if (!stageGroups.ContainsKey(stageName))
+            if (!stageGroups.TryGetValue(stageName, out var groups))
                 return 0;
 
-            foreach (var statistics in stageGroups[stageName])
+            foreach (var statistics in groups)
             {
                 if (stageName == "ThreadPoolThread")
                 {

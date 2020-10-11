@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.ConsistentRing;
@@ -13,7 +13,6 @@ namespace Orleans.Runtime.Services
     /// <typeparam name="TGrainService"></typeparam>
     public abstract class GrainServiceClient<TGrainService> : IGrainServiceClient<TGrainService> where TGrainService : IGrainService
     {
-        private readonly ISiloRuntimeClient runtimeClient;
         private readonly IInternalGrainFactory grainFactory;
         private readonly IConsistentRingProvider ringProvider;
         private readonly int grainTypeCode;
@@ -23,7 +22,6 @@ namespace Orleans.Runtime.Services
         /// </summary>
         protected GrainServiceClient(IServiceProvider serviceProvider)
         {
-            runtimeClient =  serviceProvider.GetRequiredService<ISiloRuntimeClient>();
             grainFactory = serviceProvider.GetRequiredService<IInternalGrainFactory>();
             ringProvider = serviceProvider.GetRequiredService<IConsistentRingProvider>();
 
@@ -39,12 +37,9 @@ namespace Orleans.Runtime.Services
         {
             get
             {
-                // Currently we only support a single GrainService per Silo, hence we pass zero here instead of partitioning.
-                var grainId = GrainId.GetGrainServiceGrainId(0, grainTypeCode);
-
                 var destination = MapGrainReferenceToSiloRing(CallingGrainReference);
-
-                var grainService = grainFactory.GetSystemTarget<TGrainService>(grainId, destination);
+                var grainId = SystemTargetGrainId.CreateGrainServiceGrainId(grainTypeCode, null, destination);
+                var grainService = grainFactory.GetSystemTarget<TGrainService>(grainId);
 
                 return grainService;
             }
@@ -53,7 +48,7 @@ namespace Orleans.Runtime.Services
         /// <summary>
         /// Resolves the Grain Reference invoking this request.
         /// </summary>
-        protected GrainReference CallingGrainReference => (RuntimeContext.Current?.ActivationContext as SchedulingContext)?.Activation?.GrainReference;
+        protected GrainReference CallingGrainReference => RuntimeContext.CurrentGrainContext?.GrainReference;
 
         /// <summary>
         /// Moved from InsideRuntimeClient.cs

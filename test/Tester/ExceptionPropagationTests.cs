@@ -1,36 +1,42 @@
 using Orleans;
+using System;
+using System.Threading.Tasks;
+using TestExtensions;
+
+using UnitTests.GrainInterfaces;
+
+using Xunit;
+using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
-    using System;
-    using System.Threading.Tasks;
-    using TestExtensions;
-
-    using UnitTests.GrainInterfaces;
-    using UnitTests.Grains;
-
-    using Xunit;
-    using Xunit.Abstractions;
-    
     /// <summary>
     /// Tests that exceptions are correctly propagated.
     /// </summary>
     public class ExceptionPropagationTests : OrleansTestingBase, IClassFixture<ExceptionPropagationTests.Fixture>
     {
+        private const int TestIterations = 100;
         private readonly ITestOutputHelper output;
         private readonly Fixture fixture;
+        private readonly IMessageSerializationGrain exceptionGrain;
+        private readonly MessageSerializationClientObject clientObject = new MessageSerializationClientObject();
+        private readonly IMessageSerializationClientObject clientObjectRef;
 
         public ExceptionPropagationTests(ITestOutputHelper output, Fixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
+
+            var grainFactory = (IInternalGrainFactory)this.fixture.GrainFactory;
+            this.exceptionGrain = grainFactory.GetGrain<IMessageSerializationGrain>(GetRandomGrainId());
+            this.clientObjectRef = grainFactory.CreateObjectReference<IMessageSerializationClientObject>(this.clientObject);
         }
 
         public class Fixture : BaseTestClusterFixture
         {
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task BasicExceptionPropagation()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -41,11 +47,11 @@ namespace UnitTests.General
             Assert.Equal("Test exception", exception.Message);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public void ExceptionContainsOriginalStackTrace()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
-            
+
             // Explicitly using .Wait() instead of await the task to avoid any modification of the inner exception
             var aggEx = Assert.Throws<AggregateException>(
                 () => grain.ThrowsInvalidOperationException().Wait());
@@ -57,7 +63,7 @@ namespace UnitTests.General
             Assert.Contains("ThrowsInvalidOperationException", exception.StackTrace);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact(Skip = "Does not work on .NET Core"), TestCategory("BVT")]
         public async Task ExceptionContainsOriginalStackTraceWhenRethrowingLocally()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -76,7 +82,7 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task ExceptionPropagationDoesNotUnwrapAggregateExceptions()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -87,7 +93,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", nestedEx.Message);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task ExceptionPropagationDoesNoFlattenAggregateExceptions()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -99,7 +105,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", doubleNestedEx.Message);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task TaskCancelationPropagation()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -107,7 +113,7 @@ namespace UnitTests.General
                 () => grain.Canceled());
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task GrainForwardingExceptionPropagation()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -118,7 +124,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", exception.Message);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task GrainForwardingExceptionPropagationDoesNotUnwrapAggregateExceptions()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -130,7 +136,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", nestedEx.Message);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task SynchronousExceptionThrownShouldResultInFaultedTask()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -147,7 +153,7 @@ namespace UnitTests.General
             Assert.Equal("Test exception", exception2.Message);
         }
 
-        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT"), TestCategory("Functional")]
+        [Fact(Skip = "Implementation of issue #1378 is still pending"), TestCategory("BVT")]
         public void ExceptionPropagationForwardsEntireAggregateException()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -163,7 +169,7 @@ namespace UnitTests.General
             catch (AggregateException exception)
             {
                 output.WriteLine(exception.ToString());
-                
+
                 // make sure that all exceptions in the task are present, and not just the first one.
                 Assert.Equal(2, exception.InnerExceptions.Count);
                 var firstEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerExceptions[0]);
@@ -173,7 +179,7 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT")]
         public async Task SynchronousAggregateExceptionThrownShouldResultInFaultedTaskWithOriginalAggregateExceptionUnmodifiedAsInnerException()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());
@@ -184,8 +190,8 @@ namespace UnitTests.General
             // assert that the faulted task has an inner exception of type AggregateException, which should be our original exception
             var exception = await Assert.ThrowsAsync<AggregateException>(() => grainCallTask);
 
-            Assert.Equal("Test AggregateException message", exception.Message);
-            
+            Assert.StartsWith("Test AggregateException message", exception.Message);
+
             // make sure that all exceptions in the task are present, and not just the first one.
             Assert.Equal(2, exception.InnerExceptions.Count);
             var firstEx = Assert.IsAssignableFrom<InvalidOperationException>(exception.InnerExceptions[0]);
@@ -195,87 +201,167 @@ namespace UnitTests.General
         }
 
         /// <summary>
-        /// Tests that when a grain cannot deserialize a request from a client, an exception is promptly propagated from the grain to the caller.
+        /// Tests that when a client cannot deserialize a request from a grain, an exception is promptly propagated back to the original caller.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
-        public async Task ExceptionPropagation_GrainToClient_DeserializationFailure()
+        public async Task ExceptionPropagation_GrainCallsClient_Request_Deserialization_Failure()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMessageSerializationGrain>(GetRandomGrainId());
-            
-            var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => grain.Send(new UndeserializableType(2)));
-            Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.SendUndeserializableToClient(this.clientObjectRef));
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
         }
 
         /// <summary>
-        /// Tests that when a grain cannot serialize a response to a client, an exception is promptly propagated from the grain to the caller.
+        /// Tests that when a client cannot serialize a response to a grain, an exception is promptly propagated back to the original caller.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
-        public async Task ExceptionPropagation_GrainToClient_SerializationFailure()
+        public async Task ExceptionPropagation_GrainCallsClient_Response_Serialization_Failure()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMessageSerializationGrain>(GetRandomGrainId());
-            
-            var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => grain.Get());
-            Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.GetUnserializableFromClient(this.clientObjectRef));
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
         }
 
         /// <summary>
-        /// Tests that when a grain cannot deserialize a request from another silo, an exception is promptly propagated from the grain to the caller.
+        /// Tests that when a grain cannot deserialize a response from a client, an exception is promptly propagated back to the original caller.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
-        public async Task ExceptionPropagation_GrainToGrain_DeserializationFailure()
+        public async Task ExceptionPropagation_GrainCallsClient_Response_Deserialization_Failure()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMessageSerializationGrain>(GetRandomGrainId());
-            
-            var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => grain.SendToOtherSilo());
-            Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.GetUndeserializableFromClient(this.clientObjectRef));
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
         }
 
         /// <summary>
-        /// Tests that when a grain cannot serialize a response to another silo, an exception is promptly propagated from the grain to the caller.
+        /// Tests that when a grain cannot serialize a request to a client, an exception is promptly propagated back to the original caller.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
-        public async Task ExceptionPropagation_GrainToGrain_SerializationFailure()
+        public async Task ExceptionPropagation_GrainCallsClient_Request_Serialization_Failure()
         {
-            var grain = this.fixture.GrainFactory.GetGrain<IMessageSerializationGrain>(GetRandomGrainId());
-            
-            var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => grain.GetFromOtheSilo());
-            Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.SendUnserializableToClient(this.clientObjectRef));
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
         }
 
         /// <summary>
-        /// Tests that when a client cannot deserialize a request from a grain, an exception is promptly propagated from the client to the caller.
+        /// Tests that when a grain cannot deserialize a request from another grain, an exception is promptly propagated back to the original caller.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
-        public async Task ExceptionPropagation_ClientToGrain_DeserializationFailure()
+        public async Task ExceptionPropagation_GrainCallsGrain_Request_Deserialization_Failure()
         {
-            var obj = new MessageSerializationClientObject();
-            var grainFactory = (IInternalGrainFactory)this.fixture.GrainFactory;
-            var objRef = grainFactory.CreateObjectReference<IMessageSerializationClientObject>(obj);
-            var grain = this.fixture.GrainFactory.GetGrain<IMessageSerializationGrain>(GetRandomGrainId());
-            
-            var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => grain.SendToClient(objRef));
-            Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.SendUndeserializableToOtherSilo());
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
         }
-        
+
         /// <summary>
-        /// Tests that when a client cannot serialize a response to a grain, an exception is promptly propagated from the client to the caller.
+        /// Tests that when a grain cannot serialize a request to another grain, an exception is promptly propagated back to the original caller.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
-        public async Task ExceptionPropagation_ClientToGrain_SerializationFailure()
+        public async Task ExceptionPropagation_GrainCallsGrain_Request_Serialization_Failure()
         {
-            var obj = new MessageSerializationClientObject();
-            var grainFactory = (IInternalGrainFactory)this.fixture.GrainFactory;
-            var objRef = grainFactory.CreateObjectReference<IMessageSerializationClientObject>(obj);
-            var grain = grainFactory.GetGrain<IMessageSerializationGrain>(GetRandomGrainId());
-            
-            var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => grain.GetFromClient(objRef));
-            Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.SendUnserializableToOtherSilo());
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
+        }
+
+        /// <summary>
+        /// Tests that when a grain cannot serialize a response to another grain, an exception is promptly propagated back to the original caller.
+        /// </summary>
+        [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
+        public async Task ExceptionPropagation_GrainCallsGrain_Response_Serialization_Failure()
+        {
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.GetUnserializableFromOtherSilo());
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
+        }
+
+        /// <summary>
+        /// Tests that when a grain cannot deserialize a response from another grain, an exception is promptly propagated back to the original caller.
+        /// </summary>
+        [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
+        public async Task ExceptionPropagation_GrainCallsGrain_Response_Deserialization_Failure()
+        {
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.GetUndeserializableFromOtherSilo());
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
+        }
+
+        /// <summary>
+        /// Tests that when a grain cannot deserialize a request from a client, an exception is promptly propagated back to the original caller.
+        /// </summary>
+        [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
+        public async Task ExceptionPropagation_ClientCallsGrain_Request_Deserialization_Failure()
+        {
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.SendUndeserializable(new UndeserializableType(32)));
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
+        }
+
+        /// <summary>
+        /// Tests that when a client cannot serialize a request to a grain, an exception is promptly propagated back to the original caller.
+        /// </summary>
+        [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
+        public async Task ExceptionPropagation_ClientCallsGrain_Request_Serialization_Failure()
+        {
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<NotSupportedException>(() => exceptionGrain.SendUnserializable(new UnserializableType()));
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
+        }
+
+        /// <summary>
+        /// Tests that when a grain cannot serialize a response to a client, an exception is promptly propagated back to the original caller.
+        /// </summary>
+        [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
+        public async Task ExceptionPropagation_ClientCallsGrain_Response_Serialization_Failure()
+        {
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<Exception>(() => exceptionGrain.GetUnserializable());
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
+        }
+
+        /// <summary>
+        /// Tests that when a client cannot deserialize a response from a grain, an exception is promptly propagated back to the original caller.
+        /// </summary>
+        [Fact, TestCategory("BVT"), TestCategory("Messaging"), TestCategory("Serialization")]
+        public async Task ExceptionPropagation_ClientCallsGrain_Response_Deserialization_Failure()
+        {
+            for (var i = 0; i < TestIterations; i++)
+            {
+                var exception = await Assert.ThrowsAnyAsync<Exception>(() => exceptionGrain.GetUndeserializable());
+                Assert.Contains(UndeserializableType.FailureMessage, exception.Message);
+            }
         }
 
         private class MessageSerializationClientObject : IMessageSerializationClientObject
         {
-            public Task Send(UndeserializableType input) => Task.FromResult(input);
-            public Task<UnserializableType> Get() => Task.FromResult(new UnserializableType());
+            public Task SendUndeserializable(UndeserializableType input) => Task.FromResult(input);
+            public Task SendUnserializable(UnserializableType input) => Task.FromResult(input);
+            public Task<UnserializableType> GetUnserializable() => Task.FromResult(new UnserializableType());
+            public Task<UndeserializableType> GetUndeserializable() => Task.FromResult(new UndeserializableType(35));
         }
     }
 }

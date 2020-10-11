@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans stream provider for Google Cloud Platform</Title>
     <Description>Microsoft Orleans stream provider for Google Cloud Platform PubSub.</Description>
     <PackageTags>$(PackageTags)</PackageTags>
+    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

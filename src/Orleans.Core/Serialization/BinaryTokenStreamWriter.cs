@@ -52,7 +52,36 @@ namespace Orleans.Serialization
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
         internal static void Write<TWriter>(this TWriter @this, GrainId id) where TWriter : IBinaryTokenStreamWriter
         {
+            @this.Write(id.Type);
             @this.Write(id.Key);
+        }
+
+        /// <summary> Write a <c>GrainId</c> value to the stream. </summary>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
+        internal static void Write<TWriter>(this TWriter @this, GrainType type) where TWriter : IBinaryTokenStreamWriter
+        {
+            @this.Write(type.Value);
+        }
+
+        internal static void Write<TWriter>(this TWriter @this, GrainInterfaceType type) where TWriter : IBinaryTokenStreamWriter
+        {
+            @this.Write(type.Value);
+        }
+
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
+        internal static void Write<TWriter>(this TWriter @this, IdSpan value) where TWriter : IBinaryTokenStreamWriter
+        {
+            @this.Write(value.GetHashCode());
+            var array = IdSpan.UnsafeGetArray(value);
+            if (array is object)
+            {
+                @this.Write((ushort)array.Length);
+                @this.Write(array);
+            }
+            else
+            {
+                @this.Write((ushort)0);
+            }
         }
 
         /// <summary>

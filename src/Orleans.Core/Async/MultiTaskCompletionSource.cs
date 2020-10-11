@@ -16,7 +16,7 @@ namespace Orleans
             {
                 throw new ArgumentOutOfRangeException("count", "count has to be positive.");
             }
-            tcs = new TaskCompletionSource<bool>();
+            tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.count = count;
             lockable = new object();
         }

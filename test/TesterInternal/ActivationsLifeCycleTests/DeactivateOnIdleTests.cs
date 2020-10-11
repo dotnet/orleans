@@ -11,7 +11,10 @@ using UnitTests.TestHelper;
 using Xunit;
 using Xunit.Abstractions;
 using System.Linq;
-using Orleans.Runtime.Configuration;
+using Orleans.Internal;
+using Orleans.Hosting;
+using Orleans.Configuration;
+using Microsoft.Extensions.Configuration;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
@@ -35,15 +38,21 @@ namespace UnitTests.ActivationsLifeCycleTests
                 builder = new TestClusterBuilder(1);
             }
 
-            builder.ConfigureLegacyConfiguration();
             testCluster = builder.Build();
             testCluster.Deploy();
         }
         
         public void Dispose()
         {
-            testCluster?.StopAllSilos();
-            testCluster = null;
+            try
+            {
+                testCluster?.StopAllSilos();
+            }
+            finally
+            {
+                testCluster?.Dispose();
+                testCluster = null;
+            }
         }
 
         [Fact, TestCategory("Functional")]
@@ -186,23 +195,30 @@ namespace UnitTests.ActivationsLifeCycleTests
             await DeactivateOnIdle_NonExistentActivation_Runner(1);
         }
 
+        public class ClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.Configure<StaticGatewayListProviderOptions>(options => { options.Gateways = options.Gateways.Take(1).ToList(); });
+            }
+        }
+
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                var cfg = hostBuilder.GetConfiguration();
+                var maxForwardCount = int.Parse(cfg["MaxForwardCount"]);
+                hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = maxForwardCount);
+            }
+        }
+
         private async Task DeactivateOnIdle_NonExistentActivation_Runner(int forwardCount)
         {
             var builder = new TestClusterBuilder(2);
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.MaxForwardCount = forwardCount;
-                // For this test we only want to talk to the primary
-                legacy.ClientConfiguration.Gateways.RemoveAt(1);
-                if (forwardCount == 0)
-                {
-                    // Disable reminder service for this test: when the secondary silo starts it may
-                    // not see right away the activation from the primary silo. This request should be forwarded 
-                    // to the correct activation, but since we deactivate forwarding, the secondary silo will
-                    // fail to start...
-                    legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
-                }
-            });
+            builder.AddClientBuilderConfigurator<ClientConfigurator>();
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            builder.Properties["MaxForwardCount"] = forwardCount.ToString();
             Initialize(builder);
 
             ICollectionTestGrain grain = await PickGrainInNonPrimary();
@@ -268,16 +284,7 @@ namespace UnitTests.ActivationsLifeCycleTests
         {
             var directoryLazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
             var builder = new TestClusterBuilder(2);
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                // Disable retries in this case, to make test more predictable.
-                legacy.ClusterConfiguration.Globals.MaxForwardCount = 0;
-                // Disable reminder service for this test: when the secondary silo starts it may
-                // not see right away the activation from the primary silo. This request should be forwarded 
-                // to the correct activation, but since we deactivate forwarding, the secondary silo will
-                // fail to start...
-                legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
-            });
+            builder.AddSiloBuilderConfigurator<NoForwardingSiloConfigurator>();
             Initialize(builder);
             for (int i = 0; i < 10; i++)
             {
@@ -285,18 +292,22 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
+        public class NoForwardingSiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                // Disable retries in this case, to make test more predictable.
+                hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = 0);
+            }
+        }
+
         [Fact, TestCategory("Functional")]
         public async Task MissingActivation_WithDirectoryLazyDeregistration_SingleSilo()
         {
-            var directoryLazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000);
             var lazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000);
             var builder = new TestClusterBuilder(1);
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                legacy.ClusterConfiguration.Globals.DirectoryLazyDeregistrationDelay = directoryLazyDeregistrationDelay;
-                // Disable retries in this case, to make test more predictable.
-                legacy.ClusterConfiguration.Globals.MaxForwardCount = 0;
-            });
+            builder.AddSiloBuilderConfigurator<NoForwardingSiloConfigurator>();
+            builder.AddSiloBuilderConfigurator<LazyDeregistrationDelaySiloConfigurator>();
 
             Initialize(builder);
 
@@ -306,22 +317,22 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
+        public class LazyDeregistrationDelaySiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.Configure<GrainDirectoryOptions>(options => options.LazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000));
+            }
+        }
+
         [Fact(Skip = "Needs investigation"), TestCategory("Functional")]
         public async Task MissingActivation_WithoutDirectoryLazyDeregistration_MultiSilo_SecondaryFirst()
         {
             var lazyDeregistrationDelay = TimeSpan.FromMilliseconds(-1);
             var builder = new TestClusterBuilder(2);
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                // Disable retries in this case, to make test more predictable.
-                legacy.ClusterConfiguration.Globals.MaxForwardCount = 0;
-                legacy.ClientConfiguration.Gateways.RemoveAt(1);
-                // Disable reminder service for this test: when the secondary silo starts it may
-                // not see right away the activation from the primary silo. This request should be forwarded 
-                // to the correct activation, but since we deactivate forwarding, the secondary silo will
-                // fail to start...
-                legacy.ClusterConfiguration.Globals.ReminderServiceType = GlobalConfiguration.ReminderServiceProviderType.Disabled;
-            });
+            builder.Properties["MaxForwardCount"] = "0";
+            builder.AddClientBuilderConfigurator<ClientConfigurator>();
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
 
             Initialize(builder);
 

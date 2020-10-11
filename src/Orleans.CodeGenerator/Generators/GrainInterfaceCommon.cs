@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -45,23 +45,27 @@ namespace Orleans.CodeGenerator.Generators
             foreach (var type in interfaces)
             {
                 var interfaceId = types.GetTypeId(type);
-                var allMethods = new[] {type}.Concat(type.AllInterfaces).SelectMany(i => i.GetMembers().OfType<IMethodSymbol>());
+                var typeInterfaces = new[] { type }.Concat(type.AllInterfaces);
+
+                var allMethods = new Dictionary<int, IMethodSymbol>();
+                foreach (var typeInterface in typeInterfaces)
+                {
+                    foreach (var method in typeInterface.GetDeclaredInstanceMembers<IMethodSymbol>())
+                    {
+                        allMethods[types.GetMethodId(method)] = method;
+                    }
+                }
 
                 var methodCases = new List<SwitchSectionSyntax>();
 
                 // Switch on method id.
                 foreach (var method in allMethods)
                 {
-                    // Generate switch case.
-                    var methodId = types.GetMethodId(method);
-
-                    var methodType = method;
-
-                    // Generate the switch label for this interface id.
-                    var methodIdSwitchLabel = CaseSwitchLabel(methodId.ToHexLiteral());
+                    // Generate the switch label for this method id.
+                    var methodIdSwitchLabel = CaseSwitchLabel(method.Key.ToHexLiteral());
 
                     // Generate the switch body.
-                    var methodInvokeStatement = generateMethodHandler(methodType);
+                    var methodInvokeStatement = generateMethodHandler(method.Value);
 
                     methodCases.Add(
                         SwitchSection().AddLabels(methodIdSwitchLabel).AddStatements(methodInvokeStatement));
@@ -83,7 +87,7 @@ namespace Orleans.CodeGenerator.Generators
 
         public static PropertyDeclarationSyntax GenerateInterfaceIdProperty(WellKnownTypes wellKnownTypes, GrainInterfaceDescription description)
         {
-            var property = wellKnownTypes.IGrainMethodInvoker.Property("InterfaceId");
+            var property = wellKnownTypes.GrainReference.Property("InterfaceTypeCode");
             var returnValue = description.InterfaceId.ToHexLiteral();
             return
                 PropertyDeclaration(wellKnownTypes.Int32.ToTypeSyntax(), property.Name)
@@ -94,7 +98,7 @@ namespace Orleans.CodeGenerator.Generators
 
         public static PropertyDeclarationSyntax GenerateInterfaceVersionProperty(WellKnownTypes wellKnownTypes, GrainInterfaceDescription description)
         {
-            var property = wellKnownTypes.IGrainMethodInvoker.Property("InterfaceVersion");
+            var property = wellKnownTypes.GrainReference.Property("InterfaceVersion");
             var returnValue = LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
                 Literal(description.InterfaceVersion));

@@ -9,7 +9,7 @@ namespace Orleans.Transactions
     {
         private static readonly MethodInfo create = typeof(ITransactionCommitterFactory).GetMethod("Create");
 
-        public Factory<IGrainActivationContext, object> GetFactory(ParameterInfo parameter, TransactionCommitterAttribute attribute)
+        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, TransactionCommitterAttribute attribute)
         {
             TransactionCommitterAttribute config = attribute;
             // use generic type args to define collection type.
@@ -18,7 +18,7 @@ namespace Orleans.Transactions
             return context => Create(context, genericCreate, args);
         }
 
-        private object Create(IGrainActivationContext context, MethodInfo genericCreate, object[] args)
+        private object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
         {
             ITransactionCommitterFactory factory = context.ActivationServices.GetRequiredService<ITransactionCommitterFactory>();
             return genericCreate.Invoke(factory, args);

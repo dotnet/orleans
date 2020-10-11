@@ -7,6 +7,8 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 
 namespace UnitTests.Grains
 {
@@ -14,14 +16,18 @@ namespace UnitTests.Grains
     {
         private string label;
 
-        private Logger logger;
+        private ILogger logger;
+
+        public StressTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
             if (this.GetPrimaryKeyLong() == -2)
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
-            this.logger = this.GetLogger("StressTestGrain " + base.RuntimeIdentity);
             this.label = this.GetPrimaryKeyLong().ToString();
             this.logger.Info("OnActivateAsync");
 
@@ -107,12 +113,16 @@ namespace UnitTests.Grains
     internal class ReentrantStressTestGrain : Grain, IReentrantStressTestGrain
     {
         private string label;
-        private Logger logger;
+        private ILogger logger;
+
+        public ReentrantStressTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
             this.label = this.GetPrimaryKeyLong().ToString();
-            this.logger = this.GetLogger("ReentrantStressTestGrain " + base.Data.Address.ToString());
             this.logger.Info("OnActivateAsync");
             return Task.CompletedTask;
         }
@@ -262,12 +272,16 @@ namespace UnitTests.Grains
     public class ReentrantLocalStressTestGrain : Grain, IReentrantLocalStressTestGrain
     {
         private string label;
-        private Logger logger;
+        private ILogger logger;
+
+        public ReentrantLocalStressTestGrain(ILoggerFactory loggerFactory)
+        {
+            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        }
 
         public override Task OnActivateAsync()
         {
             this.label = this.GetPrimaryKeyLong().ToString();
-            this.logger = this.GetLogger("ReentrantLocalStressTestGrain " + base.Data.Address.ToString());
             this.logger.Info("OnActivateAsync");
             return Task.CompletedTask;
         }

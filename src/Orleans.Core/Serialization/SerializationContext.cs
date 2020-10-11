@@ -14,7 +14,7 @@ namespace Orleans.Serialization
         public static ISerializationContext CreateNestedContext(
             this ISerializationContext context,
             int position,
-            BinaryTokenStreamWriter writer)
+            IBinaryTokenStreamWriter writer)
         {
             return new SerializationContext.NestedSerializationContext(context, position, writer);
         }
@@ -33,7 +33,7 @@ namespace Orleans.Serialization
     /// record the mapping of original object to the copied instance of that object
     /// so that object identity can be preserved when serializing .NET object graphs.
     /// </remarks>
-    public class SerializationContext : SerializationContextBase, ICopyContext, ISerializationContext
+    public sealed class SerializationContext : SerializationContextBase, ICopyContext, ISerializationContext
     {
         private struct Record
         {
@@ -58,17 +58,23 @@ namespace Orleans.Serialization
         /// </summary>
         public IBinaryTokenStreamWriter StreamWriter { get; set; }
 
-        private readonly Dictionary<object, Record> processedObjects;
+        private Dictionary<object, Record> processedObjects;
 
-        public SerializationContext(SerializationManager serializationManager) : 
-            base(serializationManager)
+        public SerializationContext(SerializationManager serializationManager) : base(serializationManager)
         {
-            processedObjects = new Dictionary<object, Record>(ReferenceEqualsComparer.Instance);
+            this.Reset();
         }
 
         internal void Reset()
         {
-            processedObjects.Clear();
+            if (this.processedObjects is null || this.processedObjects.Count > this.MaxSustainedSerializationContextCapacity)
+            {
+                processedObjects = new Dictionary<object, Record>(ReferenceEqualsComparer.Instance);
+            }
+            else
+            {
+                processedObjects.Clear();
+            }
         }
 
         /// <summary>
@@ -142,7 +148,7 @@ namespace Orleans.Serialization
             /// <param name="parent">The parent context.</param>
             /// <param name="offset">The absolute offset at which this stream begins.</param>
             /// <param name="writer">The writer.</param>
-            public NestedSerializationContext(ISerializationContext parent, int offset, BinaryTokenStreamWriter writer)
+            public NestedSerializationContext(ISerializationContext parent, int offset, IBinaryTokenStreamWriter writer)
             {
                 this.parentContext = parent;
                 this.initialOffset = offset;

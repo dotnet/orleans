@@ -113,33 +113,6 @@ namespace NonSilo.Tests
         }
 
         /// <summary>
-        /// Tests that configuration cannot be specified twice.
-        /// </summary>
-        [Fact]
-        public void ClientBuilder_DoubleSpecifyConfigurationTest()
-        {
-            var builder = new ClientBuilder()
-                .ConfigureDefaults()
-                .ConfigureServices(RemoveConfigValidators)
-                .UseConfiguration(new ClientConfiguration())
-                .UseConfiguration(new ClientConfiguration());
-            Assert.Throws<InvalidOperationException>(() => builder.Build());
-        }
-
-        /// <summary>
-        /// Tests that a client can be created without specifying configuration.
-        /// </summary>
-        [Fact]
-        public void ClientBuilder_NullConfigurationTest()
-        {
-            var builder = new ClientBuilder()
-                .ConfigureDefaults()
-                .ConfigureServices(RemoveConfigValidators);
-            Assert.Throws<ArgumentNullException>(() => builder.UseConfiguration(null));
-        }
-        
-
-        /// <summary>
         /// Tests that the <see cref="IClientBuilder.ConfigureServices"/> delegate works as expected.
         /// </summary>
         [Fact]

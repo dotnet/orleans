@@ -1,10 +1,9 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Azure.EventHubs;
+using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
@@ -22,10 +21,20 @@ namespace Orleans.ServiceBus.Providers.Testing
     {
         private EventDataGeneratorStreamOptions ehGeneratorOptions;
 
-        public EventDataGeneratorAdapterFactory(string name, EventDataGeneratorStreamOptions options,
-            EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions,
-            IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+        public EventDataGeneratorAdapterFactory(
+            string name,
+            EventDataGeneratorStreamOptions options,
+            EventHubOptions ehOptions,
+            EventHubReceiverOptions receiverOptions,
+            EventHubStreamCachePressureOptions cacheOptions,
+            StreamCacheEvictionOptions evictionOptions,
+            StreamStatisticOptions statisticOptions,
+            IEventHubDataAdapter dataAdapter,
+            IServiceProvider serviceProvider,
+            SerializationManager serializationManager,
+            ITelemetryProducer telemetryProducer,
+            ILoggerFactory loggerFactory)
+            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
         {
             this.ehGeneratorOptions = options;
         }
@@ -53,7 +62,7 @@ namespace Orleans.ServiceBus.Providers.Testing
 
         private IEventHubReceiver EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
         {
-            Func<IStreamIdentity, IStreamDataGenerator<EventData>> streamGeneratorFactory = this.serviceProvider.GetServiceByName<Func<IStreamIdentity, IStreamDataGenerator<EventData>>>(this.Name)
+            var streamGeneratorFactory = this.serviceProvider.GetServiceByName<Func<StreamId, IStreamDataGenerator<EventData>>>(this.Name)
                 ?? SimpleStreamEventDataGenerator.CreateFactory(this.serviceProvider);
             var generator = new EventHubPartitionDataGenerator(this.ehGeneratorOptions, streamGeneratorFactory, logger);
             return new EventHubPartitionGeneratorReceiver(generator);
@@ -64,7 +73,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             if (args == null)
                 return;
             int randomNumber = args.RandomNumber;
-            IStreamIdentity streamId = args.StreamId;
+            StreamId streamId = args.StreamId;
             var allQueueInTheCluster = (this.EventHubQueueMapper as EventHubQueueMapper)?.GetAllQueues().OrderBy(queueId => queueId.ToString());
 
             if (allQueueInTheCluster != null)
@@ -76,7 +85,7 @@ namespace Orleans.ServiceBus.Providers.Testing
                 if (this.EventHubReceivers.TryGetValue(queueToAssign, out receiverToAssign))
                 {
                     receiverToAssign.ConfigureDataGeneratorForStream(streamId);
-                    logger.Info($"Stream {streamId.Namespace}-{streamId.Guid.ToString()} is assigned to queue {queueToAssign.ToString()}");
+                    logger.Info($"Stream {streamId} is assigned to queue {queueToAssign.ToString()}");
                 }
             }
             else
@@ -85,7 +94,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             }
         }
 
-        private void StopProducingOnStream(IStreamIdentity streamId)
+        private void StopProducingOnStream(StreamId streamId)
         {
             foreach (var ehReceiver in this.EventHubReceivers)
             {
@@ -127,7 +136,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             /// <summary>
             /// StreamId
             /// </summary>
-            public IStreamIdentity StreamId { get; set; }
+            public StreamId StreamId { get; set; }
 
             /// <summary>
             /// A random number
@@ -139,7 +148,7 @@ namespace Orleans.ServiceBus.Providers.Testing
             /// </summary>
             /// <param name="streamId"></param>
             /// <param name="randomNumber"></param>
-            public StreamRandomPlacementArg(IStreamIdentity streamId, int randomNumber)
+            public StreamRandomPlacementArg(StreamId streamId, int randomNumber)
             {
                 this.StreamId = streamId;
                 this.RandomNumber = randomNumber;
@@ -160,7 +169,7 @@ namespace Orleans.ServiceBus.Providers.Testing
                     this.RandomlyPlaceStreamToQueue(arg as StreamRandomPlacementArg);
                     break;
                 case (int)Commands.Stop_Producing_On_Stream:
-                    this.StopProducingOnStream(arg as IStreamIdentity);
+                    this.StopProducingOnStream((StreamId) arg);
                     break;
                 default: break;
 
@@ -176,8 +185,11 @@ namespace Orleans.ServiceBus.Providers.Testing
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
+            IEventHubDataAdapter dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
+                ?? services.GetService<IEventHubDataAdapter>()
+                ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
             var factory = ActivatorUtilities.CreateInstance<EventDataGeneratorAdapterFactory>(services, name, generatorOptions, ehOptions, receiverOptions, cacheOptions, 
-                evictionOptions, statisticOptions);
+                evictionOptions, statisticOptions, dataAdapter);
             factory.Init();
             return factory;
         }

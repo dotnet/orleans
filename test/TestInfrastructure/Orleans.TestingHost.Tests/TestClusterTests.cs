@@ -18,7 +18,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
         }
@@ -32,7 +32,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
         }
@@ -46,7 +46,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
         }
@@ -60,9 +60,10 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -74,9 +75,10 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -88,9 +90,10 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -102,9 +105,10 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -116,9 +120,10 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -130,9 +135,10 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
@@ -144,13 +150,14 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
+            await testCluster.StopAllSilosAsync();
         }
     }
 
-    public class TestClusterTests : IDisposable
+    public class TestClusterTests : IDisposable, IAsyncLifetime
     {
         private readonly ITestOutputHelper output;
         private TestCluster testCluster;
@@ -192,9 +199,9 @@ namespace Orleans.TestingHost.Tests
             Assert.Equal(2, await grain.GetA());
         }
 
-        public class SiloConfigurator : ISiloBuilderConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddMemoryGrainStorageAsDefault();
             }
@@ -203,5 +210,15 @@ namespace Orleans.TestingHost.Tests
         {
             this.testCluster?.StopAllSilos();
         }
-     }
+
+        public Task InitializeAsync()
+        {
+            return Task.CompletedTask;
+        }
+
+        public async Task DisposeAsync()
+        {
+            await this.testCluster.StopAllSilosAsync();
+        }
+    }
 }

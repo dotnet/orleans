@@ -47,22 +47,28 @@ namespace Orleans.Streams
             logger = providerRt.ServiceProvider.GetRequiredService<ILogger<StreamConsumerExtension>>();
         }
 
-        internal StreamSubscriptionHandleImpl<T> SetObserver<T>(GuidId subscriptionId, StreamImpl<T> stream, IAsyncObserver<T> observer, IAsyncBatchObserver<T> batchObserver, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
+        internal StreamSubscriptionHandleImpl<T> SetObserver<T>(
+            GuidId subscriptionId,
+            StreamImpl<T> stream,
+            IAsyncObserver<T> observer,
+            IAsyncBatchObserver<T> batchObserver,
+            StreamSequenceToken token,
+            string filterData)
         {
             if (null == stream) throw new ArgumentNullException("stream");
 
             try
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.StreamId);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
-                var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, batchObserver, stream, filter, token);
+                var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, batchObserver, stream, token, filterData);
                 return allStreamObservers.AddOrUpdate(subscriptionId, handle, (key, old) => handle) as StreamSubscriptionHandleImpl<T>;
             }
             catch (Exception exc)
             {
                 logger.Error(ErrorCode.StreamProvider_AddObserverException,
-                    $"{providerRuntime.ExecutingEntityIdentity()} StreamConsumerExtension.AddObserver({stream.StreamId}) caugth exception.", exc);
+                    $"{providerRuntime.ExecutingEntityIdentity()} StreamConsumerExtension.AddObserver({stream.InternalStreamId}) caugth exception.", exc);
                 throw;
             }
         }
@@ -73,12 +79,12 @@ namespace Orleans.Streams
             return allStreamObservers.TryRemove(subscriptionId, out ignore);
         }
 
-        public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, StreamId streamId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+        public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, InternalStreamId streamId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
             return DeliverMutable(subscriptionId, streamId, item.Value, currentToken, handshakeToken);
         }
 
-        public async Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, StreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
+        public async Task<StreamHandshakeToken> DeliverMutable(GuidId subscriptionId, InternalStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)
         {
             if (logger.IsEnabled(LogLevel.Trace))
             {
@@ -113,7 +119,7 @@ namespace Orleans.Streams
             return default(StreamHandshakeToken);
         }
 
-        public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, StreamId streamId, Immutable<IBatchContainer> batch, StreamHandshakeToken handshakeToken)
+        public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, InternalStreamId streamId, Immutable<IBatchContainer> batch, StreamHandshakeToken handshakeToken)
         {
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("DeliverBatch {0} for subscription {1}", batch.Value, subscriptionId);
 
@@ -180,7 +186,7 @@ namespace Orleans.Streams
             return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observer) ? observer.GetSequenceToken() : null);
         }
 
-        internal int DiagCountStreamObservers<T>(StreamId streamId)
+        internal int DiagCountStreamObservers<T>(InternalStreamId streamId)
         {
             return allStreamObservers.Values
                                      .OfType<StreamSubscriptionHandleImpl<T>>()

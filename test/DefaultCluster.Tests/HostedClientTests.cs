@@ -25,13 +25,19 @@ namespace DefaultCluster.Tests.General
         private readonly TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);
         private readonly ISiloHost silo;
 
-        public class Fixture : IDisposable
+        public class Fixture : IAsyncLifetime
         {
-            public ISiloHost Silo { get; }
+            private TestClusterPortAllocator portAllocator;
+            public ISiloHost Silo { get; private set; }
 
             public Fixture()
             {
-                var (siloPort, gatewayPort) = TestClusterNetworkHelper.GetRandomAvailableServerPorts();
+                this.portAllocator = new TestClusterPortAllocator();
+            }
+
+            public async Task InitializeAsync()
+            {
+                var (siloPort, gatewayPort) = portAllocator.AllocateConsecutivePortPairs(1);
                 this.Silo = new SiloHostBuilder()
                     .UseLocalhostClustering(siloPort, gatewayPort)
                     .Configure<ClusterOptions>(options =>
@@ -39,15 +45,24 @@ namespace DefaultCluster.Tests.General
                         options.ClusterId = Guid.NewGuid().ToString();
                         options.ServiceId = Guid.NewGuid().ToString();
                     })
+                    .ConfigureLogging(logging => logging.AddDebug())
                     .AddMemoryGrainStorage("PubSubStore")
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemStream")
                     .Build();
-                this.Silo.StartAsync().GetAwaiter().GetResult();
+                await this.Silo.StartAsync();
             }
 
-            public void Dispose()
+            public async Task DisposeAsync()
             {
-                this.Silo?.Dispose();
+                try
+                {
+                    await this.Silo.StopAsync();
+                }
+                finally
+                {
+                    this.Silo.Dispose();
+                    portAllocator.Dispose();
+                }
             }
         }
 
@@ -101,30 +116,30 @@ namespace DefaultCluster.Tests.General
             var handle = new AsyncResultHandle();
 
             var callbackCounter = new int[1];
-            var callbacksRecieved = new bool[2];
+            var callbacksReceived = new bool[2];
 
             var grain = client.GetGrain<ISimpleObserverableGrain>(0);
             var observer = new ObserverTests.SimpleGrainObserver(
                 (a, b, result) =>
                 {
-                    Assert.Null(RuntimeContext.Current);
+                    Assert.Null(RuntimeContext.CurrentGrainContext);
                     callbackCounter[0]++;
 
                     if (a == 3 && b == 0)
-                        callbacksRecieved[0] = true;
+                        callbacksReceived[0] = true;
                     else if (a == 3 && b == 2)
-                        callbacksRecieved[1] = true;
+                        callbacksReceived[1] = true;
                     else
                         throw new ArgumentOutOfRangeException("Unexpected callback with values: a=" + a + ",b=" + b);
 
                     if (callbackCounter[0] == 1)
                     {
                         // Allow for callbacks occurring in any order
-                        Assert.True(callbacksRecieved[0] || callbacksRecieved[1]);
+                        Assert.True(callbacksReceived[0] || callbacksReceived[1]);
                     }
                     else if (callbackCounter[0] == 2)
                     {
-                        Assert.True(callbacksRecieved[0] && callbacksRecieved[1]);
+                        Assert.True(callbacksReceived[0] && callbacksReceived[1]);
                         result.Done = true;
                     }
                     else
@@ -152,14 +167,14 @@ namespace DefaultCluster.Tests.General
 
             var handle = new AsyncResultHandle();
             var vals = new List<int>();
-            await client.GetStreamProvider("MemStream").GetStream<int>(Guid.Empty, "hi")
-                        .SubscribeAsync(
-                            (val, token) =>
-                            {
-                                vals.Add(val);
-                                if (vals.Count >= 2) handle.Done = true;
-                                return Task.CompletedTask;
-                            });
+            var stream0 = client.GetStreamProvider("MemStream").GetStream<int>(Guid.Empty, "hi");
+            await stream0.SubscribeAsync(
+                (val, token) =>
+                {
+                    vals.Add(val);
+                    if (vals.Count >= 2) handle.Done = true;
+                    return Task.CompletedTask;
+                });
             var stream = client.GetStreamProvider("MemStream").GetStream<int>(Guid.Empty, "hi");
             await stream.OnNextAsync(1);
             await stream.OnNextAsync(409);

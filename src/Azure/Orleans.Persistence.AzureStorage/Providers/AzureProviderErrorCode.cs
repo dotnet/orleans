@@ -3,7 +3,7 @@ namespace Orleans.Providers.Azure
     internal enum AzureProviderErrorCode
     {
         ProvidersBase = 200000,
-        
+
         // Azure storage provider related
         AzureTableProviderBase                      = ProvidersBase + 100,
         AzureTableProvider_DataNotFound             = AzureTableProviderBase + 1,

@@ -1,5 +1,6 @@
 
 using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
@@ -11,11 +12,13 @@ namespace Orleans.Runtime
     {
         private readonly SerializationManager serializationManager;
         private readonly ILogger logger;
+        private readonly MessagingTrace messagingTrace;
 
-        public MessageFactory(SerializationManager serializationManager, ILogger<MessageFactory> logger)
+        public MessageFactory(SerializationManager serializationManager, ILogger<MessageFactory> logger, MessagingTrace messagingTrace)
         {
             this.serializationManager = serializationManager;
             this.logger = logger;
+            this.messagingTrace = messagingTrace;
         }
 
         public Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
@@ -29,22 +32,21 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = request,
-                IsUsingInterfaceVersions = request.InterfaceVersion > 0,
                 RequestContextData = RequestContextExtensions.Export(this.serializationManager)
             };
 
             if (options.IsTransactional())
             {
                 SetTransaction(message, options);
-            } else
+            }
+            else
             {
                 // clear transaction info if not in transaction
                 message.RequestContextData?.Remove(TransactionContext.Orleans_TransactionContext_Key);
             }
 
-
+            messagingTrace.OnCreateMessage(message);
             return message;
-
         }
 
         private void SetTransaction(Message message, InvokeMethodOptions options)
@@ -94,6 +96,7 @@ namespace Orleans.Runtime
                 IsReadOnly = request.IsReadOnly,
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
                 TargetSilo = request.SendingSilo,
+                TraceContext = request.TraceContext,
                 TransactionInfo = request.TransactionInfo
             };
 
@@ -114,15 +117,10 @@ namespace Orleans.Runtime
                 {
                     response.SendingActivation = request.TargetActivation;
                 }
-                else if (request.TargetGrain.IsSystemTarget)
+                else if (request.TargetGrain.IsSystemTarget())
                 {
-                    response.SendingActivation = ActivationId.GetSystemActivation(request.TargetGrain, request.TargetSilo);
+                    response.SendingActivation = ActivationId.GetDeterministic(request.TargetGrain);
                 }
-            }
-
-            if (request.DebugContext != null)
-            {
-                response.DebugContext = request.DebugContext;
             }
 
             response.CacheInvalidationHeader = request.CacheInvalidationHeader;
@@ -134,6 +132,7 @@ namespace Orleans.Runtime
                 response.RequestContextData = contextData;
             }
 
+            messagingTrace.OnCreateMessage(response);
             return response;
         }
 
@@ -145,6 +144,17 @@ namespace Orleans.Runtime
             response.RejectionInfo = info;
             response.BodyObject = ex;
             if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
+            return response;
+        }
+
+        internal Message CreateDiagnosticResponseMessage(Message request, bool isExecuting, bool isWaiting, List<string> diagnostics)
+        {
+            var response = this.CreateResponseMessage(request);
+            response.Result = Message.ResponseTypes.Status;
+            response.BodyObject = new StatusResponse(isExecuting, isWaiting, diagnostics);
+
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMesssage} status update with diagnostics {Diagnostics}", request, diagnostics);
+
             return response;
         }
     }

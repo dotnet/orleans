@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 using Orleans.Core;
 
@@ -10,7 +10,7 @@ namespace Orleans.Runtime
     [Serializable]
     public class ClientNotAvailableException : OrleansException
     {
-        internal ClientNotAvailableException(IGrainIdentity clientId) : base("No activation for client " + clientId) { }
+        internal ClientNotAvailableException(GrainId clientId) : base("No activation for client " + clientId.ToString()) { }
         internal ClientNotAvailableException(string msg) : base(msg) { }
         internal ClientNotAvailableException(string message, Exception innerException) : base(message, innerException) { }
 

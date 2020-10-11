@@ -1,20 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class AdaptiveDirectoryCacheMaintainer<TValue> : DedicatedAsynchAgent
+    internal class AdaptiveDirectoryCacheMaintainer : TaskSchedulerAgent
     {
         private static readonly TimeSpan SLEEP_TIME_BETWEEN_REFRESHES = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromMinutes(1); // this should be something like minTTL/4
 
-        private readonly AdaptiveGrainDirectoryCache<TValue> cache;
+        private readonly AdaptiveGrainDirectoryCache cache;
         private readonly LocalGrainDirectory router;
-        private readonly Func<List<ActivationAddress>, TValue> updateFunc;
         private readonly IInternalGrainFactory grainFactory;
 
         private long lastNumAccesses;       // for stats
@@ -22,14 +22,11 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal AdaptiveDirectoryCacheMaintainer(
             LocalGrainDirectory router,
-            AdaptiveGrainDirectoryCache<TValue> cache,
-            Func<List<ActivationAddress>, TValue> updateFunc,
+            AdaptiveGrainDirectoryCache cache,
             IInternalGrainFactory grainFactory,
-            ExecutorService executorService,
             ILoggerFactory loggerFactory)
-            :base(executorService, loggerFactory)
+            : base(loggerFactory)
         {
-            this.updateFunc = updateFunc;
             this.grainFactory = grainFactory;
             this.router = router;
             this.cache = cache;
@@ -39,7 +36,7 @@ namespace Orleans.Runtime.GrainDirectory
             OnFault = FaultBehavior.RestartOnFault;
         }
 
-        protected override void Run()
+        protected override async Task Run()
         {
             while (router.Running)
             {
@@ -106,11 +103,11 @@ namespace Orleans.Runtime.GrainDirectory
                         else
                         {
                             // 3. If the entry is expired and was accessed in the last time interval, put into "fetch-batch-requests" list
-                            if (!fetchInBatchList.ContainsKey(owner))
+                            if (!fetchInBatchList.TryGetValue(owner, out var list))
                             {
-                                fetchInBatchList[owner] = new List<GrainId>();
+                                fetchInBatchList[owner] = list = new List<GrainId>();
                             }
-                            fetchInBatchList[owner].Add(grain);
+                            list.Add(grain);
                             // And reset the entry's access count for next time
                             entry.NumAccesses = 0;
                             cnt4++;                         // for debug
@@ -126,35 +123,35 @@ namespace Orleans.Runtime.GrainDirectory
                 ProduceStats();
 
                 // recheck every X seconds (Consider making it a configurable parameter)
-                Thread.Sleep(SLEEP_TIME_BETWEEN_REFRESHES);
+                await Task.Delay(SLEEP_TIME_BETWEEN_REFRESHES);
             }
         }
 
         private void SendBatchCacheRefreshRequests(Dictionary<SiloAddress, List<GrainId>> refreshRequests)
         {
-            foreach (SiloAddress silo in refreshRequests.Keys)
+            foreach (var kv in refreshRequests)
             {
-                List<Tuple<GrainId, int>> cachedGrainAndETagList = BuildGrainAndETagList(refreshRequests[silo]);
+                var cachedGrainAndETagList = BuildGrainAndETagList(kv.Value);
 
-                SiloAddress capture = silo;
+                var silo = kv.Key;
 
                 router.CacheValidationsSent.Increment();
                 // Send all of the items in one large request
-                var validator = this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorId, capture);
-                                
+                var validator = this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorType, silo);
+
                 router.Scheduler.QueueTask(async () =>
                 {
                     var response = await validator.LookUpMany(cachedGrainAndETagList);
-                    ProcessCacheRefreshResponse(capture, response);
-                }, router.CacheValidator.SchedulingContext).Ignore();
+                    ProcessCacheRefreshResponse(silo, response);
+                }, router.CacheValidator).Ignore();
 
-                if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} is sending request to silo {1} with {2} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);                
+                if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} is sending request to silo {1} with {2} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);
             }
         }
 
         private void ProcessCacheRefreshResponse(
             SiloAddress silo,
-            IReadOnlyCollection<Tuple<GrainId, int, List<ActivationAddress>>> refreshResponse)
+            List<Tuple<GrainId, int, List<ActivationAddress>>> refreshResponse)
         {
             if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} received ProcessCacheRefreshResponse. #Response entries {1}.", router.MyAddress, refreshResponse.Count);
 
@@ -166,7 +163,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (tuple.Item3 != null)
                 {
                     // the server returned an updated entry
-                    var updated = updateFunc(tuple.Item3);
+                    var updated = tuple.Item3.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList().AsReadOnly();
                     cache.AddOrUpdate(tuple.Item1, updated, tuple.Item2);
                     cnt1++;
                 }
@@ -199,14 +196,14 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="grains">List of grains owned by the same silo</param>
         /// <returns>List of grains in input along with their generation counters stored in the cache </returns>
-        private List<Tuple<GrainId, int>> BuildGrainAndETagList(IEnumerable<GrainId> grains)
+        private List<Tuple<GrainId, int>> BuildGrainAndETagList(List<GrainId> grains)
         {
             var grainAndETagList = new List<Tuple<GrainId, int>>();
 
             foreach (GrainId grain in grains)
             {
                 // NOTE: should this be done with TryGet? Won't Get invoke the LRU getter function?
-                AdaptiveGrainDirectoryCache<TValue>.GrainDirectoryCacheEntry entry = cache.Get(grain);
+                AdaptiveGrainDirectoryCache.GrainDirectoryCacheEntry entry = cache.Get(grain);
 
                 if (entry != null)
                 {

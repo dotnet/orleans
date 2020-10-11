@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -17,7 +17,7 @@ namespace Orleans.Transactions
         where TState : class, new()
     {
         private readonly IGrainStorage grainStorage;
-        private readonly IGrainActivationContext context;
+        private readonly IGrainContext context;
         private readonly ILoggerFactory loggerFactory;
         private readonly string stateName;
 
@@ -25,7 +25,7 @@ namespace Orleans.Transactions
         private IStorage<TransactionalStateRecord<TState>> StateStorage => stateStorage ?? (stateStorage = GetStateStorage());
 
 
-        public TransactionalStateStorageProviderWrapper(IGrainStorage grainStorage, string stateName, IGrainActivationContext context, ILoggerFactory loggerFactory)
+        public TransactionalStateStorageProviderWrapper(IGrainStorage grainStorage, string stateName, IGrainContext context, ILoggerFactory loggerFactory)
         {
             this.grainStorage = grainStorage;
             this.context = context;
@@ -103,7 +103,7 @@ namespace Orleans.Transactions
         {
             string formattedTypeName = RuntimeTypeNameFormatter.Format(this.context.GrainInstance.GetType());
             string fullStateName = $"{formattedTypeName}-{this.stateName}";
-            return new StateStorageBridge<TransactionalStateRecord<TState>>(fullStateName, this.context.GrainInstance.GrainReference, grainStorage, this.loggerFactory);
+            return new StateStorageBridge<TransactionalStateRecord<TState>>(fullStateName, this.context.GrainReference, grainStorage, this.loggerFactory);
         }
     }
 

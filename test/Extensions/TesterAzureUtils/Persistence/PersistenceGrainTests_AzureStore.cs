@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -13,13 +12,13 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans;
 using Orleans.Hosting;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.Providers;
-using Orleans.Persistence.AzureStorage;
+using Orleans.Internal;
 using TestExtensions;
 using TestExtensions.Runners;
 using UnitTests.GrainInterfaces;
+using AzureStoragePolicyOptions = Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -41,14 +40,13 @@ namespace Tester.AzureUtils.Persistence
         private GrainPersistenceTestsRunner basicPersistenceTestsRunner;
         private const int MaxReadTime = 200;
         private const int MaxWriteTime = 2000;
-        public class SiloBuilderConfigurator : ISiloBuilderConfigurator
+        public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.UseAzureStorageClustering(options =>
                 {
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    options.MaxStorageBusyRetries = 3;
+                    options.ConfigureTestDefaults();
                 });
             }
         }
@@ -57,7 +55,7 @@ namespace Tester.AzureUtils.Persistence
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.UseAzureStorageClustering(gatewayOptions => { gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
+                clientBuilder.UseAzureStorageClustering(gatewayOptions => { gatewayOptions.ConfigureTestDefaults(); });
             }
         }
 
@@ -248,13 +246,13 @@ namespace Tester.AzureUtils.Persistence
                 promises.Add(promise);
                 if ((i % BatchSize) == 0 && i > 0)
                 {
-                    Task.WaitAll(promises.ToArray(), AzureTableDefaultPolicies.TableCreationTimeout);
+                    Task.WaitAll(promises.ToArray(), new AzureStoragePolicyOptions().CreationTimeout);
                     promises.Clear();
                     //output.WriteLine("{0} has done {1} iterations  in {2} at {3} RPS",
                     //                  testName, i, sw.Elapsed, i / sw.Elapsed.TotalSeconds);
                 }
             }
-            Task.WaitAll(promises.ToArray(), AzureTableDefaultPolicies.TableCreationTimeout);
+            Task.WaitAll(promises.ToArray(), new AzureStoragePolicyOptions().CreationTimeout);
             sw.Stop();
             output.WriteLine("{0} completed. Did {1} iterations in {2} at {3} RPS",
                               testName, n, sw.Elapsed, n / sw.Elapsed.TotalSeconds);

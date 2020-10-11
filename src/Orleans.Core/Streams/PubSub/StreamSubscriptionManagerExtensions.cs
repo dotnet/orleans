@@ -1,4 +1,4 @@
-﻿using Orleans.Streams.Core;
+using Orleans.Streams.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,7 +13,7 @@ namespace Orleans.Streams.PubSub
         public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
             this IStreamSubscriptionManager manager,
             IGrainFactory grainFactory,
-            IStreamIdentity streamId,
+            StreamId streamId,
             string streamProviderName,
             Guid primaryKey,
             string grainClassNamePrefix = null)
@@ -26,7 +26,7 @@ namespace Orleans.Streams.PubSub
         public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
             this IStreamSubscriptionManager manager,
             IGrainFactory grainFactory,
-            IStreamIdentity streamId,
+            StreamId streamId,
             string streamProviderName,
             long primaryKey,
             string grainClassNamePrefix = null)
@@ -39,7 +39,7 @@ namespace Orleans.Streams.PubSub
         public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
             this IStreamSubscriptionManager manager,
             IGrainFactory grainFactory,
-            IStreamIdentity streamId,
+            StreamId streamId,
             string streamProviderName,
             string primaryKey,
             string grainClassNamePrefix = null)
@@ -52,7 +52,7 @@ namespace Orleans.Streams.PubSub
         public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
             this IStreamSubscriptionManager manager,
             IGrainFactory grainFactory,
-            IStreamIdentity streamId,
+            StreamId streamId,
             string streamProviderName,
             Guid primaryKey,
             string keyExtension,
@@ -66,7 +66,7 @@ namespace Orleans.Streams.PubSub
         public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
             this IStreamSubscriptionManager manager,
             IGrainFactory grainFactory,
-            IStreamIdentity streamId,
+            StreamId streamId,
             string streamProviderName,
             long primaryKey,
             string keyExtension,

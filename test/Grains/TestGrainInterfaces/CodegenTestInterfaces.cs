@@ -333,4 +333,19 @@ namespace UnitTests.GrainInterfaces
         {
         }
     }
+
+    /// <summary>
+    /// Regression test for https://github.com/dotnet/orleans/issues/5243.
+    /// </summary>
+    [Serializable]
+    public readonly struct ReadOnlyStructWithReadOnlyArray
+    {
+#pragma warning disable IDE0032 // Use auto property
+        private readonly byte[] value;
+#pragma warning restore IDE0032 // Use auto property
+
+        public ReadOnlyStructWithReadOnlyArray(byte[] value) => this.value = value;
+
+        public byte[] Value => this.value;
+    }
 }

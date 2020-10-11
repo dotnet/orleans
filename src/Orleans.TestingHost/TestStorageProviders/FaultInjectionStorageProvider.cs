@@ -124,7 +124,7 @@ namespace Orleans.TestingHost
     /// <summary>
     /// Factory to create FaultInjectionGrainStorage
     /// </summary>
-    public class FaultInjectionGrainStorageFactory
+    public static class FaultInjectionGrainStorageFactory
     {
         /// <summary>Create FaultInjectionGrainStorage</summary>
         /// <param name="services"></param>

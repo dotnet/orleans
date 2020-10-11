@@ -8,7 +8,7 @@ namespace Orleans.TestingHost
     /// <summary>
     /// Represents a handle to a silo that is remotely deployed
     /// </summary>
-    public abstract class SiloHandle : IDisposable
+    public abstract class SiloHandle : IDisposable, IAsyncDisposable
     {
         /// <summary> Get or set configuration of the cluster </summary>
         public TestClusterOptions ClusterOptions { get; set; }
@@ -55,6 +55,9 @@ namespace Orleans.TestingHost
                 StopSiloAsync(true).GetAwaiter().GetResult();
             }
         }
+
+        /// <inheritdoc />
+        public abstract ValueTask DisposeAsync();
 
         /// <inheritdoc />
         ~SiloHandle()

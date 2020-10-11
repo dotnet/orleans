@@ -1,9 +1,8 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
 using Orleans.Providers.Streams.SimpleMessageStream;
 
-namespace Orleans.Streams
+namespace Orleans.Hosting
 {
     public interface ISimpleMessageStreamConfigurator : INamedServiceConfigurator { }
 
