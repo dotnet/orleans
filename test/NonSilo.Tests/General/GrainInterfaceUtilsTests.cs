@@ -1,11 +1,16 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 using Xunit;
 
 namespace NonSilo.Tests.General
 {
     [TestCategory("BVT")]
-    public class TypeCodeOverrideTests
+    public class GrainInterfaceUtilsTests
     {
         [Fact]
         public void Override_MethodId_Test()
@@ -28,5 +33,14 @@ namespace NonSilo.Tests.General
             interfaceId = GrainInterfaceUtils.GetGrainInterfaceId(typeof(IOutgoingMethodInterceptionGrain));
             Assert.Equal(-6548972, interfaceId);
         }
+
+        [Fact]
+        public void Generic_InterfaceId_Test()
+        {
+            var expected = GrainInterfaceUtils.GetGrainInterfaceId(typeof(ISimpleGenericGrain<>));
+            IDictionary<int, Type> actual = GrainInterfaceUtils.GetRemoteInterfaces(typeof(SimpleGenericGrain<>));
+            Assert.Contains(expected, actual);
+        }
     }
 }
+

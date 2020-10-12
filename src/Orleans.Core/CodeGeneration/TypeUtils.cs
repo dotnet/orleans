@@ -2,6 +2,7 @@ using System;
 using System.CodeDom.Compiler;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -34,6 +35,9 @@ namespace Orleans.Runtime
 
         public static string GetSimpleTypeName(Type type, Predicate<Type> fullName = null)
         {
+            if (type.IsGenericParameter)
+                return GetGenericTypeParameterName(type);
+
             if (type.IsNestedPublic || type.IsNestedPrivate)
             {
                 if (type.DeclaringType.IsGenericType)
@@ -52,6 +56,9 @@ namespace Orleans.Runtime
 
             return fullName != null && fullName(type) ? GetFullName(type) : type.Name;
         }
+
+        private static string GetGenericTypeParameterName(Type type) =>
+            "T" + type.GenericParameterPosition.ToString(CultureInfo.InvariantCulture);
 
         public static string GetUntemplatedTypeName(string typeName)
         {
@@ -322,7 +329,7 @@ namespace Orleans.Runtime
                        + new string(',', t.GetArrayRank() - 1)
                        + "]";
             }
-            return t.FullName ?? (t.IsGenericParameter ? t.Name : t.Namespace + "." + t.Name);
+            return t.FullName ?? (t.IsGenericParameter ? GetGenericTypeParameterName(t) : t.Namespace + "." + t.Name);
         }
 
         /// <summary>

@@ -5,11 +5,11 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    class SimpleGenericGrain<T> :Grain, ISimpleGenericGrain<T>
+    public class SimpleGenericGrain<TType> : Grain, ISimpleGenericGrain<TType>
     {
-        protected T Value { get; set; }
+        protected TType Value { get; set; }
 
-        public virtual Task Set(T t)
+        public virtual Task Set(TType t)
         {
             Value = t;
             return Task.CompletedTask;
@@ -20,16 +20,16 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<T> Get()
+        public Task<TType> Get()
         {
             return Task.FromResult(Value);
         }
 
-        public Task CompareGrainReferences(ISimpleGenericGrain<T> clientReference)
+        public Task CompareGrainReferences(ISimpleGenericGrain<TType> clientReference)
         {
             // Compare reference to this grain created by the client 
-            var thisReference = GrainFactory.GetGrain<ISimpleGenericGrain<T>>(this.GetPrimaryKeyLong());
-            if(!thisReference.Equals(clientReference))
+            var thisReference = GrainFactory.GetGrain<ISimpleGenericGrain<TType>>(this.GetPrimaryKeyLong());
+            if (!thisReference.Equals(clientReference))
                 throw new Exception(String.Format("Case_3: 2 grain references are different, while should have been the same: gr1={0}, gr2={1}", thisReference, clientReference));
 
             return Task.CompletedTask;
