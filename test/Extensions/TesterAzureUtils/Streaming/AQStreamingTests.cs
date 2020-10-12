@@ -1,12 +1,14 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.Streaming;
@@ -20,7 +22,7 @@ namespace Tester.AzureUtils.Streaming
     {
         public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-        private readonly SingleStreamTestRunner runner;
+        private SingleStreamTestRunner runner;
         private const int queueCount = 8;
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
@@ -39,7 +41,7 @@ namespace Tester.AzureUtils.Streaming
                     b.ConfigureAzureQueue(ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         })));
             }
@@ -53,12 +55,12 @@ namespace Tester.AzureUtils.Streaming
                     .AddSimpleMessageStreamProvider(SmsStreamProviderName)
                     .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConfigureTestDefaults();
                         options.DeleteStateOnClear = true;
                     }))
                     .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.ConfigureTestDefaults();
                             options.DeleteStateOnClear = true;
                         }))
                     .AddMemoryGrainStorage("MemoryStore")
@@ -66,23 +68,27 @@ namespace Tester.AzureUtils.Streaming
                         c.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                             (options, dep) =>
                             {
-                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.ConfigureTestDefaults();
                                 options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         })));
             }
         }
 
-        public AQStreamingTests()
+        public override async Task InitializeAsync()
         {
+            await base.InitializeAsync();
             runner = new SingleStreamTestRunner(this.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME);
         }
 
-        public override void Dispose()
+        public override async Task DisposeAsync()
         {
-            base.Dispose();
-            AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(NullLoggerFactory.Instance,
-                AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                TestDefaultConfiguration.DataConnectionString).Wait();
+            await base.DisposeAsync();
+            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            {
+                await AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                    new AzureQueueOptions().ConfigureTestDefaults());
+            }
         }
 
         ////------------------------ One to One ----------------------//

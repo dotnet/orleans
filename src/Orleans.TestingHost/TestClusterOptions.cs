@@ -34,6 +34,7 @@ namespace Orleans.TestingHost
                 [nameof(ApplicationBaseDirectory)] = this.ApplicationBaseDirectory,
                 [nameof(ConfigureFileLogging)] = this.ConfigureFileLogging.ToString(),
                 [nameof(AssumeHomogenousSilosForTesting)] = this.AssumeHomogenousSilosForTesting.ToString(),
+                [nameof(GatewayPerSilo)] = this.GatewayPerSilo.ToString(),
             };
             
             if (this.SiloBuilderConfiguratorTypes != null)
@@ -63,14 +64,14 @@ namespace Orleans.TestingHost
         public string SiloName { get; set; }
         public int PrimarySiloPort { get; set; }
 
-        public static TestSiloSpecificOptions Create(TestClusterOptions testClusterOptions, int instanceNumber, bool assignNewPort = false)
+        public static TestSiloSpecificOptions Create(TestCluster testCluster, TestClusterOptions testClusterOptions, int instanceNumber, bool assignNewPort = false)
         {
             var siloName = testClusterOptions.UseTestClusterMembership && instanceNumber == 0
                 ? Silo.PrimarySiloName
                 : $"Secondary_{instanceNumber}";
             if (assignNewPort)
             {
-                (int siloPort, int gatewayPort) = TestClusterBuilder.GetAvailableConsecutiveServerPortsPair(1);
+                (int siloPort, int gatewayPort) = testCluster.PortAllocator.AllocateConsecutivePortPairs(1);
                 var result = new TestSiloSpecificOptions
                 {
                     SiloPort = siloPort,

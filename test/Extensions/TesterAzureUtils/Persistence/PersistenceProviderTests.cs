@@ -12,8 +12,8 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Storage;
+using Orleans.Streams;
 using Samples.StorageProviders;
 using TestExtensions;
 using UnitTests.Persistence;
@@ -36,8 +36,12 @@ namespace Tester.AzureUtils.Persistence
         {
             this.output = output;
             this.fixture = fixture;
-            var clusterOptions = fixture.Services.GetRequiredService<IOptions<ClusterOptions>>();
-            this.providerRuntime = new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance, clusterOptions);
+            this.providerRuntime = new ClientProviderRuntime(
+                fixture.InternalGrainFactory,
+                fixture.Services,
+                NullLoggerFactory.Instance,
+                fixture.Services.GetRequiredService<ImplicitStreamSubscriberTable>(),
+                fixture.Services.GetRequiredService<ClientGrainContext>());
             this.providerCfgProps.Clear();
         }
 
@@ -125,7 +129,7 @@ namespace Tester.AzureUtils.Persistence
 
             var grainState = TestStoreGrainState.NewRandomState(stringLength);
             EnsureEnvironmentSupportsState(grainState);
-            var grainId = GrainId.NewId();
+            var grainId = LegacyGrainId.NewId();
 
             var store = await InitAzureTableGrainStorage(useJsonForWrite);
 
@@ -153,7 +157,7 @@ namespace Tester.AzureUtils.Persistence
             var grainState = TestStoreGrainState.NewRandomState(stringLength);
             EnsureEnvironmentSupportsState(grainState);
 
-            var grainId = GrainId.NewId();
+            var grainId = LegacyGrainId.NewId();
 
             var store = await InitAzureTableGrainStorage(useJsonForFirstWrite);
 
@@ -225,7 +229,7 @@ namespace Tester.AzureUtils.Persistence
                 MockCallsOnly = true
             }, NullLoggerFactory.Instance, this.providerRuntime.ServiceProvider.GetService<IGrainFactory>());
 
-            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(GrainId.NewId());
+            GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(LegacyGrainId.NewId());
             var state = TestStoreGrainState.NewRandomState();
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -264,17 +268,17 @@ namespace Tester.AzureUtils.Persistence
         {
             var options = new AzureTableStorageOptions
             {
-                ConnectionString = TestDefaultConfiguration.DataConnectionString,
                 UseJson = useJson,
                 TypeNameHandling = typeNameHandling
             };
+            options.ConfigureTestDefaults();
             return InitAzureTableGrainStorage(options);
         }
 
         private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store,
-            GrainState<TestStoreGrainState> grainState = null, GrainId grainId = null)
+            GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
         {
-            var reference = this.fixture.InternalGrainFactory.GetGrain(grainId ?? GrainId.NewId());
+            var reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? (GrainId)LegacyGrainId.NewId() : grainId);
 
             if (grainState == null)
             {
@@ -297,9 +301,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
-            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = null)
+            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
         {
-            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(grainId ?? GrainId.NewId());
+            GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? (GrainId)LegacyGrainId.NewId() : grainId);
 
             if (grainState == null)
             {
@@ -329,9 +333,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteClearRead(string grainTypeName,
-            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = null)
+            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
         {
-            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(grainId ?? GrainId.NewId());
+            GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? (GrainId)LegacyGrainId.NewId() : grainId);
 
             if (grainState == null)
             {

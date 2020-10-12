@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -341,7 +341,7 @@ namespace UnitTests.StreamingTests
         {
             var grainIds = targets.Distinct().Where(t => t is GrainReference).Select(t => ((GrainReference)t).GrainId).ToArray();
             IManagementGrain systemManagement = grainFactory.GetGrain<IManagementGrain>(0);
-            var tasks = grainIds.Select(g => systemManagement.GetGrainActivationCount(grainFactory.GetGrain(g))).ToArray();
+            var tasks = grainIds.Select(g => systemManagement.GetGrainActivationCount((GrainReference)grainFactory.GetGrain(g))).ToArray();
             await Task.WhenAll(tasks);
             return tasks.Sum(t => t.Result);
         }
@@ -361,7 +361,10 @@ namespace UnitTests.StreamingTests
         }
 
         public string ProviderName { get { return _providerName; } }
-        public Guid StreamId { get { return _streamId; } }
+
+        public Guid StreamIdGuid { get { return _streamId; } }
+
+        public StreamId StreamId { get; }
 
         private ProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string providerName, ILogger logger)
         {
@@ -370,6 +373,7 @@ namespace UnitTests.StreamingTests
             _streamId = streamId;
             _providerName = providerName;
             _cleanedUpFlag = new InterlockedFlag();
+            StreamId = StreamId.Create(null, streamId);
         }
 
         private static async Task<ProducerProxy> NewProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string streamProvider, string streamNamespace, ILogger logger)

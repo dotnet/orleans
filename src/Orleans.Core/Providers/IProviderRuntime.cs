@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans.Providers
@@ -14,19 +13,6 @@ namespace Orleans.Providers
     /// <seealso cref="IProvider"/>
     public interface IProviderRuntime
     {
-        /// <summary>
-        /// Specifies this cluster's ServiceId, which is intended to be a long lived identifier which remains constant
-        /// across deployments.
-        /// </summary>
-        /// <returns>The ServiceId for this service.</returns>
-        string ServiceId { get; }
-
-        /// <summary>
-        /// A unique identifier for the current silo.
-        /// There is no semantic content to this string, but it may be useful for logging.
-        /// </summary>
-        string SiloIdentity { get; }
-
         /// <summary>
         /// Factory for getting references to grains.
         /// </summary>
@@ -44,16 +30,8 @@ namespace Orleans.Providers
         /// <typeparam name="TExtensionInterface">The public interface type of the implementation.</typeparam>
         /// <param name="newExtensionFunc">A factory function that constructs a new extension object.</param>
         /// <returns>A tuple, containing first the extension and second an addressable reference to the extension's interface.</returns>
-        Task<Tuple<TExtension, TExtensionInterface>> BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : IGrainExtension
+        (TExtension, TExtensionInterface) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
+            where TExtension : TExtensionInterface
             where TExtensionInterface : IGrainExtension;
-    }
-
-    /// <summary>
-    /// Provider-facing interface for log consistency
-    /// </summary>
-    public interface ILogConsistencyProviderRuntime : IProviderRuntime
-    {
-        // for now empty, later can add provider specific runtime capabilities.
     }
 }

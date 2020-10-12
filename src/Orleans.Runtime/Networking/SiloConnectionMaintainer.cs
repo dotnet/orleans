@@ -40,25 +40,24 @@ namespace Orleans.Runtime.Messaging
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
         {
-            if (status == SiloStatus.Dead)
+            if (status == SiloStatus.Dead && updatedSilo != siloStatusOracle.SiloAddress)
             {
-                _ = Task.Run(() => this.AbortConnectionAsync(updatedSilo));
+                _ = Task.Run(() => this.CloseConnectionAsync(updatedSilo));
             }
         }
 
-        private async Task AbortConnectionAsync(SiloAddress silo)
+        private async Task CloseConnectionAsync(SiloAddress silo)
         {
             try
             {
                 // Allow a short grace period to complete sending pending messages (eg, gossip responses)
-                await Task.Delay(TimeSpan.FromSeconds(1));
+                await Task.Delay(TimeSpan.FromSeconds(10));
 
-                this.log.LogInformation("Aborting connections to defunct silo {SiloAddress}", silo);
-                this.connectionManager.Abort(silo);
+                this.connectionManager.Close(silo);
             }
             catch (Exception exception)
             {
-                this.log.LogInformation("Exception while aborting connections to defunct silo {SiloAddress}: {Exception}", silo, exception);
+                this.log.LogInformation("Exception while closing connections to defunct silo {SiloAddress}: {Exception}", silo, exception);
             }
         }
     }

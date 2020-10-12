@@ -9,6 +9,7 @@ using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
 using TesterInternal;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -21,7 +22,6 @@ namespace AWSUtils.Tests.StorageTests
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
     public class PersistenceGrainTests_AWSDynamoDBStore : Base_PersistenceGrainTests_AWSStore, IClassFixture<PersistenceGrainTests_AWSDynamoDBStore.Fixture>
     {
-        private static readonly string DataConnectionString = $"Service={AWSTestConstants.Service}";
         public class Fixture : TestExtensions.BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -186,8 +186,8 @@ namespace AWSUtils.Tests.StorageTests
             var options = new DynamoDBStorageOptions();
             options.Service = AWSTestConstants.Service;
 
-            DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(runtime.ServiceProvider, options);
-            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(runtime.ServiceProvider, new LifecycleSubject(null));
+            DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(runtime.ServiceProvider, "PersistenceGrainTests", options);
+            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(runtime.ServiceProvider, NullLogger<SiloLifecycleSubject>.Instance);
             store.Participate(lifecycle);
             await lifecycle.OnStart();
             return store;

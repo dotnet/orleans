@@ -455,7 +455,7 @@ namespace UnitTests.StreamingTests
         public async Task StopProxies()
         {
             await producer.StopBeingProducer();
-            await AssertProducerCount(0, producer.ProviderName, producer.StreamId);
+            await AssertProducerCount(0, producer.ProviderName, producer.StreamIdGuid);
             await consumer.StopBeingConsumer();
         }
 
@@ -479,20 +479,22 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private async Task AssertProducerCount(int expectedCount, string providerName, Guid streamId)
+        private async Task AssertProducerCount(int expectedCount, string providerName, Guid streamIdGuid)
         {
             // currently, we only support checking the producer count on the SMS rendezvous grain.
             if (providerName == SMS_STREAM_PROVIDER_NAME)
             {
-                var actualCount = await StreamTestUtils.GetStreamPubSub(this.client).ProducerCount(streamId, providerName, StreamTestsConstants.DefaultStreamNamespace);
+                var streamId = StreamId.Create(StreamTestsConstants.DefaultStreamNamespace, streamIdGuid);
+                var actualCount = await StreamTestUtils.GetStreamPubSub(this.client).ProducerCount(new InternalStreamId(providerName, streamId));
                 logger.Info("StreamingTestRunner.AssertProducerCount: expected={0} actual (SMSStreamRendezvousGrain.ProducerCount)={1} streamId={2}", expectedCount, actualCount, streamId);
                 Assert.Equal(expectedCount, actualCount);
             }
         }
 
-        private Task ValidatePubSub(Guid streamId, string providerName)
+        private Task ValidatePubSub(StreamId streamId, string providerName)
         {
-            var rendez = this.client.GetGrain<IPubSubRendezvousGrain>(streamId, providerName, null);
+            var intStreamId = new InternalStreamId(providerName, streamId);
+            var rendez = this.client.GetGrain<IPubSubRendezvousGrain>(intStreamId.ToString());
             return rendez.Validate();
         }
 

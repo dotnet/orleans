@@ -84,6 +84,18 @@ namespace Orleans.Providers.Streams.Common
             this.periodicMonitoring?.TryAction(nowUtc);
         }
 
+        /// <summary>
+        /// Given a purge cached message, indicates whether it should be purged from the cache.
+        /// </summary>
+        protected virtual bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, DateTime nowUtc)
+        {
+            TimeSpan timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
+            // age of message relative to the most recent event in the cache.
+            TimeSpan relativeAge = newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
+
+            return timePurge.ShouldPurgFromTime(timeInCache, relativeAge);
+        }
+
         private void PerformPurgeInternal(DateTime nowUtc)
         {
             //if the cache is empty, then nothing to purge, return
@@ -143,16 +155,6 @@ namespace Orleans.Providers.Streams.Common
                 this.cacheSizeInByte -= memoryReleasedInByte;
                 this.cacheMonitor?.TrackMemoryReleased(memoryReleasedInByte);
             }
-        }
-
-        // Given a purge cached message, indicates whether it should be purged from the cache
-        private bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, DateTime nowUtc)
-        {
-            TimeSpan timeInCache = nowUtc - cachedMessage.DequeueTimeUtc;
-            // age of message relative to the most recent event in the cache.
-            TimeSpan relativeAge =  newestCachedMessage.EnqueueTimeUtc - cachedMessage.EnqueueTimeUtc;
-
-            return timePurge.ShouldPurgFromTime(timeInCache, relativeAge);
         }
 
         /// <summary>

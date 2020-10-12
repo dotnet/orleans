@@ -7,6 +7,10 @@ SET CMDHOME=%~dp0
 @REM Remove trailing backslash \
 set CMDHOME=%CMDHOME:~0,-1%
 
+:: Clear the 'Platform' env variable for this session, as it's a per-project setting within the build, and
+:: misleading value (such as 'MCD' in HP PCs) may lead to build breakage (issue: #69).
+set Platform=
+
 :: Disable multilevel lookup https://github.com/dotnet/core-setup/blob/master/Documentation/design-docs/multilevel-sharedfx-lookup.md
 set DOTNET_MULTILEVEL_LOOKUP=0 
 
@@ -35,21 +39,18 @@ set TESTS=^
 %CMDHOME%\test\Extensions\TestServiceFabric,^
 %CMDHOME%\test\Extensions\TesterAdoNet,^
 %CMDHOME%\test\Extensions\TesterZooKeeperUtils,^
-%CMDHOME%\test\RuntimeCodeGen.Tests,^
 %CMDHOME%\test\Transactions\Orleans.Transactions.Tests,^
 %CMDHOME%\test\Transactions\Orleans.Transactions.Azure.Test,^
 %CMDHOME%\test\TestInfrastructure\Orleans.TestingHost.Tests,^
 %CMDHOME%\test\DependencyInjection.Tests,^
 %CMDHOME%\test\Orleans.Connections.Security.Tests,^
 %CMDHOME%\test\NetCore.Tests,^
-%CMDHOME%\test\Analyzers.Tests
-
-if []==[%TEST_FILTERS%] set "TEST_FILTERS=Category=BVT^|Category=SlowBVT"
+%CMDHOME%\test\Analyzers.Tests,^
+%CMDHOME%\test\CodeGeneration\CodeGenerator.Tests
 
 @Echo Test assemblies = %TESTS%
-@Echo Test filters = %TEST_FILTERS%
 
-PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.ps1 -directories %TESTS% -testFilter '%TEST_FILTERS%' -outDir '%TestResultDir%' -dotnet '%_dotnet%'"
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& ./Parallel-Tests.ps1 -directories %TESTS% -dotnet '%_dotnet%'"
 set testresult=%errorlevel%
 popd
 endlocal&set testresult=%testresult%

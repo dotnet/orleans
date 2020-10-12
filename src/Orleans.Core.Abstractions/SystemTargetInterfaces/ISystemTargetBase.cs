@@ -10,5 +10,6 @@ namespace Orleans
         SiloAddress Silo { get; }
         GrainId GrainId { get; }
         IGrainReferenceRuntime GrainReferenceRuntime { get; }
+        GrainReference GrainReference { get; }
     }
 }

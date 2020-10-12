@@ -22,11 +22,19 @@ namespace Orleans
         /// Gets a reference to the specified system target.
         /// </summary>
         /// <typeparam name="TGrainInterface">The system target interface.</typeparam>
-        /// <param name="grainId">The id of the target.</param>
+        /// <param name="grainType">The type of the target.</param>
         /// <param name="destination">The destination silo.</param>
         /// <returns>A reference to the specified system target.</returns>
-        TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId, SiloAddress destination)
+        TGrainInterface GetSystemTarget<TGrainInterface>(GrainType grainType, SiloAddress destination)
             where TGrainInterface : ISystemTarget;
+
+        /// <summary>
+        /// Gets a reference to the specified system target.
+        /// </summary>
+        /// <typeparam name="TGrainInterface">The system target interface.</typeparam>
+        /// <param name="grainId">The id of the target.</param>
+        /// <returns>A reference to the specified system target.</returns>
+        TGrainInterface GetSystemTarget<TGrainInterface>(GrainId grainId) where TGrainInterface : ISystemTarget;
 
         /// <summary>
         /// Casts the provided <paramref name="grain"/> to the specified interface
@@ -37,22 +45,6 @@ namespace Orleans
         /// A reference to <paramref name="grain"/> which implements <typeparamref name="TGrainInterface"/>.
         /// </returns>
         TGrainInterface Cast<TGrainInterface>(IAddressable grain);
-
-        /// <summary>
-        /// Gets a reference to the grain with the provided id.
-        /// </summary>
-        /// <typeparam name="TGrainInterface">The grain reference interface type.</typeparam>
-        /// <param name="grainId">The grain id.</param>
-        /// <returns>A reference to the grain with the provided id.</returns>
-        TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable;
-
-        /// <summary>
-        /// Gets a reference to the grain with the provided id.
-        /// </summary>
-        /// <param name="grainId">The grain id.</param>
-        /// <param name="genericArguments">The generic type arguments.</param>
-        /// <returns>A reference to the grain with the provided id.</returns>
-        GrainReference GetGrain(GrainId grainId, string genericArguments = null);
 
         /// <summary>
         /// Casts the provided <paramref name="grain"/> to the provided <paramref name="interfaceType"/>.

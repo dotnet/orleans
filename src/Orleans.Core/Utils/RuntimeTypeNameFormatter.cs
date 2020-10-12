@@ -1,20 +1,31 @@
 using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text;
+using Orleans.Runtime;
 
 namespace Orleans.Utilities
 {
     /// <summary>
     /// Utility methods for formatting <see cref="Type"/> instances in a way which can be parsed by
-    /// <see cref="Type.GetType(string)"/>.
+    /// <see cref="Type.GetType(string)"/> and <see cref="RuntimeTypeNameParser"/>.
     /// </summary>
     public static class RuntimeTypeNameFormatter
     {
         private static readonly Assembly SystemAssembly = typeof(int).Assembly;
         private static readonly char[] SimpleNameTerminators = { '`', '*', '[', '&' };
 
-        private static readonly CachedReadConcurrentDictionary<Type, string> Cache =
-            new CachedReadConcurrentDictionary<Type, string>();
+        private static readonly ConcurrentDictionary<Type, string> Cache = new ConcurrentDictionary<Type, string>();
+
+        static RuntimeTypeNameFormatter()
+        {
+            IncludeAssemblyName = type => !SystemAssembly.Equals(type.Assembly);
+        }
+
+        /// <summary>
+        /// Gets or sets the delegate used to determine whether an assembly name should be printed for the provided type.
+        /// </summary>
+        public static Func<Type, bool> IncludeAssemblyName { get; set; }
 
         /// <summary>
         /// Returns a <see cref="string"/> form of <paramref name="type"/> which can be parsed by <see cref="Type.GetType(string)"/>.
@@ -64,7 +75,10 @@ namespace Orleans.Utilities
 
             // Types which are used as elements are not formatted with their assembly name, since that is added after the
             // element type's adornments.
-            if (!isElementType) AddAssembly(builder, type);
+            if (!isElementType && IncludeAssemblyName(type))
+            {
+                AddAssembly(builder, type);
+            }
         }
 
         private static void AddNamespace(StringBuilder builder, Type type)
@@ -95,7 +109,7 @@ namespace Orleans.Utilities
         {
             // Generic type definitions (eg, List<> without parameters) and non-generic types do not include any
             // parameters in their formatting.
-            if (!type.IsConstructedGenericType) return;
+            if (!type.IsConstructedGenericType || type.ContainsGenericParameters) return;
 
             var args = type.GetGenericArguments();
             builder.Append('[');
@@ -149,9 +163,17 @@ namespace Orleans.Utilities
         private static void AddAssembly(StringBuilder builder, Type type)
         {
             // Do not include the assembly name for the system assembly.
-            if (SystemAssembly.Equals(type.Assembly)) return;
+            if (IsSystemNamespace(type)) return;
             builder.Append(',');
             builder.Append(type.Assembly.GetName().Name);
+        }
+
+        private static bool IsSystemNamespace(Type type)
+        {
+            var ns = type?.Namespace;
+            if (string.IsNullOrWhiteSpace(ns)) return false;
+            if (type.DeclaringType is Type declaringType) return IsSystemNamespace(declaringType);
+            return string.Equals(ns, "System", StringComparison.Ordinal) || ns.StartsWith("System.", StringComparison.Ordinal);
         }
     }
 }

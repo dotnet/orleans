@@ -24,37 +24,37 @@ namespace Orleans.AzureUtils
 
         private readonly AzureTableDataManager<SiloInstanceTableEntry> storage;
         private readonly ILogger logger;
-
-        internal static TimeSpan initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
+        private readonly AzureStoragePolicyOptions storagePolicyOptions;
 
         public string DeploymentId { get; private set; }
 
-        private OrleansSiloInstanceManager(string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
+        private OrleansSiloInstanceManager(
+            string clusterId,
+            ILoggerFactory loggerFactory,
+            AzureStorageOperationOptions options)
         {
             DeploymentId = clusterId;
-            TableName = tableName;
+            TableName = options.TableName;
             logger = loggerFactory.CreateLogger<OrleansSiloInstanceManager>();
             storage = new AzureTableDataManager<SiloInstanceTableEntry>(
-                tableName, storageConnectionString, loggerFactory);
+                options,
+                loggerFactory.CreateLogger<AzureTableDataManager<SiloInstanceTableEntry>>());
+            this.storagePolicyOptions = options.StoragePolicyOptions;
         }
 
-        public static async Task<OrleansSiloInstanceManager> GetManager(string clusterId, string storageConnectionString, string tableName, ILoggerFactory loggerFactory)
+        public static async Task<OrleansSiloInstanceManager> GetManager(
+            string clusterId,
+            ILoggerFactory loggerFactory,
+            AzureStorageOperationOptions options)
         {
-            var instance = new OrleansSiloInstanceManager(clusterId, storageConnectionString, tableName, loggerFactory);
+            var instance = new OrleansSiloInstanceManager(clusterId, loggerFactory, options);
             try
             {
-                await instance.storage.InitTableAsync()
-                    .WithTimeout(initTimeout);
-            }
-            catch (TimeoutException te)
-            {
-                string errorMsg = String.Format("Unable to create or connect to the Azure table in {0}", initTimeout);
-                instance.logger.Error((int)TableStorageErrorCode.AzureTable_32, errorMsg, te);
-                throw new OrleansException(errorMsg, te);
+                await instance.storage.InitTableAsync();
             }
             catch (Exception ex)
             {
-                string errorMsg = String.Format("Exception trying to create or connect to the Azure table: {0}", ex.Message);
+                string errorMsg = string.Format("Exception trying to create or connect to the Azure table: {0}", ex.Message);
                 instance.logger.Error((int)TableStorageErrorCode.AzureTable_33, errorMsg, ex);
                 throw new OrleansException(errorMsg, ex);
             }
@@ -76,24 +76,21 @@ namespace Orleans.AzureUtils
         {
             entry.Status = INSTANCE_STATUS_CREATED;
             logger.Info(ErrorCode.Runtime_Error_100270, "Registering silo instance: {0}", entry.ToString());
-            storage.UpsertTableEntryAsync(entry)
-                .WaitWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
+            Task.WaitAll(new Task[] { storage.UpsertTableEntryAsync(entry) });
         }
 
-        public void UnregisterSiloInstance(SiloInstanceTableEntry entry)
+        public Task<string> UnregisterSiloInstance(SiloInstanceTableEntry entry)
         {
             entry.Status = INSTANCE_STATUS_DEAD;
             logger.Info(ErrorCode.Runtime_Error_100271, "Unregistering silo instance: {0}", entry.ToString());
-            storage.UpsertTableEntryAsync(entry)
-                .WaitWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
+            return storage.UpsertTableEntryAsync(entry);
         }
 
-        public void ActivateSiloInstance(SiloInstanceTableEntry entry)
+        public Task<string> ActivateSiloInstance(SiloInstanceTableEntry entry)
         {
             logger.Info(ErrorCode.Runtime_Error_100272, "Activating silo instance: {0}", entry.ToString());
             entry.Status = INSTANCE_STATUS_ACTIVE;
-            storage.UpsertTableEntryAsync(entry)
-                .WaitWithThrow(AzureTableDefaultPolicies.TableOperationTimeout);
+            return storage.UpsertTableEntryAsync(entry);
         }
 
         public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
@@ -134,8 +131,7 @@ namespace Orleans.AzureUtils
                     INSTANCE_STATUS_ACTIVE);
                 string filterOnProxyPort = TableQuery.GenerateFilterCondition(nameof(SiloInstanceTableEntry.ProxyPort), QueryComparisons.NotEqual, zeroPort);
                 string query = TableQuery.CombineFilters(filterOnPartitionKey, TableOperators.And, TableQuery.CombineFilters(filterOnStatus, TableOperators.And, filterOnProxyPort));
-                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query)
-                                    .WithTimeout(AzureTableDefaultPolicies.TableOperationTimeout);
+                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query);
 
                 List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
 
@@ -194,13 +190,15 @@ namespace Orleans.AzureUtils
 
             await DeleteEntriesBatch(entriesList);
 
-            return entriesList.Count();
+            return entriesList.Count;
         }
 
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
             var entriesList = (await FindAllSiloEntries())
-                .Where(entry => entry.Item1.Status == INSTANCE_STATUS_DEAD && entry.Item1.Timestamp < beforeDate)
+                .Where(entry => !string.Equals(SiloInstanceTableEntry.TABLE_VERSION_ROW, entry.Item1.RowKey)
+                    && entry.Item1.Status != INSTANCE_STATUS_ACTIVE
+                    && entry.Item1.Timestamp < beforeDate)
                 .ToList();
 
             await DeleteEntriesBatch(entriesList);
@@ -208,14 +206,14 @@ namespace Orleans.AzureUtils
 
         private async Task DeleteEntriesBatch(List<Tuple<SiloInstanceTableEntry, string>> entriesList)
         {
-            if (entriesList.Count <= AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS)
+            if (entriesList.Count <= this.storagePolicyOptions.MaxBulkUpdateRows)
             {
                 await storage.DeleteTableEntriesAsync(entriesList);
             }
             else
             {
                 var tasks = new List<Task>();
-                foreach (var batch in entriesList.BatchIEnumerable(AzureTableDefaultPolicies.MAX_BULK_UPDATE_ROWS))
+                foreach (var batch in entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows))
                 {
                     tasks.Add(storage.DeleteTableEntriesAsync(batch));
                 }

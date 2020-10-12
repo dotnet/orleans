@@ -1,4 +1,3 @@
-using Orleans.GrainDirectory;
 using System;
 using System.Threading.Tasks;
 
@@ -12,30 +11,27 @@ namespace Orleans.Runtime.Placement
     /// </summary>
     internal class ClientObserversPlacementDirector : RandomPlacementDirector
     {
-        public override async Task<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
+        public override ValueTask<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
-            // no need to check if we can find an activation for this client in the cache or local directory partition
-            // as TrySelectActivationSynchronously which checks for that should have been called before 
-            AddressesAndTag addresses;
-
-            // we need to look up the directory entry for this grain on a remote silo
-            switch (target.Category)
+            if (!ClientGrainId.TryParse(target, out var clientId))
             {
-                case UniqueKey.Category.Client:
-                    {
-                        addresses = await context.FullLookup(target);
-                        return ChooseRandomActivation(addresses.Addresses, context);
-                    }
+                throw new InvalidOperationException($"Unsupported id format: {target}");
+            }
+            
+            var grainId = clientId.GrainId;
+            
+            if (context.FastLookup(grainId, out var addresses))
+            {
+                var placementResult = ChooseRandomActivation(addresses, context);
+                return new ValueTask<PlacementResult>(placementResult);
+            }
 
-                case UniqueKey.Category.GeoClient:
-                    {
-                        // we need to look up the activations in the remote cluster
-                        addresses = await context.LookupInCluster(target, target.Key.ClusterId);
-                        return ChooseRandomActivation(addresses.Addresses, context);
-                    }
+            return SelectActivationAsync(grainId, context);
 
-                default:
-                    throw new InvalidOperationException("Unsupported client type. Grain " + target);
+            async ValueTask<PlacementResult> SelectActivationAsync(GrainId target, IPlacementRuntime context)
+            {
+                var places = await context.FullLookup(target);
+                return ChooseRandomActivation(places, context);
             }
         }
         
@@ -44,7 +40,7 @@ namespace Orleans.Runtime.Placement
             PlacementTarget target, 
             IPlacementContext context)
         {
-            throw new InvalidOperationException("Client Observers are not activated using the placement subsystem. Grain " + target.GrainIdentity);
+            throw new ClientNotAvailableException(target.GrainIdentity);
         }
     }
 }

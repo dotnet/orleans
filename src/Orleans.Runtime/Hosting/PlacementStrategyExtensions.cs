@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
@@ -18,7 +18,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The builder.</param>
         /// <returns>The builder.</returns>
         public static ISiloHostBuilder AddPlacementDirector<TStrategy, TDirector>(this ISiloHostBuilder builder)
-            where TStrategy : PlacementStrategy
+            where TStrategy : PlacementStrategy, new()
             where TDirector : class, IPlacementDirector
         {
             return builder.ConfigureServices(services => services.AddPlacementDirector<TStrategy, TDirector>());
@@ -32,7 +32,7 @@ namespace Orleans.Hosting
         /// <param name="createDirector">The delegate used to create the placement director.</param>
         /// <returns>The builder.</returns>
         public static ISiloHostBuilder AddPlacementDirector<TStrategy>(this ISiloHostBuilder builder, Func<IServiceProvider, IPlacementDirector> createDirector)
-            where TStrategy : PlacementStrategy
+            where TStrategy : PlacementStrategy, new()
         {
             return builder.ConfigureServices(services => services.AddPlacementDirector<TStrategy>(createDirector));
         }
@@ -45,7 +45,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The builder.</param>
         /// <returns>The builder.</returns>
         public static ISiloBuilder AddPlacementDirector<TStrategy, TDirector>(this ISiloBuilder builder)
-            where TStrategy : PlacementStrategy
+            where TStrategy : PlacementStrategy, new()
             where TDirector : class, IPlacementDirector
         {
             return builder.ConfigureServices(services => services.AddPlacementDirector<TStrategy, TDirector>());
@@ -59,13 +59,13 @@ namespace Orleans.Hosting
         /// <param name="createDirector">The delegate used to create the placement director.</param>
         /// <returns>The builder.</returns>
         public static ISiloBuilder AddPlacementDirector<TStrategy>(this ISiloBuilder builder, Func<IServiceProvider, IPlacementDirector> createDirector)
-            where TStrategy : PlacementStrategy
+            where TStrategy : PlacementStrategy, new()
         {
             return builder.ConfigureServices(services => services.AddPlacementDirector<TStrategy>(createDirector));
         }
 
         internal static void AddPlacementDirector<TStrategy, TDirector>(this IServiceCollection services)
-            where TStrategy : PlacementStrategy
+            where TStrategy : PlacementStrategy, new()
             where TDirector : class, IPlacementDirector
         {
             services.AddSingletonNamedService<PlacementStrategy, TStrategy>(typeof(TStrategy).Name);
@@ -73,7 +73,7 @@ namespace Orleans.Hosting
         }
 
         private static void AddPlacementDirector<TStrategy>(this IServiceCollection services, Func<IServiceProvider, IPlacementDirector> createDirector)
-            where TStrategy : PlacementStrategy
+            where TStrategy : PlacementStrategy, new()
         {
             services.AddSingletonNamedService<PlacementStrategy, TStrategy>(typeof(TStrategy).Name);
             services.AddSingletonKeyedService<Type, IPlacementDirector>(typeof(TStrategy), (sp, type) => createDirector(sp));

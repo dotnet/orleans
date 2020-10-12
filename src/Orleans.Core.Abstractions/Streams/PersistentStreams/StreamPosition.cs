@@ -1,5 +1,6 @@
 
 using System;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -12,25 +13,21 @@ namespace Orleans.Streams
         /// <summary>
         /// Stream position consists of the stream identity and the sequence token
         /// </summary>
-        /// <param name="streamIdentity"></param>
+        /// <param name="streamId"></param>
         /// <param name="sequenceToken"></param>
-        public StreamPosition(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)
+        public StreamPosition(StreamId streamId, StreamSequenceToken sequenceToken)
         {
-            if (streamIdentity == null)
-            {
-                throw new ArgumentNullException("streamIdentity");
-            }
             if (sequenceToken == null)
             {
                 throw new ArgumentNullException("sequenceToken");
             }
-            StreamIdentity = streamIdentity;
+            StreamId = streamId;
             SequenceToken = sequenceToken;
         }
         /// <summary>
         /// Identity of the stream
         /// </summary>
-        public IStreamIdentity StreamIdentity { get; }
+        public StreamId StreamId { get; }
 
         /// <summary>
         /// Position in the stream

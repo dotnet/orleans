@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -12,6 +12,6 @@ namespace Orleans.Streams
     {
         IEnumerable<QueueId> GetAllQueues();
 
-        QueueId GetQueueForStream(Guid streamGuid, String streamNamespace);
+        QueueId GetQueueForStream(StreamId streamId);
     }
 }

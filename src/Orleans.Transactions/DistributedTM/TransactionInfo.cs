@@ -1,12 +1,9 @@
-﻿
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Collections.Concurrent;
-using Orleans.Transactions.Abstractions;
 using Orleans.Serialization;
-using Orleans.Runtime;
-using Orleans.Concurrency;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
@@ -76,7 +73,6 @@ namespace Orleans.Transactions
 
         public OrleansTransactionAbortedException MustAbort(SerializationManager sm)
         {
-
             if (OriginalException != null)
             {
                 var reader = new BinaryTokenStreamReader(OriginalException);
@@ -90,7 +86,6 @@ namespace Orleans.Transactions
             {
                 return null;
             }
-
         }
 
         public void RecordException(Exception e, SerializationManager sm)
@@ -130,13 +125,13 @@ namespace Orleans.Transactions
             // Take sum of write counts
             foreach (KeyValuePair<ParticipantId, AccessCounter> participant in other.Participants)
             {
-                if(!this.Participants.Keys.Contains(participant.Key))
+                if (!this.Participants.TryGetValue(participant.Key, out var existing))
                 {
                     this.Participants[participant.Key] = participant.Value;
                 }
                 else
                 {
-                    this.Participants[participant.Key] += participant.Value;
+                    this.Participants[participant.Key] = existing + participant.Value;
                 }
             }
 

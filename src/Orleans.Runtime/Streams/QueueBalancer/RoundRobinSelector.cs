@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace Orleans.Streams
@@ -11,12 +10,12 @@ namespace Orleans.Streams
     /// <typeparam name="T"></typeparam>
     internal class RoundRobinSelector<T> : IResourceSelector<T>
     {
-        private ReadOnlyCollection<T> resources;
+        private readonly List<T> resources;
         private int lastSelection;
         public RoundRobinSelector(IEnumerable<T> resources, Random random)
         {
             // distinct randomly ordered readonly collection
-            this.resources = new ReadOnlyCollection<T>(resources.Distinct().OrderBy(_ => random.Next()).ToList());
+            this.resources = resources.Distinct().OrderBy(_ => random.Next()).ToList();
             this.lastSelection = random.Next(this.resources.Count);
         }
 

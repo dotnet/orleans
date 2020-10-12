@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Fabric;
 using System.Fabric.Description;
@@ -215,6 +215,8 @@ namespace TestServiceFabric
             public void Dispose()
             {
             }
+
+            public ValueTask DisposeAsync() => default;
         }
     }
 }

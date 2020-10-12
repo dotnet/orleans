@@ -4,6 +4,9 @@ using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Streams;
 using Orleans.Configuration;
+using Orleans.Streams.Filtering;
+using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.Hosting
 {
@@ -103,6 +106,28 @@ namespace Orleans.Hosting
 
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b.Configure(configureOptions));
+        }
+
+        public static ISiloBuilder AddStreamFilter<T>(this ISiloBuilder builder, string name) where T : class, IStreamFilter
+        {
+            return builder.ConfigureServices(svc => svc.AddStreamFilter<T>(name));
+        }
+
+        public static ISiloHostBuilder AddStreamFilter<T>(this ISiloHostBuilder builder, string name) where T : class, IStreamFilter
+        {
+            return builder.ConfigureServices(svc => svc.AddStreamFilter<T>(name));
+        }
+
+        public static IClientBuilder AddStreamFilter<T>(this IClientBuilder builder, string name) where T : class, IStreamFilter
+        {
+            return builder.ConfigureServices(svc => svc.AddStreamFilter<T>(name));
+        }
+
+
+        public static IServiceCollection AddStreamFilter<T>(this IServiceCollection services, string name) where T : class, IStreamFilter
+        {
+            //services.TryAddSingleton<T>();
+            return services.AddSingletonNamedService<IStreamFilter, T>(name);
         }
     }
 }

@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
@@ -11,12 +10,12 @@ using Xunit;
 namespace NetCore.Tests
 {
     [Trait("Category", "BVT")]
-    public class ExceptionTests : IDisposable
+    public class ExceptionTests : IAsyncLifetime
     {
-        private readonly ISiloHost silo;
-        private readonly IClusterClient client;
+        private ISiloHost silo;
+        private IClusterClient client;
 
-        public ExceptionTests()
+        public async Task InitializeAsync()
         {
             this.silo = new SiloHostBuilder()
                 .ConfigureApplicationParts(
@@ -26,14 +25,14 @@ namespace NetCore.Tests
                         .AddApplicationPart(typeof(IExceptionGrain).Assembly))
                 .UseLocalhostClustering()
                 .Build();
-            this.silo.StartAsync().GetAwaiter().GetResult();
+            await this.silo.StartAsync();
 
             this.client = new ClientBuilder()
                 .ConfigureApplicationParts(parts =>
                     parts.AddApplicationPart(typeof(IExceptionGrain).Assembly))
                 .UseLocalhostClustering()
                 .Build();
-            this.client.Connect().GetAwaiter().GetResult();
+            await this.client.Connect();
         }
 
         [Fact]
@@ -48,15 +47,21 @@ namespace NetCore.Tests
             Assert.Equal("null null null", nullReferenceException.Message);
         }
 
-        public void Dispose()
+        public async Task DisposeAsync()
         {
             var cancel = new CancellationTokenSource();
             cancel.Cancel();
-            this.silo?.StopAsync(cancel.Token).GetAwaiter().GetResult();
-            this.silo?.Dispose();
+            if (this.silo is ISiloHost s)
+            {
+                await s.StopAsync(cancel.Token);
+                await s.DisposeAsync();
+            }
 
-            this.client?.AbortAsync().GetAwaiter().GetResult();
-            this.client?.Dispose();
+            if (this.client is IClusterClient c)
+            {
+                await c.AbortAsync();
+                await c.DisposeAsync();
+            }
         }
     }
 }

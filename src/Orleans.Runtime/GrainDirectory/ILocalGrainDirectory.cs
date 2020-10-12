@@ -5,7 +5,7 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal interface ILocalGrainDirectory : IGrainDirectory
+    internal interface ILocalGrainDirectory : IDhtGrainDirectory
     {
         /// <summary>
         /// Starts the local portion of the directory service.
@@ -20,7 +20,6 @@ namespace Orleans.Runtime.GrainDirectory
 
         RemoteGrainDirectory RemoteGrainDirectory { get; }
         RemoteGrainDirectory CacheValidator { get; }
-        ClusterGrainDirectory RemoteClusterGrainDirectory { get; }
 
         /// <summary>
         /// Removes the record for an non-existing activation from the directory service.
@@ -46,15 +45,6 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="addresses">An output parameter that receives the list of locally-known activations of the grain.</param>
         /// <returns>True if remote addresses are complete within freshness constraint</returns>
         bool LocalLookup(GrainId grain, out AddressesAndTag addresses);
-
-        /// <summary>
-        /// Fetches complete directory information for a grain in an explicitly named cluster.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="grain">The ID of the grain to look up.</param>
-        /// <param name="clusterId">The cluster in which to look up the grain</param>
-        /// <returns>A list of all known activations of the grain, and the e-tag.</returns>
-        Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId);
 
         /// <summary>
         /// Invalidates cache entry for the given activation address.

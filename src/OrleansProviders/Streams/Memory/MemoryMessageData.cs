@@ -1,5 +1,6 @@
-﻿
+
 using System;
+using Orleans.Runtime;
 
 namespace Orleans.Providers
 {
@@ -12,11 +13,7 @@ namespace Orleans.Providers
         /// <summary>
         /// Stream Guid of the event data.
         /// </summary>
-        public Guid StreamGuid;
-        /// <summary>
-        /// Stream namespace.
-        /// </summary>
-        public string StreamNamespace;
+        public StreamId StreamId;
         /// <summary>
         /// Position of even in stream.
         /// </summary>
@@ -37,12 +34,11 @@ namespace Orleans.Providers
         /// </summary>
         public ArraySegment<byte> Payload;
 
-        internal static MemoryMessageData Create(Guid streamGuid, String streamNamespace, ArraySegment<byte> arraySegment)
+        internal static MemoryMessageData Create(StreamId streamId, ArraySegment<byte> arraySegment)
         {
             return new MemoryMessageData
             {
-                StreamGuid = streamGuid,
-                StreamNamespace = streamNamespace,
+                StreamId = streamId,
                 EnqueueTimeUtc = DateTime.UtcNow,
                 Payload = arraySegment
             };

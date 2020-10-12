@@ -36,23 +36,13 @@ namespace UnitTests
             }
         }
 
-        public class SiloConfigurator :ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.Configure<SchedulingOptions>(options => options.AllowCallChainReentrancy = true);
-            }
-        }
-
         private readonly ITestOutputHelper output;
         private readonly Fixture fixture;
-        private readonly TestCluster hostedCluster;
 
         public ReentrancyTests(ITestOutputHelper output, Fixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
-            hostedCluster = fixture.HostedCluster;
         }
 
         // See https://github.com/dotnet/orleans/pull/5086
@@ -131,19 +121,6 @@ namespace UnitTests
             this.fixture.Logger.Info("Reentrancy NonReentrantGrain_WithMayInterleavePredicate_WhenPredicateThrows Test finished OK.");
         }
         
-        [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
-        public async Task IsReentrant()
-        {
-            IReentrantTestSupportGrain grain = this.fixture.GrainFactory.GetGrain<IReentrantTestSupportGrain>(0);
-
-            var grainFullName = typeof(ReentrantGrain).FullName;
-            Assert.True(await grain.IsReentrant(grainFullName));
-            grainFullName = typeof(NonRentrantGrain).FullName;
-            Assert.False(await grain.IsReentrant(grainFullName));
-            grainFullName = typeof(UnorderedNonRentrantGrain).FullName;
-            Assert.False(await grain.IsReentrant(grainFullName));
-        }
-
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public void Reentrancy_Deadlock_1()
         {

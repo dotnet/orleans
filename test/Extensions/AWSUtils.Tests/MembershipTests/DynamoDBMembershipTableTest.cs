@@ -45,7 +45,7 @@ namespace AWSUtils.Tests.MembershipTests
         {
             var options = new DynamoDBGatewayOptions();
             DynamoDBGatewayListProviderHelper.ParseDataConnectionString(this.connectionString, options);
-            return new DynamoDBGatewayListProvider(this.loggerFactory, Options.Create(options), this.clusterOptions, this.gatewayOptions);
+            return new DynamoDBGatewayListProvider(this.loggerFactory.CreateLogger<DynamoDBGatewayListProvider>(), Options.Create(options), this.clusterOptions, this.gatewayOptions);
         }
 
         protected override Task<string> GetConnectionString()
@@ -87,6 +87,12 @@ namespace AWSUtils.Tests.MembershipTests
         public async Task MembershipTable_DynamoDB_UpdateRow()
         {
             await MembershipTable_UpdateRow();
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task MembershipTable_DynamoDB_CleanupDefunctSiloEntries()
+        {
+            await MembershipTable_CleanupDefunctSiloEntries();
         }
 
         [SkippableFact]

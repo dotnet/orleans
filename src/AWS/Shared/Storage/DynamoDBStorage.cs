@@ -38,22 +38,28 @@ namespace Orleans.Transactions.DynamoDB
         public const int DefaultWriteCapacityUnits = 5;
         private int readCapacityUnits = DefaultReadCapacityUnits;
         private int writeCapacityUnits = DefaultWriteCapacityUnits;
+        private readonly bool useProvisionedThroughput;
         private AmazonDynamoDBClient ddbClient;
         private ILogger Logger;
 
         /// <summary>
         /// Create a DynamoDBStorage instance
         /// </summary>
-        /// <param name="loggerFactory"></param>
+        /// <param name="logger"></param>
         /// <param name="accessKey"></param>
         /// <param name="secretKey"></param>
         /// <param name="service"></param>
         /// <param name="readCapacityUnits"></param>
         /// <param name="writeCapacityUnits"></param>
-        public DynamoDBStorage(ILoggerFactory loggerFactory, string service,
-            string accessKey = "", string secretKey = "",
+        /// <param name="useProvisionedThroughput"></param>
+        public DynamoDBStorage(
+            ILogger logger,
+            string service,
+            string accessKey = "",
+            string secretKey = "",
             int readCapacityUnits = DefaultReadCapacityUnits,
-            int writeCapacityUnits = DefaultWriteCapacityUnits)
+            int writeCapacityUnits = DefaultWriteCapacityUnits,
+            bool useProvisionedThroughput = true)
         {
             if (service == null) throw new ArgumentNullException(nameof(service));
             this.accessKey = accessKey;
@@ -61,7 +67,8 @@ namespace Orleans.Transactions.DynamoDB
             this.service = service;
             this.readCapacityUnits = readCapacityUnits;
             this.writeCapacityUnits = writeCapacityUnits;
-            Logger = loggerFactory.CreateLogger<DynamoDBStorage>();
+            this.useProvisionedThroughput = useProvisionedThroughput;
+            Logger = logger;
             CreateClient();
         }
 
@@ -101,12 +108,12 @@ namespace Orleans.Transactions.DynamoDB
             {
                 // AWS DynamoDB instance (auth via explicit credentials)
                 var credentials = new BasicAWSCredentials(this.accessKey, this.secretKey);
-                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
             }
             else
             {
                 // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig {ServiceURL = service, RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
             }
         }
 
@@ -127,14 +134,13 @@ namespace Orleans.Transactions.DynamoDB
 
         private async Task CreateTable(string tableName, List<KeySchemaElement> keys, List<AttributeDefinition> attributes, List<GlobalSecondaryIndex> secondaryIndexes = null, string ttlAttributeName = null)
         {
-            var useProvisionedThroughput = readCapacityUnits > 0 && writeCapacityUnits > 0;
             var request = new CreateTableRequest
             {
                 TableName = tableName,
                 AttributeDefinitions = attributes,
                 KeySchema = keys,
-                BillingMode = useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
-                ProvisionedThroughput = useProvisionedThroughput ? new ProvisionedThroughput
+                BillingMode = this.useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
+                ProvisionedThroughput = this.useProvisionedThroughput ? new ProvisionedThroughput
                 {
                     ReadCapacityUnits = readCapacityUnits,
                     WriteCapacityUnits = writeCapacityUnits
@@ -143,7 +149,7 @@ namespace Orleans.Transactions.DynamoDB
 
             if (secondaryIndexes != null && secondaryIndexes.Count > 0)
             {
-                if (useProvisionedThroughput)
+                if (this.useProvisionedThroughput)
                 {
                     var indexThroughput = new ProvisionedThroughput {ReadCapacityUnits = readCapacityUnits, WriteCapacityUnits = writeCapacityUnits};
                     secondaryIndexes.ForEach(i =>

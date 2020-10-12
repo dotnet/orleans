@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,12 +17,23 @@ namespace Orleans.Configuration.Internal
         /// <param name="services">The service collection.</param>
         public static void AddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
         {
-            var registration = services.FirstOrDefault(service => service.ServiceType == typeof(TImplementation));
+            services.AddFromExisting(typeof(TService), typeof(TImplementation));
+        }
+
+        /// <summary>
+        /// Registers an existing registration of <paramref name="implementation"/> as a provider of service type <paramref name="service"/>.
+        /// </summary>
+        /// <param name="services">The service collection.</param>
+        /// <param name="service">The service type being provided.</param>
+        /// <param name="implementation">The implementation of <paramref name="service"/>.</param>
+        public static void AddFromExisting(this IServiceCollection services, Type service, Type implementation)
+        {
+            var registration = services.FirstOrDefault(s => s.ServiceType == implementation);
             if (registration != null)
             {
                 var newRegistration = new ServiceDescriptor(
-                    typeof(TService),
-                    sp => sp.GetRequiredService<TImplementation>(),
+                    service,
+                    sp => sp.GetRequiredService(implementation),
                     registration.Lifetime);
                 services.Add(newRegistration);
             }
@@ -35,8 +47,7 @@ namespace Orleans.Configuration.Internal
         /// <param name="services">The service collection.</param>
         public static void TryAddFromExisting<TService, TImplementation>(this IServiceCollection services) where TImplementation : TService
         {
-            var providedService = services.FirstOrDefault(service => service.ServiceType == typeof(TService));
-            if (providedService == null)
+            if (!services.Any(service => service.ServiceType == typeof(TService)))
             {
                 services.AddFromExisting<TService, TImplementation>();
             }

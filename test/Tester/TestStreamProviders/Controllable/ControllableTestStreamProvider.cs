@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Tester.TestStreamProviders.Controllable
@@ -19,7 +20,7 @@ namespace Tester.TestStreamProviders.Controllable
     {
         public string Name { get; private set; }
 
-        public Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
+        public Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
             return Task.CompletedTask;

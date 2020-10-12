@@ -1,14 +1,11 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Configuration;
 using Orleans.Runtime;
 using Orleans.Hosting;
 using Orleans;
 using Orleans.Configuration;
-using Orleans.Runtime.Configuration;
-using Orleans.Streaming.EventHubs;
 using Orleans.TestingHost;
 using Tester.TestStreamProviders;
 using ServiceBus.Tests.TestStreamProviders.EventHub;
@@ -32,10 +29,15 @@ namespace ServiceBus.Tests.StreamingTests
         private const string EHConsumerGroup = "orleansnightly";
 
         private readonly ITestOutputHelper output;
-        private readonly ClientStreamTestRunner runner;
+        private ClientStreamTestRunner runner;
         public EHClientStreamTests(ITestOutputHelper output)
         {
             this.output = output;
+        }
+
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
@@ -56,7 +58,7 @@ namespace ServiceBus.Tests.StreamingTests
                         b.Configure<SiloMessagingOptions>(ob => ob.Configure(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5)));
                         b.Configure<EventHubOptions>(ob => ob.Configure(options =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConfigureTestDefaults();
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                         }));
@@ -81,7 +83,7 @@ namespace ServiceBus.Tests.StreamingTests
                     .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>b
                         .Configure<EventHubOptions>(ob=>ob.Configure(options =>
                         {
-                            options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                            options.ConfigureTestDefaults();
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                         })))

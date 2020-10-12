@@ -24,7 +24,6 @@ namespace Orleans.Runtime
 
         private readonly DeploymentLoadPublisher deploymentLoadPublisher;
         private readonly Catalog catalog;
-        private readonly GrainTypeManager grainTypeManager;
         private readonly CachedVersionSelectorManager cachedVersionSelectorManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly VersionSelectorManager selectorManager;
@@ -47,7 +46,6 @@ namespace Orleans.Runtime
             ILocalSiloDetails localSiloDetails,
             DeploymentLoadPublisher deploymentLoadPublisher,
             Catalog catalog,
-            GrainTypeManager grainTypeManager,
             CachedVersionSelectorManager cachedVersionSelectorManager, 
             CompatibilityDirectorManager compatibilityDirectorManager,
             VersionSelectorManager selectorManager,
@@ -59,14 +57,13 @@ namespace Orleans.Runtime
             IAppEnvironmentStatistics appEnvironmentStatistics,
             IHostEnvironmentStatistics hostEnvironmentStatistics,
             IOptions<LoadSheddingOptions> loadSheddingOptions)
-            : base(Constants.SiloControlId, localSiloDetails.SiloAddress, loggerFactory)
+            : base(Constants.SiloControlType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.localSiloDetails = localSiloDetails;
 
             this.logger = loggerFactory.CreateLogger<SiloControl>();
             this.deploymentLoadPublisher = deploymentLoadPublisher;
             this.catalog = catalog;
-            this.grainTypeManager = grainTypeManager;
             this.cachedVersionSelectorManager = cachedVersionSelectorManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
             this.selectorManager = selectorManager;
@@ -174,11 +171,6 @@ namespace Orleans.Runtime
             return controllable.ExecuteCommand(command, arg);
         }
 
-        public Task<string[]> GetGrainTypeList()
-        {
-            return Task.FromResult(this.grainTypeManager.GetGrainTypeList());
-        }
-
         public Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
         {
             this.compatibilityDirectorManager.SetStrategy(strategy);
@@ -193,16 +185,16 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        public Task SetCompatibilityStrategy(int interfaceId, CompatibilityStrategy strategy)
+        public Task SetCompatibilityStrategy(GrainInterfaceType interfaceId, CompatibilityStrategy strategy)
         {
             this.compatibilityDirectorManager.SetStrategy(interfaceId, strategy);
             this.cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }
 
-        public Task SetSelectorStrategy(int interfaceId, VersionSelectorStrategy strategy)
+        public Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
         {
-            this.selectorManager.SetSelector(interfaceId, strategy);
+            this.selectorManager.SetSelector(interfaceType, strategy);
             this.cachedVersionSelectorManager.ResetCache();
             return Task.CompletedTask;
         }

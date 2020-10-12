@@ -203,6 +203,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
+
         public Task Notify(ISimpleGrainObserver observer)
         {
             this.count++;
@@ -210,10 +211,25 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
+        public ValueTask NotifyValueTask(ISimpleGrainObserver observer)
+        {
+            this.count++;
+            observer.StateChanged(this.count - 1, this.count);
+            return default;
+        }
+
         public async Task<bool> NotifyOtherGrain(IOneWayGrain otherGrain, ISimpleGrainObserver observer)
         {
             var task = otherGrain.Notify(observer);
             var completedSynchronously = task.Status == TaskStatus.RanToCompletion;
+            await task;
+            return completedSynchronously;
+        }
+
+        public async Task<bool> NotifyOtherGrainValueTask(IOneWayGrain otherGrain, ISimpleGrainObserver observer)
+        {
+            var task = otherGrain.NotifyValueTask(observer);
+            var completedSynchronously = task.IsCompleted;
             await task;
             return completedSynchronously;
         }
@@ -245,7 +261,7 @@ namespace UnitTests.Grains
             var grainId = ((GrainReference)grain).GrainId;
             if (this.catalog.FastLookup(grainId, out var addresses))
             {
-                return Task.FromResult(addresses.Addresses.Single().ToString());
+                return Task.FromResult(addresses.Single().ToString());
             }
 
             return Task.FromResult<string>(null);
@@ -266,6 +282,11 @@ namespace UnitTests.Grains
             throw new Exception("GET OUT!");
         }
 
+        public ValueTask ThrowsOneWayValueTask()
+        {
+            throw new Exception("GET OUT (ValueTask)!");
+        }
+
         public Task<SiloAddress> GetSiloAddress()
         {
             return Task.FromResult(this.LocalSiloDetails.SiloAddress);
@@ -273,7 +294,7 @@ namespace UnitTests.Grains
 
         public Task<SiloAddress> GetPrimaryForGrain()
         {
-            var grainId = (GrainId)this.Identity;
+            var grainId = (GrainId)this.GrainId;
             var primaryForGrain = this.LocalGrainDirectory.GetPrimaryForGrain(grainId);
             return Task.FromResult(primaryForGrain);
         }
@@ -301,9 +322,21 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
+        public ValueTask NotifyValueTask(ISimpleGrainObserver observer)
+        {
+            this.count++;
+            observer.StateChanged(this.count - 1, this.count);
+            return default;
+        }
+
         public Task<int> GetCount() => Task.FromResult(this.count);
 
         public Task Throws()
+        {
+            throw new Exception("GET OUT!");
+        }
+
+        public ValueTask ThrowsValueTask()
         {
             throw new Exception("GET OUT!");
         }

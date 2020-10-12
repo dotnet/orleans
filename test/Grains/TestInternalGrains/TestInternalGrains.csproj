@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>UnitTests.Grains</RootNamespace>
     <AssemblyName>TestInternalGrains</AssemblyName>
@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="xunit.assert" Version="$(xUnitVersion)" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="$(SystemDiagnosticsEventLogVersion)" />
   </ItemGroup>
 
   <ItemGroup>

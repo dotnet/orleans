@@ -1,10 +1,10 @@
 using System;
-using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Azure.Messaging.EventHubs;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -127,12 +127,12 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Get a cursor into the cache to read events from a stream.
         /// </summary>
-        /// <param name="streamIdentity"></param>
+        /// <param name="streamId"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public object GetCursor(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)
+        public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken)
         {
-            return cache.GetCursor(streamIdentity, sequenceToken);
+            return cache.GetCursor(streamId, sequenceToken);
         }
 
         /// <summary>

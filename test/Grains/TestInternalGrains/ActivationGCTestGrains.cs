@@ -64,11 +64,11 @@ namespace UnitTests.Grains
 
         private void OnCollectActivation(GrainId grainId)
         {
-            int other = grainId.TypeCode;
-            int self = Data.Address.Grain.TypeCode;
+            var other = grainId.Type;
+            var self = Data.Address.Grain.Type;
             if (other == self)
             {
-                IBusyActivationGcTestGrain1 g = GrainFactory.GetGrain<IBusyActivationGcTestGrain1>(grainId.GetPrimaryKey());
+                IBusyActivationGcTestGrain1 g = GrainFactory.GetGrain<IBusyActivationGcTestGrain1>(grainId);
                 for (int i = 0; i < burstCount; ++i)
                 {
                     g.Delay(TimeSpan.FromMilliseconds(10)).Ignore();

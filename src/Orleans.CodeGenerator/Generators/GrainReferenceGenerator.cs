@@ -69,7 +69,6 @@ namespace Orleans.CodeGenerator.Generators
                         GrainInterfaceCommon.GenerateInterfaceIdProperty(this.wellKnownTypes, description).AddModifiers(Token(SyntaxKind.OverrideKeyword)),
                         GrainInterfaceCommon.GenerateInterfaceVersionProperty(this.wellKnownTypes, description).AddModifiers(Token(SyntaxKind.OverrideKeyword)),
                         GenerateInterfaceNameProperty(description),
-                        GenerateIsCompatibleMethod(description),
                         GenerateGetMethodNameMethod(description))
                     .AddMembers(GenerateInvokeMethods(description))
                     .AddAttributeLists(attributes);
@@ -195,15 +194,22 @@ namespace Orleans.CodeGenerator.Generators
 
                     if (isOneWayTask)
                     {
-                        if (!SymbolEqualityComparer.Default.Equals(wellKnownTypes.Task, method.ReturnType))
+                        if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.Task, method.ReturnType))
+                        {
+                            var done = wellKnownTypes.Task.ToNameSyntax().Member((object _) => Task.CompletedTask);
+                            body.Add(ReturnStatement(done));
+                        }
+                        else if (wellKnownTypes.ValueTask is WellKnownTypes.Some valueTask
+                            && SymbolEqualityComparer.Default.Equals(valueTask.Value, method.ReturnType))
+                        {
+                            body.Add(ReturnStatement(LiteralExpression(SyntaxKind.DefaultLiteralExpression)));
+                        }
+                        else
                         {
                             throw new CodeGenerationException(
                                 $"Method {method} is marked with [{wellKnownTypes.OneWayAttribute.Name}], " +
-                                $"but has a return type which is not assignable from {typeof(Task)}");
+                                $"but has a return type which is not assignable from {typeof(Task)} or {typeof(ValueTask)}");
                         }
-
-                        var done = wellKnownTypes.Task.ToNameSyntax().Member((object _) => Task.CompletedTask);
-                        body.Add(ReturnStatement(done));
                     }
                 }
                 else if (method.ReturnType is INamedTypeSymbol methodReturnType)
@@ -231,9 +237,8 @@ namespace Orleans.CodeGenerator.Generators
 
                     var methodResult = asyncMethod ? AwaitExpression(invocation) : (ExpressionSyntax)invocation;
 
-                    var isUntypedValueTaskMethod =
-                        SymbolEqualityComparer.Default.Equals(wellKnownTypes.ValueTask, methodReturnType);
-                    if (isUntypedValueTaskMethod)
+                    if (this.wellKnownTypes.ValueTask is WellKnownTypes.Some valueTask
+                        && SymbolEqualityComparer.Default.Equals(valueTask.Value, methodReturnType))
                     {
                         body.Add(ExpressionStatement(methodResult));
                     }
@@ -312,7 +317,7 @@ namespace Orleans.CodeGenerator.Generators
                 var enumType = wellKnownTypes.TransactionOption;
                 var txRequirement = (int)attr.ConstructorArguments.First().Value;
                 var values = enumType.GetMembers().OfType<IFieldSymbol>().ToList();
-                var mapping = values.ToDictionary(m => (int) m.ConstantValue, m => m.Name);
+                var mapping = values.ToDictionary(m => (int)m.ConstantValue, m => m.Name);
                 if (!mapping.TryGetValue(txRequirement, out var value))
                 {
                     throw new NotSupportedException(
@@ -362,37 +367,6 @@ namespace Orleans.CodeGenerator.Generators
             }
 
             return Argument(NameColon("options"), Token(SyntaxKind.None), allOptions);
-        }
-
-        private MemberDeclarationSyntax GenerateIsCompatibleMethod(GrainInterfaceDescription description)
-        {
-            var method = wellKnownTypes.GrainReference.Method("IsCompatible");
-            var interfaceIdParameter = method.Parameters[0].Name.ToIdentifierName();
-
-            var interfaceIds =
-                new HashSet<int>(
-                    new[] { description.InterfaceId }.Concat(
-                        description.Type.AllInterfaces.Where(wellKnownTypes.IsGrainInterface).Select(wellKnownTypes.GetTypeId)));
-
-            var returnValue = default(BinaryExpressionSyntax);
-            foreach (var interfaceId in interfaceIds)
-            {
-                var check = BinaryExpression(
-                    SyntaxKind.EqualsExpression,
-                    interfaceIdParameter,
-                    interfaceId.ToHexLiteral());
-
-                // If this is the first check, assign it, otherwise OR this check with the previous checks.
-                returnValue = returnValue == null
-                                  ? check
-                                  : BinaryExpression(SyntaxKind.LogicalOrExpression, returnValue, check);
-            }
-
-            return
-                method.GetDeclarationSyntax()
-                    .AddModifiers(Token(SyntaxKind.OverrideKeyword))
-                    .WithExpressionBody(ArrowExpressionClause(returnValue))
-                    .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
         }
 
         private MemberDeclarationSyntax GenerateInterfaceNameProperty(GrainInterfaceDescription description)

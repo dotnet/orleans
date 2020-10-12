@@ -15,7 +15,7 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly IConnectionListenerFactory listenerFactory;
         private readonly ConnectionManager connectionManager;
-        private readonly ConcurrentDictionary<Connection, Task> connections = new ConcurrentDictionary<Connection, Task>(ReferenceEqualsComparer.Instance);
+        protected readonly ConcurrentDictionary<Connection, Task> connections = new ConcurrentDictionary<Connection, Task>(ReferenceEqualsComparer.Instance);
         private readonly ConnectionCommon connectionShared;
         private TaskCompletionSource<object> acceptLoopTcs;
         private IConnectionListener listener;
@@ -121,14 +121,13 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 var cycles = 0;
-                var exception = new ConnectionAbortedException("Shutting down");
                 while (this.ConnectionCount > 0)
                 {
                     foreach (var connection in this.connections.Keys.ToImmutableList())
                     {
                         try
                         {
-                            connection.Close(exception);
+                            connection.Close();
                         }
                         catch
                         {
@@ -180,11 +179,11 @@ namespace Orleans.Runtime.Messaging
                     var connectionTask = connection.Run();
                     this.connections.TryAdd(connection, connectionTask);
                     await connectionTask;
-                    this.NetworkingTrace.LogInformation("Connection {@Connection} terminated", connection);
+                    this.NetworkingTrace.LogInformation("Connection {Connection} terminated", connection);
                 }
                 catch (Exception exception)
                 {
-                    this.NetworkingTrace.LogInformation(exception, "Connection {@Connection} terminated with an exception", connection);
+                    this.NetworkingTrace.LogInformation(exception, "Connection {Connection} terminated with an exception", connection);
                 }
                 finally
                 {

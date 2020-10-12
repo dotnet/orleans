@@ -165,7 +165,7 @@ On Linux and macOS, run the `build.sh` script or `dotnet build` to build Orleans
 
 The latest stable, production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
 
-Nightly builds are published to https://dotnet.myget.org/gallery/orleans-ci. These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds published to NuGet.
+Nightly builds are published to [a NuGet feed](https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json). These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds published to NuGet.
 
 <details>
 <summary>
@@ -179,7 +179,7 @@ To use nightly builds in your project, add the MyGet feed using either of the fo
 ```xml
   <RestoreSources>
     $(RestoreSources);
-    https://dotnet.myget.org/F/orleans-ci/api/v3/index.json;
+    https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json;
   </RestoreSources>
 ```
 
@@ -192,7 +192,7 @@ or
 <configuration>
  <packageSources>
   <clear />
-  <add key="orleans-ci" value="https://dotnet.myget.org/F/orleans-ci/api/v3/index.json" />
+  <add key="orleans-ci" value="https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json" />
   <add key="nuget" value="https://api.nuget.org/v3/index.json" />
  </packageSources>
 </configuration>
@@ -219,5 +219,3 @@ This project is licensed under the [MIT license](https://github.com/dotnet/orlea
 * Technical Report: [Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/apps/pubs/default.aspx?id=210931)
 * [Orleans Documentation](http://dotnet.github.io/orleans/)
 * [Contributing](http://dotnet.github.io/orleans/Community/Contributing.html)
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.

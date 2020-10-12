@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -160,11 +160,6 @@ namespace TestGrains
         public Task<int> GetConfirmedVersion()
         {
             return Task.FromResult(this.Version);
-        }
-
-        public Task<IEnumerable<ConnectionIssue>> GetUnresolvedConnectionIssues()
-        {
-            return Task.FromResult(this.UnresolvedConnectionIssues);
         }
 
         public async Task<KeyValuePair<int, object>> Read()

@@ -26,7 +26,7 @@ namespace AWSUtils.Tests.Liveness
                 Orleans.AWSUtils.Tests.DynamoDBStorage storage;
                 try
                 {
-                    storage = new Orleans.AWSUtils.Tests.DynamoDBStorage(NullLoggerFactory.Instance, "http://localhost:8000");
+                    storage = new Orleans.AWSUtils.Tests.DynamoDBStorage(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), "http://localhost:8000");
                 }
                 catch (AmazonServiceException)
                 {

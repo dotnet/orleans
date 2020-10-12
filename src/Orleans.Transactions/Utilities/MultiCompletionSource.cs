@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -21,7 +21,7 @@ namespace Orleans.Transactions
                 throw new ArgumentOutOfRangeException(nameof(count), "count has to be positive.");
             }
 
-            tcs = new TaskCompletionSource<bool>();
+            tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.count = count;
         }
 

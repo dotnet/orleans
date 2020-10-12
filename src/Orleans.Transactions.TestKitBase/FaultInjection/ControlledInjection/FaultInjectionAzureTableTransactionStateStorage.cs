@@ -69,7 +69,7 @@ namespace Orleans.Transactions.TestKit
             this.factory = factory;
         }
 
-        public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainActivationContext context) where TState : class, new()
+        public ITransactionalStateStorage<TState> Create<TState>(string stateName, IGrainContext context) where TState : class, new()
         {
             var azureStateStorage = this.factory.Create<TState>(stateName, context);
             return ActivatorUtilities.CreateInstance<FaultInjectionAzureTableTransactionStateStorage<TState>>(

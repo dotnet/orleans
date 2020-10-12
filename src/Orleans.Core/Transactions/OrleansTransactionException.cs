@@ -87,7 +87,7 @@ namespace Orleans.Transactions
             this.TransactionId = transactionId;
         }
 
-        public OrleansTransactionInDoubtException(string transactionId, string msg) : base(string.Format("Transaction {0} is InDoubt: {1}", transactionId, msg))
+        public OrleansTransactionInDoubtException(string transactionId, string msg, Exception innerException) : base(string.Format("Transaction {0} is InDoubt: {1}", transactionId, msg), innerException)
         {
             this.TransactionId = transactionId;
         }
@@ -116,6 +116,11 @@ namespace Orleans.Transactions
         /// </summary>
         public string TransactionId { get; private set; }
  
+        public OrleansTransactionAbortedException(string transactionId, string msg, Exception innerException) : base(msg, innerException)
+        {
+            this.TransactionId = transactionId;
+        }
+
         public OrleansTransactionAbortedException(string transactionId, string msg) : base(msg)
         {
             this.TransactionId = transactionId;
@@ -156,6 +161,11 @@ namespace Orleans.Transactions
 
         public OrleansCascadingAbortException(string transactionId)
             : base(transactionId, string.Format("Transaction {0} aborted because a dependent transaction aborted", transactionId))
+        {
+        }
+
+        public OrleansCascadingAbortException(string transactionId, Exception innerException)
+            : base(transactionId, string.Format("Transaction {0} aborted because a dependent transaction aborted", transactionId), innerException)
         {
         }
 
@@ -232,6 +242,11 @@ namespace Orleans.Transactions
         {
         }
 
+        public OrleansBrokenTransactionLockException(string transactionId, string situation, Exception innerException)
+            : base(transactionId, $"Transaction {transactionId} aborted because a broken lock was detected, {situation}", innerException)
+        {
+        }
+
         public OrleansBrokenTransactionLockException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -261,8 +276,8 @@ namespace Orleans.Transactions
     [Serializable]
     public class OrleansTransactionPrepareTimeoutException : OrleansTransactionTransientFailureException
     {
-        public OrleansTransactionPrepareTimeoutException(string transactionId)
-            : base(transactionId, $"Transaction {transactionId} Aborted because the prepare phase did not complete within the timeout limit")
+        public OrleansTransactionPrepareTimeoutException(string transactionId, Exception innerException)
+            : base(transactionId, $"Transaction {transactionId} Aborted because the prepare phase did not complete within the timeout limit", innerException)
         {
         }
 
@@ -279,6 +294,11 @@ namespace Orleans.Transactions
     [Serializable]
     public class OrleansTransactionTransientFailureException : OrleansTransactionAbortedException
     {
+        public OrleansTransactionTransientFailureException(string transactionId, string msg, Exception innerException)
+            : base(transactionId, msg, innerException)
+        {
+        }
+
         public OrleansTransactionTransientFailureException(string transactionId, string msg)
             : base(transactionId, msg)
         {

@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Azure.Storage.Queue;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,7 +18,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     {
         private readonly string providerName;
         private readonly AzureQueueOptions options;
-        private readonly IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter;
+        private readonly IQueueDataAdapter<string, IBatchContainer> dataAdapter;
         private readonly ClusterOptions clusterOptions;
         private readonly ILoggerFactory loggerFactory;
         private IAzureStreamQueueMapper streamQueueMapper;
@@ -39,7 +38,7 @@ namespace Orleans.Providers.Streams.AzureQueue
             string name,
             AzureQueueOptions options,
             SimpleQueueCacheOptions cacheOptions,
-            IQueueDataAdapter<CloudQueueMessage, IBatchContainer> dataAdapter,
+            IQueueDataAdapter<string, IBatchContainer> dataAdapter,
             IServiceProvider serviceProvider,
             IOptions<ClusterOptions> clusterOptions,
             SerializationManager serializationManager,
@@ -102,8 +101,8 @@ namespace Orleans.Providers.Streams.AzureQueue
         {
             var azureQueueOptions = services.GetOptionsByName<AzureQueueOptions>(name);
             var cacheOptions = services.GetOptionsByName<SimpleQueueCacheOptions>(name);
-            var dataAdapter = services.GetServiceByName<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>>(name)
-                ?? services.GetService<IQueueDataAdapter<CloudQueueMessage, IBatchContainer>>();
+            var dataAdapter = services.GetServiceByName<IQueueDataAdapter<string, IBatchContainer>>(name)
+                ?? services.GetService<IQueueDataAdapter<string, IBatchContainer>>();
             IOptions<ClusterOptions> clusterOptions = services.GetProviderClusterOptions(name);
             var factory = ActivatorUtilities.CreateInstance<AzureQueueAdapterFactory>(services, name, azureQueueOptions, cacheOptions, dataAdapter, clusterOptions);
             factory.Init();

@@ -1,7 +1,7 @@
 @if not defined _echo @echo off
 setlocal enabledelayedexpansion
 
-:: Locate dotnet.exe, we're processing multi-line output of where.exe and only matchin the first tag of the 
+:: Locate dotnet.exe, we're processing multi-line output of where.exe and only matching the first tag of the 
 :: found version number
 
 set /p REQUIRED_DOTNET_VERSION=< "%~dp0DotnetCLIVersion.txt"

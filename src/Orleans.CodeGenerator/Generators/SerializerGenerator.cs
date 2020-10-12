@@ -5,13 +5,12 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.Utilities;
-using Microsoft.Extensions.Logging;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using ITypeSymbol = Microsoft.CodeAnalysis.ITypeSymbol;
 
@@ -98,7 +97,7 @@ namespace Orleans.CodeGenerator.Generators
                         break;
                 }
             }
-            
+
             return CodeGenerator.ToolName + b;
         }
 
@@ -121,7 +120,7 @@ namespace Orleans.CodeGenerator.Generators
             };
 
             var fields = GetFields(model, type, logger);
-            
+
             var members = new List<MemberDeclarationSyntax>(GenerateFields(fields))
             {
                 GenerateConstructor(className, fields),
@@ -191,7 +190,7 @@ namespace Orleans.CodeGenerator.Generators
                     var getterInvoke = CastExpression(
                         getterType,
                         InvocationExpression(fieldUtils.Member("GetGetter")).AddArgumentListArguments(Argument(fieldInfoField)));
-                    
+
                     body.Add(ExpressionStatement(
                         AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(field.GetterFieldName), getterInvoke)));
                 }
@@ -249,7 +248,7 @@ namespace Orleans.CodeGenerator.Generators
                                 .WithInitializer(EqualsValueClause(GetObjectCreationExpressionSyntax(type, model)))));
             var resultVariable = IdentifierName("result");
 
-            var body = new List<StatementSyntax> {resultDeclaration};
+            var body = new List<StatementSyntax> { resultDeclaration };
 
             // Value types cannot be referenced, only copied, so there is no need to box & record instances of value types.
             if (!type.IsValueType)
@@ -346,11 +345,10 @@ namespace Orleans.CodeGenerator.Generators
         private MemberDeclarationSyntax GenerateDeepCopierMethod(INamedTypeSymbol type, List<FieldInfoMember> fields, SemanticModel model)
         {
             var originalVariable = IdentifierName("original");
-            var inputVariable = IdentifierName("input");
-            var resultVariable = IdentifierName("result");
 
             var body = new List<StatementSyntax>();
-            if (type.HasInterface(wellKnownTypes.ImmutableAttribute))
+            if (type.HasAttribute(wellKnownTypes.ImmutableAttribute)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.Immutable_1, type))
             {
                 // Immutable types do not require copying.
                 var typeName = type.ToDisplayString();
@@ -359,6 +357,7 @@ namespace Orleans.CodeGenerator.Generators
             }
             else
             {
+                var inputVariable = IdentifierName("input");
                 body.Add(
                     LocalDeclarationStatement(
                         VariableDeclaration(type.ToTypeSyntax())
@@ -368,27 +367,40 @@ namespace Orleans.CodeGenerator.Generators
                                         EqualsValueClause(
                                             ParenthesizedExpression(
                                                 CastExpression(type.ToTypeSyntax(), originalVariable)))))));
-                body.Add(
+
+                if (IsOrleansShallowCopyable(type))
+                {
+                    var comment = Comment($"// {type.ToDisplayString()} needs only a shallow copy.");
+                    body.Add(ReturnStatement(inputVariable).WithLeadingTrivia(comment));
+                }
+                else
+                {
+                    var resultVariable = IdentifierName("result");
+                    body.Add(
                     LocalDeclarationStatement(
                         VariableDeclaration(type.ToTypeSyntax())
                             .AddVariables(
                                 VariableDeclarator("result")
                                     .WithInitializer(EqualsValueClause(GetObjectCreationExpressionSyntax(type, model))))));
 
-                // Record this serialization.
-                var context = IdentifierName("context");
-                body.Add(
-                    ExpressionStatement(
-                        InvocationExpression(context.Member("RecordCopy"))
-                            .AddArgumentListArguments(Argument(originalVariable), Argument(resultVariable))));
+                    var context = IdentifierName("context");
+                    if (!type.IsValueType)
+                    {
+                        // Record this serialization.
+                        body.Add(
+                            ExpressionStatement(
+                                InvocationExpression(context.Member("RecordCopy"))
+                                    .AddArgumentListArguments(Argument(originalVariable), Argument(resultVariable))));
+                    }
 
-                // Copy all members from the input to the result.
-                foreach (var field in fields)
-                {
-                    body.Add(ExpressionStatement(field.GetSetter(resultVariable, field.GetGetter(inputVariable, context))));
+                    // Copy all members from the input to the result.
+                    foreach (var field in fields)
+                    {
+                        body.Add(ExpressionStatement(field.GetSetter(resultVariable, field.GetGetter(inputVariable, context))));
+                    }
+
+                    body.Add(ReturnStatement(resultVariable));
                 }
-
-                body.Add(ReturnStatement(resultVariable));
             }
 
             return
@@ -603,21 +615,15 @@ namespace Orleans.CodeGenerator.Generators
             if (fieldType.TypeKind == TypeKind.Pointer) return false;
             if (fieldType.TypeKind == TypeKind.Delegate) return false;
 
-            if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.IntPtr, fieldType)) return false;
-            if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.UIntPtr, fieldType)) return false;
+            if (fieldType.SpecialType == SpecialType.System_IntPtr) return false;
+            if (fieldType.SpecialType == SpecialType.System_UIntPtr) return false;
 
             if (symbol.ContainingType.HasBaseType(wellKnownTypes.MarshalByRefObject)) return false;
 
             return true;
         }
-        
-        internal bool IsOrleansShallowCopyable(ITypeSymbol type)
-        {
-            var root = new HashSet<ITypeSymbol>();
-            return IsOrleansShallowCopyable(type, root);
-        }
 
-        internal bool IsOrleansShallowCopyable(ITypeSymbol type, HashSet<ITypeSymbol> examining)
+        internal bool IsOrleansShallowCopyable(ITypeSymbol type)
         {
             switch (type.SpecialType)
             {
@@ -647,7 +653,8 @@ namespace Orleans.CodeGenerator.Generators
                 || SymbolEqualityComparer.Default.Equals(wellKnownTypes.ActivationId, type)
                 || SymbolEqualityComparer.Default.Equals(wellKnownTypes.ActivationAddress, type)
                 || wellKnownTypes.CorrelationId is WellKnownTypes.Some correlationIdType && SymbolEqualityComparer.Default.Equals(correlationIdType.Value, type)
-                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.CancellationToken, type)) return true;
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.CancellationToken, type)
+                || SymbolEqualityComparer.Default.Equals(wellKnownTypes.Type, type)) return true;
 
             if (ShallowCopyableTypes.TryGetValue(type, out var result)) return result;
 
@@ -666,20 +673,45 @@ namespace Orleans.CodeGenerator.Generators
                 return ShallowCopyableTypes[type] = false;
             }
 
-            if (namedType.IsGenericType && SymbolEqualityComparer.Default.Equals(wellKnownTypes.Immutable_1, namedType.ConstructedFrom))
+            if (namedType.IsTupleType)
             {
-                return ShallowCopyableTypes[type] = true;
+                return ShallowCopyableTypes[type] = namedType.TupleElements.All(f => IsOrleansShallowCopyable(f.Type));
             }
-            
-            if (type.TypeKind == TypeKind.Struct && !namedType.IsGenericType && !namedType.IsUnboundGenericType)
+            else if (namedType.IsGenericType)
             {
-                return ShallowCopyableTypes[type] =  IsValueTypeFieldsShallowCopyable(type, examining);
+                var def = namedType.ConstructedFrom;
+                if (def.SpecialType == SpecialType.System_Nullable_T)
+                {
+                    return ShallowCopyableTypes[type] = IsOrleansShallowCopyable(namedType.TypeArguments.Single());
+                }
+
+                if (SymbolEqualityComparer.Default.Equals(wellKnownTypes.Immutable_1, def))
+                {
+                    return ShallowCopyableTypes[type] = true;
+                }
+
+                if (wellKnownTypes.TupleTypes.Any(t => SymbolEqualityComparer.Default.Equals(t, def)))
+                {
+                    return ShallowCopyableTypes[type] = namedType.TypeArguments.All(IsOrleansShallowCopyable);
+                }
+            }
+            else
+            {
+                if (type.TypeKind == TypeKind.Enum)
+                {
+                    return ShallowCopyableTypes[type] = true;
+                }
+
+                if (type.TypeKind == TypeKind.Struct && !namedType.IsUnboundGenericType)
+                {
+                    return ShallowCopyableTypes[type] = IsValueTypeFieldsShallowCopyable(type);
+                }
             }
 
             return ShallowCopyableTypes[type] = false;
         }
 
-        private bool IsValueTypeFieldsShallowCopyable(ITypeSymbol type, HashSet<ITypeSymbol> examining)
+        private bool IsValueTypeFieldsShallowCopyable(ITypeSymbol type)
         {
             foreach (var field in type.GetInstanceMembers<IFieldSymbol>())
             {
@@ -692,7 +724,7 @@ namespace Orleans.CodeGenerator.Generators
 
                 if (SymbolEqualityComparer.Default.Equals(type, fieldType)) return false;
 
-                if (!IsOrleansShallowCopyable(fieldType, examining)) return false;
+                if (!IsOrleansShallowCopyable(fieldType)) return false;
             }
 
             return true;
@@ -781,7 +813,7 @@ namespace Orleans.CodeGenerator.Generators
                     {
                         return this.property;
                     }
-                    
+
                     var propertyName = Regex.Match(this.Field.Name, "^<([^>]+)>.*$");
                     if (!propertyName.Success || this.Field.ContainingType == null) return null;
 

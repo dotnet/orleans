@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Azure.EventHubs;
+using Azure.Messaging.EventHubs;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 
@@ -54,20 +55,20 @@ namespace Orleans.ServiceBus.Providers
             return new EventHubSequenceTokenV2("", cachedMessage.SequenceNumber, 0);
         }
 
-        public virtual EventData ToQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public virtual EventData ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
             if (token != null) throw new ArgumentException("EventHub streams currently does not support non-null StreamSequenceToken.", nameof(token));
-            return EventHubBatchContainer.ToEventData(this.serializationManager, streamGuid, streamNamespace, events, requestContext);
+            return EventHubBatchContainer.ToEventData(this.serializationManager, streamId, events, requestContext);
         }
 
         public virtual CachedMessage FromQueueMessage(StreamPosition streamPosition, EventData queueMessage, DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
         {
             return new CachedMessage()
             {
-                StreamGuid = streamPosition.StreamIdentity.Guid,
-                StreamNamespace = streamPosition.StreamIdentity.Namespace != null ? string.Intern(streamPosition.StreamIdentity.Namespace) : null,
-                SequenceNumber = queueMessage.SystemProperties.SequenceNumber,
-                EnqueueTimeUtc = queueMessage.SystemProperties.EnqueuedTimeUtc,
+                StreamId = streamPosition.StreamId, 
+                SequenceNumber = queueMessage.SequenceNumber,
+                EventIndex = streamPosition.SequenceToken.EventIndex,
+                EnqueueTimeUtc = queueMessage.EnqueuedTime.UtcDateTime,
                 DequeueTimeUtc = dequeueTime,
                 Segment = EncodeMessageIntoSegment(queueMessage, getSegment)
             };
@@ -75,13 +76,10 @@ namespace Orleans.ServiceBus.Providers
 
         public virtual StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            Guid streamGuid =
-            Guid.Parse(queueMessage.SystemProperties.PartitionKey);
-            string streamNamespace = queueMessage.GetStreamNamespaceProperty();
-            IStreamIdentity stremIdentity = new StreamIdentity(streamGuid, streamNamespace);
+            StreamId streamId = this.GetStreamIdentity(queueMessage);
             StreamSequenceToken token =
-                new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
-            return new StreamPosition(stremIdentity, token);
+                new EventHubSequenceTokenV2(queueMessage.Offset.ToString(), queueMessage.SequenceNumber, 0);
+            return new StreamPosition(streamId, token);
         }
 
         /// <summary>
@@ -94,14 +92,33 @@ namespace Orleans.ServiceBus.Providers
             return SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset); // read offset
         }
 
+        /// <summary>
+        /// Get the Event Hub partition key to use for a stream.
+        /// </summary>
+        /// <param name="streamId">The stream Guid.</param>
+        /// <returns>The partition key to use for the stream.</returns>
+        public virtual string GetPartitionKey(StreamId streamId) => streamId.GetKeyAsString();
+
+        /// <summary>
+        /// Get the <see cref="IStreamIdentity"/> for an event message.
+        /// </summary>
+        /// <param name="queueMessage">The event message.</param>
+        /// <returns>The stream identity.</returns>
+        public virtual StreamId GetStreamIdentity(EventData queueMessage)
+        {
+            string streamKey = queueMessage.PartitionKey;
+            string streamNamespace = queueMessage.GetStreamNamespaceProperty();
+            return StreamId.Create(streamNamespace, streamKey);
+        }
+
         // Placed object message payload into a segment.
         protected virtual ArraySegment<byte> EncodeMessageIntoSegment(EventData queueMessage, Func<int, ArraySegment<byte>> getSegment)
         {
             byte[] propertiesBytes = queueMessage.SerializeProperties(this.serializationManager);
-            byte[] payload = queueMessage.Body.Array;
+            var payload = queueMessage.Body;
             // get size of namespace, offset, partitionkey, properties, and payload
-            int size = SegmentBuilder.CalculateAppendSize(queueMessage.SystemProperties.Offset) +
-                SegmentBuilder.CalculateAppendSize(queueMessage.SystemProperties.PartitionKey) +
+            int size = SegmentBuilder.CalculateAppendSize(queueMessage.Offset.ToString()) +
+                SegmentBuilder.CalculateAppendSize(queueMessage.PartitionKey) +
                 SegmentBuilder.CalculateAppendSize(propertiesBytes) +
                 SegmentBuilder.CalculateAppendSize(payload);
 
@@ -110,8 +127,8 @@ namespace Orleans.ServiceBus.Providers
 
             // encode namespace, offset, partitionkey, properties and payload into segment
             int writeOffset = 0;
-            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.SystemProperties.Offset);
-            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.SystemProperties.PartitionKey);
+            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.Offset.ToString());
+            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.PartitionKey);
             SegmentBuilder.Append(segment, ref writeOffset, propertiesBytes);
             SegmentBuilder.Append(segment, ref writeOffset, payload);
 

@@ -1,9 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Azure.EventHubs;
 using Orleans.Runtime;
-using Microsoft.Extensions.Options;
-using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using ServiceBus.Tests.TestStreamProviders;
@@ -55,7 +52,7 @@ namespace ServiceBus.Tests.MonitorTests
                     hostBuilder
                         .ConfigureServices(services =>
                         {
-                            services.AddTransientNamedService<Func<IStreamIdentity, IStreamDataGenerator<EventData>>>(StreamProviderName, (s, n) => SimpleStreamEventDataGenerator.CreateFactory(s));
+                            services.AddTransientNamedService(StreamProviderName, (s, n) => SimpleStreamEventDataGenerator.CreateFactory(s));
                         })
                         .AddMemoryGrainStorage("PubSubStore");
                 }

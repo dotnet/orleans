@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans
 {
@@ -142,7 +141,7 @@ namespace Orleans
 
         public override string ToString()
         {
-            return string.Format("<IOrleansReminder: GrainRef={0} ReminderName={1} ETag={2}>", GrainRef.ToDetailedString(), ReminderName, ETag);
+            return string.Format("<IOrleansReminder: GrainRef={0} ReminderName={1} ETag={2}>", GrainRef.ToString(), ReminderName, ETag);
         }
     }
 }

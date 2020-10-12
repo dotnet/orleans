@@ -4,11 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.MultiCluster;
+using Orleans.Metadata;
 using Orleans.Runtime.MembershipService;
-using Orleans.Runtime.MultiClusterNetwork;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
@@ -18,33 +15,26 @@ namespace Orleans.Runtime.Management
     /// <summary>
     /// Implementation class for the Orleans management grain.
     /// </summary>
-    [OneInstancePerCluster]
     internal class ManagementGrain : Grain, IManagementGrain
     {
-        private readonly MultiClusterOptions multiClusterOptions;
-        private readonly IMultiClusterOracle multiClusterOracle;
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
-        private readonly GrainTypeManager grainTypeManager;
         private readonly IVersionStore versionStore;
         private readonly MembershipTableManager membershipTableManager;
+        private readonly GrainManifest siloManifest;
         private readonly ILogger logger;
         public ManagementGrain(
-            IOptions<MultiClusterOptions> multiClusterOptions,
-            IMultiClusterOracle multiClusterOracle,
             IInternalGrainFactory internalGrainFactory,
             ISiloStatusOracle siloStatusOracle,
-            GrainTypeManager grainTypeManager, 
             IVersionStore versionStore,
             ILogger<ManagementGrain> logger,
-            MembershipTableManager membershipTableManager)
+            MembershipTableManager membershipTableManager,
+            IClusterManifestProvider clusterManifestProvider)
         {
             this.membershipTableManager = membershipTableManager;
-            this.multiClusterOptions = multiClusterOptions.Value;
-            this.multiClusterOracle = multiClusterOracle;
+            this.siloManifest = clusterManifestProvider.LocalGrainManifest;
             this.internalGrainFactory = internalGrainFactory;
             this.siloStatusOracle = siloStatusOracle;
-            this.grainTypeManager = grainTypeManager;
             this.versionStore = versionStore;
             this.logger = logger;
         }
@@ -166,19 +156,6 @@ namespace Orleans.Runtime.Management
             return tasks.Select(s => s.Result).Select(r => r.LocalActivations.Count).Sum();
         }
 
-        public async Task<string[]> GetActiveGrainTypes(SiloAddress[] hostsIds=null)
-        {
-            if (hostsIds == null)
-            {
-                Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
-                SiloAddress[] silos = hosts.Keys.ToArray();
-            }
-            var all = GetSiloAddresses(hostsIds).Select(s => GetSiloControlReference(s).GetGrainTypeList()).ToArray();
-            await Task.WhenAll(all);
-            return all.SelectMany(s => s.Result).Distinct().ToArray();
-
-        }
-
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
         {
             await SetStrategy(
@@ -193,20 +170,20 @@ namespace Orleans.Runtime.Management
                 siloControl => siloControl.SetSelectorStrategy(strategy));
         }
 
-        public async Task SetCompatibilityStrategy(int interfaceId, CompatibilityStrategy strategy)
+        public async Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy)
         {
-            CheckIfIsExistingInterface(interfaceId);
+            CheckIfIsExistingInterface(interfaceType);
             await SetStrategy(
-                store => store.SetCompatibilityStrategy(interfaceId, strategy),
-                siloControl => siloControl.SetCompatibilityStrategy(interfaceId, strategy));
+                store => store.SetCompatibilityStrategy(interfaceType, strategy),
+                siloControl => siloControl.SetCompatibilityStrategy(interfaceType, strategy));
         }
 
-        public async Task SetSelectorStrategy(int interfaceId, VersionSelectorStrategy strategy)
+        public async Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
         {
-            CheckIfIsExistingInterface(interfaceId);
+            CheckIfIsExistingInterface(interfaceType);
             await SetStrategy(
-                store => store.SetSelectorStrategy(interfaceId, strategy),
-                siloControl => siloControl.SetSelectorStrategy(interfaceId, strategy));
+                store => store.SetSelectorStrategy(interfaceType, strategy),
+                siloControl => siloControl.SetSelectorStrategy(interfaceType, strategy));
         }
 
         public async Task<int> GetTotalActivationCount()
@@ -231,13 +208,21 @@ namespace Orleans.Runtime.Management
                 String.Format("SendControlCommandToProvider of type {0} and name {1} command {2}.", providerTypeFullName, providerName, command));
         }
 
-        private void CheckIfIsExistingInterface(int interfaceId)
+        private void CheckIfIsExistingInterface(GrainInterfaceType interfaceType)
         {
-            Type unused;
-            var interfaceMap = this.grainTypeManager.ClusterGrainInterfaceMap;
-            if (!interfaceMap.TryGetServiceInterface(interfaceId, out unused))
+            GrainInterfaceType lookupId;
+            if (GenericGrainInterfaceType.TryParse(interfaceType, out var generic))
             {
-                throw new ArgumentException($"Interface code '{interfaceId} not found", nameof(interfaceId));
+                lookupId = generic.Value;
+            }
+            else
+            {
+                lookupId = interfaceType;
+            }
+
+            if (!this.siloManifest.Interfaces.TryGetValue(lookupId, out _))
+            { 
+                throw new ArgumentException($"Interface '{interfaceType} not found", nameof(interfaceType));
             }
         }
 
@@ -281,7 +266,7 @@ namespace Orleans.Runtime.Management
                 return silos;
 
             return this.siloStatusOracle
-                       .GetApproximateSiloStatuses(true).Select(s => s.Key).ToArray();
+                       .GetApproximateSiloStatuses(true).Keys.ToArray();
         }
 
         /// <summary>
@@ -310,7 +295,7 @@ namespace Orleans.Runtime.Management
             var first = path.FirstOrDefault();
             if (first == null) return;
 
-            if (first.StartsWith("@"))
+            if (first.StartsWith("@", StringComparison.Ordinal))
             {
                 first = first.Substring(1);
                 if (path.Count() != 1)
@@ -339,63 +324,7 @@ namespace Orleans.Runtime.Management
 
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
-            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, silo);
-        }
-
-        private IMultiClusterOracle GetMultiClusterOracle()
-        {
-            if (!this.multiClusterOptions.HasMultiClusterNetwork)
-                throw new OrleansException("No multicluster network configured");
-            return this.multiClusterOracle;
-        }
-
-        public Task<List<IMultiClusterGatewayInfo>> GetMultiClusterGateways()
-        {
-            return Task.FromResult(GetMultiClusterOracle().GetGateways().Cast<IMultiClusterGatewayInfo>().ToList());
-        }
-
-        public Task<MultiClusterConfiguration> GetMultiClusterConfiguration()
-        {
-            return Task.FromResult(GetMultiClusterOracle().GetMultiClusterConfiguration());
-        }
-
-        public async Task<MultiClusterConfiguration> InjectMultiClusterConfiguration(IEnumerable<string> clusters, string comment = "", bool checkForLaggingSilosFirst = true)
-        {
-            var multiClusterOracle = GetMultiClusterOracle();
-
-            var configuration = new MultiClusterConfiguration(DateTime.UtcNow, clusters.ToList(), comment);
-
-            if (!MultiClusterConfiguration.OlderThan(multiClusterOracle.GetMultiClusterConfiguration(), configuration))
-                throw new OrleansException("Could not inject multi-cluster configuration: current configuration is newer than clock");
-
-            if (checkForLaggingSilosFirst)
-            {
-                try
-                {
-                    var laggingSilos = await multiClusterOracle.FindLaggingSilos(multiClusterOracle.GetMultiClusterConfiguration());
-
-                    if (laggingSilos.Count > 0)
-                    {
-                        var msg = string.Format("Found unstable silos {0}", string.Join(",", laggingSilos));
-                        throw new OrleansException(msg);
-                    }
-                }
-                catch (Exception e)
-                {
-                    throw new OrleansException("Could not inject multi-cluster configuration: stability check failed", e);
-                }
-            }
-
-            await multiClusterOracle.InjectMultiClusterConfiguration(configuration);
-
-            return configuration;
-        }
-
-        public Task<List<SiloAddress>> FindLaggingSilos()
-        {
-            var multiClusterOracle = GetMultiClusterOracle();
-            var expected = multiClusterOracle.GetMultiClusterConfiguration();
-            return multiClusterOracle.FindLaggingSilos(expected);
+            return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
         }
     }
 }

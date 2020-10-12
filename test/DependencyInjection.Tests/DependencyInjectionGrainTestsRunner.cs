@@ -99,8 +99,8 @@ namespace DependencyInjection.Tests
             var grain2 = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(id2);
 
             // the injected service will only return a different value if it's a different instance
-            Assert.Contains(id1.ToString(), await grain1.GetStringValue());
-            Assert.Contains(id2.ToString(), await grain2.GetStringValue());
+            Assert.Contains(id1.ToString("X"), await grain1.GetStringValue());
+            Assert.Contains(id2.ToString("X"), await grain2.GetStringValue());
 
             await grain1.DoDeactivate();
             await grain2.DoDeactivate();
@@ -158,7 +158,7 @@ namespace DependencyInjection.Tests
             ISimpleDIGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
             var exception = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLongValue());
             Assert.Contains("Error creating activation for", exception.Message);
-            Assert.Contains(nameof(ExplicitlyRegisteredSimpleDIGrain), exception.Message);
+            Assert.Contains("explicitly-registered", exception.Message);
         }
 
         [Fact]

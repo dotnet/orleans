@@ -4,13 +4,14 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Azure.Messaging.EventHubs;
+using Azure.Messaging.EventHubs.Producer;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -47,7 +48,7 @@ namespace Orleans.ServiceBus.Providers
         private IEventHubQueueMapper streamQueueMapper;
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
-        private EventHubClient client;
+        private EventHubProducerClient client;
         private ITelemetryProducer telemetryProducer;
 
         /// <summary>
@@ -215,17 +216,17 @@ namespace Orleans.ServiceBus.Providers
         /// Writes a set of events to the queue as a single batch associated with the provided streamId.
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="streamGuid"></param>
-        /// <param name="streamNamespace"></param>
+        /// <param name="streamId"></param>
         /// <param name="events"></param>
         /// <param name="token"></param>
         /// <param name="requestContext"></param>
         /// <returns></returns>
-        public virtual Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
+        public virtual Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
-            EventData eventData = this.dataAdapter.ToQueueMessage(streamGuid, streamNamespace, events, token, requestContext);
-            return this.client.SendAsync(eventData, streamGuid.ToString());
+            EventData eventData = this.dataAdapter.ToQueueMessage(streamId, events, token, requestContext);
+            string partitionKey = this.dataAdapter.GetPartitionKey(streamId);
+            return this.client.SendAsync(new[] { eventData }, new SendEventOptions { PartitionKey = partitionKey });
         }
 
         /// <summary>
@@ -254,11 +255,9 @@ namespace Orleans.ServiceBus.Providers
 
         protected virtual void InitEventHubClient()
         {
-            var connectionStringBuilder = new EventHubsConnectionStringBuilder(this.ehOptions.ConnectionString)
-            {
-                EntityPath = this.ehOptions.Path
-            };
-            this.client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
+            this.client = ehOptions.TokenCredential != null
+                ? new EventHubProducerClient(ehOptions.FullyQualifiedNamespace, ehOptions.Path, ehOptions.TokenCredential)
+                : new EventHubProducerClient(ehOptions.ConnectionString, ehOptions.Path);
         }
 
         /// <summary>
@@ -302,8 +301,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual async Task<string[]> GetPartitionIdsAsync()
         {
-            EventHubRuntimeInformation runtimeInfo = await client.GetRuntimeInformationAsync();
-            return runtimeInfo.PartitionIds;
+            return await client.GetPartitionIdsAsync();
         }
 
         public static EventHubAdapterFactory Create(IServiceProvider services, string name)

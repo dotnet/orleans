@@ -88,7 +88,7 @@ namespace Orleans.CodeGenerator.Utilities
                 return interfaceName;
             }
         }
-        
+
         public static IEnumerable<INamedTypeSymbol> GetDeclaredTypes(this IAssemblySymbol reference)
         {
             foreach (var module in reference.Modules)
@@ -124,9 +124,11 @@ namespace Orleans.CodeGenerator.Utilities
 
         public static bool HasBaseType(this ITypeSymbol typeSymbol, INamedTypeSymbol baseType)
         {
-            if (SymbolEqualityComparer.Default.Equals(baseType, typeSymbol.BaseType)) return true;
-            if (typeSymbol.BaseType is null) return false;
-            return typeSymbol.BaseType.HasBaseType(baseType);
+            for (; typeSymbol != null; typeSymbol = typeSymbol.BaseType)
+            {
+                if (SymbolEqualityComparer.Default.Equals(baseType, typeSymbol)) return true;
+            }
+            return false;
         }
 
         public static bool HasAttribute(this ISymbol symbol, INamedTypeSymbol attributeType)
@@ -173,7 +175,7 @@ namespace Orleans.CodeGenerator.Utilities
             var temp = default(List<AttributeData>);
             foreach (var attr in symbol.GetAttributes())
             {
-                if (!SymbolEqualityComparer.Default.Equals(attr.AttributeClass, attributeType) && !attr.AttributeClass.HasBaseType(attributeType)) continue;
+                if (!attr.AttributeClass.HasBaseType(attributeType)) continue;
 
                 if (temp == null) temp = new List<AttributeData>();
                 temp.Add(attr);
@@ -246,7 +248,7 @@ namespace Orleans.CodeGenerator.Utilities
 
             return results[0];
         }
-        
+
         public static IMethodSymbol Method(this ITypeSymbol type, string name, Func<IMethodSymbol, bool> predicate = null) => type.Member(name, predicate);
 
         public static IMethodSymbol Method(this ITypeSymbol type, string name, params INamedTypeSymbol[] parameters) =>

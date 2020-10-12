@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -21,7 +21,7 @@ namespace Orleans.Runtime
     [Serializable]
     public class DeadlockException : OrleansException
     {
-        internal IEnumerable<Tuple<GrainId, string>> CallChain { get; private set; }
+        internal IEnumerable<GrainId> CallChain { get; private set; }
 
         public DeadlockException() : base("Deadlock between grain calls") {}
 
@@ -29,7 +29,7 @@ namespace Orleans.Runtime
 
         public DeadlockException(string message, Exception innerException) : base(message, innerException) { }
 
-        internal DeadlockException(string message, IList<Tuple<GrainId, string>> callChain)
+        internal DeadlockException(string message, IList<GrainId> callChain)
             : base(message)
         {
             CallChain = callChain;
@@ -40,7 +40,7 @@ namespace Orleans.Runtime
         {
             if (info != null)
             {
-                CallChain = (IEnumerable<Tuple<GrainId, string>>)info.GetValue("CallChain", typeof(IEnumerable<Tuple<GrainId, string>>));
+                CallChain = (IEnumerable<GrainId>)info.GetValue("CallChain", typeof(IEnumerable<GrainId>));
             }
         }
 
@@ -48,7 +48,7 @@ namespace Orleans.Runtime
         {
             if (info != null)
             {
-                info.AddValue("CallChain", this.CallChain, typeof(IEnumerable<Tuple<GrainId, string>>));
+                info.AddValue("CallChain", this.CallChain, typeof(IEnumerable<GrainId>));
             }
 
             base.GetObjectData(info, context);

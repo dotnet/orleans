@@ -4,12 +4,8 @@ namespace Orleans.Runtime.Scheduler
 {
     internal abstract class WorkItemBase : IWorkItem
     {
+        public abstract IGrainContext GrainContext { get; }
 
-        internal protected WorkItemBase()
-        {
-        }
-
-        public ISchedulingContext SchedulingContext { get; set; }
         public TimeSpan TimeSinceQueued 
         {
             get { return Utils.Since(TimeQueued); } 
@@ -23,17 +19,14 @@ namespace Orleans.Runtime.Scheduler
 
         public abstract void Execute();
 
-        public bool IsSystemPriority
-        {
-            get { return SchedulingUtils.IsSystemPriorityContext(this.SchedulingContext); }
-        }
+        public bool IsSystemPriority => this.GrainContext is SystemTarget systemTarget && !systemTarget.IsLowPriority;
 
         public override string ToString()
         {
             return string.Format("[{0} WorkItem Name={1}, Ctx={2}]", 
                 ItemType, 
                 Name ?? string.Empty,
-                SchedulingContext?.ToString() ?? "null"
+                GrainContext?.ToString() ?? "null"
             );
         }
     }

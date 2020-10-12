@@ -82,11 +82,6 @@ namespace Tests.GeoClusterTests
         {
             await DoBasicLogTestGrainTest("TestGrains.LogTestGrainCustomStorage");
         }
-        [SkippableFact]
-        public async Task GsiStorage()
-        {
-            await DoBasicLogTestGrainTest("TestGrains.GsiLogTestGrain");
-        }
 
         private int GetRandom()
         {

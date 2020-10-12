@@ -21,6 +21,7 @@ using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 using Program = OneBoxDeployment.Api.Program;
+using System.Net.Mime;
 
 namespace OneBoxDeployment.IntegrationTests
 {
@@ -120,6 +121,10 @@ namespace OneBoxDeployment.IntegrationTests
         /// </summary>
         public string DefaultIdentityRootUrl { get; set; }
 
+        /// <summary>
+        /// This route can be used to test pipeline exception handling during tests.
+        /// </summary>
+        public const string FaultyRouteUrlFragment = "/internalservererror";
 
         /// <summary>
         /// These are testing only default extra parameters that should not be present in a running application.
@@ -130,15 +135,13 @@ namespace OneBoxDeployment.IntegrationTests
             //This setting creates a route that will always throw an exception. It's injected with a
             //a setting to not to create the route in production. This is built like this also so that
             //there would not be a path to accidentally inject faulty code to production.
-            { ConfigurationKeys.AlwaysFaultyRoute, "/internalservererror" }
+            { ConfigurationKeys.AlwaysFaultyRoute, FaultyRouteUrlFragment }
         };
-
 
         /// <summary>
         /// The test message sink.
         /// </summary>
         public IMessageSink MessageSink { get; }
-
 
         /// <summary>
         /// The in-memory storage of logs in the whole system.
@@ -194,8 +197,8 @@ namespace OneBoxDeployment.IntegrationTests
             var services = new ServiceCollection();
             services.AddTypedHttpClient<FaultyRouteClient>(httpClient =>
             {
-                httpClient.BaseAddress = new Uri(DefaultApiRootUrl);
-                httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+                httpClient.BaseAddress = new Uri(new Uri(DefaultApiRootUrl), FaultyRouteUrlFragment);
+                httpClient.DefaultRequestHeaders.Add("Accept", MediaTypeNames.Application.Json);
                 httpClient.DefaultRequestHeaders.Add("x-correlation-id", "test123");
             })
             .AddHttpMessageHandler(_ => new SecurityHeaderTestMessageHandler());

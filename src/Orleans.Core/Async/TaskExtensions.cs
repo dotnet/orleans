@@ -140,21 +140,21 @@ namespace Orleans.Internal
         
         private static Task<object> TaskFromFaulted(Task task)
         {
-            var completion = new TaskCompletionSource<object>();
+            var completion = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             completion.SetException(task.Exception.InnerExceptions);
             return completion.Task;
         }
 
         private static Task<T> TaskFromFaulted<T>(Task task)
         {
-            var completion = new TaskCompletionSource<T>();
+            var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
             completion.SetException(task.Exception.InnerExceptions);
             return completion.Task;
         }
 
         private static Task<T> TaskFromCanceled<T>()
         {
-            var completion = new TaskCompletionSource<T>();
+            var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
             completion.SetCanceled();
             return completion.Task;
         }
@@ -332,7 +332,7 @@ namespace Orleans.Internal
 
         private static async Task MakeCancellable(Task task, CancellationToken cancellationToken)
         {
-            var tcs = new TaskCompletionSource<object>();
+            var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             using (cancellationToken.Register(() =>
                       tcs.TrySetCanceled(cancellationToken), useSynchronizationContext: false))
             {
@@ -395,7 +395,7 @@ namespace Orleans.Internal
 
         private static async Task<T> MakeCancellable<T>(Task<T> task, CancellationToken cancellationToken)
         {
-            var tcs = new TaskCompletionSource<T>();
+            var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
             using (cancellationToken.Register(() =>
                       tcs.TrySetCanceled(cancellationToken), useSynchronizationContext: false))
             {
@@ -427,7 +427,7 @@ namespace Orleans.Internal
         {
             if (task == null) return Task.FromResult(default(T));
 
-            var resolver = new TaskCompletionSource<T>();
+            var resolver = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             if (task.Status == TaskStatus.RanToCompletion)
             {

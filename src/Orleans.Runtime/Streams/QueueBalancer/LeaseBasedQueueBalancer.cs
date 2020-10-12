@@ -1,17 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.LeaseProviders;
 using Orleans.Runtime;
-using Orleans.Configuration;
 using Orleans.Timers;
-using System.Diagnostics;
-using System.Reflection.Metadata;
-using Orleans.Internal;
 
 namespace Orleans.Streams
 {
@@ -37,12 +34,12 @@ namespace Orleans.Streams
         private readonly LeaseBasedQueueBalancerOptions options;
         private readonly ILeaseProvider leaseProvider;
         private readonly ITimerRegistry timerRegistry;
-        private readonly AsyncSerialExecutor executor;
-        private ReadOnlyCollection<QueueId> allQueues;
-        private List<AcquiredQueue> myQueues;
+        private readonly AsyncSerialExecutor executor = new AsyncSerialExecutor();
+        private int allQueuesCount;
+        private readonly List<AcquiredQueue> myQueues = new List<AcquiredQueue>();
         private IDisposable leaseMaintenanceTimer;
         private IDisposable leaseAquisitionTimer;
-        private IResourceSelector<QueueId> queueSelector;
+        private RoundRobinSelector<QueueId> queueSelector;
         private int responsibility;
         private int leaseOrder;
 
@@ -50,13 +47,11 @@ namespace Orleans.Streams
         /// Constructor
         /// </summary>
         public LeaseBasedQueueBalancer(string name, LeaseBasedQueueBalancerOptions options, ILeaseProvider leaseProvider, ITimerRegistry timerRegistry, IServiceProvider services, ILoggerFactory loggerFactory)
-            : base(services, loggerFactory.CreateLogger($"{nameof(LeaseBasedQueueBalancer)}-{name}"))
+            : base(services, loggerFactory.CreateLogger($"{typeof(LeaseBasedQueueBalancer).FullName}.{name}"))
         {
             this.options = options;
             this.leaseProvider = leaseProvider;
             this.timerRegistry = timerRegistry;
-            this.executor = new AsyncSerialExecutor();
-            this.myQueues = new List<AcquiredQueue>();
         }
 
         public static IStreamQueueBalancer Create(IServiceProvider services, string name)
@@ -75,11 +70,12 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("queueMapper");
             }
-            this.allQueues = new ReadOnlyCollection<QueueId>(queueMapper.GetAllQueues().ToList());
+            var allQueues = queueMapper.GetAllQueues().ToList();
+            this.allQueuesCount = allQueues.Count;
 
             //Selector default to round robin selector now, but we can make a further change to make selector configurable if needed.  Selector algorithm could 
             //be affecting queue balancing stablization time in cluster initializing and auto-scaling
-            this.queueSelector = new RoundRobinSelector<QueueId>(this.allQueues, new Random(this.GetHashCode()));
+            this.queueSelector = new RoundRobinSelector<QueueId>(allQueues, new Random(this.GetHashCode()));
             return base.Initialize(queueMapper);
         }
 
@@ -312,7 +308,7 @@ namespace Orleans.Streams
                 return allRenewed;
             var results = await this.leaseProvider.Renew(this.options.LeaseCategory, this.myQueues.Select(queue => queue.AcquiredLease).ToArray());
             //update myQueues list with successfully renewed leases
-            for (var i = 0; i < results.Count(); i++)
+            for (var i = 0; i < results.Length; i++)
             {
                 AcquireLeaseResult result = results[i];
                 switch (result.StatusCode)
@@ -396,7 +392,6 @@ namespace Orleans.Streams
             // TODO: use heap? - jbragg
             return activeSilos.OrderBy(silo => silo)
                               .Take(overflow)
-                              .ToList()
                               .Contains(base.SiloAddress);
         }
 
@@ -404,8 +399,8 @@ namespace Orleans.Streams
         {
             if (base.Cancellation.IsCancellationRequested) return;
             var activeSiloCount = Math.Max(1, activeSilos.Count);
-            this.responsibility = this.allQueues.Count / activeSiloCount;
-            var overflow = this.allQueues.Count % activeSiloCount;
+            this.responsibility = this.allQueuesCount / activeSiloCount;
+            var overflow = this.allQueuesCount % activeSiloCount;
             if(overflow != 0 && this.AmGreedy(overflow, activeSilos))
             {
                 this.responsibility++;
@@ -414,7 +409,7 @@ namespace Orleans.Streams
             if (this.Logger.IsEnabled(LogLevel.Debug))
             {
                 this.Logger.LogDebug("Updating Responsibilities for {QueueCount} queue over {SiloCount} silos. Need {MinQueueCount} queues, have {MyQueueCount}",
-                    this.allQueues.Count, activeSiloCount, this.responsibility, this.myQueues.Count);
+                    this.allQueuesCount, activeSiloCount, this.responsibility, this.myQueues.Count);
             }
 
             if (this.myQueues.Count < this.responsibility && this.leaseAquisitionTimer == null)

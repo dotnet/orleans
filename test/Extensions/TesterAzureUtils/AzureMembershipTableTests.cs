@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.AzureUtils;
+using Orleans.Clustering.AzureStorage;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.MembershipService;
@@ -35,20 +36,15 @@ namespace Tester.AzureUtils
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             TestUtils.CheckForAzureStorage();
-            var options = new AzureStorageClusteringOptions()
-            {
-                MaxStorageBusyRetries = 3,
-                ConnectionString = this.connectionString,
-            };
+            var options = new AzureStorageClusteringOptions();
+            options.ConfigureTestDefaults();
             return new AzureBasedMembershipTable(loggerFactory, Options.Create(options), this.clusterOptions);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
-            var options = new AzureStorageGatewayOptions()
-            {
-                ConnectionString = this.connectionString
-            };
+            var options = new AzureStorageGatewayOptions();
+            options.ConfigureTestDefaults();
             return new AzureGatewayListProvider(loggerFactory, Options.Create(options), this.clusterOptions, this.gatewayOptions);
         }
 

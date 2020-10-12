@@ -8,25 +8,6 @@ namespace Orleans.Hosting
 {
     public static partial class OrleansConnectionSecurityHostingExtensions
     {
-        public static ISiloHostBuilder UseMutualTls(
-            this ISiloHostBuilder builder,
-            X509Certificate2 certificate,
-            Action<TlsOptions> configureOptions)
-        {
-            return builder.UseTls(options =>
-            {
-                options.LocalCertificate = certificate;
-                options.RemoteCertificateMode = RemoteCertificateMode.RequireCertificate;
-                options.RemoteCertificateValidation = ValidateClientCertificate;
-                configureOptions(options);
-            });
-
-            bool ValidateClientCertificate(X509Certificate2 clientCertificate, X509Chain certificateChain, SslPolicyErrors sslPolicyErrors)
-            {
-                return clientCertificate.Equals(certificate);
-            }
-        }
-
         /// <summary>
         /// Configures TLS.
         /// </summary>
@@ -45,7 +26,7 @@ namespace Orleans.Hosting
             StoreLocation location,
             Action<TlsOptions> configureOptions)
         {
-            if (configureOptions == null)
+            if (configureOptions is null)
             {
                 throw new ArgumentNullException(nameof(configureOptions));
             }
@@ -67,14 +48,19 @@ namespace Orleans.Hosting
             X509Certificate2 certificate,
             Action<TlsOptions> configureOptions)
         {
-            if (certificate == null)
+            if (certificate is null)
             {
                 throw new ArgumentNullException(nameof(certificate));
             }
 
-            if (configureOptions == null)
+            if (configureOptions is null)
             {
                 throw new ArgumentNullException(nameof(configureOptions));
+            }
+
+            if (!certificate.HasPrivateKey)
+            {
+                TlsConnectionBuilderExtensions.ThrowNoPrivateKey(certificate, nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -94,9 +80,14 @@ namespace Orleans.Hosting
             this ISiloHostBuilder builder,
             X509Certificate2 certificate)
         {
-            if (certificate == null)
+            if (certificate is null)
             {
                 throw new ArgumentNullException(nameof(certificate));
+            }
+
+            if (!certificate.HasPrivateKey)
+            {
+                TlsConnectionBuilderExtensions.ThrowNoPrivateKey(certificate, nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -115,7 +106,7 @@ namespace Orleans.Hosting
             this ISiloHostBuilder builder,
             Action<TlsOptions> configureOptions)
         {
-            if (configureOptions == null)
+            if (configureOptions is null)
             {
                 throw new ArgumentNullException(nameof(configureOptions));
             }
@@ -125,6 +116,11 @@ namespace Orleans.Hosting
             if (options.LocalCertificate is null && options.LocalServerCertificateSelector is null)
             {
                 throw new InvalidOperationException("No certificate specified");
+            }
+
+            if (options.LocalCertificate is X509Certificate2 certificate && !certificate.HasPrivateKey)
+            {
+                TlsConnectionBuilderExtensions.ThrowNoPrivateKey(certificate, $"{nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)}");
             }
 
             return builder.Configure<SiloConnectionOptions>(connectionOptions =>

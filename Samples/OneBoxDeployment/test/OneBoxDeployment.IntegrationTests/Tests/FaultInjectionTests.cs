@@ -37,16 +37,14 @@ namespace OneBoxDeployment.IntegrationTests.Tests
         [Fact]
         public async Task DataApiUnhandledExceptionsReturnHttp500WithJsonContent()
         {
-            //string faultyRoute = Fixture.DefaultExtraParameters[ConfigurationKeys.AlwaysFaultyRoute];
-            //var supposedlyFaultyRouteValue = await ApiClient.GetAsync(faultyRoute).ConfigureAwait(false);
             var supposedlyFaultyRouteValue = await FaultClientClient.CallFaultyRouteAsync().ConfigureAwait(false);
 
             Assert.Equal(HttpStatusCode.InternalServerError, supposedlyFaultyRouteValue.StatusCode);
-            Assert.Equal("application/problem+json", supposedlyFaultyRouteValue.Content.Headers.ContentType.MediaType);
+            Assert.Equal(MimeTypes.ProblemDetailJsonMimeType, supposedlyFaultyRouteValue.Content.Headers.ContentType.MediaType);
 
-            var response = await supposedlyFaultyRouteValue.Content.DeserializeAsync<ValidationProblemDetails>().ConfigureAwait(false);
+            var response = await supposedlyFaultyRouteValue.Content.DeserializeAsync<ProblemDetails>().ConfigureAwait(false);
             Assert.Equal((int)HttpStatusCode.InternalServerError, response.Status);
-            Assert.Equal("Internal server error", response.Title);
+            Assert.Equal("Internal Server Error", response.Title);
             Assert.StartsWith("urn:oneboxdeployment:error", response.Instance);
         }
     }

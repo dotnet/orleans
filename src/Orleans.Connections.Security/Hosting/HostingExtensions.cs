@@ -1,4 +1,5 @@
 using System;
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -12,7 +13,7 @@ namespace Orleans
             this IConnectionBuilder builder,
             TlsOptions options)
         {
-            if (options == null)
+            if (options is null)
             {
                 throw new ArgumentNullException(nameof(options));
             }
@@ -29,7 +30,7 @@ namespace Orleans
             this IConnectionBuilder builder,
             TlsOptions options)
         {
-            if (options == null)
+            if (options is null)
             {
                 throw new ArgumentNullException(nameof(options));
             }
@@ -40,6 +41,11 @@ namespace Orleans
                 var middleware = new TlsClientConnectionMiddleware(next, options, loggerFactory);
                 return middleware.OnConnectionAsync;
             });
+        }
+
+        internal static void ThrowNoPrivateKey(X509Certificate2 certificate, string parameterName)
+        {
+            throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", parameterName);
         }
     }
 }

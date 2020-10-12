@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>TestVersionGrains</RootNamespace>
     <AssemblyName>TestVersionGrains</AssemblyName>
@@ -8,6 +8,10 @@
 
   <ItemGroup>
     <Compile Include="$(SourceRoot)test\Grains\TestVersionGrains\VersionGrainsSiloBuilderfactory.cs" Link="VersionGrainsSiloBuilderfactory.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Diagnostics.EventLog" Version="$(SystemDiagnosticsEventLogVersion)" />
   </ItemGroup>
 
   <ItemGroup>

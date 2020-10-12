@@ -11,6 +11,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
+using Orleans.Streams;
 using TestExtensions;
 using UnitTests.Persistence;
 using UnitTests.StorageTests.Relational;
@@ -34,8 +35,12 @@ namespace AWSUtils.Tests.StorageTests
             this.output = output;
             this.fixture = fixture;
             providerCfgProps["DataConnectionString"] = $"Service={AWSTestConstants.Service}";
-            var clusterOptions = fixture.Services.GetRequiredService<IOptions<ClusterOptions>>();
-            this.providerRuntime = new ClientProviderRuntime(fixture.InternalGrainFactory, fixture.Services, NullLoggerFactory.Instance, clusterOptions);
+            this.providerRuntime = new ClientProviderRuntime(
+                fixture.InternalGrainFactory,
+                fixture.Services,
+                NullLoggerFactory.Instance,
+                fixture.Services.GetRequiredService<ImplicitStreamSubscriberTable>(),
+                fixture.Services.GetRequiredService<ClientGrainContext>());
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("DynamoDB")]
@@ -93,7 +98,7 @@ namespace AWSUtils.Tests.StorageTests
 
             var grainState = TestStoreGrainState.NewRandomState(stringLength);
             EnsureEnvironmentSupportsState(grainState);
-            var grainId = GrainId.NewId();
+            var grainId = GrainId.Create("test", Guid.NewGuid().ToString("N"));
 
             var store = await InitDynamoDBGrainStorage(useJsonForWrite);
 
@@ -121,7 +126,7 @@ namespace AWSUtils.Tests.StorageTests
             var grainState = TestStoreGrainState.NewRandomState(stringLength);
             EnsureEnvironmentSupportsState(grainState);
 
-            var grainId = GrainId.NewId();
+            var grainId = GrainId.Create("test", Guid.NewGuid().ToString("N"));
 
             var store = await InitDynamoDBGrainStorage(useJsonForFirstWrite);
 
@@ -166,8 +171,8 @@ namespace AWSUtils.Tests.StorageTests
 
         private async Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(DynamoDBStorageOptions options)
         {
-            DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(this.providerRuntime.ServiceProvider, options);
-            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider, new LifecycleSubject(null));
+            DynamoDBGrainStorage store = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(this.providerRuntime.ServiceProvider, "StorageProviderTests", options);
+            ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider, NullLogger<SiloLifecycleSubject>.Instance);
             store.Participate(lifecycle);
             await lifecycle.OnStart();
             return store;
@@ -184,9 +189,9 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store,
-            GrainState<TestStoreGrainState> grainState = null, GrainId grainId = null)
+            GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
         {
-            var reference = this.fixture.InternalGrainFactory.GetGrain(grainId ?? GrainId.NewId());
+            var reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId);
 
             if (grainState == null)
             {
@@ -209,9 +214,9 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
-            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = null)
+            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
         {
-            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(grainId ?? GrainId.NewId());
+            GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId);
 
             if (grainState == null)
             {
@@ -241,9 +246,9 @@ namespace AWSUtils.Tests.StorageTests
         }
 
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteClearRead(string grainTypeName,
-            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = null)
+            IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
         {
-            GrainReference reference = this.fixture.InternalGrainFactory.GetGrain(grainId ?? GrainId.NewId());
+            GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId);
 
             if (grainState == null)
             {

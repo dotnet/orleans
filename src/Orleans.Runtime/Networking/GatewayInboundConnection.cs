@@ -13,7 +13,6 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly MessageCenter messageCenter;
         private readonly ILocalSiloDetails siloDetails;
-        private readonly MultiClusterOptions multiClusterOptions;
         private readonly ConnectionOptions connectionOptions;
         private readonly Gateway gateway;
         private readonly OverloadDetector overloadDetector;
@@ -26,7 +25,6 @@ namespace Orleans.Runtime.Messaging
             Gateway gateway,
             OverloadDetector overloadDetector,
             ILocalSiloDetails siloDetails,
-            IOptions<MultiClusterOptions> multiClusterOptions,
             ConnectionOptions connectionOptions,
             MessageCenter messageCenter,
             ConnectionCommon connectionShared)
@@ -37,7 +35,6 @@ namespace Orleans.Runtime.Messaging
             this.overloadDetector = overloadDetector;
             this.siloDetails = siloDetails;
             this.messageCenter = messageCenter;
-            this.multiClusterOptions = multiClusterOptions.Value;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.myAddress = siloDetails.SiloAddress;
             this.MessageReceivedCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
@@ -57,12 +54,6 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            // return address translation for geo clients (replace sending address cli/* with gcl/*)
-            if (this.multiClusterOptions.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
-            {
-                msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.siloDetails.ClusterId);
-            }
-
             // Are we overloaded?
             if (this.overloadDetector.Overloaded)
             {
@@ -80,13 +71,14 @@ namespace Orleans.Runtime.Messaging
             {
                 // reroute via Dispatcher
                 msg.TargetSilo = null;
-                msg.TargetActivation = null;
+                msg.TargetActivation = default;
                 msg.ClearTargetAddress();
 
-                if (msg.TargetGrain.IsSystemTarget)
+                if (SystemTargetGrainId.TryParse(msg.TargetGrain, out var systemTargetId))
                 {
                     msg.TargetSilo = this.myAddress;
-                    msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, this.myAddress);
+                    msg.TargetGrain = systemTargetId.WithSiloAddress(this.myAddress).GrainId;
+                    msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 
                 MessagingStatisticsGroup.OnMessageReRoute(msg);
@@ -96,6 +88,13 @@ namespace Orleans.Runtime.Messaging
             {
                 // send directly
                 msg.TargetSilo = targetAddress;
+
+                if (SystemTargetGrainId.TryParse(msg.TargetGrain, out var systemTargetId))
+                {
+                    msg.TargetGrain = systemTargetId.WithSiloAddress(targetAddress).GrainId;
+                    msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
+                }
+
                 this.messageCenter.SendMessage(msg);
             }
         }
@@ -113,35 +112,14 @@ namespace Orleans.Runtime.Messaging
                     this.myAddress);
             }
 
-            if (grainId.Equals(Constants.SiloDirectConnectionId))
+            if (!ClientGrainId.TryParse(grainId, out var clientId))
             {
-                throw new InvalidOperationException($"Unexpected direct silo connection on proxy endpoint from {siloAddress?.ToString() ?? "unknown silo"}");
-            }
-
-            // refuse clients that are connecting to the wrong cluster
-            if (grainId.Category == UniqueKey.Category.GeoClient)
-            {
-                if (grainId.Key.ClusterId != this.siloDetails.ClusterId)
-                {
-                    var message = string.Format(
-                            "Refusing connection by client {0} because of cluster id mismatch: client={1} silo={2}",
-                            grainId, grainId.Key.ClusterId, this.siloDetails.ClusterId);
-                    this.Log.Error(ErrorCode.GatewayAcceptor_WrongClusterId, message);
-                    throw new InvalidOperationException(message);
-                }
-            }
-            else
-            {
-                //convert handshake cliendId to a GeoClient ID 
-                if (this.multiClusterOptions.HasMultiClusterNetwork)
-                {
-                    grainId = GrainId.NewClientId(grainId.PrimaryKey, this.siloDetails.ClusterId);
-                }
+                throw new InvalidOperationException($"Unexpected connection id {grainId} on proxy endpoint from {siloAddress?.ToString() ?? "unknown silo"}");
             }
 
             try
             {
-                this.gateway.RecordOpenedConnection(this, grainId);
+                this.gateway.RecordOpenedConnection(this, clientId);
                 await base.RunInternal();
             }
             finally

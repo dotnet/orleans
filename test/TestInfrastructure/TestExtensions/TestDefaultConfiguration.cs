@@ -26,9 +26,24 @@ namespace TestExtensions
             }
         }
 
+        public static bool UseAadAuthentication
+        {
+            get
+            {
+                bool.TryParse(defaultConfiguration[nameof(UseAadAuthentication)], out var value);
+                return value;
+            }
+        }
+
+        public static Uri TableEndpoint => new Uri(defaultConfiguration[nameof(TableEndpoint)]);
+        public static string TableResourceId => defaultConfiguration[nameof(TableResourceId)];
+        public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]);
+        public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]);
         public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
+        public static string EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
+        public static string RedisConnectionString => defaultConfiguration[nameof(RedisConnectionString)];
 
         public static bool GetValue(string key, out string value)
         {

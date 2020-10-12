@@ -27,7 +27,6 @@ namespace UnitTests.CatalogTests
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.Configure<SiloMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromMinutes(1));
-                hostBuilder.Configure<SchedulingOptions>(options => options.MaxActiveThreads = 1);
             }
         }
 

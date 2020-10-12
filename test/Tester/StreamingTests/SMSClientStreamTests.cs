@@ -6,7 +6,6 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.StreamingTests;
@@ -20,11 +19,16 @@ namespace Tester.StreamingTests
         private const string SMSStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "SMSDeactivationTestsNamespace";
         private readonly ITestOutputHelper output;
-        private readonly ClientStreamTestRunner runner;
+        private ClientStreamTestRunner runner;
 
         public SMSClientStreamTests(ITestOutputHelper output)
         {
             this.output = output;
+        }
+
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 

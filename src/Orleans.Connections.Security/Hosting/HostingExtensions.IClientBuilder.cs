@@ -26,7 +26,7 @@ namespace Orleans
             StoreLocation location,
             Action<TlsOptions> configureOptions)
         {
-            if (configureOptions == null)
+            if (configureOptions is null)
             {
                 throw new ArgumentNullException(nameof(configureOptions));
             }
@@ -48,14 +48,19 @@ namespace Orleans
             X509Certificate2 certificate,
             Action<TlsOptions> configureOptions)
         {
-            if (certificate == null)
+            if (certificate is null)
             {
                 throw new ArgumentNullException(nameof(certificate));
             }
 
-            if (configureOptions == null)
+            if (configureOptions is null)
             {
                 throw new ArgumentNullException(nameof(configureOptions));
+            }
+
+            if (!certificate.HasPrivateKey)
+            {
+                TlsConnectionBuilderExtensions.ThrowNoPrivateKey(certificate, nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -75,9 +80,14 @@ namespace Orleans
             this IClientBuilder builder,
             X509Certificate2 certificate)
         {
-            if (certificate == null)
+            if (certificate is null)
             {
                 throw new ArgumentNullException(nameof(certificate));
+            }
+
+            if (!certificate.HasPrivateKey)
+            {
+                TlsConnectionBuilderExtensions.ThrowNoPrivateKey(certificate, nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -96,16 +106,21 @@ namespace Orleans
             this IClientBuilder builder,
             Action<TlsOptions> configureOptions)
         {
-            if (configureOptions == null)
+            if (configureOptions is null)
             {
                 throw new ArgumentNullException(nameof(configureOptions));
             }
 
             var options = new TlsOptions();
             configureOptions(options);
-            if (options.LocalCertificate is null && options.LocalServerCertificateSelector is null)
+            if (options.LocalCertificate is null && options.ClientCertificateMode == RemoteCertificateMode.RequireCertificate)
             {
                 throw new InvalidOperationException("No certificate specified");
+            }
+
+            if (options.LocalCertificate is X509Certificate2 certificate && !certificate.HasPrivateKey)
+            {
+                TlsConnectionBuilderExtensions.ThrowNoPrivateKey(certificate, $"{nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)}");
             }
 
             return builder.Configure<ClientConnectionOptions>(connectionOptions =>

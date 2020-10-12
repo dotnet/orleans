@@ -221,10 +221,18 @@ namespace Orleans.TestingHost
                     {
                         int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
                         int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
+                        bool gatewayPerSilo = bool.Parse(configuration[nameof(TestClusterOptions.GatewayPerSilo)]);
 
-                        options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
-                            .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
-                            .ToList();
+                        if (gatewayPerSilo)
+                        {
+                            options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
+                                .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
+                                .ToList();
+                        }
+                        else
+                        {
+                            options.Gateways = new List<Uri> { new IPEndPoint(IPAddress.Loopback, baseGatewayPort).ToGatewayUri() };
+                        }
                     };
                 if (configureOptions != null)
                 {

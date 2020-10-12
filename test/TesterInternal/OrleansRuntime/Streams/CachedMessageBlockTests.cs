@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Streams;
 using Xunit;
 
@@ -20,8 +21,7 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private class TestBatchContainer : IBatchContainer
         {
-            public Guid StreamGuid { get; set; }
-            public string StreamNamespace => null;
+            public StreamId StreamId { get; set; }
             public StreamSequenceToken SequenceToken { get; set; }
 
             public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
@@ -33,11 +33,6 @@ namespace UnitTests.OrleansRuntime.Streams
             {
                 throw new NotImplementedException();
             }
-
-            public bool ShouldDeliver(IStreamIdentity stream, object filterData, StreamFilterPredicate shouldReceiveFunc)
-            {
-                throw new NotImplementedException();
-            }
         }
 
         private class TestCacheDataAdapter : ICacheDataAdapter
@@ -46,7 +41,7 @@ namespace UnitTests.OrleansRuntime.Streams
             {
                 return new TestBatchContainer()
                 {
-                    StreamGuid = cachedMessage.StreamGuid,
+                    StreamId = cachedMessage.StreamId,
                     SequenceToken = new EventSequenceToken(cachedMessage.SequenceNumber, cachedMessage.EventIndex)
                 };
             }
@@ -59,9 +54,9 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
         {
-            IStreamIdentity streamIdentity = new StreamIdentity(queueMessage.StreamGuid, null);
+            var streamId = StreamId.Create(null, queueMessage.StreamGuid);
             StreamSequenceToken sequenceToken = queueMessage.SequenceToken;
-            return new StreamPosition(streamIdentity, sequenceToken);
+            return new StreamPosition(streamId, sequenceToken);
         }
 
         private CachedMessage QueueMessageToCachedMessage(TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
@@ -69,7 +64,7 @@ namespace UnitTests.OrleansRuntime.Streams
             StreamPosition streamPosition = GetStreamPosition(queueMessage);
             return new CachedMessage
             {
-                StreamGuid = streamPosition.StreamIdentity.Guid,
+                StreamId = streamPosition.StreamId,
                 SequenceNumber = queueMessage.SequenceToken.SequenceNumber,
                 EventIndex = queueMessage.SequenceToken.EventIndex,
             };
@@ -182,13 +177,13 @@ namespace UnitTests.OrleansRuntime.Streams
 
             // get index of first stream
             int streamIndex;
-            Assert.True(block.TryFindFirstMessage(streams[0], dataAdapter, out streamIndex));
+            Assert.True(block.TryFindFirstMessage(StreamId.Create(streams[0]), dataAdapter, out streamIndex));
             Assert.Equal(0, streamIndex);
             Assert.Equal(0, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
 
             // find stream1 messages
             int iteration = 1;
-            while (block.TryFindNextMessage(streamIndex + 1, streams[0], dataAdapter, out streamIndex))
+            while (block.TryFindNextMessage(streamIndex + 1, StreamId.Create(streams[0]), dataAdapter, out streamIndex))
             {
                 Assert.Equal(iteration * 2, streamIndex);
                 Assert.Equal(iteration * 4, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
@@ -197,13 +192,13 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal(iteration, TestBlockSize / 2);
 
             // get index of first stream
-            Assert.True(block.TryFindFirstMessage(streams[1], dataAdapter, out streamIndex));
+            Assert.True(block.TryFindFirstMessage(StreamId.Create(streams[1]), dataAdapter, out streamIndex));
             Assert.Equal(1, streamIndex);
             Assert.Equal(2, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);
 
             // find stream1 messages
             iteration = 1;
-            while (block.TryFindNextMessage(streamIndex + 1, streams[1], dataAdapter, out streamIndex))
+            while (block.TryFindNextMessage(streamIndex + 1, StreamId.Create(streams[1]), dataAdapter, out streamIndex))
             {
                 Assert.Equal(iteration * 2 + 1, streamIndex);
                 Assert.Equal(iteration * 4 + 2, block.GetSequenceToken(streamIndex, dataAdapter).SequenceNumber);

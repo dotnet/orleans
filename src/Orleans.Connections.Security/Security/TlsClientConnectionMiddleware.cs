@@ -1,9 +1,6 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.IO.Pipelines;
 using System.Net.Security;
-using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,12 +28,11 @@ namespace Orleans.Connections.Security
             _next = next;
 
             // capture the certificate now so it can't be switched after validation
-            _certificate = options.LocalCertificate;
+            _certificate = ValidateCertificate(options.LocalCertificate, options.ClientCertificateMode);
 
-            EnsureCertificateIsAllowedForClientAuth(_certificate);
 
             _options = options;
-            _logger = loggerFactory?.CreateLogger<TlsServerConnectionMiddleware>();
+            _logger = loggerFactory?.CreateLogger<TlsClientConnectionMiddleware>();
         }
 
         public Task OnConnectionAsync(ConnectionContext context)
@@ -119,7 +115,7 @@ namespace Orleans.Connections.Security
                 {
                     var sslOptions = new TlsClientAuthenticationOptions
                     {
-                        ClientCertificates = new X509CertificateCollection(new[] { _certificate }),
+                        ClientCertificates = _certificate == null ? null : new X509CertificateCollection { _certificate },
                         EnabledSslProtocols = _options.SslProtocols,
                     };
 
@@ -135,9 +131,9 @@ namespace Orleans.Connections.Security
                         sslOptions.CertificateRevocationCheckMode == X509RevocationMode.Online);
 #endif
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
-                    _logger?.LogDebug(2, "Authentication timed out");
+                    _logger?.LogWarning(2, ex, "Authentication timed out");
 #if NETCOREAPP
                     await sslStream.DisposeAsync();
 #else
@@ -145,9 +141,9 @@ namespace Orleans.Connections.Security
 #endif
                     return;
                 }
-                catch (Exception ex) when (ex is IOException || ex is AuthenticationException)
+                catch (Exception ex)
                 {
-                    _logger?.LogDebug(1, ex, "Authentication failed");
+                    _logger?.LogWarning(1, ex, "Authentication failed: {Exception}", ex);
 #if NETCOREAPP
                     await sslStream.DisposeAsync();
 #else
@@ -199,8 +195,32 @@ namespace Orleans.Connections.Security
             }
         }
 
+        private static X509Certificate2 ValidateCertificate(X509Certificate2 certificate, RemoteCertificateMode mode)
+        {
+            switch (mode)
+            {
+                case RemoteCertificateMode.NoCertificate:
+                    return null;
+                case RemoteCertificateMode.AllowCertificate:
+                    //if certificate exists but can not be used for client authentication.
+                    if (certificate != null && CertificateLoader.IsCertificateAllowedForClientAuth(certificate))
+                        return certificate;
+                    return null;
+                case RemoteCertificateMode.RequireCertificate:
+                    EnsureCertificateIsAllowedForClientAuth(certificate);
+                    return certificate;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
+            }
+        }
+
         protected static void EnsureCertificateIsAllowedForClientAuth(X509Certificate2 certificate)
         {
+            if (certificate is null)
+            {
+                throw new InvalidOperationException("No certificate provided for client authentication.");
+            }
+
             if (!CertificateLoader.IsCertificateAllowedForClientAuth(certificate))
             {
                 throw new InvalidOperationException($"Invalid client certificate for client authentication: {certificate.Thumbprint}");

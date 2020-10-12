@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Generator
@@ -14,7 +15,7 @@ namespace Orleans.Providers.Streams.Generator
     internal class SimpleGenerator : IStreamGenerator
     {
         private SimpleGeneratorOptions options;
-        private Guid streamGuid;
+        private StreamId streamId;
         private int sequenceId;
 
         public void Configure(IServiceProvider serviceProvider, IStreamGeneratorConfig generatorConfig)
@@ -26,7 +27,7 @@ namespace Orleans.Providers.Streams.Generator
             }
             options = cfg;
             sequenceId = 0;
-            streamGuid = Guid.NewGuid();
+            streamId = StreamId.Create(options.StreamNamespace, Guid.NewGuid());
         }
 
         /// <summary>
@@ -65,7 +66,7 @@ namespace Orleans.Providers.Streams.Generator
                         ? GeneratedEvent.GeneratedEventType.Fill
                         : GeneratedEvent.GeneratedEventType.Report
             };
-            batch = new GeneratedBatchContainer(streamGuid, this.options.StreamNamespace, evt, new EventSequenceTokenV2(sequenceId));
+            batch = new GeneratedBatchContainer(streamId, evt, new EventSequenceTokenV2(sequenceId));
             return true;
         }
     }

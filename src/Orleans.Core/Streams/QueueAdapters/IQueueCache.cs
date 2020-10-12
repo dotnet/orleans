@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
@@ -21,10 +22,10 @@ namespace Orleans.Streams
         /// Acquire a stream message cursor.  This can be used to retrieve messages from the
         ///   cache starting at the location indicated by the provided token.
         /// </summary>
-        /// <param name="streamIdentity"></param>
+        /// <param name="streamId"></param>
         /// <param name="token"></param>
         /// <returns></returns>
-        IQueueCacheCursor GetCacheCursor(IStreamIdentity streamIdentity, StreamSequenceToken token);
+        IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken token);
 
         /// <summary>
         /// Returns true if this cache is under pressure.

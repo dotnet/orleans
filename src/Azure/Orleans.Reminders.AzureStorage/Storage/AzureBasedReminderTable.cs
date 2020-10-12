@@ -5,12 +5,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
+using Orleans.Reminders.AzureStorage;
 
 namespace Orleans.Runtime.ReminderService
 {
     public class AzureBasedReminderTable : IReminderTable
     {
-        private readonly IGrainReferenceConverter grainReferenceConverter;
+        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly ClusterOptions clusterOptions;
@@ -18,7 +19,7 @@ namespace Orleans.Runtime.ReminderService
         private RemindersTableManager remTableManager;
 
         public AzureBasedReminderTable(
-            IGrainReferenceConverter grainReferenceConverter,
+            GrainReferenceKeyStringConverter grainReferenceConverter,
             ILoggerFactory loggerFactory,
             IOptions<ClusterOptions> clusterOptions,
             IOptions<AzureTableReminderStorageOptions> storageOptions)
@@ -33,7 +34,10 @@ namespace Orleans.Runtime.ReminderService
         public async Task Init()
         {
             this.remTableManager = await RemindersTableManager.GetManager(
-                this.clusterOptions.ServiceId, this.clusterOptions.ClusterId, this.storageOptions.ConnectionString, this.storageOptions.TableName, this.loggerFactory);
+                this.clusterOptions.ServiceId,
+                this.clusterOptions.ClusterId,
+                this.loggerFactory,
+                options: this.storageOptions);
         }
 
         private ReminderTableData ConvertFromTableEntryList(IEnumerable<Tuple<ReminderTableEntry, string>> entries)
@@ -60,7 +64,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 return new ReminderEntry
                 {
-                    GrainRef = this.grainReferenceConverter.GetGrainFromKeyString(tableEntry.GrainReference),
+                    GrainRef = this.grainReferenceConverter.FromKeyString(tableEntry.GrainReference),
                     ReminderName = tableEntry.ReminderName,
                     StartAt = LogFormatter.ParseDate(tableEntry.StartAt),
                     Period = TimeSpan.Parse(tableEntry.Period),

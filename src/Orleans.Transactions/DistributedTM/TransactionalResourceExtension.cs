@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -12,9 +12,9 @@ namespace Orleans.Transactions
         private readonly ResourceFactoryRegistry<ITransactionalResource> factories;
         private readonly Dictionary<string, ITransactionalResource> resources;
 
-        public TransactionalResourceExtension(IGrainActivationContext context)
+        public TransactionalResourceExtension(IGrainContextAccessor contextAccessor)
         {
-            this.factories = context.GetResourceFactoryRegistry<ITransactionalResource>();
+            this.factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionalResource>();
             this.resources = new Dictionary<string, ITransactionalResource>();
         }
 

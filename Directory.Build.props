@@ -43,34 +43,28 @@
   <!-- Shared Package Versions -->
   <PropertyGroup>
     <!-- System packages -->
-    <SystemRuntimeVersion>4.3.1</SystemRuntimeVersion>
     <SystemDataSqlClientVersion>4.8.0</SystemDataSqlClientVersion>
-    <SystemDataCommonVersion>4.3.0</SystemDataCommonVersion>
     <SystemDiagnosticsEventLogVersion>4.7.0</SystemDiagnosticsEventLogVersion>
-    <SystemConfigurationConfigurationManagerVersion>4.7.0</SystemConfigurationConfigurationManagerVersion>
     <SystemCollectionsImmutableVersion>1.7.0</SystemCollectionsImmutableVersion>
     <SystemRuntimeCompilerServicesUnsafeVersion>4.7.0</SystemRuntimeCompilerServicesUnsafeVersion>
-    <SystemNetHttpVersion>4.3.4</SystemNetHttpVersion>
+    <SystemDiagnosticsPerformanceCounterVersion>4.7.0</SystemDiagnosticsPerformanceCounterVersion>
     <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
     <SystemReflectionMetadataVersion>1.8.0</SystemReflectionMetadataVersion>
-    <SystemReflectionTypeExtensionsVersion>4.7.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.5.0</SystemValueTupleVersion>
     <SystemReflectionEmitVersion>4.7.0</SystemReflectionEmitVersion>
-    <SystemThreadingTasksExtensionsVersion>4.5.3</SystemThreadingTasksExtensionsVersion>
     <SystemThreadingChannelsVersion>4.7.0</SystemThreadingChannelsVersion>
-    <SystemBuffersVersion>4.5.0</SystemBuffersVersion>
-    <SystemMemoryVersion>4.5.3</SystemMemoryVersion>
     <SystemIOPipelinesVersion>4.7.0</SystemIOPipelinesVersion>
     <SystemCodeDomVersion>4.7.0</SystemCodeDomVersion>
-    <SystemSecurityPermissionsVersion>4.7.0</SystemSecurityPermissionsVersion>
     <SystemDiagnosticsDiagnosticsSourceVersion>4.7.0</SystemDiagnosticsDiagnosticsSourceVersion>
+    <SystemSecurityCryptographyVersion>4.7.0</SystemSecurityCryptographyVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>16.4.0</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>3.4.0</MicrosoftCodeAnalysisVersion>
-    <MicrosoftWin32RegistryVersion>4.7.0</MicrosoftWin32RegistryVersion>
-    <MicrosoftBclAsyncInterfacesVersion>1.1.0</MicrosoftBclAsyncInterfacesVersion>
+    <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
+    <MicrosoftBclAsyncInterfacesVersion>1.1.1</MicrosoftBclAsyncInterfacesVersion>
     <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.0</MicrosoftNETFrameworkReferenceAssembliesVersion>
+    <MicrosoftBclHashCodeVersion>1.0.0</MicrosoftBclHashCodeVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
     <MicrosoftExtensionsConfigurationBinderVersion>3.0.0</MicrosoftExtensionsConfigurationBinderVersion>
@@ -80,16 +74,19 @@
     <MicrosoftExtensionsDependencyInjectionVersion>3.0.0</MicrosoftExtensionsDependencyInjectionVersion>
     <MicrosoftExtensionsDependencyModelVersion>3.0.0</MicrosoftExtensionsDependencyModelVersion>
     <MicrosoftExtensionsLoggingVersion>3.0.0</MicrosoftExtensionsLoggingVersion>
-    <MicrosoftExtensionsOptionsConfigurationExtensionsVersion>3.0.0</MicrosoftExtensionsOptionsConfigurationExtensionsVersion>
+    <MicrosoftExtensionsObjectPoolVersion>3.0.0</MicrosoftExtensionsObjectPoolVersion>
     <MicrosoftExtensionsOptionsVersion>3.0.0</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsHttpVersion>3.0.0</MicrosoftExtensionsHttpVersion>
     <MicrosoftExtensionsHostingAbstractionsVersion>3.0.0</MicrosoftExtensionsHostingAbstractionsVersion>
     <MicrosoftExtensionsHostingVersion>3.0.0</MicrosoftExtensionsHostingVersion>
 
     <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
     <MicrosoftAzureCosmosTableVersion>1.0.5</MicrosoftAzureCosmosTableVersion>
-    <MicrosoftAzureEventHubsVersion>4.1.0</MicrosoftAzureEventHubsVersion>
-    <MicrosoftAzureStorageBlobVersion>11.1.0</MicrosoftAzureStorageBlobVersion>
-    <MicrosoftAzureStorageQueueVersion>11.1.0</MicrosoftAzureStorageQueueVersion>
+    <AzureCoreVersion>1.3.0</AzureCoreVersion>
+    <AzureIdentityVersion>1.1.1</AzureIdentityVersion>
+    <AzureMessagingEventHubs>5.1.0</AzureMessagingEventHubs>
+    <AzureStorageBlobsVersion>12.4.4</AzureStorageBlobsVersion>
+    <AzureStorageQueuesVersion>12.3.2</AzureStorageQueuesVersion>
     <MicrosoftDataSQLiteVersion>3.1.0</MicrosoftDataSQLiteVersion>
     <MicrosoftServiceFabricServicesVersion>3.4.664</MicrosoftServiceFabricServicesVersion>
 
@@ -105,11 +102,13 @@
     <ProtobufNetVersion>2.3.7</ProtobufNetVersion>
     <MySqlDataVersion>8.0.18</MySqlDataVersion>
     <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
-    <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
+    <NewtonsoftJsonVersion>11.0.1</NewtonsoftJsonVersion>
     <NpgsqlVersion>3.1.9</NpgsqlVersion>
     <NSubstituteVersion>4.2.0</NSubstituteVersion>
     <NSubstituteAnalyzersCSharpVersion>1.0.10</NSubstituteAnalyzersCSharpVersion>
     <ZooKeeperNetExVersion>3.4.12.1</ZooKeeperNetExVersion>
+    <StackExchangeRedis>2.0.601</StackExchangeRedis>
+    <KubernetesClientVersion>2.0.29</KubernetesClientVersion>
 
     <!-- Test related packages -->
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>

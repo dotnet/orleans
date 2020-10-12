@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
-
 namespace Orleans.Runtime
 {
     internal class GrainTimer : IGrainTimer
@@ -27,7 +26,7 @@ namespace Orleans.Runtime
 
         private GrainTimer(OrleansTaskScheduler scheduler, IActivationData activationData, ILogger logger, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period, string name)
         {
-            var ctxt = RuntimeContext.CurrentActivationContext;
+            var ctxt = RuntimeContext.CurrentGrainContext;
             scheduler.CheckSchedulingContextValidity(ctxt);
             this.scheduler = scheduler;
             this.activationData = activationData;
@@ -41,31 +40,6 @@ namespace Orleans.Runtime
             timerFrequency = period;
             previousTickTime = DateTime.UtcNow;
             totalNumTicks = 0;
-        }
-
-        internal static GrainTimer FromTimerCallback(
-            OrleansTaskScheduler scheduler,
-            ILogger logger,
-            TimerCallback callback,
-            object state,
-            TimeSpan dueTime,
-            TimeSpan period,
-            string name = null)
-        {
-            return new GrainTimer(
-                scheduler,
-                null,
-                logger, 
-                ob =>
-                {
-                    if (callback != null)
-                        callback(ob);
-                    return Task.CompletedTask;
-                },
-                state,
-                dueTime,
-                period,
-                name);
         }
 
         internal static IGrainTimer FromTaskCallback(
@@ -94,7 +68,7 @@ namespace Orleans.Runtime
             asyncCallback = null;
         }
 
-        private async Task TimerTick(object state, ISchedulingContext context)
+        private async Task TimerTick(object state, IGrainContext context)
         {
             if (TimerAlreadyStopped)
                 return;
@@ -163,11 +137,6 @@ namespace Orleans.Runtime
             var callbackTarget = callback?.Target?.ToString() ?? string.Empty; 
             var callbackMethodInfo = callback?.GetMethodInfo()?.ToString() ?? string.Empty;
             return $"GrainTimer.{this.Name ?? string.Empty} TimerCallbackHandler:{callbackTarget ?? string.Empty}->{callbackMethodInfo ?? string.Empty}";
-        }
-
-        public int GetNumTicks()
-        {
-            return totalNumTicks;
         }
 
         // The reason we need to check CheckTimerFreeze on both the SafeTimer and this GrainTimer

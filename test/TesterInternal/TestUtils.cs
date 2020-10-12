@@ -80,7 +80,7 @@ namespace UnitTests.TestHelper
         {
             // Use the siloAddress here, not the gateway address, since we may be targeting a silo on which we are not 
             // connected to the gateway
-            var siloControl = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlId, siloHandle.SiloAddress);
+            var siloControl = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, siloHandle.SiloAddress);
             return siloControl.GetDetailedGrainReport(grainId);
         }
     }

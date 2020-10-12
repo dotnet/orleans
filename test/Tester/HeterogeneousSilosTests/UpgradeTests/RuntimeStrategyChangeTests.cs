@@ -2,9 +2,11 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
+using Orleans.Metadata;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using TestVersionGrainInterfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Tester.HeterogeneousSilosTests.UpgradeTests
@@ -18,9 +20,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         [Fact]
         public async Task ChangeCompatibilityStrategy()
         {
-            var ifaceId = GrainInterfaceUtils.GetGrainInterfaceId(typeof(IVersionUpgradeTestGrain));
-
             await StartSiloV1();
+            var resolver = this.Client.ServiceProvider.GetService<GrainInterfaceTypeResolver>();
+            var ifaceId = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
 
             var grainV1 = Client.GetGrain<IVersionUpgradeTestGrain>(0);
             Assert.Equal(1, await grainV1.GetVersion());
@@ -63,9 +65,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         [Fact]
         public async Task ChangeVersionSelectorStrategy()
         {
-            var ifaceId = GrainInterfaceUtils.GetGrainInterfaceId(typeof(IVersionUpgradeTestGrain));
-
             await StartSiloV1();
+            var resolver = this.Client.ServiceProvider.GetService<GrainInterfaceTypeResolver>();
+            var ifaceId = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
 
             // Only V1 exists
             var grainV1 = Client.GetGrain<IVersionUpgradeTestGrain>(0);

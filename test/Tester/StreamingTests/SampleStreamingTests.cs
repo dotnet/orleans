@@ -2,11 +2,11 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -39,6 +39,7 @@ namespace UnitTests.StreamingTests
                          .AddMemoryGrainStorage("PubSubStore");
                 }
             }
+
             public class ClientConfiguretor : IClientBuilderConfigurator
             {
                 public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)

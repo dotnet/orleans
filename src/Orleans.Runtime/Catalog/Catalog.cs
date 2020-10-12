@@ -1,82 +1,38 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
+using Orleans.Metadata;
 using Orleans.MultiCluster;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
+using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Serialization;
-using Orleans.Streams.Core;
 using Orleans.Streams;
-using System.Runtime.ExceptionServices;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
-    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime, IDisposable
+    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime, IHealthCheckParticipant
     {
-        [Serializable]
-        internal class NonExistentActivationException : Exception
-        {
-            public ActivationAddress NonExistentActivation { get; private set; }
-
-            public bool IsStatelessWorker { get; private set; }
-
-            public NonExistentActivationException() : base("NonExistentActivationException") { }
-            public NonExistentActivationException(string msg) : base(msg) { }
-            public NonExistentActivationException(string message, Exception innerException) 
-                : base(message, innerException) { }
-
-            public NonExistentActivationException(string msg, ActivationAddress nonExistentActivation, bool isStatelessWorker)
-                : base(msg)
-            {
-                NonExistentActivation = nonExistentActivation;
-                IsStatelessWorker = isStatelessWorker;
-            }
-
-            protected NonExistentActivationException(SerializationInfo info, StreamingContext context)
-                : base(info, context)
-            {
-                if (info != null)
-                {
-                    NonExistentActivation = (ActivationAddress)info.GetValue("NonExistentActivation", typeof(ActivationAddress));
-                    IsStatelessWorker = (bool)info.GetValue("IsStatelessWorker", typeof(bool));
-                }
-            }
-
-            public override void GetObjectData(SerializationInfo info, StreamingContext context)
-            {
-                if (info != null)
-                {
-                    info.AddValue("NonExistentActivation", NonExistentActivation, typeof(ActivationAddress));
-                    info.AddValue("IsStatelessWorker", IsStatelessWorker, typeof(bool));
-                }
-                // MUST call through to the base class to let it save its own state
-                base.GetObjectData(info, context);
-            }
-        }
-
-
-        public GrainTypeManager GrainTypeManager { get; private set; }
-
         public SiloAddress LocalSilo { get; private set; }
         internal ISiloStatusOracle SiloStatusOracle { get; set; }
         private readonly ActivationCollector activationCollector;
 
         private static readonly TimeSpan UnregisterTimeout = TimeSpan.FromSeconds(1);
 
+        private readonly GrainLocator grainLocator;
+        private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly ILocalGrainDirectory directory;
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activations;
@@ -84,55 +40,66 @@ namespace Orleans.Runtime
         private IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private int collectionNumber;
-        private int destroyActivationsNumber;
-        private IDisposable gcTimer;
+        private IAsyncTimer gcTimer;
+        private Task gcTimerTask;
         private readonly string localSiloName;
         private readonly CounterStatistic activationsCreated;
         private readonly CounterStatistic activationsDestroyed;
         private readonly CounterStatistic activationsFailedToActivate;
         private readonly IntValueStatistic inProcessRequests;
         private readonly CounterStatistic collectionCounter;
-        private readonly GrainCreator grainCreator;
+        private readonly GrainContextActivator grainCreator;
         private readonly TimeSpan maxRequestProcessingTime;
         private readonly TimeSpan maxWarningRequestProcessingTime;
         private readonly SerializationManager serializationManager;
         private readonly CachedVersionSelectorManager versionSelectorManager;
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
-        private readonly IOptions<SiloMessagingOptions> messagingOptions;
+        private readonly IOptionsMonitor<SiloMessagingOptions> messagingOptions;
         private readonly RuntimeMessagingTrace messagingTrace;
+        private readonly PlacementStrategyResolver placementStrategyResolver;
+        private readonly GrainContextActivator grainActivator;
+        private readonly GrainVersionManifest grainInterfaceVersions;
+        private readonly GrainPropertiesResolver grainPropertiesResolver;
 
         public Catalog(
             ILocalSiloDetails localSiloDetails,
+            GrainLocator grainLocator,
+            GrainDirectoryResolver grainDirectoryResolver,
             ILocalGrainDirectory grainDirectory,
-            GrainTypeManager typeManager,
             OrleansTaskScheduler scheduler,
             ActivationDirectory activationDirectory,
             ActivationCollector activationCollector,
-            GrainCreator grainCreator,
-            ISiloMessageCenter messageCenter,
-            PlacementDirectorsManager placementDirectorsManager,
+            GrainContextActivator grainCreator,
+            MessageCenter messageCenter,
             MessageFactory messageFactory,
             SerializationManager serializationManager,
             IStreamProviderRuntime providerRuntime,
             IServiceProvider serviceProvider,
             CachedVersionSelectorManager versionSelectorManager,
             ILoggerFactory loggerFactory,
-            IOptions<SchedulingOptions> schedulingOptions,
             IOptions<GrainCollectionOptions> collectionOptions,
-            IOptions<SiloMessagingOptions> messagingOptions,
-            RuntimeMessagingTrace messagingTrace)
-            : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
+            IOptionsMonitor<SiloMessagingOptions> messagingOptions,
+            RuntimeMessagingTrace messagingTrace,
+            IAsyncTimerFactory timerFactory,
+            PlacementStrategyResolver placementStrategyResolver,
+            PlacementService placementService,
+            GrainContextActivator grainActivator,
+            GrainVersionManifest grainInterfaceVersions,
+            CompatibilityDirectorManager compatibilityDirectorManager,
+            GrainPropertiesResolver grainPropertiesResolver,
+            IncomingRequestMonitor incomingRequestMonitor)
+            : base(Constants.CatalogType, messageCenter.MyAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
             this.localSiloName = localSiloDetails.Name;
+            this.grainLocator = grainLocator;
+            this.grainDirectoryResolver = grainDirectoryResolver;
             this.directory = grainDirectory;
             this.activations = activationDirectory;
             this.scheduler = scheduler;
             this.loggerFactory = loggerFactory;
-            this.GrainTypeManager = typeManager;
             this.collectionNumber = 0;
-            this.destroyActivationsNumber = 0;
             this.grainCreator = grainCreator;
             this.serializationManager = serializationManager;
             this.versionSelectorManager = versionSelectorManager;
@@ -141,25 +108,27 @@ namespace Orleans.Runtime
             this.collectionOptions = collectionOptions;
             this.messagingOptions = messagingOptions;
             this.messagingTrace = messagingTrace;
+            this.placementStrategyResolver = placementStrategyResolver;
+            this.grainActivator = grainActivator;
+            this.grainInterfaceVersions = grainInterfaceVersions;
+            this.grainPropertiesResolver = grainPropertiesResolver;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
             this.Dispatcher = new Dispatcher(
                 scheduler,
                 messageCenter,
                 this,
-                this.messagingOptions,
-                placementDirectorsManager,
+                messagingOptions,
+                placementService,
                 grainDirectory,
-                this.activationCollector,
                 messageFactory,
-                versionSelectorManager.CompatibilityDirectorManager,
                 loggerFactory,
-                schedulingOptions,
+                activationDirectory,
                 messagingTrace);
+            this.ActivationMessageScheduler = new ActivationMessageScheduler(this, this.Dispatcher, grainInterfaceVersions, messagingTrace, activationCollector, scheduler, compatibilityDirectorManager, incomingRequestMonitor);
+
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
 
-// TODO: figure out how to read config change notification from options. - jbragg
-//            config.OnConfigChange("Globals/Activation", () => scheduler.RunOrQueueAction(Start, SchedulingContext), false);
             IntValueStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_COUNT, () => activations.Count);
             activationsCreated = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_CREATED);
             activationsDestroyed = CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_DESTROYED);
@@ -178,9 +147,10 @@ namespace Orleans.Runtime
                 }
                 return counter;
             });
-            maxWarningRequestProcessingTime = this.messagingOptions.Value.ResponseTimeout.Multiply(5);
-            maxRequestProcessingTime = this.messagingOptions.Value.MaxRequestProcessingTime;
+            maxWarningRequestProcessingTime = this.messagingOptions.CurrentValue.ResponseTimeout.Multiply(5);
+            maxRequestProcessingTime = this.messagingOptions.CurrentValue.MaxRequestProcessingTime;
             grainDirectory.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
+            this.gcTimer = timerFactory.Create(this.activationCollector.Quantum, "Catalog.GCTimer");
         }
 
         /// <summary>
@@ -188,33 +158,46 @@ namespace Orleans.Runtime
         /// </summary>
         public Dispatcher Dispatcher { get; }
 
-        public IList<SiloAddress> GetCompatibleSilos(PlacementTarget target)
+        public ActivationMessageScheduler ActivationMessageScheduler { get; }
+
+        public SiloAddress[] GetCompatibleSilos(PlacementTarget target)
         {
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
-            if (this.messagingOptions.Value.AssumeHomogenousSilosForTesting)
+            if (this.messagingOptions.CurrentValue.AssumeHomogenousSilosForTesting)
                 return AllActiveSilos;
 
-            var typeCode = target.GrainIdentity.TypeCode;
+            var grainType = target.GrainIdentity.Type;
             var silos = target.InterfaceVersion > 0
-                ? versionSelectorManager.GetSuitableSilos(typeCode, target.InterfaceId, target.InterfaceVersion).SuitableSilos
-                : GrainTypeManager.GetSupportedSilos(typeCode);
+                ? versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
+                : grainInterfaceVersions.GetSupportedSilos(grainType).Result;
 
-            var compatibleSilos = silos.Intersect(AllActiveSilos).ToList();
-            if (compatibleSilos.Count == 0)
-                throw new OrleansException($"TypeCode ${typeCode} not supported in the cluster");
+            var compatibleSilos = silos.Intersect(AllActiveSilos).ToArray();
+            if (compatibleSilos.Length == 0)
+            {
+                var allWithType = grainInterfaceVersions.GetSupportedSilos(grainType).Result;
+                var versions = grainInterfaceVersions.GetSupportedSilos(target.InterfaceType, target.InterfaceVersion).Result;
+                var allWithTypeString = string.Join(", ", allWithType.Select(s => s.ToString())) is string withGrain && !string.IsNullOrWhiteSpace(withGrain) ? withGrain : "none";
+                var allWithInterfaceString = string.Join(", ", versions.Select(s => s.ToString())) is string withIface && !string.IsNullOrWhiteSpace(withIface) ? withIface : "none";
+                throw new OrleansException(
+                    $"No active nodes are compatible with grain {grainType} and interface {target.InterfaceType} version {target.InterfaceVersion}. "
+                    + $"Known nodes with grain type: {allWithTypeString}. "
+                    + $"All known nodes compatible with interface version: {allWithTypeString}");
+            }
 
             return compatibleSilos;
         }
 
-        public IReadOnlyDictionary<ushort, IReadOnlyList<SiloAddress>> GetCompatibleSilosWithVersions(PlacementTarget target)
+        public IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target)
         {
             if (target.InterfaceVersion == 0)
+            {
                 throw new ArgumentException("Interface version not provided", nameof(target));
+            }
 
-            var typeCode = target.GrainIdentity.TypeCode;
+            var grainType = target.GrainIdentity.Type;
             var silos = versionSelectorManager
-                .GetSuitableSilos(typeCode, target.InterfaceId, target.InterfaceVersion)
+                .GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion)
                 .SuitableSilosByVersion;
 
             return silos;
@@ -222,23 +205,29 @@ namespace Orleans.Runtime
 
         internal void Start()
         {
-            if (gcTimer != null) gcTimer.Dispose();
-
-            var t = GrainTimer.FromTaskCallback(
-                this.RuntimeClient.Scheduler,
-                this.loggerFactory.CreateLogger<GrainTimer>(),
-                OnTimer,
-                null,
-                TimeSpan.Zero,
-                this.activationCollector.Quantum,
-                "Catalog.GCTimer");
-            t.Start();
-            gcTimer = t;
+            this.gcTimerTask = this.RunActivationCollectionLoop();
         }
 
-        private Task OnTimer(object _)
+        internal async Task Stop()
         {
-            return CollectActivationsImpl(true);
+            this.gcTimer?.Dispose();
+
+            if (this.gcTimerTask is Task task) await task;
+        }
+
+        private async Task RunActivationCollectionLoop()
+        {
+            while (await this.gcTimer.NextTick())
+            {
+                try
+                {
+                    await this.CollectActivationsImpl(true);
+                }
+                catch (Exception exception)
+                {
+                    this.logger.LogError(exception, "Exception while collecting activations: {Exception}", exception);
+                }
+            }
         }
 
         public Task CollectActivations(TimeSpan ageLimit)
@@ -248,25 +237,46 @@ namespace Orleans.Runtime
 
         private async Task CollectActivationsImpl(bool scanStale, TimeSpan ageLimit = default(TimeSpan))
         {
-            var watch = new Stopwatch();
-            watch.Start();
+            var watch = ValueStopwatch.StartNew();
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
-            logger.Info(ErrorCode.Catalog_BeforeCollection, "Before collection#{0}: memory={1}MB, #activations={2}, collector={3}.",
-                number, memBefore, activations.Count, this.activationCollector.ToString());
+
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(
+                    (int)ErrorCode.Catalog_BeforeCollection,
+                    "Before collection #{CollectionNumber}: memory: {MemoryBefore}MB, #activations: {ActivationCount}, collector: {CollectorStatus}",
+                    number,
+                    memBefore,
+                    activations.Count,
+                    this.activationCollector.ToString());
+            }
+
             List<ActivationData> list = scanStale ? this.activationCollector.ScanStale() : this.activationCollector.ScanAll(ageLimit);
             collectionCounter.Increment();
             var count = 0;
             if (list != null && list.Count > 0)
             {
                 count = list.Count;
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CollectActivations{0}", list.ToStrings(d => d.Grain.ToString() + d.ActivationId));
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CollectActivations{0}", list.ToStrings(d => d.GrainId.ToString() + d.ActivationId));
                 await DeactivateActivationsFromCollector(list);
             }
+            
             long memAfter = GC.GetTotalMemory(false) / (1024 * 1024);
             watch.Stop();
-            logger.Info(ErrorCode.Catalog_AfterCollection, "After collection#{0}: memory={1}MB, #activations={2}, collected {3} activations, collector={4}, collection time={5}.",
-                number, memAfter, activations.Count, count, this.activationCollector.ToString(), watch.Elapsed);
+
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug(
+                    (int)ErrorCode.Catalog_AfterCollection,
+                    "After collection #{CollectionNumber} memory: {MemoryAfter}MB, #activations: {ActivationCount}, collected {CollectedCount} activations, collector: {CollectorStatus}, collection time: {CollectionTime}",
+                    number,
+                    memAfter,
+                    activations.Count,
+                    count,
+                    this.activationCollector.ToString(),
+                    watch.Elapsed);
+            }
         }
 
         public List<Tuple<GrainId, string, int>> GetGrainStatistics()
@@ -280,18 +290,18 @@ namespace Orleans.Runtime
                     if (data == null || data.GrainInstance == null) continue;
 
                     // TODO: generic type expansion
-                    var grainTypeName = TypeUtils.GetFullName(data.GrainInstanceType);
+                    var grainTypeName = TypeUtils.GetFullName(data.GrainInstance.GetType());
                     
                     Dictionary<GrainId, int> grains;
                     int n;
                     if (!counts.TryGetValue(grainTypeName, out grains))
                     {
-                        counts.Add(grainTypeName, new Dictionary<GrainId, int> { { data.Grain, 1 } });
+                        counts.Add(grainTypeName, new Dictionary<GrainId, int> { { data.GrainId, 1 } });
                     }
-                    else if (!grains.TryGetValue(data.Grain, out n))
-                        grains[data.Grain] = 1;
+                    else if (!grains.TryGetValue(data.GrainId, out n))
+                        grains[data.GrainId] = 1;
                     else
-                        grains[data.Grain] = n + 1;
+                        grains[data.GrainId] = n + 1;
                 }
             }
             return counts
@@ -309,14 +319,14 @@ namespace Orleans.Runtime
                     ActivationData data = activation.Value;
                     if (data == null || data.GrainInstance == null) continue;
 
-                    if (types==null || types.Contains(TypeUtils.GetFullName(data.GrainInstanceType)))
+                    var grainType = TypeUtils.GetFullName(data.GrainInstance.GetType());
+                    if (types==null || types.Contains(grainType))
                     {
                         stats.Add(new DetailedGrainStatistic()
                         {
-                            GrainType = TypeUtils.GetFullName(data.GrainInstanceType),
-                            GrainIdentity = data.Grain,
-                            SiloAddress = data.Silo,
-                            Category = data.Grain.Category.ToString()
+                            GrainType = grainType,
+                            GrainId = data.GrainId,
+                            SiloAddress = data.Silo
                         });
                     }
                 }
@@ -342,11 +352,11 @@ namespace Orleans.Runtime
             };
             try
             {
-                PlacementStrategy unused;
-                MultiClusterRegistrationStrategy unusedActivationStrategy;
-                string grainClassName;
-                GrainTypeManager.GetTypeInfo(grain.TypeCode, out grainClassName, out unused, out unusedActivationStrategy);
-                report.GrainClassTypeName = grainClassName;
+                var properties = this.grainPropertiesResolver.GetGrainProperties(grain.Type);
+                if (properties.Properties.TryGetValue(WellKnownGrainTypeProperties.TypeName, out var grainClassName))
+                {
+                    report.GrainClassTypeName = grainClassName;
+                }
             }
             catch (Exception exc)
             {
@@ -366,7 +376,7 @@ namespace Orleans.Runtime
         /// <param name="activation"></param>
         public void RegisterMessageTarget(ActivationData activation)
         {
-            scheduler.RegisterWorkContext(activation.SchedulingContext);
+            scheduler.RegisterWorkContext(activation);
             activations.RecordNewTarget(activation);
             activationsCreated.Increment();
         }
@@ -383,13 +393,14 @@ namespace Orleans.Runtime
             this.activationCollector.TryCancelCollection(activation);
             activationsDestroyed.Increment();
 
-            scheduler.UnregisterWorkContext(activation.SchedulingContext);
+            scheduler.UnregisterWorkContext(activation);
 
-            if (activation.GrainInstance == null) return;
-
-            var grainTypeName = TypeUtils.GetFullName(activation.GrainInstanceType);
-            activations.DecrementGrainCounter(grainTypeName);
-            activation.SetGrainInstance(null);
+            if (activation.GrainInstance is object grainInstance)
+            {
+                var grainTypeName = TypeUtils.GetFullName(grainInstance.GetType());
+                activations.DecrementGrainCounter(grainTypeName);
+                activation.SetGrainInstance(null);
+            }
         }
 
         /// <summary>
@@ -408,21 +419,6 @@ namespace Orleans.Runtime
             return numActsBefore;
         }
 
-        internal bool CanInterleave(ActivationId running, Message message)
-        {
-            ActivationData target;
-            GrainTypeData data;
-            return TryGetActivationData(running, out target) &&
-                target.GrainInstance != null &&
-                GrainTypeManager.TryGetData(TypeUtils.GetFullName(target.GrainInstanceType), out data) &&
-                (data.IsReentrant || data.MayInterleave((InvokeMethodRequest)message.BodyObject));
-        }
-
-        public void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
-        {
-            GrainTypeManager.GetTypeInfo(typeCode, out grainClass, out placement, out activationStrategy, genericArguments);
-        }
-
         public int ActivationCount { get { return activations.Count; } }
 
         /// <summary>
@@ -433,105 +429,64 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="address">Grain's activation address</param>
         /// <param name="newPlacement">Creation of new activation was requested by the placement director.</param>
-        /// <param name="grainType">The type of grain to be activated or created</param>
-        /// <param name="genericArguments">Specific generic type of grain to be activated or created</param>
         /// <param name="requestContextData">Request context data.</param>
-        /// <param name="activatedPromise"></param>
         /// <returns></returns>
         public ActivationData GetOrCreateActivation(
             ActivationAddress address,
             bool newPlacement,
-            string grainType,
-            string genericArguments,
-            Dictionary<string, object> requestContextData,
-            out Task activatedPromise)
+            Dictionary<string, object> requestContextData)
         {
-            ActivationData result;
-            activatedPromise = Task.CompletedTask;
-            PlacementStrategy placement;
+            if (TryGetActivationData(address.Activation, out var result))
+            {
+                return result;
+            }
 
+            // Lock over all activations to try to prevent multiple instances of the same activation being created concurrently.
             lock (activations)
             {
                 if (TryGetActivationData(address.Activation, out result))
                 {
                     return result;
                 }
-                
-                int typeCode = address.Grain.TypeCode;
-                string actualGrainType = null;
-                MultiClusterRegistrationStrategy activationStrategy;
-
-                if (typeCode != 0)
-                {
-                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement, out activationStrategy, genericArguments);
-                    if (string.IsNullOrEmpty(grainType))
-                    {
-                        grainType = actualGrainType;
-                    }
-                }
-                else
-                {
-                    // special case for Membership grain.
-                    placement = SystemPlacement.Singleton;
-                    activationStrategy = ClusterLocalRegistration.Singleton;
-                }
 
                 if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
-                    TimeSpan ageLimit = this.collectionOptions.Value.ClassSpecificCollectionAge.TryGetValue(grainType, out TimeSpan limit)
-                        ? limit
-                        : collectionOptions.Value.CollectionAge;
+                    result = (ActivationData)this.grainActivator.CreateInstance(address);
+                    if (result.GrainInstance is object grainInstance)
+                    {
+                        var grainTypeName = TypeUtils.GetFullName(grainInstance.GetType());
+                        activations.IncrementGrainCounter(grainTypeName);
+                    }
 
-                    // create a dummy activation that will queue up messages until the real data arrives
-                    // We want to do this (RegisterMessageTarget) under the same lock that we tested TryGetActivationData. They both access ActivationDirectory.
-                    result = new ActivationData(
-                        address,
-                        genericArguments,
-                        placement,
-                        activationStrategy,
-                        this.activationCollector,
-                        ageLimit,
-                        this.messagingOptions,
-                        this.maxWarningRequestProcessingTime,
-                        this.maxRequestProcessingTime,
-                        this.RuntimeClient,
-                        this.loggerFactory);
                     RegisterMessageTarget(result);
                 }
             } // End lock
 
-            // Did not find and did not start placing new
-            if (result == null)
+            if (result is null)
             {
-                var msg = String.Format("Non-existent activation: {0}, grain type: {1}.",
-                                           address.ToFullString(), grainType);
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.CatalogNonExistingActivation2, msg);
-                CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
-                throw new NonExistentActivationException(msg, address, placement is StatelessWorkerPlacement);
-            }
-
-            try
-            {
-                SetupActivationInstance(result, grainType, genericArguments);
-            }
-            catch
-            {
-                // Exception was thrown when trying to constuct the grain
-                UnregisterMessageTarget(result);
-                throw;
-            }
-            activatedPromise = InitActivation(result, requestContextData);
-            return result;
-        }
-
-        private void SetupActivationInstance(ActivationData result, string grainType, string genericArguments)
-        {
-            lock (result)
-            {
-                if (result.GrainInstance == null)
+                // Did not find and did not start placing new
+                if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    CreateGrainInstance(grainType, result, genericArguments);
+                    logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Non-existent activation {Activation}", address.ToFullString());
                 }
+
+                CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS).Increment();
+
+                this.directory.InvalidateCacheEntry(address);
+
+                // Unregister the target activation so we don't keep getting spurious messages.
+                // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
+                // this request snuck ahead of another request, with new placement requested, for the same activation.
+                // If the activation registration request from the new placement somehow sneaks ahead of this unregistration,
+                // we want to make sure that we don't unregister the activation we just created.
+                _ = this.UnregisterNonExistentActivation(address);
+                return null;
+            }
+            else
+            {
+                // Initialize the new activation asynchronously.
+                _ = InitActivation(result, requestContextData);
+                return result;
             }
         }
 
@@ -544,6 +499,22 @@ namespace Orleans.Runtime
             Completed
         }
 
+        private async Task UnregisterNonExistentActivation(ActivationAddress address)
+        {
+            try
+            {
+                await this.grainLocator.Unregister(address, UnregistrationCause.NonexistentActivation);
+            }
+            catch (Exception exc)
+            {
+                logger.LogWarning(
+                    (int)ErrorCode.Dispatcher_FailedToUnregisterNonExistingAct,
+                    exc,
+                    "Failed to unregister non-existent activation {Address}",
+                    address);
+            }
+        }
+
         private async Task InitActivation(ActivationData activation, Dictionary<string, object> requestContextData)
         {
             // We've created a dummy activation, which we'll eventually return, but in the meantime we'll queue up (or perform promptly)
@@ -554,28 +525,34 @@ namespace Orleans.Runtime
             // Register with the grain directory, register with the store if necessary and call the Activate method on the new activation.
             try
             {
-                initStage = ActivationInitializationStage.Register;
-                var registrationResult = await RegisterActivationInGrainDirectoryAndValidate(activation);
-                if (!registrationResult.IsSuccess)
+                try
                 {
-                    // If registration failed, recover and bail out.
-                    await RecoverFailedInitActivation(activation, initStage, registrationResult);
-                    return;
+                    initStage = ActivationInitializationStage.Register;
+                    var registrationResult = await RegisterActivationInGrainDirectoryAndValidate(activation);
+                    if (!registrationResult.IsSuccess)
+                    {
+                        // If registration failed, recover and bail out.
+                        await RecoverFailedInitActivation(activation, initStage, registrationResult);
+                        return;
+                    }
+
+                    initStage = ActivationInitializationStage.InvokeActivate;
+                    await InvokeActivate(activation, requestContextData);
+
+                    this.activationCollector.ScheduleCollection(activation);
+
+                    // Success!! Log the result, and start processing messages
+                    initStage = ActivationInitializationStage.Completed;
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InitActivation is done: {0}", activation.Address);
                 }
-
-                initStage = ActivationInitializationStage.InvokeActivate;
-                await InvokeActivate(activation, requestContextData);
-
-                this.activationCollector.ScheduleCollection(activation);
-
-                // Success!! Log the result, and start processing messages
-                initStage = ActivationInitializationStage.Completed;
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InitActivation is done: {0}", activation.Address);
+                catch (Exception ex)
+                {
+                    await RecoverFailedInitActivation(activation, initStage, exception: ex);
+                }
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                await RecoverFailedInitActivation(activation, initStage, exception: ex);
-                throw;
+                this.logger.LogWarning(exception, "Exception trying to initialize grain activation {Grain}", activation);
             }
         }
 
@@ -592,7 +569,7 @@ namespace Orleans.Runtime
             ActivationRegistrationResult registrationResult = default(ActivationRegistrationResult),
             Exception exception = null)
         {
-            ActivationAddress address = activation.Address;
+            var address = activation.Address;
 
             if (initStage == ActivationInitializationStage.Register && registrationResult.ExistingActivationAddress != null)
             {
@@ -613,7 +590,7 @@ namespace Orleans.Runtime
                             // Forward on all of the pending messages, and then forget about this activation.
                             var logMsg =
                                 $"Tried to create a duplicate activation {address}, but we'll use {activation.ForwardingAddress} instead. " +
-                                $"GrainInstanceType is {activation.GrainInstanceType}. " +
+                                $"GrainInstance Type is {activation.GrainInstance?.GetType()}. " +
                                 $"{(primary != null ? "Primary Directory partition for this grain is " + primary + ". " : string.Empty)}" +
                                 $"Full activation address is {address.ToFullString()}. We have {activation.WaitingCount} messages to forward.";
                             logger.Debug(ErrorCode.Catalog_DuplicateActivation, logMsg);
@@ -632,8 +609,8 @@ namespace Orleans.Runtime
                     try
                     {
                         await this.scheduler.RunOrQueueTask(
-                                    () => directory.UnregisterAsync(address, UnregistrationCause.Force),
-                                    SchedulingContext).WithTimeout(UnregisterTimeout);
+                                    () => this.grainLocator.Unregister(address, UnregistrationCause.Force),
+                                    this).WithTimeout(UnregisterTimeout);
                     }
                     catch (Exception ex)
                     {
@@ -665,66 +642,6 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Perform just the prompt, local part of creating an activation object
-        /// Caller is responsible for registering locally, registering with store and calling its activate routine
-        /// </summary>
-        /// <param name="grainTypeName"></param>
-        /// <param name="data"></param>
-        /// <param name="genericArguments"></param>
-        /// <returns></returns>
-        private void CreateGrainInstance(string grainTypeName, ActivationData data, string genericArguments)
-        {
-            string grainClassName;
-            if (!GrainTypeManager.TryGetPrimaryImplementation(grainTypeName, out grainClassName))
-            {
-                // Lookup from grain type code
-                var typeCode = data.Grain.TypeCode;
-                if (typeCode != 0)
-                {
-                    PlacementStrategy unused;
-                    MultiClusterRegistrationStrategy unusedActivationStrategy;
-                    GetGrainTypeInfo(typeCode, out grainClassName, out unused, out unusedActivationStrategy, genericArguments);
-                }
-                else
-                {
-                    grainClassName = grainTypeName;
-                }
-            }
-
-            GrainTypeData grainTypeData = GrainTypeManager[grainClassName];
-
-            //Get the grain's type
-            Type grainType = grainTypeData.Type;
-
-            lock (data)
-            {
-                data.SetupContext(grainTypeData, this.serviceProvider);
-
-                Grain grain = grainCreator.CreateGrainInstance(data);
-                
-                //if grain implements IStreamSubscriptionObserver, then install stream consumer extension on it
-                if(grain is IStreamSubscriptionObserver)
-                    InstallStreamConsumerExtension(data, grain as IStreamSubscriptionObserver);
-
-                grain.Data = data;
-                data.SetGrainInstance(grain);
-            }
-            
-            activations.IncrementGrainCounter(grainClassName);
-
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
-        }
-
-        private void InstallStreamConsumerExtension(ActivationData result, IStreamSubscriptionObserver observer)
-        {
-            var invoker = InsideRuntimeClient.TryGetExtensionMethodInvoker(this.GrainTypeManager, typeof(IStreamConsumerExtension));
-            if (invoker == null)
-                throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
-            var handler = new StreamConsumerExtension(this.providerRuntime, observer);
-            result.ExtensionInvoker.TryAddExtension(invoker, handler);
-        }
-
-        /// <summary>
         /// Try to get runtime data for an activation
         /// </summary>
         /// <param name="activationId"></param>
@@ -732,25 +649,39 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public bool TryGetActivationData(ActivationId activationId, out ActivationData data)
         {
-            data = null;
-            if (activationId.IsSystem) return false;
-
             data = activations.FindTarget(activationId);
             return data != null;
         }
 
-        private Task DeactivateActivationsFromCollector(List<ActivationData> list)
+        private async Task DeactivateActivationsFromCollector(List<ActivationData> list)
         {
+            var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+            var mtcs = new MultiTaskCompletionSource(list.Count);
+
             logger.Info(ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {0} to promptly Destroy.", list.Count);
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
-            foreach (var activation in list)
+
+            for (var i = 0; i < list.Count; i++)
             {
-                lock (activation)
+                var activationData = list[i];
+                lock (activationData)
                 {
-                    activation.PrepareForDeactivation(); // Don't accept any new messages
+                    // Continue deactivation when ready
+                    activationData.AddOnInactive(async () =>
+                    {
+                        try
+                        {
+                            await DestroyActivation(activationData, cts.Token);
+                        }
+                        finally
+                        {
+                            mtcs.SetOneResult();
+                        }
+                    });
                 }
             }
-            return DestroyActivations(list);
+
+            await mtcs.Task;
         }
 
         // To be called fro within Activation context.
@@ -760,21 +691,19 @@ namespace Orleans.Runtime
             DeactivateActivationImpl(data, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE);
         }
 
-        // To be called fro within Activation context.
+        // To be called from within Activation context.
         // To be used only if an activation is stuck for a long time, since it can lead to a duplicate activation
-        internal void DeactivateStuckActivation(ActivationData activationData)
+        internal async Task DeactivateStuckActivation(ActivationData activationData)
         {
-            DeactivateActivationImpl(activationData, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_STUCK_ACTIVATION);
             // The unregistration is normally done in the regular deactivation process, but since this activation seems
             // stuck (it might never run the deactivation process), we remove it from the directory directly
-            scheduler.RunOrQueueTask(
-                () => directory.UnregisterAsync(activationData.Address, UnregistrationCause.Force),
-                SchedulingContext)
-                .Ignore();
+            await this.grainLocator.Unregister(activationData.Address, UnregistrationCause.Force);
+            DeactivateActivationImpl(activationData, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_STUCK_ACTIVATION);
         }
 
         private void DeactivateActivationImpl(ActivationData data, StatisticName statisticName)
         {
+            var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
             bool promptly = false;
             bool alreadBeingDestroyed = false;
             lock (data)
@@ -790,7 +719,7 @@ namespace Orleans.Runtime
                     }
                     else // busy, so destroy later.
                     {
-                        data.AddOnInactive(() => DestroyActivationVoid(data));
+                        data.AddOnInactive(() => _ = DestroyActivation(data, cts.Token));
                     }
                 }
                 else if (data.State == ActivationState.Create)
@@ -816,7 +745,68 @@ namespace Orleans.Runtime
             CounterStatistic.FindOrCreate(statisticName).Increment();
             if (promptly)
             {
-                DestroyActivationVoid(data); // Don't await or Ignore, since we are in this activation context and it may have alraedy been destroyed!
+                _ = DestroyActivation(data, cts.Token); // Don't await or Ignore, since we are in this activation context and it may have alraedy been destroyed!
+            }
+        }
+
+        internal async Task DeactivateActivation(ActivationData activationData)
+        {
+            TaskCompletionSource<object> tcs;
+            var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+
+            lock (activationData)
+            {
+                if (activationData.State != ActivationState.Valid)
+                    return; // Nothing to do
+
+                tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                // Don't accept any new messages
+                activationData.PrepareForDeactivation();
+                this.activationCollector.TryCancelCollection(activationData);
+
+                // Continue deactivation when ready
+                activationData.AddOnInactive(async () =>
+                {
+                    try
+                    {
+                        await DestroyActivation(activationData, cts.Token);
+                    }
+                    finally
+                    {
+                        tcs.SetResult(null);
+                    }
+                });
+            }
+
+            await tcs.Task.WithCancellation(cts.Token);
+        }
+
+        private async Task DestroyActivation(ActivationData activationData, CancellationToken ct)
+        {
+            try
+            {
+                // Wait timers and call OnDeactivateAsync()
+                await activationData.WaitForAllTimersToFinish();
+                await this.scheduler.RunOrQueueTask(() => CallGrainDeactivateAndCleanupStreams(activationData, ct), activationData);
+                // Unregister from directory
+                await this.grainLocator.Unregister(activationData.Address, UnregistrationCause.Force);
+            }
+            catch (Exception ex)
+            {
+                this.logger.Warn(ErrorCode.Catalog_DeactivateActivation_Exception, $"Exception when trying to deactivation {activationData}", ex);
+            }
+            finally
+            {
+                lock (activationData)
+                {
+                    activationData.SetState(ActivationState.Invalid);
+                }
+                // Capture grainInstance since UnregisterMessageTarget will set it to null...
+                var grainInstance = activationData.GrainInstance;
+                UnregisterMessageTarget(activationData);
+                RerouteAllQueuedMessages(activationData, null, "Finished Destroy Activation");
+                await activationData.DisposeAsync();
             }
         }
 
@@ -832,60 +822,8 @@ namespace Orleans.Runtime
             if (list == null || list.Count == 0) return;
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("DeactivateActivations: {0} activations.", list.Count);
-            List<ActivationData> destroyNow = null;
-            List<MultiTaskCompletionSource> destroyLater = null;
-            int alreadyBeingDestroyed = 0;
-            foreach (var d in list)
-            {
-                var activationData = d; // capture
-                lock (activationData)
-                {
-                    if (activationData.State == ActivationState.Valid)
-                    {
-                        // Change the ActivationData state here, since we're about to give up the lock.
-                        activationData.PrepareForDeactivation(); // Don't accept any new messages
-                        this.activationCollector.TryCancelCollection(activationData);
-                        if (!activationData.IsCurrentlyExecuting)
-                        {
-                            if (destroyNow == null)
-                            {
-                                destroyNow = new List<ActivationData>();
-                            }
-                            destroyNow.Add(activationData);
-                        }
-                        else // busy, so destroy later.
-                        {
-                            if (destroyLater == null)
-                            {
-                                destroyLater = new List<MultiTaskCompletionSource>();
-                            }
-                            var tcs = new MultiTaskCompletionSource(1);
-                            destroyLater.Add(tcs);
-                            activationData.AddOnInactive(() => DestroyActivationAsync(activationData, tcs));
-                        }
-                    }
-                    else
-                    {
-                        alreadyBeingDestroyed++;
-                    }
-                }
-            }
 
-            int numDestroyNow = destroyNow == null ? 0 : destroyNow.Count;
-            int numDestroyLater = destroyLater == null ? 0 : destroyLater.Count;
-            logger.Info(ErrorCode.Catalog_ShutdownActivations_3,
-                "DeactivateActivations: total {0} to shutdown, out of them {1} promptly, {2} later when become idle and {3} are already being destroyed or invalid.",
-                list.Count, numDestroyNow, numDestroyLater, alreadyBeingDestroyed);
-            CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DIRECT_SHUTDOWN).IncrementBy(list.Count);
-
-            if (destroyNow != null && destroyNow.Count > 0)
-            {
-                await DestroyActivations(destroyNow);
-            }
-            if (destroyLater != null && destroyLater.Count > 0)
-            {
-                await Task.WhenAll(destroyLater.Select(t => t.Task).ToArray());
-            }
+            await Task.WhenAll(list.Select(DeactivateActivation));
         }
 
         public Task DeactivateAllActivations()
@@ -895,180 +833,6 @@ namespace Orleans.Runtime
             return DeactivateActivations(activationsToShutdown);
         }
 
-        /// <summary>
-        /// Deletes activation immediately regardless of active transactions etc.
-        /// For use by grain delete, transaction abort, etc.
-        /// </summary>
-        /// <param name="activation"></param>
-        private void DestroyActivationVoid(ActivationData activation)
-        {
-            StartDestroyActivations(new List<ActivationData> { activation });
-        }
-
-        private void DestroyActivationAsync(ActivationData activation, MultiTaskCompletionSource tcs)
-        {
-            StartDestroyActivations(new List<ActivationData> { activation }, tcs);
-        }
-
-        /// <summary>
-        /// Forcibly deletes activations now, without waiting for any outstanding transactions to complete.
-        /// Deletes activation immediately regardless of active transactions etc.
-        /// For use by grain delete, transaction abort, etc.
-        /// </summary>
-        /// <param name="list"></param>
-        /// <returns></returns>
-        // Overall code flow:
-        // Deactivating state was already set before, in the correct context under lock.
-        //      that means no more new requests will be accepted into this activation and all timer were stopped (no new ticks will be delivered or enqueued) 
-        // Wait for all already scheduled ticks to finish
-        // CallGrainDeactivate
-        //      when AsyncDeactivate promise is resolved (NOT when all Deactivate turns are done, which may be orphan tasks):
-        // Unregister in the directory 
-        //      when all AsyncDeactivate turns are done (Dispatcher.OnActivationCompletedRequest):
-        // Set Invalid state
-        // UnregisterMessageTarget -> no new tasks will be enqueue (if an orphan task get enqueud, it is ignored and dropped on the floor).
-        // InvalidateCacheEntry
-        // Reroute pending
-        private Task DestroyActivations(List<ActivationData> list)
-        {
-            if (list == null || list.Count == 0) return Task.CompletedTask;
-
-            var tcs = new MultiTaskCompletionSource(list.Count);
-            StartDestroyActivations(list, tcs);
-            return tcs.Task;
-        }
-
-        private async void StartDestroyActivations(List<ActivationData> list, MultiTaskCompletionSource tcs = null)
-        {
-            var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
-
-            int number = destroyActivationsNumber;
-            destroyActivationsNumber++;
-            try
-            {
-                logger.Info(ErrorCode.Catalog_DestroyActivations, "Starting DestroyActivations #{0} of {1} activations", number, list.Count);
-
-                // step 1 - WaitForAllTimersToFinish
-                var tasks1 = new List<Task>();
-                foreach (var activation in list)
-                {
-                    tasks1.Add(activation.WaitForAllTimersToFinish());
-                }
-
-                try
-                {
-                    await Task.WhenAll(tasks1).WithCancellation(cts.Token);
-                }
-                catch (Exception exc)
-                {
-                    logger.Warn(ErrorCode.Catalog_WaitForAllTimersToFinish_Exception, String.Format("WaitForAllTimersToFinish {0} failed.", list.Count), exc);
-                }
-
-                // step 2 - CallGrainDeactivate
-                var tasks2 = new List<Tuple<Task, ActivationData>>();
-                foreach (var activation in list)
-                {
-                    var activationData = activation; // Capture loop variable
-                    var task = scheduler.RunOrQueueTask(() => CallGrainDeactivateAndCleanupStreams(activationData, cts.Token), activationData.SchedulingContext);
-                    tasks2.Add(new Tuple<Task, ActivationData>(task, activationData));
-                }
-                var asyncQueue = new AsyncBatchedContinuationQueue<ActivationData>();
-                asyncQueue.Queue(tasks2, tupleList =>
-                {
-                    FinishDestroyActivations(tupleList.Select(t => t.Item2).ToList(), number, tcs);
-                    GC.KeepAlive(asyncQueue); // not sure about GC not collecting the asyncQueue local var prematuraly, so just want to capture it here to make sure. Just to be safe.
-                });
-            }
-            catch (Exception exc)
-            {
-                logger.Warn(ErrorCode.Catalog_DeactivateActivation_Exception, String.Format("StartDestroyActivations #{0} failed with {1} Activations.", number, list.Count), exc);
-            }
-        }
-
-        private async void FinishDestroyActivations(List<ActivationData> list, int number, MultiTaskCompletionSource tcs)
-        {
-            try
-            {
-                //logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Starting FinishDestroyActivations #{0} - with {1} Activations.", number, list.Count);
-                // step 3 - UnregisterManyAsync
-                try
-                {            
-                    List<ActivationAddress> activationsToDeactivate = list.
-                        Where((ActivationData d) => d.IsUsingGrainDirectory).
-                        Select((ActivationData d) => ActivationAddress.GetAddress(LocalSilo, d.Grain, d.ActivationId)).ToList();
-
-                    if (activationsToDeactivate.Count > 0)
-                    {
-                        await scheduler.RunOrQueueTask(() =>
-                            directory.UnregisterManyAsync(activationsToDeactivate, UnregistrationCause.Force),
-                            SchedulingContext);
-                    }
-                }
-                catch (Exception exc)
-                {
-                    logger.Warn(ErrorCode.Catalog_UnregisterManyAsync, String.Format("UnregisterManyAsync {0} failed.", list.Count), exc);
-                }
-
-                // step 4 - UnregisterMessageTarget and OnFinishedGrainDeactivate
-                foreach (var activationData in list)
-                {
-                    Grain grainInstance = activationData.GrainInstance;
-                    try
-                    {
-                        lock (activationData)
-                        {
-                            activationData.SetState(ActivationState.Invalid); // Deactivate calls on this activation are finished
-                        }
-                        UnregisterMessageTarget(activationData);
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget2, String.Format("UnregisterMessageTarget failed on {0}.", activationData), exc);
-                    }
-
-                    // IMPORTANT: no more awaits and .Ignore after that point.
-
-                    // Just use this opportunity to invalidate local Cache Entry as well. 
-                    // If this silo is not the grain directory partition for this grain, it may have it in its cache.
-                    try
-                    {
-
-                        directory.InvalidateCacheEntry(activationData.Address);
-
-                        RerouteAllQueuedMessages(activationData, null, "Finished Destroy Activation");
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget3, String.Format("Last stage of DestroyActivations failed on {0}.", activationData), exc);
-                    }
-                    try
-                    {
-                        if (grainInstance != null)
-                        {
-                            lock (activationData)
-                            {
-                                grainCreator.Release(activationData, grainInstance);
-                            }
-                        }
-
-                        activationData.Dispose();
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Warn(ErrorCode.Catalog_UnregisterMessageTarget3, String.Format("Releasing of the grain instance and scope failed on {0}.", activationData), exc);
-                    }
-                }
-                // step 5 - Resolve any waiting TaskCompletionSource
-                if (tcs != null)
-                {
-                    tcs.SetMultipleResults(list.Count);
-                }
-                logger.Info(ErrorCode.Catalog_DestroyActivations_Done, "Done FinishDestroyActivations #{0} - Destroyed {1} Activations.", number, list.Count);
-            }catch (Exception exc)
-            {
-                logger.Error(ErrorCode.Catalog_FinishDeactivateActivation_Exception, String.Format("FinishDestroyActivations #{0} failed with {1} Activations.", number, list.Count), exc);
-            }
-        }
         private void RerouteAllQueuedMessages(ActivationData activation, ActivationAddress forwardingAddress, string failedOperation, Exception exc = null)
         {
             lock (activation)
@@ -1076,7 +840,8 @@ namespace Orleans.Runtime
                 List<Message> msgs = activation.DequeueAllWaitingMessages();
                 if (msgs == null || msgs.Count <= 0) return;
 
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_RerouteAllQueuedMessages, String.Format("RerouteAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count(), activation));
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_RerouteAllQueuedMessages, String.Format("RerouteAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count, activation));
+                this.directory.InvalidateCacheEntry(activation.Address);
                 this.Dispatcher.ProcessRequestsToInvalidActivation(msgs, activation.Address, forwardingAddress, failedOperation, exc);
             }
         }
@@ -1100,7 +865,8 @@ namespace Orleans.Runtime
                 if (logger.IsEnabled(LogLevel.Debug))
                     logger.Debug(
                         ErrorCode.Catalog_RerouteAllQueuedMessages,
-                        string.Format("RejectAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count(), activation));
+                        string.Format("RejectAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count, activation));
+                this.directory.InvalidateCacheEntry(activation.Address);
                 this.Dispatcher.ProcessRequestsToInvalidActivation(
                     msgs,
                     activation.Address,
@@ -1113,7 +879,7 @@ namespace Orleans.Runtime
 
         private async Task CallGrainActivate(ActivationData activation, Dictionary<string, object> requestContextData)
         {
-            var grainTypeName = activation.GrainInstanceType.FullName;
+            var grainTypeName = activation.GrainInstance?.GetType().FullName;
 
             // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_BeforeCallingActivate, "About to call {1} grain's OnActivateAsync() method {0}", activation, grainTypeName);
@@ -1122,22 +888,8 @@ namespace Orleans.Runtime
             try
             {
                 RequestContextExtensions.Import(requestContextData);
-                await activation.Lifecycle.OnStart();
+                await activation.ActivateAsync(CancellationToken.None);
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_AfterCallingActivate, "Returned from calling {1} grain's OnActivateAsync() method {0}", activation, grainTypeName);
-
-                lock (activation)
-                {
-                    if (activation.State == ActivationState.Activating)
-                    {
-                        activation.SetState(ActivationState.Valid); // Activate calls on this activation are finished
-                    }
-                    if (!activation.IsCurrentlyExecuting)
-                    {
-                        activation.RunOnInactive();
-                    }
-                    // Run message pump to see if there is a new request is queued to be processed
-                    this.Dispatcher.RunMessagePump(activation);
-                }
             }
             catch (Exception exc)
             {
@@ -1149,12 +901,16 @@ namespace Orleans.Runtime
                 // TODO: During lifecycle refactor discuss with team whether activation failure should have a well defined exception, or throw whatever
                 //   exception caused activation to fail, with no indication that it occured durring activation
                 //   rather than the grain call.
-                OrleansLifecycleCanceledException canceledException = exc as OrleansLifecycleCanceledException;
-                if(canceledException?.InnerException != null)
+                var canceledException = exc as OrleansLifecycleCanceledException;
+                if (canceledException?.InnerException != null)
                 {
                     ExceptionDispatchInfo.Capture(canceledException.InnerException).Throw();
                 }
                 throw;
+            }
+            finally
+            {
+                RequestContext.Clear();
             }
         }
 
@@ -1162,7 +918,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                var grainTypeName = activation.GrainInstanceType.FullName;
+                var grainTypeName = activation.GrainInstance?.GetType().FullName;
 
                 // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Catalog_BeforeCallingDeactivate, "About to call {1} grain's OnDeactivateAsync() method {0}", activation, grainTypeName);
@@ -1203,7 +959,7 @@ namespace Orleans.Runtime
                     await ((ILogConsistencyProtocolParticipant)activation.GrainInstance).DeactivateProtocolParticipant();
                 }
             }
-            catch(Exception exc)
+            catch (Exception exc)
             {
                 logger.Error(ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception, String.Format("CallGrainDeactivateAndCleanupStreams Activation = {0} failed.", activation), exc);
             }
@@ -1220,7 +976,7 @@ namespace Orleans.Runtime
             /// </summary>
             public static readonly ActivationRegistrationResult Success = new ActivationRegistrationResult
             {
-                IsSuccess = true       
+                IsSuccess = true
             };
 
             public ActivationRegistrationResult(ActivationAddress existingActivationAddress)
@@ -1229,7 +985,7 @@ namespace Orleans.Runtime
                 ExistingActivationAddress = existingActivationAddress;
                 IsSuccess = false;
             }
-            
+
             /// <summary>
             /// Returns true if this instance represents a successful registration, false otherwise.
             /// </summary>
@@ -1249,16 +1005,16 @@ namespace Orleans.Runtime
 
         private async Task<ActivationRegistrationResult> RegisterActivationInGrainDirectoryAndValidate(ActivationData activation)
         {
-            ActivationAddress address = activation.Address;
+            var address = activation.Address;
 
             // Currently, the only grain type that is not registered in the Grain Directory is StatelessWorker. 
             // Among those that are registered in the directory, we currently do not have any multi activations.
             if (activation.IsUsingGrainDirectory)
             {
-                var result = await scheduler.RunOrQueueTask(() => directory.RegisterAsync(address, singleActivation:true), this.SchedulingContext);
-                if (address.Equals(result.Address)) return ActivationRegistrationResult.Success;
-               
-                return new ActivationRegistrationResult(existingActivationAddress: result.Address);
+                var result = await scheduler.RunOrQueueTask(() => this.grainLocator.Register(address), this);
+                if (address.Equals(result)) return ActivationRegistrationResult.Success;
+
+                return new ActivationRegistrationResult(existingActivationAddress: result);
             }
             else if (activation.PlacedUsing is StatelessWorkerPlacement stPlacement)
             {
@@ -1305,13 +1061,13 @@ namespace Orleans.Runtime
             {
                 activation.SetState(ActivationState.Activating);
             }
-            return scheduler.QueueTask(() => CallGrainActivate(activation, requestContextData), activation.SchedulingContext); // Target grain's scheduler context);
+            return scheduler.QueueTask(() => CallGrainActivate(activation, requestContextData), activation); // Target grain);
             // ActivationData will transition out of ActivationState.Activating via Dispatcher.OnActivationCompletedRequest
         }
 
-        public bool FastLookup(GrainId grain, out AddressesAndTag addresses)
+        public bool FastLookup(GrainId grain, out List<ActivationAddress> addresses)
         {
-            return directory.LocalLookup(grain, out addresses) && addresses.Addresses != null && addresses.Addresses.Count > 0;
+            return this.grainLocator.TryLocalLookup(grain, out addresses) && addresses != null && addresses.Count > 0;
             // NOTE: only check with the local directory cache.
             // DO NOT check in the local activations TargetDirectory!!!
             // The only source of truth about which activation should be legit to is the state of the ditributed directory.
@@ -1320,16 +1076,10 @@ namespace Orleans.Runtime
             // thus volaiting the single-activation semantics and not converging even eventualy!
         }
 
-        public Task<AddressesAndTag> FullLookup(GrainId grain)
+        public Task<List<ActivationAddress>> FullLookup(GrainId grain)
         {
-            return scheduler.RunOrQueueTask(() => directory.LookupAsync(grain), this.SchedulingContext);
+            return scheduler.RunOrQueueTask(() => this.grainLocator.Lookup(grain), this);
         }
-
-        public Task<AddressesAndTag> LookupInCluster(GrainId grain, string clusterId)
-        {
-            return scheduler.RunOrQueueTask(() => directory.LookupInCluster(grain, clusterId), this.SchedulingContext);
-        }
-
 
         public bool LocalLookup(GrainId grain, out List<ActivationData> addresses)
         {
@@ -1337,45 +1087,53 @@ namespace Orleans.Runtime
             return addresses != null;
         }
 
-        public List<SiloAddress> AllActiveSilos
+        public SiloAddress[] AllActiveSilos
         {
             get
             {
-                var result = SiloStatusOracle.GetApproximateSiloStatuses(true).Select(s => s.Key).ToList();
-                if (result.Count > 0) return result;
+                var result = SiloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
+                if (result.Length > 0) return result;
 
                 logger.Warn(ErrorCode.Catalog_GetApproximateSiloStatuses, "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty");
-                return new List<SiloAddress> { LocalSilo };
+                return new SiloAddress[] { LocalSilo };
             }
         }
 
         public SiloStatus LocalSiloStatus
         {
-            get {
+            get
+            {
                 return SiloStatusOracle.CurrentStatus;
             }
         }
 
         public Task DeleteActivations(List<ActivationAddress> addresses)
         {
-            return DestroyActivations(TryGetActivationDatas(addresses));
-        }
-
-
-        private List<ActivationData> TryGetActivationDatas(List<ActivationAddress> addresses)
-        {
-            var datas = new List<ActivationData>(addresses.Count);
-            foreach (var activationAddress in addresses)
+            List<ActivationData> TryGetActivationDatas(List<ActivationAddress> addresses)
             {
-                ActivationData data;
-                if (TryGetActivationData(activationAddress.Activation, out data))
-                    datas.Add(data);
+                var datas = new List<ActivationData>(addresses.Count);
+                foreach (var activationAddress in addresses)
+                {
+                    ActivationData data;
+                    if (TryGetActivationData(activationAddress.Activation, out data))
+                        datas.Add(data);
+                }
+                return datas;
             }
-            return datas;
+
+            var timeoutTokenSource = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
+            var tasks = new List<Task>(addresses.Count);
+            foreach (var activationData in TryGetActivationDatas(addresses))
+            {
+                var capture = activationData;
+                tasks.Add(DestroyActivation(capture, timeoutTokenSource.Token));
+            }
+            return Task.WhenAll(tasks);
         }
 
+        // TODO move this logic in the LocalGrainDirectory
         private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
-        { 
+        {
             // ignore joining events and also events on myself.
             if (updatedSilo.Equals(LocalSilo)) return;
 
@@ -1400,8 +1158,8 @@ namespace Orleans.Runtime
                         try
                         {
                             var activationData = activation.Value;
-                            if (!activationData.IsUsingGrainDirectory) continue;
-                            if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.Grain))) continue;
+                            if (!activationData.IsUsingGrainDirectory || grainDirectoryResolver.HasNonDefaultDirectory(activationData.GrainId.Type)) continue;
+                            if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.GrainId))) continue;
 
                             lock (activationData)
                             {
@@ -1431,9 +1189,14 @@ namespace Orleans.Runtime
             }
         }
 
-        void IDisposable.Dispose()
+        public bool CheckHealth(DateTime lastCheckTime)
         {
-            this.gcTimer?.Dispose();
+            if (this.gcTimer is IAsyncTimer timer)
+            {
+                return timer.CheckHealth(lastCheckTime);
+            }
+
+            return true;
         }
     }
 }

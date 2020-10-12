@@ -27,19 +27,6 @@
   </Choose>
 
   <Choose>
-    <When Condition="$(OrleansRuntimeAbstractionsVersion) == $(VersionPrefix) AND $(OrleansRuntimeAbstractionsVersion) == $(OrleansTransactionsVersion)">
-      <ItemGroup>
-        <ProjectReference Include="..\..\Orleans.Runtime.Abstractions\Orleans.Runtime.Abstractions.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Runtime.Abstractions" Version="$(OrleansRuntimeAbstractionsVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
-  <Choose>
     <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansTransactionsVersion)">
       <ItemGroup>
         <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />

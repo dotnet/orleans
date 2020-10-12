@@ -61,7 +61,7 @@ namespace Orleans.Transactions.TestKit
         public FaultInjectionControl FaultInjectionControl { get; set; }
         private IControlledTransactionFaultInjector faultInjector;
         public string CurrentTransactionId => this.txState.CurrentTransactionId;
-        public FaultInjectionTransactionalState(TransactionalState<TState> txState, IGrainActivationContext activationContext, IGrainRuntime grainRuntime, ILogger<FaultInjectionTransactionalState<TState>> logger)
+        public FaultInjectionTransactionalState(TransactionalState<TState> txState, IGrainContext activationContext, IGrainRuntime grainRuntime, ILogger<FaultInjectionTransactionalState<TState>> logger)
         {
             this.grainRuntime = grainRuntime;
             this.txState = txState;
@@ -80,7 +80,7 @@ namespace Orleans.Transactions.TestKit
                 (ct) => this.txState.OnSetupState(ct, this.SetupResourceFactory));
         }
 
-        internal void SetupResourceFactory(IGrainActivationContext context, string stateName, TransactionQueue<TState> queue)
+        internal void SetupResourceFactory(IGrainContext context, string stateName, TransactionQueue<TState> queue)
         {
             // Add resources factory to the grain context
             context.RegisterResourceFactory<ITransactionalResource>(stateName, () => new FaultInjectionTransactionalResource<TState>(this.faultInjector, FaultInjectionControl, new TransactionalResource<TState>(queue), context, logger,  grainRuntime));

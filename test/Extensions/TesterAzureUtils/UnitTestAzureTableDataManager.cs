@@ -4,6 +4,7 @@ using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Clustering.AzureStorage;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Tester.AzureUtils
 {
@@ -50,10 +51,11 @@ namespace Tester.AzureUtils
     {
         protected const string INSTANCE_TABLE_NAME = "UnitTestAzureData";
 
-        public UnitTestAzureTableDataManager(string storageConnectionString, ILoggerFactory loggerFactory)
-            : base(INSTANCE_TABLE_NAME, storageConnectionString, loggerFactory)
+        public UnitTestAzureTableDataManager()
+            : base(new AzureStorageOperationOptions { TableName = INSTANCE_TABLE_NAME }.ConfigureTestDefaults(),
+                  NullLoggerFactory.Instance.CreateLogger<UnitTestAzureTableDataManager>())
         {
-            InitTableAsync().WithTimeout(AzureTableDefaultPolicies.TableCreationTimeout).Wait();
+            InitTableAsync().WithTimeout(new AzureStoragePolicyOptions().CreationTimeout).Wait();
         }
     }
 }

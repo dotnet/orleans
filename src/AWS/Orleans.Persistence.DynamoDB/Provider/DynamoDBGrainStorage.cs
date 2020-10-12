@@ -35,10 +35,9 @@ namespace Orleans.Storage
 
         private readonly DynamoDBStorageOptions options;
         private readonly SerializationManager serializationManager;
-        private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
-        private readonly IGrainFactory grainFactory;
-        private readonly ITypeResolver typeResolver;
+        private readonly IServiceProvider serviceProvider;
+        private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
         private readonly string name;
 
         private DynamoDBStorage storage;
@@ -47,17 +46,20 @@ namespace Orleans.Storage
         /// <summary>
         /// Default Constructor
         /// </summary>
-        public DynamoDBGrainStorage(string name, DynamoDBStorageOptions options, SerializationManager serializationManager,
-            IGrainFactory grainFactory, ITypeResolver typeResolver, ILoggerFactory loggerFactory)
+        public DynamoDBGrainStorage(
+            string name,
+            DynamoDBStorageOptions options,
+            SerializationManager serializationManager,
+            IServiceProvider serviceProvider,
+            GrainReferenceKeyStringConverter grainReferenceConverter,
+            ILogger<DynamoDBGrainStorage> logger)
         {
             this.name = name;
-            this.loggerFactory = loggerFactory;
-            var loggerName = $"{typeof(DynamoDBGrainStorage).FullName}.{name}";
-            this.logger = loggerFactory.CreateLogger(loggerName);
+            this.logger = logger;
             this.options = options;
             this.serializationManager = serializationManager;
-            this.grainFactory = grainFactory;
-            this.typeResolver = typeResolver;
+            this.serviceProvider = serviceProvider;
+            this.grainReferenceConverter = grainReferenceConverter;
         }
 
         public void Participate(ISiloLifecycle lifecycle)
@@ -76,14 +78,14 @@ namespace Orleans.Storage
                         this.name, this.options.ServiceId, this.options.TableName, this.options.DeleteStateOnClear);
 
                 this.jsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(
-                    OrleansJsonSerializer.GetDefaultSerializerSettings(this.typeResolver, this.grainFactory),
+                    OrleansJsonSerializer.GetDefaultSerializerSettings(this.serviceProvider),
                     this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
                 this.options.ConfigureJsonSerializerSettings?.Invoke(this.jsonSettings);
 
                 this.logger.LogInformation((int)ErrorCode.StorageProviderBase, $"AWS DynamoDB Grain Storage {this.name} is initializing: {initMsg}");
 
-                this.storage = new DynamoDBStorage(this.loggerFactory, this.options.Service, this.options.AccessKey, this.options.SecretKey,
-                 this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
+                this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
+                 this.options.ReadCapacityUnits, this.options.WriteCapacityUnits, this.options.UseProvisionedThroughput);
 
                 await storage.InitializeTable(this.options.TableName,
                     new List<KeySchemaElement>
@@ -147,6 +149,7 @@ namespace Orleans.Storage
             if (record != null)
             {
                 var loadedState = ConvertFromStorageFormat(record, grainState.Type);
+                grainState.RecordExists = loadedState != null;
                 grainState.State = loadedState ?? Activator.CreateInstance(grainState.Type);
                 grainState.ETag = record.ETag.ToString();
             }
@@ -187,7 +190,7 @@ namespace Orleans.Storage
         {
             var fields = new Dictionary<string, AttributeValue>();
             if (this.options.TimeToLive.HasValue)
-            {                                
+            {
                 fields.Add(GRAIN_TTL_PROPERTY_NAME, new AttributeValue { N = ((DateTimeOffset)DateTime.UtcNow.Add(this.options.TimeToLive.Value)).ToUnixTimeSeconds().ToString() });
             }
 
@@ -240,6 +243,7 @@ namespace Orleans.Storage
             }
 
             grainState.ETag = newEtag.ToString();
+            grainState.RecordExists = !clear;
         }
 
         /// <summary> Clear / Delete state data function for this storage provider. </summary>
@@ -300,7 +304,7 @@ namespace Orleans.Storage
 
         private string GetKeyString(GrainReference grainReference)
         {
-            var key = string.Format("{0}_{1}", this.options.ServiceId, grainReference.ToKeyString());
+            var key = string.Format("{0}_{1}", this.options.ServiceId, this.grainReferenceConverter.ToKeyString(grainReference));
             return AWSUtils.ValidateDynamoDBPartitionKey(key);
         }
 

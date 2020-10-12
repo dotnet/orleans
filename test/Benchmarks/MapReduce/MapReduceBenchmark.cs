@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -10,7 +10,7 @@ using Orleans.TestingHost;
 
 namespace Benchmarks.MapReduce
 {
-    public class MapReduceBenchmark
+    public class MapReduceBenchmark : IDisposable
     {
         private static TestCluster _host;
         private readonly int _intermediateStagesCount = 15;
@@ -100,6 +100,11 @@ namespace Benchmarks.MapReduce
                     resultList = await collector.ReceiveAll();
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            _host?.Dispose();
         }
 
         private string _text = @"Historically, the world of data and the world of objects" +

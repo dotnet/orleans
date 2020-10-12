@@ -1,12 +1,15 @@
 using System;
+using System.Collections.Generic;
+using Orleans.Metadata;
+using Orleans.Runtime;
 
-namespace Orleans.Configuration
+namespace Orleans
 {
     /// <summary>
     /// Specifies the period of inactivity before a grain is available for collection and deactivation.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public class CollectionAgeLimitAttribute : Attribute
+    public class CollectionAgeLimitAttribute : Attribute, IGrainPropertiesProvider
     {
         public static readonly TimeSpan DEFAULT_COLLECTION_AGE_LIMIT = TimeSpan.FromHours(2);
 
@@ -29,6 +32,25 @@ namespace Orleans.Configuration
                     ? MinAgeLimit
                     : span;
             }
+        }
+
+        /// <inheritdoc />
+        public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
+        {
+            properties[WellKnownGrainTypeProperties.IdleDeactivationPeriod] = this.Amount.ToString("c");
+        }
+    }
+
+
+    /// <summary>
+    /// Specifies the period of inactivity before a grain is available for collection and deactivation.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+    public class KeepAliveAttribute : Attribute, IGrainPropertiesProvider
+    {
+        public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
+        {
+            properties[WellKnownGrainTypeProperties.IdleDeactivationPeriod] = WellKnownGrainTypeProperties.IndefiniteIdleDeactivationPeriodValue;
         }
     }
 }

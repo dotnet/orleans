@@ -1,6 +1,7 @@
-﻿using Google.Cloud.PubSub.V1;
+using Google.Cloud.PubSub.V1;
 using Google.Protobuf;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 using System;
@@ -17,7 +18,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         /// <summary>
         /// Creates a <seealso cref="PubsubMessage"/> from stream event data.
         /// </summary>
-        PubsubMessage ToPubSubMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext);
+        PubsubMessage ToPubSubMessage<T>(StreamId streamId, IEnumerable<T> events, Dictionary<string, object> requestContext);
 
         /// <summary>
         /// Creates a batch container from a <seealso cref="PubsubMessage"/> message
@@ -47,9 +48,9 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         }
 
         /// <inherithdoc/>
-        public PubsubMessage ToPubSubMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        public PubsubMessage ToPubSubMessage<T>(StreamId streamId, IEnumerable<T> events, Dictionary<string, object> requestContext)
         {
-            var batchMessage = new PubSubBatchContainer(streamGuid, streamNamespace, events.Cast<object>().ToList(), requestContext);
+            var batchMessage = new PubSubBatchContainer(streamId, events.Cast<object>().ToList(), requestContext);
             var rawBytes = _serializationManager.SerializeToByteArray(batchMessage);
 
             return new PubsubMessage { Data = ByteString.CopyFrom(rawBytes) };

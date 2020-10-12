@@ -26,11 +26,12 @@ namespace Orleans.TestingHost
     /// Make sure that your test project references your test grains and test grain interfaces 
     /// projects, and has CopyLocal=True set on those references [which should be the default].
     /// </remarks>
-    public class TestCluster : IDisposable
+    public class TestCluster : IDisposable, IAsyncDisposable
     {
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
         private readonly TestClusterOptions options;
         private readonly StringBuilder log = new StringBuilder();
+        private bool _disposed;
         private int startedInstances;
 
         /// <summary>
@@ -117,14 +118,23 @@ namespace Orleans.TestingHost
         /// Delegate used to create and start an individual silo.
         /// </summary>
         public Func<string, IList<IConfigurationSource>, Task<SiloHandle>> CreateSiloAsync { private get; set; } = InProcessSiloHandle.CreateAsync;
+
+        /// <summary>
+        /// The port allocator.
+        /// </summary>
+        public ITestClusterPortAllocator PortAllocator { get; }
         
         /// <summary>
         /// Configures the test cluster plus client in-process.
         /// </summary>
-        public TestCluster(TestClusterOptions options, IReadOnlyList<IConfigurationSource> configurationSources)
+        public TestCluster(
+            TestClusterOptions options,
+            IReadOnlyList<IConfigurationSource> configurationSources,
+            ITestClusterPortAllocator portAllocator)
         {
             this.options = options;
             this.ConfigurationSources = configurationSources.ToArray();
+            this.PortAllocator = portAllocator;
         }
 
         /// <summary>
@@ -377,20 +387,25 @@ namespace Orleans.TestingHost
 
         private async Task StopClusterClientAsync()
         {
+            var client = this.InternalClient;
             try
             {
-                if (InternalClient != null)
+                if (client != null)
                 {
-                    await this.InternalClient.Close();
+                    await client.Close().ConfigureAwait(false);
                 }                
             }
             catch (Exception exc)
             {
-                WriteLog("Exception Uninitializing grain client: {0}", exc);
+                WriteLog("Exception stopping client: {0}", exc);
             }
             finally
             {
-                this.InternalClient?.Dispose();
+                if (client is object)
+                {
+                    await client.DisposeAsync().ConfigureAwait(false);
+                }
+
                 this.InternalClient = null;
             }
         }
@@ -589,7 +604,7 @@ namespace Orleans.TestingHost
 
             // Add overrides.
             if (configurationOverrides != null) configurationSources.AddRange(configurationOverrides);
-            var siloSpecificOptions = TestSiloSpecificOptions.Create(clusterOptions, instanceNumber, startSiloOnNewPort);
+            var siloSpecificOptions = TestSiloSpecificOptions.Create(this, clusterOptions, instanceNumber, startSiloOnNewPort);
             configurationSources.Add(new MemoryConfigurationSource
             {
                 InitialData = siloSpecificOptions.ToDictionary()
@@ -605,11 +620,12 @@ namespace Orleans.TestingHost
         {
             try
             {
-                await instance.StopSiloAsync(stopGracefully);
-                instance.Dispose();
+                await instance.StopSiloAsync(stopGracefully).ConfigureAwait(false);
             }
             finally
             {
+                await instance.DisposeAsync().ConfigureAwait(false);
+
                 Interlocked.Decrement(ref this.startedInstances);
             }
         }
@@ -635,8 +651,46 @@ namespace Orleans.TestingHost
             Console.WriteLine(GetLog());
         }
 
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            await Task.Run(async () =>
+            {
+                foreach (var handle in this.SecondarySilos)
+                {
+                    await handle.DisposeAsync().ConfigureAwait(false);
+                }
+
+                if (this.Primary is object)
+                {
+                    await this.Primary.DisposeAsync().ConfigureAwait(false);
+                }
+
+                if (this.Client is object)
+                {
+                    await this.Client.DisposeAsync().ConfigureAwait(false);
+                }
+
+                if (this.PortAllocator is object)
+                {
+                    this.PortAllocator.Dispose();
+                }
+            });
+
+            _disposed = true;
+        }
+
         public void Dispose()
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             foreach (var handle in this.SecondarySilos)
             {
                 handle.Dispose();
@@ -644,6 +698,13 @@ namespace Orleans.TestingHost
 
             this.Primary?.Dispose();
             this.Client?.Dispose();
+
+            if (this.PortAllocator is object)
+            {
+                this.PortAllocator.Dispose();
+            }
+
+            _disposed = true;
         }
     }
 }

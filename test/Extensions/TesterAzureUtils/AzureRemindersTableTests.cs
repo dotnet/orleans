@@ -11,8 +11,7 @@ using Tester;
 using TestExtensions;
 using Xunit;
 using Orleans.Reminders.AzureStorage;
-using Orleans.Clustering.AzureStorage;
-using AzureTableDefaultPolicies = Orleans.Clustering.AzureStorage.AzureTableDefaultPolicies;
+using Tester.AzureUtils;
 
 namespace UnitTests.RemindersTest
 {
@@ -34,22 +33,19 @@ namespace UnitTests.RemindersTest
             filters.AddFilter("Storage", LogLevel.Trace);
             return filters;
         }
-        public override void Dispose()
+
+        public override Task DisposeAsync()
         {
             // Reset init timeout after tests
-            OrleansSiloInstanceManager.initTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-            base.Dispose();
+            return base.DisposeAsync();
         }
 
         protected override IReminderTable CreateRemindersTable()
         {
             TestUtils.CheckForAzureStorage();
-            var options = new OptionsWrapper<AzureTableReminderStorageOptions>(
-                new AzureTableReminderStorageOptions
-                    {
-                        ConnectionString = this.connectionStringFixture.ConnectionString
-                    });
-            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<IGrainReferenceConverter>(), loggerFactory, this.clusterOptions, options);
+            var options = Options.Create(new AzureTableReminderStorageOptions());
+            options.Value.ConfigureTestDefaults();
+            return new AzureBasedReminderTable(this.ClusterFixture.Services.GetRequiredService<GrainReferenceKeyStringConverter>(), loggerFactory, this.clusterOptions, options);
         }
 
         protected override Task<string> GetConnectionString()

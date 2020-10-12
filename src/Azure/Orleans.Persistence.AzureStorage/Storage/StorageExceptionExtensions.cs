@@ -1,6 +1,6 @@
 using System.Net;
-using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Blob.Protocol;
+using Azure;
+using Azure.Storage.Blobs.Models;
 
 namespace Orleans.Storage
 {
@@ -21,26 +21,26 @@ namespace Orleans.Storage
             return storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.NotFound;
         }
 
-        public static bool IsPreconditionFailed(this StorageException storageException)
+        public static bool IsPreconditionFailed(this RequestFailedException requestFailedException)
         {
-            return storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.PreconditionFailed;
+            return requestFailedException?.Status == (int)HttpStatusCode.PreconditionFailed;
         }
 
-        public static bool IsConflict(this StorageException storageException)
+        public static bool IsConflict(this RequestFailedException requestFailedException)
         {
-            return storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.Conflict;
+            return requestFailedException?.Status == (int)HttpStatusCode.Conflict;
         }
 
-        public static bool IsContainerNotFound(this StorageException storageException)
+        public static bool IsContainerNotFound(this RequestFailedException requestFailedException)
         {
-            return storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.NotFound
-                && storageException.RequestInformation.ExtendedErrorInformation.ErrorCode == BlobErrorCodeStrings.ContainerNotFound;
+            return requestFailedException?.Status == (int)HttpStatusCode.NotFound
+                && requestFailedException.ErrorCode == BlobErrorCode.ContainerNotFound;
         }
 
-        public static bool IsBlobNotFound(this StorageException storageException)
+        public static bool IsBlobNotFound(this RequestFailedException requestFailedException)
         {
-            return storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.NotFound
-                && storageException.RequestInformation.ExtendedErrorInformation.ErrorCode == BlobErrorCodeStrings.BlobNotFound;
+            return requestFailedException?.Status == (int)HttpStatusCode.NotFound
+                && requestFailedException.ErrorCode == BlobErrorCode.BlobNotFound;
         }
     }
 }

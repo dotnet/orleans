@@ -116,6 +116,7 @@ namespace DefaultCluster.Tests.General
         public void KeysAllowPlusSymbols()
         {
             const string key = "foo+bar+zaz";
+            var converter = this.Client.ServiceProvider.GetRequiredService<GrainReferenceKeyStringConverter>();
 
             {
                 // Verify that grains with string keys can include + symbols in their key.
@@ -124,9 +125,7 @@ namespace DefaultCluster.Tests.General
                 var key2 = grainRef.GetPrimaryKeyString();
                 Assert.Equal(key, key2);
 
-                var grainRef2 = GrainReference.FromKeyString(
-                    grainRef.ToKeyString(),
-                    this.Client.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
+                var grainRef2 = converter.FromKeyString(grainRef.ToKeyString());
                 Assert.True(grainRef.Equals(grainRef2));
             }
 
@@ -140,19 +139,9 @@ namespace DefaultCluster.Tests.General
                 Assert.Equal(primaryKey, actualPrimaryKey);
                 Assert.Equal(key, keyExt);
 
-                var grainRef2 = GrainReference.FromKeyString(
-                    grainRef.ToKeyString(),
-                    this.Client.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
+                var grainRef2 = converter.FromKeyString(grainRef.ToKeyString());
                 Assert.True(grainRef.Equals(grainRef2));
             }
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("PrimaryKeyExtension")]
-        public void GetPrimaryKeyStringOnWrongGrainReference()
-        {
-            var grain = this.GrainFactory.GetGrain<ISimpleGrain>(0);
-            var key = ((GrainReference)grain).GetPrimaryKeyString();
-            Assert.Null(key);
         }
     }
 }

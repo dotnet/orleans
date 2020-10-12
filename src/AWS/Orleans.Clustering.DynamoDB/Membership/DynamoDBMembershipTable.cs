@@ -23,7 +23,6 @@ namespace Orleans.Clustering.DynamoDB
         private const int MAX_BATCH_SIZE = 25;
 
         private readonly ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
         private DynamoDBStorage storage;
         private readonly DynamoDBClusteringOptions options;
         private readonly string clusterId;
@@ -33,7 +32,6 @@ namespace Orleans.Clustering.DynamoDB
             IOptions<DynamoDBClusteringOptions> clusteringOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
-            this.loggerFactory = loggerFactory;
             logger = loggerFactory.CreateLogger<DynamoDBMembershipTable>();
             this.options = clusteringOptions.Value;
             this.clusterId = clusterOptions.Value.ClusterId;
@@ -41,7 +39,7 @@ namespace Orleans.Clustering.DynamoDB
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            this.storage = new DynamoDBStorage(this.loggerFactory, this.options.Service, this.options.AccessKey, this.options.SecretKey,
+            this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
                   this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
 
             logger.Info(ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
@@ -538,9 +536,38 @@ namespace Orleans.Clustering.DynamoDB
             };
         }
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            throw new NotImplementedException();
+            try
+            {
+                var keys = new Dictionary<string, AttributeValue>
+                {
+                    { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
+                };
+                var filter = $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}";
+                
+                var records = await this.storage.QueryAllAsync(this.options.TableName, keys, filter, item => new SiloInstanceRecord(item));
+                var defunctRecordKeys = records.Where(r => SiloIsDefunct(r, beforeDate)).Select(r => r.GetKeys());
+
+                var tasks = new List<Task>();
+                foreach (var batch in defunctRecordKeys.BatchIEnumerable(MAX_BATCH_SIZE))
+                {
+                    tasks.Add(this.storage.DeleteEntriesAsync(this.options.TableName, batch));
+                }
+                await Task.WhenAll(tasks);
+            }
+            catch (Exception exc)
+            {
+                this.logger.Error(ErrorCode.MembershipBase, $"Unable to clean up defunct membership records on table {this.options.TableName} for clusterId {this.clusterId}", exc);
+                throw;
+            }
+        }
+
+        private static bool SiloIsDefunct(SiloInstanceRecord silo, DateTimeOffset beforeDate)
+        {
+            return DateTimeOffset.TryParse(silo.IAmAliveTime, out var iAmAliveTime)
+                    && iAmAliveTime < beforeDate
+                    && silo.Status != (int)SiloStatus.Active;
         }
     }
 }

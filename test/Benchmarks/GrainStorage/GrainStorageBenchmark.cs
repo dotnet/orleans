@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using Orleans.Hosting;
@@ -8,7 +8,7 @@ using BenchmarkGrainInterfaces.GrainStorage;
 
 namespace Benchmarks.GrainStorage
 {
-    public class GrainStorageBenchmark
+    public class GrainStorageBenchmark : IDisposable
     {
         private TestCluster host;
 
@@ -110,6 +110,11 @@ namespace Benchmarks.GrainStorage
         public void Teardown()
         {
             host.StopAllSilos();
+        }
+
+        public void Dispose()
+        {
+            host?.Dispose();
         }
     }
 }

@@ -46,25 +46,35 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact]
-        public async Task MethodsInvokedThroughOneWayExtensionReturnSynchronously()
+        public async Task OneWayMethodsReturnSynchronously_ViaClient_ValueTask()
         {
-            var grain = this.Client.GetGrain<ICanBeOneWayGrain>(Guid.NewGuid());
+            var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
 
             var observer = new SimpleGrainObserver();
-            var observerRef = await Client.CreateObjectReference<ISimpleGrainObserver>(observer);
-            grain.InvokeOneWay(g =>
-            {
-                Assert.False(object.ReferenceEquals(g, grain), "One way call should be executed on copy of grain reference");
-                Assert.Equal(g, grain);
-                return g.Notify(observerRef);
-            });
-
+            var task = grain.NotifyValueTask(await this.Client.CreateObjectReference<ISimpleGrainObserver>(observer));
+            Assert.True(task.IsCompleted, "ValueTask should be synchronously completed.");
             await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
             var count = await grain.GetCount();
             Assert.Equal(1, count);
 
             // This should not throw.
-            grain.InvokeOneWay(g => g.Throws());
+            task = grain.ThrowsOneWayValueTask();
+            Assert.True(task.IsCompleted, "Task should be synchronously completed.");
+        }
+
+        [Fact]
+        public async Task OneWayMethodReturnSynchronously_ViaGrain_ValueTask()
+        {
+            var grain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+            var otherGrain = this.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
+
+            var observer = new SimpleGrainObserver();
+            var observerReference = await this.Client.CreateObjectReference<ISimpleGrainObserver>(observer);
+            var completedSynchronously = await grain.NotifyOtherGrainValueTask(otherGrain, observerReference);
+            Assert.True(completedSynchronously, "Task should be synchronously completed.");
+            await observer.ReceivedValue.WithTimeout(TimeSpan.FromSeconds(10));
+            var count = await otherGrain.GetCount();
+            Assert.Equal(1, count);
         }
 
         private class SimpleGrainObserver : ISimpleGrainObserver

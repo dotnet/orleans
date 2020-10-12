@@ -7,9 +7,9 @@ namespace Orleans.Runtime.Versions.Selector
 {
     internal class AllCompatibleVersionsSelector : IVersionSelector
     {
-        public IReadOnlyList<ushort> GetSuitableVersion(ushort requestedVersion, IReadOnlyList<ushort> availableVersions, ICompatibilityDirector compatibilityDirector)
+        public ushort[] GetSuitableVersion(ushort requestedVersion, ushort[] availableVersions, ICompatibilityDirector compatibilityDirector)
         {
-            return availableVersions.Where(v => compatibilityDirector.IsCompatible(requestedVersion, v)).ToList();
+            return availableVersions.Where(v => compatibilityDirector.IsCompatible(requestedVersion, v)).ToArray();
         }
     }
 }

@@ -18,7 +18,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
         }
@@ -32,7 +32,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
         }
@@ -46,7 +46,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
         }
@@ -60,7 +60,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
             await testCluster.StopAllSilosAsync();
@@ -75,7 +75,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
             await testCluster.StopAllSilosAsync();
@@ -90,7 +90,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
             await testCluster.StopAllSilosAsync();
@@ -105,7 +105,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
             await testCluster.StopAllSilosAsync();
@@ -120,7 +120,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
             await testCluster.StopAllSilosAsync();
@@ -135,7 +135,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
             await testCluster.StopAllSilosAsync();
@@ -150,7 +150,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new TestClusterBuilder(2);
             builder.Options.ServiceId = Guid.NewGuid().ToString();
             builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
-            var testCluster = builder.Build();
+            using var testCluster = builder.Build();
 
             await testCluster.DeployAsync();
             await testCluster.StopAllSilosAsync();

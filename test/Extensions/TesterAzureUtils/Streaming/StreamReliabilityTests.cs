@@ -24,6 +24,7 @@ using UnitTests.Grains;
 using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
+using Tester.AzureUtils;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -63,12 +64,12 @@ namespace UnitTests.Streaming.Reliability
             {
                 clientBuilder.UseAzureStorageClustering(gatewayOptions =>
                 {
-                    gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    gatewayOptions.ConfigureTestDefaults();
                 })
                 .AddAzureQueueStreams(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
                     (options, dep) =>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConfigureTestDefaults();
                         options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                     }))
                 .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME)
@@ -82,12 +83,11 @@ namespace UnitTests.Streaming.Reliability
             {
                 hostBuilder.UseAzureStorageClustering(options =>
                 {
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    options.MaxStorageBusyRetries = 3;
+                    options.ConfigureTestDefaults();
                 })
                 .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                     {
-                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.ConfigureTestDefaults();
                         options.DeleteStateOnClear = true;
                     }))
                 .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
@@ -95,18 +95,18 @@ namespace UnitTests.Streaming.Reliability
                 .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                 {
                     options.DeleteStateOnClear = true;
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.ConfigureTestDefaults();
                 }))
                 .AddAzureQueueStreams(AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
                 (options, dep) =>
                 {
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.ConfigureTestDefaults();
                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                 }))
                 .AddAzureQueueStreams("AzureQueueProvider2", ob => ob.Configure<IOptions<ClusterOptions>>(
                 (options, dep) =>
                 {
-                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    options.ConfigureTestDefaults();
                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
                 }));
             }
@@ -115,13 +115,18 @@ namespace UnitTests.Streaming.Reliability
         public StreamReliabilityTests(ITestOutputHelper output)
         {
             this.output = output;
-            CheckSilosRunning("Initially", numExpectedSilos);
 #if DELETE_AFTER_TEST
             _usedGrains = new HashSet<IStreamReliabilityTestGrain>();
 #endif
         }
 
-        public override void Dispose()
+        public override async Task InitializeAsync()
+        {
+            await base.InitializeAsync();
+            CheckSilosRunning("Initially", numExpectedSilos);
+        }
+
+        public override async Task DisposeAsync()
         {
 #if DELETE_AFTER_TEST
             List<Task> promises = new List<Task>();
@@ -129,18 +134,19 @@ namespace UnitTests.Streaming.Reliability
             {
                 promises.Add(g.ClearGrain());
             }
-            Task.WhenAll(promises).Wait();
-#endif
-            base.Dispose();
 
-            if (this.HostedCluster != null)
+            await Task.WhenAll(promises);
+#endif
+            await base.DisposeAsync();
+
+            if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
             {
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                    TestDefaultConfiguration.DataConnectionString).Wait();
-                AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    new AzureQueueOptions().ConfigureTestDefaults());
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
                     AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
-                    TestDefaultConfiguration.DataConnectionString).Wait();
+                    new AzureQueueOptions().ConfigureTestDefaults());
             }
         }
 

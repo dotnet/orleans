@@ -41,10 +41,8 @@ namespace UnitTests.StreamingTests
         public async Task RegisterConsumerFaultTest()
         {
             this.fixture.Logger.Info("************************ RegisterConsumerFaultTest *********************************");
-            var streamId = StreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
-            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(
-                streamId.Guid,
-                keyExtension: streamId.ProviderName + "_" + streamId.Namespace);
+            var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(typeof(PubSubRendezvousGrain).FullName);
 
             // clean call, to make sure everything is happy and pubsub has state.
@@ -69,10 +67,8 @@ namespace UnitTests.StreamingTests
         public async Task UnregisterConsumerFaultTest()
         {
             this.fixture.Logger.Info("************************ UnregisterConsumerFaultTest *********************************");
-            var streamId = StreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
-            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(
-                streamId.Guid,
-                keyExtension: streamId.ProviderName + "_" + streamId.Namespace);
+            var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(typeof(PubSubRendezvousGrain).FullName);
 
             // Add two consumers so when we remove the first it does a storage write, not a storage clear.
@@ -117,10 +113,8 @@ namespace UnitTests.StreamingTests
         public async Task RegisterProducerFaultTest()
         {
             this.fixture.Logger.Info("************************ RegisterProducerFaultTest *********************************");
-            var streamId = StreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
-            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(
-                streamId.Guid,
-                keyExtension: streamId.ProviderName + "_" + streamId.Namespace);
+            var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(typeof(PubSubRendezvousGrain).FullName);
 
             // clean call, to make sure everything is happy and pubsub has state.
@@ -149,10 +143,8 @@ namespace UnitTests.StreamingTests
         public async Task UnregisterProducerFaultTest()
         {
             this.fixture.Logger.Info("************************ UnregisterProducerFaultTest *********************************");
-            var streamId = StreamId.GetStreamId(Guid.NewGuid(), "ProviderName", "StreamNamespace");
-            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(
-                streamId.Guid,
-                keyExtension: streamId.ProviderName + "_" + streamId.Namespace);
+            var streamId = new InternalStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(typeof(PubSubRendezvousGrain).FullName);
 
             IStreamProducerExtension firstProducer = new DummyStreamProducerExtension();
@@ -198,13 +190,12 @@ namespace UnitTests.StreamingTests
                 id = Guid.NewGuid();
             }
 
-            public Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer,
-                IStreamFilterPredicateWrapper filter)
+            public Task AddSubscriber(GuidId subscriptionId, InternalStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
             {
                 return Task.CompletedTask;
             }
 
-            public Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId)
+            public Task RemoveSubscriber(GuidId subscriptionId, InternalStreamId streamId)
             {
                 return Task.CompletedTask;
             }

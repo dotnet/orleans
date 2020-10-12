@@ -20,21 +20,7 @@ namespace Orleans.LogConsistency
     /// </summary>
     /// <typeparam name="TView">The type of the view</typeparam>
     public abstract class LogConsistentGrain<TView> : Grain, ILifecycleParticipant<IGrainLifecycle>
-
     {
-        protected LogConsistentGrain()
-        {
-        }
-
-        /// <summary>
-        /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
-        /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
-        /// </summary>
-        protected LogConsistentGrain(IGrainIdentity identity, IGrainRuntime runtime)
-            : base(identity, runtime)
-        {
-        }
-
         /// <summary>
         /// called right after grain construction to install the log view adaptor 
         /// </summary>
@@ -65,11 +51,11 @@ namespace Orleans.LogConsistency
         private Task OnSetupState(CancellationToken ct)
         {
             if (ct.IsCancellationRequested) return Task.CompletedTask;
-            IGrainActivationContext activationContext = this.ServiceProvider.GetRequiredService<IGrainActivationContext>();
-            Factory<Grain, IMultiClusterRegistrationStrategy, ILogConsistencyProtocolServices> protocolServicesFactory = this.ServiceProvider.GetRequiredService<Factory<Grain, IMultiClusterRegistrationStrategy, ILogConsistencyProtocolServices>>();
-            ILogViewAdaptorFactory consistencyProvider = SetupLogConsistencyProvider(activationContext);
+            IGrainContextAccessor grainContextAccessor = this.ServiceProvider.GetRequiredService<IGrainContextAccessor>();
+            Factory<Grain, ILogConsistencyProtocolServices> protocolServicesFactory = this.ServiceProvider.GetRequiredService<Factory<Grain, ILogConsistencyProtocolServices>>();
+            ILogViewAdaptorFactory consistencyProvider = SetupLogConsistencyProvider(grainContextAccessor.GrainContext);
             IGrainStorage grainStorage = consistencyProvider.UsesStorageProvider ? this.GetGrainStorage(this.ServiceProvider) : null;
-            InstallLogViewAdaptor(activationContext.RegistrationStrategy, protocolServicesFactory, consistencyProvider, grainStorage);
+            InstallLogViewAdaptor(protocolServicesFactory, consistencyProvider, grainStorage);
             return Task.CompletedTask;
         }
 
@@ -79,18 +65,17 @@ namespace Orleans.LogConsistency
         }
 
         private async Task PostActivate(CancellationToken ct)
-        {
+        { 
             await ((ILogConsistencyProtocolParticipant)this).PostActivateProtocolParticipant();
         }
 
         private void InstallLogViewAdaptor(
-            IMultiClusterRegistrationStrategy mcRegistrationStrategy,
-            Factory<Grain, IMultiClusterRegistrationStrategy, ILogConsistencyProtocolServices> protocolServicesFactory,
+            Factory<Grain, ILogConsistencyProtocolServices> protocolServicesFactory,
             ILogViewAdaptorFactory factory,
             IGrainStorage grainStorage)
         {
             // encapsulate runtime services used by consistency adaptors
-            ILogConsistencyProtocolServices svc = protocolServicesFactory(this, mcRegistrationStrategy);
+            ILogConsistencyProtocolServices svc = protocolServicesFactory(this);
 
             TView state = (TView)Activator.CreateInstance(typeof(TView));
 
@@ -98,7 +83,7 @@ namespace Orleans.LogConsistency
         }
 
 
-        private ILogViewAdaptorFactory SetupLogConsistencyProvider(IGrainActivationContext activationContext)
+        private ILogViewAdaptorFactory SetupLogConsistencyProvider(IGrainContext activationContext)
         {
             var attr = this.GetType().GetCustomAttributes<LogConsistencyProviderAttribute>(true).FirstOrDefault();
 

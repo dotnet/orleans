@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -118,13 +119,11 @@ namespace UnitTests.Grains
 #endif
         }
 
-        protected void InitStream(Guid streamId, string streamNamespace, string providerToUse)
+        protected void InitStream(StreamId streamId, string providerToUse)
         {
-            if (streamId == null) throw new ArgumentNullException("streamId", "Can't have null stream id");
-            if (streamNamespace == null) throw new ArgumentNullException("streamNamespace", "Can't have null stream namespace values");
             if (providerToUse == null) throw new ArgumentNullException("providerToUse", "Can't have null stream provider name");
 
-            if (State.Stream != null && State.Stream.Guid != streamId)
+            if (State.Stream != null && !State.Stream.StreamId.Equals(streamId))
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Stream already exists for StreamId={0} StreamProvider={1} - Resetting", State.Stream, providerToUse);
 
@@ -143,7 +142,7 @@ namespace UnitTests.Grains
                 _streamProvider = GetStreamProvider(providerToUse);
                 _lastProviderName = providerToUse;
             }
-            IAsyncStream<int> stream = _streamProvider.GetStream<int>(streamId, streamNamespace);
+            IAsyncStream<int> stream = _streamProvider.GetStream<int>(streamId);
             State.Stream = stream;
             State.StreamProviderName = providerToUse;
 
@@ -154,10 +153,10 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     internal class StreamLifecycleConsumerGrain : StreamLifecycleTestGrainBase, IStreamLifecycleConsumerGrain
     {
-        protected readonly ISiloRuntimeClient runtimeClient;
+        protected readonly InsideRuntimeClient runtimeClient;
         protected readonly IStreamProviderRuntime streamProviderRuntime;
 
-        public StreamLifecycleConsumerGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime, ILoggerFactory loggerFactory) : base(loggerFactory)
+        public StreamLifecycleConsumerGrain(InsideRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime, ILoggerFactory loggerFactory) : base(loggerFactory)
         {
             this.runtimeClient = runtimeClient;
             this.streamProviderRuntime = streamProviderRuntime;
@@ -220,10 +219,10 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public virtual async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
+        public virtual async Task BecomeConsumer(StreamId streamId, string providerToUse)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BecomeConsumer StreamId={0} StreamProvider={1} Grain={2}", streamId, providerToUse, this.AsReference<IStreamLifecycleConsumerGrain>());
-            InitStream(streamId, streamNamespace, providerToUse);
+            InitStream(streamId, providerToUse);
             var observer = new MyStreamObserver<int>(logger);
             var subsHandle = await State.Stream.SubscribeAsync(observer);
             State.ConsumerSubscriptionHandles.Add(subsHandle);
@@ -231,31 +230,26 @@ namespace UnitTests.Grains
             await WriteStateAsync();
         }
 
-        public virtual async Task TestBecomeConsumerSlim(Guid streamIdGuid, string streamNamespace, string providerName)
+        public virtual async Task TestBecomeConsumerSlim(StreamId streamId, string providerName)
         {
-            InitStream(streamIdGuid, streamNamespace, providerName);
+            InitStream(streamId, providerName);
             var observer = new MyStreamObserver<int>(logger);
 
             //var subsHandle = await State.Stream.SubscribeAsync(observer);
 
-            IStreamConsumerExtension myExtensionReference;
-#if USE_CAST
-            myExtensionReference = StreamConsumerExtensionFactory.Cast(this.AsReference());
-#else
-            var tup = await runtimeClient.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
-                        () => new StreamConsumerExtension(streamProviderRuntime));
-            StreamConsumerExtension myExtension = tup.Item1;
-            myExtensionReference = tup.Item2;
-#endif
-            string extKey = providerName + "_" + State.Stream.Namespace;
-            IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamIdGuid, extKey, null);
+            var context = this.Data;
+            var (myExtension, myExtensionReference) = this.streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(
+                () => new StreamConsumerExtension(streamProviderRuntime));
+            string extKey = providerName + "_" + Encoding.UTF8.GetString(State.Stream.StreamId.Namespace.ToArray());
+            var id = new InternalStreamId(providerName, streamId);
+            IPubSubRendezvousGrain pubsub = GrainFactory.GetGrain<IPubSubRendezvousGrain>(id.ToString());
             GuidId subscriptionId = GuidId.GetNewGuidId();
-            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).StreamId, myExtensionReference, null);
+            await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).InternalStreamId, myExtensionReference, null);
 
             myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null, null);
         }
 
-        public async Task RemoveConsumer(Guid streamId, string streamNamespace, string providerName, StreamSubscriptionHandle<int> subsHandle)
+        public async Task RemoveConsumer(StreamId streamId, string providerName, StreamSubscriptionHandle<int> subsHandle)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("RemoveConsumer StreamId={0} StreamProvider={1}", streamId, providerName);
             if (State.ConsumerSubscriptionHandles.Count == 0) throw new InvalidOperationException("Not a Consumer");
@@ -278,99 +272,6 @@ namespace UnitTests.Grains
             State.IsProducer = false;
             Observers.Clear();
             await ClearStateAsync();
-        }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
-    internal class FilteredStreamConsumerGrain : StreamLifecycleConsumerGrain, IFilteredStreamConsumerGrain
-    {
-        private static ILogger staticLogger;
-        private const int FilterDataOdd = 1;
-        private const int FilterDataEven = 2;
-
-        public FilteredStreamConsumerGrain(ISiloRuntimeClient runtimeClient, IStreamProviderRuntime streamProviderRuntime, ILoggerFactory loggerFactory)
-            : base(runtimeClient, streamProviderRuntime, loggerFactory)
-        {
-            staticLogger = loggerFactory.CreateLogger<FilteredStreamConsumerGrain>();
-        }
-
-        public override Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName)
-        {
-            throw new InvalidOperationException("Should not be calling unfiltered BecomeConsumer method on " + GetType());
-        }
-
-        public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName, bool sendEvensOnly)
-        {
-            if (logger.IsEnabled(LogLevel.Debug))
-                logger.LogDebug("BecomeConsumer StreamId={0} StreamProvider={1} Filter={2} Grain={3}",
-                streamId, providerName, sendEvensOnly, this.AsReference<IFilteredStreamConsumerGrain>());
-            InitStream(streamId, streamNamespace, providerName);
-
-            var observer = new MyStreamObserver<int>(logger);
-
-            StreamFilterPredicate filterFunc;
-            object filterData;
-            if (sendEvensOnly)
-            {
-                filterFunc = FilterIsEven;
-                filterData = FilterDataEven;
-            }
-            else
-            {
-                filterFunc = FilterIsOdd;
-                filterData = FilterDataOdd;
-            }
-
-            var subsHandle = await State.Stream.SubscribeAsync(observer, null, filterFunc, filterData);
-
-            State.ConsumerSubscriptionHandles.Add(subsHandle);
-            Observers.Add(subsHandle, observer);
-            await WriteStateAsync();
-        }
-
-        public async Task SubscribeWithBadFunc(Guid streamId, string streamNamespace, string providerName)
-        {
-            logger.Info("SubscribeWithBadFunc StreamId={0} StreamProvider={1}Grain={2}",
-                streamId, providerName, this.AsReference<IFilteredStreamConsumerGrain>());
-
-            InitStream(streamId, streamNamespace, providerName);
-
-            var observer = new MyStreamObserver<int>(logger);
-
-            StreamFilterPredicate filterFunc = BadFunc;
-
-            // This next call should fail because func is not static
-            await State.Stream.SubscribeAsync(observer, null, filterFunc);
-        }
-
-        public static bool FilterIsEven(IStreamIdentity stream, object filterData, object item)
-        {
-            if (!FilterDataEven.Equals(filterData))
-            {
-                throw new Exception("Should have got the correct filter data passed in, but got: " + filterData);
-            }
-            int val = (int) item;
-            bool result = val % 2 == 0;
-            if (staticLogger != null) staticLogger.Info("FilterIsEven(Stream={0},FilterData={1},Item={2}) Filter = {3}", stream, filterData, item, result);
-            return result;
-        }
-
-        public static bool FilterIsOdd(IStreamIdentity stream, object filterData, object item)
-        {
-            if (!FilterDataOdd.Equals(filterData))
-            {
-                throw new Exception("Should have got the correct filter data passed in, but got: " + filterData);
-            }
-            int val = (int) item;
-            bool result = val % 2 == 1;
-            if (staticLogger != null) staticLogger.Info("FilterIsOdd(Stream={0},FilterData={1},Item={2}) Filter = {3}", stream, filterData, item, result);
-            return result;
-        }
-
-        // Function is not static, so cannot be used as a filter predicate function.
-        public bool BadFunc(IStreamIdentity stream, object filterData, object item)
-        {
-            return true;
         }
     }
 
@@ -449,10 +350,10 @@ namespace UnitTests.Grains
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Finished SendItem for Item={0}", item);
         }
 
-        public async Task BecomeProducer(Guid streamId, string streamNamespace, string providerName)
+        public async Task BecomeProducer(StreamId streamId, string providerName)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BecomeProducer StreamId={0} StreamProvider={1}", streamId, providerName);
-            InitStream(streamId, streamNamespace, providerName);
+            InitStream(streamId, providerName);
             State.IsProducer = true;
 
             // Send an initial message to ensure we are properly initialized as a Producer.

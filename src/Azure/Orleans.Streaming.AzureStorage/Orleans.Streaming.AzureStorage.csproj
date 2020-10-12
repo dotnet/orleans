@@ -11,26 +11,23 @@
     <AssemblyName>Orleans.Streaming.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.Streaming.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <DefineConstants>TRACE;ORLEANS_STREAMING,ORLEANS_PERSISTENCE</DefineConstants>
+    <DefineConstants>$(DefineConstants);ORLEANS_STREAMING</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="..\Shared\Storage\AzureBlobUtils.cs" Link="Utilities\AzureBlobUtils.cs" />
-    <Compile Include="..\Shared\Storage\AzureQueueUtils.cs" Link="Storage\AzureQueueUtils.cs" />
+    <Compile Include="..\Shared\Storage\AzureStorageOperationOptions.cs" Link="Storage\AzureStorageOperationOptions.cs" />
+    <Compile Include="..\Shared\Storage\AzureStoragePolicyOptions.cs" Link="Storage\AzureStoragePolicyOptions.cs" />
     <Compile Include="..\Shared\Storage\AzureTableDataManager.cs" Link="Storage\AzureTableDataManager.cs" />
-    <Compile Include="..\Shared\Storage\AzureTableDefaultPolicies.cs" Link="Storage\AzureTableDefaultPolicies.cs" />
     <Compile Include="..\Shared\Storage\AzureTableUtils.cs" Link="Storage\AzureTableUtils.cs" />
     <Compile Include="..\Shared\Utilities\ErrorCode.cs" Link="Utilities\ErrorCode.cs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Core" Version="$(AzureCoreVersion)" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="$(AzureStorageBlobsVersion)" />
+    <PackageReference Include="Azure.Storage.Queues" Version="$(AzureStorageQueuesVersion)" />
     <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="$(MicrosoftAzureCosmosTableVersion)" />
-    <PackageReference Include="Microsoft.Azure.Storage.Blob" Version="$(MicrosoftAzureStorageBlobVersion)" />
-    <PackageReference Include="Microsoft.Azure.Storage.Queue" Version="$(MicrosoftAzureStorageQueueVersion)" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Storage\" />
-    <Folder Include="Utilities\" />
+    <PackageReference Include="System.Net.NameResolution" Version="$(SystemNetNameResolutionVersion)" />
   </ItemGroup>
 </Project>

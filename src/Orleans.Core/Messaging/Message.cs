@@ -65,7 +65,8 @@ namespace Orleans.Runtime
         {
             Success,
             Error,
-            Rejection
+            Rejection,
+            Status
         }
 
         public enum RejectionTypes
@@ -168,23 +169,23 @@ namespace Orleans.Runtime
 
         public ActivationAddress TargetAddress
         {
-            get { return targetAddress ?? (targetAddress = ActivationAddress.GetAddress(TargetSilo, TargetGrain, TargetActivation)); }
+            get
+            {
+                if (targetAddress is object) return targetAddress;
+                if (!TargetGrain.IsDefault)
+                {
+                    return targetAddress = ActivationAddress.GetAddress(TargetSilo, TargetGrain, TargetActivation);
+                }
+
+                return null;
+            }
+
             set
             {
                 TargetGrain = value.Grain;
                 TargetActivation = value.Activation;
                 TargetSilo = value.Silo;
                 targetAddress = value;
-            }
-        }
-        
-        public GuidId TargetObserverId
-        {
-            get { return Headers.TargetObserverId; }
-            set
-            {
-                Headers.TargetObserverId = value;
-                targetAddress = null;
             }
         }
         
@@ -250,12 +251,21 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool IsUsingInterfaceVersions
+        public ushort InterfaceVersion
         {
-            get { return Headers.IsUsingIfaceVersion; }
+            get { return Headers.InterfaceVersion; }
             set
             {
-                Headers.IsUsingIfaceVersion = value;
+                Headers.InterfaceVersion = value;
+            }
+        }
+
+        public GrainInterfaceType InterfaceType
+        {
+            get { return Headers.InterfaceType; }
+            set
+            {
+                Headers.InterfaceType = value;
             }
         }
 
@@ -290,19 +300,13 @@ namespace Orleans.Runtime
             if (id == null) return false;
 
             // don't set expiration for one way, system target and system grain messages.
-            return Direction != Directions.OneWay && !id.IsSystemTarget;
+            return Direction != Directions.OneWay && !id.IsSystemTarget();
         }
 
         public ITransactionInfo TransactionInfo
         {
             get { return Headers.TransactionInfo; }
             set { Headers.TransactionInfo = value; }
-        }
-
-        public string DebugContext
-        {
-            get { return GetNotNullString(Headers.DebugContext); }
-            set { Headers.DebugContext = value; }
         }
 
         public List<ActivationAddress> CacheInvalidationHeader
@@ -326,25 +330,6 @@ namespace Orleans.Runtime
             CacheInvalidationHeader = list;
         }
         
-        /// <summary>
-        /// Set by sender's placement logic when NewPlacementRequested is true
-        /// so that receiver knows desired grain type
-        /// </summary>
-        public string NewGrainType
-        {
-            get { return GetNotNullString(Headers.NewGrainType); }
-            set { Headers.NewGrainType = value; }
-        }
-        
-        /// <summary>
-        /// Set by caller's grain reference 
-        /// </summary>
-        public string GenericGrainType
-        {
-            get { return GetNotNullString(Headers.GenericGrainType); }
-            set { Headers.GenericGrainType = value; }
-        }
-
         public RejectionTypes RejectionType
         {
             get { return Headers.RejectionType; }
@@ -390,26 +375,17 @@ namespace Orleans.Runtime
         {
             var sb = new StringBuilder();
 
-            string debugContex = DebugContext;
-            if (!string.IsNullOrEmpty(debugContex))
-            {
-                // if DebugContex is present, print it first.
-                sb.Append(debugContex).Append(".");
-            }
-
             AppendIfExists(HeadersContainer.Headers.CACHE_INVALIDATION_HEADER, sb, (m) => m.CacheInvalidationHeader);
             AppendIfExists(HeadersContainer.Headers.CATEGORY, sb, (m) => m.Category);
             AppendIfExists(HeadersContainer.Headers.DIRECTION, sb, (m) => m.Direction);
             AppendIfExists(HeadersContainer.Headers.TIME_TO_LIVE, sb, (m) => m.TimeToLive);
             AppendIfExists(HeadersContainer.Headers.FORWARD_COUNT, sb, (m) => m.ForwardCount);
-            AppendIfExists(HeadersContainer.Headers.GENERIC_GRAIN_TYPE, sb, (m) => m.GenericGrainType);
             AppendIfExists(HeadersContainer.Headers.CORRELATION_ID, sb, (m) => m.Id);
             AppendIfExists(HeadersContainer.Headers.ALWAYS_INTERLEAVE, sb, (m) => m.IsAlwaysInterleave);
             AppendIfExists(HeadersContainer.Headers.IS_NEW_PLACEMENT, sb, (m) => m.IsNewPlacement);
             AppendIfExists(HeadersContainer.Headers.IS_RETURNED_FROM_REMOTE_CLUSTER, sb, (m) => m.IsReturnedFromRemoteCluster);
             AppendIfExists(HeadersContainer.Headers.READ_ONLY, sb, (m) => m.IsReadOnly);
             AppendIfExists(HeadersContainer.Headers.IS_UNORDERED, sb, (m) => m.IsUnordered);
-            AppendIfExists(HeadersContainer.Headers.NEW_GRAIN_TYPE, sb, (m) => m.NewGrainType);
             AppendIfExists(HeadersContainer.Headers.REJECTION_INFO, sb, (m) => m.RejectionInfo);
             AppendIfExists(HeadersContainer.Headers.REJECTION_TYPE, sb, (m) => m.RejectionType);
             AppendIfExists(HeadersContainer.Headers.REQUEST_CONTEXT, sb, (m) => m.RequestContextData);
@@ -419,7 +395,6 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.SENDING_SILO, sb, (m) => m.SendingSilo);
             AppendIfExists(HeadersContainer.Headers.TARGET_ACTIVATION, sb, (m) => m.TargetActivation);
             AppendIfExists(HeadersContainer.Headers.TARGET_GRAIN, sb, (m) => m.TargetGrain);
-            AppendIfExists(HeadersContainer.Headers.TARGET_OBSERVER, sb, (m) => m.TargetObserverId);
             AppendIfExists(HeadersContainer.Headers.CALL_CHAIN_ID, sb, (m) => m.CallChainId);
             AppendIfExists(HeadersContainer.Headers.TRACE_CONTEXT, sb, (m) => m.TraceContext);
             AppendIfExists(HeadersContainer.Headers.TARGET_SILO, sb, (m) => m.TargetSilo);
@@ -452,21 +427,24 @@ namespace Orleans.Runtime
                         response = string.Format("{0} Rejection (info: {1}) ", RejectionType, RejectionInfo);
                         break;
 
+                    case ResponseTypes.Status:
+                        response = "Status ";
+                        break;
+
                     default:
                         break;
                 }
             }
-            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}: {9}",
+            return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}",
                 IsReadOnly ? "ReadOnly " : "", //0
                 IsAlwaysInterleave ? "IsAlwaysInterleave " : "", //1
                 IsNewPlacement ? "NewPlacement " : "", // 2
                 response,  //3
                 Direction, //4
-                String.Format("{0}{1}{2}", SendingSilo, SendingGrain, SendingActivation), //5
-                String.Format("{0}{1}{2}{3}", TargetSilo, TargetGrain, TargetActivation, TargetObserverId), //6
+                $"[{SendingSilo} {SendingGrain} {SendingActivation}]", //5
+                $"[{TargetSilo} {TargetGrain} {TargetActivation}]", //6
                 Id, //7
-                ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "", //8
-                DebugContext); //9
+                ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : ""); //8
         }
 
         internal void SetTargetPlacement(PlacementResult value)
@@ -476,11 +454,7 @@ namespace Orleans.Runtime
 
             if (value.IsNewPlacement)
                 IsNewPlacement = true;
-
-            if (!String.IsNullOrEmpty(value.GrainType))
-                NewGrainType = value.GrainType;
         }
-
 
         public string GetTargetHistory()
         {
@@ -494,7 +468,7 @@ namespace Orleans.Runtime
             {
                 history.Append(TargetGrain).Append(":");
             }
-            if (TargetActivation != null)
+            if (TargetActivation is object)
             {
                 history.Append(TargetActivation);
             }
@@ -563,7 +537,7 @@ namespace Orleans.Runtime
                 CACHE_INVALIDATION_HEADER = 1 << 1,
                 CATEGORY = 1 << 2,
                 CORRELATION_ID = 1 << 3,
-                DEBUG_CONTEXT = 1 << 4,
+                DEBUG_CONTEXT = 1 << 4, // No longer used
                 DIRECTION = 1 << 5,
                 TIME_TO_LIVE = 1 << 6,
                 FORWARD_COUNT = 1 << 7,
@@ -586,7 +560,7 @@ namespace Orleans.Runtime
                 IS_UNORDERED = 1 << 23,
                 REQUEST_CONTEXT = 1 << 24,
                 IS_RETURNED_FROM_REMOTE_CLUSTER = 1 << 25,
-                IS_USING_INTERFACE_VERSION = 1 << 26,
+                INTERFACE_VERSION = 1 << 26,
 
                 // transactions
                 TRANSACTION_INFO = 1 << 27,
@@ -594,7 +568,9 @@ namespace Orleans.Runtime
 
                 CALL_CHAIN_ID = 1 << 29,
 
-                TRACE_CONTEXT = 1 << 30
+                TRACE_CONTEXT = 1 << 30,
+
+                INTERFACE_TYPE = 1 << 31
                 // Do not add over int.MaxValue of these.
             }
 
@@ -610,25 +586,22 @@ namespace Orleans.Runtime
             private SiloAddress _targetSilo;
             private GrainId _targetGrain;
             private ActivationId _targetActivation;
-            private GuidId _targetObserverId;
             private SiloAddress _sendingSilo;
             private GrainId _sendingGrain;
             private ActivationId _sendingActivation;
             private bool _isNewPlacement;
-            private bool _isUsingIfaceVersion;
+            private ushort _interfaceVersion;
             private ResponseTypes _result;
             private ITransactionInfo _transactionInfo;
             private TimeSpan? _timeToLive;
-            private string _debugContext;
             private List<ActivationAddress> _cacheInvalidationHeader;
-            private string _newGrainType;
-            private string _genericGrainType;
             private RejectionTypes _rejectionType;
             private string _rejectionInfo;
             private Dictionary<string, object> _requestContextData;
             private CorrelationId _callChainId;
             private readonly DateTime _localCreationTime;
-            private TraceContext traceContext;
+            private TraceContext _traceContext;
+            private GrainInterfaceType interfaceType;
 
             public HeadersContainer()
             {
@@ -637,8 +610,8 @@ namespace Orleans.Runtime
 
             public TraceContext TraceContext
             {
-                get { return traceContext; }
-                set { traceContext = value; }
+                get { return _traceContext; }
+                set { _traceContext = value; }
             }
 
             public Categories Category
@@ -749,15 +722,6 @@ namespace Orleans.Runtime
                 }
             }
 
-            public GuidId TargetObserverId
-            {
-                get { return _targetObserverId; }
-                set
-                {
-                    _targetObserverId = value;
-                }
-            }
-
             public SiloAddress SendingSilo
             {
                 get { return _sendingSilo; }
@@ -794,12 +758,12 @@ namespace Orleans.Runtime
                 }
             }
 
-            public bool IsUsingIfaceVersion
+            public ushort InterfaceVersion
             {
-                get { return _isUsingIfaceVersion; }
+                get { return _interfaceVersion; }
                 set
                 {
-                    _isUsingIfaceVersion = value;
+                    _interfaceVersion = value;
                 }
             }
 
@@ -833,47 +797,12 @@ namespace Orleans.Runtime
                 }
             }
 
-
-            public string DebugContext
-            {
-                get { return _debugContext; }
-                set
-                {
-                    _debugContext = value;
-                }
-            }
-
             public List<ActivationAddress> CacheInvalidationHeader
             {
                 get { return _cacheInvalidationHeader; }
                 set
                 {
                     _cacheInvalidationHeader = value;
-                }
-            }
-
-            /// <summary>
-            /// Set by sender's placement logic when NewPlacementRequested is true
-            /// so that receiver knows desired grain type
-            /// </summary>
-            public string NewGrainType
-            {
-                get { return _newGrainType; }
-                set
-                {
-                    _newGrainType = value;
-                }
-            }
-
-            /// <summary>
-            /// Set by caller's grain reference 
-            /// </summary>
-            public string GenericGrainType
-            {
-                get { return _genericGrainType; }
-                set
-                {
-                    _genericGrainType = value;
                 }
             }
 
@@ -913,6 +842,15 @@ namespace Orleans.Runtime
                 }
             }
 
+            public GrainInterfaceType InterfaceType
+            {
+                get { return interfaceType; }
+                set
+                {
+                    interfaceType = value;
+                }
+            }
+
             internal Headers GetHeadersMask()
             {
                 Headers headers = Headers.NONE;
@@ -933,28 +871,25 @@ namespace Orleans.Runtime
                     headers = headers | Headers.FORWARD_COUNT;
 
                 headers = _targetSilo == null ? headers & ~Headers.TARGET_SILO : headers | Headers.TARGET_SILO;
-                headers = _targetGrain == null ? headers & ~Headers.TARGET_GRAIN : headers | Headers.TARGET_GRAIN;
-                headers = _targetActivation == null ? headers & ~Headers.TARGET_ACTIVATION : headers | Headers.TARGET_ACTIVATION;
-                headers = _targetObserverId == null ? headers & ~Headers.TARGET_OBSERVER : headers | Headers.TARGET_OBSERVER;
-                headers = _sendingSilo == null ? headers & ~Headers.SENDING_SILO : headers | Headers.SENDING_SILO;
-                headers = _sendingGrain == null ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
-                headers = _sendingActivation == null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
+                headers = _targetGrain.IsDefault ? headers & ~Headers.TARGET_GRAIN : headers | Headers.TARGET_GRAIN;
+                headers = _targetActivation is null ? headers & ~Headers.TARGET_ACTIVATION : headers | Headers.TARGET_ACTIVATION;
+                headers = _sendingSilo is null ? headers & ~Headers.SENDING_SILO : headers | Headers.SENDING_SILO;
+                headers = _sendingGrain.IsDefault ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
+                headers = _sendingActivation is null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
                 headers = _isNewPlacement == default(bool) ? headers & ~Headers.IS_NEW_PLACEMENT : headers | Headers.IS_NEW_PLACEMENT;
                 headers = _isReturnedFromRemoteCluster == default(bool) ? headers & ~Headers.IS_RETURNED_FROM_REMOTE_CLUSTER : headers | Headers.IS_RETURNED_FROM_REMOTE_CLUSTER;
-                headers = _isUsingIfaceVersion == default(bool) ? headers & ~Headers.IS_USING_INTERFACE_VERSION : headers | Headers.IS_USING_INTERFACE_VERSION;
+                headers = _interfaceVersion == 0 ? headers & ~Headers.INTERFACE_VERSION : headers | Headers.INTERFACE_VERSION;
                 headers = _result == default(ResponseTypes)? headers & ~Headers.RESULT : headers | Headers.RESULT;
                 headers = _timeToLive == null ? headers & ~Headers.TIME_TO_LIVE : headers | Headers.TIME_TO_LIVE;
-                headers = string.IsNullOrEmpty(_debugContext) ? headers & ~Headers.DEBUG_CONTEXT : headers | Headers.DEBUG_CONTEXT;
                 headers = _cacheInvalidationHeader == null || _cacheInvalidationHeader.Count == 0 ? headers & ~Headers.CACHE_INVALIDATION_HEADER : headers | Headers.CACHE_INVALIDATION_HEADER;
-                headers = string.IsNullOrEmpty(_newGrainType) ? headers & ~Headers.NEW_GRAIN_TYPE : headers | Headers.NEW_GRAIN_TYPE;
-                headers = string.IsNullOrEmpty(GenericGrainType) ? headers & ~Headers.GENERIC_GRAIN_TYPE : headers | Headers.GENERIC_GRAIN_TYPE;
                 headers = _rejectionType == default(RejectionTypes) ? headers & ~Headers.REJECTION_TYPE : headers | Headers.REJECTION_TYPE;
                 headers = string.IsNullOrEmpty(_rejectionInfo) ? headers & ~Headers.REJECTION_INFO : headers | Headers.REJECTION_INFO;
                 headers = _requestContextData == null || _requestContextData.Count == 0 ? headers & ~Headers.REQUEST_CONTEXT : headers | Headers.REQUEST_CONTEXT;
                 headers = _callChainId == null ? headers & ~Headers.CALL_CHAIN_ID : headers | Headers.CALL_CHAIN_ID;
-                headers = traceContext == null? headers & ~Headers.TRACE_CONTEXT : headers | Headers.TRACE_CONTEXT;
+                headers = _traceContext == null? headers & ~Headers.TRACE_CONTEXT : headers | Headers.TRACE_CONTEXT;
                 headers = IsTransactionRequired ? headers | Headers.IS_TRANSACTION_REQUIRED : headers & ~Headers.IS_TRANSACTION_REQUIRED;
                 headers = _transactionInfo == null ? headers & ~Headers.TRANSACTION_INFO : headers | Headers.TRANSACTION_INFO;
+                headers = interfaceType.IsDefault ? headers & ~Headers.INTERFACE_TYPE : headers | Headers.INTERFACE_TYPE;
                 return headers;
             }
 
@@ -987,9 +922,6 @@ namespace Orleans.Runtime
                     writer.Write((byte)input.Category);
                 }
 
-                if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
-                    writer.Write(input.DebugContext);
-
                 if ((headers & Headers.DIRECTION) != Headers.NONE)
                     writer.Write((byte)input.Direction.Value);
 
@@ -998,9 +930,6 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
                     writer.Write(input.ForwardCount);
-
-                if ((headers & Headers.GENERIC_GRAIN_TYPE) != Headers.NONE)
-                    writer.Write(input.GenericGrainType);
 
                 if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
                     writer.Write(input.Id);
@@ -1014,17 +943,14 @@ namespace Orleans.Runtime
                 if ((headers & Headers.IS_RETURNED_FROM_REMOTE_CLUSTER) != Headers.NONE)
                     writer.Write(input.IsReturnedFromRemoteCluster);
 
-                // Nothing to do with Headers.IS_USING_INTERFACE_VERSION since the value in
-                // the header is sufficient
+                if ((headers & Headers.INTERFACE_VERSION) != Headers.NONE)
+                    writer.Write(input.InterfaceVersion);
 
                 if ((headers & Headers.READ_ONLY) != Headers.NONE)
                     writer.Write(input.IsReadOnly);
 
                 if ((headers & Headers.IS_UNORDERED) != Headers.NONE)
                     writer.Write(input.IsUnordered);
-
-                if ((headers & Headers.NEW_GRAIN_TYPE) != Headers.NONE)
-                    writer.Write(input.NewGrainType);
 
                 if ((headers & Headers.REJECTION_INFO) != Headers.NONE)
                     writer.Write(input.RejectionInfo);
@@ -1072,11 +998,6 @@ namespace Orleans.Runtime
                     writer.Write(input.TargetGrain);
                 }
 
-                if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
-                {
-                    WriteObj(sm, context, typeof(GuidId), input.TargetObserverId);
-                }
-
                 if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
                 {
                     writer.Write(input.CallChainId);
@@ -1092,7 +1013,12 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.TRACE_CONTEXT) != Headers.NONE)
                 {
-                    SerializationManager.SerializeInner(input.traceContext, context, typeof(TraceContext));
+                    SerializationManager.SerializeInner(input._traceContext, context, typeof(TraceContext));
+                }
+
+                if ((headers & Headers.INTERFACE_TYPE) != Headers.NONE)
+                {
+                    writer.Write(input.interfaceType);
                 }
             }
 
@@ -1122,7 +1048,7 @@ namespace Orleans.Runtime
                     result.Category = (Categories)reader.ReadByte();
 
                 if ((headers & Headers.DEBUG_CONTEXT) != Headers.NONE)
-                    result.DebugContext = reader.ReadString();
+                    _ = reader.ReadString();
 
                 if ((headers & Headers.DIRECTION) != Headers.NONE)
                     result.Direction = (Message.Directions)reader.ReadByte();
@@ -1134,7 +1060,7 @@ namespace Orleans.Runtime
                     result.ForwardCount = reader.ReadInt();
 
                 if ((headers & Headers.GENERIC_GRAIN_TYPE) != Headers.NONE)
-                    result.GenericGrainType = reader.ReadString();
+                    _ = reader.ReadString();
 
                 if ((headers & Headers.CORRELATION_ID) != Headers.NONE)
                     result.Id = (Orleans.Runtime.CorrelationId)ReadObj(sm, typeof(CorrelationId), context);
@@ -1148,8 +1074,8 @@ namespace Orleans.Runtime
                 if ((headers & Headers.IS_RETURNED_FROM_REMOTE_CLUSTER) != Headers.NONE)
                     result.IsReturnedFromRemoteCluster = ReadBool(reader);
 
-                if ((headers & Headers.IS_USING_INTERFACE_VERSION) != Headers.NONE)
-                    result.IsUsingIfaceVersion = true;
+                if ((headers & Headers.INTERFACE_VERSION) != Headers.NONE)
+                    result.InterfaceVersion = reader.ReadUShort();
 
                 if ((headers & Headers.READ_ONLY) != Headers.NONE)
                     result.IsReadOnly = ReadBool(reader);
@@ -1158,7 +1084,7 @@ namespace Orleans.Runtime
                     result.IsUnordered = ReadBool(reader);
 
                 if ((headers & Headers.NEW_GRAIN_TYPE) != Headers.NONE)
-                    result.NewGrainType = reader.ReadString();
+                    _ = reader.ReadString();
 
                 if ((headers & Headers.REJECTION_INFO) != Headers.NONE)
                     result.RejectionInfo = reader.ReadString();
@@ -1199,7 +1125,7 @@ namespace Orleans.Runtime
                     result.TargetGrain = reader.ReadGrainId();
 
                 if ((headers & Headers.TARGET_OBSERVER) != Headers.NONE)
-                    result.TargetObserverId = (GuidId)ReadObj(sm, typeof(GuidId), context);
+                    _ = (GuidId)ReadObj(sm, typeof(GuidId), context);
 
                 if ((headers & Headers.CALL_CHAIN_ID) != Headers.NONE)
                     result.CallChainId = reader.ReadCorrelationId();
@@ -1214,6 +1140,9 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.TRACE_CONTEXT) != Headers.NONE)
                     result.TraceContext = SerializationManager.DeserializeInner<TraceContext>(context);
+
+                if ((headers & Headers.INTERFACE_TYPE) != Headers.NONE)
+                    result.InterfaceType = reader.ReadGrainInterfaceType();
 
                 return result;
             }

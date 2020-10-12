@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Azure.Storage.Queue;
+using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
+using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
@@ -14,7 +14,7 @@ using Xunit;
 namespace Tester.AzureUtils
 {
     [TestCategory("Azure"), TestCategory("Storage"), TestCategory("AzureQueue")]
-    public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTests>, IDisposable
+    public class AzureQueueDataManagerTests : IClassFixture<AzureStorageBasicTests>, IAsyncLifetime
     {
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -28,16 +28,17 @@ namespace Tester.AzureUtils
             this.loggerFactory = loggerFactory;
         }
 
-        public void Dispose()
-        {
-            AzureQueueDataManager manager = GetTableManager(queueName).Result;
-            manager.DeleteQueue().Wait();
-        }
+        public Task InitializeAsync() => Task.CompletedTask;
 
+        public async Task DisposeAsync()
+        {
+            AzureQueueDataManager manager = await GetTableManager(queueName);
+            await manager.DeleteQueue();
+        }
 
         private async Task<AzureQueueDataManager> GetTableManager(string qName, TimeSpan? visibilityTimeout = null)
         {
-            AzureQueueDataManager manager = new AzureQueueDataManager(this.loggerFactory, $"{qName}-{DeploymentId}", TestDefaultConfiguration.DataConnectionString, visibilityTimeout);
+            AzureQueueDataManager manager = new AzureQueueDataManager(this.loggerFactory, $"{qName}-{DeploymentId}", new AzureQueueOptions { MessageVisibilityTimeout = visibilityTimeout }.ConfigureTestDefaults());
             await manager.InitQueueAsync();
             return manager;
         }
@@ -49,25 +50,25 @@ namespace Tester.AzureUtils
             AzureQueueDataManager manager = await GetTableManager(queueName);
             Assert.Equal(0, await manager.GetApproximateMessageCount());
 
-            CloudQueueMessage inMessage = new CloudQueueMessage("Hello, World");
+            var inMessage = "Hello, World";
             await manager.AddQueueMessage(inMessage);
             //Nullable<int> count = manager.ApproximateMessageCount;
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
-            CloudQueueMessage outMessage1 = await manager.PeekQueueMessage();
-            logger.Info("PeekQueueMessage 1: {0}", PrintCloudQueueMessage(outMessage1));
-            Assert.Equal(inMessage.AsString, outMessage1.AsString);
+            var outMessage1 = await manager.PeekQueueMessage();
+            logger.Info("PeekQueueMessage 1: {0}", PrintQueueMessage(outMessage1));
+            Assert.Equal(inMessage, outMessage1.MessageText);
 
-            CloudQueueMessage outMessage2 = await manager.PeekQueueMessage();
-            logger.Info("PeekQueueMessage 2: {0}", PrintCloudQueueMessage(outMessage2));
-            Assert.Equal(inMessage.AsString, outMessage2.AsString);
+            var outMessage2 = await manager.PeekQueueMessage();
+            logger.Info("PeekQueueMessage 2: {0}", PrintQueueMessage(outMessage2));
+            Assert.Equal(inMessage, outMessage2.MessageText);
 
-            CloudQueueMessage outMessage3 = await manager.GetQueueMessage();
-            logger.Info("GetQueueMessage 3: {0}", PrintCloudQueueMessage(outMessage3));
-            Assert.Equal(inMessage.AsString, outMessage3.AsString);
+            QueueMessage outMessage3 = await manager.GetQueueMessage();
+            logger.Info("GetQueueMessage 3: {0}", PrintQueueMessage(outMessage3));
+            Assert.Equal(inMessage, outMessage3.MessageText);
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
-            CloudQueueMessage outMessage4 = await manager.GetQueueMessage();
+            QueueMessage outMessage4 = await manager.GetQueueMessage();
             Assert.Null(outMessage4);
 
             Assert.Equal(1, await manager.GetApproximateMessageCount());
@@ -82,19 +83,19 @@ namespace Tester.AzureUtils
             queueName = "Test-2-".ToLower() + Guid.NewGuid();
             AzureQueueDataManager manager = await GetTableManager(queueName);
 
-            IEnumerable<CloudQueueMessage> msgs = await manager.GetQueueMessages();
+            IEnumerable<QueueMessage> msgs = await manager.GetQueueMessages();
             Assert.True(msgs == null || msgs.Count() == 0);
 
             int numMsgs = 10;
             List<Task> promises = new List<Task>();
             for (int i = 0; i < numMsgs; i++)
             {
-                promises.Add(manager.AddQueueMessage(new CloudQueueMessage(i.ToString())));
+                promises.Add(manager.AddQueueMessage(i.ToString()));
             }
             Task.WaitAll(promises.ToArray());
             Assert.Equal(numMsgs, await manager.GetApproximateMessageCount());
 
-            msgs = new List<CloudQueueMessage>(await manager.GetQueueMessages(numMsgs));
+            msgs = new List<QueueMessage>(await manager.GetQueueMessages(numMsgs));
             Assert.Equal(numMsgs, msgs.Count());
             Assert.Equal(numMsgs, await manager.GetApproximateMessageCount());
 
@@ -135,33 +136,41 @@ namespace Tester.AzureUtils
             AzureQueueDataManager manager = await GetTableManager(queueName, visibilityTimeout);
             Assert.Equal(0, await manager.GetApproximateMessageCount());
 
-            CloudQueueMessage inMessage = new CloudQueueMessage("Hello, World");
+            var inMessage = "Hello, World";
             await manager.AddQueueMessage(inMessage);
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
-            CloudQueueMessage outMessage = await manager.GetQueueMessage();
-            logger.Info("GetQueueMessage: {0}", PrintCloudQueueMessage(outMessage));
-            Assert.Equal(inMessage.AsString, outMessage.AsString);
+            QueueMessage outMessage = await manager.GetQueueMessage();
+            logger.Info("GetQueueMessage: {0}", PrintQueueMessage(outMessage));
+            Assert.Equal(inMessage, outMessage.MessageText);
 
             await Task.Delay(visibilityTimeout);
 
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
-            CloudQueueMessage outMessage2 = await manager.GetQueueMessage();
-            Assert.Equal(inMessage.AsString, outMessage2.AsString);
+            QueueMessage outMessage2 = await manager.GetQueueMessage();
+            Assert.Equal(inMessage, outMessage2.MessageText);
 
             await manager.DeleteQueueMessage(outMessage2);
             Assert.Equal(0, await manager.GetApproximateMessageCount());
         }
 
-        private static string PrintCloudQueueMessage(CloudQueueMessage message)
+        private static string PrintQueueMessage(QueueMessage message)
         {
-            return String.Format("CloudQueueMessage: Id = {0}, NextVisibleTime = {1}, DequeueCount = {2}, PopReceipt = {3}, Content = {4}",
-                    message.Id,
-                    message.NextVisibleTime.HasValue ? LogFormatter.PrintDate(message.NextVisibleTime.Value.DateTime) : "",
+            return String.Format("QueueMessage: Id = {0}, NextVisibleTime = {1}, DequeueCount = {2}, PopReceipt = {3}, Content = {4}",
+                    message.MessageId,
+                    message.NextVisibleOn.HasValue ? LogFormatter.PrintDate(message.NextVisibleOn.Value.DateTime) : "",
                     message.DequeueCount,
                     message.PopReceipt,
-                    message.AsString);
+                    message.MessageText);
+        }
+
+        private static string PrintQueueMessage(PeekedMessage message)
+        {
+            return String.Format("QueueMessage: Id = {0}, DequeueCount = {1}, Content = {2}",
+                    message.MessageId,
+                    message.DequeueCount,
+                    message.MessageText);
         }
     }
 }

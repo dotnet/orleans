@@ -1,8 +1,10 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
-using Orleans.Runtime.Providers;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using System.Threading;
+using System.Diagnostics;
 
 namespace Orleans.Runtime
 {
@@ -10,52 +12,48 @@ namespace Orleans.Runtime
     /// Contains list of cancellation token source corresponding to the tokens
     /// passed to the related grain activation.
     /// </summary>
-    internal class CancellationSourcesExtension : ICancellationSourcesExtension
+    internal class CancellationSourcesExtension : ICancellationSourcesExtension, IDisposable
     {
+        private readonly ConcurrentDictionary<Guid, Entry> _cancellationTokens = new ConcurrentDictionary<Guid, Entry>();
         private readonly ILogger _logger;
-
-        private readonly Interner<Guid, GrainCancellationToken> _cancellationTokens;
+        private readonly IGrainCancellationTokenRuntime _cancellationTokenRuntime;
+        private readonly Timer _cleanupTimer;
+        private readonly Func<Guid, Entry> _createToken;
         private static readonly TimeSpan _cleanupFrequency = TimeSpan.FromMinutes(7);
-        private const int _defaultInternerCollectionSize = 31;
 
-
-        public CancellationSourcesExtension(ILoggerFactory loggerFactory)
+        public CancellationSourcesExtension(ILoggerFactory loggerFactory, IGrainCancellationTokenRuntime cancellationRuntime)
         {
-            _cancellationTokens = new Interner<Guid, GrainCancellationToken>(
-                 _defaultInternerCollectionSize,
-                 _cleanupFrequency);
             _logger = loggerFactory.CreateLogger<CancellationSourcesExtension>();
+            _cancellationTokenRuntime = cancellationRuntime;
+            _cleanupTimer = new Timer(obj => ((CancellationSourcesExtension)obj).ExpireTokens(), this, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+            _createToken = id => new Entry(new GrainCancellationToken(id, false, _cancellationTokenRuntime));
         }
 
         public Task CancelRemoteToken(Guid tokenId)
         {
-            GrainCancellationToken gct;
-            if (!_cancellationTokens.TryFind(tokenId, out gct))
+            if (!_cancellationTokens.TryGetValue(tokenId, out var entry))
             {
-                _logger.Error(ErrorCode.CancellationTokenCancelFailed,  $"Remote token cancellation failed: token with id {tokenId} was not found");
+                _logger.LogWarning((int)ErrorCode.CancellationTokenCancelFailed, "Received a cancel call for token with id {TokenId}, but the token was not found", tokenId);
+
+                // Record the cancellation anyway, in case the call which would have registered the cancellation is still pending.
+                this.RecordCancellationToken(tokenId, isCancellationRequested: true);
                 return Task.CompletedTask;
             }
 
-            return gct.Cancel();
+            entry.Touch();
+            var token = entry.Token;
+            return token.Cancel();
         }
 
         /// <summary>
         /// Adds CancellationToken to the grain extension
-        /// so that it can be cancelled through remote call to the CancellationSourcesExtension.
+        /// so that it can be canceled through remote call to the CancellationSourcesExtension.
         /// </summary>
         /// <param name="target"></param>
         /// <param name="request"></param>
-        /// <param name="loggerFactory">logger factory configured in current cluster</param>
-        /// <param name="logger">caller's logger</param>
-        /// <param name="siloRuntimeClient"></param>
-        /// <param name="cancellationTokenRuntime"></param>
         internal static void RegisterCancellationTokens(
-            IAddressable target,
-            InvokeMethodRequest request,
-            ILoggerFactory loggerFactory,
-            ILogger logger,
-            ISiloRuntimeClient siloRuntimeClient,
-            IGrainCancellationTokenRuntime cancellationTokenRuntime)
+            IGrainContext target,
+            InvokeMethodRequest request)
         {
             for (var i = 0; i < request.Arguments.Length; i++)
             {
@@ -63,32 +61,67 @@ namespace Orleans.Runtime
                 if (!(arg is GrainCancellationToken)) continue;
                 var grainToken = ((GrainCancellationToken) request.Arguments[i]);
 
-                CancellationSourcesExtension cancellationExtension;
-                if (!siloRuntimeClient.TryGetExtensionHandler(out cancellationExtension))
-                {
-                    cancellationExtension = new CancellationSourcesExtension(loggerFactory);
-                    if (!siloRuntimeClient.TryAddExtension(cancellationExtension))
-                    {
-                        logger.Error(
-                            ErrorCode.CancellationExtensionCreationFailed,
-                            $"Could not add cancellation token extension to: {target}");
-                        return;
-                    }
-                }
+                var cancellationExtension = (CancellationSourcesExtension)target.GetGrainExtension<ICancellationSourcesExtension>(); 
 
                 // Replacing the half baked GrainCancellationToken that came from the wire with locally fully created one.
-                request.Arguments[i] = cancellationExtension.RecordCancellationToken(grainToken.Id, grainToken.IsCancellationRequested, cancellationTokenRuntime);
+                request.Arguments[i] = cancellationExtension.RecordCancellationToken(grainToken.Id, grainToken.IsCancellationRequested);
             }
         }
 
-        private GrainCancellationToken RecordCancellationToken(Guid tokenId, bool isCancellationRequested, IGrainCancellationTokenRuntime cancellationTokenRuntime)
+        private GrainCancellationToken RecordCancellationToken(Guid tokenId, bool isCancellationRequested)
         {
-            GrainCancellationToken localToken;
-            if (_cancellationTokens.TryFind(tokenId, out localToken))
+            if (_cancellationTokens.TryGetValue(tokenId, out var entry))
             {
-                return localToken;
+                entry.Touch();
+                return entry.Token;
             }
-            return _cancellationTokens.Intern(tokenId, new GrainCancellationToken(tokenId, isCancellationRequested, cancellationTokenRuntime));
+
+            entry = _cancellationTokens.GetOrAdd(tokenId, _createToken);
+            if (isCancellationRequested)
+            {
+                entry.Token.Cancel();
+            }
+
+            return entry.Token;
+        }
+
+        private void ExpireTokens()
+        {
+            var now = Stopwatch.GetTimestamp();
+            foreach (var token in _cancellationTokens)
+            {
+                if (token.Value.IsExpired(_cleanupFrequency, now))
+                {
+                    _cancellationTokens.TryRemove(token.Key, out _);
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            _cleanupTimer.Dispose();
+        }
+
+        private class Entry
+        {
+            private long _createdTime;
+
+            public Entry(GrainCancellationToken token)
+            {
+                Token = token;
+                _createdTime = Stopwatch.GetTimestamp();
+            }
+
+            public void Touch() => _createdTime = Stopwatch.GetTimestamp();
+
+            public GrainCancellationToken Token { get; }
+
+            public bool IsExpired(TimeSpan expiry, long nowTimestamp)
+            {
+                var untouchedTime = TimeSpan.FromSeconds((nowTimestamp - _createdTime) / Stopwatch.Frequency);
+
+                return untouchedTime >= expiry;
+            }
         }
     }
 }

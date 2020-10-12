@@ -2,7 +2,6 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Internal;
 
 namespace Orleans.Runtime
 {
@@ -13,8 +12,7 @@ namespace Orleans.Runtime
         /// </summary>
         private static readonly TimeSpan TimerDelaySlack = TimeSpan.FromSeconds(3);
 
-        private readonly Task cancellationTask;
-        private readonly CancellationTokenSource cancellation;
+        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly TimeSpan period;
         private readonly ILogger log;
         private DateTime lastFired = DateTime.MinValue;
@@ -22,8 +20,6 @@ namespace Orleans.Runtime
 
         public AsyncTimer(TimeSpan period, ILogger log)
         {
-            this.cancellation = new CancellationTokenSource();
-            this.cancellationTask = this.cancellation.Token.WhenCancelled();
             this.log = log;
             this.period = period;
         }
@@ -35,7 +31,7 @@ namespace Orleans.Runtime
         /// <returns><see langword="true"/> if the timer completed or <see langword="false"/> if the timer was cancelled</returns>
         public async Task<bool> NextTick(TimeSpan? overrideDelay = default)
         {
-            if (this.cancellationTask.IsCompleted) return false;
+            if (cancellation.IsCancellationRequested) return false;
 
             var start = DateTime.UtcNow;
             TimeSpan delay;
@@ -61,8 +57,23 @@ namespace Orleans.Runtime
             this.expected = dueTime;
             if (delay > TimeSpan.Zero)
             {
-                var resultTask = await Task.WhenAny(this.cancellationTask, Task.Delay(delay));
-                if (ReferenceEquals(resultTask, this.cancellationTask)) return false;
+                try
+                {
+                    // for backwards compatibility, support timers with periods up to ReminderRegistry.MaxSupportedTimeout
+                    var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
+                    if (delay > maxDelay)
+                    {
+                        delay -= maxDelay;
+                        await Task.Delay(maxDelay, cancellation.Token).ConfigureAwait(false);
+                    }
+
+                    await Task.Delay(delay, cancellation.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    await Task.Yield();
+                    return false;
+                }
             }
 
             var now = this.lastFired = DateTime.UtcNow;
@@ -110,7 +121,7 @@ namespace Orleans.Runtime
         public void Dispose()
         {
             this.expected = default;
-            this.cancellation?.Cancel(throwOnFirstException: false);
+            this.cancellation.Cancel();
         }
     }
 }

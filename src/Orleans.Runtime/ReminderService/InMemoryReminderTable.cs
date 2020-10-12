@@ -1,56 +1,55 @@
 using System;
-using System.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime.ReminderService
 {
     internal class InMemoryReminderTable : IReminderTable, ILifecycleParticipant<ISiloLifecycle>
     {
+        internal const long ReminderTableGrainId = 12345;
         private readonly IReminderTableGrain reminderTableGrain;
         private bool isAvailable;
 
         public InMemoryReminderTable(IGrainFactory grainFactory)
         {
-            this.reminderTableGrain = grainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
+            this.reminderTableGrain = grainFactory.GetGrain<IReminderTableGrain>(ReminderTableGrainId);
         }
 
         public Task Init() => Task.CompletedTask;
 
-        public async Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
+        public Task<ReminderEntry> ReadRow(GrainReference grainRef, string reminderName)
         {
             this.ThrowIfNotAvailable();
-            return await this.reminderTableGrain.ReadRow(grainRef, reminderName);
+            return this.reminderTableGrain.ReadRow(grainRef, reminderName);
         }
 
-        public async Task<ReminderTableData> ReadRows(GrainReference key)
+        public Task<ReminderTableData> ReadRows(GrainReference key)
         {
             this.ThrowIfNotAvailable();
-            return await this.reminderTableGrain.ReadRows(key);
+            return this.reminderTableGrain.ReadRows(key);
         }
 
-        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+        public Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
-            if (!this.isAvailable) return new ReminderTableData();
-
-            return await this.reminderTableGrain.ReadRows(begin, end);
+            return this.isAvailable ? this.reminderTableGrain.ReadRows(begin, end) : Task.FromResult(new ReminderTableData());
         }
 
-        public async Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
+        public Task<bool> RemoveRow(GrainReference grainRef, string reminderName, string eTag)
         {
             this.ThrowIfNotAvailable();
-            return await this.reminderTableGrain.RemoveRow(grainRef, reminderName, eTag);
+            return this.reminderTableGrain.RemoveRow(grainRef, reminderName, eTag);
         }
 
-        public async Task TestOnlyClearTable()
+        public Task TestOnlyClearTable()
         {
             this.ThrowIfNotAvailable();
-            await this.reminderTableGrain.TestOnlyClearTable();
+            return this.reminderTableGrain.TestOnlyClearTable();
         }
 
-        public async Task<string> UpsertRow(ReminderEntry entry)
+        public Task<string> UpsertRow(ReminderEntry entry)
         {
             this.ThrowIfNotAvailable();
-            return await this.reminderTableGrain.UpsertRow(entry);
+            return this.reminderTableGrain.UpsertRow(entry);
         }
 
         private void ThrowIfNotAvailable()

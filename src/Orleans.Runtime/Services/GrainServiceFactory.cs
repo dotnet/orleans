@@ -27,9 +27,9 @@ namespace Orleans.Runtime
         }
 
         public GrainReference MakeGrainServiceReference(int typeData, string systemGrainId, SiloAddress siloAddress)
-            => GrainReference.FromGrainId(GrainId.GetGrainServiceGrainId(typeData, systemGrainId), this.runtimeClient.GrainReferenceRuntime, systemTargetSilo: siloAddress);
+            => (GrainReference)this.runtimeClient.InternalGrainFactory.GetGrain(SystemTargetGrainId.CreateGrainServiceGrainId(typeData, systemGrainId, siloAddress));
 
         public T CastToGrainServiceReference<T>(GrainReference grainReference) where T : IGrainService
-            => this.runtimeClient.InternalGrainFactory.GetSystemTarget<T>(grainReference.GrainId, grainReference.SystemTargetSilo);
+            => this.runtimeClient.InternalGrainFactory.GetSystemTarget<T>(grainReference.GrainId);
     }
 }

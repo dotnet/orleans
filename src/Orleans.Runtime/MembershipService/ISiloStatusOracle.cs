@@ -73,13 +73,6 @@ namespace Orleans.Runtime
         Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false);
 
         /// <summary>
-        /// Get a list of silos that are designated to function as gateways.
-        /// </summary>
-        /// <returns></returns>
-        [Obsolete("Use " + nameof(Orleans.Runtime.MultiClusterNetwork.IMultiClusterOracle), error: true)]
-        IReadOnlyList<SiloAddress> GetApproximateMultiClusterGateways();
-
-        /// <summary>
         /// Get the name of a silo. 
         /// Silo name is assumed to be static and does not change across restarts of the same silo.
         /// </summary>
