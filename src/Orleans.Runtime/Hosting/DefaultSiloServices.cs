@@ -382,6 +382,7 @@ namespace Orleans.Hosting
             services.AddSingleton<SiloLoggingHelper>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloLoggingHelper>();
             services.AddFromExisting<IGrainIdLoggingHelper, SiloLoggingHelper>();
+            services.AddFromExisting<IInvokeMethodRequestLoggingHelper, SiloLoggingHelper>();
         }
     }
 }

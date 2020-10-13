@@ -11,4 +11,9 @@ namespace Orleans
 
         string GetSystemTargetName(GrainId grainId);
     }
+
+    internal interface IInvokeMethodRequestLoggingHelper
+    {
+        void GetInterfaceAndMethodName(int interfaceId, int methodId, out string interfaceName, out string methodName);
+    }
 }

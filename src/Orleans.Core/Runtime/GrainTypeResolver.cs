@@ -11,6 +11,7 @@ namespace Orleans.Runtime
         bool TryGetGrainClassData(Type grainInterfaceType, out GrainClassData implementation, string grainClassNamePrefix);
         bool TryGetGrainClassData(int grainInterfaceId, out GrainClassData implementation, string grainClassNamePrefix);
         bool TryGetGrainClassData(string grainImplementationClassName, out GrainClassData implementation);
+        bool TryGetInterfaceData(int grainInterfaceId, out GrainInterfaceData interfaceData);
         bool IsUnordered(int grainTypeCode);
         string GetLoadedGrainAssemblies();
         string GetGrainTypeName(int typeCode);
@@ -92,6 +93,17 @@ namespace Orleans.Runtime
             }
             return false;
         }
+
+        public bool TryGetInterfaceData(int grainInterfaceId, out GrainInterfaceData interfaceData)
+        {
+            if (table.TryGetValue(grainInterfaceId, out interfaceData))
+            {
+                return true;
+            }
+            interfaceData = null;
+            return false;
+        }
+
 
         public string GetLoadedGrainAssemblies()
         {

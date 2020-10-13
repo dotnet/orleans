@@ -119,6 +119,7 @@ namespace Orleans
             services.AddSingleton<ClientLoggingHelper>();
             services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientLoggingHelper>();
             services.AddFromExisting<IGrainIdLoggingHelper, ClientLoggingHelper>();
+            services.AddFromExisting<IInvokeMethodRequestLoggingHelper, ClientLoggingHelper>();
         }
     }
 }
