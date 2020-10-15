@@ -45,11 +45,6 @@ namespace Orleans.CodeGeneration
                 return $"InvokeMethodRequest {this.InterfaceId}:{this.MethodId}";
             }
         }
-
-        private void GetInterfaceAndMethodName()
-        {
-
-        }
     }
 
     /// <summary>
