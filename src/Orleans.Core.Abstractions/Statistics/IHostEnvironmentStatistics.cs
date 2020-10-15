@@ -10,10 +10,10 @@ namespace Orleans.Statistics
         long? TotalPhysicalMemory { get; }
 
         /// <summary>
-        /// Host CPU usage from 0.0-1.0
-        /// i.e. 0.7f for 70% CPU usage
+        /// Host CPU usage from 0.0-100.0
+        /// i.e. 70.0f for 70% CPU usage
         /// </summary>
-        /// <value>0.7</value>
+        /// <value>70.0</value>
         float? CpuUsage { get; }
 
         /// <summary>
