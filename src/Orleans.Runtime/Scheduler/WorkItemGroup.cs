@@ -440,7 +440,7 @@ namespace Orleans.Runtime.Scheduler
                 // If our run list is empty, then we're waiting.
                 lock (lockable)
                 {
-                    if (WorkItemCount > 0 && !this.IsShutdown)
+                    if (WorkItemCount > 0)
                     {
                         state = WorkGroupStatus.Runnable;
                         ScheduleExecution(this);
