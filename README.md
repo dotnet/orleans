@@ -86,7 +86,7 @@ public class ThermostatGrain : Grain, IThermostat, IThermostatControl
 }
 ```
 
-The grain class above does not persist its state. More thorough example demonstrating state persistence is available in the [documentation](https://dotnet.github.io/orleans/Documentation/grains/grain_persistence/index.html).
+The grain class above does not persist its state. A more thorough example demonstrating state persistence is available in the [documentation](https://dotnet.github.io/orleans/Documentation/grains/grain_persistence/index.html).
 
 ## Orleans Runtime
 
