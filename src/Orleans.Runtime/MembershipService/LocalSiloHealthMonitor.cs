@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -13,7 +15,17 @@ namespace Orleans.Runtime.MembershipService
 {
     internal interface ILocalSiloHealthMonitor
     {
+        /// <summary>
+        /// Returns the local health degradation score, which is a value between 0 (healthy) and <see cref="LocalSiloHealthMonitor.MaxScore"/> (unhealthy).
+        /// </summary>
+        /// <param name="checkTime">The time which the check is taking place.</param>
+        /// <returns>The local health degradation score, which is a value between 0 (healthy) and <see cref="LocalSiloHealthMonitor.MaxScore"/> (unhealthy).</returns>
         int GetLocalHealthDegradationScore(DateTime checkTime);
+
+        /// <summary>
+        /// The most recent list of detected health issues.
+        /// </summary>
+        ImmutableArray<string> Complaints { get; }
     }
 
     /// <summary>
@@ -77,26 +89,33 @@ namespace Orleans.Runtime.MembershipService
             _runTime = ValueStopwatch.StartNew();
         }
 
+        /// <inheritdoc />
+        public ImmutableArray<string> Complaints { get; private set; } = ImmutableArray<string>.Empty;
+
+        /// <inheritdoc />
+        public int GetLocalHealthDegradationScore(DateTime checkTime) => GetLocalHealthDegradationScore(checkTime, null);
+
         /// <summary>
         /// Returns the local health degradation score, which is a value between 0 (healthy) and <see cref="MaxScore"/> (unhealthy).
         /// </summary>
         /// <param name="checkTime">The time which the check is taking place.</param>
+        /// <param name="complaints">If not null, will be populated with the current set of detected health issues.</param>
         /// <returns>The local health degradation score, which is a value between 0 (healthy) and <see cref="MaxScore"/> (unhealthy).</returns>
-        public int GetLocalHealthDegradationScore(DateTime checkTime)
+        public int GetLocalHealthDegradationScore(DateTime checkTime, List<string> complaints) 
         {
             var score = 0;
-            score += CheckSuspectingNodes(checkTime);
-            score += CheckReceivedProbeResponses(checkTime);
-            score += CheckReceivedProbeRequests(checkTime);
-            score += CheckLocalHealthCheckParticipants(checkTime);
-            score += CheckThreadPoolQueueDelay(checkTime);
+            score += CheckSuspectingNodes(checkTime, complaints);
+            score += CheckReceivedProbeResponses(checkTime, complaints);
+            score += CheckReceivedProbeRequests(checkTime, complaints);
+            score += CheckLocalHealthCheckParticipants(checkTime, complaints);
+            score += CheckThreadPoolQueueDelay(checkTime, complaints);
 
             // Clamp the score between 0 and the maximum allowed score.
             score = Math.Max(0, Math.Min(MaxScore, score));
             return score;
         }
 
-        private int CheckThreadPoolQueueDelay(DateTime checkTime)
+        private int CheckThreadPoolQueueDelay(DateTime checkTime, List<string> complaints)
         {
             var threadPoolDelaySeconds = _threadPoolMonitor.MeasureQueueDelay().TotalSeconds;
 
@@ -114,11 +133,14 @@ namespace Orleans.Runtime.MembershipService
                     threadPoolDelaySeconds);
             }
 
+            complaints?.Add(
+                $".NET Thread Pool is exhibiting delays of {threadPoolDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.");
+
             // Each second of delay contributes to the score.
             return (int)threadPoolDelaySeconds;
         }
 
-        private int CheckSuspectingNodes(DateTime now)
+        private int CheckSuspectingNodes(DateTime now, List<string> complaints)
         {
             var score = 0;
             var membershipSnapshot = _membershipTableManager.MembershipTableSnapshot;
@@ -129,6 +151,7 @@ namespace Orleans.Runtime.MembershipService
                     if (_log.IsEnabled(LogLevel.Warning))
                     {
                         _log.LogWarning("This silo is not active (Status: {Status}) and is therefore not healthy.", membershipEntry.Status);
+                        complaints?.Add($"This silo is not active (Status: {membershipEntry.Status} and is therefore not healthy.");
                     }
 
                     score = MaxScore;
@@ -143,7 +166,8 @@ namespace Orleans.Runtime.MembershipService
                     {
                         if (_log.IsEnabled(LogLevel.Warning))
                         {
-                            _log.LogWarning("Silo {Silo} recently suspected for node at {SuspectingTime}.", vote.Item1, vote.Item2);
+                            _log.LogWarning("Silo {Silo} recently suspected this silo is dead at {SuspectingTime}.", vote.Item1, vote.Item2);
+                            complaints?.Add($"Silo {vote.Item1} recently suspected this silo is dead at {vote.Item2}.");
                         }
 
                         ++score;
@@ -156,6 +180,7 @@ namespace Orleans.Runtime.MembershipService
                 if (_log.IsEnabled(LogLevel.Error))
                 {
                     _log.LogError("Could not find a membership entry for this silo");
+                    complaints?.Add("Could not find a membership entry for this silo");
                 }
 
                 score = MaxScore;
@@ -164,7 +189,7 @@ namespace Orleans.Runtime.MembershipService
             return score;
         }
 
-        private int CheckReceivedProbeRequests(DateTime now)
+        private int CheckReceivedProbeRequests(DateTime now, List<string> complaints)
         {
             // Have we received ping REQUESTS from other nodes?
             var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
@@ -211,10 +236,12 @@ namespace Orleans.Runtime.MembershipService
                     if (lastProbeRequest == default)
                     {
                         _log.LogWarning("This silo has not received any probe requests from currently valid connections");
+                        complaints?.Add("This silo has not received any probe requests from currently valid connections");
                     }
                     else
                     {
                         _log.LogWarning("This silo has not received a probe request since {LastProbeRequest}", lastProbeRequest);
+                        complaints?.Add($"This silo has not received a probe request since {lastProbeRequest}");
                     }
                 }
 
@@ -224,7 +251,7 @@ namespace Orleans.Runtime.MembershipService
             return score;
         }
 
-        private int CheckLocalHealthCheckParticipants(DateTime now)
+        private int CheckLocalHealthCheckParticipants(DateTime now, List<string> complaints)
         {
             // Check for execution delays and other local health warning signs.
             var score = 0;
@@ -237,6 +264,7 @@ namespace Orleans.Runtime.MembershipService
                         if (_log.IsEnabled(LogLevel.Warning))
                         {
                             _log.LogWarning("Health check participant {Participant} is reporting that it is unhealthy", participant?.GetType().ToString());
+                            complaints?.Add($"Health check participant {participant?.GetType().ToString()}");
                         }
 
                         ++score;
@@ -245,6 +273,7 @@ namespace Orleans.Runtime.MembershipService
                 catch (Exception exception)
                 {
                     _log.LogError(exception, "Error checking health for {Participant}", participant?.GetType().ToString());
+                    complaints?.Add($"Error checking health for participant {participant?.GetType().ToString()}: {LogFormatter.PrintException(exception)}");
                 }
             }
 
@@ -252,7 +281,7 @@ namespace Orleans.Runtime.MembershipService
             return score;
         }
 
-        private int CheckReceivedProbeResponses(DateTime now)
+        private int CheckReceivedProbeResponses(DateTime now, List<string> complaints)
         {
             var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
             if (_runTime.Elapsed < recencyWindow)
@@ -290,10 +319,12 @@ namespace Orleans.Runtime.MembershipService
                     if (lastSuccessfulResponse == default)
                     {
                         _log.LogWarning("This silo has not received any successful probe responses");
+                        complaints?.Add("This silo has not received any successful probe responses");
                     }
                     else
                     {
                         _log.LogWarning("This silo has not received a successful probe response since {LastSuccessfulResponse}", lastSuccessfulResponse);
+                        complaints?.Add($"This silo has not received a successful probe response since {lastSuccessfulResponse}");
                     }
                 }
 
@@ -309,12 +340,16 @@ namespace Orleans.Runtime.MembershipService
             {
                 try
                 {
+                    var complaints = new List<string>();
                     var now = DateTime.UtcNow;
-                    var score = GetLocalHealthDegradationScore(now);
+                    var score = GetLocalHealthDegradationScore(now, complaints);
                     if (score > 0 && _log.IsEnabled(LogLevel.Warning))
                     {
-                        _log.LogWarning("Self-monitoring determined that local health is degraded. Degradation score is {Score}/{MaxScore} (lower is better)", score, MaxScore);
+                        var complaintsString = string.Join("\n", complaints);
+                        _log.LogWarning("Self-monitoring determined that local health is degraded. Degradation score is {Score}/{MaxScore} (lower is better). Complaints: {Complaints}", score, MaxScore, complaintsString);
                     }
+
+                    this.Complaints = ImmutableArray.CreateRange(complaints);
                 }
                 catch (Exception exception)
                 {
