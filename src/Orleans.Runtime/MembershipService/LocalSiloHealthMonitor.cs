@@ -167,9 +167,10 @@ namespace Orleans.Runtime.MembershipService
         private int CheckReceivedProbeRequests(DateTime now)
         {
             // Have we received ping REQUESTS from other nodes?
+            var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
             var score = 0;
 
-            if (_runTime.Elapsed < TimeSpan.FromSeconds(30))
+            if (_runTime.Elapsed < recencyWindow)
             {
                 return 0;
             }
@@ -202,7 +203,6 @@ namespace Orleans.Runtime.MembershipService
 
             // Only consider recency of the last received probe request if there is more than one other node.
             // Otherwise, it may fail to vote another node dead in a one or two node cluster.
-            var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
             if (lastProbeRequest < now - recencyWindow && membershipSnapshot.ActiveNodeCount > 2)
             {
                 // This node has not received a successful ping response since the window began.
@@ -254,9 +254,10 @@ namespace Orleans.Runtime.MembershipService
 
         private int CheckReceivedProbeResponses(DateTime now)
         {
-            if (_runTime.Elapsed < TimeSpan.FromSeconds(30))
+            var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
+            if (_runTime.Elapsed < recencyWindow)
             {
-                // If the silo has not been live for long enough, 
+                // If the silo has not been live for long enough.
                 return 0;
             }
 
@@ -281,7 +282,6 @@ namespace Orleans.Runtime.MembershipService
 
             // Only consider recency of the last successful ping if this node is monitoring more than one other node.
             // Otherwise, it may fail to vote another node dead in a one or two node cluster.
-            var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
             if (lastSuccessfulResponse < now - recencyWindow && siloMonitors.Count > 1)
             {
                 // This node has not received a successful ping response since the window began.

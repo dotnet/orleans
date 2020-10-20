@@ -112,5 +112,10 @@ namespace Orleans.Configuration
         /// The period between self-tests to log local health degradation status.
         /// </summary>
         public TimeSpan LocalHealthDegradationMonitoringPeriod { get; set; } = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// Whether to extend the effective <see cref="ProbeTimeout"/> value based upon current local health degradation.
+        /// </summary>
+        public bool ExtendProbeTimeoutDuringDegradation { get; set; } = false;
     }
 }

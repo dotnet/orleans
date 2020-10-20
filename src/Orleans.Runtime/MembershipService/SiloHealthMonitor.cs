@@ -142,13 +142,21 @@ namespace Orleans.Runtime.MembershipService
             
                 try
                 {
-                    var localDegradationScore = _localSiloHealthMonitor.GetLocalHealthDegradationScore(DateTime.UtcNow);
+                    TimeSpan timeout;
+                    if (_clusterMembershipOptions.ExtendProbeTimeoutDuringDegradation)
+                    {
+                        var localDegradationScore = _localSiloHealthMonitor.GetLocalHealthDegradationScore(DateTime.UtcNow);
 
-                    // Probe the silo directly.
-                    // Attempt to account for local health degradation by extending the timeout period.
-                    var timeout = _clusterMembershipOptions.ProbeTimeout.Multiply(1 + localDegradationScore);
+                        // Probe the silo directly.
+                        // Attempt to account for local health degradation by extending the timeout period.
+                        timeout = _clusterMembershipOptions.ProbeTimeout.Multiply(1 + localDegradationScore);
+                    }
+                    else
+                    {
+                        timeout = _clusterMembershipOptions.ProbeTimeout;
+                    }
+
                     var cancellation = new CancellationTokenSource(timeout);
-
                     var probeResult = await this.ProbeDirectly(cancellation.Token).ConfigureAwait(false);
 
                     await _onProbeResult(this, probeResult).ConfigureAwait(false);
