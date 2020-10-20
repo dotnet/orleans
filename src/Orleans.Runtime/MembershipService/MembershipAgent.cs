@@ -427,10 +427,6 @@ namespace Orleans.Runtime.MembershipService
             this.iAmAliveTimer.Dispose();
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime)
-        {
-            var ok = this.iAmAliveTimer.CheckHealth(lastCheckTime);
-            return ok;
-        }
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason) => this.iAmAliveTimer.CheckHealth(lastCheckTime, out reason);
     }
 }

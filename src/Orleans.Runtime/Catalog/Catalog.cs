@@ -1189,13 +1189,14 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool CheckHealth(DateTime lastCheckTime)
+        public bool CheckHealth(DateTime lastCheckTime, out string reason)
         {
             if (this.gcTimer is IAsyncTimer timer)
             {
-                return timer.CheckHealth(lastCheckTime);
+                return timer.CheckHealth(lastCheckTime, out reason);
             }
 
+            reason = default;
             return true;
         }
     }

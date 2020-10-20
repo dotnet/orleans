@@ -843,11 +843,7 @@ namespace Orleans.Runtime.MembershipService
             return true;
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime)
-        {
-            var ok = this.membershipUpdateTimer.CheckHealth(lastCheckTime);
-            return ok;
-        }
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason) => this.membershipUpdateTimer.CheckHealth(lastCheckTime, out reason);
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {

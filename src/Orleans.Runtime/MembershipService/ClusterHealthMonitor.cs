@@ -234,12 +234,25 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime)
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason)
         {
             var ok = true;
+            reason = default;
             foreach (var monitor in this.monitoredSilos.Values)
             {
-                ok &= monitor.CheckHealth(lastCheckTime);
+                ok &= monitor.CheckHealth(lastCheckTime, out var monitorReason);
+                if (!string.IsNullOrWhiteSpace(monitorReason))
+                {
+                    var siloReason = $"Monitor for {monitor.SiloAddress} is degraded with: {monitorReason}.";
+                    if (string.IsNullOrWhiteSpace(reason))
+                    {
+                        reason = siloReason;
+                    }
+                    else
+                    {
+                        reason = reason + " " + siloReason;
+                    }
+                }
             }
 
             return ok;

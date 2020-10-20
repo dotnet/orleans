@@ -59,8 +59,9 @@ namespace Orleans.Runtime.MembershipService
         private readonly IAsyncTimer _degradationCheckTimer;
         private readonly ThreadPoolMonitor _threadPoolMonitor;
         private readonly ProbeRequestMonitor _probeRequestMonitor; 
-        private ValueStopwatch _runTime;
+        private ValueStopwatch _clusteredDuration;
         private Task _runTask;
+        private bool _isActive;
         private DateTime _lastHealthCheckTime;
 
         public LocalSiloHealthMonitor(
@@ -86,7 +87,6 @@ namespace Orleans.Runtime.MembershipService
                 _clusterMembershipOptions.LocalHealthDegradationMonitoringPeriod,
                 nameof(LocalSiloHealthMonitor));
             _threadPoolMonitor = new ThreadPoolMonitor(loggerFactory.CreateLogger<ThreadPoolMonitor>());
-            _runTime = ValueStopwatch.StartNew();
         }
 
         /// <inheritdoc />
@@ -105,10 +105,29 @@ namespace Orleans.Runtime.MembershipService
         {
             var score = 0;
             score += CheckSuspectingNodes(checkTime, complaints);
-            score += CheckReceivedProbeResponses(checkTime, complaints);
-            score += CheckReceivedProbeRequests(checkTime, complaints);
             score += CheckLocalHealthCheckParticipants(checkTime, complaints);
             score += CheckThreadPoolQueueDelay(checkTime, complaints);
+
+            if (_isActive)
+            {
+                var membershipSnapshot = _membershipTableManager.MembershipTableSnapshot;
+                if (membershipSnapshot.ActiveNodeCount <= 1)
+                {
+                    _clusteredDuration.Reset();
+                }
+                else if (!_clusteredDuration.IsRunning)
+                {
+                    _clusteredDuration.Restart();
+                }
+
+                // Only consider certain checks if the silo has been a member of a multi-silo cluster for a certain period.
+                var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
+                if (_clusteredDuration.Elapsed > recencyWindow)
+                {
+                    score += CheckReceivedProbeResponses(checkTime, complaints);
+                    score += CheckReceivedProbeRequests(checkTime, complaints);
+                }
+            }
 
             // Clamp the score between 0 and the maximum allowed score.
             score = Math.Max(0, Math.Min(MaxScore, score));
@@ -119,22 +138,25 @@ namespace Orleans.Runtime.MembershipService
         {
             var threadPoolDelaySeconds = _threadPoolMonitor.MeasureQueueDelay().TotalSeconds;
 
-            if (threadPoolDelaySeconds > 10)
+            if ((int)threadPoolDelaySeconds >= 1)
             {
-                // Log as an error if the delay is massive.
-                _log.LogError(
-                    ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.",
-                    threadPoolDelaySeconds);
-            }
-            else if (threadPoolDelaySeconds > 1)
-            {
-                _log.LogWarning(
-                    ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.",
-                    threadPoolDelaySeconds);
-            }
+                if ((int)threadPoolDelaySeconds >= 10)
+                {
+                    // Log as an error if the delay is massive.
+                    _log.LogError(
+                        ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.",
+                        threadPoolDelaySeconds);
+                }
+                else
+                {
+                    _log.LogWarning(
+                        ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.",
+                        threadPoolDelaySeconds);
+                }
 
-            complaints?.Add(
-                $".NET Thread Pool is exhibiting delays of {threadPoolDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.");
+                complaints?.Add(
+                    $".NET Thread Pool is exhibiting delays of {threadPoolDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.");
+            } 
 
             // Each second of delay contributes to the score.
             return (int)threadPoolDelaySeconds;
@@ -148,11 +170,8 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (membershipEntry.Status != SiloStatus.Active)
                 {
-                    if (_log.IsEnabled(LogLevel.Warning))
-                    {
-                        _log.LogWarning("This silo is not active (Status: {Status}) and is therefore not healthy.", membershipEntry.Status);
-                        complaints?.Add($"This silo is not active (Status: {membershipEntry.Status} and is therefore not healthy.");
-                    }
+                    _log.LogWarning("This silo is not active (Status: {Status}) and is therefore not healthy.", membershipEntry.Status);
+                    complaints?.Add($"This silo is not active (Status: {membershipEntry.Status} and is therefore not healthy.");
 
                     score = MaxScore;
                 }
@@ -164,11 +183,8 @@ namespace Orleans.Runtime.MembershipService
                 {
                     if (membershipSnapshot.GetSiloStatus(vote.Item1) == SiloStatus.Active)
                     {
-                        if (_log.IsEnabled(LogLevel.Warning))
-                        {
-                            _log.LogWarning("Silo {Silo} recently suspected this silo is dead at {SuspectingTime}.", vote.Item1, vote.Item2);
-                            complaints?.Add($"Silo {vote.Item1} recently suspected this silo is dead at {vote.Item2}.");
-                        }
+                        _log.LogWarning("Silo {Silo} recently suspected this silo is dead at {SuspectingTime}.", vote.Item1, vote.Item2);
+                        complaints?.Add($"Silo {vote.Item1} recently suspected this silo is dead at {vote.Item2}.");
 
                         ++score;
                     }
@@ -177,11 +193,8 @@ namespace Orleans.Runtime.MembershipService
             else
             {
                 // If our entry is not found, this node is not healthy.
-                if (_log.IsEnabled(LogLevel.Error))
-                {
-                    _log.LogError("Could not find a membership entry for this silo");
-                    complaints?.Add("Could not find a membership entry for this silo");
-                }
+                _log.LogError("Could not find a membership entry for this silo");
+                complaints?.Add("Could not find a membership entry for this silo");
 
                 score = MaxScore;
             }
@@ -192,30 +205,67 @@ namespace Orleans.Runtime.MembershipService
         private int CheckReceivedProbeRequests(DateTime now, List<string> complaints)
         {
             // Have we received ping REQUESTS from other nodes?
-            var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
             var score = 0;
-
-            if (_runTime.Elapsed < recencyWindow)
-            {
-                return 0;
-            }
-
             var membershipSnapshot = _membershipTableManager.MembershipTableSnapshot;
-            var sinceLastProbeRequest = _probeRequestMonitor.ElapsedSinceLastProbeRequest;
 
             // Only consider recency of the last received probe request if there is more than one other node.
             // Otherwise, it may fail to vote another node dead in a one or two node cluster.
-            if (sinceLastProbeRequest > recencyWindow && membershipSnapshot.ActiveNodeCount > 2)
+            if (membershipSnapshot.ActiveNodeCount > 2)
             {
-                // This node has not received a successful ping response since the window began.
-                if (_log.IsEnabled(LogLevel.Warning))
+                var sinceLastProbeRequest = _probeRequestMonitor.ElapsedSinceLastProbeRequest;
+                var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
+                if (!sinceLastProbeRequest.HasValue)
                 {
-                    var lastRequestTime = now - sinceLastProbeRequest;
+                    _log.LogWarning("This silo has not received any probe requests");
+                    complaints?.Add("This silo has not received any probe requests");
+                    ++score;
+                }
+                else if (sinceLastProbeRequest.Value > recencyWindow)
+                {
+                    // This node has not received a successful ping response since the window began.
+                    var lastRequestTime = now - sinceLastProbeRequest.Value;
                     _log.LogWarning("This silo has not received a probe request since {LastProbeRequest}", lastRequestTime);
                     complaints?.Add($"This silo has not received a probe request since {lastRequestTime}");
+                    ++score;
                 }
+            }
 
-                ++score;
+            return score;
+        }
+
+        private int CheckReceivedProbeResponses(DateTime now, List<string> complaints)
+        {
+            // Determine how recently the latest successful ping response was received.
+            var siloMonitors = _clusterHealthMonitor.SiloMonitors;
+            var elapsedSinceLastResponse = default(TimeSpan?);
+            foreach (var monitor in siloMonitors.Values)
+            {
+                var current = monitor.ElapsedSinceLastResponse;
+                if (current.HasValue && (!elapsedSinceLastResponse.HasValue || current.Value < elapsedSinceLastResponse.Value))
+                {
+                    elapsedSinceLastResponse = current.Value;
+                }
+            }
+
+            // Only consider recency of the last successful ping if this node is monitoring more than one other node.
+            // Otherwise, it may fail to vote another node dead in a one or two node cluster.
+            int score = 0;
+            if (siloMonitors.Count > 1)
+            {
+                var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
+                if (!elapsedSinceLastResponse.HasValue)
+                {
+                    _log.LogWarning("This silo has not received any successful probe responses");
+                    complaints?.Add("This silo has not received any successful probe responses");
+                    ++score;
+                }
+                else if (elapsedSinceLastResponse.Value > recencyWindow)
+                {
+                    // This node has not received a successful ping response since the window began.
+                    _log.LogWarning("This silo has not received a successful probe response since {LastSuccessfulResponse}", elapsedSinceLastResponse.Value);
+                    complaints?.Add($"This silo has not received a successful probe response since {elapsedSinceLastResponse.Value}");
+                    ++score;
+                }
             }
 
             return score;
@@ -229,13 +279,10 @@ namespace Orleans.Runtime.MembershipService
             {
                 try
                 {
-                    if (!participant.CheckHealth(_lastHealthCheckTime))
+                    if (!participant.CheckHealth(_lastHealthCheckTime, out var reason))
                     {
-                        if (_log.IsEnabled(LogLevel.Warning))
-                        {
-                            _log.LogWarning("Health check participant {Participant} is reporting that it is unhealthy", participant?.GetType().ToString());
-                            complaints?.Add($"Health check participant {participant?.GetType().ToString()}");
-                        }
+                        _log.LogWarning("Health check participant {Participant} is reporting that it is unhealthy with complaint: {Reason}", participant?.GetType().ToString(), reason);
+                        complaints?.Add($"Health check participant {participant?.GetType().ToString()} is reporting that it is unhealthy with complaint: {reason}");
 
                         ++score;
                     }
@@ -244,63 +291,12 @@ namespace Orleans.Runtime.MembershipService
                 {
                     _log.LogError(exception, "Error checking health for {Participant}", participant?.GetType().ToString());
                     complaints?.Add($"Error checking health for participant {participant?.GetType().ToString()}: {LogFormatter.PrintException(exception)}");
+
+                    ++score;
                 }
             }
 
             _lastHealthCheckTime = now;
-            return score;
-        }
-
-        private int CheckReceivedProbeResponses(DateTime now, List<string> complaints)
-        {
-            var recencyWindow = _clusterMembershipOptions.ProbeTimeout.Multiply(_clusterMembershipOptions.NumMissedProbesLimit);
-            if (_runTime.Elapsed < recencyWindow)
-            {
-                // If the silo has not been live for long enough.
-                return 0;
-            }
-
-            // Determine how recently the latest successful ping response was received.
-            var score = 0;
-            var siloMonitors = _clusterHealthMonitor.SiloMonitors;
-            var lastSuccessfulResponse = default(DateTime);
-            var shortestRoundTripTime = TimeSpan.MaxValue;
-            foreach (var monitor in siloMonitors.Values)
-            {
-                var current = monitor.LastResponse;
-                if (current > lastSuccessfulResponse)
-                {
-                    lastSuccessfulResponse = current;
-                }
-
-                if (monitor.LastRoundTripTime < shortestRoundTripTime)
-                {
-                    shortestRoundTripTime = monitor.LastRoundTripTime;
-                }
-            }
-
-            // Only consider recency of the last successful ping if this node is monitoring more than one other node.
-            // Otherwise, it may fail to vote another node dead in a one or two node cluster.
-            if (lastSuccessfulResponse < now - recencyWindow && siloMonitors.Count > 1)
-            {
-                // This node has not received a successful ping response since the window began.
-                if (_log.IsEnabled(LogLevel.Warning))
-                {
-                    if (lastSuccessfulResponse == default)
-                    {
-                        _log.LogWarning("This silo has not received any successful probe responses");
-                        complaints?.Add("This silo has not received any successful probe responses");
-                    }
-                    else
-                    {
-                        _log.LogWarning("This silo has not received a successful probe response since {LastSuccessfulResponse}", lastSuccessfulResponse);
-                        complaints?.Add($"This silo has not received a successful probe response since {lastSuccessfulResponse}");
-                    }
-                }
-
-                ++score;
-            }
-
             return score;
         }
 
@@ -313,7 +309,7 @@ namespace Orleans.Runtime.MembershipService
                     var complaints = new List<string>();
                     var now = DateTime.UtcNow;
                     var score = GetLocalHealthDegradationScore(now, complaints);
-                    if (score > 0 && _log.IsEnabled(LogLevel.Warning))
+                    if (score > 0)
                     {
                         var complaintsString = string.Join("\n", complaints);
                         _log.LogWarning("Self-monitoring determined that local health is degraded. Degradation score is {Score}/{MaxScore} (lower is better). Complaints: {Complaints}", score, MaxScore, complaintsString);
@@ -336,13 +332,14 @@ namespace Orleans.Runtime.MembershipService
         public Task OnStart(CancellationToken ct)
         {
             _runTask = Task.Run(this.Run);
-            _runTime.Restart();
+            _isActive = true;
             return Task.CompletedTask;
         }
 
         public async Task OnStop(CancellationToken ct)
         {
             _degradationCheckTimer.Dispose();
+            _isActive = false;
 
             if (_runTask is Task task)
             {

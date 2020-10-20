@@ -10,11 +10,6 @@ namespace Orleans.Runtime.Messaging
         private readonly object _lock = new object();
         private ValueStopwatch _probeRequestStopwatch;
 
-        public ProbeRequestMonitor()
-        {
-            _probeRequestStopwatch = ValueStopwatch.StartNew();
-        }
-
         /// <summary>
         /// Called when this silo receives a health probe request.
         /// </summary>
@@ -29,6 +24,6 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// The duration which has elapsed since the most recently received health probe request.
         /// </summary>
-        public TimeSpan ElapsedSinceLastProbeRequest => _probeRequestStopwatch.Elapsed;
+        public TimeSpan? ElapsedSinceLastProbeRequest => _probeRequestStopwatch.IsRunning ? (Nullable<TimeSpan>)_probeRequestStopwatch.Elapsed : null;
     }
 }

@@ -21,6 +21,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly CancellationTokenSource _stoppingCancellation = new CancellationTokenSource();
         private readonly object _lockObj = new object();
         private readonly IAsyncTimer _pingTimer;
+        private ValueStopwatch _elapsedSinceLastSuccessfulResponse;
         private Func<SiloHealthMonitor, ProbeResult, Task> _onProbeResult;
         private Task _runTask;
 
@@ -40,9 +41,9 @@ namespace Orleans.Runtime.MembershipService
         private int _failedProbes;
 
         /// <summary>
-        /// The time that the last ping response was received from either the node being monitored or an intermediary.
+        /// The time since the last ping response was received from either the node being monitored or an intermediary.
         /// </summary>
-        public DateTime LastResponse { get; private set; }
+        public TimeSpan? ElapsedSinceLastResponse => _elapsedSinceLastSuccessfulResponse.IsRunning ? (Nullable<TimeSpan>)_elapsedSinceLastSuccessfulResponse.Elapsed : null;
 
         /// <summary>
         /// The duration of time measured from just prior to sending the last probe which received a response until just after receiving and processing the response.
@@ -67,6 +68,7 @@ namespace Orleans.Runtime.MembershipService
                 _clusterMembershipOptions.ProbeTimeout,
                 nameof(SiloHealthMonitor));
             _onProbeResult = onProbeResult;
+            _elapsedSinceLastSuccessfulResponse = ValueStopwatch.StartNew();
         }
 
         internal interface ITestAccessor
@@ -250,7 +252,7 @@ namespace Orleans.Runtime.MembershipService
 
                         _highestCompletedProbeId = id;
                         Interlocked.Exchange(ref _failedProbes, 0);
-                        LastResponse = DateTime.UtcNow;
+                        _elapsedSinceLastSuccessfulResponse.Restart();
                         LastRoundTripTime = roundTripTimer.Elapsed;
                         probeResult = new ProbeResult(0, ProbeResultStatus.Succeeded);
                     }
@@ -289,7 +291,7 @@ namespace Orleans.Runtime.MembershipService
                         _log.LogWarning(
                             (int)ErrorCode.MembershipMissedPing,
                             failureException,
-                            "Did not get response for probe # Current number of consecutive failed probes is {FailedProbeCount}",
+                            "Did not get response for probe #{Id} to silo {Silo} after {Elapsed}. Current number of consecutive failed probes is {FailedProbeCount}",
                             id,
                             SiloAddress,
                             roundTripTimer.Elapsed,
@@ -304,7 +306,7 @@ namespace Orleans.Runtime.MembershipService
         }
 
         /// <inheritdoc />
-        public bool CheckHealth(DateTime lastCheckTime) => _pingTimer.CheckHealth(lastCheckTime);
+        public bool CheckHealth(DateTime lastCheckTime, out string reason) => _pingTimer.CheckHealth(lastCheckTime, out reason);
 
         /// <summary>
         /// Represents the result of probing a silo.
