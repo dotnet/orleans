@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -53,13 +52,13 @@ namespace Orleans.Runtime.MembershipService
         private const int MaxScore = 8;
         private readonly List<IHealthCheckParticipant> _healthCheckParticipants;
         private readonly MembershipTableManager _membershipTableManager;
-        private readonly ConnectionManager _connectionManager;
         private readonly ClusterHealthMonitor _clusterHealthMonitor;
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly ILogger<LocalSiloHealthMonitor> _log;
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IAsyncTimer _degradationCheckTimer;
         private readonly ThreadPoolMonitor _threadPoolMonitor;
+        private readonly ProbeRequestMonitor _probeRequestMonitor; 
         private ValueStopwatch _runTime;
         private Task _runTask;
         private DateTime _lastHealthCheckTime;
@@ -73,14 +72,15 @@ namespace Orleans.Runtime.MembershipService
             ILogger<LocalSiloHealthMonitor> log,
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IAsyncTimerFactory timerFactory,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            ProbeRequestMonitor probeRequestMonitor)
         {
             _healthCheckParticipants = healthCheckParticipants.ToList();
             _membershipTableManager = membershipTableManager;
-            _connectionManager = connectionManager;
             _clusterHealthMonitor = clusterHealthMonitor;
             _localSiloDetails = localSiloDetails;
             _log = log;
+            _probeRequestMonitor = probeRequestMonitor;
             _clusterMembershipOptions = clusterMembershipOptions.Value;
             _degradationCheckTimer = timerFactory.Create(
                 _clusterMembershipOptions.LocalHealthDegradationMonitoringPeriod,
@@ -200,49 +200,19 @@ namespace Orleans.Runtime.MembershipService
                 return 0;
             }
 
-            var lastProbeRequest = default(DateTime);
             var membershipSnapshot = _membershipTableManager.MembershipTableSnapshot;
-            foreach (var entry in membershipSnapshot.Entries)
-            {
-                if (entry.Key.Equals(_localSiloDetails.SiloAddress))
-                {
-                    continue;
-                }
-
-                if (entry.Value.Status == SiloStatus.Active)
-                {
-                    foreach (var connection in _connectionManager.GetExistingConnections(entry.Key))
-                    {
-                        if (!connection.IsValid) continue;
-                        if (connection is SiloConnection siloConnection)
-                        {
-                            var siloLastProbeRequest = siloConnection.LastReceivedProbeRequest;
-                            if (siloLastProbeRequest > lastProbeRequest)
-                            {
-                                lastProbeRequest = siloLastProbeRequest;
-                            }
-                        }
-                    }
-                }
-            }
+            var sinceLastProbeRequest = _probeRequestMonitor.ElapsedSinceLastProbeRequest;
 
             // Only consider recency of the last received probe request if there is more than one other node.
             // Otherwise, it may fail to vote another node dead in a one or two node cluster.
-            if (lastProbeRequest < now - recencyWindow && membershipSnapshot.ActiveNodeCount > 2)
+            if (sinceLastProbeRequest > recencyWindow && membershipSnapshot.ActiveNodeCount > 2)
             {
                 // This node has not received a successful ping response since the window began.
                 if (_log.IsEnabled(LogLevel.Warning))
                 {
-                    if (lastProbeRequest == default)
-                    {
-                        _log.LogWarning("This silo has not received any probe requests from currently valid connections");
-                        complaints?.Add("This silo has not received any probe requests from currently valid connections");
-                    }
-                    else
-                    {
-                        _log.LogWarning("This silo has not received a probe request since {LastProbeRequest}", lastProbeRequest);
-                        complaints?.Add($"This silo has not received a probe request since {lastProbeRequest}");
-                    }
+                    var lastRequestTime = now - sinceLastProbeRequest;
+                    _log.LogWarning("This silo has not received a probe request since {LastProbeRequest}", lastRequestTime);
+                    complaints?.Add($"This silo has not received a probe request since {lastRequestTime}");
                 }
 
                 ++score;
