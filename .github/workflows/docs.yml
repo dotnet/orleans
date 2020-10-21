@@ -30,10 +30,11 @@ jobs:
         $remote_branch="gh-bages"
         
         git init
+        git checkout -b scratch
         git config user.name "${GITHUB_ACTOR}"
         git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
         git add .
         
-        echo git commit -m "GitHub Action - Automated build"
-        echo git push --force $remote_repo master:$remote_branch
+        git commit -m "GitHub Action - Automated build"
+        git push --force $remote_repo scratch:$remote_branch
       
