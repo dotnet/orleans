@@ -148,6 +148,11 @@ namespace Orleans
             services.AddSingleton<IGrainInterfacePropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
+            // Logging helpers
+            services.AddSingleton<ClientLoggingHelper>();
+            services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientLoggingHelper>();
+            services.AddFromExisting<IGrainIdLoggingHelper, ClientLoggingHelper>();
+            services.AddFromExisting<IInvokeMethodRequestLoggingHelper, ClientLoggingHelper>();
         }
     }
 }

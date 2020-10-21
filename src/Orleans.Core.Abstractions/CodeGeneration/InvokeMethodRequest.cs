@@ -9,6 +9,8 @@ namespace Orleans.CodeGeneration
     [Serializable]
     public sealed class InvokeMethodRequest
     {
+        internal static IInvokeMethodRequestLoggingHelper Helper { get; set; }
+
         /// <summary> InterfaceId for this Invoke request. </summary>
         public int InterfaceTypeCode { get; private set; }
         /// <summary> MethodId for this Invoke request. </summary>
@@ -31,7 +33,15 @@ namespace Orleans.CodeGeneration
         /// </remarks>
         public override string ToString()
         {
-            return String.Format("InvokeMethodRequest {0}:{1}", InterfaceTypeCode, MethodId);
+            if (Helper != null)
+            {
+                Helper.GetInterfaceAndMethodName(this.InterfaceTypeCode, this.MethodId, out var interfaceName, out var methodName);
+                return $"InvokeMethodRequest [{interfaceName}:{methodName}]";
+            }
+            else
+            {
+                return $"InvokeMethodRequest [{this.InterfaceTypeCode}:{this.MethodId}]";
+            }
         }
     }
 

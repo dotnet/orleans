@@ -75,13 +75,20 @@ namespace Orleans.Runtime
             {ClientObserverRegistrarType,"ClientObserverRegistrar"},
             {CatalogType,"Catalog"},
             {MembershipOracleType,"MembershipOracle"},
-            {MultiClusterOracleType,"MultiClusterOracle"},
             {TypeManagerType,"TypeManagerId"},
-            {ProtocolGatewayType,"ProtocolGateway"},
             {FallbackSystemTargetType, "FallbackSystemTarget"},
+            {LifecycleSchedulingSystemTargetType, "LifecycleSchedulingSystemTarget"},
             {DeploymentLoadPublisherSystemTargetType, "DeploymentLoadPublisherSystemTarget"},
-            {StreamPullingAgentType, "PullingAgentSystemTarget"},
+            {MultiClusterOracleType,"MultiClusterOracle"},
+            {ClusterDirectoryServiceType,"ClusterDirectoryService"},
+            {StreamProviderManagerAgentSystemTargetType,"StreamProviderManagerAgent"},
+            {TestHooksSystemTargetType,"TestHooksSystemTargetType"},
+            {ProtocolGatewayType,"ProtocolGateway"},
+            {TransactionAgentSystemTargetType,"TransactionAgentSystemTarget"},
+            {SystemMembershipTableType,"SystemMembershipTable"},
             {StreamPullingAgentManagerType, "PullingAgentsManagerSystemTarget"},
+            {StreamPullingAgentType, "PullingAgentSystemTarget"},
+            {ManifestProviderType, "ManifestProvider"},
         };
 
         public static ushort DefaultInterfaceVersion = 1;
