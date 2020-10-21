@@ -342,6 +342,22 @@ namespace Orleans.Runtime
             return s.ToString();
         }
 
+        internal string ToGrainKeyString()
+        {
+            string keyString;
+            if (HasKeyExt)
+            {
+                string extension;
+                keyString = IsLongKey ? PrimaryKeyToLong(out extension).ToString() : PrimaryKeyToGuid(out extension).ToString();
+                keyString = $"{keyString}+{extension}";
+            }
+            else
+            {
+                keyString = this.IsLongKey ? PrimaryKeyToLong().ToString() : this.PrimaryKeyToGuid().ToString();
+            }
+            return keyString;
+        }
+
         private static void ValidateKeyExt(string keyExt, UInt64 typeCodeData)
         {
             Category category = GetCategory(typeCodeData);
