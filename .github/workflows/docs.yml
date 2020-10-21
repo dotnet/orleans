@@ -25,8 +25,7 @@ jobs:
         Get-ChildItem Env:
         cd _site
         
-        $token=${{ secrets.GITHUB_TOKEN }}
-        $remote_repo="https://x-access-token:${token}@github.com/${$env:GITHUB_REPOSITORY}.git"
+        $remote_repo="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${$env:GITHUB_REPOSITORY}.git"
         $remote_branch="gh-bages"
         
         git init
