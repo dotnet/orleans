@@ -23,7 +23,6 @@ jobs:
     - name: Publish
       run: |
         #!/bin/bash
-        set -e
         set -o pipefail
 
         cd _site
