@@ -10,6 +10,8 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
+      with:
+        ref: 'docs'
     - name: Setup .NET Core 3.1
       uses: actions/setup-dotnet@v1
       with:
