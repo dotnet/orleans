@@ -27,14 +27,12 @@ jobs:
         cd _site
         
         echo remote_repo="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-        $remote_branch="gh-pages"
+        $remote_branch="gh-bages"
         
         git init
         git config user.name "${GITHUB_ACTOR}"
         git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
         git add .
-        
-        echo -n 'Files to Commit:' && ls -l | wc -l
         
         echo git commit -m "GitHub Action - Automated build"
         echo git push --force $remote_repo master:$remote_branch
