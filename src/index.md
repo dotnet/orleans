@@ -13,6 +13,6 @@ Orleans takes familiar concepts like objects, interfaces, async/await, and try/c
 
 It was created by [Microsoft Research](http://research.microsoft.com/projects/orleans/) and introduced the [Virtual Actor Model](http://research.microsoft.com/apps/pubs/default.aspx?id=210931) as a novel approach to building a new generation of distributed systems for the Cloud era. The core contribution of Orleans is its programming model which tames the complexity inherent to highly-parallel distributed systems without restricting capabilities or imposing onerous constraints on the developer.
 
-Documentation is located [here](Documentation/index.md)
+Documentation is located [here](docs/index.md)
 
 Chinese translation of the documentation can be found here [here](https://orleans.azurewebsites.net)

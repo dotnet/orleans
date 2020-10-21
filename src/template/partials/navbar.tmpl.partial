@@ -8,7 +8,7 @@
         <span class="icon-bar"></span>
       </button>
       <a class="navbar-brand" href="{{_rel}}index.html">
-        <img id="logo" class="svg" src="{{_rel}}Images/logo-light.svg" alt="{{_appName}}">
+        <img id="logo" class="svg" src="{{_rel}}images/logo-light-padded.svg" alt="{{_appName}}">
       </a>
     </div>
     <div class="collapse navbar-collapse" id="navbar">
