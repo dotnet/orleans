@@ -26,7 +26,7 @@ jobs:
         
         cd _site
         
-        echo remote_repo="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        $remote_repo="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         $remote_branch="gh-bages"
         
         git init
