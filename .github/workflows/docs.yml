@@ -23,11 +23,10 @@ jobs:
     - name: Publish
       run: |
         #!/bin/bash
-        set -o pipefail
-
+        
         cd _site
         
-        remote_repo="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        echo remote_repo="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
         remote_branch="gh-pages"
         
         git init
@@ -37,6 +36,6 @@ jobs:
         
         echo -n 'Files to Commit:' && ls -l | wc -l
         
-        #git commit -m "GitHub Action - Automated build"
-        #git push --force $remote_repo master:$remote_branch
+        echo git commit -m "GitHub Action - Automated build"
+        echo git push --force $remote_repo master:$remote_branch
       
