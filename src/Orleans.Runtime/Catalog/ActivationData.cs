@@ -780,7 +780,7 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            return String.Format("[Activation: {0}{1}{2}{3} State={4}]",
+            return String.Format("[Activation: {0}/{1}{2}{3} State={4}]",
                  Silo,
                  this.GrainId,
                  this.ActivationId,
@@ -792,7 +792,7 @@ namespace Orleans.Runtime
         {
             return
                 String.Format(
-                    "[Activation: {0}{1}{2} {3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} InFlightCount={7} NumRunning={8} IdlenessTimeSpan={9} CollectionAgeLimit={10}{11}]",
+                    "[Activation: {0}/{1}{2} {3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} InFlightCount={7} NumRunning={8} IdlenessTimeSpan={9} CollectionAgeLimit={10}{11}]",
                     Silo.ToLongString(),
                     this.GrainId.ToString(),
                     this.ActivationId,
