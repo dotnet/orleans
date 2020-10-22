@@ -2,11 +2,11 @@ using System;
 using System.CodeDom.Compiler;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 
@@ -35,9 +35,6 @@ namespace Orleans.Runtime
 
         public static string GetSimpleTypeName(Type type, Predicate<Type> fullName = null)
         {
-            if (type.IsGenericParameter)
-                return GetGenericTypeParameterName(type);
-
             if (type.IsNestedPublic || type.IsNestedPrivate)
             {
                 if (type.DeclaringType.IsGenericType)
@@ -56,9 +53,6 @@ namespace Orleans.Runtime
 
             return fullName != null && fullName(type) ? GetFullName(type) : type.Name;
         }
-
-        private static string GetGenericTypeParameterName(Type type) =>
-            "T" + type.GenericParameterPosition.ToString(CultureInfo.InvariantCulture);
 
         public static string GetUntemplatedTypeName(string typeName)
         {
@@ -124,23 +118,30 @@ namespace Orleans.Runtime
             if (!t.IsGenericType || (t.DeclaringType != null && t.DeclaringType.IsGenericType)) return baseName;
             string s = baseName;
             s += "<";
-            s += GetGenericTypeArgs(genericArguments, fullName);
+            s += GetGenericTypeArgs(t, genericArguments, fullName);
             s += ">";
             return s;
         }
 
-        public static string GetGenericTypeArgs(IEnumerable<Type> args, Predicate<Type> fullName)
+        public static string GetGenericTypeArgs(Type originalType, IEnumerable<Type> args, Predicate<Type> fullName)
         {
             string s = string.Empty;
 
             bool first = true;
+            var genericTypeDefinition = originalType.GetGenericTypeDefinition();
+            var originalGenericArguments = genericTypeDefinition.GetGenericArguments();
             foreach (var genericParameter in args)
             {
                 if (!first)
                 {
                     s += ",";
                 }
-                if (!genericParameter.IsGenericType)
+
+                if (genericParameter.IsGenericParameter)
+                {
+                    s += originalGenericArguments[genericParameter.GenericParameterPosition].Name;
+                }
+                else if (!genericParameter.IsGenericType)
                 {
                     s += GetSimpleTypeName(genericParameter, fullName);
                 }
@@ -317,7 +318,9 @@ namespace Orleans.Runtime
 
         public static string GetFullName(Type t)
         {
-            if (t == null) throw new ArgumentNullException(nameof(t));
+            if (t == null)
+                throw new ArgumentNullException(nameof(t));
+
             if (t.IsNested && !t.IsGenericParameter)
             {
                 return t.Namespace + "." + t.DeclaringType.Name + "." + t.Name;
@@ -329,7 +332,7 @@ namespace Orleans.Runtime
                        + new string(',', t.GetArrayRank() - 1)
                        + "]";
             }
-            return t.FullName ?? (t.IsGenericParameter ? GetGenericTypeParameterName(t) : t.Namespace + "." + t.Name);
+            return t.FullName ?? (t.IsGenericParameter ? t.Name : t.Namespace + "." + t.Name);
         }
 
         /// <summary>
