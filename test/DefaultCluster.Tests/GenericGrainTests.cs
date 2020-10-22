@@ -79,7 +79,7 @@ namespace DefaultCluster.Tests.General
         public async Task GenericGrainTests_SimpleGenericGrainGetGrain<T>(T setValue)
         {
 
-            var grain= GetGrain<ISimpleGenericGrain<T>>();
+            var grain = GetGrain<ISimpleGenericGrain<T>>();
 
             await grain.Set(setValue);
 

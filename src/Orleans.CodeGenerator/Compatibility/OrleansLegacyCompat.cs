@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -297,19 +298,23 @@ namespace Orleans.CodeGenerator.Compatibility
             return s;
         }
 
-        public static string GetGenericTypeArgs(IEnumerable<ITypeSymbol> args, Func<ITypeSymbol, bool> fullName)
+        public static string GetGenericTypeArgs(IReadOnlyList<ITypeSymbol> args, Func<ITypeSymbol, bool> fullName)
         {
             var result = string.Empty;
 
-            var first = true;
-            foreach (var genericParameter in args)
+            for (var i = 0; i < args.Count; i++)
             {
-                if (!first)
+                var genericParameter = args[i];
+                if (i > 0)
                 {
                     result += ",";
                 }
 
-                if (genericParameter is INamedTypeSymbol named && !named.IsGenericType)
+                if (genericParameter.TypeKind == TypeKind.Error || genericParameter.TypeKind == TypeKind.TypeParameter)
+                {
+                    result += "T" + i.ToString(CultureInfo.InvariantCulture);
+                }
+                else if (genericParameter is INamedTypeSymbol named && !named.IsGenericType)
                 {
                     result += GetSimpleTypeName(named, fullName);
                 }
@@ -317,8 +322,6 @@ namespace Orleans.CodeGenerator.Compatibility
                 {
                     result += GetTemplatedName(genericParameter, fullName);
                 }
-
-                first = false;
             }
 
             return result;
@@ -345,6 +348,7 @@ namespace Orleans.CodeGenerator.Compatibility
 
             return fullName != null && fullName(type) ? GetFullName(type) : type.Name;
         }
+
 
         public static string GetUntemplatedTypeName(string typeName)
         {
