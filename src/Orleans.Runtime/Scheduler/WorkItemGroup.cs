@@ -33,6 +33,7 @@ namespace Orleans.Runtime.Scheduler
         private long totalItemsEnQueued;    // equals total items queued, + 1
         private long totalItemsProcessed;
         private TimeSpan totalQueuingDelay;
+        private long lastLongQueueWarningTimestamp;
 
         private Task currentTask;
         private DateTime currentTaskStarted;
@@ -204,12 +205,18 @@ namespace Orleans.Runtime.Scheduler
                 int maxPendingItemsLimit = masterScheduler.MaxPendingItemsSoftLimit;
                 if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
                 {
-                    log.LogWarning(
-                        (int)ErrorCode.SchedulerTooManyPendingItems,
-                        "{PendingWorkItemCount} pending work items for group {WorkGroupName}, exceeding the warning threshold of {WarningThreshold}",
-                        count,
-                        this.Name,
-                        maxPendingItemsLimit);
+                    var now = ValueStopwatch.GetTimestamp();
+                    if (ValueStopwatch.FromTimestamp(this.lastLongQueueWarningTimestamp, now).Elapsed > TimeSpan.FromSeconds(10))
+                    {
+                        log.LogWarning(
+                            (int)ErrorCode.SchedulerTooManyPendingItems,
+                            "{PendingWorkItemCount} pending work items for group {WorkGroupName}, exceeding the warning threshold of {WarningThreshold}",
+                            count,
+                            this.Name,
+                            maxPendingItemsLimit);
+                    }
+
+                    lastLongQueueWarningTimestamp = now;
                 }
                 if (state != WorkGroupStatus.Waiting) return;
 

@@ -108,6 +108,11 @@ namespace Orleans.Runtime
         public void Restart() => this.value = GetTimestamp();
 
         /// <summary>
+        /// Resets this stopwatch into a stopped state with no elapsed duration.
+        /// </summary>
+        public void Reset() => this.value = 0;
+
+        /// <summary>
         /// Stops this stopwatch.
         /// </summary>
         public void Stop()

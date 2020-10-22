@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -58,30 +61,7 @@ namespace Orleans.Runtime.MembershipService
         /// <param name="remoteSilo">The remote silo to ping.</param>
         /// <param name="probeNumber">The probe number, for diagnostic purposes.</param>
         /// <returns>The result of pinging the remote silo.</returns>
-        public Task ProbeRemoteSilo(SiloAddress remoteSilo, int probeNumber)
-        {
-            Task Probe()
-            {
-                Task task;
-                try
-                {
-                    RequestContext.Set(RequestContext.PING_APPLICATION_HEADER, true);
-                    var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleType, remoteSilo);
-                    task = remoteOracle.Ping(probeNumber);
-
-                    // Update stats counter. Only count Pings that were successfuly sent, but not necessarily replied to.
-                    MessagingStatisticsGroup.OnPingSend(remoteSilo);
-                }
-                finally
-                {
-                    RequestContext.Remove(RequestContext.PING_APPLICATION_HEADER);
-                }
-
-                return task;
-            }
-
-            return this.ScheduleTask(Probe);
-        }
+        public Task ProbeRemoteSilo(SiloAddress remoteSilo, int probeNumber) => this.ScheduleTask(() => ProbeInternal(remoteSilo, probeNumber));
 
         public Task GossipToRemoteSilos(
             List<SiloAddress> gossipPartners,
@@ -121,6 +101,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleType, silo);
+
                 try
                 {
                     await remoteOracle.MembershipChangeNotification(snapshot);
@@ -135,7 +116,9 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.log.LogError(
                     (int)ErrorCode.MembershipGossipSendFailure,
-                    "Exception while sending gossip notification to remote silo {Silo}: {Exception}", silo, exception);
+                    exception,
+                    "Exception while sending gossip notification to remote silo {Silo}",
+                    silo);
             }
         }
 
@@ -152,6 +135,26 @@ namespace Orleans.Runtime.MembershipService
                     "Error refreshing membership table: {Exception}",
                     exception);
             }
+        }
+
+        private Task ProbeInternal(SiloAddress remoteSilo, int probeNumber)
+        {
+            Task task;
+            try
+            {
+                RequestContext.Set(RequestContext.PING_APPLICATION_HEADER, true);
+                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleType, remoteSilo);
+                task = remoteOracle.Ping(probeNumber);
+
+                // Update stats counter. Only count Pings that were successfuly sent, but not necessarily replied to.
+                MessagingStatisticsGroup.OnPingSend(remoteSilo);
+            }
+            finally
+            {
+                RequestContext.Remove(RequestContext.PING_APPLICATION_HEADER);
+            }
+
+            return task;
         }
     }
 }
