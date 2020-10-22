@@ -1,9 +1,7 @@
 name: Build and publish site
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - docs
+  repository_dispatch:
 
 jobs:
   build:
@@ -11,7 +9,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        ref: 'docs'
+        ref: ${{ github.event.client_payload.ref }}
     - name: Setup .NET Core 3.1
       uses: actions/setup-dotnet@v1
       with:
@@ -35,4 +33,3 @@ jobs:
         
         git commit -m "GitHub Action - Automated build"
         git push --force $remote_repo scratch:$remote_branch
-      
