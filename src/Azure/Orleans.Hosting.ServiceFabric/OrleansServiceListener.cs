@@ -23,7 +23,7 @@ namespace Orleans.Hosting.ServiceFabric
         }
 
         /// <summary>
-        /// Creates a <see cref="ServiceInstanceListener"/> which manages an Orleans silo for a stateless service.
+        /// Creates a <see cref="ServiceInstanceListener"/> which manages an Orleans silo for a stateful service.
         /// </summary>
         /// <param name="configure">The <see cref="ISiloHostBuilder"/> configuration delegate.</param>
         /// <returns>A <see cref="ServiceInstanceListener"/> which manages an Orleans silo.</returns>
