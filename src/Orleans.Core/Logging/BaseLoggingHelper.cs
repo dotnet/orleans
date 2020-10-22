@@ -39,11 +39,6 @@ namespace Orleans
 
         public virtual string GetGrainTypeName(GrainType grainType)
         {
-            if (grainType.IsSystemTarget())
-            {
-                return Constants.SystemTargetName(grainType);
-            }
-
             if (grainType.IsLegacyGrain())
             {
                 if (this.grainTypeNameCache.TryGetValue(grainType, out var name))
