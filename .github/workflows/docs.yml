@@ -23,7 +23,7 @@ jobs:
         cd _site
         
         $remote_repo="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$($env:GITHUB_REPOSITORY).git"
-        $remote_branch="gh-pages"
+        $remote_branch="gh-bages"
         
         git init
         git checkout -b scratch
