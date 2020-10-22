@@ -22,7 +22,6 @@ jobs:
       run: dotnet build src
     - name: Publish
       run: |
-        Get-ChildItem Env:
         cd _site
         
         $remote_repo="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$($env:GITHUB_REPOSITORY).git"
