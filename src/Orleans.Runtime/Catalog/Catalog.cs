@@ -1019,14 +1019,34 @@ namespace Orleans.Runtime
             else if (activation.PlacedUsing is StatelessWorkerPlacement stPlacement)
             {
                 // Stateless workers are not registered in the directory and can have multiple local activations.
-                int maxNumLocalActivations = stPlacement.MaxLocal;
+                var maxNumLocalActivations = stPlacement.MaxLocal;
                 lock (activations)
                 {
-                    List<ActivationData> local;
-                    if (!LocalLookup(address.Grain, out local) || local.Count <= maxNumLocalActivations)
-                        return ActivationRegistrationResult.Success;
+                    // Fetch all local activations for the grain
+                    if (!LocalLookup(address.Grain, out var local))
+                        // The activation must have been registered with the local activation directory so this is an error
+                        throw new OrleansException("Invalid stateless worker activation: no local activations found for grain");
 
-                    var id = StatelessWorkerDirector.PickRandom(local).Address;
+                    // There might be too many activations for the grain, in which case we need to redirect the
+                    // surplus activations to valid ones. Activations [0..maxNumLocalActivations) are considered valid,
+                    // extra activations are redirected to a random one in the valid range.
+                    var activationIndex = local.FindIndex(entry => entry.ActivationId.Equals(activation.ActivationId));
+
+                    if (activationIndex == -1)
+                    {
+                        throw new OrleansException("Invalid stateless worker activation: not found in local activation directory");
+                    }
+
+                    if (activationIndex < maxNumLocalActivations)
+                    {
+                        // The activation falls in the valid range
+                        return ActivationRegistrationResult.Success;
+                    }
+
+                    // This activation should not exist; there are too many activations and this is one of them.
+                    // Redirect to a random activation in the valid range.
+                    var validActivations = local.Take(maxNumLocalActivations).ToList();
+                    var id = StatelessWorkerDirector.PickRandom(validActivations).Address;
                     return new ActivationRegistrationResult(existingActivationAddress: id);
                 }
             }
