@@ -9,6 +9,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
+        repository: 'dotnet/orleans-docs'
         ref: ${{ github.event.client_payload.ref }}
     - name: Setup .NET Core 3.1
       uses: actions/setup-dotnet@v1
