@@ -1,9 +1,0 @@
-- name: Runtime Monitoring
-  href: index.md
-  homepage: index.md
-- name: Silo Error Code Monitoring
-  href: silo_error_code_monitoring.md
-- name: Client Error Code Monitoring
-  href: client_error_code_monitoring.md
-
-  
