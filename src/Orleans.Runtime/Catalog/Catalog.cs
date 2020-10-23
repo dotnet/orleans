@@ -452,6 +452,21 @@ namespace Orleans.Runtime
                 if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
                     result = (ActivationData)this.grainActivator.CreateInstance(address);
+
+                    if (result.PlacedUsing is StatelessWorkerPlacement st)
+                    {
+                        // Check if there is already enough StatelessWorker created
+                        if (LocalLookup(address.Grain, out var local) && local.Count > st.MaxLocal)
+                        {
+                            // Redirect directly to an already created StatelessWorker
+                            // It's a bit hacky since we will return an activation with a different
+                            // ActivationId than the one requested, but StatelessWorker are local only,
+                            // so no need to clear the cache. This will avoid unecessary and costly redirects.
+                            return StatelessWorkerDirector.PickRandom(local);
+                        }
+                        // The newly created StatelessWorker will be registered in RegisterMessageTarget()
+                    }
+
                     if (result.GrainInstance is object grainInstance)
                     {
                         var grainTypeName = TypeUtils.GetFullName(grainInstance.GetType());
@@ -1019,36 +1034,8 @@ namespace Orleans.Runtime
             else if (activation.PlacedUsing is StatelessWorkerPlacement stPlacement)
             {
                 // Stateless workers are not registered in the directory and can have multiple local activations.
-                var maxNumLocalActivations = stPlacement.MaxLocal;
-                lock (activations)
-                {
-                    // Fetch all local activations for the grain
-                    if (!LocalLookup(address.Grain, out var local))
-                        // The activation must have been registered with the local activation directory so this is an error
-                        throw new OrleansException("Invalid stateless worker activation: no local activations found for grain");
-
-                    // There might be too many activations for the grain, in which case we need to redirect the
-                    // surplus activations to valid ones. Activations [0..maxNumLocalActivations) are considered valid,
-                    // extra activations are redirected to a random one in the valid range.
-                    var activationIndex = local.FindIndex(entry => entry.ActivationId.Equals(activation.ActivationId));
-
-                    if (activationIndex == -1)
-                    {
-                        throw new OrleansException("Invalid stateless worker activation: not found in local activation directory");
-                    }
-
-                    if (activationIndex < maxNumLocalActivations)
-                    {
-                        // The activation falls in the valid range
-                        return ActivationRegistrationResult.Success;
-                    }
-
-                    // This activation should not exist; there are too many activations and this is one of them.
-                    // Redirect to a random activation in the valid range.
-                    var validActivations = local.Take(maxNumLocalActivations).ToList();
-                    var id = StatelessWorkerDirector.PickRandom(validActivations).Address;
-                    return new ActivationRegistrationResult(existingActivationAddress: id);
-                }
+                // We already checked earlier that we didn't created too many instances of this worker
+                return ActivationRegistrationResult.Success;
             }
             else
             {
