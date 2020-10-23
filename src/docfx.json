@@ -3,16 +3,8 @@
     "content": [
       {
         "files": [
-          "Documentation/**/**.yml",
-          "Documentation/**/**.md",
-          "Tutorials/**.yml",
-          "Tutorials/**.md",
-          "Community/**.yml",
-          "Community/**.md",
-          "1.5/**.yml",
-          "1.5/**.md",
-          "blog/**.yml",
-          "blog/**.md"
+          "**/**.yml",
+          "**/**.md"
         ]
       },
       {
@@ -29,17 +21,20 @@
     "resource": [
       {
         "files": [
+          "Build.cmd",
+          "Test.cmd",
+          "assets/**",
           "images/**",
-          "1.5/images/**",
+          "**/*.png",
+          "**/*.jpg",
+          "**/*.svg",
+          "**/*.gif",
+          "**/*.ppt",
+          "**/*.pptx",
+          "**/*.pdf",
           "logo.svg",
           "logo-light.svg",
-          "Documentation/**/**.png",
-          "Documentation/**/**.gif",
-          "Tutorials/**.png",
-          "1.5/Documentation/**/**.png",
-          "1.5/Documentation/**/**.gif",
-          "1.5/Tutorials/**.png",
-          "Community/**.png",
+          "tutorials_and_samples/**.png",
           "blog/media/**.png",
           "blog/media/**.jpg"
         ],

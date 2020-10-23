@@ -1,6 +1,0 @@
-- name: Migration from Orleans 1.5
-  href: migration1.5.md
-- name: Migration from Orleans 1.5 in Azure Cloud Services
-  href: migrationAzure2.0.md
-- name: Code Generation
-  href: codegen.md
