@@ -96,6 +96,20 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("StatelessWorker")]
+        public async Task ManyConcurrentInvocationsOnActivationLimitedStatelessWorkerDoesNotFail()
+        {
+            // Issue #6795: significantly more concurrent invocations than the local worker limit results in too many
+            // message forwards. When the issue occurs, this test will throw an exception.
+
+            // We are trying to trigger a race condition and need more than 1 attempt to reliably reproduce the issue.
+            for (var attempt = 0; attempt < 100; attempt ++)
+            {
+                var grain = this.GrainFactory.GetGrain<IStatelessWorkerGrain>(attempt);
+                await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => grain.DummyCall()));
+            }
+        }
+
         [SkippableFact(Skip = "Skipping test for now, since there seems to be a bug"), TestCategory("Functional"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerFastActivationsDontFailInMultiSiloDeployment()
         {

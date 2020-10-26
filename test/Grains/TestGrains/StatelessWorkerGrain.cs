@@ -77,5 +77,7 @@ namespace UnitTests.Grains
             logger.Info($"# allActivationIds {ids.Count} for silo {silo}: {Utils.EnumerableToString(ids)}");
             return Task.FromResult(Tuple.Create(activationGuid, silo, calls));
         }
+
+        public Task DummyCall() => Task.CompletedTask;
     }
 }

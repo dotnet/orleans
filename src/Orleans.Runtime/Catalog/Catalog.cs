@@ -452,6 +452,30 @@ namespace Orleans.Runtime
                 if (newPlacement && !SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
                     result = (ActivationData)this.grainActivator.CreateInstance(address);
+
+                    if (result.PlacedUsing is StatelessWorkerPlacement st)
+                    {
+                        // Check if there is already enough StatelessWorker created
+                        if (LocalLookup(address.Grain, out var local) && local.Count > st.MaxLocal)
+                        {
+                            // Redirect directly to an already created StatelessWorker
+                            // It's a bit hacky since we will return an activation with a different
+                            // ActivationId than the one requested, but StatelessWorker are local only,
+                            // so no need to clear the cache. This will avoid unecessary and costly redirects.
+                            var redirect = StatelessWorkerDirector.PickRandom(local);
+                            if (logger.IsEnabled(LogLevel.Debug))
+                            {
+                                logger.LogDebug(
+                                    (int)ErrorCode.Catalog_DuplicateActivation,
+                                    "Trying to create too many {GrainType} activations on this silo. Redirecting to activation {RedirectActivation}",
+                                    result.Name,
+                                    redirect.ActivationId);
+                            }
+                            return redirect;
+                        }
+                        // The newly created StatelessWorker will be registered in RegisterMessageTarget()
+                    }
+
                     if (result.GrainInstance is object grainInstance)
                     {
                         var grainTypeName = TypeUtils.GetFullName(grainInstance.GetType());
@@ -1019,16 +1043,8 @@ namespace Orleans.Runtime
             else if (activation.PlacedUsing is StatelessWorkerPlacement stPlacement)
             {
                 // Stateless workers are not registered in the directory and can have multiple local activations.
-                int maxNumLocalActivations = stPlacement.MaxLocal;
-                lock (activations)
-                {
-                    List<ActivationData> local;
-                    if (!LocalLookup(address.Grain, out local) || local.Count <= maxNumLocalActivations)
-                        return ActivationRegistrationResult.Success;
-
-                    var id = StatelessWorkerDirector.PickRandom(local).Address;
-                    return new ActivationRegistrationResult(existingActivationAddress: id);
-                }
+                // We already checked earlier that we didn't created too many instances of this worker
+                return ActivationRegistrationResult.Success;
             }
             else
             {
