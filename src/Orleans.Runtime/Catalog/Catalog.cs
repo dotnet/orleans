@@ -462,7 +462,16 @@ namespace Orleans.Runtime
                             // It's a bit hacky since we will return an activation with a different
                             // ActivationId than the one requested, but StatelessWorker are local only,
                             // so no need to clear the cache. This will avoid unecessary and costly redirects.
-                            return StatelessWorkerDirector.PickRandom(local);
+                            var redirect = StatelessWorkerDirector.PickRandom(local);
+                            if (logger.IsEnabled(LogLevel.Debug))
+                            {
+                                logger.LogDebug(
+                                    (int)ErrorCode.Catalog_DuplicateActivation,
+                                    "Trying to create too many {GrainType} activations on this silo. Redirecting to activation {RedirectActivation}",
+                                    result.Name,
+                                    redirect.ActivationId);
+                            }
+                            return redirect;
                         }
                         // The newly created StatelessWorker will be registered in RegisterMessageTarget()
                     }
