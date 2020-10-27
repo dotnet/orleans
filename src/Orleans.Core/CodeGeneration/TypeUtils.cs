@@ -6,7 +6,6 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
-using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 
@@ -137,13 +136,19 @@ namespace Orleans.Runtime
                     s += ",";
                 }
 
-                if (genericParameter.IsGenericParameter)
+                if (!genericParameter.IsGenericType)
                 {
-                    s += originalGenericArguments[genericParameter.GenericParameterPosition].Name;
-                }
-                else if (!genericParameter.IsGenericType)
-                {
-                    s += GetSimpleTypeName(genericParameter, fullName);
+                    var noneGenericType = genericParameter;
+                    // get generic parameter from generic type definition to have consisttnt naming for inherit interfaces
+                    // Example: interface IA<TName>, class A<TOtherName>: IA<OtherName>
+                    // in this case generic parameter name of IA interface from class A is OtherName instead of TName.
+                    // To avoid this situation use generic parameter from generic type definition.
+                    if (genericParameter.IsGenericParameter)
+                    {
+                        noneGenericType = originalGenericArguments[genericParameter.GenericParameterPosition];
+                    }
+
+                    s += GetSimpleTypeName(noneGenericType, fullName);
                 }
                 else
                 {
@@ -318,8 +323,7 @@ namespace Orleans.Runtime
 
         public static string GetFullName(Type t)
         {
-            if (t == null)
-                throw new ArgumentNullException(nameof(t));
+            if (t == null) throw new ArgumentNullException(nameof(t));
 
             if (t.IsNested && !t.IsGenericParameter)
             {
