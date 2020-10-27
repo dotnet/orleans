@@ -16,10 +16,10 @@ namespace Orleans.Runtime.MembershipService
     internal class SiloHealthMonitor : ITestAccessor, IHealthCheckable
     {
         private readonly ILogger _log;
-        private readonly ClusterMembershipOptions _clusterMembershipOptions;
+        private readonly IOptionsMonitor<ClusterMembershipOptions> _clusterMembershipOptions;
         private readonly IRemoteSiloProber _prober;
         private readonly ILocalSiloHealthMonitor _localSiloHealthMonitor;
-        private readonly MembershipTableManager _membershipService;
+        private readonly IClusterMembershipService _membershipService;
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly CancellationTokenSource _stoppingCancellation = new CancellationTokenSource();
         private readonly object _lockObj = new object();
@@ -56,23 +56,23 @@ namespace Orleans.Runtime.MembershipService
         public SiloHealthMonitor(
             SiloAddress siloAddress,
             Func<SiloHealthMonitor, ProbeResult, Task> onProbeResult,
-            IOptions<ClusterMembershipOptions> clusterMembershipOptions,
+            IOptionsMonitor<ClusterMembershipOptions> clusterMembershipOptions,
             ILoggerFactory loggerFactory,
             IRemoteSiloProber remoteSiloProber,
             IAsyncTimerFactory asyncTimerFactory,
             ILocalSiloHealthMonitor localSiloHealthMonitor,
-            MembershipTableManager membershipService,
+            IClusterMembershipService membershipService,
             ILocalSiloDetails localSiloDetails)
         {
             SiloAddress = siloAddress;
-            _clusterMembershipOptions = clusterMembershipOptions.Value;
+            _clusterMembershipOptions = clusterMembershipOptions;
             _prober = remoteSiloProber;
             _localSiloHealthMonitor = localSiloHealthMonitor;
             _membershipService = membershipService;
             _localSiloDetails = localSiloDetails;
             _log = loggerFactory.CreateLogger<SiloHealthMonitor>();
             _pingTimer = asyncTimerFactory.Create(
-                _clusterMembershipOptions.ProbeTimeout,
+                _clusterMembershipOptions.CurrentValue.ProbeTimeout,
                 nameof(SiloHealthMonitor));
             _onProbeResult = onProbeResult;
             _elapsedSinceLastSuccessfulResponse = ValueStopwatch.StartNew();
@@ -144,9 +144,9 @@ namespace Orleans.Runtime.MembershipService
         private async Task Run()
         {
             var random = new SafeRandom();
-            MembershipTableSnapshot activeMembersSnapshot = default;
+            ClusterMembershipSnapshot activeMembersSnapshot = default;
             SiloAddress[] otherNodes = default;
-            TimeSpan? overrideDelay = random.NextTimeSpan(_clusterMembershipOptions.ProbeTimeout);
+            TimeSpan? overrideDelay = random.NextTimeSpan(_clusterMembershipOptions.CurrentValue.ProbeTimeout);
             while (await _pingTimer.NextTick(overrideDelay))
             {
                 ProbeResult probeResult;
@@ -155,17 +155,17 @@ namespace Orleans.Runtime.MembershipService
                 try
                 {
                     // Discover the other active nodes in the cluster, if there are any.
-                    var membershipSnapshot = _membershipService.MembershipTableSnapshot;
+                    var membershipSnapshot = _membershipService.CurrentSnapshot;
                     if (otherNodes is null || !object.ReferenceEquals(activeMembersSnapshot, membershipSnapshot))
                     {
                         activeMembersSnapshot = membershipSnapshot;
-                        otherNodes = membershipSnapshot.Entries.Values
+                        otherNodes = membershipSnapshot.Members.Values
                             .Where(v => v.Status == SiloStatus.Active && v.SiloAddress != this.SiloAddress && v.SiloAddress != _localSiloDetails.SiloAddress)
                             .Select(s => s.SiloAddress)
                             .ToArray();
                     }
 
-                    var isDirectProbe = !_clusterMembershipOptions.EnableIndirectProbes || _failedProbes < _clusterMembershipOptions.NumMissedProbesLimit - 1 || otherNodes.Length == 0;
+                    var isDirectProbe = !_clusterMembershipOptions.CurrentValue.EnableIndirectProbes || _failedProbes < _clusterMembershipOptions.CurrentValue.NumMissedProbesLimit - 1 || otherNodes.Length == 0;
                     var timeout = GetTimeout(isDirectProbe);
                     var cancellation = new CancellationTokenSource(timeout);
 
@@ -189,7 +189,7 @@ namespace Orleans.Runtime.MembershipService
                         if (probeResult.Status != ProbeResultStatus.Succeeded && probeResult.IntermediaryHealthDegradationScore > 0)
                         {
                             _log.LogInformation("Recusing unhealthy intermediary {Intermediary} and trying again with remaining nodes", intermediary);
-                            otherNodes = otherNodes.Where(node => node.Equals(intermediary)).ToArray();
+                            otherNodes = otherNodes.Where(node => !node.Equals(intermediary)).ToArray();
                             overrideDelay = TimeSpan.FromMilliseconds(250);
                         }
                     }
@@ -206,7 +206,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var additionalTimeout = 0;
 
-                if (_clusterMembershipOptions.ExtendProbeTimeoutDuringDegradation)
+                if (_clusterMembershipOptions.CurrentValue.ExtendProbeTimeoutDuringDegradation)
                 {
                     // Attempt to account for local health degradation by extending the timeout period.
                     var localDegradationScore = _localSiloHealthMonitor.GetLocalHealthDegradationScore(DateTime.UtcNow);
@@ -219,7 +219,7 @@ namespace Orleans.Runtime.MembershipService
                     additionalTimeout += 1;
                 }
 
-                return _clusterMembershipOptions.ProbeTimeout.Multiply(1 + additionalTimeout);
+                return _clusterMembershipOptions.CurrentValue.ProbeTimeout.Multiply(1 + additionalTimeout);
             }
         }
 

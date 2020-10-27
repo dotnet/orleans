@@ -33,6 +33,7 @@ namespace NonSilo.Tests.Membership
         private readonly ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)> timerCalls;
         private readonly DelegateAsyncTimerFactory timerFactory;
         private readonly ILocalSiloHealthMonitor localSiloHealthMonitor;
+        private readonly IClusterMembershipService membershipService;
         private readonly IRemoteSiloProber prober;
         private readonly InMemoryMembershipTable membershipTable;
         private readonly MembershipTableManager manager;
@@ -71,6 +72,9 @@ namespace NonSilo.Tests.Membership
             this.localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
             this.localSiloHealthMonitor.GetLocalHealthDegradationScore(default).ReturnsForAnyArgs(0);
 
+            this.membershipService = Substitute.For<IClusterMembershipService>();
+            this.membershipService.CurrentSnapshot.ReturnsForAnyArgs(info => this.manager.MembershipTableSnapshot.CreateClusterMembershipSnapshot());
+
             this.prober = Substitute.For<IRemoteSiloProber>();
             this.membershipTable = new InMemoryMembershipTable(new TableVersion(1, "1"));
             this.manager = new MembershipTableManager(
@@ -99,12 +103,14 @@ namespace NonSilo.Tests.Membership
             });
 
             var clusterMembershipOptions = new ClusterMembershipOptions();
-            var options = Options.Create(clusterMembershipOptions);
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.ReturnsForAnyArgs(clusterMembershipOptions);
+
             var monitor = new ClusterHealthMonitor(
                 this.localSiloDetails,
                 this.manager,
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
-                options,
+                optionsMonitor,
                 this.fatalErrorHandler,
                 null);
             ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(this.lifecycle);
@@ -112,12 +118,12 @@ namespace NonSilo.Tests.Membership
             testAccessor.CreateMonitor = s => new SiloHealthMonitor(
                 s,
                 testAccessor.OnProbeResult,
-                options,
+                optionsMonitor,
                 this.loggerFactory,
                 this.prober,
                 this.timerFactory,
                 this.localSiloHealthMonitor,
-                this.manager,
+                this.membershipService,
                 this.localSiloDetails);
 
             await this.lifecycle.OnStart();
