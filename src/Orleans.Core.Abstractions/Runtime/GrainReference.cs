@@ -22,7 +22,7 @@ namespace Orleans.Runtime
             this.InvokeMethodOptions = invokeMethodOptions;
         }
 
-        public IGrainReferenceRuntime Runtime { get; }  
+        public IGrainReferenceRuntime Runtime { get; }
 
         public GrainType GrainType { get; }
 
@@ -90,7 +90,7 @@ namespace Orleans.Runtime
         public uint GetUniformHashCode()
         {
             // GrainId already includes the hashed type code for generic arguments.
-            return (uint)GrainId.GetHashCode();
+            return GrainId.GetUniformHashCode();
         }
 
         /// <summary>
@@ -155,7 +155,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Return the name of the interface for this GrainReference. 
+        /// Return the name of the interface for this GrainReference.
         /// Implemented in Orleans generated code.
         /// </summary>
         public virtual string InterfaceName => InterfaceType.ToStringUtf8();
