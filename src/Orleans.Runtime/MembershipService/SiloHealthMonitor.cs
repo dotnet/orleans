@@ -31,12 +31,7 @@ namespace Orleans.Runtime.MembershipService
         /// <summary>
         /// The id of the next probe.
         /// </summary>
-        private long _nextProbeId;
-
-        /// <summary>
-        /// The highest internal probe number which has completed.
-        /// </summary>
-        private long _highestCompletedProbeId = -1;
+        private int _nextProbeId;
 
         /// <summary>
         /// The number of failed probes since the last successful probe.
@@ -81,7 +76,6 @@ namespace Orleans.Runtime.MembershipService
         internal interface ITestAccessor
         {
             int MissedProbes { get; }
-            Func<SiloHealthMonitor, ProbeResult, Task> OnProbeResult { get; set; }
         }
 
         /// <summary>
@@ -95,8 +89,6 @@ namespace Orleans.Runtime.MembershipService
         public bool IsCanceled => _stoppingCancellation.IsCancellationRequested;
 
         int ITestAccessor.MissedProbes => _failedProbes;
-
-        Func<SiloHealthMonitor, ProbeResult, Task> ITestAccessor.OnProbeResult { get => _onProbeResult; set => _onProbeResult = value; }
 
         /// <summary>
         /// Start the monitor.
@@ -151,7 +143,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 ProbeResult probeResult;
                 overrideDelay = default;
-            
+
                 try
                 {
                     // Discover the other active nodes in the cluster, if there are any.
@@ -178,7 +170,7 @@ namespace Orleans.Runtime.MembershipService
                     {
                         // Pick a random other node and probe the target indirectly, using the selected node as an intermediary.
                         var intermediary = otherNodes[random.Next(0, otherNodes.Length - 1)];
- 
+
                         // Select a timeout which will allow the intermediary node to attempt to probe the target node and still respond to this node
                         // if the remote node does not respond in time.
                         // Attempt to account for local health degradation by extending the timeout period.
@@ -194,7 +186,10 @@ namespace Orleans.Runtime.MembershipService
                         }
                     }
 
-                    await _onProbeResult(this, probeResult).ConfigureAwait(false);
+                    if (!_stoppingCancellation.IsCancellationRequested)
+                    {
+                        await _onProbeResult(this, probeResult).ConfigureAwait(false);
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -230,8 +225,7 @@ namespace Orleans.Runtime.MembershipService
         /// <returns>The number of failed probes since the last successful probe.</returns>
         private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation)
         {
-            var id = (int)Interlocked.Increment(ref _nextProbeId);
-
+            var id = ++_nextProbeId;
             if (_log.IsEnabled(LogLevel.Trace))
             {
                 _log.LogTrace("Going to send Ping #{Id} to probe silo {Silo}", id, SiloAddress);
@@ -270,89 +264,35 @@ namespace Orleans.Runtime.MembershipService
             {
                 MessagingStatisticsGroup.OnPingReplyReceived(SiloAddress);
 
-                lock (_lockObj)
+                if (_log.IsEnabled(LogLevel.Trace))
                 {
-                    if (id <= _highestCompletedProbeId)
-                    {
-                        _log.LogInformation(
-                            "Ignoring success result for ping #{Id} from {Silo} in {RoundTripTime} since a later probe has already completed. Highest ({HighestCompletedProbeId}) > Current ({CurrentProbeId})",
-                            id,
-                            SiloAddress,
-                            roundTripTimer.Elapsed,
-                            _highestCompletedProbeId,
-                            id);
-                        probeResult = ProbeResult.CreateDirect(_failedProbes, ProbeResultStatus.Unknown);
-                    }
-                    else if (_stoppingCancellation.IsCancellationRequested)
-                    {
-                        _log.LogInformation(
-                            "Ignoring success result for ping #{Id} from {Silo} in {RoundTripTime} since this monitor has been stopped",
-                            id,
-                            SiloAddress,
-                            roundTripTimer.Elapsed);
-                        probeResult = ProbeResult.CreateDirect(_failedProbes, ProbeResultStatus.Unknown);
-                    }
-                    else
-                    {
-                        if (_log.IsEnabled(LogLevel.Trace))
-                        {
-                            _log.LogTrace(
-                                "Got successful ping response for ping #{Id} from {Silo} with round trip time of {RoundTripTime}",
-                                id,
-                                SiloAddress,
-                                roundTripTimer.Elapsed);
-                        }
-
-                        _highestCompletedProbeId = id;
-                        Interlocked.Exchange(ref _failedProbes, 0);
-                        _elapsedSinceLastSuccessfulResponse.Restart();
-                        LastRoundTripTime = roundTripTimer.Elapsed;
-                        probeResult = ProbeResult.CreateDirect(0, ProbeResultStatus.Succeeded);
-                    }
+                    _log.LogTrace(
+                        "Got successful ping response for ping #{Id} from {Silo} with round trip time of {RoundTripTime}",
+                        id,
+                        SiloAddress,
+                        roundTripTimer.Elapsed);
                 }
+
+                _failedProbes = 0;
+                _elapsedSinceLastSuccessfulResponse.Restart();
+                LastRoundTripTime = roundTripTimer.Elapsed;
+                probeResult = ProbeResult.CreateDirect(0, ProbeResultStatus.Succeeded);
             }
             else
             {
                 MessagingStatisticsGroup.OnPingReplyMissed(SiloAddress);
 
-                lock (_lockObj)
-                {
-                    if (id <= _highestCompletedProbeId)
-                    {
-                        _log.LogInformation(
-                            failureException,
-                            "Ignoring failure result for probe #{Id} to {Silo} since a later probe has already completed. Highest completed probe id is {HighestCompletedProbeId}",
-                            id,
-                            SiloAddress,
-                            _highestCompletedProbeId);
-                        probeResult = ProbeResult.CreateDirect(_failedProbes, ProbeResultStatus.Unknown);
-                    }
-                    else if (_stoppingCancellation.IsCancellationRequested)
-                    {
-                        _log.LogInformation(
-                            failureException,
-                            "Ignoring failure result for probe #{Id} to {Silo} since this monitor has been stopped",
-                            id,
-                            SiloAddress);
-                        probeResult = ProbeResult.CreateDirect(_failedProbes, ProbeResultStatus.Unknown);
-                    }
-                    else
-                    {
-                        _highestCompletedProbeId = id;
-                        var failedProbes = Interlocked.Increment(ref _failedProbes);
+                var failedProbes = ++_failedProbes;
+                _log.LogWarning(
+                    (int)ErrorCode.MembershipMissedPing,
+                    failureException,
+                    "Did not get response for probe #{Id} to silo {Silo} after {Elapsed}. Current number of consecutive failed probes is {FailedProbeCount}",
+                    id,
+                    SiloAddress,
+                    roundTripTimer.Elapsed,
+                    failedProbes);
 
-                        _log.LogWarning(
-                            (int)ErrorCode.MembershipMissedPing,
-                            failureException,
-                            "Did not get response for probe #{Id} to silo {Silo} after {Elapsed}. Current number of consecutive failed probes is {FailedProbeCount}",
-                            id,
-                            SiloAddress,
-                            roundTripTimer.Elapsed,
-                            failedProbes);
-
-                        probeResult = ProbeResult.CreateDirect(failedProbes, ProbeResultStatus.Failed);
-                    }
-                }
+                probeResult = ProbeResult.CreateDirect(failedProbes, ProbeResultStatus.Failed);
             }
 
             return probeResult;
@@ -367,8 +307,7 @@ namespace Orleans.Runtime.MembershipService
         /// <returns>The number of failed probes since the last successful probe.</returns>
         private async Task<ProbeResult> ProbeIndirectly(SiloAddress intermediary, TimeSpan directProbeTimeout, CancellationToken cancellation)
         {
-            var id = (int)Interlocked.Increment(ref _nextProbeId);
-
+            var id = ++_nextProbeId;
             if (_log.IsEnabled(LogLevel.Trace))
             {
                 _log.LogTrace("Going to send indirect ping #{Id} to probe silo {Silo} via {Intermediary}", id, SiloAddress, intermediary);
@@ -410,91 +349,36 @@ namespace Orleans.Runtime.MembershipService
 
                         MessagingStatisticsGroup.OnPingReplyReceived(SiloAddress);
 
-                        lock (_lockObj)
-                        {
-                            if (id <= _highestCompletedProbeId)
-                            {
-                                _log.LogInformation(
-                                    "Ignoring success result for indirect probe #{Id} to {SiloAddress} via {IntermediarySiloAddress} in {RoundTripTime} with direct probe time of {ProbeResponseTime} since a later probe has already completed. Highest completed probe is {HighestCompletedProbeId}",
-                                    id,
-                                    SiloAddress,
-                                    intermediary,
-                                    roundTripTime,
-                                    indirectResult.ProbeResponseTime,
-                                    _highestCompletedProbeId);
-
-                                return ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, indirectResult);
-                            }
-                            else if (_stoppingCancellation.IsCancellationRequested)
-                            {
-                                _log.LogInformation(
-                                    "Ignoring success result for indirect probe #{Id} to {SiloAddress} via {IntermediarySiloAddress} in {RoundTripTime} with direct probe time of {ProbeResponseTime} since this monitor is stopping",
-                                    id,
-                                    SiloAddress,
-                                    intermediary,
-                                    roundTripTime,
-                                    indirectResult.ProbeResponseTime);
-
-                                probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, indirectResult);
-                            }
-                            else
-                            {
-                                _highestCompletedProbeId = id;
-                                Interlocked.Exchange(ref _failedProbes, 0);
-                                probeResult = ProbeResult.CreateIndirect(0, ProbeResultStatus.Succeeded, indirectResult);
-                            }
-                        } 
+                        _failedProbes = 0;
+                        probeResult = ProbeResult.CreateIndirect(0, ProbeResultStatus.Succeeded, indirectResult);
                     }
                     else
                     {
                         MessagingStatisticsGroup.OnPingReplyMissed(SiloAddress);
 
-                        lock (_lockObj)
+                        if (indirectResult.IntermediaryHealthScore > 0)
                         {
-                            if (id <= _highestCompletedProbeId)
-                            {
-                                _log.LogInformation(
-                                    "Ignoring failure result for ping #{Id} from {Silo} since a later probe has already completed. Highest completed id ({HighestCompletedProbeId}). Failure message: {FailureMessage}",
-                                    id,
-                                    SiloAddress,
-                                    _highestCompletedProbeId,
-                                    indirectResult.FailureMessage);
-                                probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, indirectResult);
-                            }
-                            else if (_stoppingCancellation.IsCancellationRequested)
-                            {
-                                _log.LogInformation(
-                                    "Ignoring failure result for ping #{Id} from {Silo} since this monitor has been stopped. Failure message: {FailureMessage}",
-                                    id,
-                                    SiloAddress,
-                                    indirectResult.FailureMessage);
-                                probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, indirectResult);
-                            }
-                            else if (indirectResult.IntermediaryHealthScore > 0)
-                            {
-                                _log.LogInformation(
-                                    "Ignoring failure result for ping #{Id} from {Silo} since the intermediary used to probe the silo is not healthy. Intermediary health degradation score: {IntermediaryHealthScore}",
-                                    id,
-                                    SiloAddress,
-                                    indirectResult.IntermediaryHealthScore);
-                                probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, indirectResult);
-                            }
-                            else
-                            {
-                                _log.LogWarning(
-                                    "Indirect probe request #{Id} to silo {SiloAddress} via silo {IntermediarySiloAddress} failed after {RoundTripTime} with a direct probe response time of {ProbeResponseTime}. Failure message: {FailureMessage}. Intermediary health score: {IntermediaryHealthScore}",
-                                    id,
-                                    SiloAddress,
-                                    intermediary,
-                                    roundTripTimer.Elapsed,
-                                    indirectResult.ProbeResponseTime,
-                                    indirectResult.FailureMessage,
-                                    indirectResult.IntermediaryHealthScore);
+                            _log.LogInformation(
+                                "Ignoring failure result for ping #{Id} from {Silo} since the intermediary used to probe the silo is not healthy. Intermediary health degradation score: {IntermediaryHealthScore}",
+                                id,
+                                SiloAddress,
+                                indirectResult.IntermediaryHealthScore);
+                            probeResult = ProbeResult.CreateIndirect(_failedProbes, ProbeResultStatus.Unknown, indirectResult);
+                        }
+                        else
+                        {
+                            _log.LogWarning(
+                                "Indirect probe request #{Id} to silo {SiloAddress} via silo {IntermediarySiloAddress} failed after {RoundTripTime} with a direct probe response time of {ProbeResponseTime}. Failure message: {FailureMessage}. Intermediary health score: {IntermediaryHealthScore}",
+                                id,
+                                SiloAddress,
+                                intermediary,
+                                roundTripTimer.Elapsed,
+                                indirectResult.ProbeResponseTime,
+                                indirectResult.FailureMessage,
+                                indirectResult.IntermediaryHealthScore);
 
-                                _highestCompletedProbeId = id;
-                                var missed = Interlocked.Increment(ref _failedProbes);
-                                probeResult = ProbeResult.CreateIndirect(missed, ProbeResultStatus.Failed, indirectResult);
-                            }
+                            var missed = ++_failedProbes;
+                            probeResult = ProbeResult.CreateIndirect(missed, ProbeResultStatus.Failed, indirectResult);
                         }
                     }
                 }

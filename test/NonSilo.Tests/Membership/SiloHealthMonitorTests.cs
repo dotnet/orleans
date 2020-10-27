@@ -22,7 +22,7 @@ using static Orleans.Runtime.MembershipService.SiloHealthMonitor;
 
 namespace NonSilo.Tests.Membership
 {
-    [TestCategory("BVT")]
+    [TestCategory("BVT"), TestCategory("Membership")]
     public class SiloHealthMonitorTests
     {
         private readonly ITestOutputHelper _output;

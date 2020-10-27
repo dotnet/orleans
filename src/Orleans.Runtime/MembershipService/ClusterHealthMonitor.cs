@@ -228,6 +228,12 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         private async Task OnProbeResultInternal(SiloHealthMonitor monitor, ProbeResult probeResult)
         {
+            // Do not act on probe results if shutdown is in progress.
+            if (this.shutdownCancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
             if (probeResult.IsDirectProbe)
             {
                 if (probeResult.Status == ProbeResultStatus.Failed && probeResult.FailedProbeCount >= this.clusterMembershipOptions.CurrentValue.NumMissedProbesLimit)
