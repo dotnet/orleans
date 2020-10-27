@@ -35,6 +35,20 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact]
+        public void GrainReferenceComparison_ShouldProduceUniformHashCode()
+        {
+            var simpleGrain = this.GrainFactory.GetGrain<ISimpleGrain>(1234L, UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
+            var r = simpleGrain as GrainReference;
+            Assert.NotNull(r);
+
+            // Hey there stranger. So the test failed here?
+            // It's probably because the way hash codes are generated for the GrainReference
+            // have changed. If you are sure the new code is repeatable, then it's fine to
+            // update the expected value here. Good luck, friend.
+            Assert.Equal(2223355815u, r.GetUniformHashCode());
+        }
+
+        [Fact]
         public void GrainReferenceComparison_DifferentReference()
         {
             ISimpleGrain ref1 = this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
@@ -65,7 +79,7 @@ namespace DefaultCluster.Tests.General
         {
             IChainedGrain g1 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
             IChainedGrain g2 = this.GrainFactory.GetGrain<IChainedGrain>(GetRandomGrainId());
-            
+
             g1.PassThis(g2).Wait();
         }
 
@@ -116,7 +130,7 @@ namespace DefaultCluster.Tests.General
         public async Task GrainReference_Json_Serialization_Nested()
         {
             var settings = OrleansJsonSerializer.GetDefaultSerializerSettings(this.HostedCluster.Client.ServiceProvider);
-            
+
             var grain = HostedCluster.GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId());
             await grain.SetA(56820);
             var input = new GenericGrainReferenceHolder
