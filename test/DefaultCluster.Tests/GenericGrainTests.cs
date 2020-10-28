@@ -72,30 +72,23 @@ namespace DefaultCluster.Tests.General
         }
 
         /// Can instantiate generic grain specializations
-        [Fact, TestCategory("BVT"), TestCategory("Generics")]
-        public async Task GenericGrainTests_SimpleGenericGrainGetGrain()
+        [Theory, TestCategory("BVT"), TestCategory("Generics")]
+        [InlineData(1.2f)]
+        [InlineData(3.4f)]
+        [InlineData("5.6")]
+        public async Task GenericGrainTests_SimpleGenericGrainGetGrain<T>(T setValue)
         {
 
-            var grainOfFloat1 = GetGrain<ISimpleGenericGrain<float>>();
-            var grainOfFloat2 = GetGrain<ISimpleGenericGrain<float>>();
-            var grainOfString = GetGrain<ISimpleGenericGrain<string>>();
+            var grain = GetGrain<ISimpleGenericGrain<T>>();
 
-            await grainOfFloat1.Set(1.2f);
-            await grainOfFloat2.Set(3.4f);
-            await grainOfString.Set("5.6");
+            await grain.Set(setValue);
 
             // generic grain implementation does not change the set value:
-            await grainOfFloat1.Transform();
-            await grainOfFloat2.Transform();
-            await grainOfString.Transform();
-
-            var floatResult1 = await grainOfFloat1.Get();
-            var floatResult2 = await grainOfFloat2.Get();
-            var stringResult = await grainOfString.Get();
-
-            Assert.Equal(1.2f, floatResult1);
-            Assert.Equal(3.4f, floatResult2);
-            Assert.Equal("5.6", stringResult);
+            await grain.Transform();
+            
+            T result = await grain.Get();
+            
+            Assert.Equal(setValue, result);            
         }
 
         /// Can instantiate grains that implement generic interfaces with generic type parameters

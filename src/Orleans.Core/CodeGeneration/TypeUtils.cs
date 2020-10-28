@@ -117,25 +117,39 @@ namespace Orleans.Runtime
             if (!t.IsGenericType || (t.DeclaringType != null && t.DeclaringType.IsGenericType)) return baseName;
             string s = baseName;
             s += "<";
-            s += GetGenericTypeArgs(genericArguments, fullName);
+            s += GetGenericTypeArgs(t, genericArguments, fullName);
             s += ">";
             return s;
         }
 
-        public static string GetGenericTypeArgs(IEnumerable<Type> args, Predicate<Type> fullName)
+        public static string GetGenericTypeArgs(Type originalType, IEnumerable<Type> args, Predicate<Type> fullName)
         {
             string s = string.Empty;
 
             bool first = true;
+            var genericTypeDefinition = originalType.GetGenericTypeDefinition();
+            var originalGenericArguments = genericTypeDefinition.GetGenericArguments();
             foreach (var genericParameter in args)
             {
                 if (!first)
                 {
                     s += ",";
                 }
+
                 if (!genericParameter.IsGenericType)
                 {
-                    s += GetSimpleTypeName(genericParameter, fullName);
+                    var nonGenericType = genericParameter;
+                    
+                    // get generic parameter from generic type definition to have consistent naming for inherited interfaces
+                    // Example: interface IA<TName>, class A<TOtherName>: IA<OtherName>
+                    // in this case generic parameter name of IA interface from class A is OtherName instead of TName.
+                    // To avoid this situation use generic parameter from generic type definition.
+                    if (genericParameter.IsGenericParameter)
+                    {
+                        nonGenericType = originalGenericArguments[genericParameter.GenericParameterPosition];
+                    }
+
+                    s += GetSimpleTypeName(nonGenericType, fullName);
                 }
                 else
                 {
@@ -311,6 +325,7 @@ namespace Orleans.Runtime
         public static string GetFullName(Type t)
         {
             if (t == null) throw new ArgumentNullException(nameof(t));
+
             if (t.IsNested && !t.IsGenericParameter)
             {
                 return t.Namespace + "." + t.DeclaringType.Name + "." + t.Name;
