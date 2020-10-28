@@ -138,17 +138,18 @@ namespace Orleans.Runtime
 
                 if (!genericParameter.IsGenericType)
                 {
-                    var noneGenericType = genericParameter;
+                    var nonGenericType = genericParameter;
+                    
                     // get generic parameter from generic type definition to have consistent naming for inherited interfaces
                     // Example: interface IA<TName>, class A<TOtherName>: IA<OtherName>
                     // in this case generic parameter name of IA interface from class A is OtherName instead of TName.
                     // To avoid this situation use generic parameter from generic type definition.
                     if (genericParameter.IsGenericParameter)
                     {
-                        noneGenericType = originalGenericArguments[genericParameter.GenericParameterPosition];
+                        nonGenericType = originalGenericArguments[genericParameter.GenericParameterPosition];
                     }
 
-                    s += GetSimpleTypeName(noneGenericType, fullName);
+                    s += GetSimpleTypeName(nonGenericType, fullName);
                 }
                 else
                 {
