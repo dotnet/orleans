@@ -1506,15 +1506,6 @@ namespace Orleans.Serialization
             return result;
         }
 
-        public object DeserializeFromMemoryByte(Type expectedType, ReadOnlyMemory<byte> data)
-        {
-            var context = new DeserializationContext(this);
-            var reader = new ReadOnlySequence<byte>(data);
-            context.StreamReader = new BinaryTokenStreamReader2(reader);
-            var result = DeserializeInner(expectedType, context);
-            return result;
-        }
-
         internal static void SerializeMessageHeaders(Message.HeadersContainer headers, SerializationContext context)
         {
             var sm = context.SerializationManager;

@@ -15,6 +15,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Statistics;
+using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 

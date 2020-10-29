@@ -1,26 +1,32 @@
 using System;
+using System.Buffers;
 using Orleans.Serialization;
 
 namespace Orleans.Storage
 {
     public interface IGrainStateSerializer
     {
-        ReadOnlyMemory<byte> Serialize(Type t, object value);
+        void Serialize(Type t, object value, IBufferWriter<byte> output);
 
-        object Deserialize(Type expected, ReadOnlyMemory<byte> value);
+        object Deserialize(Type expected, ReadOnlySequence<byte> input);
     }
 
-    internal class OrleansGrainStateSerializer : IGrainStateSerializer
+    public static class GrainStateSerializerExtensions
     {
-        private readonly SerializationManager serializationManager;
-
-        public OrleansGrainStateSerializer(SerializationManager serializationManager)
+        public static ReadOnlyMemory<byte> Serialize(this IGrainStateSerializer self, Type t, object value)
         {
-            this.serializationManager = serializationManager;
+#if NETCOREAPP
+            var writer = new System.Buffers.ArrayBufferWriter<byte>();
+#else
+            var writer = new Orleans.Serialization.ArrayBufferWriter<byte>();
+#endif
+            self.Serialize(t, value, writer);
+            return writer.WrittenMemory;
         }
 
-        public ReadOnlyMemory<byte> Serialize(Type t, object value) => this.serializationManager.SerializeToByteArray(value);
-
-        public object Deserialize(Type expected, ReadOnlyMemory<byte> value) => this.serializationManager.DeserializeFromMemoryByte(typeof(object), value);
+        public static object Deserialize(this IGrainStateSerializer self, Type expected, ReadOnlyMemory<byte> input)
+        {
+            return self.Deserialize(expected, new ReadOnlySequence<byte>(input));
+        }
     }
 }
