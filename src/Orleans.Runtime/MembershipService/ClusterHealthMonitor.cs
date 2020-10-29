@@ -25,7 +25,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly MembershipTableManager membershipService;
         private readonly ILogger<ClusterHealthMonitor> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
-        private readonly ClusterMembershipOptions clusterMembershipOptions;
+        private readonly IOptionsMonitor<ClusterMembershipOptions> clusterMembershipOptions;
         private ImmutableDictionary<SiloAddress, SiloHealthMonitor> monitoredSilos = ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
         private MembershipVersion observedMembershipVersion;
         private Func<SiloAddress, SiloHealthMonitor> createMonitor;
@@ -46,7 +46,7 @@ namespace Orleans.Runtime.MembershipService
             ILocalSiloDetails localSiloDetails,
             MembershipTableManager membershipService,
             ILogger<ClusterHealthMonitor> log,
-            IOptions<ClusterMembershipOptions> clusterMembershipOptions,
+            IOptionsMonitor<ClusterMembershipOptions> clusterMembershipOptions,
             IFatalErrorHandler fatalErrorHandler,
             IServiceProvider serviceProvider)
         {
@@ -55,7 +55,7 @@ namespace Orleans.Runtime.MembershipService
             this.membershipService = membershipService;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
-            this.clusterMembershipOptions = clusterMembershipOptions.Value;
+            this.clusterMembershipOptions = clusterMembershipOptions;
             this.onProbeResult = this.OnProbeResultInternal;
             Func<SiloHealthMonitor, ProbeResult, Task> onProbeResultFunc = (siloHealthMonitor, probeResult) => this.onProbeResult(siloHealthMonitor, probeResult);
             this.createMonitor = silo => ActivatorUtilities.CreateInstance<SiloHealthMonitor>(serviceProvider, silo, onProbeResultFunc);
@@ -84,7 +84,7 @@ namespace Orleans.Runtime.MembershipService
                     {
                         if (!newMonitoredSilos.ContainsKey(pair.Key))
                         {
-                            var cancellation = new CancellationTokenSource(this.clusterMembershipOptions.ProbeTimeout).Token;
+                            var cancellation = new CancellationTokenSource(this.clusterMembershipOptions.CurrentValue.ProbeTimeout).Token;
                             await pair.Value.StopAsync(cancellation);
                         }
                     }
@@ -142,14 +142,14 @@ namespace Orleans.Runtime.MembershipService
             var silosToWatch = new List<SiloAddress>();
             var additionalSilos = new List<SiloAddress>();
 
-            for (int i = 0; i < tmpList.Count - 1 && silosToWatch.Count < this.clusterMembershipOptions.NumProbedSilos; i++)
+            for (int i = 0; i < tmpList.Count - 1 && silosToWatch.Count < this.clusterMembershipOptions.CurrentValue.NumProbedSilos; i++)
             {
                 var candidate = tmpList[(myIndex + i + 1) % tmpList.Count];
                 var candidateEntry = membership.Entries[candidate];
 
                 if (candidate.IsSameLogicalSilo(this.localSiloDetails.SiloAddress)) continue;
 
-                bool isSuspected = candidateEntry.GetFreshVotes(now, this.clusterMembershipOptions.DeathVoteExpirationTimeout).Count > 0;
+                bool isSuspected = candidateEntry.GetFreshVotes(now, this.clusterMembershipOptions.CurrentValue.DeathVoteExpirationTimeout).Count > 0;
                 if (isSuspected)
                 {
                     additionalSilos.Add(candidate);
@@ -228,9 +228,30 @@ namespace Orleans.Runtime.MembershipService
         /// </summary>
         private async Task OnProbeResultInternal(SiloHealthMonitor monitor, ProbeResult probeResult)
         {
-            if (probeResult.Status == ProbeResultStatus.Failed && probeResult.FailedProbeCount >= this.clusterMembershipOptions.NumMissedProbesLimit)
+            // Do not act on probe results if shutdown is in progress.
+            if (this.shutdownCancellation.IsCancellationRequested)
             {
-                await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress);
+                return;
+            }
+
+            if (probeResult.IsDirectProbe)
+            {
+                if (probeResult.Status == ProbeResultStatus.Failed && probeResult.FailedProbeCount >= this.clusterMembershipOptions.CurrentValue.NumMissedProbesLimit)
+                {
+                    await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress).ConfigureAwait(false);
+                }
+            }
+            else if (probeResult.Status == ProbeResultStatus.Failed)
+            {
+                if (this.clusterMembershipOptions.CurrentValue.NumVotesForDeathDeclaration <= 2)
+                {
+                    // Since both this silo and another silo were unable to probe the target silo, we declare it dead.
+                    await this.membershipService.TryKill(monitor.SiloAddress).ConfigureAwait(false);
+                }
+                else
+                {
+                    await this.membershipService.TryToSuspectOrKill(monitor.SiloAddress).ConfigureAwait(false);
+                }
             }
         }
 

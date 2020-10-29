@@ -26,6 +26,17 @@ namespace Orleans.Runtime
         /// <param name="self">The <see cref="SystemTarget"/>.</param>
         /// <param name="action">The action.</param>
         /// <returns>A <see cref="Task"/> which completes when the <paramref name="action"/> has completed.</returns>
+        public static Task<T> ScheduleTask<T>(this SystemTarget self, Func<Task<T>> action)
+        {
+            return self.RuntimeClient.Scheduler.RunOrQueueTask(action, self);
+        }
+
+        /// <summary>
+        /// Schedules the provided <paramref name="action"/> on the <see cref="SystemTarget"/>.
+        /// </summary>
+        /// <param name="self">The <see cref="SystemTarget"/>.</param>
+        /// <param name="action">The action.</param>
+        /// <returns>A <see cref="Task"/> which completes when the <paramref name="action"/> has completed.</returns>
         public static Task ScheduleTask(this SystemTarget self, Action action)
         {
             return self.RuntimeClient.Scheduler.RunOrQueueAction(action, self);
