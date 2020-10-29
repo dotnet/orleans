@@ -126,17 +126,19 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override int GetHashCode() => HashCode.Combine(this.Type, this.Key);
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Generates uniform, stable hash code for GrainReference
+        /// </summary>
         public uint GetUniformHashCode()
         {
             // This value must be stable for a given id and equal for all nodes in a cluster.
             // HashCode.Combine does not currently offer stability with respect to its inputs.
             unchecked
             {
-                int hash = 17;
-                hash = hash * 31 + Type.GetHashCode();
-                hash = hash * 31 + Key.GetHashCode();
-                return (uint)hash;
+                var hash = 17u;
+                hash = hash * 31 + Type.GetUniformHashCode();
+                hash = hash * 31 + Key.GetUniformHashCode();
+                return hash;
             }
         }
 

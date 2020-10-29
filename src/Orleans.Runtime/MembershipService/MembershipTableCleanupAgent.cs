@@ -109,10 +109,15 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime)
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason)
         {
-            var ok = this.cleanupDefunctSilosTimer?.CheckHealth(lastCheckTime) ?? true;
-            return ok;
+            if (cleanupDefunctSilosTimer is IAsyncTimer timer)
+            {
+                return timer.CheckHealth(lastCheckTime, out reason);
+            }
+
+            reason = default;
+            return true;
         }
     }
 }

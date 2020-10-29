@@ -14,14 +14,16 @@ namespace Orleans.Runtime
 
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly TimeSpan period;
+        private readonly string name;
         private readonly ILogger log;
         private DateTime lastFired = DateTime.MinValue;
         private DateTime? expected;
 
-        public AsyncTimer(TimeSpan period, ILogger log)
+        public AsyncTimer(TimeSpan period, string name, ILogger log)
         {
             this.log = log;
             this.period = period;
+            this.name = name;
         }
 
         /// <summary>
@@ -61,7 +63,7 @@ namespace Orleans.Runtime
                 {
                     // for backwards compatibility, support timers with periods up to ReminderRegistry.MaxSupportedTimeout
                     var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
-                    if (delay > maxDelay)
+                    while (delay > maxDelay)
                     {
                         delay -= maxDelay;
                         await Task.Delay(maxDelay, cancellation.Token).ConfigureAwait(false);
@@ -101,20 +103,18 @@ namespace Orleans.Runtime
             return TimeSpan.Zero;
         }
 
-        public bool CheckHealth(DateTime lastCheckTime)
+        public bool CheckHealth(DateTime lastCheckTime, out string reason)
         {
             var now = DateTime.UtcNow;
             var dueTime = this.expected.GetValueOrDefault();
             var overshoot = GetOvershootDelay(now, dueTime);
             if (overshoot > TimeSpan.Zero)
             {
-                this.log?.LogWarning(
-                    "Timer should have fired at {DueTime}, which is {Overshoot} ago",
-                    dueTime,
-                    overshoot);
+                reason = $"{this.name} timer should have fired at {dueTime}, which is {overshoot} ago";
                 return false;
             }
 
+            reason = default;
             return true;
         }
 

@@ -68,6 +68,11 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override int GetHashCode() => Value.GetHashCode();
 
+        /// <summary>
+        /// Generates uniform, stable hash code for GrainType
+        /// </summary>
+        public uint GetUniformHashCode() => Value.GetUniformHashCode();
+
         public static byte[] UnsafeGetArray(GrainType id) => IdSpan.UnsafeGetArray(id.Value);
 
         /// <inheritdoc/>
