@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
@@ -234,6 +235,11 @@ namespace Orleans.Runtime
             }
 
             if (targetActivation.Blocking.IsReadOnly && incoming.IsReadOnly)
+            {
+                return true;
+            }
+
+            if (incoming.CallChainId != null && targetActivation.RunningRequests.Keys.Any(message => incoming.CallChainId.Equals(message.CallChainId)))
             {
                 return true;
             }

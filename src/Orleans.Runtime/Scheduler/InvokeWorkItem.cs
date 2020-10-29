@@ -44,7 +44,7 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.activation);
+                RuntimeContext.SetExecutionContext(this.activation, message.CallChainId?.ToInt64());
                 Task task = this.runtimeClient.Invoke(this.activation, this.message);
 
                 // Note: This runs for all outcomes of resultPromiseTask - both Success or Fault

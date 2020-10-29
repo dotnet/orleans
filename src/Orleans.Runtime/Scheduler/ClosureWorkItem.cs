@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.GrainContext);
+                RuntimeContext.SetExecutionContext(this.GrainContext, null);
                 RequestContext.Clear();
                 await this.continuation();
                 this.completion.TrySetResult(true);
@@ -85,7 +85,7 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.GrainContext);
+                RuntimeContext.SetExecutionContext(this.GrainContext, null);
                 RequestContext.Clear();
                 var result = await this.continuation();
                 this.completion.TrySetResult(result);

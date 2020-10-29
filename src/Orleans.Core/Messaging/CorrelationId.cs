@@ -65,7 +65,7 @@ namespace Orleans.Runtime
 
         public static bool operator !=(CorrelationId lhs, CorrelationId rhs)
         {
-            return rhs.id != lhs.id;
+            return !(lhs == rhs);
         }
 
         public int CompareTo(CorrelationId other)

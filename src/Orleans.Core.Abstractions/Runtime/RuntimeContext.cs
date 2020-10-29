@@ -7,6 +7,8 @@ namespace Orleans.Runtime
     {
         public IGrainContext GrainContext { get; private set; }
 
+        public long? CallChainId { get; private set; }
+
         [ThreadStatic]
         private static RuntimeContext threadLocalContext;
 
@@ -14,19 +16,24 @@ namespace Orleans.Runtime
 
         internal static IGrainContext CurrentGrainContext { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => threadLocalContext?.GrainContext; }
 
+        internal static long? CurrentCallChainId { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => threadLocalContext?.CallChainId; }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void SetExecutionContext(IGrainContext newContext)
+        internal static void SetExecutionContext(IGrainContext newContext, long? newCallChainId)
         {
             var ctx = threadLocalContext ??= new RuntimeContext();
             ctx.GrainContext = newContext;
+            ctx.CallChainId = newCallChainId;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void SetExecutionContext(IGrainContext newContext, out IGrainContext existingContext)
+        internal static void SetExecutionContext(IGrainContext newContext, long? newCallChainId, out IGrainContext existingContext, out long? existingCallChainId)
         {
             var ctx = threadLocalContext ??= new RuntimeContext();
             existingContext = ctx.GrainContext;
+            existingCallChainId = ctx.CallChainId;
             ctx.GrainContext = newContext;
+            ctx.CallChainId = newCallChainId;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

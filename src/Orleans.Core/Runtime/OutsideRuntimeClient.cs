@@ -260,7 +260,7 @@ namespace Orleans
             Justification = "CallbackData is IDisposable but instances exist beyond lifetime of this method so cannot Dispose yet.")]
         public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, InvokeMethodOptions options)
         {
-            var message = this.messageFactory.CreateMessage(request, options);
+            var message = this.messageFactory.CreateMessage(request, options, null);
             OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
             SendRequestMessage(target, message, context, options);
         }

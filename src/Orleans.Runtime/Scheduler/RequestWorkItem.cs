@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                RuntimeContext.SetExecutionContext(this.target);
+                RuntimeContext.SetExecutionContext(this.target, request.CallChainId?.ToInt64());
                 target.HandleNewRequest(request);
             }
             finally

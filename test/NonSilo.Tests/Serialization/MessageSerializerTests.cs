@@ -43,18 +43,27 @@ namespace UnitTests.Serialization
         public async Task MessageTest_TtlUpdatedOnAccess()
         {
             var request = new InvokeMethodRequest(0, 0, null);
-            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None, null);
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
             await Task.Delay(TimeSpan.FromMilliseconds(500));
             Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
+        [Fact, TestCategory("Functional")]
+        public void MessageTest_CallChainIdGeneratedIfNotProvided()
+        {
+            var request = new InvokeMethodRequest(0, 0, null);
+            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None, null);
+
+            Assert.NotNull(message.CallChainId);
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public async Task MessageTest_TtlUpdatedOnSerialization()
         {
             var request = new InvokeMethodRequest(0, 0, null);
-            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None, null);
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
             await Task.Delay(TimeSpan.FromMilliseconds(500));
@@ -74,7 +83,7 @@ namespace UnitTests.Serialization
                 RequestContext.Set("big_object", new byte[maxHeaderSize + 1]);
 
                 var request = new InvokeMethodRequest(0, 0, null);
-                var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+                var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None, null);
 
                 var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
                 var writer = pipe.Writer;
@@ -94,7 +103,7 @@ namespace UnitTests.Serialization
             // Create a request with a ridiculously big argument
             var arg = new byte[maxBodySize + 1];
             var request = new InvokeMethodRequest(0, 0, new[] { arg });
-            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None, null);
 
             var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
             var writer = pipe.Writer;
@@ -152,7 +161,7 @@ namespace UnitTests.Serialization
         private void RunTest(int numItems)
         {
             InvokeMethodRequest request = new InvokeMethodRequest(0, 2, null);
-            Message resp = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+            Message resp = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None, null);
             resp.Id = new CorrelationId();
             resp.SendingSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 200), 0);
             resp.TargetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 300), 0);

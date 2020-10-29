@@ -102,7 +102,7 @@ namespace Orleans.Runtime
         }
 
         public IServiceProvider ServiceProvider { get; }
-        
+
         public IStreamProviderRuntime CurrentStreamProviderRuntime { get; internal set; }
 
         public OrleansTaskScheduler Scheduler { get; }
@@ -112,7 +112,7 @@ namespace Orleans.Runtime
         private SiloAddress MySilo { get; }
 
         public GrainFactory ConcreteGrainFactory { get; }
-        
+
         private Catalog Catalog => this.catalog ?? (this.catalog = this.ServiceProvider.GetRequiredService<Catalog>());
 
         private ILocalGrainDirectory Directory
@@ -131,7 +131,8 @@ namespace Orleans.Runtime
             TaskCompletionSource<object> context,
             InvokeMethodOptions options)
         {
-            var message = this.messageFactory.CreateMessage(request, options);
+            var callChainId = RuntimeContext.CurrentCallChainId;
+            var message = this.messageFactory.CreateMessage(request, options, callChainId.HasValue ? new CorrelationId(callChainId.Value) : null);
             message.InterfaceType = target.InterfaceType;
             message.InterfaceVersion = target.InterfaceVersion;
 
@@ -290,7 +291,7 @@ namespace Orleans.Runtime
                 object resultObject;
                 try
                 {
-                    var request = (InvokeMethodRequest) message.BodyObject;
+                    var request = (InvokeMethodRequest)message.BodyObject;
                     if (request.Arguments != null)
                     {
                         CancellationSourcesExtension.RegisterCancellationTokens(target, request);
@@ -322,7 +323,7 @@ namespace Orleans.Runtime
                     if (transactionInfo != null)
                     {
                         transactionInfo.ReconcilePending();
-                        
+
                         // Record reason for abort, if not already set.
                         transactionInfo.RecordException(exc1, serializationManager);
 
@@ -439,7 +440,7 @@ namespace Orleans.Runtime
 
         private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy =
             new Lazy<Func<Exception, Exception>>(CreateExceptionPrepForRemotingMethod);
-        
+
         private static Func<Exception, Exception> CreateExceptionPrepForRemotingMethod()
         {
             var methodInfo = typeof(Exception).GetMethod(

@@ -21,7 +21,7 @@ namespace Orleans.Runtime
             this.messagingTrace = messagingTrace;
         }
 
-        public Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
+        public Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options, CorrelationId callChainId)
         {
             var message = new Message
             {
@@ -32,7 +32,8 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = request,
-                RequestContextData = RequestContextExtensions.Export(this.serializationManager)
+                RequestContextData = RequestContextExtensions.Export(this.serializationManager),
+                CallChainId = callChainId ?? CorrelationId.GetNext()
             };
 
             if (options.IsTransactional())
