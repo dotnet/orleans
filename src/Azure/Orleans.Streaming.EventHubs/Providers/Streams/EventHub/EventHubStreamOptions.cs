@@ -1,4 +1,5 @@
 using Azure.Core;
+using Azure.Messaging.EventHubs;
 using Orleans.Runtime;
 using Orleans.Streams;
 using System;
@@ -32,6 +33,15 @@ namespace Orleans.Configuration
         /// Required when <see cref="TokenCredential"/> is specified.
         /// </summary>
         public string FullyQualifiedNamespace { get; set; }
+
+        /// <summary>
+        /// Gets or sets the type of the event hubs transport.
+        /// </summary>
+        ///
+        /// <value>
+        /// The type of the event hubs transport.
+        /// </value>
+        public EventHubsTransportType EventHubsTransportType { get; set; } = EventHubsTransportType.AmqpTcp;
     }
 
     public class EventHubOptionsValidator : IConfigurationValidator
@@ -75,7 +85,7 @@ namespace Orleans.Configuration
         public void ValidateConfiguration()
         {
             var checkpointerFactory = services.GetServiceByName<IStreamQueueCheckpointerFactory>(this.name);
-            if(checkpointerFactory == null)
+            if (checkpointerFactory == null)
                 throw new OrleansConfigurationException($"No IStreamQueueCheckpointer is configured with PersistentStreamProvider {this.name}. Please configure one.");
         }
     }
