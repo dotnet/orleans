@@ -18,7 +18,7 @@ namespace DefaultCluster.Tests
         }
 
         [Fact, TestCategory("Functional")]
-        public async Task GenericGrainTests_ConcreteGrainWithGenericInterfaceGetGrain()
+        public async Task CallChainTests_CircularCallChainWithThreeGrains()
         {
             var grain = GrainFactory.GetGrain<ICallChainGrain1>(0);
             var result = await grain.Run(10);

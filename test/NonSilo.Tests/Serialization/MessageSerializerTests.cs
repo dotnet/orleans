@@ -50,15 +50,6 @@ namespace UnitTests.Serialization
             Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
-        [Fact, TestCategory("Functional")]
-        public void MessageTest_CallChainIdGeneratedIfNotProvided()
-        {
-            var request = new InvokeMethodRequest(0, 0, null);
-            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None, null);
-
-            Assert.NotNull(message.CallChainId);
-        }
-
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public async Task MessageTest_TtlUpdatedOnSerialization()
         {
