@@ -180,7 +180,7 @@ namespace CodeGenerator.Tests
                     var expected = TypeUtils.GetTemplatedName(
                         TypeUtils.GetFullName(type),
                         type,
-                        type.GetGenericArguments(),
+                        type.GetGenericArgumentsSafe(),
                         t => false);
                     var named = Assert.IsAssignableFrom<INamedTypeSymbol>(symbol);
                     var actual = OrleansLegacyCompat.FormatTypeForIdComputation(named);

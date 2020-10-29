@@ -85,7 +85,7 @@ namespace Orleans.CodeGeneration
             if (t.IsGenericType)
             {
                 var typeName = t.GetGenericTypeDefinition().FullName;
-                return typeName == "System.Threading.Tasks.Task`1" 
+                return typeName == "System.Threading.Tasks.Task`1"
                        || typeName == "System.Threading.Tasks.ValueTask`1";
             }
 
@@ -145,14 +145,14 @@ namespace Orleans.CodeGeneration
 
             if (IsGrainInterface(type))
                 dict.Add(GetGrainInterfaceId(type), type);
-            
+
             Type[] interfaces = type.GetInterfaces();
             foreach (Type interfaceType in interfaces.Where(i => !checkIsGrainInterface || IsGrainInterface(i)))
                 dict.Add(GetGrainInterfaceId(interfaceType), interfaceType);
 
             return dict;
         }
-        
+
         public static int ComputeMethodId(MethodInfo methodInfo)
         {
             var attr = methodInfo.GetCustomAttribute<MethodIdAttribute>(true);
@@ -390,7 +390,7 @@ namespace Orleans.CodeGeneration
             foreach (Type iType in iTypes)
             {
                 var mapping = new InterfaceMapping();
-                
+
                 if (grainType.IsClass)
                     mapping = grainType.GetTypeInfo().GetRuntimeInterfaceMap(iType);
 
@@ -422,12 +422,17 @@ namespace Orleans.CodeGeneration
             var attr = grainInterfaceOrClass.GetCustomAttributes<TypeCodeOverrideAttribute>(false).FirstOrDefault();
             if (attr != null) return attr.TypeCode;
 
-            var fullName = TypeUtils.GetTemplatedName(
-                TypeUtils.GetFullName(grainInterfaceOrClass), 
-                grainInterfaceOrClass,
-                grainInterfaceOrClass.GetGenericArguments(),
-                t => false);
+            var fullName = GetFullName(grainInterfaceOrClass);
             return Utils.CalculateIdHash(fullName);
+        }
+
+        public static string GetFullName(Type grainInterfaceOrClass)
+        {
+            return TypeUtils.GetTemplatedName(
+                TypeUtils.GetFullName(grainInterfaceOrClass),
+                grainInterfaceOrClass,
+                grainInterfaceOrClass.GetGenericArgumentsSafe(),
+                t => false);
         }
     }
 }
