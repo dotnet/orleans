@@ -7,12 +7,20 @@ using Orleans.CodeGeneration;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace NonSilo.Tests.General
 {
     [TestCategory("BVT")]
     public class GrainInterfaceUtilsTests
     {
+        private readonly ITestOutputHelper _testOutputHelper;
+
+        public GrainInterfaceUtilsTests(ITestOutputHelper testOutputHelper)
+        {
+            _testOutputHelper = testOutputHelper;
+        }
+
         [Fact]
         public void Override_MethodId_Test()
         {
@@ -90,6 +98,7 @@ namespace NonSilo.Tests.General
             "UnitTests.GrainInterfaces.IGenericReader3`3<TOne,TTwo,TThree>",
             "UnitTests.GrainInterfaces.IGenericReader2`2<TOne,TTwo>")]
 
+        [InlineData(typeof(OpenGeneric<,>), "NonSilo.Tests.General.IHalfOpenGrain`2<T1,T2>")]
         [InlineData(typeof(HalfOpenGrain1<>), "NonSilo.Tests.General.IHalfOpenGrain`2<T1,Int32>")]
         [InlineData(typeof(HalfOpenGrain2<>), "NonSilo.Tests.General.IHalfOpenGrain`2<Int32,T2>")]
         [InlineData(typeof(Root<>.G<,,>), "NonSilo.Tests.General.IG`1<Root<TRoot,T1,T2,T3>.IA>")]
@@ -105,6 +114,9 @@ namespace NonSilo.Tests.General
                 .Select(p => GrainInterfaceUtils.GetFullName(p))
                 .ToArray();
 
+            _testOutputHelper.WriteLine("Expected: " + string.Join(";", expected));
+            _testOutputHelper.WriteLine("Actual: " + string.Join(";", expected));
+
             Assert.Equal(expected, actual);
         }
     }
@@ -115,6 +127,9 @@ namespace NonSilo.Tests.General
     public class HalfOpenGrain1<T> : IHalfOpenGrain<T, int>
     { }
     public class HalfOpenGrain2<T> : IHalfOpenGrain<int, T>
+    { }
+
+    public class OpenGeneric<T2, T1> : IHalfOpenGrain<T2, T1>
     { }
 
     public interface IG<T> : IGrain
