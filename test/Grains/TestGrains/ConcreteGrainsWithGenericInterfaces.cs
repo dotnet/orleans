@@ -5,7 +5,7 @@ using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {
-    public class ConcreteGrainWithGenericInterfaceOfIntFloat : Grain, IGenericGrain<int, float>
+    class ConcreteGrainWithGenericInterfaceOfIntFloat : Grain, IGenericGrain<int, float>
     {
         protected int T { get; set; }
 
@@ -21,7 +21,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class ConcreteGrainWithGenericInterfaceOfFloatString : Grain, IGenericGrain<float, string>
+    class ConcreteGrainWithGenericInterfaceOfFloatString : Grain, IGenericGrain<float, string>
     {
         protected float T { get; set; }
 
@@ -37,7 +37,7 @@ namespace UnitTests.Grains
         }
     }
 
-    public class ConcreteGrainWith2GenericInterfaces : Grain, IGenericGrain<int, string>, ISimpleGenericGrain<int>
+    class ConcreteGrainWith2GenericInterfaces : Grain, IGenericGrain<int, string>, ISimpleGenericGrain<int>
     {
         // IGenericGrain<int, string> methods:
 

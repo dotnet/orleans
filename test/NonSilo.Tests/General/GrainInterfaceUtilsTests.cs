@@ -71,20 +71,14 @@ namespace NonSilo.Tests.General
         [InlineData(typeof(SimpleGenericGrain<>), "UnitTests.GrainInterfaces.ISimpleGenericGrain`1<T>")]
         [InlineData(typeof(SimpleGenericGrain2<,>), "UnitTests.GrainInterfaces.ISimpleGenericGrain2`2<T,U>")]
 
-        [InlineData(typeof(SpecializedSimpleGenericGrain),
-            "UnitTests.GrainInterfaces.ISimpleGenericGrain`1[[System.Double, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]<Double>")]
+        [InlineData(typeof(ClosedGeneric),
+            "NonSilo.Tests.General.IG2`2[[NonSilo.Tests.General.Dummy1, NonSilo.Tests, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null],[NonSilo.Tests.General.Dummy2, NonSilo.Tests, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null]]<Dummy1,Dummy2>")]
 
-        [InlineData(typeof(ConcreteGrainWithGenericInterfaceOfIntFloat),
-            "UnitTests.GrainInterfaces.IGenericGrain`2[[System.Int32, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Single, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]<Int32,Single>")]
+        [InlineData(typeof(ClosedGenericWithManyInterfaces),
+            "NonSilo.Tests.General.IG2`2[[NonSilo.Tests.General.Dummy1, NonSilo.Tests, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null],[NonSilo.Tests.General.Dummy2, NonSilo.Tests, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null]]<Dummy1,Dummy2>",
+            "NonSilo.Tests.General.IG2`2[[NonSilo.Tests.General.Dummy2, NonSilo.Tests, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null],[NonSilo.Tests.General.Dummy1, NonSilo.Tests, Version=2.0.0.0, Culture=neutral, PublicKeyToken=null]]<Dummy2,Dummy1>")]
 
-        [InlineData(typeof(ConcreteGrainWithGenericInterfaceOfFloatString),
-            "UnitTests.GrainInterfaces.IGenericGrain`2[[System.Single, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.String, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]<Single,String>")]
-        [InlineData(typeof(ConcreteGrainWith2GenericInterfaces),
-            "UnitTests.GrainInterfaces.IGenericGrain`2[[System.Int32, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.String, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]<Int32,String>",
-            "UnitTests.GrainInterfaces.ISimpleGenericGrain`1[[System.Int32, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]<Int32>")]
-
-        [InlineData(typeof(GenericGrainWithGenericState<,,>),
-            "UnitTests.GrainInterfaces.IGenericGrainWithGenericState`3<TFirstTypeParam,TStateType,TLastTypeParam>")]
+        [InlineData(typeof(GenericGrainWithGenericState<,,>), "UnitTests.GrainInterfaces.IGenericGrainWithGenericState`3<TFirstTypeParam,TStateType,TLastTypeParam>")]
 
         [InlineData(typeof(GenericReaderWriterGrain1<>),
             "UnitTests.GrainInterfaces.IGenericReaderWriterGrain1`1<T>",
@@ -98,9 +92,9 @@ namespace NonSilo.Tests.General
             "UnitTests.GrainInterfaces.IGenericReader3`3<TOne,TTwo,TThree>",
             "UnitTests.GrainInterfaces.IGenericReader2`2<TOne,TTwo>")]
 
-        [InlineData(typeof(OpenGeneric<,>), "NonSilo.Tests.General.IHalfOpenGrain`2<T1,T2>")]
-        [InlineData(typeof(HalfOpenGrain1<>), "NonSilo.Tests.General.IHalfOpenGrain`2<T1,Int32>")]
-        [InlineData(typeof(HalfOpenGrain2<>), "NonSilo.Tests.General.IHalfOpenGrain`2<Int32,T2>")]
+        [InlineData(typeof(OpenGeneric<,>), "NonSilo.Tests.General.IG2`2<T1,T2>")]
+        [InlineData(typeof(HalfOpenGrain1<>), "NonSilo.Tests.General.IG2`2<T1,Int32>")]
+        [InlineData(typeof(HalfOpenGrain2<>), "NonSilo.Tests.General.IG2`2<Int32,T2>")]
         [InlineData(typeof(Root<>.G<,,>), "NonSilo.Tests.General.IG`1<Root<TRoot,T1,T2,T3>.IA>")]
         [InlineData(typeof(G1<,,,>), "NonSilo.Tests.General.Root`1.IA`3")]
 
@@ -115,22 +109,32 @@ namespace NonSilo.Tests.General
                 .ToArray();
 
             _testOutputHelper.WriteLine("Expected: " + string.Join(";", expected));
-            _testOutputHelper.WriteLine("Actual: " + string.Join(";", expected));
+            _testOutputHelper.WriteLine("Actual: " + string.Join(";", actual));
 
             Assert.Equal(expected, actual);
         }
     }
 
-    public interface IHalfOpenGrain<T1, T2> : IGrainWithGuidKey
+    public interface IG2<T1, T2> : IGrainWithGuidKey
     { }
 
-    public class HalfOpenGrain1<T> : IHalfOpenGrain<T, int>
+    public class HalfOpenGrain1<T> : IG2<T, int>
     { }
-    public class HalfOpenGrain2<T> : IHalfOpenGrain<int, T>
+    public class HalfOpenGrain2<T> : IG2<int, T>
     { }
 
-    public class OpenGeneric<T2, T1> : IHalfOpenGrain<T2, T1>
+    public class OpenGeneric<T2, T1> : IG2<T2, T1>
     { }
+
+    public class ClosedGeneric : IG2<Dummy1, Dummy2>
+    { }
+
+    public class ClosedGenericWithManyInterfaces : IG2<Dummy1, Dummy2>, IG2<Dummy2, Dummy1>
+    { }
+
+    public class Dummy1 { }
+
+    public class Dummy2 { }
 
     public interface IG<T> : IGrain
     {

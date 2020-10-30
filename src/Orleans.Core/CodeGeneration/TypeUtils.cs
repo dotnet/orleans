@@ -350,6 +350,11 @@ namespace Orleans.Runtime
                        + new string(',', t.GetArrayRank() - 1)
                        + "]";
             }
+
+            // using of t.FullName breaks interop with core and full .net in one cluster, because
+            // FullName of types from corelib is different.
+            // .net core int: [System.Int32, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]
+            // full .net int: [System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]
             return t.FullName ?? (t.IsGenericParameter ? t.Name : t.Namespace + "." + t.Name);
         }
 
