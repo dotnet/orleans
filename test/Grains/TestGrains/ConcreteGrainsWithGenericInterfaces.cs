@@ -37,7 +37,7 @@ namespace UnitTests.Grains
         }
     }
 
-    class ConcreteGrainWith2GenericInterfaces: Grain, IGenericGrain<int, string>, ISimpleGenericGrain<int>
+    class ConcreteGrainWith2GenericInterfaces : Grain, IGenericGrain<int, string>, ISimpleGenericGrain<int>
     {
         // IGenericGrain<int, string> methods:
 
@@ -72,7 +72,7 @@ namespace UnitTests.Grains
             return Task.FromResult(T);
         }
 
-        public Task CompareGrainReferences(ISimpleGenericGrain<int> clientReference) 
+        public Task CompareGrainReferences(ISimpleGenericGrain<int> clientReference)
         {
             throw new NotImplementedException();
         }
