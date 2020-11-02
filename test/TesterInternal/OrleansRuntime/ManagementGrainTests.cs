@@ -29,12 +29,12 @@ namespace UnitTests.OrleansRuntime
             var mgmt1 = this.fixture.Client.GetGrain<IManagementGrain>(1);
             var mgmt2 = this.fixture.Client.GetGrain<IManagementGrain>(2);
 
-            var mgmt1Address = await mgmt1.GetActivationAddress(mgmt1 as GrainReference);
+            var mgmt1Address = await mgmt1.GetActivationAddress(mgmt1);
             Assert.NotNull(mgmt1Address);
-            var mgmt2Address = await mgmt1.GetActivationAddress(mgmt2 as GrainReference);
+            var mgmt2Address = await mgmt1.GetActivationAddress(mgmt2);
             Assert.Null(mgmt2Address);
 
-            var mgmt1Address2 = await mgmt2.GetActivationAddress(mgmt1 as GrainReference);
+            var mgmt1Address2 = await mgmt2.GetActivationAddress(mgmt1);
             Assert.NotNull(mgmt1Address2);
             Assert.True(mgmt1Address == mgmt1Address2);
         }

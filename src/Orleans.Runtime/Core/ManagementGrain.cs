@@ -212,8 +212,9 @@ namespace Orleans.Runtime.Management
                 String.Format("SendControlCommandToProvider of type {0} and name {1} command {2}.", providerTypeFullName, providerName, command));
         }
 
-        public ValueTask<SiloAddress> GetActivationAddress(GrainReference grainReference)
+        public ValueTask<SiloAddress> GetActivationAddress(IAddressable reference)
         {
+            var grainReference = reference as GrainReference;
             var grainId = grainReference.GrainId;
             if (this.catalog.FastLookup(grainId, out var addresses))
             {

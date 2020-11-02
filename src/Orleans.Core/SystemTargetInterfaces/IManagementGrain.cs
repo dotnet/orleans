@@ -104,8 +104,8 @@ namespace Orleans.Runtime
         /// <summary>
         /// Return the <see cref="Orleans.Runtime.SiloAddress"/> where a given Grain is activated (if any).
         /// </summary>
-        /// <param name="grainReference">The <see cref="Orleans.Runtime.GrainReference"/> to </param>
+        /// <param name="reference">The <see cref="Orleans.Runtime.IAddressable"/> to look up.</param>
         /// <returns>The <see cref="Orleans.Runtime.SiloAddress"/> where the Grain is activated or null if not activated.</returns>
-        ValueTask<SiloAddress> GetActivationAddress(GrainReference grainReference);
+        ValueTask<SiloAddress> GetActivationAddress(IAddressable reference);
     }
 }
