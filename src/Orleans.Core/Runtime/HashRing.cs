@@ -7,10 +7,10 @@ namespace Orleans.Runtime
     {
         private readonly T[] sortedRingList;
 
-        public HashRing(List<T> ring)
+        public HashRing(T[] ring)
         {
-            sortedRingList = ring.ToArray();
-            Array.Sort(sortedRingList, (x, y) => x.GetUniformHashCode().CompareTo(y.GetUniformHashCode()));
+            Array.Sort(ring, (x, y) => x.GetUniformHashCode().CompareTo(y.GetUniformHashCode()));
+            sortedRingList = ring;
         }
 
         public T[] GetAllRingMembers() => sortedRingList;

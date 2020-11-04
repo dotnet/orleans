@@ -11,11 +11,10 @@ namespace Orleans.Streams
         public HashRingBasedStreamQueueMapper(HashRingStreamQueueMapperOptions options, string queueNamePrefix)
         {
             var numQueues = options.TotalQueueCount;
-            var queueIds = new List<QueueId>(numQueues);
+            var queueIds = new QueueId[numQueues];
             if (numQueues == 1)
             {
-                uint uniformHashCode = 0;
-                queueIds.Add(QueueId.GetQueueId(queueNamePrefix, 0, uniformHashCode));
+                queueIds[0] = QueueId.GetQueueId(queueNamePrefix, 0, 0);
             }
             else
             {
@@ -23,7 +22,7 @@ namespace Orleans.Streams
                 for (uint i = 0; i < numQueues; i++)
                 {
                     uint uniformHashCode = checked(portion * i);
-                    queueIds.Add(QueueId.GetQueueId(queueNamePrefix, i, uniformHashCode));
+                    queueIds[i] = QueueId.GetQueueId(queueNamePrefix, i, uniformHashCode);
                 }
             }
             this.hashRing = new HashRing<QueueId>(queueIds);
