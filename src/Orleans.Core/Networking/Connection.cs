@@ -431,9 +431,11 @@ namespace Orleans.Runtime.Messaging
                     this.RemoteEndPoint?.ToString() ?? "(never connected)");
             }
 
-            ThreadPool.UnsafeQueueUserWorkItem(
-                msg => this.RetryMessage((Message)msg),
-                message);
+            ThreadPool.UnsafeQueueUserWorkItem(state =>
+            {
+                var (t, msg) = ((Connection, Message))state;
+                t.RetryMessage(msg);
+            }, (this, message));
         }
 
         private static EndPoint NormalizeEndpoint(EndPoint endpoint)

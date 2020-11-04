@@ -17,6 +17,12 @@ namespace DefaultCluster.Tests
             IReminderTestGrain grain = this.GrainFactory.GetGrain<IReminderTestGrain>(GetRandomGrainId());
             bool notExists = await grain.IsReminderExists("not exists");
             Assert.False(notExists);
+
+            await grain.AddReminder("dummy");
+            Assert.True(await grain.IsReminderExists("dummy"));
+
+            await grain.RemoveReminder("dummy");
+            Assert.False(await grain.IsReminderExists("dummy"));
         }
     }
 }

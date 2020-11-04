@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
@@ -14,34 +13,30 @@ namespace Orleans.Runtime.ConsistentRing
     /// Note: MembershipOracle uses 'forward/counter-clockwise' definition to assign responsibilities. 
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
-    internal class ConsistentRingProvider :
+    internal sealed class ConsistentRingProvider :
         IConsistentRingProvider, ISiloStatusListener // make the ring shutdown-able?
     {
         // internal, so that unit tests can access them
-        internal SiloAddress MyAddress { get; private set; }
+        internal SiloAddress MyAddress { get; }
         internal IRingRange MyRange { get; private set; }
-        
+
         /// list of silo members sorted by the hash value of their address
-        private readonly List<SiloAddress> membershipRingList;
+        private readonly List<SiloAddress> membershipRingList = new List<SiloAddress>();
         private readonly ILogger log;
         private bool isRunning;
         private readonly int myKey;
-        private readonly List<IRingRangeListener> statusListeners;
-
-        
+        private readonly List<IRingRangeListener> statusListeners = new List<IRingRangeListener>();
 
         public ConsistentRingProvider(SiloAddress siloAddr, ILoggerFactory loggerFactory)
         {
             log = loggerFactory.CreateLogger<ConsistentRingProvider>();
-            membershipRingList = new List<SiloAddress>();
             MyAddress = siloAddr;
             myKey = MyAddress.GetConsistentHashCode();
 
             // add myself to the list of members
             AddServer(MyAddress);
             MyRange = RangeFactory.CreateFullRange(); // i am responsible for the whole range
-            statusListeners = new List<IRingRangeListener>();
-           
+
             Start();
         }
 
@@ -92,11 +87,11 @@ namespace Orleans.Runtime.ConsistentRing
             {
                 if (membershipRingList.Contains(silo)) return; // we already have this silo
 
-                int myOldIndex = membershipRingList.FindIndex(elem => elem.Equals(MyAddress));
+                int myOldIndex = membershipRingList.IndexOf(MyAddress);
 
                 if (!(membershipRingList.Count == 0 || myOldIndex != -1))
                     throw new OrleansException(string.Format("{0}: Couldn't find my position in the ring {1}.", MyAddress, Utils.EnumerableToString(membershipRingList)));
-                
+
 
                 // insert new silo in the sorted order
                 int hash = silo.GetConsistentHashCode();
@@ -135,12 +130,12 @@ namespace Orleans.Runtime.ConsistentRing
             {
                 if (membershipRingList.Count == 1)
                     return Utils.EnumerableToString(membershipRingList, silo => String.Format("{0} -> {1}", silo.ToStringWithHashCode(), RangeFactory.CreateFullRange()));
-                
+
                 var sb = new StringBuilder("[");
-                for (int i=0; i < membershipRingList.Count; i++)
+                for (int i = 0; i < membershipRingList.Count; i++)
                 {
-                    SiloAddress curr = membershipRingList[ i ];
-                    SiloAddress next = membershipRingList[ (i +1) % membershipRingList.Count];
+                    SiloAddress curr = membershipRingList[i];
+                    SiloAddress next = membershipRingList[(i + 1) % membershipRingList.Count];
                     IRingRange range = RangeFactory.CreateRange(unchecked((uint)curr.GetConsistentHashCode()), unchecked((uint)next.GetConsistentHashCode()));
                     sb.Append(String.Format("{0} -> {1},  ", curr.ToStringWithHashCode(), range));
                 }
@@ -153,17 +148,17 @@ namespace Orleans.Runtime.ConsistentRing
         {
             lock (membershipRingList)
             {
-                int indexOfFailedSilo = membershipRingList.FindIndex(elem => elem.Equals(silo));
+                int indexOfFailedSilo = membershipRingList.IndexOf(silo);
                 if (indexOfFailedSilo < 0) return; // we have already removed this silo
-                
-                membershipRingList.Remove(silo);
+
+                membershipRingList.RemoveAt(indexOfFailedSilo);
 
                 // related to triggering handler
-                int myNewIndex = membershipRingList.FindIndex(elem => elem.Equals(MyAddress));
+                int myNewIndex = membershipRingList.IndexOf(MyAddress);
 
                 if (myNewIndex == -1)
                     throw new OrleansException(string.Format("{0}: Couldn't find my position in the ring {1}.", MyAddress, this.ToString()));
-                
+
                 bool wasMyPred = ((myNewIndex == indexOfFailedSilo) || (myNewIndex == 0 && indexOfFailedSilo == membershipRingList.Count)); // no need for '- 1'
                 if (wasMyPred) // failed node was our predecessor
                 {
@@ -195,7 +190,7 @@ namespace Orleans.Runtime.ConsistentRing
         {
             lock (membershipRingList)
             {
-                int index = membershipRingList.FindIndex(elem => elem.Equals(silo));
+                int index = membershipRingList.IndexOf(silo);
                 if (index == -1)
                 {
                     log.Warn(ErrorCode.Runtime_Error_100201, "Got request to find predecessors of silo " + silo + ", which is not in the list of members.");
@@ -220,7 +215,7 @@ namespace Orleans.Runtime.ConsistentRing
         {
             lock (membershipRingList)
             {
-                int index = membershipRingList.FindIndex(elem => elem.Equals(silo));
+                int index = membershipRingList.IndexOf(silo);
                 if (index == -1)
                 {
                     log.Warn(ErrorCode.Runtime_Error_100203, "Got request to find successors of silo " + silo + ", which is not in the list of members.");
@@ -253,17 +248,17 @@ namespace Orleans.Runtime.ConsistentRing
         {
             lock (statusListeners)
             {
-                return statusListeners.Contains(observer) && statusListeners.Remove(observer);
+                return statusListeners.Remove(observer);
             }
         }
 
         private void NotifyLocalRangeSubscribers(IRingRange old, IRingRange now, bool increased)
         {
             log.Info("-NotifyLocalRangeSubscribers about old {0} new {1} increased? {2}", old, now, increased);
-            List<IRingRangeListener> copy;
+            IRingRangeListener[] copy;
             lock (statusListeners)
             {
-                copy = statusListeners.ToList();
+                copy = statusListeners.ToArray();
             }
             foreach (IRingRangeListener listener in copy)
             {
@@ -329,7 +324,7 @@ namespace Orleans.Runtime.ConsistentRing
                 // use clockwise ... current code in membershipOracle.CalculateTargetSilo() does counter-clockwise ...
                 // if you want to stick to counter-clockwise, change the responsibility definition in 'In()' method & responsibility defs in OrleansReminderMemory
                 // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
-        
+
                 for (int index = 0; index < membershipRingList.Count; ++index)
                 {
                     var siloAddr = membershipRingList[index];

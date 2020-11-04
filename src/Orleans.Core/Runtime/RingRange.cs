@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 
 namespace Orleans.Runtime
@@ -38,7 +37,7 @@ namespace Orleans.Runtime
     }
 
     [Serializable]
-    internal class SingleRange : IRingRangeInternal, IEquatable<SingleRange>, ISingleRange
+    internal sealed class SingleRange : IRingRangeInternal, IEquatable<SingleRange>, ISingleRange
     {
         private readonly uint begin;
         private readonly uint end;
@@ -86,13 +85,10 @@ namespace Orleans.Runtime
             {
                 return end - begin;
             }
-                return RangeFactory.RING_SIZE - (begin - end);
+            return RangeFactory.RING_SIZE - (begin - end);
         }
-   
-        public double RangePercentage()
-        {
-            return ((double)RangeSize() / (double)RangeFactory.RING_SIZE) * ((double)100.0);
-        }
+
+        public double RangePercentage() => RangeSize() * (100.0 / RangeFactory.RING_SIZE);
 
         public bool Equals(SingleRange other)
         {
@@ -118,108 +114,139 @@ namespace Orleans.Runtime
             return String.Format("<(x{0,8:X8} x{1,8:X8}], Size=x{2,8:X8}, %Ring={3:0.000}%>", begin, end, RangeSize(), RangePercentage());
         }
 
-        public string ToCompactString()
+        public string ToFullString()
         {
             return ToString();
         }
 
-        public string ToFullString()
+        internal bool Overlaps(SingleRange other) => Equals(other) || InRange(other.begin) || other.InRange(begin);
+
+        internal SingleRange Merge(SingleRange other)
         {
-            return ToString();
+            return (begin | end) == 0 || (other.begin | other.end) == 0 ? RangeFactory.FullRange
+                : Equals(other) ? this
+                : InRange(other.begin) ? MergeEnds(other)
+                : other.InRange(begin) ? other.MergeEnds(this)
+                : throw new InvalidOperationException("Ranges don't overlap");
+        }
+
+        // other range begins inside this range, merge it based on where it ends
+        private SingleRange MergeEnds(SingleRange other)
+        {
+            return begin == other.end ? RangeFactory.FullRange
+                : !InRange(other.end) ? new SingleRange(begin, other.end)
+                : other.InRange(begin) ? RangeFactory.FullRange : this;
         }
     }
 
     public static class RangeFactory
     {
         public const long RING_SIZE = ((long)uint.MaxValue) + 1;
+        private static readonly IRingRange EmptyRange = new GeneralMultiRange(new List<SingleRange>());
+        internal static readonly SingleRange FullRange = new SingleRange(0, 0);
 
-        public static IRingRange CreateFullRange()
-        {
-            return new SingleRange(0, 0);
-        }
+        public static IRingRange CreateFullRange() => FullRange;
 
-        public static IRingRange CreateRange(uint begin, uint end)
-        {
-            return new SingleRange(begin, end);
-        }
+        public static IRingRange CreateRange(uint begin, uint end) => new SingleRange(begin, end);
 
-        public static IRingRange CreateRange(List<IRingRange> inRanges)
+        public static IRingRange CreateRange(List<IRingRange> inRanges) => inRanges.Count switch
         {
-            return new GeneralMultiRange(inRanges);
-        }
+            0 => EmptyRange,
+            1 => inRanges[0],
+            _ => new GeneralMultiRange(inRanges.ConvertAll(r => (SingleRange)r))
+        };
 
-        internal static EquallyDividedMultiRange CreateEquallyDividedMultiRange(IRingRange range, int numSubRanges)
-        {
-            return new EquallyDividedMultiRange(range, numSubRanges);
-        }
+        internal static IRingRange GetEquallyDividedSubRange(IRingRange range, int numSubRanges, int mySubRangeIndex)
+            => EquallyDividedMultiRange.GetEquallyDividedSubRange(range, numSubRanges, mySubRangeIndex);
 
-        public static IEnumerable<ISingleRange> GetSubRanges(IRingRange range)
+        public static IEnumerable<ISingleRange> GetSubRanges(IRingRange range) => range switch
         {
-            if (range is SingleRange)
-            {
-                return new SingleRange[] { (SingleRange)range };
-            }
-            else if (range is GeneralMultiRange)
-            {
-                return ((GeneralMultiRange)range).Ranges;
-            }
-            return null;
-        }
+            ISingleRange single => new[] { single },
+            GeneralMultiRange m => m.Ranges,
+            _ => null,
+        };
+
+        public static IEnumerable<ISingleRange> GetCompactSubRanges(IRingRange range) => range switch
+        {
+            ISingleRange single => new[] { single },
+            GeneralMultiRange m => m.GetCompactRanges(),
+            _ => null,
+        };
     }
 
     [Serializable]
-    internal class GeneralMultiRange : IRingRangeInternal
+    internal sealed class GeneralMultiRange : IRingRangeInternal
     {
         private readonly List<SingleRange> ranges;
         private readonly long rangeSize;
-        private readonly double rangePercentage;
 
-        internal IEnumerable<SingleRange> Ranges { get { return ranges; } }
+        internal List<SingleRange> Ranges => ranges;
 
-        internal GeneralMultiRange(IEnumerable<IRingRange> inRanges)
+        internal GeneralMultiRange(List<SingleRange> ranges)
         {
-            ranges = inRanges.Cast<SingleRange>().ToList();
-            if (ranges.Count == 0)
+            this.ranges = ranges;
+            foreach (var r in ranges)
+                rangeSize += r.RangeSize();
+        }
+
+        internal IEnumerable<SingleRange> GetCompactRanges()
+        {
+            return rangeSize == 0 ? Array.Empty<SingleRange>()
+                : rangeSize == RangeFactory.RING_SIZE ? (new[] { RangeFactory.FullRange })
+                : HasOverlaps() ? Compact()
+                : ranges;
+
+            bool HasOverlaps()
             {
-                rangeSize = 0;
-                rangePercentage = 0;
+                var last = ranges[0];
+                for (var i = 1; i < ranges.Count; i++)
+                {
+                    var r = ranges[i];
+                    if (last.Overlaps(r)) return true;
+                    last = r;
+                }
+                return false;
             }
-            else
+
+            IEnumerable<SingleRange> Compact()
             {
-                rangeSize = ranges.Sum(r => r.RangeSize());
-                rangePercentage = ranges.Sum(r => r.RangePercentage());
+                var res = new List<SingleRange>();
+                var last = ranges[0];
+                for (var i = 1; i < ranges.Count; i++)
+                {
+                    var r = ranges[i];
+                    if (last.Overlaps(r))
+                        last = last.Merge(r);
+                    else
+                    {
+                        res.Add(last);
+                        last = r;
+                    }
+                }
+                res.Add(last);
+                return res;
             }
         }
 
         public bool InRange(uint n)
         {
-            foreach (IRingRange s in Ranges)
+            foreach (var s in ranges)
             {
                 if (s.InRange(n)) return true;
             }
             return false;
         }
+
         public bool InRange(GrainReference grainReference)
         {
             return InRange(grainReference.GetUniformHashCode());
         }
 
-        public long RangeSize()
-        {
-            return rangeSize;
-        }
+        public long RangeSize() => rangeSize;
 
-        public double RangePercentage()
-        {
-            return rangePercentage;
-        }
+        public double RangePercentage() => RangeSize() * (100.0 / RangeFactory.RING_SIZE);
 
         public override string ToString()
-        {
-            return ToCompactString();
-        }
-
-        public string ToCompactString()
         {
             if (ranges.Count == 0) return "Empty MultiRange";
             if (ranges.Count == 1) return ranges[0].ToString();
@@ -234,129 +261,60 @@ namespace Orleans.Runtime
         }
     }
 
-    [Serializable]
-    internal class EquallyDividedMultiRange
+    internal static class EquallyDividedMultiRange
     {
-        [Serializable]
-        private class EquallyDividedSingleRange
+        internal static SingleRange GetEquallyDividedSubRange(SingleRange singleRange, int numSubRanges, int mySubRangeIndex)
         {
-            private readonly List<SingleRange> ranges;
-
-            internal EquallyDividedSingleRange(SingleRange singleRange, int numSubRanges)
+            var rangeSize = singleRange.RangeSize();
+            uint portion = (uint)(rangeSize / numSubRanges);
+            uint remainder = (uint)(rangeSize - portion * numSubRanges);
+            uint start = singleRange.Begin;
+            for (int i = 0; i < numSubRanges; i++)
             {
-                ranges = new List<SingleRange>();
-                if (numSubRanges == 0) throw new ArgumentException("numSubRanges is 0.", "numSubRanges");
-                
-                if (numSubRanges == 1)
+                // (Begin, End]
+                uint end = (unchecked(start + portion));
+                // I want it to overflow on purpose. It will do the right thing.
+                if (remainder > 0)
                 {
-                    ranges.Add(singleRange);
+                    end++;
+                    remainder--;
                 }
-                else
-                {    
-                    uint uNumSubRanges = checked((uint)numSubRanges);
-                    uint portion = (uint)(singleRange.RangeSize() / uNumSubRanges);
-                    uint remainder = (uint)(singleRange.RangeSize() - portion * uNumSubRanges);
-                    uint start = singleRange.Begin;
-                    for (uint i = 0; i < uNumSubRanges; i++)
+                if (i == mySubRangeIndex)
+                    return new SingleRange(start, end);
+                start = end; // nextStart
+            }
+            throw new ArgumentException(nameof(mySubRangeIndex));
+        }
+
+        // Takes a range and devides it into numSubRanges equal ranges and returns the subrange at mySubRangeIndex.
+        public static IRingRange GetEquallyDividedSubRange(IRingRange range, int numSubRanges, int mySubRangeIndex)
+        {
+            if (numSubRanges <= 0) throw new ArgumentException(nameof(numSubRanges));
+            if ((uint)mySubRangeIndex >= (uint)numSubRanges) throw new ArgumentException(nameof(mySubRangeIndex));
+
+            if (numSubRanges == 1) return range;
+
+            switch (range)
+            {
+                case SingleRange singleRange:
+                    return GetEquallyDividedSubRange(singleRange, numSubRanges, mySubRangeIndex);
+
+                case GeneralMultiRange multiRange:
+                    switch (multiRange.Ranges.Count)
                     {
-                        // (Begin, End]
-                        uint end = (unchecked(start + portion));
-                            // I want it to overflow on purpose. It will do the right thing.
-                        if (remainder > 0)
-                        {
-                            end++;
-                            remainder--;
-                        }
-                        ranges.Add(new SingleRange(start, end));
-                        start = end; // nextStart
+                        case 0: return multiRange;
+                        case 1: return GetEquallyDividedSubRange(multiRange.Ranges[0], numSubRanges, mySubRangeIndex);
+                        default:
+                            // Take each of the single ranges in the multi range and divide each into equal sub ranges.
+                            // Then go over all those and group them by sub range index.
+                            var singlesForThisIndex = new List<SingleRange>(multiRange.Ranges.Count);
+                            foreach (var singleRange in multiRange.Ranges)
+                                singlesForThisIndex.Add(GetEquallyDividedSubRange(singleRange, numSubRanges, mySubRangeIndex));
+                            return new GeneralMultiRange(singlesForThisIndex);
                     }
-                }
+
+                default: throw new ArgumentException(nameof(range));
             }
-
-            internal SingleRange GetSubRange(int mySubRangeIndex)
-            {
-                return ranges[mySubRangeIndex];
-            }
-        }
-
-        private readonly Dictionary<int, IRingRangeInternal> multiRanges;
-        private readonly long rangeSize;
-        private readonly double rangePercentage;
-
-        // This class takes a range and devides it into X (x being numSubRanges) equal ranges.
-        public EquallyDividedMultiRange(IRingRange range, int numSubRanges)
-        {
-            multiRanges = new Dictionary<int, IRingRangeInternal>();
-            if (range is SingleRange)
-            {
-                var fullSingleRange = range as SingleRange;
-                var singleDevided = new EquallyDividedSingleRange(fullSingleRange, numSubRanges);
-                for (int i = 0; i < numSubRanges; i++)
-                {
-                    var singleRange = singleDevided.GetSubRange(i);
-                    multiRanges[i] = singleRange;
-                }
-            }
-            else if (range is GeneralMultiRange)
-            {
-                var fullMultiRange = range as GeneralMultiRange;
-                // Take each of the single ranges in the multi range and divide each into equal sub ranges.
-                // Then go over all those and group them by sub range index.
-                var allSinglesDevided = new List<EquallyDividedSingleRange>();
-                foreach (var singleRange in fullMultiRange.Ranges)
-                {
-                    var singleDevided = new EquallyDividedSingleRange(singleRange, numSubRanges);
-                    allSinglesDevided.Add(singleDevided);
-                }
-
-                for (int i = 0; i < numSubRanges; i++)
-                {
-                    var singlesForThisIndex = new List<IRingRange>();
-                    foreach (var singleDevided in allSinglesDevided)
-                    {
-                        IRingRange singleRange = singleDevided.GetSubRange(i);
-                        singlesForThisIndex.Add(singleRange);
-                    }
-                    IRingRangeInternal multi = (IRingRangeInternal)RangeFactory.CreateRange(singlesForThisIndex);
-                    multiRanges[i] = multi;
-                }
-            }
-            if (multiRanges.Count == 0)
-            {
-                rangeSize = 0;
-                rangePercentage = 0;
-            }
-            else
-            {
-                rangeSize = multiRanges.Values.Sum(r => r.RangeSize());
-                rangePercentage = multiRanges.Values.Sum(r => r.RangePercentage());
-            }
-        }
-
-        internal IRingRange GetSubRange(int mySubRangeIndex)
-        {
-            return multiRanges[mySubRangeIndex];
-        }
-
-        public override string ToString()
-        {
-            return ToCompactString();
-        }
-
-        public string ToCompactString()
-        {
-            if (multiRanges.Count == 0) return "Empty EquallyDevidedMultiRange";
-            if (multiRanges.Count == 1) return multiRanges.First().Value.ToString();
-
-            return String.Format("<EquallyDevidedMultiRange: Size=x{0,8:X8}, %Ring={1:0.000}%>", rangeSize, rangePercentage);
-        }
-
-        public string ToFullString()
-        {
-            if (multiRanges.Count == 0) return "Empty EquallyDevidedMultiRange";
-            if (multiRanges.Count == 1) return multiRanges.First().Value.ToFullString();
-            return String.Format("<EquallyDevidedMultiRange: Size=x{0,8:X8}, %Ring={1:0.000}%, {2} Ranges: {3}>", rangeSize, rangePercentage, multiRanges.Count,
-                Utils.DictionaryToString(multiRanges, r => r.ToFullString()));
         }
     }
 }

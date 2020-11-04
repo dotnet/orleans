@@ -1,16 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 
 namespace Orleans.Runtime.ConsistentRing
 {
-    internal class EquallyDividedRangeRingProvider : IConsistentRingProviderForGrains, IRingRangeListener
+    internal sealed class EquallyDividedRangeRingProvider : IConsistentRingProviderForGrains, IRingRangeListener
     {
         private readonly IConsistentRingProvider ringProvider;
-        private readonly List<IAsyncRingRangeListener> grainStatusListeners;
+        private readonly List<IAsyncRingRangeListener> grainStatusListeners = new List<IAsyncRingRangeListener>();
         private readonly ILogger logger;
         private readonly int numSubRanges;
         private readonly int mySubRangeIndex;
@@ -20,25 +19,17 @@ namespace Orleans.Runtime.ConsistentRing
         {
             if (mySubRangeIndex < 0 || mySubRangeIndex >= numSubRanges)
                 throw new IndexOutOfRangeException("mySubRangeIndex is out of the range. mySubRangeIndex = " + mySubRangeIndex + " numSubRanges = " + numSubRanges);
-            
+
             ringProvider = provider;
             this.numSubRanges = numSubRanges;
             this.mySubRangeIndex = mySubRangeIndex;
-            grainStatusListeners = new List<IAsyncRingRangeListener>();
             ringProvider.SubscribeToRangeChangeEvents(this);
             logger = loggerFactory.CreateLogger<EquallyDividedRangeRingProvider>();
         }
 
-        public IRingRange GetMyRange()
-        {
-            return myRange ?? (myRange = CalcMyRange());
-        }
+        public IRingRange GetMyRange() => myRange ??= CalcMyRange();
 
-        private IRingRange CalcMyRange()
-        {
-            var equallyDevidedMultiRange = RangeFactory.CreateEquallyDividedMultiRange(ringProvider.GetMyRange(), numSubRanges);
-            return equallyDevidedMultiRange.GetSubRange(mySubRangeIndex);
-        }
+        private IRingRange CalcMyRange() => RangeFactory.GetEquallyDividedSubRange(ringProvider.GetMyRange(), numSubRanges, mySubRangeIndex);
 
         public bool SubscribeToRangeChangeEvents(IAsyncRingRangeListener observer)
         {
@@ -55,7 +46,7 @@ namespace Orleans.Runtime.ConsistentRing
         {
             lock (grainStatusListeners)
             {
-                return grainStatusListeners.Contains(observer) && grainStatusListeners.Remove(observer);
+                return grainStatusListeners.Remove(observer);
             }
         }
 
@@ -63,10 +54,8 @@ namespace Orleans.Runtime.ConsistentRing
         {
             myRange = CalcMyRange();
 
-            var oldMultiRange = RangeFactory.CreateEquallyDividedMultiRange(old, numSubRanges);
-            IRingRange oldSubRange = oldMultiRange.GetSubRange(mySubRangeIndex);
-            var newMultiRange = RangeFactory.CreateEquallyDividedMultiRange(now, numSubRanges);
-            IRingRange newSubRange = newMultiRange.GetSubRange(mySubRangeIndex);
+            var oldSubRange = RangeFactory.GetEquallyDividedSubRange(old, numSubRanges, mySubRangeIndex);
+            var newSubRange = RangeFactory.GetEquallyDividedSubRange(now, numSubRanges, mySubRangeIndex);
 
             if (oldSubRange.Equals(newSubRange)) return;
 
@@ -76,10 +65,10 @@ namespace Orleans.Runtime.ConsistentRing
 
             logger.Info("-NotifyLocal GrainRangeSubscribers about old {0} and new {1} increased? {2}.", oldSubRange.ToString(), newSubRange.ToString(), increased);
 
-            List<IAsyncRingRangeListener> copy;
+            IAsyncRingRangeListener[] copy;
             lock (grainStatusListeners)
             {
-                copy = grainStatusListeners.ToList();
+                copy = grainStatusListeners.ToArray();
             }
             foreach (IAsyncRingRangeListener listener in copy)
             {
@@ -88,7 +77,7 @@ namespace Orleans.Runtime.ConsistentRing
                     Task task = listener.RangeChangeNotification(oldSubRange, newSubRange);
                     // We don't want to await it here since it will delay delivering notifications to other listeners.
                     // We only want to log an error if it happends, so use ContinueWith.
-                    task.LogException(logger, ErrorCode.CRP_ForGrains_Local_Subscriber_Exception_1, 
+                    task.LogException(logger, ErrorCode.CRP_ForGrains_Local_Subscriber_Exception_1,
                                         String.Format("Local IGrainRingRangeListener {0} has thrown an asynchronous exception when was notified about RangeChangeNotification about old {1} new {2}.",
                                         listener.GetType().FullName, oldSubRange, newSubRange))
                         .Ignore();

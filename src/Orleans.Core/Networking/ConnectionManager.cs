@@ -381,13 +381,11 @@ namespace Orleans.Runtime.Messaging
 
         private void StartConnection(SiloAddress address, Connection connection)
         {
-            ThreadPool.UnsafeQueueUserWorkItem(this.StartConnectionCore, (address, connection));
-        }
-
-        private void StartConnectionCore(object state)
-        {
-            var (address, connection) = ((SiloAddress, Connection))state;
-            _ = this.RunConnectionAsync(address, connection);
+            ThreadPool.UnsafeQueueUserWorkItem(state =>
+            {
+                var (t, address, connection) = ((ConnectionManager, SiloAddress, Connection))state;
+                _ = t.RunConnectionAsync(address, connection);
+            }, (this, address, connection));
         }
 
         private async Task RunConnectionAsync(SiloAddress address, Connection connection)
