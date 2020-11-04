@@ -109,7 +109,7 @@ namespace Orleans.Runtime
         {
             if (begin == 0 && end == 0)
             {
-                return String.Format("<(0 0], Size=x{0,8:X8}, %Ring={1:0.000}%>", RangeSize(), RangePercentage());
+                return "<(0 0], Size=x100000000, %Ring=100%>";
             }
             return String.Format("<(x{0,8:X8} x{1,8:X8}], Size=x{2,8:X8}, %Ring={3:0.000}%>", begin, end, RangeSize(), RangePercentage());
         }
@@ -153,7 +153,7 @@ namespace Orleans.Runtime
         {
             0 => EmptyRange,
             1 => inRanges[0],
-            _ => new GeneralMultiRange(inRanges.ConvertAll(r => (SingleRange)r))
+            _ => GeneralMultiRange.Create(inRanges)
         };
 
         internal static IRingRange GetEquallyDividedSubRange(IRingRange range, int numSubRanges, int mySubRangeIndex)
@@ -163,14 +163,7 @@ namespace Orleans.Runtime
         {
             ISingleRange single => new[] { single },
             GeneralMultiRange m => m.Ranges,
-            _ => null,
-        };
-
-        public static IEnumerable<ISingleRange> GetCompactSubRanges(IRingRange range) => range switch
-        {
-            ISingleRange single => new[] { single },
-            GeneralMultiRange m => m.GetCompactRanges(),
-            _ => null,
+            _ => throw new NotSupportedException(),
         };
     }
 
@@ -189,42 +182,32 @@ namespace Orleans.Runtime
                 rangeSize += r.RangeSize();
         }
 
-        internal IEnumerable<SingleRange> GetCompactRanges()
+        internal static IRingRange Create(List<IRingRange> inRanges)
         {
-            return rangeSize == 0 ? Array.Empty<SingleRange>()
-                : rangeSize == RangeFactory.RING_SIZE ? (new[] { RangeFactory.FullRange })
-                : HasOverlaps() ? Compact()
-                : ranges;
+            var ranges = inRanges.ConvertAll(r => (SingleRange)r);
+            return HasOverlaps() ? Compact() : new GeneralMultiRange(ranges);
 
             bool HasOverlaps()
             {
                 var last = ranges[0];
                 for (var i = 1; i < ranges.Count; i++)
-                {
-                    var r = ranges[i];
-                    if (last.Overlaps(r)) return true;
-                    last = r;
-                }
+                    if (last.Overlaps(last = ranges[i])) return true;
                 return false;
             }
 
-            IEnumerable<SingleRange> Compact()
+            IRingRange Compact()
             {
-                var res = new List<SingleRange>();
+                var lastIdx = 0;
                 var last = ranges[0];
                 for (var i = 1; i < ranges.Count; i++)
                 {
                     var r = ranges[i];
-                    if (last.Overlaps(r))
-                        last = last.Merge(r);
-                    else
-                    {
-                        res.Add(last);
-                        last = r;
-                    }
+                    if (last.Overlaps(r)) ranges[lastIdx] = last = last.Merge(r);
+                    else ranges[++lastIdx] = last = r;
                 }
-                res.Add(last);
-                return res;
+                if (lastIdx == 0) return last;
+                ranges.RemoveRange(++lastIdx, ranges.Count - lastIdx);
+                return new GeneralMultiRange(ranges);
             }
         }
 

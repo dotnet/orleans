@@ -177,7 +177,7 @@ namespace Orleans.Runtime.ReminderService
             var rangeSerialNumberCopy = RangeSerialNumber;
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace($"My range= {RingRange}, RangeSerialNumber {RangeSerialNumber}. Local reminders count {localReminders.Count}");
             var acks = new List<Task>();
-            foreach (var range in RangeFactory.GetCompactSubRanges(RingRange))
+            foreach (var range in RangeFactory.GetSubRanges(RingRange))
             {
                 acks.Add(ReadTableAndStartTimers(range, rangeSerialNumberCopy));
             }
