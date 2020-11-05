@@ -24,6 +24,7 @@ namespace UnitTests.OrleansRuntime
         }
 
         [Fact]
+        [TestCategory("BVT")]
         public async Task GetActivationAddressTest()
         {
             var mgmt1 = this.fixture.Client.GetGrain<IManagementGrain>(1);

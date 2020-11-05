@@ -104,8 +104,13 @@ namespace Orleans.Runtime
         /// <summary>
         /// Return the <see cref="Orleans.Runtime.SiloAddress"/> where a given Grain is activated (if any).
         /// </summary>
+        /// <remarks>
+        /// Please note that this method does not represent a strong consistent view of the Grain Catalog.
+        /// The return of this method is taken based on a last known state of the grain which may or may not be up-to-date by the time the caller receive the request.
+        /// If the grain being looked up is has <see cref="Orleans.Concurrency.StatelessWorkerAttribute"/> applied to it, this method will return null.
+        /// </remarks>
         /// <param name="reference">The <see cref="Orleans.Runtime.IAddressable"/> to look up.</param>
-        /// <returns>The <see cref="Orleans.Runtime.SiloAddress"/> where the Grain is activated or null if not activated.</returns>
+        /// <returns>The <see cref="Orleans.Runtime.SiloAddress"/> where the Grain is activated or null if not activated taken from a snapshot of the last known state of the Grain Catalog.</returns>
         ValueTask<SiloAddress> GetActivationAddress(IAddressable reference);
     }
 }
