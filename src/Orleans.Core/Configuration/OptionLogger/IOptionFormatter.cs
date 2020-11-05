@@ -18,9 +18,8 @@ namespace Orleans
     /// Option formatter for a certain option type <typeparamref name="T"/>
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public interface IOptionFormatter<T> : IOptionFormatter
+    public interface IOptionFormatter<in T> : IOptionFormatter
     {
-        
     }
 
     /// <summary>
@@ -38,7 +37,6 @@ namespace Orleans
     public static class OptionFormattingUtilities
     {
         private const string DefaultFormatFormatting = "{0}: {1}";
-        private const string DefaultUnnamedFormatting = "{0}";
         private const string DefaultNamedFormatting = "{0}-{1}";
 
         /// <summary>
@@ -50,10 +48,9 @@ namespace Orleans
             return string.Format(valueFormat, key, value);
         }
 
-        public static string Name<TOptions>(string name = null, string formatting = null)
-        {
-            var valueFormat = formatting ?? ((name == null) ? DefaultUnnamedFormatting : DefaultNamedFormatting);
-            return string.Format(valueFormat, typeof(TOptions).FullName, name);
-        }
+        public static string Name<TOptions>(string name = null, string formatting = null) => Name(typeof(TOptions), name, formatting);
+
+        internal static string Name(Type type, string name = null, string formatting = null)
+            => name is null && formatting is null ? type.FullName : string.Format(formatting ?? DefaultNamedFormatting, type.FullName, name);
     }
 }

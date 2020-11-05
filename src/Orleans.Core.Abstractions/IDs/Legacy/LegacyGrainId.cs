@@ -3,21 +3,20 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
+using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
-    [Serializable]
-    public class LegacyGrainId : IEquatable<LegacyGrainId>, IComparable<LegacyGrainId>
+    [Serializable, Immutable]
+    public sealed class LegacyGrainId : IEquatable<LegacyGrainId>, IComparable<LegacyGrainId>
     {
         private static readonly object lockable = new object();
-        private const int INTERN_CACHE_INITIAL_SIZE = InternerConstants.SIZE_LARGE;
-        private static readonly TimeSpan internCacheCleanupInterval = InternerConstants.DefaultCacheCleanupFreq;
 
         private static Interner<UniqueKey, LegacyGrainId> grainIdInternCache;
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         [DataMember]
-        protected readonly internal UniqueKey Key;
+        internal readonly UniqueKey Key;
 
         public UniqueKey.Category Category => Key.IdCategory;
 
@@ -57,12 +56,12 @@ namespace Orleans.Runtime
         // For testing only.
         internal static LegacyGrainId GetGrainIdForTesting(Guid guid)
         {
-            return FindOrCreateGrainId(UniqueKey.NewKey(guid, UniqueKey.Category.None));
+            return FindOrCreateGrainId(UniqueKey.NewKey(guid));
         }
 
         internal static LegacyGrainId GetSystemTargetGrainId(long typeData)
         {
-            return FindOrCreateGrainId(UniqueKey.NewSystemTargetKey(Guid.Empty, typeData));
+            return FindOrCreateGrainId(UniqueKey.NewEmptySystemTargetKey(typeData));
         }
 
         internal static GrainType GetGrainType(long typeCode, bool isKeyExt)
@@ -289,15 +288,11 @@ namespace Orleans.Runtime
         private static LegacyGrainId FindOrCreateGrainId(UniqueKey key)
         {
             // Note: This is done here to avoid a wierd cyclic dependency / static initialization ordering problem involving the GrainId, Constants & Interner classes
-            if (grainIdInternCache != null) return grainIdInternCache.FindOrCreate(key, k => new LegacyGrainId(k));
-
-            lock (lockable)
-            {
-                if (grainIdInternCache == null)
+            if (grainIdInternCache is null)
+                lock (lockable)
                 {
-                    grainIdInternCache = new Interner<UniqueKey, LegacyGrainId>(INTERN_CACHE_INITIAL_SIZE, internCacheCleanupInterval);
+                    grainIdInternCache ??= new Interner<UniqueKey, LegacyGrainId>(InternerConstants.SIZE_LARGE);
                 }
-            }
             return grainIdInternCache.FindOrCreate(key, k => new LegacyGrainId(k));
         }
 

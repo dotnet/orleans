@@ -15,8 +15,6 @@ namespace Orleans.Runtime
     [StructLayout(LayoutKind.Auto)]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
     {
-        private static readonly char[] SegmentSeparator = new[] { '/' };
-
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
@@ -101,14 +99,14 @@ namespace Orleans.Runtime
                 return false;
             }
 
-            var parts = value.Split(SegmentSeparator, 2);
-            if (parts.Length != 2)
+            var i = value.IndexOf('/');
+            if (i < 0)
             {
                 grainId = default;
                 return false;
             }
 
-            grainId = Create(parts[0], parts[1]);
+            grainId = Create(value.Substring(0, i), value.Substring(i + 1));
             return true;
         }
 

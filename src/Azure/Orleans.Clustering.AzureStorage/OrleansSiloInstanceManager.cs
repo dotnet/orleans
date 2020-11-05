@@ -18,9 +18,9 @@ namespace Orleans.AzureUtils
     {
         public string TableName { get; }
 
-        private readonly string INSTANCE_STATUS_CREATED = SiloStatus.Created.ToString();  //"Created";
-        private readonly string INSTANCE_STATUS_ACTIVE = SiloStatus.Active.ToString();    //"Active";
-        private readonly string INSTANCE_STATUS_DEAD = SiloStatus.Dead.ToString();        //"Dead";
+        private const string INSTANCE_STATUS_CREATED = nameof(SiloStatus.Created);  //"Created";
+        private const string INSTANCE_STATUS_ACTIVE = nameof(SiloStatus.Active);    //"Active";
+        private const string INSTANCE_STATUS_DEAD = nameof(SiloStatus.Dead);        //"Dead";
 
         private readonly AzureTableDataManager<SiloInstanceTableEntry> storage;
         private readonly ILogger logger;
@@ -93,12 +93,6 @@ namespace Orleans.AzureUtils
             return storage.UpsertTableEntryAsync(entry);
         }
 
-        public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
-        {
-            IEnumerable<SiloInstanceTableEntry> gatewaySiloInstances = await FindAllGatewaySilos();
-            return gatewaySiloInstances.Select(ConvertToGatewayUri).ToList();
-        }
-
         /// <summary>
         /// Represent a silo instance entry in the gateway URI format.
         /// </summary>
@@ -106,19 +100,11 @@ namespace Orleans.AzureUtils
         /// <returns></returns>
         private static Uri ConvertToGatewayUri(SiloInstanceTableEntry gateway)
         {
-            int proxyPort = 0;
-            if (!string.IsNullOrEmpty(gateway.ProxyPort))
-                int.TryParse(gateway.ProxyPort, out proxyPort);
-
-            int gen = 0;
-            if (!string.IsNullOrEmpty(gateway.Generation))
-                int.TryParse(gateway.Generation, out gen);
-
-            SiloAddress address = SiloAddress.New(new IPEndPoint(IPAddress.Parse(gateway.Address), proxyPort), gen);
-            return address.ToGatewayUri();
+            int.TryParse(gateway.ProxyPort, out var proxyPort);
+            return new IPEndPoint(IPAddress.Parse(gateway.Address), proxyPort).ToGatewayUri();
         }
 
-        private async Task<IEnumerable<SiloInstanceTableEntry>> FindAllGatewaySilos()
+        public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0}.", this.DeploymentId);
             const string zeroPort = "0";
@@ -133,7 +119,7 @@ namespace Orleans.AzureUtils
                 string query = TableQuery.CombineFilters(filterOnPartitionKey, TableOperators.And, TableQuery.CombineFilters(filterOnStatus, TableOperators.And, filterOnProxyPort));
                 var queryResults = await storage.ReadTableEntriesAndEtagsAsync(query);
 
-                List<SiloInstanceTableEntry> gatewaySiloInstances = queryResults.Select(entity => entity.Item1).ToList();
+                var gatewaySiloInstances = queryResults.Select(entity => ConvertToGatewayUri(entity.Item1)).ToList();
 
                 logger.Info(ErrorCode.Runtime_Error_100278, "Found {0} active Gateway Silos for deployment {1}.", gatewaySiloInstances.Count, this.DeploymentId);
                 return gatewaySiloInstances;

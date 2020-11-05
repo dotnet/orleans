@@ -1,42 +1,38 @@
-using Microsoft.Extensions.Options;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
+using Microsoft.Extensions.Options;
 
 namespace Orleans
 {
-    internal class DefaultOptionsFormatter<T> : IOptionFormatter<T>
-         where T : class, new()
+    internal sealed class DefaultOptionsFormatter<T> : DefaultOptionsFormatter, IOptionFormatter<T> where T : class, new()
+    {
+        public DefaultOptionsFormatter(IOptions<T> options) : base(null, options.Value) { }
+    }
+
+    internal class DefaultOptionsFormatter : IOptionFormatter<object>
     {
         public string Name { get; }
 
-        private T options;
+        private readonly object options;
 
-        public DefaultOptionsFormatter(IOptions<T> options)
-        {
-            this.options = options.Value;
-            this.Name = OptionFormattingUtilities.Name<T>();
-        }
-
-        internal DefaultOptionsFormatter(string name, T options)
+        internal DefaultOptionsFormatter(string name, object options)
         {
             this.options = options;
-            this.Name = OptionFormattingUtilities.Name<T>(name);
+            this.Name = OptionFormattingUtilities.Name(options.GetType(), name);
         }
 
         public IEnumerable<string> Format()
         {
-            return typeof(T)
-                .GetProperties()
-                .Where(prop => prop.GetGetMethod() != null && prop.GetSetMethod() != null)
-                .SelectMany(FormatProperty)
-                .ToList();
+            var result = new List<string>();
+            foreach (var prop in options.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
+                if (prop.GetGetMethod() is { } && prop.GetSetMethod() is { })
+                    FormatProperty(prop, result);
+            return result;
         }
 
-        private IEnumerable<string> FormatProperty(PropertyInfo property)
+        private void FormatProperty(PropertyInfo property, List<string> result)
         {
-            var result = new List<string>();
             var name = property.Name;
             var value = property.GetValue(this.options);
             var redactAttribute = property.GetCustomAttribute<RedactAttribute>(inherit: true);
@@ -49,26 +45,27 @@ namespace Orleans
                        name,
                        redactAttribute.Redact(value)));
             }
-            else {
+            else
+            {
                 // If it is a dictionary -> one line per item
-                if (typeof(IDictionary).IsInstanceOfType(value))
+                if (value is IDictionary dict)
                 {
-                    var dict = (IDictionary)value;
-                    foreach (DictionaryEntry kvp in dict)
+                    var enumerator = dict.GetEnumerator();
+                    while (enumerator.MoveNext())
                     {
-                        result.Add(OptionFormattingUtilities.Format($"{name}.{kvp.Key}", kvp.Value));
+                        var kvp = enumerator.Entry;
+                        result.Add($"{name}.{kvp.Key}: {kvp.Value}");
                     }
                 }
                 // If it is a simple collection -> one line per item
-                else if (typeof(ICollection).IsInstanceOfType(value))
+                else if (value is ICollection coll)
                 {
-                    var coll = (ICollection)value;
                     if (coll.Count > 0)
                     {
                         var index = 0;
                         foreach (var item in coll)
                         {
-                            result.Add(OptionFormattingUtilities.Format($"{name}.{index}", item));
+                            result.Add($"{name}.{index}: {item}");
                             index++;
                         }
                     }
@@ -76,21 +73,15 @@ namespace Orleans
                 // Simple case
                 else
                 {
-                    result.Add(
-                        OptionFormattingUtilities.Format(
-                            name,
-                            value));
+                    result.Add(OptionFormattingUtilities.Format(name, value));
                 }
             }
-
-            return result;
         }
     }
 
-    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> 
-        where T: class, new()
+    internal sealed class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> where T : class
     {
-        private IOptionsMonitor<T> optionsMonitor;
+        private readonly IOptionsMonitor<T> optionsMonitor;
 
         public DefaultOptionsFormatterResolver(IOptionsMonitor<T> optionsMonitor)
         {
@@ -99,7 +90,7 @@ namespace Orleans
 
         public IOptionFormatter<T> Resolve(string name)
         {
-            return new DefaultOptionsFormatter<T>(name, this.optionsMonitor.Get(name));
+            return new DefaultOptionsFormatter(name, this.optionsMonitor.Get(name));
         }
     }
 }

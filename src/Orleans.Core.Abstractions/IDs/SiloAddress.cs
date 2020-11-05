@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -7,24 +8,17 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Data class encapsulating the details of silo addresses.
     /// </summary>
-    [Serializable]
+    [Serializable, Immutable]
     [DebuggerDisplay("SiloAddress {ToString()}")]
-    public class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, IComparable
+    public sealed class SiloAddress : IEquatable<SiloAddress>, IComparable<SiloAddress>, IComparable
     {
-        internal static readonly int SizeBytes = 24; // 16 for the address, 4 for the port, 4 for the generation
-
-        /// <summary> Special constant value to indicate an empty SiloAddress. </summary>
-        public static SiloAddress Zero { get; private set; }
-
-        private const int INTERN_CACHE_INITIAL_SIZE = InternerConstants.SIZE_MEDIUM;
-        private static readonly TimeSpan internCacheCleanupInterval = TimeSpan.Zero;
-
         private int hashCode = 0;
         private bool hashCodeSet = false;
 
@@ -36,16 +30,12 @@ namespace Orleans.Runtime
 
         private const char SEPARATOR = '@';
 
-        private static readonly DateTime epoch = new DateTime(2010, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        private static readonly long epoch = new DateTime(2010, 1, 1).Ticks;
 
-        private static readonly Interner<SiloAddress, SiloAddress> siloAddressInterningCache;
+        private static readonly Interner<Key, SiloAddress> siloAddressInterningCache = new Interner<Key, SiloAddress>(InternerConstants.SIZE_MEDIUM);
 
-        static SiloAddress()
-        {
-            siloAddressInterningCache = new Interner<SiloAddress, SiloAddress>(INTERN_CACHE_INITIAL_SIZE, internCacheCleanupInterval);
-            var sa = new SiloAddress(new IPEndPoint(0, 0), 0);
-            Zero = siloAddressInterningCache.Intern(sa, sa);
-        }
+        /// <summary>Special constant value to indicate an empty SiloAddress.</summary>
+        public static SiloAddress Zero { get; } = New(new IPEndPoint(0, 0), 0);
 
         /// <summary>
         /// Factory for creating new SiloAddresses with specified IP endpoint address and silo generation number.
@@ -55,8 +45,7 @@ namespace Orleans.Runtime
         /// <returns>SiloAddress object initialized with specified address and silo generation.</returns>
         public static SiloAddress New(IPEndPoint ep, int gen)
         {
-            var sa = new SiloAddress(ep, gen);
-            return siloAddressInterningCache.Intern(sa, sa);
+            return siloAddressInterningCache.FindOrCreate(new Key(ep, gen), k => new SiloAddress(k.Endpoint, k.Generation));
         }
 
         private SiloAddress(IPEndPoint endpoint, int gen)
@@ -77,7 +66,7 @@ namespace Orleans.Runtime
         /// <returns>A new silo generation number.</returns>
         public static int AllocateNewGeneration()
         {
-            long elapsed = (DateTime.UtcNow.Ticks - epoch.Ticks) / TimeSpan.TicksPerSecond;
+            long elapsed = (DateTime.UtcNow.Ticks - epoch) / TimeSpan.TicksPerSecond;
             return unchecked((int)elapsed); // Unchecked to truncate any bits beyond the lower 32
         }
 
@@ -109,17 +98,16 @@ namespace Orleans.Runtime
             {
                 throw new FormatException("Invalid string SiloAddress: " + addr);
             }
-            var epString = addr.Substring(0, atSign);
-            var genString = addr.Substring(atSign + 1);
             // IPEndpoint is the host, then ':', then the port
-            int lastColon = epString.LastIndexOf(':');
+            int lastColon = addr.LastIndexOf(':', atSign - 1);
             if (lastColon < 0) throw new FormatException("Invalid string SiloAddress: " + addr);
 
-            var hostString = epString.Substring(0, lastColon);
-            var portString = epString.Substring(lastColon + 1);
+            var hostString = addr.Substring(0, lastColon);
             var host = IPAddress.Parse(hostString);
-            int port = Int32.Parse(portString);
-            return New(new IPEndPoint(host, port), Int32.Parse(genString));
+            var portString = addr.Substring(lastColon + 1, atSign - lastColon - 1);
+            int port = int.Parse(portString, NumberStyles.None);
+            var gen = int.Parse(addr.Substring(atSign + 1), NumberStyles.None);
+            return New(new IPEndPoint(host, port), gen);
         }
 
         /// <summary>
@@ -133,7 +121,7 @@ namespace Orleans.Runtime
             // Basically, this should never change unless the data content of SiloAddress changes
 
             // First is the IPEndpoint; then '@'; then the generation
-            var atSign = addr.IndexOf((byte)SEPARATOR);
+            var atSign = addr.LastIndexOf((byte)SEPARATOR);
             if (atSign < 0) ThrowInvalidUtf8SiloAddress(addr);
 
             // IPEndpoint is the host, then ':', then the port
@@ -152,14 +140,14 @@ namespace Orleans.Runtime
             var portSlice = endpointSlice.Slice(lastColon + 1);
             fixed (byte* portBytes = portSlice)
             {
-                port = int.Parse(Encoding.UTF8.GetString(portBytes, portSlice.Length));
+                port = int.Parse(Encoding.UTF8.GetString(portBytes, portSlice.Length), NumberStyles.None);
             }
 
             int generation;
             var genSlice = addr.Slice(atSign + 1);
             fixed (byte* genBytes = genSlice)
             {
-                generation = int.Parse(Encoding.UTF8.GetString(genBytes, genSlice.Length));
+                generation = int.Parse(Encoding.UTF8.GetString(genBytes, genSlice.Length), NumberStyles.None);
             }
 
             return New(new IPEndPoint(host, port), generation);
@@ -177,10 +165,27 @@ namespace Orleans.Runtime
             throw new FormatException("Invalid string SiloAddress: " + addrString);
         }
 
+        [Immutable]
+        private readonly struct Key : IEquatable<Key>
+        {
+            public readonly IPEndPoint Endpoint;
+            public readonly int Generation;
+
+            public Key(IPEndPoint endpoint, int generation)
+            {
+                Endpoint = endpoint;
+                Generation = generation;
+            }
+
+            public override int GetHashCode() => Endpoint.GetHashCode() ^ Generation;
+
+            public bool Equals(Key other) => Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
+        }
+
         /// <summary> Object.ToString method override. </summary>
         public override string ToString()
         {
-            return String.Format("{0}{1}:{2}", (IsClient ? "C" : "S"), Endpoint, Generation);
+            return string.Format(IsClient ? "C{0}:{1}" : "S{0}:{1}", Endpoint, Generation);
         }
 
         /// <summary>
@@ -204,21 +209,14 @@ namespace Orleans.Runtime
         /// <returns>String representation of this SiloAddress.</returns>
         public string ToStringWithHashCode()
         {
-            return String.Format("{0}/x{1, 8:X8}", ToString(), GetConsistentHashCode());
+            return string.Format(IsClient ? "C{0}:{1}/x{2:X8}" : "S{0}:{1}/x{2:X8}", Endpoint, Generation, GetConsistentHashCode());
         }
 
         /// <summary> Object.Equals method override. </summary>
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as SiloAddress);
-        }
+        public override bool Equals(object obj) => Equals(obj as SiloAddress);
 
         /// <summary> Object.GetHashCode method override. </summary>
-        public override int GetHashCode()
-        {
-            // Note that Port cannot be used because Port==0 matches any non-zero Port value for .Equals
-            return Endpoint.GetHashCode() ^ Generation.GetHashCode();
-        }
+        public override int GetHashCode() => Endpoint.GetHashCode() ^ Generation;
 
         /// <summary>Get a consistent hash value for this silo address.</summary>
         /// <returns>Consistent hash value for this silo address.</returns>
@@ -226,8 +224,7 @@ namespace Orleans.Runtime
         {
             if (hashCodeSet) return hashCode;
 
-            // Note that Port cannot be used because Port==0 matches any non-zero Port value for .Equals
-            string siloAddressInfoToHash = Endpoint + Generation.ToString(CultureInfo.InvariantCulture);
+            string siloAddressInfoToHash = Endpoint.ToString() + Generation.ToString(CultureInfo.InvariantCulture);
             hashCode = CalculateIdHash(siloAddressInfoToHash);
             hashCodeSet = true;
             return hashCode;
@@ -265,46 +262,35 @@ namespace Orleans.Runtime
 
         private List<uint> GetUniformHashCodesImpl(int numHashes)
         {
-            var hashes = new List<uint>();
-            var bytes = new byte[16 + sizeof(int) + sizeof(int) + sizeof(int)]; // ip + port + generation + extraBit
-            var tmpInt = new int[1];
-
-            for (int i = 0; i < bytes.Length; i++)
-            {
-                bytes[i] = 9;
-            }
+            Span<byte> bytes = stackalloc byte[16 + sizeof(int) + sizeof(int) + sizeof(int)]; // ip + port + generation + extraBit
 
             // Endpoint IP Address
-            if (this.Endpoint.AddressFamily == AddressFamily.InterNetwork) // IPv4
+            var address = Endpoint.Address;
+            if (address.AddressFamily == AddressFamily.InterNetwork) // IPv4
             {
-                for (int i = 0; i < 12; i++)
-                {
-                    bytes[i] = 0;
-                }
-                Buffer.BlockCopy(this.Endpoint.Address.GetAddressBytes(), 0, bytes, 12, 4);
+#pragma warning disable CS0618 // Type or member is obsolete
+                BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(12), (int)address.Address);
+#pragma warning restore CS0618
+                bytes.Slice(0, 12).Clear();
             }
             else // IPv6
             {
-                Buffer.BlockCopy(this.Endpoint.Address.GetAddressBytes(), 0, bytes, 0, 16);
+                address.GetAddressBytes().CopyTo(bytes);
             }
             var offset = 16;
             // Port
-            tmpInt[0] = this.Endpoint.Port;
-            Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), Endpoint.Port);
             offset += sizeof(int);
             // Generation
-            tmpInt[0] = this.Generation;
-            Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
+            BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), Generation);
             offset += sizeof(int);
 
+            var hashes = new List<uint>(numHashes);
             for (int extraBit = 0; extraBit < numHashes; extraBit++)
             {
-                // extraBit
-                tmpInt[0] = extraBit;
-                Buffer.BlockCopy(tmpInt, 0, bytes, offset, sizeof(int));
+                BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(offset), extraBit);
                 hashes.Add(JenkinsHash.ComputeHash(bytes));
             }
-            
             return hashes;
         }
 
@@ -322,8 +308,7 @@ namespace Orleans.Runtime
         /// <summary> IEquatable.Equals method override. </summary>
         public bool Equals(SiloAddress other)
         {
-            return other != null && Endpoint.Address.Equals(other.Endpoint.Address) && (Endpoint.Port == other.Endpoint.Port) &&
-                ((Generation == other.Generation));
+            return other != null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
         }
 
         internal bool IsSameLogicalSilo(SiloAddress other)
@@ -371,32 +356,33 @@ namespace Orleans.Runtime
         // and dual stack sockets, described at https://msdn.microsoft.com/en-us/library/system.net.ipaddress.maptoipv6(v=vs.110).aspx
         private static int CompareIpAddresses(IPAddress one, IPAddress two)
         {
-            int returnVal = 0;
-            if (one.AddressFamily == two.AddressFamily)
-            {
-                byte[] b1 = one.GetAddressBytes();
-                byte[] b2 = two.GetAddressBytes();
+            var f1 = one.AddressFamily;
+            var f2 = two.AddressFamily;
+            if (f1 != f2)
+                return f1 < f2 ? -1 : 1;
 
-                for (int i = 0; i < b1.Length; i++)
+            if (f1 == AddressFamily.InterNetwork)
+            {
+#pragma warning disable CS0618 // Type or member is obsolete
+                return one.Address.CompareTo(two.Address);
+#pragma warning restore CS0618
+            }
+
+            byte[] b1 = one.GetAddressBytes();
+            byte[] b2 = two.GetAddressBytes();
+
+            for (int i = 0; i < b1.Length; i++)
+            {
+                if (b1[i] < b2[i])
                 {
-                    if (b1[i] < b2[i])
-                    {
-                        returnVal = -1;
-                        break;
-                    }
-                    else if (b1[i] > b2[i])
-                    {
-                        returnVal = 1;
-                        break;
-                    }
+                    return -1;
+                }
+                else if (b1[i] > b2[i])
+                {
+                    return 1;
                 }
             }
-            else
-            {
-                returnVal = one.AddressFamily.CompareTo(two.AddressFamily);
-            }
-            return returnVal;
+            return 0;
         }
-
-      }
+    }
 }

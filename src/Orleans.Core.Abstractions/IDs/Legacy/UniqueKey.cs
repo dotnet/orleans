@@ -1,18 +1,15 @@
 using System;
-using System.Buffers.Text;
+using System.Buffers.Binary;
 using System.Globalization;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Text;
+using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
-    [Serializable]
-    public class UniqueKey : IComparable<UniqueKey>, IEquatable<UniqueKey>
+    [Serializable, Immutable]
+    public sealed class UniqueKey : IComparable<UniqueKey>, IEquatable<UniqueKey>
     {
-        private const ulong TYPE_CODE_DATA_MASK = 0xFFFFFFFF; // Lowest 4 bytes
-        private static readonly char[] KeyExtSeparationChar = {'+'};
-
         /// <summary>
         /// Type id values encoded into UniqueKeys
         /// </summary>
@@ -36,144 +33,101 @@ namespace Orleans.Runtime
         [NonSerialized]
         private uint uniformHashCache;
 
-        public int BaseTypeCode
-        {
-            get { return (int)(TypeCodeData & TYPE_CODE_DATA_MASK); }
-        }
+        public int BaseTypeCode => (int)TypeCodeData;
 
-        public Category IdCategory
-        {
-            get { return GetCategory(TypeCodeData); }
-        }
+        public Category IdCategory => GetCategory(TypeCodeData);
 
-        public bool IsLongKey
-        {
-            get { return N0 == 0; }
-        }
+        public bool IsLongKey => N0 == 0;
 
-        public bool IsSystemTargetKey
-            => IsSystemTarget(IdCategory);
+        public bool IsSystemTargetKey => IsSystemTarget(IdCategory);
 
-        private static bool IsSystemTarget(Category category)
-            => category == Category.SystemTarget || category == Category.KeyExtSystemTarget;
+        private static bool IsSystemTarget(Category category) => category == Category.SystemTarget || category == Category.KeyExtSystemTarget;
 
         public bool HasKeyExt => IsKeyExt(IdCategory);
 
-        private static bool IsKeyExt(Category category)
-            => category == Category.KeyExtGrain
-                        || category == Category.KeyExtSystemTarget;
+        private static bool IsKeyExt(Category category) => category == Category.KeyExtGrain || category == Category.KeyExtSystemTarget;
 
-        internal static readonly UniqueKey Empty =
-            new UniqueKey
-            {
-                N0 = 0,
-                N1 = 0,
-                TypeCodeData = 0,
-                KeyExt = null
-            };
+        internal static readonly UniqueKey Empty = new UniqueKey();
 
         internal static UniqueKey Parse(ReadOnlySpan<char> input)
         {
-            var trimmed = input.Trim().ToString();
-
-            // first, for convenience we attempt to parse the string using GUID syntax. this is needed by unit
-            // tests but i don't know if it's needed for production.
-            Guid guid;
-            if (Guid.TryParse(trimmed, out guid))
-                return NewKey(guid);
-            else
+            input = input.Trim();
+            if (input.Length >= 48)
             {
-                var fields = trimmed.Split(KeyExtSeparationChar, 2);
-                var n0 = ulong.Parse(fields[0].Substring(0, 16), NumberStyles.HexNumber);
-                var n1 = ulong.Parse(fields[0].Substring(16, 16), NumberStyles.HexNumber);
-                var typeCodeData = ulong.Parse(fields[0].Substring(32, 16), NumberStyles.HexNumber);
+                var n0 = ulong.Parse(input.Slice(0, 16).ToString(), NumberStyles.HexNumber);
+                var n1 = ulong.Parse(input.Slice(16, 16).ToString(), NumberStyles.HexNumber);
+                var typeCodeData = ulong.Parse(input.Slice(32, 16).ToString(), NumberStyles.HexNumber);
                 string keyExt = null;
-                switch (fields.Length)
+                if (input.Length > 48)
                 {
-                    default:
-                        throw new InvalidDataException("UniqueKey hex strings cannot contain more than one + separator.");
-                    case 1:
-                        break;
-                    case 2:
-                        if (fields[1] != "null")
-                        {
-                            keyExt = fields[1];
-                        }
-                        break;
+                    if (input[48] != '+') throw new InvalidDataException("UniqueKey hex string missing + separator.");
+                    keyExt = input.Slice(49).ToString();
                 }
                 return NewKey(n0, n1, typeCodeData, keyExt);
             }
+
+            // last, for convenience we attempt to parse the string using GUID syntax. this is needed by unit
+            // tests but i don't know if it's needed for production.
+            return NewKey(Guid.Parse(input.ToString()));
         }
 
         internal static UniqueKey NewKey(ulong n0, ulong n1, Category category, long typeData, string keyExt)
-        {
-            if (!IsKeyExt(category) && keyExt != null)
-                throw new ArgumentException("Only key extended grains can specify a non-null key extension.");
-
-            var typeCodeData = ((ulong)category << 56) + ((ulong)typeData & 0x00FFFFFFFFFFFFFF);
-
-            return NewKey(n0, n1, typeCodeData, keyExt);
-        }
+            => NewKey(n0, n1, GetTypeCodeData(category, typeData), keyExt);
 
         internal static UniqueKey NewKey(long longKey, Category category = Category.None, long typeData = 0, string keyExt = null)
         {
             ThrowIfIsSystemTargetKey(category);
 
-            var n1 = unchecked((ulong)longKey);
-            return NewKey(0, n1, category, typeData, keyExt);
+            var key = NewKey(GetTypeCodeData(category, typeData), keyExt);
+            key.N1 = (ulong)longKey;
+            return key;
         }
 
-        public static UniqueKey NewKey()
-        {
-            return NewKey(Guid.NewGuid());
-        }
+        public static UniqueKey NewKey() => new UniqueKey { Guid = Guid.NewGuid() };
+
+        internal static UniqueKey NewKey(Guid guid) => new UniqueKey { Guid = guid };
 
         internal static UniqueKey NewKey(Guid guid, Category category = Category.None, long typeData = 0, string keyExt = null)
         {
             ThrowIfIsSystemTargetKey(category);
 
-            var guidBytes = guid.ToByteArray();
-            var n0 = BitConverter.ToUInt64(guidBytes, 0);
-            var n1 = BitConverter.ToUInt64(guidBytes, 8);
-            return NewKey(n0, n1, category, typeData, keyExt);
+            var key = NewKey(GetTypeCodeData(category, typeData), keyExt);
+            key.Guid = guid;
+            return key;
         }
+
+        internal static UniqueKey NewEmptySystemTargetKey(long typeData)
+            => new UniqueKey { TypeCodeData = GetTypeCodeData(Category.SystemTarget, typeData) };
 
         public static UniqueKey NewSystemTargetKey(Guid guid, long typeData)
-        {
-            var guidBytes = guid.ToByteArray();
-            var n0 = BitConverter.ToUInt64(guidBytes, 0);
-            var n1 = BitConverter.ToUInt64(guidBytes, 8);
-            return NewKey(n0, n1, Category.SystemTarget, typeData, null);
-        }
+            => new UniqueKey { Guid = guid, TypeCodeData = GetTypeCodeData(Category.SystemTarget, typeData) };
 
         public static UniqueKey NewSystemTargetKey(short systemId)
-        {
-            ulong n1 = unchecked((ulong)systemId);
-            return NewKey(0, n1, Category.SystemTarget, 0, null);
-        }
+            => new UniqueKey { N1 = (ulong)systemId, TypeCodeData = GetTypeCodeData(Category.SystemTarget) };
 
         public static UniqueKey NewGrainServiceKey(short key, long typeData)
-        {
-            ulong n1 = unchecked((ulong)key);
-            return NewKey(0, n1, Category.SystemTarget, typeData, null);
-        }
+            => new UniqueKey { N1 = (ulong)key, TypeCodeData = GetTypeCodeData(Category.SystemTarget, typeData) };
 
         public static UniqueKey NewGrainServiceKey(string key, long typeData)
-        {
-            return NewKey(0, 0, Category.KeyExtSystemTarget, typeData, key);
-        }
+            => NewKey(GetTypeCodeData(Category.KeyExtSystemTarget, typeData), key);
 
         internal static UniqueKey NewKey(ulong n0, ulong n1, ulong typeCodeData, string keyExt)
         {
-            ValidateKeyExt(keyExt, typeCodeData);
-            return
-                new UniqueKey
-                {
-                    N0 = n0,
-                    N1 = n1,
-                    TypeCodeData = typeCodeData,
-                    KeyExt = keyExt
-                };
+            var key = NewKey(typeCodeData, keyExt);
+            key.N0 = n0;
+            key.N1 = n1;
+            return key;
+        }
+
+        private static UniqueKey NewKey(ulong typeCodeData, string keyExt)
+        {
+            if (IsKeyExt(GetCategory(typeCodeData)))
+            {
+                if (string.IsNullOrWhiteSpace(keyExt))
+                    throw keyExt is null ? new ArgumentNullException("keyExt") : throw new ArgumentException("Extended key is empty or white space.", "keyExt");
+            }
+            else if (keyExt != null) throw new ArgumentException("Only key extended grains can specify a non-null key extension.");
+            return new UniqueKey { TypeCodeData = typeCodeData, KeyExt = keyExt };
         }
 
         private void ThrowIfIsNotLong()
@@ -191,11 +145,8 @@ namespace Orleans.Runtime
 
         private void ThrowIfHasKeyExt(string methodName)
         {
-            if (HasKeyExt)
-                throw new InvalidOperationException(
-                    string.Format(
-                        "This overload of {0} cannot be used if the grain uses the primary key extension feature.",
-                        methodName));
+            if (KeyExt != null)
+                throw new InvalidOperationException($"This overload of {methodName} cannot be used if the grain uses the primary key extension feature.");
         }
 
         public long PrimaryKeyToLong(out string extendedKey)
@@ -208,28 +159,24 @@ namespace Orleans.Runtime
 
         public long PrimaryKeyToLong()
         {
+            ThrowIfIsNotLong();
             ThrowIfHasKeyExt("UniqueKey.PrimaryKeyToLong");
-            string unused;
-            return PrimaryKeyToLong(out unused);
+            return (long)N1;
         }
 
         public Guid PrimaryKeyToGuid(out string extendedKey)
         {
             extendedKey = this.KeyExt;
-            return ConvertToGuid();
+            return Guid;
         }
 
         public Guid PrimaryKeyToGuid()
         {
             ThrowIfHasKeyExt("UniqueKey.PrimaryKeyToGuid");
-            string unused;
-            return PrimaryKeyToGuid(out unused);
+            return Guid;
         }
 
-        public override bool Equals(object o)
-        {
-            return o is UniqueKey && Equals((UniqueKey)o);
-        }
+        public override bool Equals(object o) => o is UniqueKey key && Equals(key);
 
         // We really want Equals to be as fast as possible, as a minimum cost, as close to native as possible.
         // No function calls, no boxing, inline.
@@ -238,7 +185,7 @@ namespace Orleans.Runtime
             return N0 == other.N0
                    && N1 == other.N1
                    && TypeCodeData == other.TypeCodeData
-                   && (!HasKeyExt || KeyExt == other.KeyExt);
+                   && (KeyExt is null || KeyExt == other.KeyExt);
         }
 
         // We really want CompareTo to be as fast as possible, as a minimum cost, as close to native as possible.
@@ -251,8 +198,8 @@ namespace Orleans.Runtime
                : N0 > other.N0 ? 1
                : N1 < other.N1 ? -1
                : N1 > other.N1 ? 1
-               : !HasKeyExt || KeyExt == null ? 0
-               : String.Compare(KeyExt, other.KeyExt, StringComparison.Ordinal);
+               : KeyExt == null ? 0
+               : string.CompareOrdinal(KeyExt, other.KeyExt);
         }
 
         public override int GetHashCode()
@@ -267,7 +214,7 @@ namespace Orleans.Runtime
             if (uniformHashCache == 0)
             {
                 uint n;
-                if (HasKeyExt && KeyExt != null)
+                if (KeyExt != null)
                 {
                     n = JenkinsHash.ComputeHash(this.ToByteArray());
                 }
@@ -297,33 +244,52 @@ namespace Orleans.Runtime
 
             var spanBytes = new byte[sizeWithoutExtBytes + extBytesLength].AsSpan();
 
-            var offset = 0;
-            var ulongBytes = MemoryMarshal.Cast<byte, ulong>(spanBytes.Slice(offset, sizeof(ulong) * 3));
+            BinaryPrimitives.WriteUInt64LittleEndian(spanBytes, N0);
+            BinaryPrimitives.WriteUInt64LittleEndian(spanBytes.Slice(8, 8), N1);
+            BinaryPrimitives.WriteUInt64LittleEndian(spanBytes.Slice(16, 8), TypeCodeData);
 
-            ulongBytes[0] = this.N0;
-            ulongBytes[1] = this.N1;
-            ulongBytes[2] = this.TypeCodeData;
-
-            offset += sizeof(ulong) * 3;
-
+            const int offset = sizeof(ulong) * 3;
             // Copy KeyExt
             if (extBytes != null)
             {
-                MemoryMarshal.Cast<byte, int>(spanBytes.Slice(offset, sizeof(int)))[0] = extBytesLength;
-                offset += sizeof(int);
-                extBytes.CopyTo(spanBytes.Slice(offset, extBytesLength));
+                BinaryPrimitives.WriteInt32LittleEndian(spanBytes.Slice(offset, sizeof(int)), extBytesLength);
+                extBytes.CopyTo(spanBytes.Slice(offset + sizeof(int)));
             }
             else
             {
-                MemoryMarshal.Cast<byte, int>(spanBytes.Slice(offset, sizeof(int)))[0] = -1;
+                BinaryPrimitives.WriteInt32LittleEndian(spanBytes.Slice(offset, sizeof(int)), -1);
             }
 
             return spanBytes;
         }
 
-        private Guid ConvertToGuid()
+        private unsafe Guid Guid
         {
-            return new Guid((UInt32)(N0 & 0xffffffff), (UInt16)(N0 >> 32), (UInt16)(N0 >> 48), (byte)N1, (byte)(N1 >> 8), (byte)(N1 >> 16), (byte)(N1 >> 24), (byte)(N1 >> 32), (byte)(N1 >> 40), (byte)(N1 >> 48), (byte)(N1 >> 56));
+            get
+            {
+                if (BitConverter.IsLittleEndian && sizeof(Guid) == 2 * sizeof(ulong))
+                {
+                    Guid value;
+                    ((ulong*)&value)[0] = N0;
+                    ((ulong*)&value)[1] = N1;
+                    return value;
+                }
+                return new Guid((uint)N0, (ushort)(N0 >> 32), (ushort)(N0 >> 48), (byte)N1, (byte)(N1 >> 8), (byte)(N1 >> 16), (byte)(N1 >> 24), (byte)(N1 >> 32), (byte)(N1 >> 40), (byte)(N1 >> 48), (byte)(N1 >> 56));
+            }
+            set
+            {
+                if (BitConverter.IsLittleEndian && sizeof(Guid) == 2 * sizeof(ulong))
+                {
+                    N0 = ((ulong*)&value)[0];
+                    N1 = ((ulong*)&value)[1];
+                }
+                else
+                {
+                    var guid = value.ToByteArray().AsSpan();
+                    N0 = BinaryPrimitives.ReadUInt64LittleEndian(guid);
+                    N1 = BinaryPrimitives.ReadUInt64LittleEndian(guid.Slice(8));
+                }
+            }
         }
 
         public override string ToString()
@@ -333,38 +299,16 @@ namespace Orleans.Runtime
 
         internal string ToHexString()
         {
-            var s = new StringBuilder();
-            s.AppendFormat("{0:x16}{1:x16}{2:x16}", N0, N1, TypeCodeData);
-            if (!HasKeyExt) return s.ToString();
-
-            s.Append("+");
-            s.Append(KeyExt ?? "null");
-            return s.ToString();
-        }
-
-        private static void ValidateKeyExt(string keyExt, UInt64 typeCodeData)
-        {
-            Category category = GetCategory(typeCodeData);
-            if (category == Category.KeyExtGrain || category == Category.KeyExtSystemTarget)
-            {
-                if (string.IsNullOrWhiteSpace(keyExt))
-                {
-                    if (null == keyExt)
-                    {
-                        throw new ArgumentNullException("keyExt");
-
-                    }
-                    else
-                    {
-                        throw new ArgumentException("Extended key is empty or white space.", "keyExt");
-                    }
-                }
-            }
+            const string format = "{0:x16}{1:x16}{2:x16}";
+            return KeyExt is null ? string.Format(format, N0, N1, TypeCodeData)
+                : string.Format(format + "+{3}", N0, N1, TypeCodeData, KeyExt);
         }
 
         internal static Category GetCategory(UInt64 typeCodeData)
         {
             return (Category)((typeCodeData >> 56) & 0xFF);
         }
+
+        private static ulong GetTypeCodeData(Category category, long typeData = 0) => ((ulong)category << 56) + ((ulong)typeData & 0x00FFFFFFFFFFFFFF);
     }
 }

@@ -1,15 +1,14 @@
 using System;
+using Orleans.Concurrency;
 
 namespace Orleans.Metadata
 {
     /// <summary>
     /// Represents a version with two components, a major (most-significant) component, and a minor (least-significant) component.
     /// </summary>
-    [Serializable]
+    [Serializable, Immutable]
     public readonly struct MajorMinorVersion : IComparable<MajorMinorVersion>, IEquatable<MajorMinorVersion>
     {
-        private static readonly char[] VersionSeparator = new char[] { '.' };
-
         public MajorMinorVersion(long majorVersion, long minorVersion)
         {
             Major = majorVersion;
@@ -60,12 +59,13 @@ namespace Orleans.Metadata
         {
             if (string.IsNullOrWhiteSpace(value)) throw new ArgumentNullException(nameof(value));
 
-            var parts = value.Split(VersionSeparator, 2);
-            return new MajorMinorVersion(long.Parse(parts[0]), long.Parse(parts[1]));
+            var i = value.IndexOf('.');
+            if (i < 0) throw new ArgumentException(nameof(value));
+            return new MajorMinorVersion(long.Parse(value.Substring(0, i)), long.Parse(value.Substring(i + 1)));
         }
 
         /// <inheritdoc />
-        public override string ToString() => $"{Major}{VersionSeparator[0]}{Minor}";
+        public override string ToString() => $"{Major}.{Minor}";
 
         /// <inheritdoc />
         public static bool operator ==(MajorMinorVersion left, MajorMinorVersion right) => left.Equals(right);

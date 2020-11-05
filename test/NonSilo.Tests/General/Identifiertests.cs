@@ -314,7 +314,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void ID_Interning_string_equals()
         {
-            Interner<string, string> interner = new Interner<string, string>();
+            using var interner = new Interner<string, string>();
             const string str = "1";
             string r1 = interner.FindOrCreate("1", _ => str);
             string r2 = interner.FindOrCreate("1", _ => null); // Should always be found
@@ -332,7 +332,7 @@ namespace UnitTests.General
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void ID_Intern_FindOrCreate_derived_class()
         {
-            Interner<int, A> interner = new Interner<int, A>();
+            using var interner = new Interner<int, A>();
             var obj1 = new A();
             var obj2 = new B();
             var obj3 = new B();
