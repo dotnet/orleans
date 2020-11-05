@@ -22,6 +22,7 @@ namespace Orleans.Runtime.Management
         private readonly IVersionStore versionStore;
         private readonly MembershipTableManager membershipTableManager;
         private readonly GrainManifest siloManifest;
+        private readonly ClusterManifest clusterManifest;
         private readonly ILogger logger;
         private readonly Catalog catalog;
 
@@ -36,6 +37,7 @@ namespace Orleans.Runtime.Management
         {
             this.membershipTableManager = membershipTableManager;
             this.siloManifest = clusterManifestProvider.LocalGrainManifest;
+            this.clusterManifest = clusterManifestProvider.Current;
             this.internalGrainFactory = internalGrainFactory;
             this.siloStatusOracle = siloStatusOracle;
             this.versionStore = versionStore;
@@ -216,8 +218,25 @@ namespace Orleans.Runtime.Management
         {
             var grainReference = reference as GrainReference;
             var grainId = grainReference.GrainId;
-            var grainProperties = siloManifest.Grains[grainId.Type].Properties;
-            if (grainProperties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out string placementStrategy))
+
+            GrainProperties grainProperties = default;
+            if (!siloManifest.Grains.TryGetValue(grainId.Type, out grainProperties))
+            {
+                var grainManifest = clusterManifest.AllGrainManifests
+                    .SelectMany(m => m.Grains.Where(g => g.Key == grainId.Type))
+                    .FirstOrDefault();
+                if (grainManifest.Value != null)
+                {
+                    grainProperties = grainManifest.Value;
+                }
+                else
+                {
+                    throw new ArgumentException($"Unable to find Grain type '{grainId.Type}'. Make sure it is added to the Application Parts Manager at the Silo configuration.");
+                }
+            }
+
+            if (grainProperties != default &&
+                grainProperties.Properties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out string placementStrategy))
             {
                 if (placementStrategy == nameof(StatelessWorkerPlacement))
                 {
