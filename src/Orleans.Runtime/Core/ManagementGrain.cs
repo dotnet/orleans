@@ -216,6 +216,17 @@ namespace Orleans.Runtime.Management
         {
             var grainReference = reference as GrainReference;
             var grainId = grainReference.GrainId;
+            var grainProperties = siloManifest.Grains[grainId.Type].Properties;
+            if (grainProperties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out string placementStrategy))
+            {
+                if (placementStrategy == nameof(StatelessWorkerPlacement))
+                {
+                    throw new InvalidOperationException(
+                        $"Grain '{grainReference.ToString()}' is a Stateless Worker. This type of grain can't be looked up by this method"
+                    );
+                }
+            }
+
             if (this.catalog.FastLookup(grainId, out var addresses))
             {
                 var placementResult = addresses.FirstOrDefault();

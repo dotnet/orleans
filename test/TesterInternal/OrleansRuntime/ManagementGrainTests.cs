@@ -1,4 +1,7 @@
+using System;
 using System.Threading.Tasks;
+using Orleans;
+using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -38,6 +41,20 @@ namespace UnitTests.OrleansRuntime
             var mgmt1Address2 = await mgmt2.GetActivationAddress(mgmt1);
             Assert.NotNull(mgmt1Address2);
             Assert.True(mgmt1Address == mgmt1Address2);
+
+            var worker = this.fixture.Client.GetGrain<IDumbWorker>(0);
+            await Assert.ThrowsAnyAsync<InvalidOperationException>(async () => await mgmt1.GetActivationAddress(worker));
         }
+    }
+
+    public interface IDumbWorker : IGrainWithIntegerKey
+    {
+        Task DoNothing();
+    }
+
+    [StatelessWorker(1)]
+    public class DumbWorker : Grain, IDumbWorker
+    {
+        public Task DoNothing() => Task.CompletedTask;
     }
 }
