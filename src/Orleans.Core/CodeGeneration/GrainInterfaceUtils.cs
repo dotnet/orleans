@@ -15,7 +15,7 @@ namespace Orleans.CodeGeneration
         private static readonly MethodInfoComparer MethodComparer = new MethodInfoComparer();
 
         [Serializable]
-        internal class RulesViolationException : ArgumentException
+        internal sealed class RulesViolationException : ArgumentException
         {
             public RulesViolationException(string message, List<string> violations)
                 : base(message)
@@ -23,7 +23,7 @@ namespace Orleans.CodeGeneration
                 Violations = violations;
             }
 
-            protected RulesViolationException(SerializationInfo info, StreamingContext context) : base(info, context)
+            private RulesViolationException(SerializationInfo info, StreamingContext context) : base(info, context)
             {
                 this.Violations = info.GetValue(nameof(Violations), typeof(List<string>)) as List<string>;
             }
@@ -34,7 +34,7 @@ namespace Orleans.CodeGeneration
                 info.AddValue(nameof(Violations), this.Violations);
             }
 
-            public List<string> Violations { get; private set; }
+            public List<string> Violations { get; }
         }
 
         public static bool IsGrainInterface(Type t)

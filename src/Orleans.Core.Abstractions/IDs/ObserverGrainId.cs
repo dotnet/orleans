@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Identifies a client-side observer object.
     /// </summary>
+    [Immutable]
     internal readonly struct ObserverGrainId : IEquatable<ObserverGrainId>, IComparable<ObserverGrainId>
     {
         internal const char SegmentSeparator = '+';
@@ -40,7 +42,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="ObserverGrainId"/> instance.
         /// </summary>
-        public static ObserverGrainId Create(ClientGrainId clientId) => Create(clientId, IdSpan.Create(Guid.NewGuid().ToString("N")));
+        public static ObserverGrainId Create(ClientGrainId clientId) => Create(clientId, GrainIdKeyExtensions.CreateGuidKey(Guid.NewGuid()));
 
         /// <summary>
         /// Creates a new <see cref="ObserverGrainId"/> instance.
@@ -50,7 +52,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns <see langword="true"/> if the provided instance represents an observer, <see langword="false"/> if otherwise.
         /// </summary>
-        public static bool IsObserverGrainId(GrainId grainId) => grainId.IsClient() && grainId.Key.ToStringUtf8().IndexOf(SegmentSeparator) >= 0;
+        public static bool IsObserverGrainId(GrainId grainId) => grainId.IsClient() && grainId.Key.AsSpan().IndexOf((byte)SegmentSeparator) >= 0;
 
         /// <summary>
         /// Converts the provided <see cref="GrainId"/> to a <see cref="ObserverGrainId"/>. A return value indicates whether the operation succeeded.
@@ -69,7 +71,15 @@ namespace Orleans.Runtime
 
         private static GrainId ConstructGrainId(ClientGrainId clientId, IdSpan scopedId)
         {
-            return GrainId.Create(clientId.GrainId.Type, clientId.GrainId.Key.ToStringUtf8() + SegmentSeparator + scopedId.ToStringUtf8());
+            var grain = clientId.GrainId.Key.AsSpan();
+            var scope = scopedId.AsSpan();
+
+            var buf = new byte[grain.Length + 1 + scope.Length];
+            grain.CopyTo(buf);
+            buf[grain.Length] = (byte)SegmentSeparator;
+            scope.CopyTo(buf.AsSpan(grain.Length + 1));
+
+            return GrainId.Create(clientId.GrainId.Type, new IdSpan(buf));
         }
 
         /// <inheritdoc/>

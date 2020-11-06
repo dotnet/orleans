@@ -88,8 +88,7 @@ namespace Orleans
                 }
                 else
                 {
-                    var args = genericInterface.GetArgumentsString();
-                    var constructed = GrainType.Create(genericGrainType.GrainType.ToStringUtf8() + args);
+                    var constructed = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
                     _genericMapping[interfaceType] = constructed;
                     result = constructed;
                 }
@@ -143,8 +142,7 @@ namespace Orleans
                     }
                     else
                     {
-                        var args = genericInterface.GetArgumentsString();
-                        var constructed = GrainType.Create(genericGrainType.GrainType.ToStringUtf8() + args);
+                        var constructed = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
                         _genericMapping[interfaceType] = constructed;
                         result = constructed;
                     }
@@ -203,7 +201,7 @@ namespace Orleans
                     {
                         knownPrimary = GrainType.Create(defaultTypeString);
                         continue;
-                    } 
+                    }
                 }
 
                 foreach (var grainType in manifest.Grains)
@@ -285,7 +283,7 @@ namespace Orleans
             }
 
             public GrainType PrimaryImplementation { get; }
-            public List<(string Prefix, GrainType GrainType)> Implementations { get; } 
+            public List<(string Prefix, GrainType GrainType)> Implementations { get; }
         }
     }
 }

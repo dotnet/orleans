@@ -39,13 +39,16 @@ namespace Orleans.Runtime
 
         public bool IsLongKey => N0 == 0;
 
-        public bool IsSystemTargetKey => IsSystemTarget(IdCategory);
+        public bool IsSystemTargetKey
+            => IsSystemTarget(IdCategory);
 
-        private static bool IsSystemTarget(Category category) => category == Category.SystemTarget || category == Category.KeyExtSystemTarget;
+        private static bool IsSystemTarget(Category category)
+            => category == Category.SystemTarget || category == Category.KeyExtSystemTarget;
 
         public bool HasKeyExt => IsKeyExt(IdCategory);
 
-        private static bool IsKeyExt(Category category) => category == Category.KeyExtGrain || category == Category.KeyExtSystemTarget;
+        private static bool IsKeyExt(Category category)
+            => category == Category.KeyExtGrain || category == Category.KeyExtSystemTarget;
 
         internal static readonly UniqueKey Empty = new UniqueKey();
 
@@ -54,9 +57,9 @@ namespace Orleans.Runtime
             input = input.Trim();
             if (input.Length >= 48)
             {
-                var n0 = ulong.Parse(input.Slice(0, 16).ToString(), NumberStyles.HexNumber);
-                var n1 = ulong.Parse(input.Slice(16, 16).ToString(), NumberStyles.HexNumber);
-                var typeCodeData = ulong.Parse(input.Slice(32, 16).ToString(), NumberStyles.HexNumber);
+                var n0 = ulong.Parse(input.Slice(0, 16).ToString(), NumberStyles.AllowHexSpecifier);
+                var n1 = ulong.Parse(input.Slice(16, 16).ToString(), NumberStyles.AllowHexSpecifier);
+                var typeCodeData = ulong.Parse(input.Slice(32, 16).ToString(), NumberStyles.AllowHexSpecifier);
                 string keyExt = null;
                 if (input.Length > 48)
                 {
@@ -146,7 +149,10 @@ namespace Orleans.Runtime
         private void ThrowIfHasKeyExt(string methodName)
         {
             if (KeyExt != null)
-                throw new InvalidOperationException($"This overload of {methodName} cannot be used if the grain uses the primary key extension feature.");
+                throw new InvalidOperationException(
+                    string.Format(
+                        "This overload of {0} cannot be used if the grain uses the primary key extension feature.",
+                        methodName));
         }
 
         public long PrimaryKeyToLong(out string extendedKey)

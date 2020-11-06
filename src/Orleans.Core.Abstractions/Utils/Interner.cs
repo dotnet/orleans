@@ -49,6 +49,8 @@ namespace Orleans
     internal sealed class Interner<K, T> : IDisposable where K : IEquatable<K> where T : class
     {
         private readonly Timer cacheCleanupTimer;
+
+        [NonSerialized]
         private readonly ConcurrentDictionary<K, WeakReference<T>> internCache;
 
         public Interner(int initialSize = InternerConstants.SIZE_SMALL)
@@ -58,8 +60,9 @@ namespace Orleans
 
             if (typeof(K) != typeof(T))
             {
-                var cleanupFreq = TimeSpan.FromMinutes(10);
-                cacheCleanupTimer = new Timer(InternCacheCleanupTimerCallback, null, cleanupFreq, cleanupFreq);
+                var period = TimeSpan.FromMinutes(10);
+                var dueTime = period + TimeSpan.FromTicks(new Random().Next((int)TimeSpan.TicksPerMinute)); // add some initial jitter
+                cacheCleanupTimer = new Timer(InternCacheCleanupTimerCallback, null, dueTime, period);
             }
         }
 

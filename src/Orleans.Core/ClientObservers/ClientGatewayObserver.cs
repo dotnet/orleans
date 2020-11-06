@@ -1,4 +1,3 @@
-using Orleans.CodeGeneration;
 using Orleans.Messaging;
 using Orleans.Runtime;
 
@@ -9,11 +8,11 @@ namespace Orleans.ClientObservers
         void StopSendingToGateway(SiloAddress gateway);
     }
 
-    internal class ClientGatewayObserver : ClientObserver, IClientGatewayObserver
+    internal sealed class ClientGatewayObserver : ClientObserver, IClientGatewayObserver
     {
-        private static IdSpan ScopedId => IdSpan.Create(nameof(ClientGatewayObserver));
+        private static readonly IdSpan ScopedId = IdSpan.Create(nameof(ClientGatewayObserver));
 
-        private GatewayManager gatewayManager;
+        private readonly GatewayManager gatewayManager;
 
         public ClientGatewayObserver(GatewayManager gatewayManager)
         {

@@ -87,8 +87,8 @@ namespace Orleans.Streams
 
         public override string ToString()
         {
-            return Namespace == null ?
-                Guid.ToString() :
+            return Namespace == null ? 
+                Guid.ToString() : 
                 String.Format("{0}-{1}-{2}", Namespace, Guid, ProviderName);
         }
 
@@ -101,14 +101,12 @@ namespace Orleans.Streams
         }
 
         // The special constructor is used to deserialize values. 
-#pragma warning disable CS0628 // New protected member declared in sealed type
-        protected LegacyStreamId(SerializationInfo info, StreamingContext context)
-#pragma warning restore CS0628
+        private LegacyStreamId(SerializationInfo info, StreamingContext context)
         {
             // Reset the property value using the GetValue method.
             var guid = (Guid)info.GetValue("Guid", typeof(Guid));
-            var providerName = (string)info.GetValue("ProviderName", typeof(string));
-            var nameSpace = (string)info.GetValue("Namespace", typeof(string));
+            var providerName = info.GetString("ProviderName");
+            var nameSpace = info.GetString("Namespace");
             key = new StreamIdInternerKey(guid, providerName, nameSpace);
         }
     }

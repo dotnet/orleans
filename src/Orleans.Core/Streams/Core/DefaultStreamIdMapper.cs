@@ -1,4 +1,6 @@
 using System;
+using System.Buffers.Text;
+using System.Runtime.InteropServices;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
@@ -41,7 +43,9 @@ namespace Orleans.Streams
 
         private static IdSpan GetGuidKey(StreamId streamId, bool includeNamespaceInGrainId)
         {
-            var guidKey = Guid.Parse(streamId.GetKeyAsString());
+            var key = streamId.Key.Span;
+            if (!Utf8Parser.TryParse(key, out Guid guidKey, out var len, 'N') || len < key.Length) throw new ArgumentException(nameof(streamId));
+
             return includeNamespaceInGrainId
                 ? GrainIdKeyExtensions.CreateGuidKey(guidKey, streamId.GetNamespace())
                 : GrainIdKeyExtensions.CreateGuidKey(guidKey);
@@ -49,12 +53,20 @@ namespace Orleans.Streams
 
         private static IdSpan GetIntegerKey(StreamId streamId, bool includeNamespaceInGrainId)
         {
-            var intKey = int.Parse(streamId.GetKeyAsString());
+            var key = streamId.Key.Span;
+            if (!Utf8Parser.TryParse(key, out int intKey, out var len) || len < key.Length) throw new ArgumentException(nameof(streamId));
+
             return includeNamespaceInGrainId
                 ? GrainIdKeyExtensions.CreateIntegerKey(intKey, streamId.GetNamespace())
                 : GrainIdKeyExtensions.CreateIntegerKey(intKey);
         }
 
-        private static IdSpan GetKey(StreamId streamId) => new IdSpan(streamId.Key.ToArray());
+        private static IdSpan GetKey(StreamId streamId)
+        {
+            var key = streamId.Key;
+            return MemoryMarshal.TryGetArray(key, out var seg) && seg.Offset == 0 && seg.Count == seg.Array.Length
+                ? new IdSpan(seg.Array)
+                : new IdSpan(key.ToArray());
+        }
     }
 }

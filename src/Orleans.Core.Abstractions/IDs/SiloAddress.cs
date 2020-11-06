@@ -1,11 +1,11 @@
 using System;
 using System.Buffers.Binary;
+using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using Orleans.Concurrency;
@@ -27,6 +27,9 @@ namespace Orleans.Runtime
 
         public IPEndPoint Endpoint { get; private set; }
         public int Generation { get; private set; }
+
+        [NonSerialized]
+        private byte[] utf8;
 
         private const char SEPARATOR = '@';
 
@@ -78,8 +81,32 @@ namespace Orleans.Runtime
         {
             // This must be the "inverse" of FromParsableString, and must be the same across all silos in a deployment.
             // Basically, this should never change unless the data content of SiloAddress changes
-
+            if (utf8 != null) return Encoding.UTF8.GetString(utf8);
             return String.Format("{0}:{1}@{2}", Endpoint.Address, Endpoint.Port, Generation);
+        }
+
+        internal unsafe byte[] ToUtf8String()
+        {
+            if (utf8 is null)
+            {
+                var addr = Endpoint.Address.ToString();
+                var size = Encoding.UTF8.GetByteCount(addr);
+                Span<byte> buf = stackalloc byte[size + 1 + 11 + 1 + 11];
+                fixed (char* src = addr)
+                fixed (byte* dst = buf)
+                    size = Encoding.UTF8.GetBytes(src, addr.Length, dst, buf.Length);
+
+                buf[size++] = (byte)':';
+                Utf8Formatter.TryFormat(Endpoint.Port, buf.Slice(size), out var len);
+                size += len;
+
+                buf[size++] = (byte)SEPARATOR;
+                Utf8Formatter.TryFormat(Generation, buf.Slice(size), out len);
+                size += len;
+
+                utf8 = buf.Slice(0, size).ToArray();
+            }
+            return utf8;
         }
 
         /// <summary>
@@ -115,7 +142,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="addr">String containing the SiloAddress info to be parsed.</param>
         /// <returns>New SiloAddress object created from the input data.</returns>
-        public static unsafe SiloAddress FromUtf8String(ReadOnlySpan<byte> addr)
+        public static SiloAddress FromUtf8String(ReadOnlySpan<byte> addr)
         {
             // This must be the "inverse" of ToParsableString, and must be the same across all silos in a deployment.
             // Basically, this should never change unless the data content of SiloAddress changes
@@ -129,41 +156,23 @@ namespace Orleans.Runtime
             int lastColon = endpointSlice.LastIndexOf((byte)':');
             if (lastColon < 0) ThrowInvalidUtf8SiloAddress(addr);
 
-            IPAddress host;
-            var hostSlice = endpointSlice.Slice(0, lastColon);
-            fixed (byte* hostBytes = hostSlice)
-            {
-                host = IPAddress.Parse(Encoding.UTF8.GetString(hostBytes, hostSlice.Length));
-            }
+            var hostString = endpointSlice.Slice(0, lastColon).GetUtf8String();
+            if (!IPAddress.TryParse(hostString, out var host))
+                ThrowInvalidUtf8SiloAddress(addr);
 
-            int port;
             var portSlice = endpointSlice.Slice(lastColon + 1);
-            fixed (byte* portBytes = portSlice)
-            {
-                port = int.Parse(Encoding.UTF8.GetString(portBytes, portSlice.Length), NumberStyles.None);
-            }
+            if (!Utf8Parser.TryParse(portSlice, out int port, out var len) || len < portSlice.Length)
+                ThrowInvalidUtf8SiloAddress(addr);
 
-            int generation;
             var genSlice = addr.Slice(atSign + 1);
-            fixed (byte* genBytes = genSlice)
-            {
-                generation = int.Parse(Encoding.UTF8.GetString(genBytes, genSlice.Length), NumberStyles.None);
-            }
+            if (!Utf8Parser.TryParse(genSlice, out int generation, out len) || len < genSlice.Length)
+                ThrowInvalidUtf8SiloAddress(addr);
 
             return New(new IPEndPoint(host, port), generation);
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static unsafe void ThrowInvalidUtf8SiloAddress(ReadOnlySpan<byte> addr)
-        {
-            string addrString;
-            fixed (byte* addrBytes = addr)
-            {
-                addrString = Encoding.UTF8.GetString(addrBytes, addr.Length);
-            }
-
-            throw new FormatException("Invalid string SiloAddress: " + addrString);
-        }
+        private static void ThrowInvalidUtf8SiloAddress(ReadOnlySpan<byte> addr)
+            => throw new FormatException("Invalid string SiloAddress: " + addr.GetUtf8String());
 
         [Immutable]
         private readonly struct Key : IEquatable<Key>

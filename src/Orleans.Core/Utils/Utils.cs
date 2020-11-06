@@ -196,7 +196,7 @@ namespace Orleans.Runtime
             sha.Dispose();
 
             var hash = 0;
-            foreach (var i in result) hash ^= i;
+            for (var i = 0; i < result.Length; i++) hash ^= result[i];
             return BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(hash) : hash;
 #else
             using var sha = SHA256.Create();
@@ -299,7 +299,7 @@ namespace Orleans.Runtime
                         foreach (var e in exc.FlattenAggregate())
                         {
                             logger.Warn(ErrorCode.Runtime_Error_100325,
-                                $"Ignoring {e.GetType().FullName} exception thrown from an action called by {caller}.", exc);
+                                $"Ignoring {e.GetType().FullName} exception thrown from an action called by {caller ?? String.Empty}.", exc);
                         }
                     }
                     catch

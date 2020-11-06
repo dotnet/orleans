@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
-using System.Text;
 using Orleans.Concurrency;
 
 namespace Orleans.Runtime
@@ -22,20 +21,6 @@ namespace Orleans.Runtime
         {
             Type = type;
             Key = key;
-        }
-
-        /// <summary>
-        /// Creates a new <see cref="GrainType"/> instance.
-        /// </summary>
-        internal GrainId(byte[] type, byte[] key) : this(new GrainType(type), new IdSpan(key))
-        {
-        }
-
-        /// <summary>
-        /// Creates a new <see cref="GrainType"/> instance.
-        /// </summary>
-        internal GrainId(GrainType type, byte[] key) : this(type, new IdSpan(key))
-        {
         }
 
         /// <summary>
@@ -68,7 +53,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
-        public static GrainId Create(GrainType type, string key) => new GrainId(type, Encoding.UTF8.GetBytes(key));
+        public static GrainId Create(GrainType type, string key) => new GrainId(type, IdSpan.Create(key));
 
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.

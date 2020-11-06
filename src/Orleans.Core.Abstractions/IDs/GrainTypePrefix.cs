@@ -31,13 +31,13 @@ namespace Orleans.Runtime
         /// <summary>
         /// The prefix for clients.
         /// </summary>
-        public const string ClientPrefix = SystemPrefix + "client";
+        public const string ClientPrefix = SystemPrefix + "client.";
 
         /// <summary>
         /// A span representation of <see cref="ClientPrefix" />.
         /// </summary>
         public static readonly ReadOnlyMemory<byte> ClientPrefixBytes = Encoding.UTF8.GetBytes(ClientPrefix);
-        public static readonly GrainType ClientGrainType = GrainType.Create(ClientPrefix);
+        public static readonly GrainType ClientGrainType = GrainType.Create(SystemPrefix + "client");
 
         /// <summary>
         /// The prefix for legacy grains.

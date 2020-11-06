@@ -6,7 +6,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Converts <see cref="GrainReference"/> instances to and from <see cref="string"/> values.
     /// </summary>
-    public sealed class GrainReferenceKeyStringConverter
+    public class GrainReferenceKeyStringConverter
     {
         private readonly GrainReferenceActivator _activator;
 

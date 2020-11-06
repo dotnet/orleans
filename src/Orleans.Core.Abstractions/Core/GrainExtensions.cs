@@ -103,7 +103,7 @@ namespace Orleans
         public static bool IsPrimaryKeyBasedOnLong(this IAddressable grain)
         {
             var grainId = GetGrainId(grain);
-            if (GrainIdKeyExtensions.TryGetIntegerKey(grainId, out var primaryKey, out _))
+            if (GrainIdKeyExtensions.TryGetIntegerKey(grainId, out _))
             {
                 return true;
             }
@@ -146,7 +146,7 @@ namespace Orleans
         public static long GetPrimaryKeyLong(this IAddressable grain)
         {
             var grainId = GetGrainId(grain);
-            if (GrainIdKeyExtensions.TryGetIntegerKey(grainId, out var primaryKey, out _))
+            if (GrainIdKeyExtensions.TryGetIntegerKey(grainId, out var primaryKey))
             {
                 return primaryKey;
             }
@@ -180,9 +180,8 @@ namespace Orleans
 
             if (GrainIdKeyExtensions.TryGetIntegerKey(grainId, out var integerKey, out keyExt))
             {
-                var N0 = 0L;
                 var N1 = integerKey;
-                return new Guid((uint)(N0 & 0xffffffff), (ushort)(N0 >> 32), (ushort)(N0 >> 48), (byte)N1, (byte)(N1 >> 8), (byte)(N1 >> 16), (byte)(N1 >> 24), (byte)(N1 >> 32), (byte)(N1 >> 40), (byte)(N1 >> 48), (byte)(N1 >> 56));
+                return new Guid(0, 0, 0, (byte)N1, (byte)(N1 >> 8), (byte)(N1 >> 16), (byte)(N1 >> 24), (byte)(N1 >> 32), (byte)(N1 >> 40), (byte)(N1 >> 48), (byte)(N1 >> 56));
             }
 
             throw new InvalidOperationException($"Unable to extract GUID key from grain id {grainId}");
@@ -193,7 +192,23 @@ namespace Orleans
         /// </summary>
         /// <param name="grain">The grain to find the primary key for.</param>
         /// <returns>A Guid representing the primary key for this grain.</returns>
-        public static Guid GetPrimaryKey(this IAddressable grain) => grain.GetPrimaryKey(out _);
+        public static Guid GetPrimaryKey(this IAddressable grain)
+        {
+            var grainId = GetGrainId(grain);
+            if (GrainIdKeyExtensions.TryGetGuidKey(grainId, out var guid))
+                return guid;
+
+            if (LegacyGrainId.TryConvertFromGrainId(grainId, out var legacyId))
+                return legacyId.GetPrimaryKey();
+
+            if (GrainIdKeyExtensions.TryGetIntegerKey(grainId, out var integerKey))
+            {
+                var N1 = integerKey;
+                return new Guid(0, 0, 0, (byte)N1, (byte)(N1 >> 8), (byte)(N1 >> 16), (byte)(N1 >> 24), (byte)(N1 >> 32), (byte)(N1 >> 40), (byte)(N1 >> 48), (byte)(N1 >> 56));
+            }
+
+            throw new InvalidOperationException($"Unable to extract GUID key from grain id {grainId}");
+        }
 
         /// <summary>
         /// Returns the string primary key of the grain.
