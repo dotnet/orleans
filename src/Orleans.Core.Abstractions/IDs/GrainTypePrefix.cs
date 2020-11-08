@@ -27,17 +27,18 @@ namespace Orleans.Runtime
         /// The prefix for grain service types.
         /// </summary>
         public const string GrainServicePrefix = SystemTargetPrefix + "user.";
+        internal static readonly ReadOnlyMemory<byte> GrainServicePrefixBytes = Encoding.UTF8.GetBytes(GrainServicePrefix);
 
         /// <summary>
         /// The prefix for clients.
         /// </summary>
-        public const string ClientPrefix = SystemPrefix + "client.";
+        public const string ClientPrefix = SystemPrefix + "client";
 
         /// <summary>
         /// A span representation of <see cref="ClientPrefix" />.
         /// </summary>
         public static readonly ReadOnlyMemory<byte> ClientPrefixBytes = Encoding.UTF8.GetBytes(ClientPrefix);
-        public static readonly GrainType ClientGrainType = GrainType.Create(SystemPrefix + "client");
+        public static readonly GrainType ClientGrainType = GrainType.Create(ClientPrefix);
 
         /// <summary>
         /// The prefix for legacy grains.

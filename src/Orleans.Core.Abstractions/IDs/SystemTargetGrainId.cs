@@ -1,4 +1,6 @@
 using System;
+using System.Buffers;
+using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Text;
 using Orleans.Concurrency;
@@ -107,10 +109,20 @@ namespace Orleans.Runtime
         /// Creates a <see cref="GrainId"/> for a grain service.
         /// </summary>
         public static GrainId CreateGrainServiceGrainId(int typeCode, string grainSystemId, SiloAddress address)
+            => CreateGrainServiceGrainId(CreateGrainServiceGrainType(typeCode, grainSystemId), address);
+
+        internal static GrainType CreateGrainServiceGrainType(int typeCode, string grainSystemId)
         {
-            var grainType = GrainType.Create($"{GrainTypePrefix.GrainServicePrefix}{typeCode:X8}{grainSystemId}");
-            return new GrainId(grainType, new IdSpan(address.ToUtf8String()));
+            var extraLen = grainSystemId is null ? 0 : Encoding.UTF8.GetByteCount(grainSystemId);
+            var buf = new byte[GrainTypePrefix.GrainServicePrefix.Length + 8 + extraLen];
+            GrainTypePrefix.GrainServicePrefixBytes.Span.CopyTo(buf);
+            Utf8Formatter.TryFormat(typeCode, buf.AsSpan(GrainTypePrefix.GrainServicePrefix.Length), out _, new StandardFormat('X', 8));
+            if (grainSystemId != null) Encoding.UTF8.GetBytes(grainSystemId, 0, grainSystemId.Length, buf, buf.Length - extraLen);
+            return new GrainType(buf);
         }
+
+        internal static GrainId CreateGrainServiceGrainId(GrainType grainType, SiloAddress address)
+            => new GrainId(grainType, new IdSpan(address.ToUtf8String()));
 
         /// <summary>
         /// Creates a system target <see cref="GrainType"/> with the provided name.

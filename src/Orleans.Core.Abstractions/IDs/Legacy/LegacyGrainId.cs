@@ -14,6 +14,7 @@ namespace Orleans.Runtime
         private static readonly Interner<UniqueKey, LegacyGrainId> grainIdInternCache = new Interner<UniqueKey, LegacyGrainId>(InternerConstants.SIZE_LARGE);
         private static readonly Interner<UniqueKey, byte[]> grainTypeInternCache = new Interner<UniqueKey, byte[]>();
         private static readonly Interner<UniqueKey, byte[]> grainKeyInternCache = new Interner<UniqueKey, byte[]>();
+        private static readonly ReadOnlyMemory<byte> ClientPrefixBytes = Encoding.UTF8.GetBytes(GrainTypePrefix.ClientPrefix + ".");
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         [DataMember]
@@ -162,7 +163,7 @@ namespace Orleans.Runtime
             return new GrainType(grainTypeInternCache.FindOrCreate(key, key =>
             {
                 var prefixBytes = key.IsSystemTargetKey ? GrainTypePrefix.SystemTargetPrefixBytes
-                    : key.IdCategory == UniqueKey.Category.Client ? GrainTypePrefix.ClientPrefixBytes
+                    : key.IdCategory == UniqueKey.Category.Client ? ClientPrefixBytes
                     : GrainTypePrefix.LegacyGrainPrefixBytes;
 
                 return CreateGrainType(prefixBytes, key.TypeCodeData);
