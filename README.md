@@ -206,7 +206,7 @@ or
 * [Orleans Blog](https://dotnet.github.io/orleans/blog/)
 * Follow the [@msftorleans](https://twitter.com/msftorleans) Twitter account for Orleans announcements.
 * [OrleansContrib - GitHub organization for community add-ons to Orleans](https://github.com/OrleansContrib/) Various community projects, including Monitoring, Design Patterns, Storage Providers, etc.
-* Guidelines for developers wanting to [contribute code changes to Orleans](http://dotnet.github.io/orleans/docs/resources/contributing.html).
+* Guidelines for developers wanting to [contribute code changes to Orleans](https://dotnet.github.io/orleans/docs/resources/contributing.html).
 * You are also encouraged to report bugs or start a technical discussion by starting a new [thread](https://github.com/dotnet/orleans/issues) on GitHub.
 
 ## License
@@ -218,4 +218,4 @@ This project is licensed under the [MIT license](https://github.com/dotnet/orlea
 * [Microsoft Research project home](http://research.microsoft.com/projects/orleans/)
 * Technical Report: [Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/apps/pubs/default.aspx?id=210931)
 * [Orleans Documentation](http://dotnet.github.io/orleans/)
-* [Contributing](http://dotnet.github.io/orleans/docs/resources/contributing.html)
+* [Contributing](https://dotnet.github.io/orleans/docs/resources/contributing.html)
