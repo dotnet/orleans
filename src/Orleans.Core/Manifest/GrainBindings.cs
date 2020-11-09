@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -148,7 +149,7 @@ namespace Orleans.Metadata
 
             bool TryExtractBindingProperty(KeyValuePair<string, string> property, out (string Index, string Key, string Value) result)
             {
-                if (!property.Key.StartsWith(BindingPrefix)
+                if (!property.Key.StartsWith(BindingPrefix, StringComparison.Ordinal)
                     || property.Key.IndexOf(BindingIndexEnd, BindingPrefix.Length) is int indexEndIndex && indexEndIndex < 0)
                 {
                     result = default;

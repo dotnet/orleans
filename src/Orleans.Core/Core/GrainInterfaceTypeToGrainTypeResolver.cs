@@ -53,7 +53,7 @@ namespace Orleans
                 var hasCandidate = false;
                 foreach (var impl in entry.Implementations)
                 {
-                    if (impl.Prefix.StartsWith(prefix))
+                    if (impl.Prefix.StartsWith(prefix, StringComparison.Ordinal))
                     {
                         if (impl.Prefix.Length == prefix.Length)
                         {
@@ -79,19 +79,9 @@ namespace Orleans
                 throw new ArgumentException($"Could not find an implementation matching prefix \"{prefix}\" for interface {interfaceType}");
             }
 
-            if (GenericGrainType.TryParse(result, out var genericGrainType))
+            if (GenericGrainType.TryParse(result, out var genericGrainType) && !genericGrainType.IsConstructed)
             {
-                if (genericGrainType.IsConstructed)
-                {
-                    _genericMapping[interfaceType] = genericGrainType.GrainType;
-                    result = genericGrainType.GrainType;
-                }
-                else
-                {
-                    var constructed = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
-                    _genericMapping[interfaceType] = constructed;
-                    result = constructed;
-                }
+                result = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
             }
 
             return result;
@@ -102,7 +92,7 @@ namespace Orleans
         /// </summary>
         public GrainType GetGrainType(GrainInterfaceType interfaceType)
         {
-            GrainType result;
+            GrainType result = default;
             var cache = GetCache();
             if (cache.Map.TryGetValue(interfaceType, out var entry))
             {
@@ -122,12 +112,10 @@ namespace Orleans
                 else
                 {
                     // No implementations
-                    result = default;
                 }
             }
-            else if (_genericMapping.TryGetValue(interfaceType, out var generic))
+            else if (_genericMapping.TryGetValue(interfaceType, out result))
             {
-                result = generic;
             }
             else if (GenericGrainInterfaceType.TryParse(interfaceType, out var genericInterface))
             {
@@ -137,25 +125,18 @@ namespace Orleans
                 {
                     if (genericGrainType.IsConstructed)
                     {
-                        _genericMapping[interfaceType] = genericGrainType.GrainType;
                         result = genericGrainType.GrainType;
                     }
                     else
                     {
-                        var constructed = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
-                        _genericMapping[interfaceType] = constructed;
-                        result = constructed;
+                        result = genericGrainType.GrainType.GetConstructed(genericInterface.Value);
                     }
                 }
                 else
                 {
-                    _genericMapping[interfaceType] = unconstructed;
                     result = unconstructed;
                 }
-            }
-            else
-            {
-                result = default;
+                _genericMapping[interfaceType] = result;
             }
 
             if (result.IsDefault)
@@ -209,8 +190,10 @@ namespace Orleans
                     var id = grainType.Key;
                     grainType.Value.Properties.TryGetValue(WellKnownGrainTypeProperties.TypeName, out var typeName);
                     grainType.Value.Properties.TryGetValue(WellKnownGrainTypeProperties.FullTypeName, out var fullTypeName);
-                    foreach (var implemented in SupportedGrainInterfaces(grainType.Value))
+                    foreach (var property in grainType.Value.Properties)
                     {
+                        if (!property.Key.StartsWith(WellKnownGrainTypeProperties.ImplementedInterfacePrefix, StringComparison.Ordinal)) continue;
+                        var implemented = GrainInterfaceType.Create(property.Value);
                         string interfaceTypeName;
                         if (manifest.Interfaces.TryGetValue(implemented, out var interfaceProperties))
                         {
@@ -249,17 +232,6 @@ namespace Orleans
             }
 
             return new Cache(clusterManifest.Version, result);
-
-            IEnumerable<GrainInterfaceType> SupportedGrainInterfaces(GrainProperties grain)
-            {
-                foreach (var property in grain.Properties)
-                {
-                    if (property.Key.StartsWith(WellKnownGrainTypeProperties.ImplementedInterfacePrefix))
-                    {
-                        yield return GrainInterfaceType.Create(property.Value);
-                    }
-                }
-            }
         }
 
         private class Cache

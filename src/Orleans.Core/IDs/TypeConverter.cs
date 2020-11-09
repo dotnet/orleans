@@ -195,7 +195,7 @@ namespace Orleans.Runtime
         {
             var args = typeArguments.Value.AsSpan();
             var index = args.IndexOf((byte)StartArgument);
-            if (index <= 0) throw new ArgumentException($"Insufficient type arguments for \"{grainType}\" to be constructed for interface \"{typeArguments}\"");
+            if (index <= 0) return grainType; // if no type arguments are provided, then the current logic expects the unconstructed form (but the grain call is going to fail later anyway...)
             args = args.Slice(index);
 
             var type = grainType.Value.AsSpan();
