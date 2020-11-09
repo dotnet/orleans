@@ -124,7 +124,7 @@ When a grain is activated in Orleans, the runtime decides which server (silo) to
 
 ### Grain Versioning &amp; Heterogeneous Clusters
 
-Application code evolves over time and upgrading live, production systems in a manner which safely accounts for these changes can be challenging, particularly in stateful systems. Grain interfaces in Orleans can be optionally versioned. The cluster maintains a mapping of which grain implementations are available on which silos in the cluster and the versions of those implementations. This version information is used by the runtime in conjunction with placement strategies to make placement decisions when routing calls to grains. In addition to safe update of versioned grains, this also enables heterogeneous clusters, where different silos have different sets of grain implementations available. For more information, see the [Grain Versioning](https://dotnet.github.io/orleans/docs/deployment/grain_versioning/grain_versioning.html) documentation.
+Application code evolves over time and upgrading live, production systems in a manner which safely accounts for these changes can be challenging, particularly in stateful systems. Grain interfaces in Orleans can be optionally versioned. The cluster maintains a mapping of which grain implementations are available on which silos in the cluster and the versions of those implementations. This version information is used by the runtime in conjunction with placement strategies to make placement decisions when routing calls to grains. In addition to safe update of versioned grains, this also enables heterogeneous clusters, where different silos have different sets of grain implementations available. For more information, see the [Grain Versioning](https://dotnet.github.io/orleans/docs/grains/grain_versioning/grain_versioning.html) documentation.
 
 ### Elastic Scalability &amp; Fault Tolerance
 
@@ -206,7 +206,7 @@ or
 * [Orleans Blog](https://dotnet.github.io/orleans/blog/)
 * Follow the [@msftorleans](https://twitter.com/msftorleans) Twitter account for Orleans announcements.
 * [OrleansContrib - GitHub organization for community add-ons to Orleans](https://github.com/OrleansContrib/) Various community projects, including Monitoring, Design Patterns, Storage Providers, etc.
-* Guidelines for developers wanting to [contribute code changes to Orleans](http://dotnet.github.io/orleans/Community/Contributing.html).
+* Guidelines for developers wanting to [contribute code changes to Orleans](http://dotnet.github.io/orleans/docs/resources/contributing.html).
 * You are also encouraged to report bugs or start a technical discussion by starting a new [thread](https://github.com/dotnet/orleans/issues) on GitHub.
 
 ## License
@@ -218,4 +218,4 @@ This project is licensed under the [MIT license](https://github.com/dotnet/orlea
 * [Microsoft Research project home](http://research.microsoft.com/projects/orleans/)
 * Technical Report: [Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/apps/pubs/default.aspx?id=210931)
 * [Orleans Documentation](http://dotnet.github.io/orleans/)
-* [Contributing](http://dotnet.github.io/orleans/Community/Contributing.html)
+* [Contributing](http://dotnet.github.io/orleans/docs/resources/contributing.html)
