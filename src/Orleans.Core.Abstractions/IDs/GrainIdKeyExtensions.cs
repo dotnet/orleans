@@ -78,7 +78,7 @@ namespace Orleans.Runtime
                 keyString = keyString.Slice(0, index);
             }
 
-            return Utf8Parser.TryParse(keyString, out key, out var len, 'X') && len < keyString.Length;
+            return Utf8Parser.TryParse(keyString, out key, out var len, 'X') && len == keyString.Length;
         }
 
         /// <summary>
@@ -90,7 +90,7 @@ namespace Orleans.Runtime
             if (keyString.IndexOf((byte)'+') is int index && index >= 0)
                 keyString = keyString.Slice(0, index);
 
-            return Utf8Parser.TryParse(keyString, out key, out var len, 'X') && len < keyString.Length;
+            return Utf8Parser.TryParse(keyString, out key, out var len, 'X') && len == keyString.Length;
         }
 
         /// <summary>

@@ -5,27 +5,29 @@ using Microsoft.Extensions.Options;
 
 namespace Orleans
 {
-    internal sealed class DefaultOptionsFormatter<T> : DefaultOptionsFormatter, IOptionFormatter<T> where T : class, new()
-    {
-        public DefaultOptionsFormatter(IOptions<T> options) : base(null, options.Value) { }
-    }
-
-    internal class DefaultOptionsFormatter : IOptionFormatter<object>
+    internal sealed class DefaultOptionsFormatter<T> : IOptionFormatter<T>
+         where T : class, new()
     {
         public string Name { get; }
 
-        private readonly object options;
+        private readonly T options;
 
-        internal DefaultOptionsFormatter(string name, object options)
+        public DefaultOptionsFormatter(IOptions<T> options)
+        {
+            this.options = options.Value;
+            this.Name = OptionFormattingUtilities.Name<T>();
+        }
+
+        internal DefaultOptionsFormatter(string name, T options)
         {
             this.options = options;
-            this.Name = OptionFormattingUtilities.Name(options.GetType(), name);
+            this.Name = OptionFormattingUtilities.Name<T>(name);
         }
 
         public IEnumerable<string> Format()
         {
             var result = new List<string>();
-            foreach (var prop in options.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            foreach (var prop in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public))
                 if (prop.GetGetMethod() is { } && prop.GetSetMethod() is { })
                     FormatProperty(prop, result);
             return result;
@@ -79,7 +81,8 @@ namespace Orleans
         }
     }
 
-    internal sealed class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> where T : class
+    internal class DefaultOptionsFormatterResolver<T> : IOptionFormatterResolver<T> 
+        where T: class, new()
     {
         private readonly IOptionsMonitor<T> optionsMonitor;
 
@@ -90,7 +93,7 @@ namespace Orleans
 
         public IOptionFormatter<T> Resolve(string name)
         {
-            return new DefaultOptionsFormatter(name, this.optionsMonitor.Get(name));
+            return new DefaultOptionsFormatter<T>(name, this.optionsMonitor.Get(name));
         }
     }
 }
