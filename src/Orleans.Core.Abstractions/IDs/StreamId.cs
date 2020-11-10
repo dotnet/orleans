@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Text;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
@@ -69,7 +70,8 @@ namespace Orleans.Runtime
             if (ns is null)
             {
                 var buf = new byte[32];
-                Utf8Formatter.TryFormat(key, buf, out _, 'N');
+                Utf8Formatter.TryFormat(key, buf, out var len, 'N');
+                Debug.Assert(len == 32);
                 return new StreamId(buf, 0);
             }
             else
@@ -77,7 +79,8 @@ namespace Orleans.Runtime
                 var nsLen = Encoding.UTF8.GetByteCount(ns);
                 var buf = new byte[nsLen + 32];
                 Encoding.UTF8.GetBytes(ns, 0, ns.Length, buf, 0);
-                Utf8Formatter.TryFormat(key, buf.AsSpan(nsLen), out _, 'N');
+                Utf8Formatter.TryFormat(key, buf.AsSpan(nsLen), out var len, 'N');
+                Debug.Assert(len == 32);
                 return new StreamId(buf, (ushort)nsLen);
             }
         }

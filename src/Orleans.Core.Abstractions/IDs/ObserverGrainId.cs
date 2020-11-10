@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Identifies a client-side observer object.
     /// </summary>
-    [Immutable]
     internal readonly struct ObserverGrainId : IEquatable<ObserverGrainId>, IComparable<ObserverGrainId>
     {
         internal const char SegmentSeparator = '+';

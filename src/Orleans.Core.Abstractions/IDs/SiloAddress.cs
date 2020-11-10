@@ -98,10 +98,12 @@ namespace Orleans.Runtime
 
                 buf[size++] = (byte)':';
                 Utf8Formatter.TryFormat(Endpoint.Port, buf.Slice(size), out var len);
+                Debug.Assert(len > 0);
                 size += len;
 
                 buf[size++] = (byte)SEPARATOR;
                 Utf8Formatter.TryFormat(Generation, buf.Slice(size), out len);
+                Debug.Assert(len > 0);
                 size += len;
 
                 utf8 = buf.Slice(0, size).ToArray();

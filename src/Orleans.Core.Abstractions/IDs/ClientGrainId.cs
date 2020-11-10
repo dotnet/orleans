@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Identifies a client.
     /// </summary>
-    [Immutable]
     internal readonly struct ClientGrainId : IEquatable<ClientGrainId>, IComparable<ClientGrainId>
     {
         /// <summary>

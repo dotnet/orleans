@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Text;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -17,6 +18,7 @@ namespace Orleans.Runtime
         {
             Span<byte> buf = stackalloc byte[sizeof(long) * 2];
             Utf8Formatter.TryFormat(key, buf, out var len, 'X');
+            Debug.Assert(len > 0);
             return new IdSpan(buf.Slice(0, len).ToArray());
         }
 
@@ -29,6 +31,7 @@ namespace Orleans.Runtime
 
             Span<byte> tmp = stackalloc byte[sizeof(long) * 2];
             Utf8Formatter.TryFormat(key, tmp, out var len, 'X');
+            Debug.Assert(len > 0);
 
             var extLen = Encoding.UTF8.GetByteCount(keyExtension);
             var buf = new byte[len + 1 + extLen];
@@ -45,7 +48,8 @@ namespace Orleans.Runtime
         public static IdSpan CreateGuidKey(Guid key)
         {
             var buf = new byte[32];
-            Utf8Formatter.TryFormat(key, buf, out _, 'N');
+            Utf8Formatter.TryFormat(key, buf, out var len, 'N');
+            Debug.Assert(len == 32);
             return new IdSpan(buf);
         }
 
@@ -58,7 +62,8 @@ namespace Orleans.Runtime
 
             var extLen = Encoding.UTF8.GetByteCount(keyExtension);
             var buf = new byte[32 + 1 + extLen];
-            Utf8Formatter.TryFormat(key, buf, out _, 'N');
+            Utf8Formatter.TryFormat(key, buf, out var len, 'N');
+            Debug.Assert(len == 32);
             buf[32] = (byte)'+';
             Encoding.UTF8.GetBytes(keyExtension, 0, keyExtension.Length, buf, 33);
 
@@ -129,7 +134,7 @@ namespace Orleans.Runtime
                 keyString = keyString.Slice(0, 32);
             }
 
-            return keyString.Length == 32 && Utf8Parser.TryParse(keyString, out key, out _, 'N');
+            return keyString.Length == 32 && Utf8Parser.TryParse(keyString, out key, out var len, 'N') && len == 32;
         }
 
         /// <summary>
@@ -141,7 +146,7 @@ namespace Orleans.Runtime
             if (keyString.Length > 32 && keyString[32] == (byte)'+')
                 keyString = keyString.Slice(0, 32);
 
-            return keyString.Length == 32 && Utf8Parser.TryParse(keyString, out key, out _, 'N');
+            return keyString.Length == 32 && Utf8Parser.TryParse(keyString, out key, out var len, 'N') && len == 32;
         }
 
         /// <summary>

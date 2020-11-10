@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Buffers.Text;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using Orleans.Concurrency;
 
@@ -116,7 +117,8 @@ namespace Orleans.Runtime
             var extraLen = grainSystemId is null ? 0 : Encoding.UTF8.GetByteCount(grainSystemId);
             var buf = new byte[GrainTypePrefix.GrainServicePrefix.Length + 8 + extraLen];
             GrainTypePrefix.GrainServicePrefixBytes.Span.CopyTo(buf);
-            Utf8Formatter.TryFormat(typeCode, buf.AsSpan(GrainTypePrefix.GrainServicePrefix.Length), out _, new StandardFormat('X', 8));
+            Utf8Formatter.TryFormat(typeCode, buf.AsSpan(GrainTypePrefix.GrainServicePrefix.Length), out var len, new StandardFormat('X', 8));
+            Debug.Assert(len == 8);
             if (grainSystemId != null) Encoding.UTF8.GetBytes(grainSystemId, 0, grainSystemId.Length, buf, buf.Length - extraLen);
             return new GrainType(buf);
         }

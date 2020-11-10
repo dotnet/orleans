@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Buffers.Text;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
@@ -175,7 +176,8 @@ namespace Orleans.Runtime
             var prefix = prefixBytes.Span;
             var buf = new byte[prefix.Length + 16];
             prefix.CopyTo(buf);
-            Utf8Formatter.TryFormat(typeCode, buf.AsSpan(prefix.Length), out _, new StandardFormat('X', 16));
+            Utf8Formatter.TryFormat(typeCode, buf.AsSpan(prefix.Length), out var len, new StandardFormat('X', 16));
+            Debug.Assert(len == 16);
             return buf;
         }
 
