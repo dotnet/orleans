@@ -256,8 +256,8 @@ namespace Orleans.ServiceBus.Providers
         protected virtual void InitEventHubClient()
         {
             this.client = ehOptions.TokenCredential != null
-                ? new EventHubProducerClient(ehOptions.FullyQualifiedNamespace, ehOptions.Path, ehOptions.TokenCredential)
-                : new EventHubProducerClient(ehOptions.ConnectionString, ehOptions.Path);
+                ? new EventHubProducerClient(ehOptions.FullyQualifiedNamespace, ehOptions.Path, ehOptions.TokenCredential, new EventHubProducerClientOptions { ConnectionOptions = new EventHubConnectionOptions { TransportType = ehOptions.EventHubsTransportType } })
+                : new EventHubProducerClient(ehOptions.ConnectionString, ehOptions.Path, new EventHubProducerClientOptions { ConnectionOptions = new EventHubConnectionOptions { TransportType = ehOptions.EventHubsTransportType } });
         }
 
         /// <summary>
@@ -268,7 +268,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions eventHubCacheOptions)
         {
-            var eventHubPath = this.ehOptions.Path;
+           var eventHubPath = this.ehOptions.Path;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
             return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, this.SerializationManager, sharedDimensions);
         }
