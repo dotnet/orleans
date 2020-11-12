@@ -79,6 +79,11 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override int GetHashCode() => _hashCode;
 
+        /// <summary>
+        /// Return uniform, stable hash code for IdSpan
+        /// </summary>
+        public uint GetUniformHashCode() => unchecked((uint)_hashCode);
+
         /// <inheritdoc/>
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {

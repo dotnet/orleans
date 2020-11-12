@@ -32,7 +32,7 @@ namespace Orleans.ServiceBus.Providers
     /// <summary>
     /// pass through decorator class for EventHubReceiver
     /// </summary>
-    internal class EventHubReceiverProxy: IEventHubReceiver
+    internal class EventHubReceiverProxy : IEventHubReceiver
     {
         private readonly PartitionReceiver client;
 
@@ -43,6 +43,8 @@ namespace Orleans.ServiceBus.Providers
             {
                 receiverOptions.PrefetchCount = partitionSettings.ReceiverOptions.PrefetchCount.Value;
             }
+
+            receiverOptions.ConnectionOptions = new EventHubConnectionOptions { TransportType = partitionSettings.Hub.EventHubsTransportType };
 
             var options = partitionSettings.Hub;
             this.client = options.TokenCredential != null

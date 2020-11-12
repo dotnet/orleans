@@ -162,11 +162,7 @@ namespace Orleans.Runtime
         /// <summary>Override of object.ToString()</summary>
         public override string ToString()
         {
-            return String.Format("[{0}SystemTarget: {1}{2}{3}]",
-                 IsLowPriority ? "LowPriority" : string.Empty,
-                 Silo,
-                 this.id,
-                 this.ActivationId);
+            return $"[{(IsLowPriority ? "LowPriority" : string.Empty)}SystemTarget: {Silo}/{this.id.ToString()}{this.ActivationId}]";
         }
 
         /// <summary>Adds details about message currently being processed</summary>

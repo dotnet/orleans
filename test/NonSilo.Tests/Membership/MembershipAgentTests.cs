@@ -35,7 +35,12 @@ namespace NonSilo.Tests.Membership
         private readonly IOptions<ClusterMembershipOptions> clusterMembershipOptions;
         private readonly MembershipTableManager manager;
         private readonly ClusterHealthMonitor clusterHealthMonitor;
+        private readonly IRemoteSiloProber remoteSiloProber;
+        private readonly Func<SiloHealthMonitor, SiloHealthMonitor.ProbeResult, Task> onProbeResult;
         private readonly MembershipAgent agent;
+        private readonly ILocalSiloHealthMonitor localSiloHealthMonitor;
+        private readonly IOptionsMonitor<ClusterMembershipOptions> optionsMonitor;
+        private readonly IClusterMembershipService membershipService;
 
         public MembershipAgentTests(ITestOutputHelper output)
         {
@@ -82,24 +87,37 @@ namespace NonSilo.Tests.Membership
                 this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)this.manager).Participate(this.lifecycle);
 
+            this.optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            this.optionsMonitor.CurrentValue.ReturnsForAnyArgs(this.clusterMembershipOptions.Value);
             this.clusterHealthMonitor = new ClusterHealthMonitor(
                 this.localSiloDetails,
                 this.manager,
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
-                this.clusterMembershipOptions,
+                optionsMonitor,
                 this.fatalErrorHandler,
-                null,
-               this.timerFactory);
+                null);
+            ((ILifecycleParticipant<ISiloLifecycle>)this.clusterHealthMonitor).Participate(this.lifecycle);
+
+            this.remoteSiloProber = Substitute.For<IRemoteSiloProber>();
+            remoteSiloProber.Probe(default, default).ReturnsForAnyArgs(Task.CompletedTask);
+
+            this.localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
+            this.localSiloHealthMonitor.GetLocalHealthDegradationScore(default).ReturnsForAnyArgs(0);
+
+            this.onProbeResult = (Func<SiloHealthMonitor, SiloHealthMonitor.ProbeResult, Task>)((siloHealthMonitor, probeResult) => Task.CompletedTask);
 
             this.agent = new MembershipAgent(
                 this.manager,
-                this.clusterHealthMonitor,
                 this.localSiloDetails,
                 this.fatalErrorHandler,
                 this.clusterMembershipOptions,
                 this.loggerFactory.CreateLogger<MembershipAgent>(),
-                this.timerFactory);
+                this.timerFactory,
+                this.remoteSiloProber);
             ((ILifecycleParticipant<ISiloLifecycle>)this.agent).Participate(this.lifecycle);
+
+            this.membershipService = Substitute.For<IClusterMembershipService>();
+            this.membershipService.CurrentSnapshot.ReturnsForAnyArgs(info => this.manager.MembershipTableSnapshot.CreateClusterMembershipSnapshot());
         }
 
         [Fact]
@@ -254,14 +272,22 @@ namespace NonSilo.Tests.Membership
                 Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
             }
 
-            var prober = Substitute.For<IRemoteSiloProber>();
-            prober.Probe(default, default).ReturnsForAnyArgs(Task.CompletedTask);
+            Func<SiloHealthMonitor, SiloHealthMonitor.ProbeResult, Task> onProbeResult = (siloHealthMonitor, probeResult) => Task.CompletedTask;
 
             var clusterHealthMonitorTestAccessor = (ClusterHealthMonitor.ITestAccessor)this.clusterHealthMonitor;
-            clusterHealthMonitorTestAccessor.CreateMonitor = silo => new SiloHealthMonitor(silo, this.loggerFactory, prober);
+            clusterHealthMonitorTestAccessor.CreateMonitor = silo => new SiloHealthMonitor(
+                silo,
+                onProbeResult,
+                this.optionsMonitor,
+                this.loggerFactory,
+                remoteSiloProber,
+                this.timerFactory,
+                this.localSiloHealthMonitor,
+                this.membershipService,
+                this.localSiloDetails);
             var started = this.lifecycle.OnStart();
 
-            await Until(() => prober.ReceivedCalls().Count() < otherSilos.Length);
+            await Until(() => remoteSiloProber.ReceivedCalls().Count() < otherSilos.Length);
             
 
             await Until(() => started.IsCompleted);
@@ -297,18 +323,26 @@ namespace NonSilo.Tests.Membership
                 Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
             }
 
-            var prober = Substitute.For<IRemoteSiloProber>();
-            prober.Probe(default, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
+            this.remoteSiloProber.Probe(default, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
 
             var dateTimeIndex = 0;
             var dateTimes = new DateTime[] { DateTime.UtcNow, DateTime.UtcNow.AddMinutes(8) };
             var membershipAgentTestAccessor = ((MembershipAgent.ITestAccessor)this.agent).GetDateTime = () => dateTimes[dateTimeIndex++];
 
             var clusterHealthMonitorTestAccessor = (ClusterHealthMonitor.ITestAccessor)this.clusterHealthMonitor;
-            clusterHealthMonitorTestAccessor.CreateMonitor = silo => new SiloHealthMonitor(silo, this.loggerFactory, prober);
+            clusterHealthMonitorTestAccessor.CreateMonitor = silo => new SiloHealthMonitor(
+                silo,
+                this.onProbeResult,
+                this.optionsMonitor,
+                this.loggerFactory,
+                this.remoteSiloProber,
+                this.timerFactory,
+                this.localSiloHealthMonitor,
+                this.membershipService,
+                this.localSiloDetails);
             var started = this.lifecycle.OnStart();
 
-            await Until(() => prober.ReceivedCalls().Count() < otherSilos.Length);
+            await Until(() => this.remoteSiloProber.ReceivedCalls().Count() < otherSilos.Length);
             await Until(() => started.IsCompleted);
 
             // Startup should have faulted.

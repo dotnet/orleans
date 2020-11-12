@@ -50,7 +50,7 @@ namespace Orleans
             {
                 this.logger.LogError(
                     (int)ErrorCode.ProxyClient_OGC_TargetNotFound_2,
-                    "Message is not addresses to an observer. {Message}",
+                    "Message is not addressed to an observer. {Message}",
                     message);
                 return;
             }

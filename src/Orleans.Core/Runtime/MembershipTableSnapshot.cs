@@ -72,6 +72,23 @@ namespace Orleans.Runtime
         public MembershipVersion Version { get; }
         public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; }
 
+        public int ActiveNodeCount
+        {
+            get
+            {
+                var count = 0;
+                foreach (var entry in this.Entries)
+                {
+                    if (entry.Value.Status == SiloStatus.Active)
+                    {
+                        ++count;
+                    }
+                }
+
+                return count;
+            }
+        }
+
         public SiloStatus GetSiloStatus(SiloAddress silo)
         {
             var status = this.Entries.TryGetValue(silo, out var entry) ? entry.Status : SiloStatus.None;

@@ -41,7 +41,7 @@ namespace Orleans.Runtime
                     return GetTemplatedName(
                         GetUntemplatedTypeName(type.DeclaringType.Name),
                         type.DeclaringType,
-                        type.GetGenericArguments(),
+                        type.GetGenericArgumentsSafe(),
                         _ => true) + "." + GetUntemplatedTypeName(type.Name);
                 }
 
@@ -99,7 +99,7 @@ namespace Orleans.Runtime
             if (fullName == null)
                 fullName = _ => true; // default to full type names
 
-            if (t.IsGenericType) return GetTemplatedName(GetSimpleTypeName(t, fullName), t, t.GetGenericArguments(), fullName);
+            if (t.IsGenericType) return GetTemplatedName(GetSimpleTypeName(t, fullName), t, t.GetGenericArgumentsSafe(), fullName);
 
             if (t.IsArray)
             {
@@ -122,17 +122,44 @@ namespace Orleans.Runtime
             return s;
         }
 
+        public static Type[] GetGenericArgumentsSafe(this Type type)
+        {
+            var result = type.GetGenericArguments();
+
+            if (type.ContainsGenericParameters)
+            {
+                // Get generic parameter from generic type definition to have consistent naming for inherited interfaces
+                // Example: interface IA<TName>, class A<TOtherName>: IA<OtherName>
+                // in this case generic parameter name of IA interface from class A is OtherName instead of TName.
+                // To avoid this situation use generic parameter from generic type definition.
+                // Matching by position in array, because GenericParameterPosition is number across generic parameters.
+                // For half open generic types (IA<int,T>) T will have position 0.
+                var originalGenericArguments = type.GetGenericTypeDefinition().GetGenericArguments();
+                if (result.Length != originalGenericArguments.Length) // this check may be redunant
+                    return result;
+
+                for (int i = 0; i < result.Length; i++)
+                {
+                    if (result[i].IsGenericParameter)
+                        result[i] = originalGenericArguments[i];
+                }
+            }
+            return result;
+        }
+
         public static string GetGenericTypeArgs(IEnumerable<Type> args, Predicate<Type> fullName)
         {
             string s = string.Empty;
 
             bool first = true;
+
             foreach (var genericParameter in args)
             {
                 if (!first)
                 {
                     s += ",";
                 }
+
                 if (!genericParameter.IsGenericType)
                 {
                     s += GetSimpleTypeName(genericParameter, fullName);
@@ -311,6 +338,7 @@ namespace Orleans.Runtime
         public static string GetFullName(Type t)
         {
             if (t == null) throw new ArgumentNullException(nameof(t));
+
             if (t.IsNested && !t.IsGenericParameter)
             {
                 return t.Namespace + "." + t.DeclaringType.Name + "." + t.Name;
@@ -322,6 +350,11 @@ namespace Orleans.Runtime
                        + new string(',', t.GetArrayRank() - 1)
                        + "]";
             }
+
+            // using of t.FullName breaks interop with core and full .net in one cluster, because
+            // FullName of types from corelib is different.
+            // .net core int: [System.Int32, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]
+            // full .net int: [System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]
             return t.FullName ?? (t.IsGenericParameter ? t.Name : t.Namespace + "." + t.Name);
         }
 

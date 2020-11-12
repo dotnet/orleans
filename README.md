@@ -86,7 +86,7 @@ public class ThermostatGrain : Grain, IThermostat, IThermostatControl
 }
 ```
 
-The grain class above does not persist its state. More thorough example demonstrating state persistence is available in the [documentation](https://dotnet.github.io/orleans/Documentation/grains/grain_persistence/index.html).
+The grain class above does not persist its state. A more thorough example demonstrating state persistence is available in the [documentation](https://dotnet.github.io/orleans/docs/grains/grain_persistence/index.html).
 
 ## Orleans Runtime
 
@@ -102,11 +102,11 @@ Orleans is compatible with .NET Standard 2.0 and above, running on Windows, Linu
 
 ### Persistence
 
-Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is maintained. Grains can have multiple named persistent data objects, for example, one called "profile" for a user's profile and one called "inventory" for their inventory. This state can be stored in any storage system. For example, profile data may be stored in one database and inventory in another. While a grain is running, this state is kept in memory so that read requests can be served without accessing storage. When the grain updates its state, a `state.WriteStateAsync()` call ensures that the backing store is updated for durability and consistency. For more information, see the [Grain Persistence](https://dotnet.github.io/orleans/Documentation/grains/grain_persistence/index.html) documentation.
+Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is maintained. Grains can have multiple named persistent data objects, for example, one called "profile" for a user's profile and one called "inventory" for their inventory. This state can be stored in any storage system. For example, profile data may be stored in one database and inventory in another. While a grain is running, this state is kept in memory so that read requests can be served without accessing storage. When the grain updates its state, a `state.WriteStateAsync()` call ensures that the backing store is updated for durability and consistency. For more information, see the [Grain Persistence](https://dotnet.github.io/orleans/docs/grains/grain_persistence/index.html) documentation.
 
 ### Distributed ACID Transactions
 
-In addition to the simple persistence model described above, grains can have *transactional state*. Multiple grains can participate in [ACID](https://en.wikipedia.org/wiki/ACID) transactions together regardless of where their state is ultimately stored. Transactions in Orleans are distributed and decentralized (there is no central transaction manager or transaction coordinator) and have [serializable isolation](https://en.wikipedia.org/wiki/Isolation_(database_systems)#Isolation_levels). For more information on transactions in Orleans, see the [documentation](https://dotnet.github.io/orleans/Documentation/grains/transactions.html) and the [Microsoft Research technical report](https://www.microsoft.com/en-us/research/publication/transactions-distributed-actors-cloud-2/).
+In addition to the simple persistence model described above, grains can have *transactional state*. Multiple grains can participate in [ACID](https://en.wikipedia.org/wiki/ACID) transactions together regardless of where their state is ultimately stored. Transactions in Orleans are distributed and decentralized (there is no central transaction manager or transaction coordinator) and have [serializable isolation](https://en.wikipedia.org/wiki/Isolation_(database_systems)#Isolation_levels). For more information on transactions in Orleans, see the [documentation](https://dotnet.github.io/orleans/docs/grains/transactions.html) and the [Microsoft Research technical report](https://www.microsoft.com/en-us/research/publication/transactions-distributed-actors-cloud-2/).
 
 ### Streams
 
@@ -116,7 +116,7 @@ Streams are backed by queueing services such as Azure Event Hubs, Amazon Kinesis
 
 ### Timers &amp; Reminders
 
-Reminders are a durable scheduling mechanism for grains. They can be used to ensure that some action is completed at a future point even if the grain is not currently activated at that time. Timers are the non-durable counterpart to reminders and can be used for high-frequency events which do not require reliability. For more information, see the [Timers and Reminders](https://dotnet.github.io/orleans/Documentation/grains/timers_and_reminders.html) documentation.
+Reminders are a durable scheduling mechanism for grains. They can be used to ensure that some action is completed at a future point even if the grain is not currently activated at that time. Timers are the non-durable counterpart to reminders and can be used for high-frequency events which do not require reliability. For more information, see the [Timers and Reminders](https://dotnet.github.io/orleans/docs/grains/timers_and_reminders.html) documentation.
 
 ### Flexible Grain Placement
 
@@ -124,7 +124,7 @@ When a grain is activated in Orleans, the runtime decides which server (silo) to
 
 ### Grain Versioning &amp; Heterogeneous Clusters
 
-Application code evolves over time and upgrading live, production systems in a manner which safely accounts for these changes can be challenging, particularly in stateful systems. Grain interfaces in Orleans can be optionally versioned. The cluster maintains a mapping of which grain implementations are available on which silos in the cluster and the versions of those implementations. This version information is used by the runtime in conjunction with placement strategies to make placement decisions when routing calls to grains. In addition to safe update of versioned grains, this also enables heterogeneous clusters, where different silos have different sets of grain implementations available. For more information, see the [Grain Versioning](https://dotnet.github.io/orleans/Documentation/deployment/grain_versioning/grain_versioning.html) documentation.
+Application code evolves over time and upgrading live, production systems in a manner which safely accounts for these changes can be challenging, particularly in stateful systems. Grain interfaces in Orleans can be optionally versioned. The cluster maintains a mapping of which grain implementations are available on which silos in the cluster and the versions of those implementations. This version information is used by the runtime in conjunction with placement strategies to make placement decisions when routing calls to grains. In addition to safe update of versioned grains, this also enables heterogeneous clusters, where different silos have different sets of grain implementations available. For more information, see the [Grain Versioning](https://dotnet.github.io/orleans/docs/grains/grain_versioning/grain_versioning.html) documentation.
 
 ### Elastic Scalability &amp; Fault Tolerance
 
@@ -136,23 +136,23 @@ Orleans runs anywhere that .NET Core or .NET Framework are supported. This inclu
 
 ### Stateless Workers
 
-Stateless workers are specially marked grains which do not have any associated state and can be activated on multiple silos simultaneously. This enables increased parallelism for stateless functions. For more information, see the [Stateless Worker Grains](https://dotnet.github.io/orleans/Documentation/grains/stateless_worker_grains.html) documentation.
+Stateless workers are specially marked grains which do not have any associated state and can be activated on multiple silos simultaneously. This enables increased parallelism for stateless functions. For more information, see the [Stateless Worker Grains](https://dotnet.github.io/orleans/docs/grains/stateless_worker_grains.html) documentation.
 
 ### Grain Call Filters
 
-Logic which is common to many grains can be expressed as [Grain Call Filters](https://dotnet.github.io/orleans/Documentation/grains/interceptors.html). Orleans supports filters for both incoming and outgoing calls. Some common use-cases of filters are: authorization, logging and telemetry, and error handling.
+Logic which is common to many grains can be expressed as [Grain Call Filters](https://dotnet.github.io/orleans/docs/grains/interceptors.html). Orleans supports filters for both incoming and outgoing calls. Some common use-cases of filters are: authorization, logging and telemetry, and error handling.
 
 ### Request Context
 
-Metadata and other information can be passed along a series of requests using [request context](https://dotnet.github.io/orleans/Documentation/grains/request_context.html). Request context can be used for holding distributed tracing information or any other user-defined values.
+Metadata and other information can be passed along a series of requests using [request context](https://dotnet.github.io/orleans/docs/grains/request_context.html). Request context can be used for holding distributed tracing information or any other user-defined values.
 
 ## Documentation
 
-Documentation is located [here](https://dotnet.github.io/orleans/Documentation/)
+Documentation is located [here](https://dotnet.github.io/orleans/docs/)
 
 ## Getting Started
 
-Please see the [getting started tutorial](https://dotnet.github.io/orleans/Documentation/tutorials_and_samples/tutorial_1.html).
+Please see the [getting started tutorial](https://dotnet.github.io/orleans/docs/tutorials_and_samples/tutorial_1.html).
 
 ### Building
 
@@ -165,7 +165,7 @@ On Linux and macOS, run the `build.sh` script or `dotnet build` to build Orleans
 
 The latest stable, production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
 
-Nightly builds are published to https://dotnet.myget.org/gallery/orleans-ci. These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds published to NuGet.
+Nightly builds are published to [a NuGet feed](https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json). These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds published to NuGet.
 
 <details>
 <summary>
@@ -179,7 +179,7 @@ To use nightly builds in your project, add the MyGet feed using either of the fo
 ```xml
   <RestoreSources>
     $(RestoreSources);
-    https://dotnet.myget.org/F/orleans-ci/api/v3/index.json;
+    https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json;
   </RestoreSources>
 ```
 
@@ -192,7 +192,7 @@ or
 <configuration>
  <packageSources>
   <clear />
-  <add key="orleans-ci" value="https://dotnet.myget.org/F/orleans-ci/api/v3/index.json" />
+  <add key="orleans-ci" value="https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json" />
   <add key="nuget" value="https://api.nuget.org/v3/index.json" />
  </packageSources>
 </configuration>
@@ -206,7 +206,7 @@ or
 * [Orleans Blog](https://dotnet.github.io/orleans/blog/)
 * Follow the [@msftorleans](https://twitter.com/msftorleans) Twitter account for Orleans announcements.
 * [OrleansContrib - GitHub organization for community add-ons to Orleans](https://github.com/OrleansContrib/) Various community projects, including Monitoring, Design Patterns, Storage Providers, etc.
-* Guidelines for developers wanting to [contribute code changes to Orleans](http://dotnet.github.io/orleans/Community/Contributing.html).
+* Guidelines for developers wanting to [contribute code changes to Orleans](https://dotnet.github.io/orleans/docs/resources/contributing.html).
 * You are also encouraged to report bugs or start a technical discussion by starting a new [thread](https://github.com/dotnet/orleans/issues) on GitHub.
 
 ## License
@@ -218,4 +218,4 @@ This project is licensed under the [MIT license](https://github.com/dotnet/orlea
 * [Microsoft Research project home](http://research.microsoft.com/projects/orleans/)
 * Technical Report: [Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/apps/pubs/default.aspx?id=210931)
 * [Orleans Documentation](http://dotnet.github.io/orleans/)
-* [Contributing](http://dotnet.github.io/orleans/Community/Contributing.html)
+* [Contributing](https://dotnet.github.io/orleans/docs/resources/contributing.html)
