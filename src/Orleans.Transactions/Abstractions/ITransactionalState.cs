@@ -26,6 +26,10 @@ namespace Orleans.Transactions.Abstractions
         /// <param name="updateFunction">A function that can read and update the state, and return a result</param>
         Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateFunction);
 
+        /// <summary>
+        /// Clears the date
+        /// </summary>
+        /// <typeparam name="TResult">The type of the state</typeparam>
         Task PerformDelete<TResult>();
     }
 }

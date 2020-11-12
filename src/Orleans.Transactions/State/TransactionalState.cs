@@ -237,7 +237,7 @@ namespace Orleans.Transactions
         {
             if (detectReentrancy)
             {
-                throw new LockRecursionException("cannot perform an update operation from within another operation");
+                throw new LockRecursionException("cannot perform an delete operation from within another operation");
             }
 
             var info = TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
