@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Threading.Tasks;
 
@@ -25,5 +25,7 @@ namespace Orleans.Transactions.Abstractions
         /// <typeparam name="TResult">The type of the return value</typeparam>
         /// <param name="updateFunction">A function that can read and update the state, and return a result</param>
         Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateFunction);
+
+        Task PerformDelete<TResult>();
     }
 }

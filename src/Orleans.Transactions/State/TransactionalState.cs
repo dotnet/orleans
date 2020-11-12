@@ -232,5 +232,73 @@ namespace Orleans.Transactions
             }
             return resultCopier.DeepCopy(result);
         }
+
+        public async Task PerformDelete<TResult>()
+        {
+            if (detectReentrancy)
+            {
+                throw new LockRecursionException("cannot perform an update operation from within another operation");
+            }
+
+            var info = TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
+
+            if (logger.IsEnabled(LogLevel.Trace))
+                logger.Trace($"StartWrite {info}");
+
+            if (info.IsReadOnly)
+            {
+                throw new OrleansReadOnlyViolatedException(info.Id);
+            }
+
+            info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
+
+            await this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, false,
+                () =>
+                {
+                    // check if we expired while waiting
+                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<TState> record))
+                    {
+                        throw new OrleansCascadingAbortException(info.TransactionId.ToString());
+                    }
+
+                    // merge the current clock into the transaction time stamp
+                    record.Timestamp = this.queue.Clock.MergeUtcNow(info.TimeStamp);
+
+                    // link to the latest state
+                    if (record.State == null)
+                    {
+                        this.queue.GetMostRecentState(out record.State, out record.SequenceNumber);
+                    }
+
+                    // if this is the first write, make a deep copy of the state
+                    if (!record.HasCopiedState)
+                    {
+                        // There is nothing to do if this record has never been written
+                        return;
+                    }
+
+                    if (logger.IsEnabled(LogLevel.Debug))
+                        logger.Debug($"update-lock write v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
+
+                    // record this write in the transaction info data structure
+                    info.RecordWrite(this.participantId, record.Timestamp);
+
+                    // perform the write
+                    try
+                    {
+                        detectReentrancy = true;
+
+                        return CopyResult<TResult>(default);
+                    }
+                    finally
+                    {
+                        if (logger.IsEnabled(LogLevel.Trace))
+                            logger.Trace($"EndWrite {info} {record.TransactionId} {record.Timestamp}");
+
+                        detectReentrancy = false;
+                    }
+                }
+            );
+        }
     }
 }

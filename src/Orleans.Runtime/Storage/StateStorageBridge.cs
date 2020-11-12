@@ -94,7 +94,12 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext();
 
                 Stopwatch sw = Stopwatch.StartNew();
-                await store.WriteStateAsync(name, grainRef, grainState);
+
+                if (grainState != null)
+                    await store.WriteStateAsync(name, grainRef, grainState);
+                else
+                    await store.ClearStateAsync(name, grainRef, grainState);
+
                 sw.Stop();
                 StorageStatisticsGroup.OnStorageWrite(name, grainRef, sw.Elapsed);
             }
