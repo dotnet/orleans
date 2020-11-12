@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -98,5 +98,7 @@ namespace Orleans.Transactions.TestKit
         {
             return this.txState.PerformUpdate(updateFunction);
         }
+
+        public Task PerformDelete<TResult>() => this.txState.PerformDelete<TResult>();
     }
 }

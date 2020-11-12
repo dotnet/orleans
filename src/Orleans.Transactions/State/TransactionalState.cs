@@ -274,7 +274,7 @@ namespace Orleans.Transactions
                     if (!record.HasCopiedState)
                     {
                         // There is nothing to do if this record has never been written
-                        return;
+                        return default;
                     }
 
                     if (logger.IsEnabled(LogLevel.Debug))
