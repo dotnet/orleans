@@ -35,7 +35,20 @@ namespace Orleans.Runtime
             this.fatalErrorHandler = fatalErrorHandler;
         }
 
-        public ClusterMembershipSnapshot CurrentSnapshot => this.snapshot;
+        public ClusterMembershipSnapshot CurrentSnapshot
+        {
+            get
+            {
+                var tableSnapshot = this.membershipTableManager.MembershipTableSnapshot;
+                if (this.snapshot.Version == tableSnapshot.Version)
+                {
+                    return this.snapshot;
+                }
+
+                this.updates.TryPublish(tableSnapshot.CreateClusterMembershipSnapshot());
+                return this.snapshot;
+            }
+        }
 
         public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => this.updates;
 
