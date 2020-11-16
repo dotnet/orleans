@@ -47,8 +47,9 @@ namespace NonSilo.Tests.General
         public void Generic_InterfaceId_Test()
         {
             var expected = GrainInterfaceUtils.GetGrainInterfaceId(typeof(ISimpleGenericGrain<>));
-            IDictionary<int, Type> actual = GrainInterfaceUtils.GetRemoteInterfaces(typeof(SimpleGenericGrain<>));
-            Assert.Contains(expected, actual);
+            var actual = GrainInterfaceUtils.GetRemoteInterfaces(typeof(SimpleGenericGrain<>));
+            Assert.Single(actual);
+            Assert.Equal(expected, GrainInterfaceUtils.GetGrainInterfaceId(actual[0]));
         }
 
         [Theory]

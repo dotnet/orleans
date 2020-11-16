@@ -5,7 +5,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Options for formatting type names.
     /// </summary>
-    public class TypeFormattingOptions : IEquatable<TypeFormattingOptions>
+    public sealed class TypeFormattingOptions : IEquatable<TypeFormattingOptions>
     {
         /// <summary>Initializes a new instance of <see cref="TypeFormattingOptions"/>.</summary>
         public TypeFormattingOptions(
@@ -31,32 +31,32 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets a value indicating whether or not to include the fully-qualified namespace of the class in the result.
         /// </summary>
-        public bool IncludeNamespace { get; private set; }
+        public bool IncludeNamespace { get; }
 
         /// <summary>
         /// Gets a value indicating whether or not to include concrete type parameters in the result.
         /// </summary>
-        public bool IncludeTypeParameters { get; private set; }
+        public bool IncludeTypeParameters { get; }
 
         /// <summary>
         /// Gets a value indicating whether or not to include generic type parameters in the result.
         /// </summary>
-        public bool IncludeGenericTypeParameters { get; private set; }
+        public bool IncludeGenericTypeParameters { get; }
 
         /// <summary>
         /// Gets the separator used between declaring types and their declared types.
         /// </summary>
-        public char NestedTypeSeparator { get; private set; }
+        public char NestedTypeSeparator { get; }
 
         /// <summary>
         /// Gets the name to append to the formatted name, before any type parameters.
         /// </summary>
-        public string NameSuffix { get; private set; }
+        public string NameSuffix { get; }
 
         /// <summary>
         /// Gets a value indicating whether or not to include the global namespace qualifier.
         /// </summary>
-        public bool IncludeGlobal { get; private set; }
+        public bool IncludeGlobal { get; }
 
         /// <summary>
         /// Indicates whether the current object is equal to another object of the same type.
@@ -67,7 +67,7 @@ namespace Orleans.Runtime
         /// </returns>
         public bool Equals(TypeFormattingOptions other)
         {
-            if (ReferenceEquals(null, other))
+            if (other is null)
             {
                 return false;
             }
@@ -89,22 +89,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if the specified object  is equal to the current object; otherwise, <see langword="false"/>.
         /// </returns>
-        public override bool Equals(object obj)
-        {
-            if (ReferenceEquals(null, obj))
-            {
-                return false;
-            }
-            if (ReferenceEquals(this, obj))
-            {
-                return true;
-            }
-            if (obj.GetType() != this.GetType())
-            {
-                return false;
-            }
-            return Equals((TypeFormattingOptions)obj);
-        }
+        public override bool Equals(object obj) => Equals(obj as TypeFormattingOptions);
 
         /// <summary>
         /// Serves as a hash function for a particular type. 
@@ -127,15 +112,9 @@ namespace Orleans.Runtime
         }
 
         /// <summary>Determines whether the specified objects are equal.</summary>
-        public static bool operator ==(TypeFormattingOptions left, TypeFormattingOptions right)
-        {
-            return Equals(left, right);
-        }
+        public static bool operator ==(TypeFormattingOptions left, TypeFormattingOptions right) => left?.Equals(right) ?? right is null;
 
         /// <summary>Determines whether the specified objects are not equal.</summary>
-        public static bool operator !=(TypeFormattingOptions left, TypeFormattingOptions right)
-        {
-            return !Equals(left, right);
-        }
+        public static bool operator !=(TypeFormattingOptions left, TypeFormattingOptions right) => !(left == right);
     }
 }

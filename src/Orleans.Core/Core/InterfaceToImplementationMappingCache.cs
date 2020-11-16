@@ -11,7 +11,7 @@ namespace Orleans
     /// </summary>
     internal class InterfaceToImplementationMappingCache
     {
-        public struct Entry
+        public readonly struct Entry
         {
             public Entry(MethodInfo implementationMethod, MethodInfo interfaceMethod)
             {
@@ -62,7 +62,6 @@ namespace Orleans
         /// <returns>The mapped interface.</returns>
         private static Dictionary<Type, Dictionary<int, Entry>> CreateInterfaceToImplementationMap(Type implementationType)
         {
-            var name = implementationType.Name;
             if (implementationType.IsConstructedGenericType) return CreateMapForConstructedGeneric(implementationType);
             return CreateMapForNonGeneric(implementationType);
         }

@@ -16,10 +16,10 @@ namespace Orleans.Streams
                 case "*":
                     predicate = new AllStreamNamespacesPredicate();
                     return true;
-                case var regex when regex.StartsWith(RegexStreamNamespacePredicate.Prefix):
+                case var regex when regex.StartsWith(RegexStreamNamespacePredicate.Prefix, StringComparison.Ordinal):
                     predicate = new RegexStreamNamespacePredicate(regex.Substring(RegexStreamNamespacePredicate.Prefix.Length));
                     return true;
-                case var ns when ns.StartsWith(ExactMatchStreamNamespacePredicate.Prefix):
+                case var ns when ns.StartsWith(ExactMatchStreamNamespacePredicate.Prefix, StringComparison.Ordinal):
                     predicate = new ExactMatchStreamNamespacePredicate(ns.Substring(ExactMatchStreamNamespacePredicate.Prefix.Length));
                     return true;
             }
@@ -52,7 +52,7 @@ namespace Orleans.Streams
         /// <inheritdoc/>
         public bool TryGetPredicate(string predicatePattern, out IStreamNamespacePredicate predicate)
         {
-            if (!predicatePattern.StartsWith(Prefix))
+            if (!predicatePattern.StartsWith(Prefix, StringComparison.Ordinal))
             {
                 predicate = null;
                 return false;

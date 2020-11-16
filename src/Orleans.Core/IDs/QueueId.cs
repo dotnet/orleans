@@ -10,10 +10,9 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [Immutable]
-    public class QueueId : IRingIdentifier<QueueId>, IEquatable<QueueId>, IComparable<QueueId>
+    public sealed class QueueId : IRingIdentifier<QueueId>, IEquatable<QueueId>, IComparable<QueueId>
     {
-        private static readonly Lazy<Interner<QueueId, QueueId>> queueIdInternCache = new Lazy<Interner<QueueId, QueueId>>(
-                    () => new Interner<QueueId, QueueId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq));
+        private static readonly Interner<QueueId, QueueId> queueIdInternCache = new Interner<QueueId, QueueId>(InternerConstants.SIZE_LARGE);
 
         private readonly string queueNamePrefix;
         private readonly uint queueId;
@@ -29,13 +28,8 @@ namespace Orleans.Streams
 
         public static QueueId GetQueueId(string queueName, uint queueId, uint hash)
         {
-            return FindOrCreateQueueId(queueName, queueId, hash);
-        }
-
-        private static QueueId FindOrCreateQueueId(string queuePrefix, uint id, uint hash)
-        {
-            var key = new QueueId(queuePrefix, id, hash);
-            return queueIdInternCache.Value.FindOrCreate(key, k => k);
+            var key = new QueueId(queueName, queueId, hash);
+            return queueIdInternCache.Intern(key, key);
         }
 
         public string GetStringNamePrefix()
@@ -55,20 +49,20 @@ namespace Orleans.Streams
 
         public int CompareTo(QueueId other)
         {
-            int cmp = queueId.CompareTo(other.queueId);
-            if (cmp != 0) return cmp;
+            if (queueId != other.queueId)
+                return queueId.CompareTo(other.queueId);
 
-            cmp = String.Compare(queueNamePrefix, other.queueNamePrefix, StringComparison.Ordinal);
+            var cmp = string.CompareOrdinal(queueNamePrefix, other.queueNamePrefix);
             if (cmp != 0) return cmp;
                 
             return uniformHashCache.CompareTo(other.uniformHashCache);
         }
 
-        public virtual bool Equals(QueueId other)
+        public bool Equals(QueueId other)
         {
             return other != null 
                 && queueId == other.queueId 
-                && String.Equals(queueNamePrefix, other.queueNamePrefix, StringComparison.Ordinal) 
+                && queueNamePrefix == other.queueNamePrefix
                 && uniformHashCache == other.uniformHashCache;
         }
 
@@ -84,12 +78,12 @@ namespace Orleans.Streams
 
         public override string ToString()
         {
-            return String.Format("{0}-{1}", (queueNamePrefix !=null ? queueNamePrefix.ToLower() : String.Empty), queueId.ToString());
+            return $"{queueNamePrefix?.ToLowerInvariant()}-{queueId.ToString()}";
         }
 
         public string ToStringWithHashCode()
         {
-            return String.Format("{0}-0x{1, 8:X8}", this.ToString(), this.GetUniformHashCode());
+            return $"{queueNamePrefix?.ToLowerInvariant()}-{queueId.ToString()}-0x{GetUniformHashCode().ToString("X8")}";
         }
     }
 }

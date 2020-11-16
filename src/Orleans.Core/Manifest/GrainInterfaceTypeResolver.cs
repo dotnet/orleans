@@ -53,15 +53,14 @@ namespace Orleans.Metadata
 
         public GrainInterfaceType GetGrainInterfaceTypeByConvention(Type type)
         {
-            var result = GrainInterfaceType.Create(_typeConverter.Format(type, DropOuterAssemblyQualification));
+            var result = GrainInterfaceType.Create(_typeConverter.Format(type, input => input switch
+            {
+                AssemblyQualifiedTypeSpec asm => asm.Type, // drop outer assembly qualification
+                _ => input
+            }));
+
             result = AddGenericParameters(result, type);
             return result;
-
-            static TypeSpec DropOuterAssemblyQualification(TypeSpec input) => input switch
-            {
-                AssemblyQualifiedTypeSpec asm => asm.Type,
-                _ => input
-            };
         }
 
         private GrainInterfaceType AddGenericParameters(GrainInterfaceType result, Type type)

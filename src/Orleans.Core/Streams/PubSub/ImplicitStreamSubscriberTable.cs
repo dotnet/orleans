@@ -187,7 +187,7 @@ namespace Orleans.Streams
 
             // Tailing 8 bytes of the guid are from the hash of the streamId Guid and a hash of the provider name.
             // get streamId guid hash code
-            uint streamIdGuidHash = JenkinsHash.ComputeHash(streamId.StreamId.Key.ToArray());
+            uint streamIdGuidHash = JenkinsHash.ComputeHash(streamId.StreamId.Key.Span);
             // get provider name hash code
             uint providerHash = JenkinsHash.ComputeHash(streamId.ProviderName);
 

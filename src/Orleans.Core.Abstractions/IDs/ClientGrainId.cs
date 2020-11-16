@@ -21,7 +21,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="ClientGrainId"/> instance.
         /// </summary>
-        public static ClientGrainId Create() => Create(Guid.NewGuid().ToString("N"));
+        public static ClientGrainId Create() => Create(GrainIdKeyExtensions.CreateGuidKey(Guid.NewGuid()));
 
         /// <summary>
         /// Creates a new <see cref="ClientGrainId"/> instance.
@@ -31,7 +31,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="ClientGrainId"/> instance.
         /// </summary>
-        public static ClientGrainId Create(IdSpan id) => new ClientGrainId(GrainId.Create(GrainTypePrefix.ClientGrainType, id));
+        public static ClientGrainId Create(IdSpan id) => new ClientGrainId(new GrainId(GrainTypePrefix.ClientGrainType, id));
 
         /// <summary>
         /// Converts the provided <see cref="GrainId"/> to a <see cref="ClientGrainId"/>. A return value indicates whether the operation succeeded.
@@ -45,12 +45,11 @@ namespace Orleans.Runtime
             }
 
             // Strip the observer id, if present.
-            var key = grainId.Key.ToStringUtf8();
-            if (key.IndexOf(ObserverGrainId.SegmentSeparator) is int index && index >= 0)
+            var key = grainId.Key.AsSpan();
+            if (key.IndexOf((byte)ObserverGrainId.SegmentSeparator) is int index && index >= 0)
             {
-                key = key.Substring(0, index);
-                clientId = new ClientGrainId(GrainId.Create(grainId.Type, IdSpan.Create(key)));
-                return true;
+                key = key.Slice(0, index);
+                grainId = new GrainId(grainId.Type, new IdSpan(key.ToArray()));
             }
 
             clientId = new ClientGrainId(grainId);

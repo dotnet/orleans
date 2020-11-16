@@ -1,11 +1,12 @@
 using System;
+using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Uniquely identifies a grain interface.
     /// </summary>
-    [Serializable]
+    [Serializable, Immutable]
     public readonly struct GrainInterfaceType : IEquatable<GrainInterfaceType>
     {
         private readonly IdSpan _value;
@@ -46,7 +47,7 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override string ToString() => _value.ToStringUtf8();
 
-        public string ToStringUtf8() => _value.ToString();
+        public string ToStringUtf8() => _value.ToStringUtf8();
 
         public static bool operator ==(GrainInterfaceType left, GrainInterfaceType right) => left.Equals(right);
         public static bool operator !=(GrainInterfaceType left, GrainInterfaceType right) => !left.Equals(right);

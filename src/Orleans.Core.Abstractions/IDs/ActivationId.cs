@@ -1,28 +1,22 @@
 using System;
 using System.Runtime.Serialization;
+using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
-    [Serializable]
-    public class ActivationId : IEquatable<ActivationId>
+    [Serializable, Immutable]
+    public sealed class ActivationId : IEquatable<ActivationId>
     {
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         [DataMember]
-        protected readonly internal UniqueKey Key;
+        internal readonly UniqueKey Key;
 
         public bool IsSystem { get { return Key.IsSystemTargetKey; } }
 
-        public static readonly ActivationId Zero;
+        private static readonly Interner<UniqueKey, ActivationId> legacyKeyInterner = new Interner<UniqueKey, ActivationId>(InternerConstants.SIZE_LARGE);
+        private static readonly Interner<GrainId, ActivationId> interner = new Interner<GrainId, ActivationId>(InternerConstants.SIZE_LARGE);
 
-        private static readonly Interner<UniqueKey, ActivationId> legacyKeyInterner;
-        private static readonly Interner<GrainId, ActivationId> interner;
-
-        static ActivationId()
-        {
-            legacyKeyInterner = new Interner<UniqueKey, ActivationId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq);
-            interner = new Interner<GrainId, ActivationId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq);
-            Zero = FindOrCreate(UniqueKey.Empty);
-        }
+        public static readonly ActivationId Zero = GetActivationId(UniqueKey.Empty);
 
         /// <summary>
         /// Only used in Json serialization
@@ -40,7 +34,7 @@ namespace Orleans.Runtime
 
         public static ActivationId NewId()
         {
-            return FindOrCreate(UniqueKey.NewKey());
+            return GetActivationId(UniqueKey.NewKey());
         }
 
         // No need to encode SiloAddress in the activation address for system target. 
@@ -48,23 +42,16 @@ namespace Orleans.Runtime
         // Need to remove it all together. For now, just use grain id as activation id.
         public static ActivationId GetDeterministic(GrainId grain)
         {
-            return interner.FindOrCreate(grain, CreateActivationId);
-
-            static ActivationId CreateActivationId(GrainId grainId)
+            return interner.FindOrCreate(grain, grainId =>
             {
                 var a = (ulong)grainId.Type.GetHashCode();
                 var b = (ulong)grainId.Key.GetHashCode();
                 var key = UniqueKey.NewKey(a, b, UniqueKey.Category.KeyExtGrain, typeData: 0, keyExt: grainId.ToString());
                 return new ActivationId(key);
-            }
+            });
         }
 
         internal static ActivationId GetActivationId(UniqueKey key)
-        {
-            return FindOrCreate(key);
-        }
-
-        private static ActivationId FindOrCreate(UniqueKey key)
         {
             return legacyKeyInterner.FindOrCreate(key, k => new ActivationId(k));
         }
@@ -87,14 +74,14 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            string idString = Key.ToString().Substring(24, 8);
-            return String.Format("@{0}{1}", IsSystem ? "S" : "", idString);
+            string idString = ((uint)Key.N1).ToString("x8");
+            return (IsSystem ? "@S" : "@") + idString;
         }
 
         public string ToFullString()
         {
-            string idString = Key.ToString();
-            return String.Format("@{0}{1}", IsSystem ? "S" : "", idString);
+            string idString = Key.ToHexString();
+            return (IsSystem ? "@S" : "@") + idString;
         }
     }
 }

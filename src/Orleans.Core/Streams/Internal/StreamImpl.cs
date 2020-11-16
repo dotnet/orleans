@@ -10,7 +10,7 @@ namespace Orleans.Streams
 {
     [Serializable]
     [Immutable]
-    internal class StreamImpl<T> : IAsyncStream<T>, IStreamControl, ISerializable, IOnDeserialized
+    internal sealed class StreamImpl<T> : IAsyncStream<T>, IStreamControl, ISerializable, IOnDeserialized
     {
         private readonly InternalStreamId                       streamId;
         private readonly bool                                   isRewindable;
@@ -180,7 +180,7 @@ namespace Orleans.Streams
             return o == null ? 1 : streamId.CompareTo(o.streamId);
         }
 
-        public virtual bool Equals(IAsyncStream<T> other)
+        public bool Equals(IAsyncStream<T> other)
         {
             var o = other as StreamImpl<T>;
             return o != null && streamId.Equals(o.streamId);
@@ -210,7 +210,7 @@ namespace Orleans.Streams
         }
 
         // The special constructor is used to deserialize values. 
-        protected StreamImpl(SerializationInfo info, StreamingContext context)
+        private StreamImpl(SerializationInfo info, StreamingContext context)
         {
             // Reset the property value using the GetValue method.
             streamId = (InternalStreamId)info.GetValue("StreamId", typeof(InternalStreamId));

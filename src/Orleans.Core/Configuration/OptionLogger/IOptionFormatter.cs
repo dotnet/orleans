@@ -38,7 +38,6 @@ namespace Orleans
     public static class OptionFormattingUtilities
     {
         private const string DefaultFormatFormatting = "{0}: {1}";
-        private const string DefaultUnnamedFormatting = "{0}";
         private const string DefaultNamedFormatting = "{0}-{1}";
 
         /// <summary>
@@ -52,8 +51,8 @@ namespace Orleans
 
         public static string Name<TOptions>(string name = null, string formatting = null)
         {
-            var valueFormat = formatting ?? ((name == null) ? DefaultUnnamedFormatting : DefaultNamedFormatting);
-            return string.Format(valueFormat, typeof(TOptions).FullName, name);
+            return name is null && formatting is null ? typeof(TOptions).FullName
+                : string.Format(formatting ?? DefaultNamedFormatting, typeof(TOptions).FullName, name);
         }
     }
 }

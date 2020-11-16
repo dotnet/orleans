@@ -1,10 +1,12 @@
 using System;
+using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Represents a <see cref="GrainType"/> that is parameterized using type parameters.
     /// </summary>
+    [Immutable]
     public readonly struct GenericGrainType : IEquatable<GenericGrainType>
     {
         private GenericGrainType(GrainType grainType)
@@ -20,14 +22,14 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns <see langword="true" /> if this instance contains concrete type parameters.
         /// </summary>
-        public bool IsConstructed => TypeConverterExtensions.IsConstructed(this.GrainType.ToStringUtf8());
+        public bool IsConstructed => TypeConverterExtensions.IsConstructed(this.GrainType.Value);
 
         /// <summary>
         /// Returns the generic grain type corresponding to the provided value.
         /// </summary>
         public static bool TryParse(GrainType grainType, out GenericGrainType result)
         {
-            if (TypeConverterExtensions.IsGenericType(grainType.ToStringUtf8()))
+            if (TypeConverterExtensions.IsGenericType(grainType.Value))
             {
                 result = new GenericGrainType(grainType);
                 return true;
@@ -42,9 +44,8 @@ namespace Orleans.Runtime
         /// </summary>
         public GenericGrainType GetUnconstructedGrainType()
         {
-            var str = this.GrainType.ToStringUtf8();
-            var generic = TypeConverterExtensions.GetDeconstructed(str);
-            return new GenericGrainType(GrainType.Create(generic));
+            var generic = TypeConverterExtensions.GetDeconstructed(GrainType.Value);
+            return new GenericGrainType(new GrainType(generic));
         }
 
         /// <summary>
@@ -52,13 +53,13 @@ namespace Orleans.Runtime
         /// </summary>
         public GenericGrainType Construct(TypeConverter formatter, params Type[] typeArguments)
         {
-            var constructed = formatter.GetConstructed(this.GrainType.ToStringUtf8(), typeArguments);
-            return new GenericGrainType(GrainType.Create(constructed));
+            var constructed = formatter.GetConstructed(this.GrainType.Value, typeArguments);
+            return new GenericGrainType(new GrainType(constructed));
         }
         /// <summary>
         /// Returns the type arguments which this instance was constructed with.
         /// </summary>
-        public Type[] GetArguments(TypeConverter formatter) => formatter.GetArguments(this.GrainType.ToStringUtf8());
+        public Type[] GetArguments(TypeConverter formatter) => formatter.GetArguments(this.GrainType.Value);
 
         /// <inheritdoc/>
         public override string ToString() => this.GrainType.ToString();

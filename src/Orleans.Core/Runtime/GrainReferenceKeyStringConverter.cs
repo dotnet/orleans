@@ -20,9 +20,10 @@ namespace Orleans.Runtime
         /// </summary>
         public GrainReference FromKeyString(string referenceString)
         {
-            var splits = referenceString.Split('_');
-            var type = new GrainType(Convert.FromBase64String(splits[0]));
-            var key = new IdSpan(Convert.FromBase64String(splits[1]));
+            var i = referenceString.IndexOf('_');
+            if (i < 0) throw new ArgumentException(nameof(referenceString));
+            var type = new GrainType(Convert.FromBase64String(referenceString.Substring(0, i)));
+            var key = new IdSpan(Convert.FromBase64String(referenceString.Substring(i + 1)));
             var id = new GrainId(type, key);
             return _activator.CreateReference(id, default);
         }

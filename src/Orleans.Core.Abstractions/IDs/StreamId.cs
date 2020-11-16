@@ -1,4 +1,6 @@
 using System;
+using System.Buffers.Text;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
@@ -15,32 +17,33 @@ namespace Orleans.Runtime
     [StructLayout(LayoutKind.Auto)]
     public readonly struct StreamId : IEquatable<StreamId>, IComparable<StreamId>, ISerializable
     {
+        private readonly byte[] fullKey;
         private readonly ushort keyIndex;
         private readonly int hash;
 
-        public ReadOnlyMemory<byte> FullKey { get; }
+        public ReadOnlyMemory<byte> FullKey => fullKey;
 
-        public ReadOnlyMemory<byte> Namespace => FullKey.Slice(0, this.keyIndex);
+        public ReadOnlyMemory<byte> Namespace => fullKey.AsMemory(0, this.keyIndex);
 
-        public ReadOnlyMemory<byte> Key => FullKey.Slice(this.keyIndex, FullKey.Length - this.keyIndex);
+        public ReadOnlyMemory<byte> Key => fullKey.AsMemory(this.keyIndex);
 
-        internal StreamId(Memory<byte> fullKey, ushort keyIndex, int hash)
+        private StreamId(byte[] fullKey, ushort keyIndex, int hash)
         {
-            FullKey = fullKey;
+            this.fullKey = fullKey;
             this.keyIndex = keyIndex;
             this.hash = hash;
         }
 
-        internal StreamId(Memory<byte> fullKey, ushort keyIndex)
-            : this(fullKey, keyIndex, (int) JenkinsHash.ComputeHash(fullKey.ToArray()))
+        internal StreamId(byte[] fullKey, ushort keyIndex)
+            : this(fullKey, keyIndex, (int) JenkinsHash.ComputeHash(fullKey))
         {
         }
 
         private StreamId(SerializationInfo info, StreamingContext context)
         {
-            FullKey = new Memory<byte>((byte[]) info.GetValue("fk", typeof(byte[])));
-            this.keyIndex = (ushort) info.GetValue("ki", typeof(ushort));
-            this.hash = (int) info.GetValue("fh", typeof(int));
+            fullKey = (byte[]) info.GetValue("fk", typeof(byte[]));
+            this.keyIndex = info.GetUInt16("ki");
+            this.hash = info.GetInt32("fh");
         }
 
 
@@ -52,27 +55,54 @@ namespace Orleans.Runtime
             if (ns != null)
             {
                 var fullKeysBytes = new byte[ns.Length + key.Length];
-                Array.Copy(ns, 0, fullKeysBytes, 0, ns.Length);
-                Array.Copy(key, 0, fullKeysBytes, ns.Length, key.Length);
+                ns.CopyTo(fullKeysBytes.AsSpan());
+                key.CopyTo(fullKeysBytes.AsSpan(ns.Length));
                 return new StreamId(fullKeysBytes, (ushort) ns.Length);
             }
             else
             {
-                var fullKeysBytes = new byte[key.Length];
-                Array.Copy(key, 0, fullKeysBytes, 0, key.Length);
-                return new StreamId(fullKeysBytes, 0);
+                return new StreamId((byte[])key.Clone(), 0);
             }
         }
 
-        public static StreamId Create(string ns, Guid key) => Create(ns, key.ToString("N"));
+        public static StreamId Create(string ns, Guid key)
+        {
+            if (ns is null)
+            {
+                var buf = new byte[32];
+                Utf8Formatter.TryFormat(key, buf, out var len, 'N');
+                Debug.Assert(len == 32);
+                return new StreamId(buf, 0);
+            }
+            else
+            {
+                var nsLen = Encoding.UTF8.GetByteCount(ns);
+                var buf = new byte[nsLen + 32];
+                Encoding.UTF8.GetBytes(ns, 0, ns.Length, buf, 0);
+                Utf8Formatter.TryFormat(key, buf.AsSpan(nsLen), out var len, 'N');
+                Debug.Assert(len == 32);
+                return new StreamId(buf, (ushort)nsLen);
+            }
+        }
 
-        public static StreamId Create(string ns, string key) => Create(ns != null ? Encoding.UTF8.GetBytes(ns) : null, Encoding.UTF8.GetBytes(key));
+        public static StreamId Create(string ns, string key)
+        {
+            if (ns is null)
+                return new StreamId(Encoding.UTF8.GetBytes(key), 0);
+
+            var nsLen = Encoding.UTF8.GetByteCount(ns);
+            var keyLen = Encoding.UTF8.GetByteCount(key);
+            var buf = new byte[nsLen + keyLen];
+            Encoding.UTF8.GetBytes(ns, 0, ns.Length, buf, 0);
+            Encoding.UTF8.GetBytes(key, 0, key.Length, buf, nsLen);
+            return new StreamId(buf, (ushort)nsLen);
+        }
 
         public static StreamId Create(IStreamIdentity streamIdentity) => Create(streamIdentity.Namespace, streamIdentity.Guid);
 
-        public int CompareTo(StreamId other) => FullKey.Span.SequenceCompareTo(other.FullKey.Span);
+        public int CompareTo(StreamId other) => fullKey.AsSpan().SequenceCompareTo(other.fullKey);
 
-        public bool Equals(StreamId other) => FullKey.Span.SequenceEqual(other.FullKey.Span);
+        public bool Equals(StreamId other) => fullKey.AsSpan().SequenceEqual(other.fullKey);
 
         public override bool Equals(object obj) => obj is StreamId other ? this.Equals(other) : false;
 
@@ -82,26 +112,22 @@ namespace Orleans.Runtime
 
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            info.AddValue("fk", FullKey.ToArray());
+            info.AddValue("fk", fullKey);
             info.AddValue("ki", this.keyIndex);
             info.AddValue("fh", this.hash);
         }
 
         public override string ToString()
         {
-            var sb = new StringBuilder();
-
-            if (!Namespace.IsEmpty)
-                sb.Append(this.GetNamespace());
-            else
-                sb.Append("null");
-
-            sb.Append($"/{this.GetKeyAsString()}");
-
-            return sb.ToString();
+            var key = this.GetKeyAsString();
+            return keyIndex == 0 ? "null/" + key : this.GetNamespace() + "/" + key;
         }
 
         public override int GetHashCode() => this.hash;
+
+        public string GetKeyAsString() => Encoding.UTF8.GetString(fullKey, keyIndex, fullKey.Length - keyIndex);
+
+        public string GetNamespace() => keyIndex == 0 ? null : Encoding.UTF8.GetString(fullKey, 0, keyIndex);
     }
 
     [Immutable]
@@ -121,7 +147,7 @@ namespace Orleans.Runtime
 
         private InternalStreamId(SerializationInfo info, StreamingContext context)
         {
-            ProviderName = (string) info.GetValue("pvn", typeof(string));
+            ProviderName = info.GetString("pvn");
             StreamId = (StreamId) info.GetValue("sid", typeof(StreamId));
         }
 
@@ -155,34 +181,7 @@ namespace Orleans.Runtime
         {
             return $"{ProviderName}/{StreamId.ToString()}";
         }
-    }
 
-    public static class StreamIdExtensions
-    {
-        public static string GetKeyAsString(this StreamId streamId)
-        {
-#if NETCOREAPP
-            var bytes = streamId.Key;
-#else
-            var bytes = streamId.Key.ToArray();
-#endif
-            return Encoding.UTF8.GetString(bytes);
-        }
-
-        public static string GetNamespace(this StreamId streamId)
-        {
-            if (streamId.Namespace.IsEmpty)
-                return null;
-#if NETCOREAPP 
-            var bytes = streamId.Namespace;
-#else
-            var bytes = streamId.Namespace.ToArray();
-#endif
-            return Encoding.UTF8.GetString(bytes);
-        }
-
-        internal static string GetKeyAsString(this InternalStreamId internalStreamId) => ((StreamId)internalStreamId).GetKeyAsString();
-
-        internal static string GetNamespace(this InternalStreamId internalStreamId) => internalStreamId.StreamId.GetNamespace();
+        internal string GetNamespace() => StreamId.GetNamespace();
     }
 }

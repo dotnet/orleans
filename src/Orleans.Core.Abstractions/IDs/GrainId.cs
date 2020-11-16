@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
-using System.Text;
 using Orleans.Concurrency;
 
 namespace Orleans.Runtime
@@ -15,8 +14,6 @@ namespace Orleans.Runtime
     [StructLayout(LayoutKind.Auto)]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
     {
-        private static readonly char[] SegmentSeparator = new[] { '/' };
-
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
@@ -24,20 +21,6 @@ namespace Orleans.Runtime
         {
             Type = type;
             Key = key;
-        }
-
-        /// <summary>
-        /// Creates a new <see cref="GrainType"/> instance.
-        /// </summary>
-        internal GrainId(byte[] type, byte[] key) : this(new GrainType(type), new IdSpan(key))
-        {
-        }
-
-        /// <summary>
-        /// Creates a new <see cref="GrainType"/> instance.
-        /// </summary>
-        internal GrainId(GrainType type, byte[] key) : this(type, new IdSpan(key))
-        {
         }
 
         /// <summary>
@@ -70,7 +53,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
         /// </summary>
-        public static GrainId Create(GrainType type, string key) => new GrainId(type, Encoding.UTF8.GetBytes(key));
+        public static GrainId Create(GrainType type, string key) => new GrainId(type, IdSpan.Create(key));
 
         /// <summary>
         /// Creates a new <see cref="GrainType"/> instance.
@@ -101,14 +84,14 @@ namespace Orleans.Runtime
                 return false;
             }
 
-            var parts = value.Split(SegmentSeparator, 2);
-            if (parts.Length != 2)
+            var i = value.IndexOf('/');
+            if (i < 0)
             {
                 grainId = default;
                 return false;
             }
 
-            grainId = Create(parts[0], parts[1]);
+            grainId = Create(value.Substring(0, i), value.Substring(i + 1));
             return true;
         }
 
