@@ -18,6 +18,7 @@ namespace Orleans.Runtime.Messaging
         private readonly EndpointOptions endpointOptions;
         private readonly ConnectionManager connectionManager;
         private readonly ConnectionCommon connectionShared;
+        private readonly ProbeRequestMonitor probeRequestMonitor;
 
         public SiloConnectionListener(
             IServiceProvider serviceProvider,
@@ -27,7 +28,8 @@ namespace Orleans.Runtime.Messaging
             IOptions<EndpointOptions> endpointOptions,
             ILocalSiloDetails localSiloDetails,
             ConnectionManager connectionManager,
-            ConnectionCommon connectionShared)
+            ConnectionCommon connectionShared,
+            ProbeRequestMonitor probeRequestMonitor)
             : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
@@ -35,6 +37,7 @@ namespace Orleans.Runtime.Messaging
             this.localSiloDetails = localSiloDetails;
             this.connectionManager = connectionManager;
             this.connectionShared = connectionShared;
+            this.probeRequestMonitor = probeRequestMonitor;
             this.endpointOptions = endpointOptions.Value;
         }
 
@@ -50,7 +53,8 @@ namespace Orleans.Runtime.Messaging
                 this.localSiloDetails,
                 this.connectionManager,
                 this.ConnectionOptions,
-                this.connectionShared);
+                this.connectionShared,
+                this.probeRequestMonitor);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
