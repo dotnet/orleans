@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.Placement;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
@@ -22,12 +23,15 @@ namespace Orleans.Runtime.Management
         private readonly IVersionStore versionStore;
         private readonly MembershipTableManager membershipTableManager;
         private readonly ILogger logger;
+        private readonly Catalog catalog;
+
         public ManagementGrain(
             IInternalGrainFactory internalGrainFactory,
             ISiloStatusOracle siloStatusOracle,
             GrainTypeManager grainTypeManager, 
             IVersionStore versionStore,
             ILogger<ManagementGrain> logger,
+            Catalog catalog,
             MembershipTableManager membershipTableManager)
         {
             this.membershipTableManager = membershipTableManager;
@@ -36,6 +40,7 @@ namespace Orleans.Runtime.Management
             this.grainTypeManager = grainTypeManager;
             this.versionStore = versionStore;
             this.logger = logger;
+            this.catalog = catalog;
         }
 
         public async Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)
@@ -102,15 +107,15 @@ namespace Orleans.Runtime.Management
                 s => GetSiloControlReference(s).ForceRuntimeStatisticsCollection());
             return Task.WhenAll(actionPromises);
         }
-        
+
         public Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] siloAddresses)
         {
             var silos = GetSiloAddresses(siloAddresses);
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("GetRuntimeStatistics on {0}", Utils.EnumerableToString(silos));
             var promises = new List<Task<SiloRuntimeStatistics>>();
-            foreach (SiloAddress siloAddress in silos)
+            foreach (var siloAddress in silos)
                 promises.Add(GetSiloControlReference(siloAddress).GetRuntimeStatistics());
-            
+
             return Task.WhenAll(promises);
         }
 
@@ -121,7 +126,7 @@ namespace Orleans.Runtime.Management
             await Task.WhenAll(all);
             return all.SelectMany(s => s.Result).ToArray();
         }
-        
+
         public async Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
             Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
@@ -150,7 +155,7 @@ namespace Orleans.Runtime.Management
             var tasks = new List<Task<DetailedGrainReport>>();
             foreach (var silo in hostsIds)
                 tasks.Add(GetSiloControlReference(silo).GetDetailedGrainReport(grainReference.GrainId));
-            
+
             await Task.WhenAll(tasks);
             return tasks.Select(s => s.Result).Select(r => r.LocalActivations.Count).Sum();
         }
@@ -220,6 +225,35 @@ namespace Orleans.Runtime.Management
                 String.Format("SendControlCommandToProvider of type {0} and name {1} command {2}.", providerTypeFullName, providerName, command));
         }
 
+        public ValueTask<SiloAddress> GetActivationAddress(IAddressable reference)
+        {
+            var grainReference = reference as GrainReference;
+            var grainId = grainReference.GrainId;
+
+            var placement = this.catalog.GetGrainPlacementStrategy(grainId);
+
+            if (placement is StatelessWorkerPlacement)
+            {
+                throw new InvalidOperationException(
+                       $"Grain '{grainReference.ToString()}' is a Stateless Worker. This type of grain can't be looked up by this method"
+                   );
+            }
+
+            if (this.catalog.FastLookup(grainId, out var addresses))
+            {
+                var placementResult = addresses.FirstOrDefault();
+                return new ValueTask<SiloAddress>(placementResult?.Silo);
+            }
+
+            return LookupAsync(grainId, this.catalog);
+
+            async ValueTask<SiloAddress> LookupAsync(GrainId grainId, Catalog catalog)
+            {
+                var places = await catalog.FullLookup(grainId);
+                return places.FirstOrDefault()?.Silo;
+            }
+        }
+
         private void CheckIfIsExistingInterface(int interfaceId)
         {
             Type unused;
@@ -252,13 +286,13 @@ namespace Orleans.Runtime.Management
         {
             var silos = await GetHosts(true);
 
-            if(logger.IsEnabled(LogLevel.Debug))
+            if (logger.IsEnabled(LogLevel.Debug))
             {
                 logger.Debug("Executing {0} against {1}", actionToLog, Utils.EnumerableToString(silos.Keys));
             }
 
             var actionPromises = new List<Task<object>>();
-            foreach (SiloAddress siloAddress in silos.Keys.ToArray())
+            foreach (var siloAddress in silos.Keys.ToArray())
                 actionPromises.Add(action(GetSiloControlReference(siloAddress)));
 
             return await Task.WhenAll(actionPromises);
@@ -277,7 +311,7 @@ namespace Orleans.Runtime.Management
         /// Perform an action for each silo.
         /// </summary>
         /// <remarks>
-        /// Because SiloControl contains a reference to a system target, each method call using that reference 
+        /// Because SiloControl contains a reference to a system target, each method call using that reference
         /// will get routed either locally or remotely to the appropriate silo instance auto-magically.
         /// </remarks>
         /// <param name="siloAddresses">List of silos to perform the action for</param>
@@ -286,9 +320,9 @@ namespace Orleans.Runtime.Management
         private List<Task> PerformPerSiloAction(SiloAddress[] siloAddresses, Func<SiloAddress, Task> perSiloAction)
         {
             var requestsToSilos = new List<Task>();
-            foreach (SiloAddress siloAddress in siloAddresses)
-                requestsToSilos.Add( perSiloAction(siloAddress) );
-            
+            foreach (var siloAddress in siloAddresses)
+                requestsToSilos.Add(perSiloAction(siloAddress));
+
             return requestsToSilos;
         }
 
