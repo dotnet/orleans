@@ -288,14 +288,27 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 if (logger != null)
+                {
                     try
                     {
                         string caller = null;
                         switch (callerGetter)
                         {
-                            case string value: caller = value; break;
-                            case Func<string> func: try { caller = func(); } catch { } break;
+                            case string value:
+                                caller = value;
+                                break;
+                            case Func<string> func:
+                                try
+                                {
+                                    caller = func();
+                                }
+                                catch
+                                {
+                                }
+
+                                break;
                         }
+
                         foreach (var e in exc.FlattenAggregate())
                         {
                             logger.Warn(ErrorCode.Runtime_Error_100325,
@@ -306,6 +319,7 @@ namespace Orleans.Runtime
                     {
                         // now really, really ignore.
                     }
+                }
             }
         }
 

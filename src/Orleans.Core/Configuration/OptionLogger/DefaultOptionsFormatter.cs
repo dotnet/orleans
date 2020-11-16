@@ -28,8 +28,13 @@ namespace Orleans
         {
             var result = new List<string>();
             foreach (var prop in typeof(T).GetProperties(BindingFlags.Instance | BindingFlags.Public))
-                if (prop.GetGetMethod() is { } && prop.GetSetMethod() is { })
+            {
+                if (prop.GetGetMethod() is object && prop.GetSetMethod() is object)
+                {
                     FormatProperty(prop, result);
+                }
+            }
+
             return result;
         }
 

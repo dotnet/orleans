@@ -54,18 +54,20 @@ namespace Orleans.Runtime
 
         internal static UniqueKey Parse(ReadOnlySpan<char> input)
         {
+            const int minimumValidKeyLength = 48;
             input = input.Trim();
-            if (input.Length >= 48)
+            if (input.Length >= minimumValidKeyLength)
             {
                 var n0 = ulong.Parse(input.Slice(0, 16).ToString(), NumberStyles.AllowHexSpecifier);
                 var n1 = ulong.Parse(input.Slice(16, 16).ToString(), NumberStyles.AllowHexSpecifier);
                 var typeCodeData = ulong.Parse(input.Slice(32, 16).ToString(), NumberStyles.AllowHexSpecifier);
                 string keyExt = null;
-                if (input.Length > 48)
+                if (input.Length > minimumValidKeyLength)
                 {
                     if (input[48] != '+') throw new InvalidDataException("UniqueKey hex string missing + separator.");
                     keyExt = input.Slice(49).ToString();
                 }
+
                 return NewKey(n0, n1, typeCodeData, keyExt);
             }
 

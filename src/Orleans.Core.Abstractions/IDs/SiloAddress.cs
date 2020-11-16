@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Buffers.Text;
 using System.Collections.Generic;
@@ -91,23 +92,32 @@ namespace Orleans.Runtime
             {
                 var addr = Endpoint.Address.ToString();
                 var size = Encoding.UTF8.GetByteCount(addr);
+
+                // Allocate sufficient room for: address + ':' + port + '@' + generation
                 Span<byte> buf = stackalloc byte[size + 1 + 11 + 1 + 11];
                 fixed (char* src = addr)
                 fixed (byte* dst = buf)
+                {
                     size = Encoding.UTF8.GetBytes(src, addr.Length, dst, buf.Length);
+                }
 
                 buf[size++] = (byte)':';
-                Utf8Formatter.TryFormat(Endpoint.Port, buf.Slice(size), out var len);
+                var success = Utf8Formatter.TryFormat(Endpoint.Port, buf.Slice(size), out var len);
+                Debug.Assert(success);
                 Debug.Assert(len > 0);
+                Debug.Assert(len <= 11);
                 size += len;
 
                 buf[size++] = (byte)SEPARATOR;
-                Utf8Formatter.TryFormat(Generation, buf.Slice(size), out len);
+                success = Utf8Formatter.TryFormat(Generation, buf.Slice(size), out len);
+                Debug.Assert(success);
                 Debug.Assert(len > 0);
+                Debug.Assert(len <= 11);
                 size += len;
 
                 utf8 = buf.Slice(0, size).ToArray();
             }
+
             return utf8;
         }
 
