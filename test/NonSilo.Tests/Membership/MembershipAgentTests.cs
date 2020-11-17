@@ -39,6 +39,8 @@ namespace NonSilo.Tests.Membership
         private readonly Func<SiloHealthMonitor, SiloHealthMonitor.ProbeResult, Task> onProbeResult;
         private readonly MembershipAgent agent;
         private readonly ILocalSiloHealthMonitor localSiloHealthMonitor;
+        private readonly IOptionsMonitor<ClusterMembershipOptions> optionsMonitor;
+        private readonly IClusterMembershipService membershipService;
 
         public MembershipAgentTests(ITestOutputHelper output)
         {
@@ -85,11 +87,13 @@ namespace NonSilo.Tests.Membership
                 this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)this.manager).Participate(this.lifecycle);
 
+            this.optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            this.optionsMonitor.CurrentValue.ReturnsForAnyArgs(this.clusterMembershipOptions.Value);
             this.clusterHealthMonitor = new ClusterHealthMonitor(
                 this.localSiloDetails,
                 this.manager,
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
-                this.clusterMembershipOptions,
+                optionsMonitor,
                 this.fatalErrorHandler,
                 null);
             ((ILifecycleParticipant<ISiloLifecycle>)this.clusterHealthMonitor).Participate(this.lifecycle);
@@ -111,6 +115,9 @@ namespace NonSilo.Tests.Membership
                 this.timerFactory,
                 this.remoteSiloProber);
             ((ILifecycleParticipant<ISiloLifecycle>)this.agent).Participate(this.lifecycle);
+
+            this.membershipService = Substitute.For<IClusterMembershipService>();
+            this.membershipService.CurrentSnapshot.ReturnsForAnyArgs(info => this.manager.MembershipTableSnapshot.CreateClusterMembershipSnapshot());
         }
 
         [Fact]
@@ -268,7 +275,16 @@ namespace NonSilo.Tests.Membership
             Func<SiloHealthMonitor, SiloHealthMonitor.ProbeResult, Task> onProbeResult = (siloHealthMonitor, probeResult) => Task.CompletedTask;
 
             var clusterHealthMonitorTestAccessor = (ClusterHealthMonitor.ITestAccessor)this.clusterHealthMonitor;
-            clusterHealthMonitorTestAccessor.CreateMonitor = silo => new SiloHealthMonitor(silo, onProbeResult, this.clusterMembershipOptions, this.loggerFactory, remoteSiloProber, this.timerFactory, this.localSiloHealthMonitor);
+            clusterHealthMonitorTestAccessor.CreateMonitor = silo => new SiloHealthMonitor(
+                silo,
+                onProbeResult,
+                this.optionsMonitor,
+                this.loggerFactory,
+                remoteSiloProber,
+                this.timerFactory,
+                this.localSiloHealthMonitor,
+                this.membershipService,
+                this.localSiloDetails);
             var started = this.lifecycle.OnStart();
 
             await Until(() => remoteSiloProber.ReceivedCalls().Count() < otherSilos.Length);
@@ -317,11 +333,13 @@ namespace NonSilo.Tests.Membership
             clusterHealthMonitorTestAccessor.CreateMonitor = silo => new SiloHealthMonitor(
                 silo,
                 this.onProbeResult,
-                Options.Create(new ClusterMembershipOptions()),
+                this.optionsMonitor,
                 this.loggerFactory,
                 this.remoteSiloProber,
                 this.timerFactory,
-                this.localSiloHealthMonitor);
+                this.localSiloHealthMonitor,
+                this.membershipService,
+                this.localSiloDetails);
             var started = this.lifecycle.OnStart();
 
             await Until(() => this.remoteSiloProber.ReceivedCalls().Count() < otherSilos.Length);
