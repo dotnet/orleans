@@ -32,7 +32,7 @@ namespace Orleans.Tests.SqlUtils
                 { AdoNetInvariants.InvariantNamePostgreSql, new Tuple<string, string>("Npgsql", "Npgsql.NpgsqlFactory") },
                 { AdoNetInvariants.InvariantNameSqlLite, new Tuple<string, string>("Microsoft.Data.SQLite", "Microsoft.Data.SQLite.SqliteFactory") },
                 { AdoNetInvariants.InvariantNameSqlServerDotnetCore, new Tuple<string, string>("Microsoft.Data.SqlClient", "Microsoft.Data.SqlClient.SqlClientFactory") },
-                { AdoNetInvariants.InvariantNameMySqlConnector, new Tuple<string, string>("MySqlConnector", "MySql.Data.MySqlClient.MySqlClientFactory") },
+                { AdoNetInvariants.InvariantNameMySqlConnector, new Tuple<string, string>("MySqlConnector", "MySqlConnector.MySqlConnectorFactory") },
             };
 
         private static CachedFactory GetFactory(string invariantName)
