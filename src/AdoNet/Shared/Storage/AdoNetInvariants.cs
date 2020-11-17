@@ -68,6 +68,6 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// An open source implementation of the MySQL connector library.
         /// </summary>
-        public const string InvariantNameMySqlConnector = "MySql.Data.MySqlConnector";
+        public const string InvariantNameMySqlConnector = "MySqlConnector";
     }
 }
