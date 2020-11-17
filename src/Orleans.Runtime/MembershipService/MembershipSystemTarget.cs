@@ -76,7 +76,7 @@ namespace Orleans.Runtime.MembershipService
         {
             Task<IndirectProbeResponse> ProbeIndirectly()
             {
-                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleType, intermediary);
+                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleId, intermediary);
                 return remoteOracle.ProbeIndirectly(target, probeTimeout, probeNumber);
             }
 
@@ -86,7 +86,7 @@ namespace Orleans.Runtime.MembershipService
         public async Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress target, TimeSpan probeTimeout, int probeNumber)
         {
             IndirectProbeResponse result;
-            var healthScore = this.ActivationServices.GetRequiredService<LocalSiloHealthMonitor>().GetLocalHealthDegradationScore(DateTime.UtcNow);
+            var healthScore = this.RuntimeClient.ServiceProvider.GetRequiredService<LocalSiloHealthMonitor>().GetLocalHealthDegradationScore(DateTime.UtcNow);
             var probeResponseTimer = ValueStopwatch.StartNew();
             try
             {
