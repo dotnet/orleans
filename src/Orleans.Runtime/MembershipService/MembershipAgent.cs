@@ -7,6 +7,7 @@ using System.Threading;
 using Microsoft.Extensions.Options;
 using System.Linq;
 using Orleans.Internal;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -17,29 +18,29 @@ namespace Orleans.Runtime.MembershipService
     {
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly MembershipTableManager tableManager;
-        private readonly ClusterHealthMonitor clusterHealthMonitor;
         private readonly ILocalSiloDetails localSilo;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
         private readonly ILogger<MembershipAgent> log;
+        private readonly IRemoteSiloProber siloProber;
         private readonly IAsyncTimer iAmAliveTimer;
         private Func<DateTime> getUtcDateTime = () => DateTime.UtcNow;
 
         public MembershipAgent(
             MembershipTableManager tableManager,
-            ClusterHealthMonitor clusterHealthMonitor,
             ILocalSiloDetails localSilo,
             IFatalErrorHandler fatalErrorHandler,
             IOptions<ClusterMembershipOptions> options,
             ILogger<MembershipAgent> log,
-            IAsyncTimerFactory timerFactory)
+            IAsyncTimerFactory timerFactory,
+            IRemoteSiloProber siloProber)
         {
             this.tableManager = tableManager;
-            this.clusterHealthMonitor = clusterHealthMonitor;
             this.localSilo = localSilo;
             this.fatalErrorHandler = fatalErrorHandler;
             this.clusterMembershipOptions = options.Value;
             this.log = log;
+            this.siloProber = siloProber;
             this.iAmAliveTimer = timerFactory.Create(
                 this.clusterMembershipOptions.IAmAliveTablePublishTimeout,
                 nameof(UpdateIAmAlive));
@@ -152,7 +153,7 @@ namespace Orleans.Runtime.MembershipService
                         activeSilos.Add(entry.SiloAddress);
                     }
 
-                    var failedSilos = await this.clusterHealthMonitor.CheckClusterConnectivity(activeSilos.ToArray());
+                    var failedSilos = await CheckClusterConnectivity(activeSilos.ToArray());
                     var successfulSilos = activeSilos.Where(s => !failedSilos.Contains(s)).ToList();
 
                     // If there were no failures, terminate the loop and return without error.
@@ -192,6 +193,85 @@ namespace Orleans.Runtime.MembershipService
 
                 ++attemptNumber;
                 now = this.getUtcDateTime();
+            }
+
+            async Task<List<SiloAddress>> CheckClusterConnectivity(SiloAddress[] members)
+            {
+                if (members.Length == 0) return new List<SiloAddress>();
+
+                var tasks = new List<Task<bool>>(members.Length);
+
+                this.log.LogInformation(
+                    (int)ErrorCode.MembershipSendingPreJoinPing,
+                    "About to send pings to {Count} nodes in order to validate communication in the Joining state. Pinged nodes = {Nodes}",
+                    members.Length,
+                    Utils.EnumerableToString(members));
+
+                var timeout = this.clusterMembershipOptions.ProbeTimeout;
+                foreach (var silo in members)
+                {
+                    tasks.Add(ProbeSilo(this.siloProber, silo, timeout, this.log));
+                }
+
+                try
+                {
+                    await Task.WhenAll(tasks);
+                }
+                catch
+                {
+                    // Ignore exceptions for now.
+                }
+
+                var failed = new List<SiloAddress>();
+                for (var i = 0; i < tasks.Count; i++)
+                {
+                    if (tasks[i].Status != TaskStatus.RanToCompletion || !tasks[i].GetAwaiter().GetResult())
+                    {
+                        failed.Add(members[i]);
+                    }
+                }
+
+                return failed;
+            }
+
+            static async Task<bool> ProbeSilo(IRemoteSiloProber siloProber, SiloAddress silo, TimeSpan timeout, ILogger log)
+            {
+                Exception exception;
+                try
+                {
+                    using var cancellation = new CancellationTokenSource(timeout);
+                    var probeTask = siloProber.Probe(silo, 0);
+                    var cancellationTask = cancellation.Token.WhenCancelled();
+                    var completedTask = await Task.WhenAny(probeTask, cancellationTask).ConfigureAwait(false);
+
+                    if (ReferenceEquals(completedTask, probeTask))
+                    {
+                        cancellation.Cancel();
+                        if (probeTask.IsFaulted)
+                        {
+                            exception = probeTask.Exception;
+                        }
+                        else if (probeTask.Status == TaskStatus.RanToCompletion)
+                        {
+                            return true;
+                        }
+                        else
+                        {
+                            exception = null;
+                        }
+                    }
+                    else
+                    {
+                        exception = null;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                }
+
+                log.LogWarning(exception, "Did not receive a probe response from silo {SiloAddress} in timeout {Timeout}", silo.ToString(), timeout);
+                return false;
             }
         }
 
@@ -347,10 +427,6 @@ namespace Orleans.Runtime.MembershipService
             this.iAmAliveTimer.Dispose();
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime)
-        {
-            var ok = this.iAmAliveTimer.CheckHealth(lastCheckTime);
-            return ok;
-        }
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason) => this.iAmAliveTimer.CheckHealth(lastCheckTime, out reason);
     }
 }

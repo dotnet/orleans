@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,6 +32,7 @@ namespace NonSilo.Tests.Membership
         private readonly List<DelegateAsyncTimer> timers;
         private readonly ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)> timerCalls;
         private readonly DelegateAsyncTimerFactory timerFactory;
+        private readonly ILocalSiloHealthMonitor localSiloHealthMonitor;
         private readonly IRemoteSiloProber prober;
         private readonly InMemoryMembershipTable membershipTable;
         private readonly MembershipTableManager manager;
@@ -66,6 +68,9 @@ namespace NonSilo.Tests.Membership
                     return t;
                 });
 
+            this.localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
+            this.localSiloHealthMonitor.GetLocalHealthDegradationScore(default).ReturnsForAnyArgs(0);
+
             this.prober = Substitute.For<IRemoteSiloProber>();
             this.membershipTable = new InMemoryMembershipTable(new TableVersion(1, "1"));
             this.manager = new MembershipTableManager(
@@ -94,20 +99,26 @@ namespace NonSilo.Tests.Membership
             });
 
             var clusterMembershipOptions = new ClusterMembershipOptions();
+            var options = Options.Create(clusterMembershipOptions);
             var monitor = new ClusterHealthMonitor(
                 this.localSiloDetails,
                 this.manager,
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
-                Options.Create(clusterMembershipOptions),
+                options,
                 this.fatalErrorHandler,
-                null,
-                this.timerFactory);
+                null);
             ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(this.lifecycle);
             var testAccessor = (ClusterHealthMonitor.ITestAccessor)monitor;
-            testAccessor.CreateMonitor = s => new SiloHealthMonitor(s, this.loggerFactory, this.prober);
+            testAccessor.CreateMonitor = s => new SiloHealthMonitor(
+                s,
+                testAccessor.OnProbeResult,
+                options,
+                this.loggerFactory,
+                this.prober,
+                this.timerFactory,
+                this.localSiloHealthMonitor);
 
             await this.lifecycle.OnStart();
-            Assert.NotEmpty(this.timers);
             Assert.Empty(testAccessor.MonitoredSilos);
 
             var otherSilos = new[]
@@ -133,9 +144,6 @@ namespace NonSilo.Tests.Membership
             }
 
             await this.manager.Refresh();
-            (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default);
-            while (!this.timerCalls.TryDequeue(out timer)) await Task.Delay(1);
-            timer.Completion.TrySetResult(true);
 
             await Until(() => testAccessor.ObservedVersion > lastVersion);
             lastVersion = testAccessor.ObservedVersion;
@@ -150,20 +158,27 @@ namespace NonSilo.Tests.Membership
 
             // Now that this silo is active, it should be monitoring some fraction of the other active silos
             Assert.NotEmpty(testAccessor.MonitoredSilos);
+            Assert.NotEmpty(this.timers);
             Assert.DoesNotContain(testAccessor.MonitoredSilos, s => s.Key.Equals(this.localSilo));
             Assert.Equal(clusterMembershipOptions.NumProbedSilos, testAccessor.MonitoredSilos.Count);
             Assert.All(testAccessor.MonitoredSilos, m => m.Key.Equals(m.Value.SiloAddress));
             Assert.Empty(probeCalls);
 
             // Check that those silos are actually being probed periodically
-            while (!this.timerCalls.TryDequeue(out timer)) await Task.Delay(1);
-            timer.Completion.TrySetResult(true);
+            await UntilEqual(clusterMembershipOptions.NumProbedSilos, () =>
+            {
+                if (this.timerCalls.TryDequeue(out var timer))
+                {
+                    timer.Completion.TrySetResult(true);
+                }
 
-            await Until(() => probeCalls.Count == clusterMembershipOptions.NumProbedSilos);
+                return probeCalls.Count;
+            });
             Assert.Equal(clusterMembershipOptions.NumProbedSilos, probeCalls.Count);
             while (probeCalls.TryDequeue(out var call)) Assert.Contains(testAccessor.MonitoredSilos, k => k.Key.Equals(call.Item1));
 
-            foreach (var siloMonitor in testAccessor.MonitoredSilos.Values)
+            var monitoredSilos = testAccessor.MonitoredSilos.Values.ToList();
+            foreach (var siloMonitor in monitoredSilos)
             {
                 Assert.Equal(0, ((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes);
             }
@@ -177,22 +192,28 @@ namespace NonSilo.Tests.Membership
 
             // The above call to specify the probe behaviour also enqueued a value, so clear it here.
             while (probeCalls.TryDequeue(out _)) ;
-            
+
             for (var expectedMissedProbes = 1; expectedMissedProbes <= clusterMembershipOptions.NumMissedProbesLimit; expectedMissedProbes++)
             {
                 var now = DateTime.UtcNow;
                 this.membershipTable.ClearCalls();
 
-                while (!this.timerCalls.TryDequeue(out timer)) await Task.Delay(1);
-                timer.Completion.TrySetResult(true);
-
                 // Wait for probes to be fired
-                await Until(() => probeCalls.Count == clusterMembershipOptions.NumProbedSilos);
+                await UntilEqual(clusterMembershipOptions.NumProbedSilos, () =>
+                {
+                    if (this.timerCalls.TryDequeue(out var timer))
+                    {
+                        timer.Completion.TrySetResult(true);
+                    }
+
+                    return probeCalls.Count;
+                });
+
                 while (probeCalls.TryDequeue(out var call)) ;
 
                 // Check that probes match the expected missed probes
                 var table = await this.membershipTable.ReadAll();
-                foreach (var siloMonitor in testAccessor.MonitoredSilos.Values)
+                foreach (var siloMonitor in monitoredSilos)
                 {
                     Assert.Equal(expectedMissedProbes, ((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes);
 
@@ -220,11 +241,16 @@ namespace NonSilo.Tests.Membership
             // The above call to specify the probe behaviour also enqueued a value, so clear it here.
             while (probeCalls.TryDequeue(out _)) ;
 
-            while (!this.timerCalls.TryDequeue(out timer)) await Task.Delay(1);
-            timer.Completion.TrySetResult(true);
-
             // Wait for probes to be fired
-            await Until(() => probeCalls.Count == clusterMembershipOptions.NumProbedSilos);
+            await UntilEqual(testAccessor.MonitoredSilos.Count, () =>
+            {
+                if (this.timerCalls.TryDequeue(out var timer))
+                {
+                    timer.Completion.TrySetResult(true);
+                }
+
+                return probeCalls.Count;
+            });
             while (probeCalls.TryDequeue(out var call)) ;
             foreach (var siloMonitor in testAccessor.MonitoredSilos.Values)
             {
@@ -237,6 +263,21 @@ namespace NonSilo.Tests.Membership
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
         private static MembershipEntry Entry(SiloAddress address, SiloStatus status) => new MembershipEntry { SiloAddress = address, Status = status };
+
+        private static async Task UntilEqual<T>(T expected, Func<T> getActual)
+        {
+            var maxTimeout = 40_000;
+            var equalityComparer = EqualityComparer<T>.Default;
+            var actual = getActual();
+            while (!equalityComparer.Equals(expected, actual) && (maxTimeout -= 10) > 0)
+            {
+                await Task.Delay(10);
+                actual = getActual();
+            }
+
+            Assert.Equal(expected, actual);
+            Assert.True(maxTimeout > 0);
+        }
 
         private static async Task Until(Func<bool> condition)
         {

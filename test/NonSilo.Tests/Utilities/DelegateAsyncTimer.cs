@@ -17,7 +17,11 @@ namespace NonSilo.Tests.Utilities
 
         public Task<bool> NextTick(TimeSpan? overrideDelay = null) => this.nextTick(overrideDelay);
 
-        public bool CheckHealth(DateTime lastCheckTime) => true;
+        public bool CheckHealth(DateTime lastCheckTime, out string reason)
+        {
+            reason = default;
+            return true;
+        }
 
         public void Dispose() => ++this.DisposedCounter;
     }

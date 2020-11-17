@@ -16,6 +16,7 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageCenter messageCenter;
         private readonly ConnectionManager connectionManager;
         private readonly ConnectionOptions connectionOptions;
+        private readonly ProbeRequestMonitor probeMonitor;
 
         public SiloConnection(
             SiloAddress remoteSiloAddress,
@@ -25,12 +26,14 @@ namespace Orleans.Runtime.Messaging
             ILocalSiloDetails localSiloDetails,
             ConnectionManager connectionManager,
             ConnectionOptions connectionOptions,
-            ConnectionCommon connectionShared)
+            ConnectionCommon connectionShared,
+            ProbeRequestMonitor probeMonitor)
             : base(connection, middleware, connectionShared)
         {
             this.messageCenter = messageCenter;
             this.connectionManager = connectionManager;
             this.connectionOptions = connectionOptions;
+            this.probeMonitor = probeMonitor;
             this.LocalSiloAddress = localSiloDetails.SiloAddress;
             this.RemoteSiloAddress = remoteSiloAddress;
         }
@@ -154,6 +157,7 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
+                this.probeMonitor.OnReceivedProbeRequest();
                 var response = this.MessageFactory.CreateResponseMessage(msg);
                 response.BodyObject = PingResponse;
                 this.Send(response);

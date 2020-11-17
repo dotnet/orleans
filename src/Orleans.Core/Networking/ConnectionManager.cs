@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -81,6 +80,16 @@ namespace Orleans.Runtime.Messaging
 
             connection = null;
             return false;
+        }
+
+        public ImmutableArray<Connection> GetExistingConnections(SiloAddress endpoint)
+        {
+            if (this.connections.TryGetValue(endpoint, out var entry))
+            {
+                return entry.Connections;
+            }
+
+            return ImmutableArray<Connection>.Empty;
         }
 
         private async Task<Connection> GetConnectionAsync(SiloAddress endpoint)

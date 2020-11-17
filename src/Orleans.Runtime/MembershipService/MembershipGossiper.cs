@@ -26,7 +26,7 @@ namespace Orleans.Runtime.MembershipService
             if (gossipPartners.Count == 0) return Task.CompletedTask;
 
             this.log.LogInformation(
-                "Gossiping {Silo} status change to {Status} to {NumPartners} partners",
+                "Gossiping {Silo} status {Status} to {NumPartners} partners",
                 updatedSilo,
                 updatedStatus,
                 gossipPartners.Count);
