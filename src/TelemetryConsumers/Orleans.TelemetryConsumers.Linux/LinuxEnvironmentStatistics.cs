@@ -50,8 +50,10 @@ namespace Orleans.Statistics
 
         public void Dispose()
         {
-            _cts?.Dispose();
-            _monitorTask?.Dispose();
+            if (_cts != null && !_cts.IsCancellationRequested)
+            {
+                _cts.Cancel();
+            }
         }
 
         public void Participate(ISiloLifecycle lifecycle)
