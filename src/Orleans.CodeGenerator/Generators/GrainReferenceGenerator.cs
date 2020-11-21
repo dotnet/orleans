@@ -150,6 +150,9 @@ namespace Orleans.CodeGenerator.Generators
                         allParameters.Add(TypeOfExpression(typeParameter.ToTypeSyntax()));
                     }
 
+                    // PR: 6844 (fix generic overload selector in GenericMethodInvoker)
+                    allParameters.AddRange(parameters.Select(p => TypeOfExpression(p.Symbol.Type.ToTypeSyntax())));
+                    
                     allParameters.AddRange(parameters.Select(p => GetParameterForInvocation(p.Symbol, p.Name)));
 
                     args =
