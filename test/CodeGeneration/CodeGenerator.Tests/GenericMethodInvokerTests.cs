@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
 using System.Threading.Tasks;
-using Moq;
 using Orleans;
 using Orleans.CodeGeneration;
 using Xunit;
@@ -47,12 +42,12 @@ namespace CodeGenerator.Tests
 
             var mock = new FooGrain();
 
-            // perform: mock.Method<bool>(42);
+            // callsite: mock.Method<bool>(42);
             var result = await invoker.Invoke(mock, new object[]
             {
-                typeof(bool),
-                typeof(int),
-                42
+                typeof(bool),   // type parameter(s)
+                typeof(int),    // argument type(s)
+                42              // argument(s)
             });
 
             Assert.Equal(1, result);
@@ -66,9 +61,9 @@ namespace CodeGenerator.Tests
 
             var result = await invoker.Invoke(mock, new object[]
             {
-                typeof(bool), // type parameter(s)
-                typeof(int), typeof(string), // argument type(s)
-                42, "bar" // argument(s)
+                typeof(bool),
+                typeof(int), typeof(string),
+                42, "bar"
             });
             
             Assert.Equal(2, result);

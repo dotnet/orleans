@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Orleans.CodeGenerator.Compatibility;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.Utilities;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;

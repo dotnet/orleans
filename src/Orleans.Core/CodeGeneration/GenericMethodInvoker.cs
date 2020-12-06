@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -64,14 +62,12 @@ namespace Orleans.CodeGeneration
         /// Invoke the defined method on the provided <paramref name="grain"/> instance with the given <paramref name="arguments"/>.
         /// </summary>
         /// <param name="grain">The grain.</param>
-        /// <param name="arguments">The arguments to the method with the type parameters first, followed by the method parameters.</param>
+        /// <param name="arguments">The arguments to the method with the type parameters first, followed by the method parameters types, and finally the parameter values..</param>
         /// <returns>The invocation result.</returns>
         public Task<object> Invoke(IAddressable grain, object[] arguments)
         {
-            // TODO: do work here
-            
             var argc = (arguments.Length - typeParameterCount) / 2;
-            
+
             // As this is on a hot path, avoid allocating (LINQ) as much as possible
             var argv = arguments.AsSpan();
 
@@ -80,9 +76,9 @@ namespace Orleans.CodeGeneration
 
             // argument values to be passed
             var argValues = argv.Slice(typeParameterCount + argc, argc);
-            
+
             var invoker = this.invokers.GetOrAdd(types.ToArray(), this.createInvoker);
-            
+
             return invoker(grain, argValues.ToArray());
         }
 
@@ -93,16 +89,15 @@ namespace Orleans.CodeGeneration
         /// <returns>A new invoker delegate.</returns>
         private GenericMethodInvokerDelegate CreateInvoker(object[] arguments)
         {
-            // will always be even number
-            
-            // First, create the concrete method which will be called.
+            // obtain the generic type parameter(s)
             var typeParameters = arguments.Take(this.typeParameterCount).Cast<Type>().ToArray();
 
+            // obtain the method argument type(s)
             var parameterTypes = arguments
-                .Skip(typeParameterCount) // [<T>, 1,2,3,]int,int,int
+                .Skip(typeParameterCount)
                 .Cast<Type>()
                 .ToArray();
-            
+
             // get open generic method for this arity/parameter combination
             var openGenericMethodInfo = GetMethod(
                 grainInterfaceType,
@@ -130,9 +125,9 @@ namespace Orleans.CodeGeneration
             {
                 il.LoadArgument(1); // Load the argument array.
 
-                // Skip the type parameters and load the particular argument.
-                il.LoadConstant(i); //+ this.typeParameterCount);
-                
+                // load the particular argument.
+                il.LoadConstant(i);
+
                 il.LoadReferenceElement();
 
                 // Cast the argument from 'object' to the type expected by the concrete method.
@@ -192,7 +187,7 @@ namespace Orleans.CodeGeneration
             if (ReferenceEquals(x, y)) return true;
             if (ReferenceEquals(x, null)) return false;
             if (ReferenceEquals(null, y)) return false;
-            
+
             return x.SequenceEqual(y);
         }
 
@@ -250,21 +245,9 @@ namespace Orleans.CodeGeneration
                 // same type parameter count?
                 if (openMethod.GetGenericArguments().Length != typeParameterCount) continue;
 
-                MethodInfo closedMethod = null;
-                try
-                {
-                    // fill in type parameters
-                    // NOTE: this may throw due to generic constraints
-                    // https://github.com/dotnet/runtime/issues/28033
-                    closedMethod = openMethod.MakeGenericMethod(typeParameters);
-                }
-                catch (ArgumentException ex)
-                {
-                    // TODO: rethrow? log? 
-                    _ = ex;
-                    continue;
-                }
-
+                // close the definition
+                MethodInfo closedMethod = openMethod.MakeGenericMethod(typeParameters);
+                
                 // obtain list of closed parameters (no generic placeholders any more)
                 var parameterInfos = closedMethod.GetParameters();
 
