@@ -27,7 +27,7 @@ namespace UnitTests.UtilsTests
         {
             var ipv4 = new IPEndPoint(IPAddress.Any, 11111);
             var uri = ipv4.ToGatewayUri();
-            Assert.Equal("gwy.tcp://0.0.0.0:11111/", uri.ToString());
+            Assert.Equal("gwy.tcp://0.0.0.0:11111/0", uri.ToString());
 
             var ipv4silo = SiloAddress.New(ipv4, 100);
             uri = ipv4silo.ToGatewayUri();
@@ -35,7 +35,7 @@ namespace UnitTests.UtilsTests
 
             var ipv6 = new IPEndPoint(IPAddress.IPv6Any, 11111);
             uri = ipv6.ToGatewayUri();
-            Assert.Equal("gwy.tcp://[::]:11111/", uri.ToString());
+            Assert.Equal("gwy.tcp://[::]:11111/0", uri.ToString());
 
             var ipv6silo = SiloAddress.New(ipv6, 100);
             uri = ipv6silo.ToGatewayUri();
