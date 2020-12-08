@@ -100,8 +100,16 @@ namespace Orleans.AzureUtils
         /// <returns></returns>
         private static Uri ConvertToGatewayUri(SiloInstanceTableEntry gateway)
         {
-            int.TryParse(gateway.ProxyPort, out var proxyPort);
-            return new IPEndPoint(IPAddress.Parse(gateway.Address), proxyPort).ToGatewayUri();
+            int proxyPort = 0;
+            if (!string.IsNullOrEmpty(gateway.ProxyPort))
+                int.TryParse(gateway.ProxyPort, out proxyPort);
+
+            int gen = 0;
+            if (!string.IsNullOrEmpty(gateway.Generation))
+                int.TryParse(gateway.Generation, out gen);
+
+            SiloAddress address = SiloAddress.New(new IPEndPoint(IPAddress.Parse(gateway.Address), proxyPort), gen);
+            return address.ToGatewayUri();
         }
 
         public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()

@@ -171,7 +171,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="ep">The input IP end point</param>
         /// <returns></returns>
-        public static Uri ToGatewayUri(this System.Net.IPEndPoint ep) => new Uri("gwy.tcp://" + ep.ToString());
+        public static Uri ToGatewayUri(this System.Net.IPEndPoint ep) => new Uri("gwy.tcp://" + ep.ToString() + "/0");
 
         /// <summary>
         /// Represent a silo address in the gateway URI format.
