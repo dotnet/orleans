@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime.Services;
 using Orleans.Timers;
 
@@ -49,7 +51,10 @@ namespace Orleans.Runtime.ReminderService
                     nameof(period),
                     $"Cannot use value larger than {MaxSupportedTimeout}ms for period when creating a reminder");
 
-            if (period < Constants.MinReminderPeriod)
+            var reminderOptions = serviceProvider.GetService<IOptions<ReminderOptions>>();
+            var minReminderPeriod = reminderOptions.Value.MinimalReminderInterval;
+
+            if (period < minReminderPeriod)
             {
                 var msg =
                     string.Format(

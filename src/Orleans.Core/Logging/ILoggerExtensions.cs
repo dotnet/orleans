@@ -72,7 +72,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Writes a log entry at the Info logLevel 
+        /// Writes a log entry at the Info logLevel
         /// </summary>
         /// <param name="logger">Target logger.</param>
         /// <param name="message">The log message.</param>
@@ -184,6 +184,11 @@ namespace Orleans.Runtime
         public static void Info(this ILogger logger, ErrorCode logCode, string message)
         {
             logger.LogInformation(LoggingUtils.CreateEventId(logCode), message);
+        }
+
+        public static void Warn(this ILogger logger, string message, params object[] args)
+        {
+            logger.LogWarning(message, args);
         }
 
         /// <summary>
