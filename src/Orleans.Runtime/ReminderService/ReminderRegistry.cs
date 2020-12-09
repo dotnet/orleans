@@ -61,7 +61,7 @@ namespace Orleans.Runtime.ReminderService
                         "Cannot register reminder {0} as requested period ({1}) is less than minimum allowed reminder period ({2})",
                         reminderName,
                         period,
-                        Constants.MinReminderPeriod);
+                        minReminderPeriod);
                 throw new ArgumentException(msg);
             }
             if (string.IsNullOrEmpty(reminderName))
