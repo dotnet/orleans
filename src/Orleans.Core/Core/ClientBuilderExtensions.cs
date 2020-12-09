@@ -2,9 +2,11 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -123,6 +125,15 @@ namespace Orleans
             builder.ConfigureServices(services => services.AddSingleton(handler));
             return builder;
         }
+
+        public static IClientBuilder AddActivityPropagation(this IClientBuilder builder) =>
+            builder.ConfigureServices(services =>
+                {
+                    var listener = new DiagnosticListener("Orleans");
+                    services.TryAddSingleton(listener);
+                    services.TryAddSingleton<DiagnosticSource>(listener);
+                })
+                .AddOutgoingGrainCallFilter<ActivityPropagationGrainCallFilter.ActivityPropagationOutgoingGrainCallFilter>();
 
         /// <summary>
         /// Specifies how the <see cref="IServiceProvider"/> for this client is configured. 

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -18,6 +19,18 @@ namespace Orleans.Hosting
         /// <summary>
         /// Configure the container to use Orleans.
         /// </summary>
+
+
+        public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder) =>
+            builder.ConfigureServices(services =>
+                {
+                    var listener = new DiagnosticListener("Orleans");
+                    services.TryAddSingleton(listener);
+                    services.TryAddSingleton<DiagnosticSource>(listener);
+                })
+                .AddOutgoingGrainCallFilter<ActivityPropagationGrainCallFilter.ActivityPropagationOutgoingGrainCallFilter>()
+                .AddIncomingGrainCallFilter<ActivityPropagationGrainCallFilter.ActivityPropagationIncomingGrainCallFilter>();
+
         /// <param name="builder">The silo builder.</param>
         /// <returns>The silo builder.</returns>
         public static ISiloBuilder ConfigureDefaults(this ISiloBuilder builder)
