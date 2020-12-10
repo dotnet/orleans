@@ -186,11 +186,6 @@ namespace Orleans.Runtime
             logger.LogInformation(LoggingUtils.CreateEventId(logCode), message);
         }
 
-        public static void Warn(this ILogger logger, string message, params object[] args)
-        {
-            logger.LogWarning(message, args);
-        }
-
         /// <summary>
         /// Writes a log entry at the Warning level
         /// </summary>

@@ -414,7 +414,7 @@ namespace Orleans.Runtime
                 var minReminderInterval = reminderOptions.Value.MinimalReminderInterval;
 
                 if (reminderOptions.Value.MinimalReminderInterval < Constants.MinReminderPeriod)
-                    this.logger.Warn(
+                    this.logger.Warn(ErrorCode.RS_FastReminderInterval,
                         $"A Minimal Reminder Interval of {minReminderInterval:g} has been set. High-Frequency reminders are dangerous for production use.");
 
                 async Task StartReminderService()
