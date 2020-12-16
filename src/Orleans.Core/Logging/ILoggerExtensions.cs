@@ -72,7 +72,7 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Writes a log entry at the Info logLevel 
+        /// Writes a log entry at the Info logLevel
         /// </summary>
         /// <param name="logger">Target logger.</param>
         /// <param name="message">The log message.</param>
