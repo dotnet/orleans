@@ -27,7 +27,7 @@ namespace UnitTests.CatalogTests
             public void Configure(ISiloBuilder siloBuilder)
             {
                 siloBuilder.Configure<ReminderOptions>(options =>
-                        options.MinimalReminderInterval = TimeSpan.FromMilliseconds(100))
+                        options.MinimumReminderPeriod = TimeSpan.FromMilliseconds(100))
                     .UseInMemoryReminderService();
             }
         }

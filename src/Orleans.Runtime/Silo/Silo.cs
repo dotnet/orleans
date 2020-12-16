@@ -410,13 +410,6 @@ namespace Orleans.Runtime
             {
                 await StartAsyncTaskWithPerfAnalysis("Start reminder service", StartReminderService, stopWatch);
 
-                var reminderOptions = Services.GetService<IOptions<ReminderOptions>>();
-                var minReminderInterval = reminderOptions.Value.MinimalReminderInterval;
-
-                if (reminderOptions.Value.MinimalReminderInterval < Constants.MinReminderPeriod)
-                    this.logger.Warn(ErrorCode.RS_FastReminderInterval,
-                        $"A Minimal Reminder Interval of {minReminderInterval:g} has been set. High-Frequency reminders are dangerous for production use.");
-
                 async Task StartReminderService()
                 {
                     // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service

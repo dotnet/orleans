@@ -69,8 +69,8 @@ namespace UnitTests.Grains
             this.logger.Info("Starting reminder {0}.", reminderName);
             IGrainReminder r = null;
             TimeSpan dueTime;
-            if (reminderOptions.Value.MinimalReminderInterval < TimeSpan.FromSeconds(2))
-                dueTime = TimeSpan.FromSeconds(2) - reminderOptions.Value.MinimalReminderInterval;
+            if (reminderOptions.Value.MinimumReminderPeriod < TimeSpan.FromSeconds(2))
+                dueTime = TimeSpan.FromSeconds(2) - reminderOptions.Value.MinimumReminderPeriod;
             else dueTime = usePeriod - TimeSpan.FromSeconds(2);
 
             if (validate)

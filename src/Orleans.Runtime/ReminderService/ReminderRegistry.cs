@@ -52,7 +52,7 @@ namespace Orleans.Runtime.ReminderService
                     $"Cannot use value larger than {MaxSupportedTimeout}ms for period when creating a reminder");
 
             var reminderOptions = serviceProvider.GetService<IOptions<ReminderOptions>>();
-            var minReminderPeriod = reminderOptions.Value.MinimalReminderInterval;
+            var minReminderPeriod = reminderOptions.Value.MinimumReminderPeriod;
 
             if (period < minReminderPeriod)
             {
