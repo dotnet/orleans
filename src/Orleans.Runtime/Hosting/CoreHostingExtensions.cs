@@ -21,15 +21,20 @@ namespace Orleans.Hosting
         /// </summary>
 
 
-        public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder) =>
-            builder.ConfigureServices(services =>
-                {
-                    var listener = new DiagnosticListener("Orleans");
-                    services.TryAddSingleton(listener);
-                    services.TryAddSingleton<DiagnosticSource>(listener);
-                })
-                .AddOutgoingGrainCallFilter<ActivityPropagationGrainCallFilter.ActivityPropagationOutgoingGrainCallFilter>()
-                .AddIncomingGrainCallFilter<ActivityPropagationGrainCallFilter.ActivityPropagationIncomingGrainCallFilter>();
+        /// <summary>
+        /// Add <see cref="Activity.Current"/> propagation through grain calls.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <returns>The builder.</returns>
+        public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder)
+        {
+            if (Activity.DefaultIdFormat != ActivityIdFormat.W3C)
+                throw new InvalidOperationException("Activity propagation available only for Activities in W3C format. Set Activity.DefaultIdFormat into ActivityIdFormat.W3C.");
+
+            return builder
+            .AddOutgoingGrainCallFilter<ActivityPropagationGrainCallFilter.ActivityPropagationOutgoingGrainCallFilter>()
+            .AddIncomingGrainCallFilter<ActivityPropagationGrainCallFilter.ActivityPropagationIncomingGrainCallFilter>();
+        }
 
         /// <param name="builder">The silo builder.</param>
         /// <returns>The silo builder.</returns>

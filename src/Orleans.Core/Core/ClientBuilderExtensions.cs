@@ -126,14 +126,19 @@ namespace Orleans
             return builder;
         }
 
-        public static IClientBuilder AddActivityPropagation(this IClientBuilder builder) =>
-            builder.ConfigureServices(services =>
-                {
-                    var listener = new DiagnosticListener("Orleans");
-                    services.TryAddSingleton(listener);
-                    services.TryAddSingleton<DiagnosticSource>(listener);
-                })
+        /// <summary>
+        /// Add <see cref="Activity.Current"/> propagation through grain calls.
+        /// </summary>
+        /// <param name="builder">The builder.</param>
+        /// <returns>The builder.</returns>
+        public static IClientBuilder AddActivityPropagation(this IClientBuilder builder)
+        {
+            if (Activity.DefaultIdFormat != ActivityIdFormat.W3C)
+                throw new InvalidOperationException("Activity propagation available only for Activities in W3C format. Set Activity.DefaultIdFormat into ActivityIdFormat.W3C.");
+
+            return builder
                 .AddOutgoingGrainCallFilter<ActivityPropagationGrainCallFilter.ActivityPropagationOutgoingGrainCallFilter>();
+        }
 
         /// <summary>
         /// Specifies how the <see cref="IServiceProvider"/> for this client is configured. 

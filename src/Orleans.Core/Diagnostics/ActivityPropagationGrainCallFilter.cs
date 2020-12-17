@@ -11,7 +11,8 @@ namespace Orleans.Runtime
         private const string TraceParentHeaderName = "traceparent";
         private const string TraceStateHeaderName = "tracestate";
         private const string TraceBaggageHeaderName = "tracebaggage";
-
+        
+        internal const string DiagnosticListenerName = "Orleans.Runtime.GrainCall";
         internal const string ActivityNameIn = "Orleans.Runtime.GrainCall.In";
         internal const string ActivityStartNameIn = "Orleans.Runtime.GrainCall.In.Start";
         internal const string ExceptionEventNameIn = "Orleans.Runtime.GrainCall.In.Exception";
@@ -20,24 +21,16 @@ namespace Orleans.Runtime
         internal const string ActivityStartNameOut = "Orleans.Runtime.GrainCall.Out.Start";
         internal const string ExceptionEventNameOut = "Orleans.Runtime.GrainCall.Out.Exception";
 
+        private static readonly DiagnosticListener DiagnosticListener = new DiagnosticListener(DiagnosticListenerName);
+        
         public class ActivityPropagationOutgoingGrainCallFilter : IOutgoingGrainCallFilter
         {
-            private readonly DiagnosticListener diagnosticListener;
-
-            public ActivityPropagationOutgoingGrainCallFilter(DiagnosticListener diagnosticListener)
-            {
-                this.diagnosticListener = diagnosticListener;
-            }
-
             public Task Invoke(IOutgoingGrainCallContext context)
             {
-                if (Activity.DefaultIdFormat != ActivityIdFormat.W3C)
-                    return context.Invoke();  // Support only W3C standard
-
                 if (Activity.Current != null)
                     return ProcessCurrentActivity(context); // Copy existing activity to RequestContext
 
-                if (diagnosticListener.IsEnabled(ActivityNameOut, context))
+                if (DiagnosticListener.IsEnabled(ActivityNameOut, context))
                     return ProcessDiagnosticSource(context); //Create activity using DiagnosticListener
 
                 return ProcessNewActivity(context); // Create activity directly
@@ -77,9 +70,9 @@ namespace Orleans.Runtime
             {
                 var activity = new Activity(ActivityNameOut);
                 // Only send start event to users who subscribed for it, but start activity anyway
-                if (diagnosticListener.IsEnabled(ActivityStartNameOut))
+                if (DiagnosticListener.IsEnabled(ActivityStartNameOut))
                 {
-                    diagnosticListener.StartActivity(activity, new ActivityStartData(context));
+                    DiagnosticListener.StartActivity(activity, new ActivityStartData(context));
                 }
                 else
                 {
@@ -92,18 +85,18 @@ namespace Orleans.Runtime
                 }
                 catch (Exception ex)
                 {
-                    if (diagnosticListener.IsEnabled(ExceptionEventNameOut))
+                    if (DiagnosticListener.IsEnabled(ExceptionEventNameOut))
                     {
                         // If request was initially instrumented, Activity.Current has all necessary context for logging
                         // Request is passed to provide some context if instrumentation was disabled and to avoid
                         // extensive Activity.Tags usage to tunnel request properties
-                        diagnosticListener.Write(ExceptionEventNameOut, new ExceptionData(ex, context));
+                        DiagnosticListener.Write(ExceptionEventNameOut, new ExceptionData(ex, context));
                     }
                     throw;
                 }
                 finally
                 {
-                    diagnosticListener.StopActivity(activity, new ActivityStopData(context));
+                    DiagnosticListener.StopActivity(activity, new ActivityStopData(context));
                 }
             }
 
@@ -158,19 +151,9 @@ namespace Orleans.Runtime
 
         public class ActivityPropagationIncomingGrainCallFilter : IIncomingGrainCallFilter
         {
-            private readonly DiagnosticListener diagnosticListener;
-
-            public ActivityPropagationIncomingGrainCallFilter(DiagnosticListener diagnosticListener)
-            {
-                this.diagnosticListener = diagnosticListener;
-            }
-
             public Task Invoke(IIncomingGrainCallContext context)
             {
-                if (Activity.DefaultIdFormat != ActivityIdFormat.W3C)
-                    return context.Invoke(); // Support only W3C standard
-
-                if (diagnosticListener.IsEnabled(ActivityNameIn, context))
+                if (DiagnosticListener.IsEnabled(ActivityNameIn, context))
                     return ProcessDiagnosticSource(context); //Create activity from context using DiagnosticListener
 
                 return ProcessActivity(context); // Create activity from context directly
@@ -180,9 +163,9 @@ namespace Orleans.Runtime
             {
                 var activity = CreateActivity();
                 // Only send start event to users who subscribed for it, but start activity anyway
-                if (diagnosticListener.IsEnabled(ActivityStartNameIn))
+                if (DiagnosticListener.IsEnabled(ActivityStartNameIn))
                 {
-                    diagnosticListener.StartActivity(activity, new ActivityStartData(context));
+                    DiagnosticListener.StartActivity(activity, new ActivityStartData(context));
                 }
                 else
                 {
@@ -195,18 +178,18 @@ namespace Orleans.Runtime
                 }
                 catch (Exception ex)
                 {
-                    if (diagnosticListener.IsEnabled(ExceptionEventNameIn))
+                    if (DiagnosticListener.IsEnabled(ExceptionEventNameIn))
                     {
                         // If request was initially instrumented, Activity.Current has all necessary context for logging
                         // Request is passed to provide some context if instrumentation was disabled and to avoid
                         // extensive Activity.Tags usage to tunnel request properties
-                        diagnosticListener.Write(ExceptionEventNameIn, new ExceptionData(ex, context));
+                        DiagnosticListener.Write(ExceptionEventNameIn, new ExceptionData(ex, context));
                     }
                     throw;
                 }
                 finally
                 {
-                    diagnosticListener.StopActivity(activity, new ActivityStopData(context));
+                    DiagnosticListener.StopActivity(activity, new ActivityStopData(context));
                 }
             }
 

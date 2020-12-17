@@ -20,12 +20,24 @@ namespace UnitTests.General
     {
         public class Fixture : BaseTestClusterFixture
         {
+            private readonly ActivityIdFormat format = Activity.DefaultIdFormat;
+
+            public Fixture()
+            {
+                Activity.DefaultIdFormat = ActivityIdFormat.W3C;
+            }
+
+            public override Task DisposeAsync()
+            {
+                Activity.DefaultIdFormat = format;
+                return base.DisposeAsync();
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.ConfigureHostConfiguration(TestDefaultConfiguration.ConfigureHostConfiguration);
                 builder.AddSiloBuilderConfigurator<SiloInvokerTestSiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<ClientConfigurator>();
-                Activity.DefaultIdFormat = ActivityIdFormat.W3C;
             }
 
             private class SiloInvokerTestSiloBuilderConfigurator : ISiloConfigurator
@@ -44,20 +56,6 @@ namespace UnitTests.General
                     clientBuilder
                         .AddActivityPropagation()
                         .AddSimpleMessageStreamProvider("SMSProvider");
-            }
-
-            private ActivityIdFormat format = Activity.DefaultIdFormat;
-
-            public override Task InitializeAsync()
-            {
-                Activity.DefaultIdFormat = ActivityIdFormat.W3C;
-                return base.InitializeAsync();
-            }
-
-            public override Task DisposeAsync()
-            {
-                Activity.DefaultIdFormat = format;
-                return base.DisposeAsync();
             }
         }
 
@@ -137,6 +135,8 @@ namespace UnitTests.General
 
                 Assert.Contains(ActivityPropagationGrainCallFilter.ActivityStartNameIn, eventNames);
                 Assert.Contains(ActivityPropagationGrainCallFilter.ActivityStartNameOut, eventNames);
+                Assert.Contains(ActivityPropagationGrainCallFilter.ActivityNameIn + ".Stop", eventNames);
+                Assert.Contains(ActivityPropagationGrainCallFilter.ActivityNameOut + ".Stop", eventNames);
             }
         }
 
@@ -156,7 +156,7 @@ namespace UnitTests.General
 
             public void OnNext(DiagnosticListener value)
             {
-                if (value.Name == "Orleans")
+                if (value.Name == ActivityPropagationGrainCallFilter.DiagnosticListenerName)
                 {
                     value.Subscribe(this);
                 }
