@@ -186,7 +186,7 @@ namespace Orleans.Connections.Security
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogWarning(1, ex, "Authentication failed: {Exception}", ex);
+                    _logger?.LogWarning(1, ex, "Authentication failed");
 #if NETCOREAPP
                     await sslStream.DisposeAsync();
 #else
