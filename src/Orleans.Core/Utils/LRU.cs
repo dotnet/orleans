@@ -9,7 +9,7 @@ namespace Orleans.Runtime
 {
     // This class implements an LRU cache of values. It keeps a bounded set of values and will
     // flush "old" values 
-    internal class LRU<TKey, TValue> : IEnumerable<KeyValuePair<TKey,TValue>> where TKey : class
+    internal class LRU<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
     {
         // Delegate type for fetching the value associated with a given key.
         public delegate TValue FetchValueDelegate(TKey key);
@@ -54,14 +54,14 @@ namespace Orleans.Runtime
             public readonly TValue Value;
             public long Generation;
 
-            public TimestampedValue(LRU<TKey,TValue> l, TValue v)
+            public TimestampedValue(LRU<TKey, TValue> l, TValue v)
             {
                 Generation = Interlocked.Increment(ref l.nextGeneration);
                 Value = v;
                 WhenLoaded = DateTime.UtcNow;
             }
         }
-        private readonly ConcurrentDictionary<TKey, TimestampedValue> cache;
+        private readonly ConcurrentDictionaryWithCount<TKey, TimestampedValue> cache;
         readonly FetchValueDelegate fetcher;
 
         public int Count { get { return cache.Count; } }
@@ -73,7 +73,7 @@ namespace Orleans.Runtime
         /// <param name="maxSize">Maximum number of entries to allow.</param>
         /// <param name="maxAge">Maximum age of an entry.</param>
         /// <param name="f"></param>
-        public LRU(int maxSize, TimeSpan maxAge, FetchValueDelegate f) 
+        public LRU(int maxSize, TimeSpan maxAge, FetchValueDelegate f)
         {
             if (maxSize <= 0)
             {
@@ -82,14 +82,14 @@ namespace Orleans.Runtime
             MaximumSize = maxSize;
             requiredFreshness = maxAge;
             fetcher = f;
-            cache = new ConcurrentDictionary<TKey, TimestampedValue>();
+            cache = new ConcurrentDictionaryWithCount<TKey, TimestampedValue>();
         }
 
         public void Add(TKey key, TValue value)
         {
             AdjustSize();
             var result = new TimestampedValue(this, value);
-            cache.AddOrUpdate(key, result, (k, o) => result);
+            cache[key] = result;
         }
 
         public bool ContainsKey(TKey key) => cache.ContainsKey(key);
@@ -97,8 +97,7 @@ namespace Orleans.Runtime
         public bool RemoveKey(TKey key, out TValue value)
         {
             value = default(TValue);
-            TimestampedValue tv;
-            if (!cache.TryRemove(key, out tv)) return false;
+            if (!cache.TryRemove(key, out var tv)) return false;
 
             value = tv.Value;
             return true;
@@ -125,32 +124,32 @@ namespace Orleans.Runtime
 
             if (cache.TryGetValue(key, out result))
             {
-                result.Generation = Interlocked.Increment(ref nextGeneration);
                 var age = DateTime.UtcNow.Subtract(result.WhenLoaded);
                 if (age > requiredFreshness)
                 {
                     if (!cache.TryRemove(key, out result)) return false;
                     if (RaiseFlushEvent == null) return false;
-                    
+
                     var args = new FlushEventArgs(key, result.Value);
                     RaiseFlushEvent(this, args);
                     return false;
                 }
-                value = result.Value;
+                else
+                {
+                    result.Generation = Interlocked.Increment(ref nextGeneration);
+                    value = result.Value;
+                    return true;
+                }
             }
             else
             {
                 return false;
             }
-
-            return true;
         }
 
         public TValue Get(TKey key)
         {
-            TValue value;
-
-            if (TryGetValue(key, out value)) return value;
+            if (TryGetValue(key, out var value)) return value;
             if (fetcher == null) return value;
 
             value = fetcher(key);
@@ -168,10 +167,9 @@ namespace Orleans.Runtime
 
                 if (entryToFree.Key == null) continue;
                 TKey keyToFree = entryToFree.Key;
-                TimestampedValue old;
-                if (!cache.TryRemove(keyToFree, out old)) continue;
+                if (!cache.TryRemove(keyToFree, out var old)) continue;
                 if (RaiseFlushEvent == null) continue;
-                
+
                 var args = new FlushEventArgs(keyToFree, old.Value);
                 RaiseFlushEvent(this, args);
             }
@@ -185,6 +183,71 @@ namespace Orleans.Runtime
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
+        }
+
+        private class ConcurrentDictionaryWithCount<K, V> : IEnumerable<KeyValuePair<K, V>>
+        {
+            private int count;
+
+            private ConcurrentDictionary<K, V> dictionary;
+
+
+            public ConcurrentDictionaryWithCount()
+            {
+                dictionary = new ConcurrentDictionary<K, V>();
+            }
+
+            public int Count => count;
+
+            public V this[K key] 
+            { 
+                get => dictionary[key]; 
+                set 
+                {
+                    // if the value is to be added, increment count, otherwise just replace
+                    dictionary.AddOrUpdate(key, k => { Interlocked.Increment(ref count); return value; }, (k, _) => value);
+                }
+            }
+
+            public bool TryRemove(K key, out V value)
+            {
+                if (dictionary.TryRemove(key, out value))
+                {
+                    Interlocked.Decrement(ref count);
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            public bool ContainsKey(K key)
+            {
+                return dictionary.ContainsKey(key);
+            }
+
+            public IEnumerator<KeyValuePair<K, V>> GetEnumerator()
+            {
+                return dictionary.GetEnumerator();
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return dictionary.GetEnumerator();
+            }
+
+            public bool TryGetValue(K key, out V value)
+            {
+                return dictionary.TryGetValue(key, out value);
+            }
+
+            // not thread-safe: if anything is added, or even removed after addition, between Clear and Count, count may be off
+            public void Clear()
+            {
+                dictionary.Clear();
+                count = dictionary.Count;
+            }
         }
     }
 }
