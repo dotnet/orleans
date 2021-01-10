@@ -660,7 +660,7 @@ namespace DefaultCluster.Tests.General
         {
             var grainId = Guid.NewGuid();
             var grain =  this.GrainFactory.GetGrain<ICircularStateTestGrain>(primaryKey: grainId, keyExtension: grainId.ToString("N"));
-            var c1 = await grain.GetState();
+            _ = await grain.GetState();
         }
                 
         [Fact, TestCategory("BVT"), TestCategory("Generics")]
@@ -965,7 +965,7 @@ namespace DefaultCluster.Tests.General
 
                 await grain.Hello();
 
-                var castRef = grain.AsReference<IInterfaceUnrelatedToConcreteGenArgs<float>>();
+                _ = grain.AsReference<IInterfaceUnrelatedToConcreteGenArgs<float>>();
 
                 var response = await grain.Hello();
 
@@ -977,7 +977,7 @@ namespace DefaultCluster.Tests.General
             public async Task Generic_CanCastToFullySpecifiedInterfaceUnrelatedToConcreteGenArgs_Activating() {
                 var grain =  this.GrainFactory.GetGrain<IArbitraryInterface<int, long>>(Guid.NewGuid());
 
-                var castRef = grain.AsReference<IInterfaceUnrelatedToConcreteGenArgs<float>>();
+                _ = grain.AsReference<IInterfaceUnrelatedToConcreteGenArgs<float>>();
 
                 var response = await grain.Hello();
 
@@ -1014,8 +1014,7 @@ namespace DefaultCluster.Tests.General
                 var grain =  this.GrainFactory.GetGrain<IAnotherReceivingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
 
                 await grain.Hello();
-
-                var castRef = grain.AsReference<IYetOneMoreReceivingFurtherSpecializedGenArg<int[]>>();
+                _ = grain.AsReference<IYetOneMoreReceivingFurtherSpecializedGenArg<int[]>>();
 
                 var response = await grain.Hello();
 
@@ -1026,8 +1025,7 @@ namespace DefaultCluster.Tests.General
             [Fact(Skip = "Currently unsupported"), TestCategory("Generics")]
             public async Task Generic_CanCastBetweenInterfacesWithFurtherSpecializedGenArgs_Activating() {
                 var grain =  this.GrainFactory.GetGrain<IAnotherReceivingFurtherSpecializedGenArg<List<int>>>(Guid.NewGuid());
-
-                var castRef = grain.AsReference<IYetOneMoreReceivingFurtherSpecializedGenArg<int[]>>();
+                _ = grain.AsReference<IYetOneMoreReceivingFurtherSpecializedGenArg<int[]>>();
 
                 var response = await grain.Hello();
 

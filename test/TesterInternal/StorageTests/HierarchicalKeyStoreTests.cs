@@ -59,8 +59,7 @@ namespace UnitTests.StorageTests
             data.Add(ValueName1, testName);
 
             var store = new HierarchicalKeyStore(1);
-
-            string eTag = store.WriteRow(keys, data, null);
+            _ = store.WriteRow(keys, data, null);
 
             var result = store.ReadRow(keys);
 
@@ -89,8 +88,7 @@ namespace UnitTests.StorageTests
             data.Add(ValueName1, testName);
 
             var store = new HierarchicalKeyStore(2);
-
-            string eTag = store.WriteRow(keys, data, null);
+            _ = store.WriteRow(keys, data, null);
 
             var result = store.ReadRow(keys);
 
@@ -123,8 +121,7 @@ namespace UnitTests.StorageTests
             data[ValueName3] = testName + 3;
 
             var store = new HierarchicalKeyStore(3);
-
-            string eTag = store.WriteRow(keys, data, null);
+            _ = store.WriteRow(keys, data, null);
 
             var result = store.ReadRow(keys);
 
@@ -158,7 +155,7 @@ namespace UnitTests.StorageTests
             data[ValueName3] = "Three";
 
             // Write #2
-            string newEtag = store.WriteRow(keys, data, eTag);
+            _ = store.WriteRow(keys, data, eTag);
 
             var result = store.ReadRow(keys);
 
@@ -229,8 +226,7 @@ namespace UnitTests.StorageTests
             data[ValueName3] = testName + 3;
 
             var store = new HierarchicalKeyStore(keys.Count);
-
-            string eTag = store.WriteRow(keys, data, null);
+            _ = store.WriteRow(keys, data, null);
 
             var readKeys = new List<Tuple<string, string>>();
             readKeys.Add(keys.First());
@@ -252,7 +248,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
         public void HKS_KeyNotFound()
         {
-            string testName = Guid.NewGuid().ToString(); //TestContext.TestName;
+            _ = Guid.NewGuid().ToString(); //TestContext.TestName;
 
             int key1 = _keyCounter++;
             int key2 = _keyCounter++;

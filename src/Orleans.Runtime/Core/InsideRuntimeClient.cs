@@ -211,8 +211,7 @@ namespace Orleans.Runtime
         /// <param name="id"></param>
         private void UnregisterCallback(CorrelationId id)
         {
-            CallbackData ignore;
-            callbacks.TryRemove(id, out ignore);
+            callbacks.TryRemove(id, out _);
         }
 
         public void SniffIncomingMessage(Message message)

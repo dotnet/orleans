@@ -60,9 +60,10 @@ namespace Orleans.Transactions
                 return (TransactionalStatus.Ok, null);
             }
 
-            List<ParticipantId> writeParticipants = null;
-            List<KeyValuePair<ParticipantId, AccessCounter>> resources = null;
             KeyValuePair<ParticipantId, AccessCounter>? manager;
+
+            List<ParticipantId> writeParticipants;
+            List<KeyValuePair<ParticipantId, AccessCounter>> resources;
             CollateParticipants(transactionInfo.Participants, out writeParticipants, out resources, out manager);
             try
             {

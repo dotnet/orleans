@@ -134,9 +134,8 @@ namespace UnitTests.Grains
         /// </param>
         public void Unsubscribe(TAddress subscriber)
         {
-            ObserverEntry removed;
             this.log.LogDebug(this.logPrefix + ": Removed entry for {0}. {1} total subscribers after remove.", subscriber, this.observers.Count);
-            this.observers.TryRemove(subscriber, out removed);
+            this.observers.TryRemove(subscriber, out _);
         }
 
         /// <summary>
@@ -188,8 +187,7 @@ namespace UnitTests.Grains
             {
                 foreach (var observer in defunct)
                 {
-                    ObserverEntry removed;
-                    this.observers.TryRemove(observer, out removed);
+                    this.observers.TryRemove(observer, out _);
                     if (this.log.IsEnabled(LogLevel.Debug))
                     {
                         this.log.LogDebug(this.logPrefix + ": Removing defunct entry for {0}. {1} total subscribers after remove.", observer, this.observers.Count);
@@ -244,8 +242,7 @@ namespace UnitTests.Grains
             {
                 foreach (var observer in defunct)
                 {
-                    ObserverEntry removed;
-                    this.observers.TryRemove(observer, out removed);
+                    this.observers.TryRemove(observer, out _);
                     if (this.log.IsEnabled(LogLevel.Debug))
                     {
                         this.log.LogDebug(this.logPrefix + ": Removing defunct entry for {0}. {1} total subscribers after remove.", observer, this.observers.Count);
@@ -277,8 +274,7 @@ namespace UnitTests.Grains
                 this.log.Info(this.logPrefix + ": Removing {0} defunct observers entries.", defunct.Count);
                 foreach (var observer in defunct)
                 {
-                    ObserverEntry removed;
-                    this.observers.TryRemove(observer, out removed);
+                    this.observers.TryRemove(observer, out _);
                 }
             }
         }

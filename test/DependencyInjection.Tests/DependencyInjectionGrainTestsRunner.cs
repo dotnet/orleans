@@ -48,7 +48,7 @@ namespace DependencyInjection.Tests
         public async Task CanGetGrainWithInjectedDependencies()
         {
             IDIGrainWithInjectedServices grain = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
-            long ignored = await grain.GetLongValue();
+            var _ = await grain.GetLongValue();
         }
 
         [Fact]
@@ -57,7 +57,7 @@ namespace DependencyInjection.Tests
             // please don't inject your implemetation of IGrainFactory to DI container in Startup Class, 
             // since we are currently not supporting replacing IGrainFactory 
             IDIGrainWithInjectedServices grain = this.fixture.GrainFactory.GetGrain<IDIGrainWithInjectedServices>(GetRandomGrainId());
-            long ignored = await grain.GetGrainFactoryId();
+            _ = await grain.GetGrainFactoryId();
         }
 
         [Fact]

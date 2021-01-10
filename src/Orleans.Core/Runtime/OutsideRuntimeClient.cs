@@ -361,8 +361,7 @@ namespace Orleans
 
         private void UnregisterCallback(CorrelationId id)
         {
-            CallbackData ignore;
-            callbacks.TryRemove(id, out ignore);
+            callbacks.TryRemove(id, out _);
         }
 
         public void Reset(bool cleanup)

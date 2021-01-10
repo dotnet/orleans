@@ -153,7 +153,7 @@ namespace Orleans.Runtime
         internal string GetPrimaryKeyString()
         {
             string key;
-            var tmp = GetPrimaryKey(out key);
+            _ = GetPrimaryKey(out key);
             return key;
         }
 
@@ -308,7 +308,7 @@ namespace Orleans.Runtime
                     idString = keyString.Substring(24, 8);
             }
 
-            string fullString = null;
+            string fullString;
             switch (Category)
             {
                 case UniqueKey.Category.Grain:

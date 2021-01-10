@@ -141,7 +141,7 @@ namespace UnitTests.StorageTests
             const string providerName = MockStorageProviderName1;
             string grainType = typeof(PersistenceTestGrain).FullName;
             Guid guid = Guid.NewGuid();
-            string id = guid.ToString("N");
+            _ = guid.ToString("N");
 
             IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(guid);
 
@@ -159,7 +159,7 @@ namespace UnitTests.StorageTests
             const string providerName = MockStorageProviderName1;
             string grainType = typeof(PersistenceTestGenericGrain<int>).FullName;
             Guid guid = Guid.NewGuid();
-            string id = guid.ToString("N");
+            _ = guid.ToString("N");
 
             var grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGenericGrain<int>>(guid);
 
@@ -236,7 +236,7 @@ namespace UnitTests.StorageTests
             string grainType = typeof(PersistenceTestGrain).FullName;
 
             Guid guid = Guid.NewGuid();
-            string id = guid.ToString("N");
+            _ = guid.ToString("N");
             IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(guid);
 
             await grain.DoSomething();
@@ -259,7 +259,7 @@ namespace UnitTests.StorageTests
         public async Task MemoryStore_Read_Write()
         {
             Guid guid = Guid.NewGuid();
-            string id = guid.ToString("N");
+            _ = guid.ToString("N");
             IMemoryStorageTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IMemoryStorageTestGrain>(guid);
 
             int val = await grain.GetValue();
@@ -389,8 +389,7 @@ namespace UnitTests.StorageTests
             const string providerName = MockStorageProviderName1;
             Guid id = Guid.NewGuid();
             IPersistenceErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceErrorGrain>(id);
-
-            var val = await grain.GetValue();
+            _ = await grain.GetValue();
 
             var providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
 
@@ -528,10 +527,9 @@ namespace UnitTests.StorageTests
             string grainType = typeof(PersistenceErrorGrain).FullName;
 
             Guid guid = Guid.NewGuid();
-            string id = guid.ToString("N");
+            _ = guid.ToString("N");
             IPersistenceErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceErrorGrain>(guid);
-
-            var val = await grain.GetValue();
+            _ = await grain.GetValue();
 
             var providerState = GetStateForStorageProviderInUse(providerName, typeof(MockStorageProvider).FullName);
 
@@ -865,16 +863,15 @@ namespace UnitTests.StorageTests
             string grainType = typeof(PersistenceUserHandledErrorGrain).FullName;
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
-            string id = guid.ToString("N");
+            _ = guid.ToString("N");
             IPersistenceUserHandledErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceUserHandledErrorGrain>(guid);
-
-            var val = await grain.GetValue(); // Activate grain
+            _ = await grain.GetValue(); // Activate grain
             int expectedVal = 42;
 
             SetErrorInjection(providerName, ErrorInjectionPoint.None);
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
 
-            val = await grain.DoRead(false);
+            var val = await grain.DoRead(false);
 
             Assert.Equal(expectedVal, val); // Returned value
 
@@ -898,16 +895,15 @@ namespace UnitTests.StorageTests
             string grainType = typeof(PersistenceUserHandledErrorGrain).FullName;
             string providerName = ErrorInjectorProviderName;
             Guid guid = Guid.NewGuid();
-            string id = guid.ToString("N");
+            _ = guid.ToString("N");
             IPersistenceUserHandledErrorGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceUserHandledErrorGrain>(guid);
-
-            var val = await grain.GetValue(); // Activate grain
+            _ = await grain.GetValue(); // Activate grain
             int expectedVal = 42;
 
             SetErrorInjection(providerName, ErrorInjectionPoint.None);
             SetStoredValue(providerName, typeof(ErrorInjectionStorageProvider).FullName, grainType, grain, "Field1", expectedVal);
 
-            val = await grain.DoRead(false);
+            var val = await grain.DoRead(false);
 
             Assert.Equal(expectedVal, val); // Returned value
 
@@ -977,7 +973,7 @@ namespace UnitTests.StorageTests
                 int expectedVal = i;
                 IPersistenceTestGrain grain = this.HostedCluster.GrainFactory.GetGrain<IPersistenceTestGrain>(Guid.NewGuid());
                 Guid guid = grain.GetPrimaryKey();
-                string id = guid.ToString("N");
+                _ = guid.ToString("N");
 
                 SetStoredValue(MockStorageProviderName1, typeof(MockStorageProvider).FullName, grainType, grain, "Field1", expectedVal); // Update state data behind grain
                 promises[i] = grain.DoRead();
@@ -1305,7 +1301,7 @@ namespace UnitTests.StorageTests
                 {
                     if (!this.HostedCluster.Client.GetTestHooks(siloHandle).HasStorageProvider(providerName).Result) continue;
                     IManagementGrain mgmtGrain = this.HostedCluster.GrainFactory.GetGrain<IManagementGrain>(0);
-                    object[] replies = mgmtGrain.SendControlCommandToProvider(typeof(MockStorageProvider).FullName,
+                    _ = mgmtGrain.SendControlCommandToProvider(typeof(MockStorageProvider).FullName,
                        providerName, (int)MockStorageProvider.Commands.ResetHistory, null).Result;
                 }
             }

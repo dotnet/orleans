@@ -82,8 +82,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool Remove(GrainId key)
         {
-            GrainDirectoryCacheEntry tmp;
-            return cache.RemoveKey(key, out tmp);
+            return cache.RemoveKey(key, out _);
         }
 
         public void Clear()

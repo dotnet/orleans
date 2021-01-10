@@ -24,11 +24,10 @@ namespace UnitTests.Grains
             this.injectedService = injectedService;
             this.injectedGrainFactory = injectedGrainFactory;
             this.injectedScopedService = injectedScopedService;
-            bool set;
             // get the object Id for injected GrainFactory, 
             // object Id will be the same if the underlying object is the same,
             // this is one way to prove that this GrainFactory is injected from DI
-            this.grainFactoryId = ObjectIdGenerator.GetId(this.injectedGrainFactory, out set);
+            this.grainFactoryId = ObjectIdGenerator.GetId(this.injectedGrainFactory, out _);
             this.grainContextAccessor = grainContextAccessor;
         }
 

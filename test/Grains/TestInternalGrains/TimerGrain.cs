@@ -54,7 +54,7 @@ namespace UnitTestGrains
                 logger.Error((int)ErrorCode.Runtime_Error_100146, "grain not running in the right activation context");
 
             string name = (string)data;
-            IDisposable timer = null;
+            IDisposable timer;
             if (name == DefaultTimerName)
             {
                 timer = defaultTimer;

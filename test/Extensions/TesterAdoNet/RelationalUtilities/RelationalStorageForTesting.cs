@@ -159,7 +159,7 @@ namespace UnitTests.General
             var splitScripts = ConvertToExecutableBatches(setupScript, dataBaseName);
             foreach (var script in splitScripts)
             {
-                var res1 = await Storage.ExecuteAsync(script);
+                _ = await Storage.ExecuteAsync(script);
             }
         }
 

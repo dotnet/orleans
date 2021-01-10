@@ -121,10 +121,8 @@ namespace UnitTests.Serialization
             TestTypeA input = new TestTypeA();
             input.Collection = new HashSet<TestTypeA>();
             input.Collection.Add(input);
-
-            TestTypeA output1 = Orleans.TestingHost.Utils.TestingUtils.RoundTripDotNetSerializer(input, this.fixture.GrainFactory, this.fixture.SerializationManager);
-
-            TestTypeA output2 = this.fixture.SerializationManager.RoundTripSerializationForTesting(input);
+            _ = Orleans.TestingHost.Utils.TestingUtils.RoundTripDotNetSerializer(input, this.fixture.GrainFactory, this.fixture.SerializationManager);
+            _ = this.fixture.SerializationManager.RoundTripSerializationForTesting(input);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Serialization")]

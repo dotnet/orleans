@@ -189,7 +189,6 @@ namespace DefaultCluster.Tests.General
         public void BasicActivation_Reentrant_RecoveryAfterExpiredMessage()
         {
             List<Task> promises = new List<Task>();
-            var client = (IInternalClusterClient) this.Client;
             TimeSpan prevTimeout = this.GetResponseTimeout();
             try
             {

@@ -824,7 +824,7 @@ namespace UnitTests.Serialization
         [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_ValidateBuildSegmentListWithLengthLimit(SerializerToUse serializerToUse)
         {
-            var environment = InitializeSerializer(serializerToUse);
+            _ = InitializeSerializer(serializerToUse);
             byte[] array1 = { 1 };
             byte[] array2 = { 2, 3 };
             byte[] array3 = { 4, 5, 6 };

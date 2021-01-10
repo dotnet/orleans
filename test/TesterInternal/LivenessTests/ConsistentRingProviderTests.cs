@@ -116,7 +116,7 @@ namespace UnitTests.LivenessTests
             var options = new HashRingStreamQueueMapperOptions();
             options.TotalQueueCount = totalNumQueues;
             HashRingBasedStreamQueueMapper queueMapper = new HashRingBasedStreamQueueMapper(options, "AzureQueues");
-            var allQueues = queueMapper.GetAllQueues();
+            _ = queueMapper.GetAllQueues();
 
             Dictionary<SiloAddress, List<int>> queueHistogram = new Dictionary<SiloAddress, List<int>>();
             foreach (var siloRange in siloRanges)

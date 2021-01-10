@@ -1,4 +1,4 @@
-﻿// ReSharper disable InconsistentNaming
+// ReSharper disable InconsistentNaming
 namespace Tester.CodeGenTests
 {
     using System;
@@ -280,8 +280,6 @@ namespace Tester.CodeGenTests
 
             public int GetHashCode(@event obj)
             {
-                var x = typeof(NestedGeneric<int>.Nested);
-
                 return obj.GetHashCode();
             }
         }

@@ -1158,10 +1158,8 @@ namespace Orleans.Serialization
                 timer.Start();
                 context.SerializationManager.serializationStatistics.Deserializations.Increment();
             }
-            object result = null;
 
-            result = DeserializeInner(t, context);
-
+            var result = DeserializeInner(t, context);
             if (timer != null)
             {
                 timer.Stop();

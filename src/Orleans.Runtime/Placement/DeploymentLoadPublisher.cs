@@ -223,9 +223,7 @@ namespace Orleans.Runtime
 
             if (Equals(updatedSilo, this.Silo))
                 this.publishTimer.Dispose();
-
-            SiloRuntimeStatistics ignore;
-            periodicStats.TryRemove(updatedSilo, out ignore);
+            periodicStats.TryRemove(updatedSilo, out _);
             NotifyAllStatisticsChangeEventsSubscribers(updatedSilo, null);
         }
     }

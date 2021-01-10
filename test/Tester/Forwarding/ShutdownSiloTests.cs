@@ -107,8 +107,7 @@ namespace Tester.Forwarding
         public async Task SiloGracefulShutdown_StuckActivation()
         {
             var grain = await GetTimerRequestGrainOnSecondary();
-
-            var promise = grain.StartAndWaitTimerTick(TimeSpan.FromMinutes(2));
+            _ = grain.StartAndWaitTimerTick(TimeSpan.FromMinutes(2));
 
             await Task.Delay(500);
             var stopwatch = Stopwatch.StartNew();

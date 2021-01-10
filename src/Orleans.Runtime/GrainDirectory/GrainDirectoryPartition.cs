@@ -126,7 +126,6 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool RemoveActivation(ActivationId act, UnregistrationCause cause, TimeSpan lazyDeregistrationDelay, out IActivationInfo info, out bool wasRemoved)
         {
-            info = null;
             wasRemoved = false;
             if (Instances.TryGetValue(act, out info) && info.OkToRemove(cause, lazyDeregistrationDelay))
             {
@@ -335,9 +334,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="cause">reason for removing the activation</param>
         internal void RemoveActivation(GrainId grain, ActivationId activation, UnregistrationCause cause = UnregistrationCause.Force)
         {
-            IActivationInfo ignore1;
-            bool ignore2;
-            RemoveActivation(grain, activation, cause, out ignore1, out ignore2);
+            RemoveActivation(grain, activation, cause, out _, out _);
         }
 
 

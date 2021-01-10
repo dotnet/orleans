@@ -42,12 +42,11 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         internal void AddStream(InternalStreamId streamId)
         {
-            StreamConsumerExtensionCollection obs;
             // no need to lock on _remoteConsumers, since on the client we have one extension per stream (per StreamProducer)
             // so this call is only made once, when StreamProducer is created.
-            if (remoteConsumers.TryGetValue(streamId, out obs)) return;
+            if (remoteConsumers.TryGetValue(streamId, out _)) return;
 
-            obs = new StreamConsumerExtensionCollection(streamPubSub, this.logger);
+            var obs = new StreamConsumerExtensionCollection(streamPubSub, this.logger);
             remoteConsumers.Add(streamId, obs);
         }
 

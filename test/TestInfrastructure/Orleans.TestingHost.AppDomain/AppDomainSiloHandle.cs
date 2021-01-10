@@ -179,7 +179,7 @@ namespace Orleans.TestingHost
 
         private static void ReportUnobservedException(object sender, System.UnhandledExceptionEventArgs eventArgs)
         {
-            Exception exception = (Exception)eventArgs.ExceptionObject;
+            _ = (Exception)eventArgs.ExceptionObject;
             // WriteLog("Unobserved exception: {0}", exception);
         }
     }

@@ -76,7 +76,6 @@ namespace Orleans.Transactions.TestKit.Consistency
 
             for (int i = 0; i < count; i++)
             {
-                string id = null;
                 var target = localRandom.Next(options.NumGrains);
                 output($"({partition},{i}) g{target}");
 
@@ -88,7 +87,7 @@ namespace Orleans.Transactions.TestKit.Consistency
 
                     if (result.Length > 0)
                     {
-                        id = result[0].ExecutingTx;
+                        var id = result[0].ExecutingTx;
 
                         lock (succeeded)
                             succeeded.Add(id);                           

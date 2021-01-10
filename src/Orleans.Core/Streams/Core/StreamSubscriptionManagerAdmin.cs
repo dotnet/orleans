@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,7 +21,7 @@ namespace Orleans.Streams.Core
 
         public IStreamSubscriptionManager GetStreamSubscriptionManager(string managerType)
         {
-            IStreamSubscriptionManager manager = null;
+            IStreamSubscriptionManager manager;
             if (this.managerStore.TryGetValue(managerType, out manager))
             {
                 return manager;

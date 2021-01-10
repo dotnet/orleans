@@ -14,7 +14,7 @@ namespace Orleans.Runtime
         internal static void InitializeSiloUnobservedExceptionsHandler(this IServiceProvider services)
         {
             //resolve handler from DI to initialize it
-            var ignore = services.GetService<SiloUnobservedExceptionsHandler>();
+            _ = services.GetService<SiloUnobservedExceptionsHandler>();
         }
 
         /// <summary>

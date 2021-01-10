@@ -67,12 +67,12 @@ namespace UnitTests.Grains
         {
             TimeSpan usePeriod = p ?? this.period;
             this.logger.Info("Starting reminder {0}.", reminderName);
-            IGrainReminder r = null;
             TimeSpan dueTime;
             if (reminderOptions.Value.MinimumReminderPeriod < TimeSpan.FromSeconds(2))
                 dueTime = TimeSpan.FromSeconds(2) - reminderOptions.Value.MinimumReminderPeriod;
             else dueTime = usePeriod - TimeSpan.FromSeconds(2);
 
+            IGrainReminder r;
             if (validate)
                 r = await RegisterOrUpdateReminder(reminderName, dueTime, usePeriod);
             else
@@ -135,7 +135,7 @@ namespace UnitTests.Grains
             this.logger.Info("Stopping reminder {0}.", reminderName);
             // we dont reset counter as we want the test methods to be able to read it even after stopping the reminder
             //return UnregisterReminder(allReminders[reminderName]);
-            IGrainReminder reminder = null;
+            IGrainReminder reminder;
             if (this.allReminders.TryGetValue(reminderName, out reminder))
             {
                 await UnregisterReminder(reminder);
@@ -265,7 +265,7 @@ namespace UnitTests.Grains
         {
             TimeSpan usePeriod = p ?? this.period;
             this.logger.Info("Starting reminder {0} for {1}", reminderName, this.GrainId);
-            IGrainReminder r = null;
+            IGrainReminder r;
             if (validate)
                 r = await RegisterOrUpdateReminder(reminderName, /*TimeSpan.FromSeconds(3)*/usePeriod - TimeSpan.FromSeconds(2), usePeriod);
             else
@@ -335,7 +335,7 @@ namespace UnitTests.Grains
             this.logger.Info("Stopping reminder {0}.", reminderName);
             // we dont reset counter as we want the test methods to be able to read it even after stopping the reminder
             //return UnregisterReminder(allReminders[reminderName]);
-            IGrainReminder reminder = null;
+            IGrainReminder reminder;
             if (this.allReminders.TryGetValue(reminderName, out reminder))
             {
                 await UnregisterReminder(reminder);

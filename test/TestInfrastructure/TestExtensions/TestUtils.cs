@@ -57,11 +57,9 @@ namespace Tester
         {
             const int NumLoops = 10000;
             TimeSpan baseline = TimeSpan.FromTicks(80); // Baseline from jthelin03D
-            int n;
             var sw = Stopwatch.StartNew();
             for (int i = 0; i < NumLoops; i++)
             {
-                n = i;
             }
             sw.Stop();
             double multiple = 1.0 * sw.ElapsedTicks / baseline.Ticks;

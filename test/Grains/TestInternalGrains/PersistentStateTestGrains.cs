@@ -65,7 +65,7 @@ namespace UnitTests.PersistentState.Grains
         public Task<string> GetExtendedKeyValue()
         {
             string extKey;
-            var pk = this.GetPrimaryKey(out extKey);
+            _ = this.GetPrimaryKey(out extKey);
             return Task.FromResult(extKey);
         }
 
