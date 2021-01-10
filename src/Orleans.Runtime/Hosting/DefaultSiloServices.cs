@@ -190,7 +190,7 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterMembershipService>();
 
             services.TryAddSingleton<ClientObserverRegistrar>();
-            services.TryAddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClientObserverRegistrar>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();
             services.TryAddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
