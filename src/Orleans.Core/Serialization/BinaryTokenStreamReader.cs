@@ -66,12 +66,6 @@ namespace Orleans.Serialization
             return new CorrelationId(@this.ReadLong());
         }
 
-        internal static GrainDirectoryEntryStatus ReadMultiClusterStatus<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
-        {
-            byte val = @this.ReadByte();
-            return (GrainDirectoryEntryStatus)val;
-        }
-
         /// <summary> Read an <c>ActivationAddress</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         internal static ActivationAddress ReadActivationAddress<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader

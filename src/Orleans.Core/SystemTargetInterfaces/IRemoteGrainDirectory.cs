@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -11,7 +9,6 @@ namespace Orleans.Runtime
     {
         SiloAddress SiloAddress { get; }
         DateTime TimeCreated { get; }
-        GrainDirectoryEntryStatus RegistrationStatus { get; set; }
         bool OkToRemove(UnregistrationCause cause, TimeSpan lazyDeregistrationDelay);
     }
 
@@ -21,7 +18,7 @@ namespace Orleans.Runtime
         int VersionTag { get; }
         bool SingleInstance { get; }
         bool AddActivation(ActivationId act, SiloAddress silo);
-        ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo, GrainDirectoryEntryStatus registrationStatus);
+        ActivationAddress AddSingleActivation(GrainId grain, ActivationId act, SiloAddress silo);
         bool RemoveActivation(ActivationId act, UnregistrationCause cause, TimeSpan lazyDeregistrationDelay, out IActivationInfo entry, out bool wasRemoved);
 
         /// <summary>
@@ -31,8 +28,6 @@ namespace Orleans.Runtime
         /// <param name="other"></param>
         /// <returns>A map of activations which must be deactivated, grouped by silo.</returns>
         Dictionary<SiloAddress, List<ActivationAddress>> Merge(GrainId grain, IGrainInfo other);
-        void CacheOrUpdateRemoteClusterRegistration(GrainId grain, ActivationId oldActivation, ActivationId activation, SiloAddress silo);
-        bool UpdateClusterRegistrationStatus(ActivationId activationId, GrainDirectoryEntryStatus registrationStatus, GrainDirectoryEntryStatus? compareWith = null);
     }
 
     /// <summary>

@@ -98,11 +98,6 @@ namespace Orleans.GrainDirectory
         Force,
 
         /// <summary>
-        /// Remove the directory entry only if it points to an activation in a different cluster
-        /// </summary>
-        CacheInvalidation,
-
-        /// <summary>
         /// Remove the directory entry only if it is not too fresh (to avoid races on new registrations)
         /// </summary>
         NonexistentActivation
