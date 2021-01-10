@@ -15,11 +15,10 @@ namespace OneBoxDeployment.Api.Controllers
     /// </summary>
     [Route("api/[controller]")]
     [Consumes("application/json")]
-    //[Produces("application/json", "application/problem+json")]
     [ApiController]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public class OneBoxDeploymentController: ControllerBase
     {
         /// <summary>

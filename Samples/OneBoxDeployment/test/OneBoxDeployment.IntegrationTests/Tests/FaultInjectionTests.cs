@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Xunit;
 using Xunit.Extensions.Ordering;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http.Json;
 
 namespace OneBoxDeployment.IntegrationTests.Tests
 {
@@ -42,7 +43,7 @@ namespace OneBoxDeployment.IntegrationTests.Tests
             Assert.Equal(HttpStatusCode.InternalServerError, supposedlyFaultyRouteValue.StatusCode);
             Assert.Equal(MimeTypes.ProblemDetailJsonMimeType, supposedlyFaultyRouteValue.Content.Headers.ContentType.MediaType);
 
-            var response = await supposedlyFaultyRouteValue.Content.DeserializeAsync<ProblemDetails>().ConfigureAwait(false);
+            var response = await supposedlyFaultyRouteValue.Content.ReadFromJsonAsync<ProblemDetails>().ConfigureAwait(false);
             Assert.Equal((int)HttpStatusCode.InternalServerError, response.Status);
             Assert.Equal("Internal Server Error", response.Title);
             Assert.StartsWith("urn:oneboxdeployment:error", response.Instance);

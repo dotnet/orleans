@@ -30,10 +30,8 @@ namespace OneBoxDeployment.Api
         /// </summary>
         /// <param name="args">The command line arguments used to run this application.</param>
         /// <returns>The command line arguments used to run this application.</returns>
-        public static IWebHost BuildWebHost(string[] args)
-        {
-            return InternalBuildWebHost(args, new Dictionary<string, string>(), Enumerable.Empty<ILoggerProvider>());
-        }
+        public static IWebHost BuildWebHost(string[] args) =>
+            InternalBuildWebHost(args, new Dictionary<string, string>(), Enumerable.Empty<ILoggerProvider>());
 
 
         /// <summary>

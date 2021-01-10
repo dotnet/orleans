@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Xunit;
 using Xunit.Extensions.Ordering;
 using OneBoxDeployment.Common;
+using System.Net.Http.Json;
 
 namespace OneBoxDeployment.IntegrationTests.Tests
 {
@@ -62,10 +63,10 @@ namespace OneBoxDeployment.IntegrationTests.Tests
             Assert.Equal(HttpStatusCode.OK, grain1IncrementedResponse.StatusCode);
             Assert.Equal(HttpStatusCode.OK, grain2IncrementedResponse.StatusCode);
 
-            var initialState1 = await grain1InitialResponse.Content.DeserializeAsync<int>().ConfigureAwait(false);
-            var initialState2 = await grain2InitialResponse.Content.DeserializeAsync<int>().ConfigureAwait(false);
-            var incrementedState1 = await grain1IncrementedResponse.Content.DeserializeAsync<int>().ConfigureAwait(false);
-            var incrementedState2 = await grain2IncrementedResponse.Content.DeserializeAsync<int>().ConfigureAwait(false);
+            var initialState1 = await grain1InitialResponse.Content.ReadFromJsonAsync<int>().ConfigureAwait(false);
+            var initialState2 = await grain2InitialResponse.Content.ReadFromJsonAsync<int>().ConfigureAwait(false);
+            var incrementedState1 = await grain1IncrementedResponse.Content.ReadFromJsonAsync<int>().ConfigureAwait(false);
+            var incrementedState2 = await grain2IncrementedResponse.Content.ReadFromJsonAsync<int>().ConfigureAwait(false);
             Assert.Equal(initialState1 + grainIncrement1, incrementedState1);
             Assert.Equal(initialState2 + grainIncrement2, incrementedState2);
 

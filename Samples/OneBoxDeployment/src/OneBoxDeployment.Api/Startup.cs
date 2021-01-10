@@ -4,16 +4,13 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.PlatformAbstractions;
 using Microsoft.OpenApi.Models;
-using Newtonsoft.Json;
 using OneBoxDeployment.Api.Filters;
 using OneBoxDeployment.Api.Logging;
 using OneBoxDeployment.Common;
@@ -26,12 +23,12 @@ using Orleans.Statistics;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Security.Principal;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 
@@ -109,7 +106,6 @@ namespace OneBoxDeployment.Api
         /// <param name="services">The ASP.NET services collection.</param>
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddProblemDetails(ConfigureProblemDetails);
             if(Environment.IsProduction())
             {
                 services.AddApplicationInsightsTelemetry(Configuration);
@@ -164,7 +160,6 @@ namespace OneBoxDeployment.Api
             services.AddSwaggerGen(openApiConfig =>
             {
                 openApiConfig.DescribeAllParametersInCamelCase();
-                openApiConfig.OperationFilter<BadRequestProblemDetailOpenApiFilterAttribute>();
 
                 //In the Swagger document this corresponds as follows:
                 //http://localhost:4003/{SwaggerRoot}/{SwaggerDocumentationBasePath}/swagger.json
@@ -196,10 +191,9 @@ namespace OneBoxDeployment.Api
 
                 //The name of the comments file (see project properties). This is set automatically to the name
                 //of the project unless explicitly changed.
-                string commentsFilename = $"{Assembly.GetAssembly(typeof(Startup)).GetName().Name}.xml";
-                string fullCommentsFilePath = Path.Combine(PlatformServices.Default.Application.ApplicationBasePath,
-                    commentsFilename);
-                openApiConfig.IncludeXmlComments(fullCommentsFilePath);
+                string commentsFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+                string fullCommentsFilePath = Path.Combine(AppContext.BaseDirectory, commentsFilename);
+                openApiConfig.IncludeXmlComments(fullCommentsFilePath, includeControllerXmlComments: true);
             });
 
             services.AddHttpContextAccessor();
@@ -212,7 +206,9 @@ namespace OneBoxDeployment.Api
             var clusterConfigValue = Configuration.GetSection(nameof(ClusterConfig));
             if(clusterConfigValue?.Value != null)
             {
-                clusterConfig = JsonConvert.DeserializeObject<ClusterConfig>(clusterConfigValue.Value, new IPAddressConverter());
+                var deserializeOptions = new JsonSerializerOptions();
+                deserializeOptions.Converters.Add(new IPAddressConverter());
+                clusterConfig = JsonSerializer.Deserialize<ClusterConfig>(clusterConfigValue.Value, deserializeOptions);
             }
             else
             {
@@ -241,6 +237,7 @@ namespace OneBoxDeployment.Api
             var client = clientBuilder.Build();
             client.Connect(async ex =>
             {
+                Logger.LogWarning("Could not connect to Orleans cluster: {exception}", ex);
                 await Task.Delay(TimeSpan.FromMilliseconds(300)).ConfigureAwait(false);
                 return true;
             }).GetAwaiter().GetResult();
@@ -378,7 +375,6 @@ namespace OneBoxDeployment.Api
             }
 
             app.UseCors("CorsPolicy");
-            app.UseProblemDetails();
             app.UseStaticFiles();
             app.UseRouting();
             //app.UseAuthorization();
@@ -391,12 +387,7 @@ namespace OneBoxDeployment.Api
             // This is the default behavior; only include exception details in a development environment.
             options.IncludeExceptionDetails = (ctx, ex) => Environment.IsDevelopment();
 
-            options.OnBeforeWriteDetails = (ctx, details) =>
-            {
-                var identifier = Guid.NewGuid().ToString();
-                ctx.TraceIdentifier = identifier;
-                details.Instance = $"urn:oneboxdeployment:error:{identifier}";
-            };
+            options.OnBeforeWriteDetails = (ctx, details) => details.Instance = $"urn:oneboxdeployment:error:{ctx.TraceIdentifier}";
 
             // You can configure the middleware to re-throw certain types of exceptions, all exceptions or based on a predicate.
             // This is useful if you have upstream middleware that needs to do additional handling of exceptions.

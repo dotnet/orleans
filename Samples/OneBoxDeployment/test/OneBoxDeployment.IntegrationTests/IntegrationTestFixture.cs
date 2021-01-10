@@ -6,14 +6,13 @@ using Dapper;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Polly;
 using Polly.Extensions.Http;
 using System;
 using System.Collections.Generic;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -22,6 +21,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Program = OneBoxDeployment.Api.Program;
 using System.Net.Mime;
+using System.Text.Json;
 
 namespace OneBoxDeployment.IntegrationTests
 {
@@ -250,7 +250,9 @@ namespace OneBoxDeployment.IntegrationTests
             var silo2 = BuildSilo(CreateClusterConfig(ClusterId, ServiceId));
             await Task.WhenAll(silo1.StartAsync(), silo2.StartAsync()).ConfigureAwait(false);
 
-            DefaultExtraParameters.Add(nameof(ClusterConfig), JsonConvert.SerializeObject(siloConfig, Formatting.Indented, new IPAddressConverter()));
+            var serializeOptions = new JsonSerializerOptions();
+            serializeOptions.Converters.Add(new IPAddressConverter());
+            DefaultExtraParameters.Add(nameof(ClusterConfig), JsonSerializer.Serialize(siloConfig, serializeOptions));
             ApiHost = Program.InternalBuildWebHost(new[] { "--server.urls", DefaultApiRootUrl }, DefaultExtraParameters, new[] { InMemoryLoggerProvider });
             var apiServerTask = ApiHost.StartAsync();
 
@@ -271,7 +273,7 @@ namespace OneBoxDeployment.IntegrationTests
         /// <returns>A new cluster configuration.</returns>
         public static ClusterConfig CreateClusterConfig(string clusterId, string serviceId)
         {
-            const string AdoNetInvariant = "System.Data.SqlClient";
+            const string AdoNetInvariant = "Microsoft.Data.SqlClient";
             int GatewayPort = PlatformUtilities.GetFreePortFromEphemeralRange();
             int SiloPort = PlatformUtilities.GetFreePortFromEphemeralRange();
             return new ClusterConfig
