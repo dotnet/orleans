@@ -312,6 +312,22 @@ namespace Orleans.Runtime
                 : string.Format(format + "+{3}", N0, N1, TypeCodeData, KeyExt);
         }
 
+        internal string ToGrainKeyString()
+        {
+            string keyString;
+            if (HasKeyExt)
+            {
+                string extension;
+                keyString = IsLongKey ? PrimaryKeyToLong(out extension).ToString() : PrimaryKeyToGuid(out extension).ToString();
+                keyString = $"{keyString}+{extension}";
+            }
+            else
+            {
+                keyString = this.IsLongKey ? PrimaryKeyToLong().ToString() : this.PrimaryKeyToGuid().ToString();
+            }
+            return keyString;
+        }
+
         internal static Category GetCategory(UInt64 typeCodeData)
         {
             return (Category)((typeCodeData >> 56) & 0xFF);
