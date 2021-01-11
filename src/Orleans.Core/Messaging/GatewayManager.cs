@@ -19,7 +19,7 @@ namespace Orleans.Messaging
     /// The known list can come from one of two places: the full list may appear in the client configuration object, or
     /// the config object may contain an IGatewayListProvider delegate. If both appear, then the delegate takes priority.
     /// </summary>
-    internal class GatewayManager : IGatewayListListener, IDisposable
+    internal class GatewayManager : IDisposable
     {
         private readonly object lockable = new object();
         private readonly SafeRandom rand = new SafeRandom();
@@ -78,11 +78,6 @@ namespace Orleans.Messaging
                 knownGateways.Count,
                 Utils.EnumerableToString(knownGateways));
 
-            if (this.gatewayListProvider is IGatewayListObservable observable)
-            {
-                observable.SubscribeToGatewayNotificationEvents(this);
-            }
-
             this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : this.rand.Next(knownGateways.Count);
             this.knownGateways = this.cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
             this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
@@ -95,14 +90,8 @@ namespace Orleans.Messaging
             {
                 Utils.SafeExecute(gatewayRefreshTimer.Dispose, logger);
             }
-            gatewayRefreshTimer = null;
 
-            if (gatewayListProvider is IGatewayListObservable observable)
-            {
-                Utils.SafeExecute(
-                    () => observable.UnSubscribeFromGatewayNotificationEvents(this),
-                    logger);
-            }
+            gatewayRefreshTimer = null;
         }
 
         public void MarkAsDead(SiloAddress gateway)
@@ -231,19 +220,6 @@ namespace Orleans.Messaging
                     // Intentionally ignore any exceptions here.
                 }
             });
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        public void GatewayListNotification(IEnumerable<Uri> gateways)
-        {
-            try
-            {
-                UpdateLiveGatewaysSnapshot(gateways.Select(gw => gw.ToGatewayAddress()), gatewayListProvider.MaxStaleness);
-            }
-            catch (Exception exc)
-            {
-                logger.Error(ErrorCode.ProxyClient_GetGateways, "Exception occurred during GatewayListNotification -> UpdateLiveGatewaysSnapshot", exc);
-            }
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
