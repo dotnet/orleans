@@ -24,7 +24,6 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly object writeLock = new object();
         private Action<SiloAddress, SiloStatus> catalogOnSiloRemoved;
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
-        private readonly ClusterLocalRegistrar localRegistrar;
 
         // Consider: move these constants into an apropriate place
         internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
@@ -123,7 +122,6 @@ namespace Orleans.Runtime.GrainDirectory
             }
             
             DirectoryPartition = grainDirectoryPartitionFactory();
-            localRegistrar = new ClusterLocalRegistrar(DirectoryPartition);
             HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
 
             RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, loggerFactory);
@@ -571,7 +569,16 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 (singleActivation ? RegistrationsSingleActLocal : RegistrationsLocal).Increment();
 
-                return localRegistrar.Register(address, singleActivation);
+                if (singleActivation)
+                {
+                    var result = DirectoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo);
+                    return result;
+                }
+                else
+                {
+                    var tag = DirectoryPartition.AddActivation(address.Grain, address.Activation, address.Silo);
+                    return new AddressAndTag() { Address = address, VersionTag = tag };
+                }
             }
             else
             {
@@ -664,7 +671,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // we are the owner
                 UnregistrationsLocal.Increment();
 
-                localRegistrar.Unregister(address, cause);
+                DirectoryPartition.RemoveActivation(address.Grain, address.Activation, cause);
             }
             else
             {
@@ -689,8 +696,6 @@ namespace Orleans.Runtime.GrainDirectory
         private void UnregisterOrPutInForwardList(IEnumerable<ActivationAddress> addresses, UnregistrationCause cause, int hopCount,
             ref Dictionary<SiloAddress, List<ActivationAddress>> forward, List<Task> tasks, string context)
         {
-            Dictionary<IGrainRegistrar, List<ActivationAddress>> unregisterBatches = new Dictionary<IGrainRegistrar, List<ActivationAddress>>();
-
             foreach (var address in addresses)
             {
                 // see if the owner is somewhere else (returns null if we are owner)
@@ -705,14 +710,8 @@ namespace Orleans.Runtime.GrainDirectory
                     // we are the owner
                     UnregistrationsLocal.Increment();
 
-                    localRegistrar.Unregister(address, cause);
+                    DirectoryPartition.RemoveActivation(address.Grain, address.Activation, cause);
                 }
-            }
-
-            // batch-unregister for each asynchronous registrar
-            foreach (var kvp in unregisterBatches)
-            {
-                tasks.Add(kvp.Key.UnregisterAsync(kvp.Value, cause));
             }
         }
 
@@ -895,7 +894,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (forwardAddress == null)
             {
                 // we are the owner
-                localRegistrar.Delete(grainId);
+                DirectoryPartition.RemoveGrain(grainId);
             }
             else
             {
