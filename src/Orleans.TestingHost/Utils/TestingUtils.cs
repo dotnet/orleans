@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Runtime.Serialization;
@@ -16,6 +17,8 @@ namespace Orleans.TestingHost.Utils
     /// <summary> Collection of test utilities </summary>
     public static class TestingUtils
     {
+        private static long uniquifier = Stopwatch.GetTimestamp();
+
         /// <summary>
         /// Configure <paramref name="builder"/> with a <see cref="FileLoggerProvider"/> which logs to <paramref name="filePath"/>
         /// by default;
@@ -42,7 +45,7 @@ namespace Orleans.TestingHost.Utils
                 Directory.CreateDirectory(traceFileFolder);
             }
 
-            var traceFileName = Path.Combine(traceFileFolder, $"{clusterId}_{nodeName}.log");
+            var traceFileName = Path.Combine(traceFileFolder, $"{clusterId}_{Interlocked.Increment(ref uniquifier):X}_{nodeName}.log");
 
             return traceFileName;
         }

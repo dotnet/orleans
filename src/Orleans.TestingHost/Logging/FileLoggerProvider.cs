@@ -21,7 +21,7 @@ namespace Orleans.TestingHost.Logging
 
         public void Dispose()
         {
-            this.output.Close();
+            this.output.Dispose();
         }
     }
 

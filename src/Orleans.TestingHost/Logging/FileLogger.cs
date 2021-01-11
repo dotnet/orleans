@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
@@ -11,13 +13,28 @@ namespace Orleans.TestingHost.Logging
     /// <summary>
     /// The log output which all <see cref="FileLogger"/> share to log messages to 
     /// </summary>
-    public class FileLoggingOutput
+    public class FileLoggingOutput : IDisposable
     {
+        private static readonly ConcurrentDictionary<FileLoggingOutput, FileLoggingOutput> Instances = new ConcurrentDictionary<FileLoggingOutput, FileLoggingOutput>();
         private readonly TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
         private DateTime lastFlush = DateTime.UtcNow;
         private StreamWriter logOutput;
         private readonly object lockObj = new object();
         private string logFileName;
+
+        static FileLoggingOutput()
+        {
+            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
+
+            static void CurrentDomain_ProcessExit(object sender, EventArgs args)
+            {
+                foreach (var pair in Instances)
+                {
+                    pair.Key.Dispose();
+                }
+            }
+        }
+
         /// <summary>
         /// Constructor
         /// </summary>
@@ -26,6 +43,7 @@ namespace Orleans.TestingHost.Logging
         {
             logOutput = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8);
             this.logFileName = fileName;
+            Instances[this] = this;
         }
 
         /// <summary>
@@ -80,10 +98,15 @@ namespace Orleans.TestingHost.Logging
             return msg;
         }
 
-        /// <summary>
-        /// Close the output
-        /// </summary>
-        public void Close()
+        ~FileLoggingOutput() => Dispose(false);
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        private void Dispose(bool disposing)
         {
             if (this.logOutput == null) return; // was already closed.
 
@@ -110,6 +133,7 @@ namespace Orleans.TestingHost.Logging
             {
                 this.logOutput = null;
                 this.logFileName = null;
+                _ = Instances.TryRemove(this, out _);
             }
         }
     }
