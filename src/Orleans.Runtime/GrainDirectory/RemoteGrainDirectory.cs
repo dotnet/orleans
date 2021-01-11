@@ -95,12 +95,6 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.FromResult(result);
         }
 
-        public Task AcceptHandoffPartition(SiloAddress source, Dictionary<GrainId, IGrainInfo> partition, bool isFullCopy)
-        {
-            router.HandoffManager.AcceptHandoffPartition(source, partition, isFullCopy);
-            return Task.CompletedTask;
-        }
-
         public Task RemoveHandoffPartition(SiloAddress source)
         {
             router.HandoffManager.RemoveHandoffPartition(source);

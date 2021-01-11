@@ -621,8 +621,7 @@ namespace Orleans.Runtime
                 if (gracefully)
                 {
                     // Stop LocalGrainDirectory
-                    await LocalScheduler.QueueTask(() => localGrainDirectory.Stop(true), localGrainDirectory.CacheValidator)
-                        .WithCancellation(ct, "Failed to stop local grain directory gracefully before cancellation");
+                    await LocalScheduler.QueueActionAsync(() => localGrainDirectory.Stop(), localGrainDirectory.CacheValidator);
 
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
 

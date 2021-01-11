@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
@@ -105,7 +105,7 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public Task Stop(bool doOnStopHandoff)
+        public void Stop()
         {
             throw new NotImplementedException();
         }

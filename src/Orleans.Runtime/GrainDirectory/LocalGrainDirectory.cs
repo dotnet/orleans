@@ -208,7 +208,7 @@ namespace Orleans.Runtime.GrainDirectory
         // The alternative would be to allow the silo to process requests after it has handed off its partition, in which case those changes 
         // would receive successful responses but would not be reflected in the eventual state of the directory. 
         // It's easy to change this, if we think the trade-off is better the other way.
-        public async Task Stop(bool doOnStopHandoff)
+        public void Stop()
         {
             // This will cause remote write requests to be forwarded to the silo that will become the new owner.
             // Requests might bounce back and forth for a while as membership stabilizes, but they will either be served by the
@@ -223,17 +223,6 @@ namespace Orleans.Runtime.GrainDirectory
                 maintainer.Stop();
             }
 
-            if (doOnStopHandoff)
-            {
-                try
-                {
-                    await HandoffManager.ProcessSiloStoppingEvent();
-                }
-                catch (Exception exc)
-                {
-                    this.log.LogWarning($"GrainDirectoryHandOffManager failed ProcessSiloStoppingEvent due to exception {exc}");
-                }
-            }
             DirectoryPartition.Clear();
             DirectoryCache.Clear();
         }
@@ -928,43 +917,6 @@ namespace Orleans.Runtime.GrainDirectory
         public SiloAddress GetPrimaryForGrain(GrainId grain)
         {
             return CalculateGrainDirectoryPartition(grain);
-        }
-
-        /// <summary>
-        /// For testing purposes only.
-        /// Returns the silos that this silo thinks hold copies of the directory information for
-        /// the provided grain ID.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <returns></returns>
-        public List<SiloAddress> GetSilosHoldingDirectoryInformationForGrain(GrainId grain)
-        {
-            var primary = CalculateGrainDirectoryPartition(grain);
-            return FindPredecessors(primary, 1);
-        }
-
-        /// <summary>
-        /// For testing purposes only.
-        /// Returns the directory information held by the local silo for the provided grain ID.
-        /// The result will be null if no information is held.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <param name="isPrimary"></param>
-        /// <returns></returns>
-        public List<ActivationAddress> GetLocalDataForGrain(GrainId grain, out bool isPrimary)
-        {
-            var primary = CalculateGrainDirectoryPartition(grain);
-            List<ActivationAddress> backupData = HandoffManager.GetHandedOffInfo(grain);
-            if (MyAddress.Equals(primary))
-            {
-                log.Assert(ErrorCode.DirectoryBothPrimaryAndBackupForGrain, backupData == null,
-                    "Silo contains both primary and backup directory data for grain " + grain);
-                isPrimary = true;
-                return GetLocalDirectoryData(grain).Addresses;
-            }
-
-            isPrimary = false;
-            return backupData;
         }
 
         public override string ToString()

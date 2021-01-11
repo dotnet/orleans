@@ -44,87 +44,6 @@ namespace Orleans.Runtime.GrainDirectory
             lastPromise = new Dictionary<SiloAddress, Task>();
         }
 
-        internal List<ActivationAddress> GetHandedOffInfo(GrainId grain)
-        {
-            lock (this)
-            {
-                foreach (var partition in directoryPartitionsMap.Values)
-                {
-                    var result = partition.LookUpActivations(grain);
-                    if (result.Addresses != null)
-                        return result.Addresses;
-                }
-            }
-            return null;
-        }
-
-        private async Task HandoffMyPartitionUponStop(List<KeyValuePair<GrainId, IGrainInfo>> batchUpdate, List<SiloAddress> silosHoldingMyPartitionCopy, bool isFullCopy)
-        {
-            if (batchUpdate.Count == 0 || silosHoldingMyPartitionCopy.Count == 0)
-            {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug((isFullCopy ? "FULL" : "DELTA") + " handoff finished with empty delta (nothing to send)");
-                return;
-            }
-
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending {0} items to my {1}: (ring status is {2})", 
-                batchUpdate.Count, silosHoldingMyPartitionCopy.ToStrings(), localDirectory.RingStatusToString());
-
-            var tasks = new List<Task>();
-
-            var n = 0;
-            var chunk = new Dictionary<GrainId, IGrainInfo>();
-
-            // Note that batchUpdate will not change while this method is executing
-            foreach (var pair in batchUpdate)
-            {
-                chunk[pair.Key] = pair.Value;
-                n++;
-                if ((n % HANDOFF_CHUNK_SIZE != 0) && (n != batchUpdate.Count))
-                {
-                    // If we haven't filled in a chunk yet, keep looping.
-                    continue;
-                }
-
-                foreach (SiloAddress silo in silosHoldingMyPartitionCopy)
-                {
-                    SiloAddress captureSilo = silo;
-                    Dictionary<GrainId, IGrainInfo> captureChunk = chunk;
-                    bool captureIsFullCopy = isFullCopy;
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending handed off partition to " + captureSilo);
-
-                    Task pendingRequest;
-                    if (lastPromise.TryGetValue(captureSilo, out pendingRequest))
-                    {
-                        try
-                        {
-                            await pendingRequest;
-                        }
-                        catch (Exception)
-                        {
-                        }
-                    }
-                    Task task = localDirectory.Scheduler.RunOrQueueTask(
-                                () => localDirectory.GetDirectoryReference(captureSilo).AcceptHandoffPartition(
-                                        localDirectory.MyAddress,
-                                        captureChunk,
-                                        captureIsFullCopy),
-                                localDirectory.RemoteGrainDirectory);
-                    lastPromise[captureSilo] = task;
-                    tasks.Add(task);
-                }
-                // We need to use a new Dictionary because the call to AcceptHandoffPartition, which reads the current Dictionary,
-                // happens asynchronously (and typically after some delay).
-                chunk = new Dictionary<GrainId, IGrainInfo>();
-
-                // This is a quick temporary solution. We send a full copy by sending one chunk as a full copy and follow-on chunks as deltas.
-                // Obviously, this will really mess up if there's a failure after the first chunk but before the others are sent, since on a
-                // full copy receive the follower dumps all old data and replaces it with the new full copy. 
-                // On the other hand, over time things should correct themselves, and of course, losing directory data isn't necessarily catastrophic.
-                isFullCopy = false;
-            }
-            await Task.WhenAll(tasks);
-        }
-
         internal void ProcessSiloRemoveEvent(SiloAddress removedSilo)
         {
             lock (this)
@@ -160,36 +79,6 @@ namespace Orleans.Runtime.GrainDirectory
                 directoryPartitionsMap.Remove(removedSilo);
                 DestroyDuplicateActivations(duplicates);
             }
-        }
-
-        internal Task ProcessSiloStoppingEvent()
-        {
-            return ProcessSiloStoppingEvent_Impl();
-        }
-
-        private async Task ProcessSiloStoppingEvent_Impl()
-        {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Processing silo stopping event");
-
-            // As we're about to enter an async context further down, this is the latest opportunity to lock, modify and copy
-            // silosHoldingMyPartition for use inside of HandoffMyPartitionUponStop
-            List<SiloAddress> silosHoldingMyPartitionCopy;
-            lock (this)
-            {
-                // Select our nearest predecessor to receive our hand-off, since that's the silo that will wind up owning our partition (assuming
-                // that it doesn't also fail and that no other silo joins during the transition period).
-                if (silosHoldingMyPartition.Count == 0)
-                {
-                    silosHoldingMyPartition.AddRange(localDirectory.FindPredecessors(localDirectory.MyAddress, 1));
-                }
-
-                silosHoldingMyPartitionCopy = silosHoldingMyPartition.ToList();
-            }
-
-            // take a copy of the current directory partition
-            var batchUpdate = localDirectory.DirectoryPartition.GetItems();
-
-            await HandoffMyPartitionUponStop(batchUpdate, silosHoldingMyPartitionCopy, true);
         }
 
         internal void ProcessSiloAddEvent(SiloAddress addedSilo)
