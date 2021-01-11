@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Net;
 using System.Threading;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -57,6 +59,14 @@ namespace Orleans.Runtime.Messaging
 
                     // Configure the connection builder using the user-defined options.
                     var connectionBuilder = new ConnectionBuilder(this.ServiceProvider);
+                    connectionBuilder.Use(next =>
+                    {
+                        return async context =>
+                        {
+                            context.Features.Set<IUnderlyingTransportFeature>(new UnderlyingConnectionTransportFeature { Transport = context.Transport });
+                            await next(context);
+                        };
+                    });
                     this.ConfigureConnectionBuilder(connectionBuilder);
                     Connection.ConfigureBuilder(connectionBuilder);
                     return this.connectionDelegate = connectionBuilder.Build();
@@ -121,20 +131,17 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 var cycles = 0;
+                var closeTasks = new List<Task>();
+                var cancellationTask = cancellationToken.WhenCancelled();
                 while (this.ConnectionCount > 0)
                 {
+                    closeTasks.Clear();
                     foreach (var connection in this.connections.Keys.ToImmutableList())
                     {
-                        try
-                        {
-                            connection.Close();
-                        }
-                        catch
-                        {
-                        }
+                        closeTasks.Add(connection.CloseAsync(exception: null));
                     }
 
-                    await Task.Delay(10);
+                    await Task.WhenAny(Task.WhenAll(closeTasks), cancellationTask);
 
                     if (cancellationToken.IsCancellationRequested) break;
 

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -19,7 +21,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionOptions connectionOptions;
         private readonly ConnectionFactory connectionFactory;
         private readonly NetworkingTrace trace;
-        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
+        private readonly CancellationTokenSource shutdownCancellation = new CancellationTokenSource();
         private readonly object lockObj = new object();
         private readonly TaskCompletionSource<int> closedTaskCompletionSource = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -97,7 +99,10 @@ namespace Orleans.Runtime.Messaging
             while (true)
             {
                 await Task.Yield();
-                this.cancellation.Token.ThrowIfCancellationRequested();
+                if (this.shutdownCancellation.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException("Shutting down");
+                }
 
                 ConnectionEntry entry;
                 Task pendingAttempt;
@@ -206,20 +211,18 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            if (exception != null)
+            if (exception != null && !this.shutdownCancellation.IsCancellationRequested)
             {
                 this.trace.LogWarning(
-                    "Connection {Connection} to endpoint {EndPoint} terminated with exception {Exception}",
-                    connection,
-                    address,
-                    exception);
+                    exception,
+                    "Connection {Connection} terminated",
+                    connection);
             }
             else
             {
                 this.trace.LogDebug(
-                    "Connection {Connection} to endpoint {EndPoint} closed",
-                    connection,
-                    address);
+                    "Connection {Connection} closed",
+                    connection);
             }
         }
 
@@ -253,7 +256,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 // Cancel pending connection attempts either when the host terminates or after the configured time limit.
-                openConnectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.cancellation.Token);
+                openConnectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.shutdownCancellation.Token);
                 openConnectionCancellation.CancelAfter(this.connectionOptions.OpenConnectionTimeout);
 
                 var connection = await this.connectionFactory.ConnectAsync(address, openConnectionCancellation.Token)
@@ -276,9 +279,9 @@ namespace Orleans.Runtime.Messaging
                 this.OnConnectionFailed(address, DateTime.UtcNow);
 
                 this.trace.LogWarning(
-                    "Connection attempt to endpoint {EndPoint} failed with exception {Exception}",
-                    address,
-                    exception);
+                    exception,
+                    "Connection attempt to endpoint {EndPoint} failed",
+                    address);
 
                 throw new ConnectionFailedException(
                     $"Unable to connect to endpoint {address}. See {nameof(exception.InnerException)}", exception);
@@ -289,7 +292,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void Close(SiloAddress endpoint)
+        public async Task CloseAsync(SiloAddress endpoint)
         {
             ConnectionEntry entry;
             lock (this.lockObj)
@@ -310,16 +313,19 @@ namespace Orleans.Runtime.Messaging
 
             if (entry is ConnectionEntry && !entry.Connections.IsDefault)
             {
+                var closeTasks = new List<Task>();
                 foreach (var connection in entry.Connections)
                 {
                     try
                     {
-                        connection.Close();
+                        closeTasks.Add(connection.CloseAsync(exception: null));
                     }
                     catch
                     {
                     }
                 }
+
+                await Task.WhenAll(closeTasks);
             }
         }
 
@@ -327,11 +333,17 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                this.cancellation.Cancel(throwOnFirstException: false);
+                if (this.trace.IsEnabled(LogLevel.Information))
+                {
+                    this.trace.LogInformation("Shutting down connections");
+                }
+
+                this.shutdownCancellation.Cancel(throwOnFirstException: false);
 
                 var cycles = 0;
                 while (this.ConnectionCount > 0)
                 {
+                    var closeTasks = new List<Task>();
                     foreach (var entry in this.connections.Values.ToImmutableList())
                     {
                         if (entry.Connections.IsDefaultOrEmpty) continue;
@@ -339,7 +351,7 @@ namespace Orleans.Runtime.Messaging
                         {
                             try
                             {
-                                connection.Close();
+                                closeTasks.Add(connection.CloseAsync(exception: null));
                             }
                             catch
                             {
@@ -347,6 +359,7 @@ namespace Orleans.Runtime.Messaging
                         }
                     }
 
+                    await Task.WhenAny(Task.WhenAll(closeTasks), ct.WhenCancelled());
                     if (ct.IsCancellationRequested) break;
 
                     await Task.Delay(10);
@@ -358,7 +371,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                this.trace?.LogWarning("Exception during shutdown: {Exception}", exception);
+                this.trace?.LogWarning(exception, "Exception during shutdown");
             }
             finally
             {
