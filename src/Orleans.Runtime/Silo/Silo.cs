@@ -521,8 +521,9 @@ namespace Orleans.Runtime
         /// </summary>
         public async Task StopAsync(CancellationToken cancellationToken)
         {
+            logger.LogInformation((int)ErrorCode.SiloShuttingDown, "Silo shutting down");
+
             bool gracefully = !cancellationToken.IsCancellationRequested;
-            string operation = gracefully ? "Shutdown()" : "Stop()";
             bool stopAlreadyInProgress = false;
             lock (lockable)
             {
@@ -535,7 +536,7 @@ namespace Orleans.Runtime
                 }
                 else if (!this.SystemStatus.Equals(SystemStatus.Running))
                 {
-                    throw new InvalidOperationException(String.Format("Calling Silo.{0} on a silo which is not in the Running state. This silo is in the {1} state.", operation, this.SystemStatus));
+                    throw new InvalidOperationException($"Attempted to stop a silo which is not in the {nameof(SystemStatus.Running)} state. This silo is in the {this.SystemStatus} state.");
                 }
                 else
                 {
@@ -567,10 +568,9 @@ namespace Orleans.Runtime
             finally
             {
                 // Signal to all awaiters that the silo has terminated.
-                await Task.Run(() => this.siloTerminatedTask.TrySetResult(0)).ConfigureAwait(false);
-
+                logger.LogInformation((int)ErrorCode.SiloShutDown, "Silo shutdown completed");
                 SafeExecute(LocalScheduler.Stop);
-                SafeExecute(LocalScheduler.PrintStatistics);
+                await Task.Run(() => this.siloTerminatedTask.TrySetResult(0)).ConfigureAwait(false);
             }
         }
 
@@ -591,8 +591,6 @@ namespace Orleans.Runtime
         private Task OnRuntimeInitializeStop(CancellationToken ct)
         {
             // 10, 11, 12: Write Dead in the table, Drain scheduler, Stop msg center, ...
-            logger.Info(ErrorCode.SiloStopped, "Silo is Stopped()");
-
             // timers
             if (platformWatchdog != null)
                 SafeExecute(platformWatchdog.Stop); // Silo may be dying before platformWatchdog was set up
@@ -614,25 +612,26 @@ namespace Orleans.Runtime
                 return;
 
             bool gracefully = !ct.IsCancellationRequested;
-            string operation = gracefully ? "Shutdown()" : "Stop()";
             try
             {
                 if (gracefully)
                 {
-                    logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
+                    // Stop LocalGrainDirectory
+                    await LocalScheduler.QueueTask(() => localGrainDirectory.Stop(true), localGrainDirectory.CacheValidator)
+                        .WithCancellation(ct, "Failed to stop local grain directory gracefully before cancellation");
 
-                    //Stop LocalGrainDirectory
-                    await LocalScheduler.QueueTask(()=>localGrainDirectory.Stop(true), localGrainDirectory.CacheValidator)
-                        .WithCancellation(ct, "localGrainDirectory Stop failed because the task was cancelled");
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
-                    //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
+
+                    // Wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
                     await Task.Delay(WaitForMessageToBeQueuedForOutbound);
                 }
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.SiloFailedToStopMembership,
-                    $"Failed to {operation}. About to FastKill this silo.", exc);
+                logger.LogError(
+                    (int)ErrorCode.SiloFailedToStopMembership,
+                    exc,
+                    "Failed to shutdown gracefully. About to terminate ungracefully");
                 this.isFastKilledNeeded = true;
             }
 

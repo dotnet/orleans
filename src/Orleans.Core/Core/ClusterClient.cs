@@ -20,6 +20,7 @@ namespace Orleans
     internal class ClusterClient : IInternalClusterClient
     {
         private readonly OutsideRuntimeClient runtimeClient;
+        private readonly ILogger<ClusterClient> logger;
         private readonly ClusterClientLifecycle clusterClientLifecycle;
         private readonly AsyncLock initLock = new AsyncLock();
         private readonly ClientApplicationLifetime applicationLifetime;
@@ -44,6 +45,7 @@ namespace Orleans
         public ClusterClient(OutsideRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
         {
             this.runtimeClient = runtimeClient;
+            this.logger = loggerFactory.CreateLogger<ClusterClient>();
             this.clusterClientLifecycle = new ClusterClientLifecycle(loggerFactory.CreateLogger<LifecycleSubject>());
 
             //set PropagateActivityId flag from node config
@@ -94,8 +96,13 @@ namespace Orleans
         /// <summary>
         /// Gets a value indicating whether or not this instance is being disposed.
         /// </summary>
-        private bool IsDisposing => this.state == LifecycleState.Disposed ||
-                                    this.state == LifecycleState.Disposing;
+        private bool IsDisposing => this.state switch
+        {
+            LifecycleState.Disposing => true,
+            LifecycleState.Disposed => true,
+            LifecycleState.Invalid => true,
+            _ => false
+        };
 
         /// <inheritdoc />
         public IStreamProvider GetStreamProvider(string name)
@@ -146,6 +153,8 @@ namespace Orleans
                 if (this.state == LifecycleState.Disposed) return;
                 try
                 {
+                    logger.LogInformation("Client shutting down");
+
                     this.state = LifecycleState.Disposing;
                     CancellationToken canceled = CancellationToken.None;
                     if (!gracefully)
@@ -158,9 +167,12 @@ namespace Orleans
                     await this.clusterClientLifecycle.OnStop(canceled).ConfigureAwait(false);
 
                     this.runtimeClient?.Reset(gracefully);
+                    this.state = LifecycleState.Disposed;
                 }
                 finally
                 {
+                    logger.LogInformation("Client shutdown completed");
+
                     // If disposal failed, the system is in an invalid state.
                     if (this.state == LifecycleState.Disposing) this.state = LifecycleState.Invalid;
                 }
