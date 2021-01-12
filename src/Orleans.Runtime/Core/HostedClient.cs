@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.GrainReferences;
 using Orleans.Internal;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -25,7 +26,6 @@ namespace Orleans.Runtime
         private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly InvokableObjectManager invokableObjects;
         private readonly IRuntimeClient runtimeClient;
-        private readonly ClientObserverRegistrar clientObserverRegistrar;
         private readonly ILogger logger;
         private readonly IInternalGrainFactory grainFactory;
         private readonly MessageCenter siloMessageCenter;
@@ -36,7 +36,6 @@ namespace Orleans.Runtime
 
         public HostedClient(
             IRuntimeClient runtimeClient,
-            ClientObserverRegistrar clientObserverRegistrar,
             ILocalSiloDetails siloDetails,
             ILogger<HostedClient> logger,
             IGrainReferenceRuntime grainReferenceRuntime,
@@ -54,7 +53,6 @@ namespace Orleans.Runtime
             });
 
             this.runtimeClient = runtimeClient;
-            this.clientObserverRegistrar = clientObserverRegistrar;
             this.grainReferenceRuntime = grainReferenceRuntime;
             this.grainFactory = grainFactory;
             this.invokableObjects = new InvokableObjectManager(
@@ -67,10 +65,12 @@ namespace Orleans.Runtime
             this.messagingTrace = messagingTrace;
             this.logger = logger;
 
-            this.ClientId = ClientGrainId.Create($"hosted-{messageCenter.MyAddress.ToParsableString()}");
-            this.Address = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, this.ClientId.GrainId);
+            this.ClientId = CreateHostedClientGrainId(siloDetails.SiloAddress);
+            this.Address = Gateway.GetClientActivationAddress(this.ClientId.GrainId, siloDetails.SiloAddress);
             this.GrainReference = referenceActivator.CreateReference(this.ClientId.GrainId, default);
         }
+
+        public static ClientGrainId CreateHostedClientGrainId(SiloAddress siloAddress) => ClientGrainId.Create($"hosted-{siloAddress.ToParsableString()}");
 
         /// <inheritdoc />
         public ClientGrainId ClientId { get; }
@@ -181,8 +181,6 @@ namespace Orleans.Runtime
         {
             if (this.disposing) return;
             this.disposing = true;
-            Utils.SafeExecute(() => this.clientObserverRegistrar.ClientDropped(this.ClientId));
-            Utils.SafeExecute(() => this.clientObserverRegistrar.SetHostedClient(null));
             Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
             Utils.SafeExecute(() => this.incomingMessages.Writer.TryComplete());
             Utils.SafeExecute(() => this.messagePump?.GetAwaiter().GetResult());
@@ -237,9 +235,7 @@ namespace Orleans.Runtime
             {
                 if (cancellation.IsCancellationRequested) return Task.CompletedTask;
 
-                // Register with the directory and message center so that we can receive messages.
-                this.clientObserverRegistrar.SetHostedClient(this);
-                this.clientObserverRegistrar.ClientAdded(this.ClientId);
+                // Register with the message center so that we can receive messages.
                 this.siloMessageCenter.SetHostedClient(this);
 
                 // Start pumping messages.

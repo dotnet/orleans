@@ -175,7 +175,7 @@ namespace UnitTests.Grains
             SiloAddress siloAddress = silos.Where(pair => !pair.Key.Equals(mySilo)).Select(pair => pair.Key).First();
             logger.Info("Sending Ping to remote silo {0}", siloAddress);
 
-            var oracle = this.internalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleType, siloAddress);
+            var oracle = this.internalGrainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, siloAddress);
 
             await oracle.Ping(1);
             logger.Info("Ping reply received for {0}", siloAddress);

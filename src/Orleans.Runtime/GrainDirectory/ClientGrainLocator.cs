@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -11,34 +14,71 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class ClientGrainLocator : IGrainLocator
     {
-        private readonly ILocalGrainDirectory localGrainDirectory;
+        private readonly SafeRandom _random = new SafeRandom();
+        private readonly ILocalClientDirectory _clientDirectory;
+        private readonly ILogger<ClientGrainLocator> _logger;
 
-        public ClientGrainLocator(ILocalGrainDirectory localGrainDirectory)
+        public ClientGrainLocator(ILocalClientDirectory clientDirectory, ILogger<ClientGrainLocator> logger)
         {
-            this.localGrainDirectory = localGrainDirectory;
+            _clientDirectory = clientDirectory;
+            _logger = logger;
         }
 
-        public async Task<List<ActivationAddress>> Lookup(GrainId grainId)
+        public Task<List<ActivationAddress>> Lookup(GrainId clientGrainId)
         {
-            if (!ClientGrainId.TryParse(grainId, out var clientId))
+            var table = _clientDirectory.GetRoutingTable();
+            if (table.Routes.TryGetValue(clientGrainId, out var clientRoutes) && clientRoutes.Count > 0)
             {
-                ThrowNotClientGrainId(grainId);
+                return Task.FromResult(clientRoutes);
             }
 
-            var addresses = await this.localGrainDirectory.LookupAsync(clientId.GrainId);
-            return addresses.Addresses;
+            return LookupClientAsync(clientGrainId, table.RemoteDirectories);
+
+            async Task<List<ActivationAddress>> LookupClientAsync(GrainId clientGrainId, IRemoteClientDirectory[] remoteDirectories)
+            {
+                var seed = _random.Next();
+                var attemptsRemaining = 5;
+                while (attemptsRemaining-- > 0 && remoteDirectories.Length > 0)
+                {
+                    try
+                    {
+                        // Cycle through remote directories.
+                        var remoteDirectory = remoteDirectories[(ushort)seed++ % remoteDirectories.Length];
+
+                        var response = await remoteDirectory.GetClientRoutes(clientGrainId);
+                        if (response is object && response.Count > 0)
+                        {
+                            var result = new List<ActivationAddress>(response.Count);
+                            foreach (var route in response)
+                            {
+                                result.Add(Gateway.GetClientActivationAddress(clientGrainId, route));
+                            }
+                        }
+                    }
+                    catch (Exception exception) when (attemptsRemaining > 0)
+                    {
+                        _logger.LogError(exception, "Exception calling remote client directory");
+                    }
+
+                    var table = _clientDirectory.GetRoutingTable();
+                    remoteDirectories = table.RemoteDirectories;
+                }
+
+                return new List<ActivationAddress>(0);
+            }
         }
 
         public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses)
         {
-            if (!ClientGrainId.TryParse(grainId, out var clientId))
+            if (!ClientGrainId.TryParse(grainId, out _))
             {
                 ThrowNotClientGrainId(grainId);
             }
 
-            if (this.localGrainDirectory.LocalLookup(clientId.GrainId, out var addressesAndTag))
+            var table = _clientDirectory.GetRoutingTable();
+            if (table.Routes.TryGetValue(grainId, out var clientRoutes) && clientRoutes.Count > 0)
             {
-                addresses = addressesAndTag.Addresses;
+                addresses = clientRoutes;
                 return true;
             }
 

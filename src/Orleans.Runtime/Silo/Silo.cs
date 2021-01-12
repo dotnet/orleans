@@ -235,32 +235,19 @@ namespace Orleans.Runtime
 
         private void CreateSystemTargets()
         {
-            logger.Debug("Creating System Targets for this silo.");
-
-            logger.Debug("Creating {0} System Target", "SiloControl");
             var siloControl = ActivatorUtilities.CreateInstance<SiloControl>(Services);
             RegisterSystemTarget(siloControl);
 
-            logger.Debug("Creating {0} System Target", "DeploymentLoadPublisher");
             RegisterSystemTarget(Services.GetRequiredService<DeploymentLoadPublisher>());
-
-            logger.Debug("Creating {0} System Target", "RemoteGrainDirectory + CacheValidator");
             RegisterSystemTarget(LocalGrainDirectory.RemoteGrainDirectory);
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
 
-            logger.Debug("Creating {0} System Target", "RemoteClusterGrainDirectory");
+            this.RegisterSystemTarget(this.Services.GetRequiredService<ClientDirectory>());
 
-            logger.Debug("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
-
-            this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
-
-            logger.Debug("Creating {0} System Target", "MembershipOracle");
             if (this.membershipService is SystemTarget)
             {
                 RegisterSystemTarget((SystemTarget)this.membershipService);
             }
-
-            logger.Debug("Finished creating System Targets for this silo.");
         }
 
         private async Task InjectDependencies()
@@ -397,7 +384,7 @@ namespace Orleans.Runtime
             {
                 // Now that we're active, we can start the gateway
                 var mc = this.messageCenter as MessageCenter;
-                mc?.StartGateway(this.Services.GetRequiredService<ClientObserverRegistrar>());
+                mc?.StartGateway();
                 logger.Debug("Message gateway service started successfully.");
             }
 
