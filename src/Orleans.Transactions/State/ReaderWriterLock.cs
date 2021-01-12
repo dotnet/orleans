@@ -414,7 +414,7 @@ namespace Orleans.Transactions.State
                     // if we have not found a place to insert this op yet, and there is room, and no conflicts, use this one
                     if (group == null
                         && pos.FillCount < this.options.MaxLockGroupSize
-                        && !HasConflict(isRead, DateTime.MaxValue, guid, pos, out var resolvable))
+                        && !HasConflict(isRead, DateTime.MaxValue, guid, pos, out _))
                     {
                         group = pos;
                     }

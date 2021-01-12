@@ -209,7 +209,7 @@ namespace Orleans.Storage
                 fields.Add(GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference));
                 fields.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
 
-                int currentEtag = 0;
+                int currentEtag;
                 int.TryParse(grainState.ETag, out currentEtag);
                 newEtag = currentEtag;
                 fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = newEtag++.ToString() });
@@ -231,7 +231,7 @@ namespace Orleans.Storage
                 keys.Add(GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference));
                 keys.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
 
-                int currentEtag = 0;
+                int currentEtag;
                 int.TryParse(grainState.ETag, out currentEtag);
                 newEtag = currentEtag;
                 newEtag++;

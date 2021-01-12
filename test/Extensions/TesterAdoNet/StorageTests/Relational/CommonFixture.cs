@@ -60,7 +60,7 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         public CommonFixture()
         {
-            var clusterOptions = this.Services.GetRequiredService<IOptions<ClusterOptions>>();
+            _ = this.Services.GetRequiredService<IOptions<ClusterOptions>>();
             DefaultProviderRuntime = new ClientProviderRuntime(
                 this.InternalGrainFactory,
                 this.Services,

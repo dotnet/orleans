@@ -74,11 +74,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.cachePressureInjectionMonitor.isUnderPressure = true;
             //set purgePredicate to be ShouldPurge
             this.purgePredicate.ShouldPurge = true;
-
-            //perform purge
-            IList<IBatchContainer> ignore;
-            this.receiver1.TryPurgeFromCache(out ignore);
-            this.receiver2.TryPurgeFromCache(out ignore);
+            this.receiver1.TryPurgeFromCache(out _);
+            this.receiver2.TryPurgeFromCache(out _);
 
             //Assert
             int expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
@@ -102,9 +99,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.purgePredicate.ShouldPurge = false;
 
             //perform purge
-            IList<IBatchContainer> ignore;
-            this.receiver1.TryPurgeFromCache(out ignore);
-            this.receiver2.TryPurgeFromCache(out ignore);
+            this.receiver1.TryPurgeFromCache(out _);
+            this.receiver2.TryPurgeFromCache(out _);
 
             //Assert
             int expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
@@ -128,9 +124,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.purgePredicate.ShouldPurge = true;
 
             //perform purge
-            IList<IBatchContainer> ignore;
-            this.receiver1.TryPurgeFromCache(out ignore);
-            this.receiver2.TryPurgeFromCache(out ignore);
+            this.receiver1.TryPurgeFromCache(out _);
+            this.receiver2.TryPurgeFromCache(out _);
 
             //Assert
             int expectedItemCountInCaches = 0;

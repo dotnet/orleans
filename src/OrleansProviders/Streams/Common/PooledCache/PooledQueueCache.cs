@@ -114,7 +114,6 @@ namespace Orleans.Providers.Streams.Common
             {
                 var newestMessage = this.Newest.Value;
                 var oldestMessage = this.Oldest.Value;
-                var now = DateTime.UtcNow;
                 var newestMessageEnqueueTime = newestMessage.EnqueueTimeUtc;
                 var oldestMessageEnqueueTime = oldestMessage.EnqueueTimeUtc;
                 var oldestMessageDequeueTime = oldestMessage.DequeueTimeUtc;

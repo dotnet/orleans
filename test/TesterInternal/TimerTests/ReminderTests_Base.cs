@@ -83,10 +83,10 @@ namespace UnitTests.TimerTests
             log.Info("Removed reminder2 successfully");
 
             // trying to see if readreminder works
-            IGrainReminder o1 = await grain.StartReminder(DR);
-            IGrainReminder o2 = await grain.StartReminder(DR);
-            IGrainReminder o3 = await grain.StartReminder(DR);
-            IGrainReminder o4 = await grain.StartReminder(DR);
+            _ = await grain.StartReminder(DR);
+            _ = await grain.StartReminder(DR);
+            _ = await grain.StartReminder(DR);
+            _ = await grain.StartReminder(DR);
 
             IGrainReminder r = await grain.GetReminderObject(DR);
             await grain.StopReminder(r);

@@ -24,7 +24,7 @@ namespace DefaultCluster.Tests.General
         public async Task SimpleGrainGetGrain()
         {
             ISimpleGrain grain = GetSimpleGrain();
-            int ignored = await grain.GetAxB();
+            _ = await grain.GetAxB();
         }
 
         [Fact, TestCategory("BVT")]

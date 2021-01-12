@@ -187,8 +187,7 @@ namespace Orleans.Runtime.Placement
 
         public void RemoveSilo(SiloAddress removedSilo)
         {
-            CachedLocalStat ignore;
-            localCache.TryRemove(removedSilo, out ignore);
+            localCache.TryRemove(removedSilo, out _);
         }
     }
 }

@@ -106,8 +106,7 @@ namespace Orleans.Runtime
         public void RemoveSystemTarget(SystemTarget target)
         {
             var systemTarget = (ISystemTargetBase) target;
-            SystemTarget ignore;
-            systemTargets.TryRemove(target.ActivationId, out ignore);
+            systemTargets.TryRemove(target.ActivationId, out _);
             if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
             {
                 FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId.Type)).DecrementBy(1);

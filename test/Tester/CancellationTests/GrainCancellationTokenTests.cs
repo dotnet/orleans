@@ -121,7 +121,7 @@ namespace UnitTests.CancellationTests
         {
             var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
             var tcs = new GrainCancellationTokenSource();
-            var grainTask = grain.CancellationTokenCallbackThrow(tcs.Token);
+            _ = grain.CancellationTokenCallbackThrow(tcs.Token);
             await Task.Delay(TimeSpan.FromMilliseconds(100));
             try
             {

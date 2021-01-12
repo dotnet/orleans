@@ -200,11 +200,11 @@ namespace Orleans.Transactions.TestKit
 
             var expectedState = this.stateFactory(123);
             var pendingstate = MakePendingState(1, expectedState, false);
-            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, null, null);
+            _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, null, null);
 
             loadresponse = await stateStorage.Load();
-            etag = loadresponse.ETag;
-            metadata = loadresponse.Metadata;
+            _ = loadresponse.ETag;
+            _ = loadresponse.Metadata;
 
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
@@ -231,16 +231,16 @@ namespace Orleans.Transactions.TestKit
             if (useTwoSteps)
             {
                 etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, null, null);
-                etag = await stateStorage.Store(etag, metadata, emptyPendingStates, 1, null);
+                _ = await stateStorage.Store(etag, metadata, emptyPendingStates, 1, null);
             }
             else
             {
-                etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, 1, null);
+                _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, 1, null);
             }
 
             loadresponse = await stateStorage.Load();
-            etag = loadresponse.ETag;
-            metadata = loadresponse.Metadata;
+            _ = loadresponse.ETag;
+            _ = loadresponse.Metadata;
 
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
@@ -262,11 +262,11 @@ namespace Orleans.Transactions.TestKit
             var pendingstate = MakePendingState(1, this.stateFactory(123), false);
 
             etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate }, null, null);
-            etag = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 0);
+            _ = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 0);
 
             loadresponse = await stateStorage.Load();
-            etag = loadresponse.ETag;
-            metadata = loadresponse.Metadata;
+            _ = loadresponse.ETag;
+            _ = loadresponse.Metadata;
 
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
@@ -291,11 +291,11 @@ namespace Orleans.Transactions.TestKit
             var pendingstate2 = MakePendingState(1, expectedState2, false);
 
             etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1 }, null, null);
-            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate2 }, null, null);
+            _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate2 }, null, null);
       
             loadresponse = await stateStorage.Load();
-            etag = loadresponse.ETag;
-            metadata = loadresponse.Metadata;
+            _ = loadresponse.ETag;
+            _ = loadresponse.Metadata;
 
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
@@ -328,22 +328,22 @@ namespace Orleans.Transactions.TestKit
                 if (reverseOrder)
                 {
                     etag = await stateStorage.Store(etag, metadata, emptyPendingStates, 1, null);
-                    etag = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 1);
+                    _ = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 1);
                 }
                 else
                 {
                     etag = await stateStorage.Store(etag, metadata, emptyPendingStates, 1, null);
-                    etag = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 1);
+                    _ = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 1);
                 }
             }
             else
             {
-                etag = await stateStorage.Store(etag, metadata, emptyPendingStates, 1, 1);
+                _ = await stateStorage.Store(etag, metadata, emptyPendingStates, 1, 1);
             }
 
             loadresponse = await stateStorage.Load();
-            etag = loadresponse.ETag;
-            metadata = loadresponse.Metadata;
+            _ = loadresponse.ETag;
+            _ = loadresponse.Metadata;
 
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
@@ -373,11 +373,11 @@ namespace Orleans.Transactions.TestKit
             {
                 pendingstates.Add(MakePendingState(i + 1, expectedStates[i], false));
             }
-            etag = await stateStorage.Store(etag, metadata, pendingstates, null, null);
+            _ = await stateStorage.Store(etag, metadata, pendingstates, null, null);
 
             loadresponse = await stateStorage.Load();
-            etag = loadresponse.ETag;
-            metadata = loadresponse.Metadata;
+            _ = loadresponse.ETag;
+            _ = loadresponse.Metadata;
 
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
@@ -416,16 +416,16 @@ namespace Orleans.Transactions.TestKit
             if (useTwoSteps)
             {
                 etag = await stateStorage.Store(etag, metadata, pendingstates, null, null);
-                etag = await stateStorage.Store(etag, metadata, emptyPendingStates, count, null);
+                _ = await stateStorage.Store(etag, metadata, emptyPendingStates, count, null);
             }
             else
             {
-                etag = await stateStorage.Store(etag, metadata, pendingstates, count, null);
+                _ = await stateStorage.Store(etag, metadata, pendingstates, count, null);
             }
 
             loadresponse = await stateStorage.Load();
-            etag = loadresponse.ETag;
-            metadata = loadresponse.Metadata;
+            _ = loadresponse.ETag;
+            _ = loadresponse.Metadata;
 
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
@@ -457,11 +457,11 @@ namespace Orleans.Transactions.TestKit
             }
 
             etag = await stateStorage.Store(etag, metadata, pendingstates, null, null);
-            etag = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 0);
+            _ = await stateStorage.Store(etag, metadata, emptyPendingStates, null, 0);
 
             loadresponse = await stateStorage.Load();
-            etag = loadresponse.ETag;
-            metadata = loadresponse.Metadata;
+            _ = loadresponse.ETag;
+            _ = loadresponse.Metadata;
 
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
@@ -504,11 +504,11 @@ namespace Orleans.Transactions.TestKit
             }
 
             etag = await stateStorage.Store(etag, metadata, pendingstates1, null, null);
-            etag = await stateStorage.Store(etag, metadata, pendingstates2, null, null);
+            _ = await stateStorage.Store(etag, metadata, pendingstates2, null, null);
 
             loadresponse = await stateStorage.Load();
-            etag = loadresponse.ETag;
-            metadata = loadresponse.Metadata;
+            _ = loadresponse.ETag;
+            _ = loadresponse.Metadata;
 
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
@@ -554,11 +554,11 @@ namespace Orleans.Transactions.TestKit
             etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1, pendingstate2, pendingstate3a, pendingstate4a}, null, null);
 
             // replace 3b,4b, prepare 5, 6, 7, 8 confirm 1, 2, 3b, 4b, 5, 6
-            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate3b, pendingstate4b, pendingstate5, pendingstate6, pendingstate7, pendingstate8 }, 6, null);
+            _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate3b, pendingstate4b, pendingstate5, pendingstate6, pendingstate7, pendingstate8 }, 6, null);
 
             loadresponse = await stateStorage.Load();
-            etag = loadresponse.ETag;
-            metadata = loadresponse.Metadata;
+            _ = loadresponse.ETag;
+            _ = loadresponse.Metadata;
 
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();
@@ -605,11 +605,11 @@ namespace Orleans.Transactions.TestKit
             etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate1, pendingstate2, pendingstate3a, pendingstate4a, pendingstate5, pendingstate6, pendingstate7, pendingstate8 }, null, null);
 
             // replace 3b,4b, confirm 1, 2, 3b, cancel 5, 6, 7, 8
-            etag = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate3b, pendingstate4b }, 3, 4);
+            _ = await stateStorage.Store(etag, metadata, new List<PendingTransactionState<TState>>() { pendingstate3b, pendingstate4b }, 3, 4);
 
             loadresponse = await stateStorage.Load();
-            etag = loadresponse.ETag;
-            metadata = loadresponse.Metadata;
+            _ = loadresponse.ETag;
+            _ = loadresponse.Metadata;
 
             loadresponse.Should().NotBeNull();
             loadresponse.Metadata.Should().NotBeNull();

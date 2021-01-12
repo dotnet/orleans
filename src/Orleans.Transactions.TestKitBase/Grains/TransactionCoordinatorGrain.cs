@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -28,7 +28,7 @@ namespace Orleans.Transactions.TestKit
 
         public Task OrphanCallTransaction(ITransactionTestGrain grain)
         {
-            Task t = grain.Add(1000);
+            _ = grain.Add(1000);
             return Task.CompletedTask;
         }
 

@@ -72,8 +72,7 @@ namespace UnitTests
             for (var i = maxSize; i >= 1; i--)
             {
                 var s = i.ToString();
-                string val;
-                target.TryGetValue(s, out val);
+                target.TryGetValue(s, out _);
             }
             
             // Add a new item to push the least recently used out -- which should be item "10"

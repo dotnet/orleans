@@ -102,7 +102,7 @@ namespace Tester.AzureUtils
 
             var data3 = data.Clone();
             data3.StringData = "EvenNewerData";
-            string ignoredETag = await manager.UpdateTableEntryAsync(data3, eTag1);
+            _ = await manager.UpdateTableEntryAsync(data3, eTag1);
             tuple = await manager.ReadSingleTableEntryAsync(data3.PartitionKey, data3.RowKey);
             Assert.Equal(data3.StringData, tuple.Item1.StringData);
 
@@ -293,7 +293,7 @@ namespace Tester.AzureUtils
 
             string etag = await manager.CreateTableEntryAsync(data2.Clone());
             var tuple1 = await manager.InsertTwoTableEntriesConditionallyAsync(data1, data2, etag);
-            var tuple2 = await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2);
+            _ = await manager.UpdateTwoTableEntriesConditionallyAsync(data1, tuple1.Item1, data2, tuple1.Item2);
 
             try
             {

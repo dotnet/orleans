@@ -21,8 +21,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool Remove(GrainId key)
         {
-            IReadOnlyList<Tuple<SiloAddress, ActivationId>> tmp;
-            return cache.RemoveKey(key, out tmp);
+            return cache.RemoveKey(key, out _);
         }
 
         public void Clear()

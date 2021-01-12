@@ -86,7 +86,6 @@ namespace UnitTests.General
                 var sw = new BinaryTokenStreamWriter();
                 sw.Write(siloAddress);
                 sw.Write(i);
-                var tmp = sw.ToByteArray();
                 var expected = JenkinsHash.ComputeHash(sw.ToByteArray());
 
                 Assert.Equal(expected, result[i]);

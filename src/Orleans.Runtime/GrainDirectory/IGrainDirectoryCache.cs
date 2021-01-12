@@ -54,8 +54,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns>true if the given key is in the cache</returns>
         public static bool LookUp(this IGrainDirectoryCache cache, GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result)
         {
-            int version;
-            return cache.LookUp(key, out result, out version);
+            return cache.LookUp(key, out result, out _);
         }
     }
 }

@@ -603,14 +603,13 @@ namespace Orleans.Serialization
 
         private byte[] CheckLength(int n, out int offset)
         {
-            bool ignore;
             byte[] res;
-            if (TryCheckLengthFast(n, out res, out offset, out ignore))
+            if (TryCheckLengthFast(n, out res, out offset, out _))
             {
                 return res;
             }
 
-            return CheckLength(n, out offset, out ignore);
+            return CheckLength(n, out offset, out _);
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -633,8 +632,6 @@ namespace Orleans.Serialization
 
         private byte[] CheckLength(int n, out int offset, out bool safeToUse)
         {
-            safeToUse = false;
-            offset = 0;
             if (currentOffset == currentSegmentOffsetPlusCount)
             {
                 StartNextSegment();

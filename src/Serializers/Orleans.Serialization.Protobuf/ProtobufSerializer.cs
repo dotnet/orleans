@@ -101,7 +101,7 @@ namespace Orleans.Serialization
             }
 
             var typeHandle = expectedType.TypeHandle;
-            MessageParser parser = null;
+            MessageParser parser;
             if (!Parsers.TryGetValue(typeHandle, out parser))
             {
                 throw new ArgumentException("No parser found for the expected type " + expectedType, nameof(expectedType));

@@ -266,6 +266,7 @@ namespace UnitTests.General
             // lookup for 'key' should return 'truth' on all silos
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos()) // do this for each silo
             {
+                testHooks = this.Client.GetTestHooks(siloHandle);
                 SiloAddress s = testHooks.GetConsistentRingPrimaryTargetSilo((uint)key).Result;
                 Assert.Equal(truth, s);
             }
@@ -274,7 +275,7 @@ namespace UnitTests.General
         private async Task<List<SiloHandle>> getSilosToFail(Fail fail, int numOfFailures)
         {
             List<SiloHandle> failures = new List<SiloHandle>();
-            int count = 0, index = 0;
+            int count = 0;
 
             // Figure out the primary directory partition and the silo hosting the ReminderTableGrain.
             var tableGrain = this.GrainFactory.GetGrain<IReminderTableGrain>(InMemoryReminderTable.ReminderTableGrainId);
@@ -304,6 +305,7 @@ namespace UnitTests.General
                 ids.Add(siloHandle.SiloAddress.GetConsistentHashCode(), siloHandle);
             }
 
+            int index;
             // we should not fail the primary!
             // we can't guarantee semantics of 'Fail' if it evalutes to the primary's address
             switch (fail)

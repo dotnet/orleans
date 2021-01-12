@@ -20,7 +20,7 @@ namespace UnitTests.Serialization
         public void Serialize_CustomCopier()
         {
             var original = new ClassWithCustomCopier() {IntProperty = 5, StringProperty = "Hello"};
-            var copy = this.fixture.SerializationManager.DeepCopy(original);
+            _ = this.fixture.SerializationManager.DeepCopy(original);
             Assert.Equal(1, ClassWithCustomCopier.CopyCounter); //Custom copier was not called
         }
 
@@ -33,7 +33,7 @@ namespace UnitTests.Serialization
             Assert.Equal(1, ClassWithCustomSerializer.SerializeCounter); //Custom serializer was not called
 
             var readStream = new BinaryTokenStreamReader(writeStream.ToBytes());
-            var obj = this.fixture.SerializationManager.Deserialize(readStream);
+            _ = this.fixture.SerializationManager.Deserialize(readStream);
             Assert.Equal(1, ClassWithCustomSerializer.DeserializeCounter); //Custom deserializer was not called
         }
 

@@ -567,7 +567,7 @@ namespace UnitTests.StreamingTests
             for (int i = 0; i < numStreams; i++)
             {
                 var streamId = new InternalStreamId(streamProviderName, streamIds[i]);
-                string extKey = streamProviderName + "_" + this.StreamNamespace;
+                _ = streamProviderName + "_" + this.StreamNamespace;
 
                 IPubSubRendezvousGrain pubsub = this.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
 
@@ -645,8 +645,7 @@ namespace UnitTests.StreamingTests
         {
             var consumers = new List<IStreamLifecycleConsumerGrain>();
             var promises = new List<Task>();
-
-            long consumerIdStart = random.Next();
+            _ = random.Next();
             for (int loopCount = 0; loopCount < numConsumers; loopCount++)
             {
                 var grain = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
@@ -794,13 +793,10 @@ namespace UnitTests.StreamingTests
             List<IStreamLifecycleProducerGrain> producers, List<IStreamLifecycleConsumerGrain> consumers,
             bool useFanOut)
         {
-            long nextGrainId = random.Next();
-
             //var promises = new List<Task>();
             AsyncPipeline pipeline = new AsyncPipeline(InitPipelineSize);
 
             // Consumers
-            long consumerIdStart = nextGrainId;
             for (int loopCount = 0; loopCount < numConsumers; loopCount++)
             {
                 var grain = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
@@ -833,10 +829,8 @@ namespace UnitTests.StreamingTests
                 //output.WriteLine("InitializeTopology: Waiting for {0} consumers to initialize", pipeline.Count);
                 pipeline.Wait();
             }
-            nextGrainId += numConsumers;
 
             // Producers
-            long producerIdStart = nextGrainId;
             pipeline = new AsyncPipeline(InitPipelineSize);
             for (int loopCount = 0; loopCount < numProducers; loopCount++)
             {

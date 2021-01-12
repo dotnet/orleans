@@ -431,8 +431,7 @@ namespace Orleans.Runtime
 
         public static bool IsConcreteGrainClass(Type type)
         {
-            IEnumerable<string> complaints;
-            return IsConcreteGrainClass(type, out complaints, complain: false);
+            return IsConcreteGrainClass(type, out _, complain: false);
         }
 
         public static bool IsGeneratedType(Type type)

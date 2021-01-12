@@ -286,8 +286,7 @@ namespace Orleans.Runtime
 
         private static bool InterpretFileLoadException(string asmPathName, out string[] complaints)
         {
-            var matched = default(Assembly);
-
+            Assembly matched;
             try
             {
                 matched = MatchWithLoadedAssembly(AssemblyName.GetAssemblyName(asmPathName));

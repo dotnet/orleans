@@ -75,8 +75,7 @@ namespace Orleans.Streams
 
         public bool RemoveObserver(GuidId subscriptionId)
         {
-            IStreamSubscriptionHandle ignore;
-            return allStreamObservers.TryRemove(subscriptionId, out ignore);
+            return allStreamObservers.TryRemove(subscriptionId, out _);
         }
 
         public Task<StreamHandshakeToken> DeliverImmutable(GuidId subscriptionId, InternalStreamId streamId, Immutable<object> item, StreamSequenceToken currentToken, StreamHandshakeToken handshakeToken)

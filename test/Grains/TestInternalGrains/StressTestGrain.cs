@@ -241,7 +241,7 @@ namespace UnitTests.Grains
                 Func<Task> func = (async () =>
                 {
                     await Task.Delay(random.NextTimeSpan(delay));
-                    string fileMetadata = fileMetadatas[fileId];
+                    _ = fileMetadatas[fileId];
                 });
                 tagPromises.Add(func());
             }

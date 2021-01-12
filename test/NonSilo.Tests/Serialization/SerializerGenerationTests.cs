@@ -28,8 +28,6 @@ namespace UnitTests.Serialization
         [Fact]
         public void SerializationTests_TypeWithInternalNestedClass()
         {
-            var v = new MyTypeWithAnInternalTypeField();
-
             Assert.NotNull(this.fixture.SerializationManager.GetSerializer(typeof(MyTypeWithAnInternalTypeField)));
             Assert.NotNull(this.fixture.SerializationManager.GetSerializer(typeof(MyTypeWithAnInternalTypeField.MyInternalDependency)));
         }

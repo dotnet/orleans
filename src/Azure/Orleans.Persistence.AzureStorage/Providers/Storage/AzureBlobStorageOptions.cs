@@ -72,7 +72,7 @@ namespace Orleans.Configuration
                     throw new OrleansConfigurationException($"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(options.ServiceUri)} is required for {nameof(options.TokenCredential)}");
                 }
 
-                if (!CloudStorageAccount.TryParse(this.options.ConnectionString, out var ignore))
+                if (!CloudStorageAccount.TryParse(this.options.ConnectionString, out _))
                     throw new OrleansConfigurationException(
                         $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ConnectionString)} is not valid.");
             }

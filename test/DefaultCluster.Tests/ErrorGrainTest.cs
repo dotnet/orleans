@@ -31,7 +31,7 @@ namespace DefaultCluster.Tests
         {
             var grainFullName = typeof(ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
-            int ignored = await grain.GetA();
+            _ = await grain.GetA();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]

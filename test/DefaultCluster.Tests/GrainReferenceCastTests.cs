@@ -149,7 +149,6 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void CastInternalCastFromMyType()
         {
-            var serviceName = typeof(SimpleGrain).FullName;
             GrainReference grain = (GrainReference)this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
             
             // This cast should be a no-op, since the interface matches the initial reference's exactly.

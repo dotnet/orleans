@@ -463,7 +463,7 @@ namespace UnitTests.StreamingTests
         {
             var consumerCount = await consumer.ConsumerCount;
             Assert.NotEqual(0,  consumerCount);  // "no consumers were detected."
-            var producerCount = await producer.ProducerCount;
+            _ = await producer.ProducerCount;
             var numProduced = await producer.ExpectedItemsProduced;
             var expectConsumed = numProduced * consumerCount;
             var numConsumed = await consumer.ItemsConsumed;

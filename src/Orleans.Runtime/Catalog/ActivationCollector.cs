@@ -418,8 +418,7 @@ namespace Orleans.Runtime
             public bool TryRemove(ActivationData item)
             {
                 if (!item.TrySetCollectionCancelledFlag()) return false;
-
-                return items.TryRemove(item.ActivationId, out ActivationData unused);
+                return items.TryRemove(item.ActivationId, out _);
             }
 
             public IEnumerable<ActivationData> CancelAll()

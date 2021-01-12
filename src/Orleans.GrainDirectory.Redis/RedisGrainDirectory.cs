@@ -90,7 +90,6 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Unregister(GrainAddress address)
         {
-            var key = GetKey(address.GrainId);
             var value = JsonConvert.SerializeObject(address);
 
             try

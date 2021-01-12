@@ -149,11 +149,10 @@ namespace Orleans.Core
 
         private string MakeErrorMsg(string what, Exception exc)
         {
-            HttpStatusCode httpStatusCode;
             string errorCode = string.Empty;
 
             var decoder = store as IRestExceptionDecoder;
-            decoder?.DecodeException(exc, out httpStatusCode, out errorCode, true);
+            decoder?.DecodeException(exc, out _, out errorCode, true);
 
             return string.Format("Error from storage provider {0} during {1} for grain Type={2} Pk={3} Id={4} Error={5}" + Environment.NewLine + " {6}",
                 $"{this.store.GetType().Name}.{this.name}", what, name, grainRef.GrainId.ToString(), grainRef, errorCode, LogFormatter.PrintException(exc));
