@@ -134,6 +134,20 @@ namespace UnitTests.Grains
         }
     }
 
+    public class TestGrainLongActivateAsync : TestGrain, ITestGrainLongOnActivateAsync
+    {
+        public TestGrainLongActivateAsync(ILoggerFactory loggerFactory)
+            : base(loggerFactory)
+        {
+        }
+
+        public override async Task OnActivateAsync()
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            await base.OnActivateAsync();
+        }
+    }
+
     internal class GuidTestGrain : Grain, IGuidTestGrain
     {
         private string label;

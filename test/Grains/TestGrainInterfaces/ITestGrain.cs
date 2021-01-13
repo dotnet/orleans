@@ -34,6 +34,9 @@ namespace UnitTests.GrainInterfaces
         Task DoLongAction(TimeSpan timespan, string str);
     }
 
+    public interface ITestGrainLongOnActivateAsync : ITestGrain
+    { }
+
     public interface IGuidTestGrain : IGrainWithGuidKey
     {
         // duplicate to verify identity
