@@ -1,7 +1,10 @@
+using System.Collections.Generic;
+using System.Collections.Immutable;
+
 namespace Orleans.Runtime.GrainDirectory
 {
     internal interface ILocalClientDirectory
     {
-        ClientRoutingTableSnapshot GetRoutingTable();
+        ImmutableDictionary<GrainId, List<ActivationAddress>> GetRoutingTable();
     }
 }
