@@ -56,16 +56,6 @@ namespace Orleans.Runtime
         Task<List<Tuple<GrainId, int, List<ActivationAddress>>>> LookUpMany(List<Tuple<GrainId, int>> grainAndETagList);
 
         /// <summary>
-        /// Handoffs the directory partition from source silo to the destination silo.
-        /// </summary>
-        /// <param name="source">The address of the owner of the partition.</param>
-        /// <param name="partition">The (full or partial) copy of the directory partition to be Haded off.</param>
-        /// <param name="isFullCopy">Flag specifying whether it is a full copy of the directory partition (and thus any old copy should be just replaced) or the
-        /// a delta copy (and thus the old copy should be updated by delta changes) </param>
-        /// <returns></returns>
-        Task AcceptHandoffPartition(SiloAddress source, Dictionary<GrainId, IGrainInfo> partition, bool isFullCopy);
-
-        /// <summary>
         /// Removes the handed off directory partition from source silo on the destination silo.
         /// </summary>
         /// <param name="source">The address of the owner of the partition.</param>
