@@ -34,7 +34,8 @@ namespace DefaultCluster.Tests.General
 
             for (int i=0; i<100; i++)
             {
-                await Assert.ThrowsAsync<OrleansException>(() => grain.Ping());
+                var ex = await Assert.ThrowsAsync<Exception>(() => grain.Ping());
+                Assert.Equal("oops", ex.Message);
             }
         }
 
