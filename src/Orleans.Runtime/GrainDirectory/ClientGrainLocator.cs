@@ -2,10 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
-using Orleans.Internal;
-using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -14,76 +11,21 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class ClientGrainLocator : IGrainLocator
     {
-        private readonly SafeRandom _random = new SafeRandom();
         private readonly ILocalClientDirectory _clientDirectory;
-        private readonly IInternalGrainFactory _grainFactory;
-        private readonly IClusterMembershipService _clusterMembershipService;
-        private readonly SiloAddress _localSilo;
-        private readonly ILogger<ClientGrainLocator> _logger;
-        private readonly object _lockObj = new object();
-        private MembershipVersion _observedMembershipVersion = MembershipVersion.MinValue;
-        private IRemoteClientDirectory[] _remoteDirectories = Array.Empty<IRemoteClientDirectory>();
 
-        public ClientGrainLocator(
-            ILocalClientDirectory clientDirectory,
-            ILogger<ClientGrainLocator> logger,
-            IInternalGrainFactory grainFactory,
-            IClusterMembershipService clusterMembershipService,
-            ILocalSiloDetails localSiloDetails)
+        public ClientGrainLocator(ILocalClientDirectory clientDirectory)
         {
             _clientDirectory = clientDirectory;
-            _logger = logger;
-            _grainFactory = grainFactory;
-            _clusterMembershipService = clusterMembershipService;
-            _localSilo = localSiloDetails.SiloAddress;
         }
 
-        public Task<List<ActivationAddress>> Lookup(GrainId grainId)
+        public async Task<List<ActivationAddress>> Lookup(GrainId grainId)
         {
-            if (TryLocalLookupInternal(grainId, out var clientRoutes))
+            if (!ClientGrainId.TryParse(grainId, out _))
             {
-                return Task.FromResult(clientRoutes);
+                ThrowNotClientGrainId(grainId);
             }
 
-            return LookupClientAsync(grainId);
-
-            async Task<List<ActivationAddress>> LookupClientAsync(GrainId grainId)
-            {
-                var seed = _random.Next();
-                var attemptsRemaining = 5;
-                List<ActivationAddress> result;
-                while (attemptsRemaining-- > 0 && GetRemoteClientDirectories() is var remoteDirectories && remoteDirectories.Length > 0) 
-                {
-                    try
-                    {
-                        // Cycle through remote directories.
-                        var remoteDirectory = remoteDirectories[(ushort)seed++ % remoteDirectories.Length];
-
-                        var response = await remoteDirectory.GetClientRoutes(grainId);
-                        if (response is object && response.Count > 0)
-                        {
-                            result = new List<ActivationAddress>(response.Count);
-                            foreach (var route in response)
-                            {
-                                result.Add(Gateway.GetClientActivationAddress(grainId, route));
-                            }
-
-                            return result;
-                        }
-                    }
-                    catch (Exception exception) when (attemptsRemaining > 0)
-                    {
-                        _logger.LogError(exception, "Exception calling remote client directory");
-                    }
-
-                    if (TryLocalLookupInternal(grainId, out result) && result.Count > 0)
-                    {
-                        return result;
-                    }
-                }
-
-                return new List<ActivationAddress>(0);
-            }
+            return await _clientDirectory.Lookup(grainId);
         }
 
         public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses)
@@ -93,20 +35,7 @@ namespace Orleans.Runtime.GrainDirectory
                 ThrowNotClientGrainId(grainId);
             }
 
-            return TryLocalLookupInternal(grainId, out addresses);
-        }
-
-        private bool TryLocalLookupInternal(GrainId grainId, out List<ActivationAddress> addresses)
-        {
-            var table = _clientDirectory.GetRoutingTable();
-            if (table.TryGetValue(grainId, out var clientRoutes) && clientRoutes.Count > 0)
-            {
-                addresses = clientRoutes;
-                return true;
-            }
-
-            addresses = null;
-            return false;
+            return _clientDirectory.TryLocalLookup(grainId, out addresses);
         }
 
         public Task<ActivationAddress> Register(ActivationAddress address) => throw new InvalidOperationException($"Cannot register client grain explicitly");
@@ -115,35 +44,5 @@ namespace Orleans.Runtime.GrainDirectory
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static GrainId ThrowNotClientGrainId(GrainId grainId) => throw new InvalidOperationException($"{grainId} is not a client id");
-
-        private IRemoteClientDirectory[] GetRemoteClientDirectories()
-        {
-            var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
-            if (membershipSnapshot.Version == _observedMembershipVersion)
-            {
-                return _remoteDirectories;
-            }
-
-            lock (_lockObj)
-            {
-                membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
-                if (membershipSnapshot.Version == _observedMembershipVersion)
-                {
-                    return _remoteDirectories;
-                }
-
-                var remotesBuilder = new List<IRemoteClientDirectory>(membershipSnapshot.Members.Count);
-                foreach (var member in membershipSnapshot.Members.Values)
-                {
-                    if (member.SiloAddress.Equals(_localSilo)) continue;
-                    if (member.Status != SiloStatus.Active) continue;
-
-                    remotesBuilder.Add(_grainFactory.GetSystemTarget<IRemoteClientDirectory>(Constants.ClientDirectoryType, member.SiloAddress));
-                }
-
-                _observedMembershipVersion = membershipSnapshot.Version;
-                return _remoteDirectories = remotesBuilder.ToArray();
-            }
-        }
     }
 }

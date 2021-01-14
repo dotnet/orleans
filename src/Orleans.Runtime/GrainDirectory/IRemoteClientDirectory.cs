@@ -7,6 +7,6 @@ namespace Orleans.Runtime.GrainDirectory
     internal interface IRemoteClientDirectory : ISystemTarget
     {
         Task OnUpdateClientRoutes(ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> update);
-        Task<ImmutableHashSet<SiloAddress>> GetClientRoutes(GrainId clientGrainId);
+        Task<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>> GetClientRoutes(ImmutableDictionary<SiloAddress, long> knownRoutes);
     }
 }

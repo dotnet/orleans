@@ -28,6 +28,7 @@ namespace Orleans.Runtime.GrainDirectory
     /// </remarks>
     internal sealed class ClientDirectory : SystemTarget, ILocalClientDirectory, IRemoteClientDirectory, ILifecycleParticipant<ISiloLifecycle>
     {
+        private readonly SafeRandom _random = new SafeRandom();
         private readonly SimpleConsistentRingProvider _consistentRing;
         private readonly IInternalGrainFactory _grainFactory;
         private readonly ILogger<ClientDirectory> _logger;
@@ -43,9 +44,10 @@ namespace Orleans.Runtime.GrainDirectory
         private MembershipVersion _observedMembershipVersion = MembershipVersion.MinValue;
         private long _observedConnectedClientsVersion = -1;
         private long _localVersion = 1;
+        private IRemoteClientDirectory[] _remoteDirectories = Array.Empty<IRemoteClientDirectory>();
         private ImmutableHashSet<GrainId> _localClients = ImmutableHashSet<GrainId>.Empty;
-        private ImmutableDictionary<GrainId, List<ActivationAddress>> _currentSnapshot;
-        private ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> _table;
+        private ImmutableDictionary<GrainId, List<ActivationAddress>> _currentSnapshot = ImmutableDictionary<GrainId, List<ActivationAddress>>.Empty;
+        private ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> _table = ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>.Empty;
 
         // For synchronization with remote silos.
         private SiloAddress _previousSuccessor;
@@ -69,12 +71,77 @@ namespace Orleans.Runtime.GrainDirectory
             _logger = loggerFactory.CreateLogger<ClientDirectory>();
             _refreshTimer = timerFactory.Create(_messagingOptions.ClientRegistrationRefresh, "ClientDirectory.RefreshTimer");
             _connectedClients = connectedClients;
-            _table = ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>.Empty;
-            _currentSnapshot = ImmutableDictionary<GrainId, List<ActivationAddress>>.Empty;
             _localHostedClientId = HostedClient.CreateHostedClientGrainId(_localSilo).GrainId;
         }
 
-        public ImmutableDictionary<GrainId, List<ActivationAddress>> GetRoutingTable()
+        public ValueTask<List<ActivationAddress>> Lookup(GrainId grainId)
+        {
+            if (TryLocalLookup(grainId, out var clientRoutes))
+            {
+                return new ValueTask<List<ActivationAddress>>(clientRoutes);
+            }
+
+            return LookupClientAsync(grainId);
+
+            async ValueTask<List<ActivationAddress>> LookupClientAsync(GrainId grainId)
+            {
+                var seed = _random.Next();
+                var attemptsRemaining = 5;
+                List<ActivationAddress> result = null;
+                while (attemptsRemaining-- > 0 && _remoteDirectories is var remoteDirectories && remoteDirectories.Length > 0) 
+                {
+                    try
+                    {
+                        // Cycle through remote directories.
+                        var remoteDirectory = remoteDirectories[(ushort)seed++ % remoteDirectories.Length];
+
+                        // Ask the remote directory for updates to our view.
+                        var versionVector = _table.ToImmutableDictionary(e => e.Key, e => e.Value.Version);
+                        var delta = await remoteDirectory.GetClientRoutes(versionVector);
+
+                        // If updates were found, update our view
+                        if (delta is object && delta.Count > 0)
+                        {
+                            UpdateRoutingTable(delta);
+                        }
+                    }
+                    catch (Exception exception) when (attemptsRemaining > 0)
+                    {
+                        _logger.LogError(exception, "Exception calling remote client directory");
+                    }
+
+                    // Try again to find the requested client's routes.
+                    // Note that this occurs whether the remote update call succeeded or failed.
+                    if (TryLocalLookup(grainId, out result) && result.Count > 0)
+                    {
+                        break;
+                    }
+                }
+
+                // Try one last time to find the requested client's routes.
+                if (result is null && !TryLocalLookup(grainId, out result))
+                {
+                    result = new List<ActivationAddress>(0);
+                }
+
+                return result;
+            }
+        }
+
+        public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses)
+        {
+            EnsureRefreshed();
+            if (_currentSnapshot.TryGetValue(grainId, out var clientRoutes) && clientRoutes.Count > 0)
+            {
+                addresses = clientRoutes;
+                return true;
+            }
+
+            addresses = null;
+            return false;
+        }
+
+        private void EnsureRefreshed()
         {
             if (IsStale())
             {
@@ -87,40 +154,10 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
 
-            return _currentSnapshot;
-
             bool IsStale()
             {
                 return _observedMembershipVersion < _clusterMembershipService.CurrentSnapshot.Version
                     || _observedConnectedClientsVersion != _connectedClients.Version;
-            }
-        }
-
-        public Task<ImmutableHashSet<SiloAddress>> GetClientRoutes(GrainId clientGrainId)
-        {
-            if (_connectedClients is null)
-            {
-                return Task.FromResult(ImmutableHashSet<SiloAddress>.Empty);
-            }
-
-            // Try finding the requested client in the table.
-            var table = GetRoutingTable();
-            if (table.TryGetValue(clientGrainId, out var value) && value.Count > 0)
-            {
-                return Task.FromResult(ToImmutableHashSet(value));
-            }
-
-            return Task.FromResult(ImmutableHashSet<SiloAddress>.Empty);
-
-            static ImmutableHashSet<SiloAddress> ToImmutableHashSet(List<ActivationAddress> value)
-            {
-                var result = ImmutableHashSet.CreateBuilder<SiloAddress>();
-                foreach (var item in value)
-                {
-                    result.Add(item.Silo);
-                }
-
-                return result.ToImmutable();
             }
         }
 
@@ -172,8 +209,22 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
+                // Ensure that the remote directories are up-to-date.
+                if (membershipSnapshot.Version > _observedMembershipVersion)
+                {
+                    var remotesBuilder = new List<IRemoteClientDirectory>(membershipSnapshot.Members.Count);
+                    foreach (var member in membershipSnapshot.Members.Values)
+                    {
+                        if (member.SiloAddress.Equals(_localSilo)) continue;
+                        if (member.Status != SiloStatus.Active) continue;
+
+                        remotesBuilder.Add(_grainFactory.GetSystemTarget<IRemoteClientDirectory>(Constants.ClientDirectoryType, member.SiloAddress));
+                    }
+
+                    _remoteDirectories = remotesBuilder.ToArray();
+                }
+
                 // Remove defunct silos.
-                _observedMembershipVersion = membershipSnapshot.Version;
                 foreach (var member in membershipSnapshot.Members.Values)
                 {
                     var silo = member.SiloAddress;
@@ -198,6 +249,8 @@ namespace Orleans.Runtime.GrainDirectory
                         }
                     }
                 }
+
+                _observedMembershipVersion = membershipSnapshot.Version;
 
                 // Update locally connected clients.
                 var (clients, version) = GetConnectedClients(_localClients, _localVersion);
@@ -306,10 +359,10 @@ namespace Orleans.Runtime.GrainDirectory
 
         private bool ShouldPublish()
         {
+            EnsureRefreshed();
             lock (_lockObj)
             {
-                var table = GetRoutingTable();
-                if (!ReferenceEquals(table, _publishedTable))
+                if (!ReferenceEquals(_table, _publishedTable))
                 {
                     return true;
                 }
@@ -400,6 +453,27 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 _logger.LogError(exception, "Exception publishing client routing table to silo {SiloAddress}", successor);
             }
+        }
+
+        public Task<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>> GetClientRoutes(ImmutableDictionary<SiloAddress, long> knownRoutes)
+        {
+            EnsureRefreshed();
+
+            // Return a collection containing all missing or out-dated routes, based on the known-routes version vector provided by the caller.
+            var table = _table;
+            var resultBuilder = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>();
+            foreach (var entry in table)
+            {
+                var silo = entry.Key;
+                var routes = entry.Value;
+                var version = routes.Version;
+                if (!knownRoutes.TryGetValue(silo, out var knownVersion) || knownVersion < version)
+                {
+                    resultBuilder[silo] = routes;
+                }
+            }
+
+            return Task.FromResult(resultBuilder.ToImmutable());
         }
 
         public void Participate(ISiloLifecycle lifecycle)
