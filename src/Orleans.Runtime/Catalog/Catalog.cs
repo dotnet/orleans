@@ -242,6 +242,8 @@ namespace Orleans.Runtime
             var number = Interlocked.Increment(ref collectionNumber);
             long memBefore = GC.GetTotalMemory(false) / (1024 * 1024);
 
+            failedActivations.RemoveExpired();
+
             if (logger.IsEnabled(LogLevel.Debug))
             {
                 logger.LogDebug(
