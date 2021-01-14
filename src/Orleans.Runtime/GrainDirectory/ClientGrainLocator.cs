@@ -53,7 +53,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var seed = _random.Next();
                 var attemptsRemaining = 5;
                 List<ActivationAddress> result;
-                while (attemptsRemaining-- > 0 && GetRemoteClientDirectories() is { Length: > 0 } remoteDirectories) 
+                while (attemptsRemaining-- > 0 && GetRemoteClientDirectories() is var remoteDirectories && remoteDirectories.Length > 0) 
                 {
                     try
                     {
