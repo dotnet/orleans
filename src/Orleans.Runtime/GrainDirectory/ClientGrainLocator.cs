@@ -38,17 +38,16 @@ namespace Orleans.Runtime.GrainDirectory
             _localSilo = localSiloDetails.SiloAddress;
         }
 
-        public Task<List<ActivationAddress>> Lookup(GrainId clientGrainId)
+        public Task<List<ActivationAddress>> Lookup(GrainId grainId)
         {
-            var table = _clientDirectory.GetRoutingTable();
-            if (table.TryGetValue(clientGrainId, out var clientRoutes) && clientRoutes.Count > 0)
+            if (TryLocalLookupInternal(grainId, out var clientRoutes))
             {
                 return Task.FromResult(clientRoutes);
             }
 
-            return LookupClientAsync(clientGrainId);
+            return LookupClientAsync(grainId);
 
-            async Task<List<ActivationAddress>> LookupClientAsync(GrainId clientGrainId)
+            async Task<List<ActivationAddress>> LookupClientAsync(GrainId grainId)
             {
                 var seed = _random.Next();
                 var attemptsRemaining = 5;
@@ -60,13 +59,13 @@ namespace Orleans.Runtime.GrainDirectory
                         // Cycle through remote directories.
                         var remoteDirectory = remoteDirectories[(ushort)seed++ % remoteDirectories.Length];
 
-                        var response = await remoteDirectory.GetClientRoutes(clientGrainId);
+                        var response = await remoteDirectory.GetClientRoutes(grainId);
                         if (response is object && response.Count > 0)
                         {
                             result = new List<ActivationAddress>(response.Count);
                             foreach (var route in response)
                             {
-                                result.Add(Gateway.GetClientActivationAddress(clientGrainId, route));
+                                result.Add(Gateway.GetClientActivationAddress(grainId, route));
                             }
 
                             return result;
@@ -77,7 +76,7 @@ namespace Orleans.Runtime.GrainDirectory
                         _logger.LogError(exception, "Exception calling remote client directory");
                     }
 
-                    if (TryLocalLookup(clientGrainId, out result) && result.Count > 0)
+                    if (TryLocalLookupInternal(grainId, out result) && result.Count > 0)
                     {
                         return result;
                     }
@@ -94,6 +93,11 @@ namespace Orleans.Runtime.GrainDirectory
                 ThrowNotClientGrainId(grainId);
             }
 
+            return TryLocalLookupInternal(grainId, out addresses);
+        }
+
+        private bool TryLocalLookupInternal(GrainId grainId, out List<ActivationAddress> addresses)
+        {
             var table = _clientDirectory.GetRoutingTable();
             if (table.TryGetValue(grainId, out var clientRoutes) && clientRoutes.Count > 0)
             {
