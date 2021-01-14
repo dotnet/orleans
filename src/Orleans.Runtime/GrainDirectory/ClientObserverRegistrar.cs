@@ -80,12 +80,13 @@ namespace Orleans.Runtime
 
         private async Task RunClientRefreshLoop()
         {
+            await Task.Yield();
             var membershipUpdates = this.clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(this.shutdownCancellation.Token);
 
             Task<bool> membershipTask = null;
             Task<bool> timerTask = this.refreshTimer.NextTick(new SafeRandom().NextTimeSpan(this.messagingOptions.ClientRegistrationRefresh));
 
-            while (true)
+            while (!shutdownCancellation.IsCancellationRequested)
             {
                 membershipTask ??= membershipUpdates.MoveNextAsync().AsTask();
                 timerTask ??= this.refreshTimer.NextTick();
@@ -150,7 +151,7 @@ namespace Orleans.Runtime
                         return functionToExecute();
                     },
                     AsyncExecutorWithRetries.INFINITE_RETRIES, // Do not limit the number of on-error retries, control it via "maxExecutionTime"
-                    (exc, i) => true, // Retry on all errors.         
+                    (exc, i) => !shutdownCancellation.IsCancellationRequested, // Retry on all errors, as long as the silo is running
                     this.messagingOptions.ClientRegistrationRefresh, // "maxExecutionTime"
                     new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)); // how long to wait between error retries
             }
@@ -216,7 +217,7 @@ namespace Orleans.Runtime
         {
             lifecycle.Subscribe(
                 nameof(ClientObserverRegistrar),
-                ServiceLifecycleStage.RuntimeServices,
+                ServiceLifecycleStage.Active,
                 _ => Task.CompletedTask,
                 async ct =>
                 {
