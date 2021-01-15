@@ -443,8 +443,7 @@ namespace Orleans.Runtime
                         msg.InterfaceType,
                         msg);
 
-                    var str = $"Error creating activation for grain {msg.TargetGrain} (interface: {msg.InterfaceType}). Message {msg}";
-                    this.RejectMessage(msg, Message.RejectionTypes.Transient, new OrleansException(str, ex));
+                    this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
                 }
             }
         }
