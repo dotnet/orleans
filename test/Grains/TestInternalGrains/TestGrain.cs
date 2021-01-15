@@ -134,6 +134,28 @@ namespace UnitTests.Grains
         }
     }
 
+    public class TestGrainLongActivateAsync : Grain, ITestGrainLongOnActivateAsync
+    {
+        public TestGrainLongActivateAsync()
+        {
+        }
+
+        public override async Task OnActivateAsync()
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3));
+
+            if (this.GetPrimaryKeyLong() == -2)
+                throw new ArgumentException("Primary key cannot be -2 for this test case");
+
+            await base.OnActivateAsync();
+        }
+
+        public Task<long> GetKey()
+        {
+            return Task.FromResult(this.GetPrimaryKeyLong());
+        }
+    }
+
     internal class GuidTestGrain : Grain, IGuidTestGrain
     {
         private string label;

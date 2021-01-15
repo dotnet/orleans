@@ -86,6 +86,35 @@ namespace DefaultCluster.Tests.General
             if (!failed) Assert.True(false, "Should have failed, but instead returned " + key);
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("ErrorHandling"), TestCategory("GetGrain")]
+        public async Task BasicActivation_BurstFail()
+        {
+            bool failed;
+            long key = 0;
+            var tasks = new List<Task>();
+            try
+            {
+                // Key values of -2 are not allowed in this case
+                var fail = this.GrainFactory.GetGrain<ITestGrainLongOnActivateAsync>(-2);
+                for (int i = 0; i < 10000; i++)
+                {
+                    tasks.Add(fail.GetKey());
+                }
+                failed = false;
+                await Task.WhenAll(tasks);
+            }
+            catch (Exception)
+            {
+                failed = true;
+                foreach (var t in tasks)
+                {
+                    Assert.Equal(typeof(ArgumentException), t.Exception.InnerException.GetType());
+                }
+            }
+
+            if (!failed) Assert.True(false, "Should have failed, but instead returned " + key);
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public void BasicActivation_ULong_MaxValue()
         {
