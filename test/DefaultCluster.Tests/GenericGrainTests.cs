@@ -568,7 +568,7 @@ namespace DefaultCluster.Tests.General
 
             var id = Guid.NewGuid();
             var nonGenericFacet =  this.GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
-            await Assert.ThrowsAsync<OrleansException>(async () =>
+            await Assert.ThrowsAsync<ArgumentException>(async () =>
             {
                 try
                 {
@@ -590,7 +590,7 @@ namespace DefaultCluster.Tests.General
             var s2 = await grain.Ping(s1);
             Assert.Equal(s1, s2);
             var nonGenericFacet =  this.GrainFactory.GetGrain<INonGenericBase>(id, "UnitTests.Grains.Generic1ArgumentGrain");
-            await Assert.ThrowsAsync<OrleansException>(async () =>
+            await Assert.ThrowsAsync<ArgumentException>(async () =>
             {
                 try
                 {

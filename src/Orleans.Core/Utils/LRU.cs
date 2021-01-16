@@ -157,6 +157,31 @@ namespace Orleans.Runtime
             return value;
         }
 
+        /// <summary>
+        /// Remove all expired value from the LRU instance.
+        /// </summary>
+        public void RemoveExpired()
+        {
+            var now = DateTime.UtcNow;
+            var toRemove = new List<TKey>();
+            foreach (var entry in this.cache)
+            {
+                var age = DateTime.UtcNow.Subtract(entry.Value.WhenLoaded);
+                if (age > requiredFreshness)
+                {
+                    toRemove.Add(entry.Key);
+                }
+            }
+            foreach (var key in toRemove)
+            {
+                if (cache.TryRemove(key, out var result) && RaiseFlushEvent != null)
+                {
+                    var args = new FlushEventArgs(key, result.Value);
+                    RaiseFlushEvent(this, args);
+                }
+            }
+        }
+
         private void AdjustSize()
         {
             while (cache.Count >= MaximumSize)

@@ -141,7 +141,7 @@ namespace Orleans.Runtime
                     {
                         var str = $"Error creating activation for {message.NewGrainType}. Message {message}";
                         logger.Error(ErrorCode.Dispatcher_ErrorCreatingActivation, str, ex);
-                        throw new OrleansException(str, ex);
+                        throw;
                     }
 
                     if (nea.IsStatelessWorker)

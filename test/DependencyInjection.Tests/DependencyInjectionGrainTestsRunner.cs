@@ -8,6 +8,7 @@ using UnitTests.Grains;
 using Xunit;
 using System.Linq;
 using Orleans.Hosting;
+using System;
 
 namespace DependencyInjection.Tests
 {
@@ -156,9 +157,8 @@ namespace DependencyInjection.Tests
         public async Task CannotGetExplictlyRegisteredGrain()
         {
             ISimpleDIGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleDIGrain>(GetRandomGrainId(), grainClassNamePrefix: "UnitTests.Grains.ExplicitlyRegistered");
-            var exception = await Assert.ThrowsAsync<OrleansException>(() => grain.GetLongValue());
-            Assert.Contains("Error creating activation for", exception.Message);
-            Assert.Contains(nameof(ExplicitlyRegisteredSimpleDIGrain), exception.Message);
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.GetLongValue());
+            Assert.Contains("Unable to resolve service for type 'System.String' while attempting to activate 'UnitTests.Grains.ExplicitlyRegisteredSimpleDIGrain'", exception.Message);
         }
 
         [Fact]
