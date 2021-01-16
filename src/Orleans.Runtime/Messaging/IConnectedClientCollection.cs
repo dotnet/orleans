@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 
-namespace Orleans.Runtime.Messaging
+namespace Orleans.Runtime
 {
     /// <summary>
     /// Represents the collection of clients which are currently connected to this gateway.
     /// </summary>
-    public interface IConnectedClientCollection
+    internal interface IConnectedClientCollection
     {
         /// <summary>
         /// The monotonically increasing version of the collection, which can be used for change notification.
