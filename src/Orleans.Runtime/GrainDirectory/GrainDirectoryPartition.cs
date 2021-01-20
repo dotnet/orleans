@@ -309,7 +309,10 @@ namespace Orleans.Runtime.GrainDirectory
             AddressAndTag result = new AddressAndTag();
 
             if (!IsValidSilo(silo))
-                return result;
+            {
+                var siloStatus = this.siloStatusOracle.GetApproximateSiloStatus(silo);
+                throw new OrleansException($"Trying to register {grain} on invalid silo: {silo}. Known status: {siloStatus}");
+            }
 
             IGrainInfo grainInfo;
             lock (lockable)
