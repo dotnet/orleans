@@ -193,6 +193,7 @@ or
   <packageSources>
     <clear />
     <add key="orleans-builds" value="https://orleans.pkgs.visualstudio.com/orleans-public/_packaging/orleans-builds/nuget/v3/index.json" />
+  <add key="nuget" value="https://api.nuget.org/v3/index.json" />
   </packageSources>
 </configuration>
 ```
