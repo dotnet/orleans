@@ -29,23 +29,19 @@ namespace Orleans.Runtime
 
         public static readonly GrainType DirectoryServiceType = SystemTargetGrainId.CreateGrainType("dir.mem");
         public static readonly GrainType DirectoryCacheValidatorType = SystemTargetGrainId.CreateGrainType("dir.cache-validator");
+        public static readonly GrainType ClientDirectoryType = SystemTargetGrainId.CreateGrainType("dir.client");
         public static readonly GrainType SiloControlType = SystemTargetGrainId.CreateGrainType("silo-control");
-        public static readonly GrainType ClientObserverRegistrarType = SystemTargetGrainId.CreateGrainType("observer.registrar");
         public static readonly GrainType CatalogType = SystemTargetGrainId.CreateGrainType("catalog");
-        public static readonly GrainType MembershipOracleType = SystemTargetGrainId.CreateGrainType("clustering.oracle");
-        public static readonly GrainType TypeManagerType = SystemTargetGrainId.CreateGrainType("type-manager");
+        public static readonly GrainType MembershipServiceType = SystemTargetGrainId.CreateGrainType("clustering");
+        public static readonly GrainType SystemMembershipTableType = SystemTargetGrainId.CreateGrainType("clustering.dev");
         public static readonly GrainType FallbackSystemTargetType = SystemTargetGrainId.CreateGrainType("fallback");
         public static readonly GrainType LifecycleSchedulingSystemTargetType = SystemTargetGrainId.CreateGrainType("lifecycle");
         public static readonly GrainType DeploymentLoadPublisherSystemTargetType = SystemTargetGrainId.CreateGrainType("load-publisher");
-        public static readonly GrainType MultiClusterOracleType = SystemTargetGrainId.CreateGrainType("multicluster-oracle");
-        public static readonly GrainType ClusterDirectoryServiceType = SystemTargetGrainId.CreateGrainType("multicluster-directory");
-        public static readonly GrainType StreamProviderManagerAgentSystemTargetType = SystemTargetGrainId.CreateGrainType("streams.provider-manager");
         public static readonly GrainType TestHooksSystemTargetType = SystemTargetGrainId.CreateGrainType("test.hooks");
-        public static readonly GrainType ProtocolGatewayType = SystemTargetGrainId.CreateGrainType("multicluster.protocol-gw");
         public static readonly GrainType TransactionAgentSystemTargetType = SystemTargetGrainId.CreateGrainType("txn.agent");
-        public static readonly GrainType SystemMembershipTableType = SystemTargetGrainId.CreateGrainType("clustering.dev");
-        public static readonly GrainType StreamPullingAgentManagerType = SystemTargetGrainId.CreateGrainType("stream-agent-mgr");
-        public static readonly GrainType StreamPullingAgentType = SystemTargetGrainId.CreateGrainType("stream-agent");
+        public static readonly GrainType StreamProviderManagerAgentSystemTargetType = SystemTargetGrainId.CreateGrainType("stream.provider-manager");
+        public static readonly GrainType StreamPullingAgentManagerType = SystemTargetGrainId.CreateGrainType("stream.agent-mgr");
+        public static readonly GrainType StreamPullingAgentType = SystemTargetGrainId.CreateGrainType("stream.agent");
         public static readonly GrainType ManifestProviderType = SystemTargetGrainId.CreateGrainType("manifest");
 
         public static readonly GrainId SiloDirectConnectionId = GrainId.Create(
@@ -71,19 +67,15 @@ namespace Orleans.Runtime
         {
             {DirectoryServiceType, "DirectoryService"},
             {DirectoryCacheValidatorType, "DirectoryCacheValidator"},
-            {SiloControlType,"SiloControl"},
-            {ClientObserverRegistrarType,"ClientObserverRegistrar"},
+            {SiloControlType, "SiloControl"},
+            {ClientDirectoryType, "ClientDirectory"},
             {CatalogType,"Catalog"},
-            {MembershipOracleType,"MembershipOracle"},
-            {TypeManagerType,"TypeManagerId"},
+            {MembershipServiceType,"MembershipService"},
             {FallbackSystemTargetType, "FallbackSystemTarget"},
             {LifecycleSchedulingSystemTargetType, "LifecycleSchedulingSystemTarget"},
             {DeploymentLoadPublisherSystemTargetType, "DeploymentLoadPublisherSystemTarget"},
-            {MultiClusterOracleType,"MultiClusterOracle"},
-            {ClusterDirectoryServiceType,"ClusterDirectoryService"},
             {StreamProviderManagerAgentSystemTargetType,"StreamProviderManagerAgent"},
             {TestHooksSystemTargetType,"TestHooksSystemTargetType"},
-            {ProtocolGatewayType,"ProtocolGateway"},
             {TransactionAgentSystemTargetType,"TransactionAgentSystemTarget"},
             {SystemMembershipTableType,"SystemMembershipTable"},
             {StreamPullingAgentManagerType, "PullingAgentsManagerSystemTarget"},

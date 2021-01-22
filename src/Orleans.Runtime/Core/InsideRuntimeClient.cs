@@ -161,7 +161,7 @@ namespace Orleans.Runtime
             {
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
                 message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
-                message.Category = targetGrainId.Type.Equals(Constants.MembershipOracleType) ?
+                message.Category = targetGrainId.Type.Equals(Constants.MembershipServiceType) ?
                     Message.Categories.Ping : Message.Categories.System;
                 sharedData = this.systemSharedCallbackData;
             }

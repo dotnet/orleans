@@ -11,39 +11,31 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class ClientGrainLocator : IGrainLocator
     {
-        private readonly ILocalGrainDirectory localGrainDirectory;
+        private readonly ILocalClientDirectory _clientDirectory;
 
-        public ClientGrainLocator(ILocalGrainDirectory localGrainDirectory)
+        public ClientGrainLocator(ILocalClientDirectory clientDirectory)
         {
-            this.localGrainDirectory = localGrainDirectory;
+            _clientDirectory = clientDirectory;
         }
 
         public async Task<List<ActivationAddress>> Lookup(GrainId grainId)
         {
-            if (!ClientGrainId.TryParse(grainId, out var clientId))
+            if (!ClientGrainId.TryParse(grainId, out _))
             {
                 ThrowNotClientGrainId(grainId);
             }
 
-            var addresses = await this.localGrainDirectory.LookupAsync(clientId.GrainId);
-            return addresses.Addresses;
+            return await _clientDirectory.Lookup(grainId);
         }
 
         public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses)
         {
-            if (!ClientGrainId.TryParse(grainId, out var clientId))
+            if (!ClientGrainId.TryParse(grainId, out _))
             {
                 ThrowNotClientGrainId(grainId);
             }
 
-            if (this.localGrainDirectory.LocalLookup(clientId.GrainId, out var addressesAndTag))
-            {
-                addresses = addressesAndTag.Addresses;
-                return true;
-            }
-
-            addresses = null;
-            return false;
+            return _clientDirectory.TryLocalLookup(grainId, out addresses);
         }
 
         public Task<ActivationAddress> Register(ActivationAddress address) => throw new InvalidOperationException($"Cannot register client grain explicitly");

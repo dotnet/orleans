@@ -149,6 +149,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);
+            services.TryAddSingleton<IConnectedClientCollection>(sp => (IConnectedClientCollection)sp.GetRequiredService<MessageCenter>().Gateway ?? new EmptyConnectedClientCollection());
             services.TryAddSingleton<Dispatcher>(sp => sp.GetRequiredService<Catalog>().Dispatcher);
             services.TryAddSingleton<ActivationMessageScheduler>(sp => sp.GetRequiredService<Catalog>().ActivationMessageScheduler);
             services.TryAddSingleton<InsideRuntimeClient>();
@@ -189,8 +190,10 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IClusterMembershipService, ClusterMembershipService>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterMembershipService>();
 
-            services.TryAddSingleton<ClientObserverRegistrar>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClientObserverRegistrar>();
+            services.TryAddSingleton<ClientDirectory>();
+            services.AddFromExisting<ILocalClientDirectory, ClientDirectory>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClientDirectory>();
+            
             services.TryAddSingleton<SiloProviderRuntime>();
             services.TryAddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();

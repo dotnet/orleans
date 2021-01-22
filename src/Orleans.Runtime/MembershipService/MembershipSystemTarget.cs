@@ -20,7 +20,7 @@ namespace Orleans.Runtime.MembershipService
             ILoggerFactory loggerFactory,
             ILogger<MembershipSystemTarget> log,
             IInternalGrainFactory grainFactory)
-            : base(Constants.MembershipOracleType, localSiloDetails.SiloAddress, loggerFactory)
+            : base(Constants.MembershipServiceType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.membershipTableManager = membershipTableManager;
             this.log = log;
@@ -76,7 +76,7 @@ namespace Orleans.Runtime.MembershipService
         {
             Task<IndirectProbeResponse> ProbeIndirectly()
             {
-                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleType, intermediary);
+                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, intermediary);
                 return remoteOracle.ProbeIndirectly(target, probeTimeout, probeNumber);
             }
 
@@ -151,7 +151,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleType, silo);
+                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, silo);
 
                 try
                 {
@@ -194,7 +194,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 RequestContext.Set(RequestContext.PING_APPLICATION_HEADER, true);
-                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipOracleType, remoteSilo);
+                var remoteOracle = this.grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, remoteSilo);
                 task = remoteOracle.Ping(probeNumber);
 
                 // Update stats counter. Only count Pings that were successfuly sent, but not necessarily replied to.

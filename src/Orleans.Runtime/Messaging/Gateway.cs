@@ -14,9 +14,8 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class Gateway
+    internal class Gateway : IConnectedClientCollection
     {
-        private readonly MessageCenter messageCenter;
         private readonly GatewayClientCleanupAgent dropper;
 
         // clients is the main authorative collection of all connected clients. 
@@ -28,13 +27,13 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloAddress gatewayAddress;
         private readonly GatewaySender sender;
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
-        private ClientObserverRegistrar clientRegistrar;
         private readonly object lockable;
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
-        
+        private long clientsCollectionVersion = 0;
+
         public Gateway(
             MessageCenter msgCtr, 
             ILocalSiloDetails siloDetails, 
@@ -44,7 +43,6 @@ namespace Orleans.Runtime.Messaging
         {
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
-            messageCenter = msgCtr;
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
             dropper = new GatewayClientCleanupAgent(this, loggerFactory, messagingOptions.ClientDropTimeout);
             clients = new ConcurrentDictionary<ClientGrainId, ClientState>();
@@ -55,10 +53,19 @@ namespace Orleans.Runtime.Messaging
             lockable = new object();
         }
 
-        internal void Start(ClientObserverRegistrar clientRegistrar)
+        public static ActivationAddress GetClientActivationAddress(GrainId clientId, SiloAddress siloAddress)
         {
-            this.clientRegistrar = clientRegistrar;
-            this.clientRegistrar.SetGateway(this);
+            // Need to pick a unique deterministic ActivationId for this client.
+            // We store it in the grain directory and there for every GrainId we use ActivationId as a key
+            // so every GW needs to behave as a different "activation" with a different ActivationId (its not enough that they have different SiloAddress)
+            string stringToHash = clientId.ToString() + siloAddress.Endpoint + siloAddress.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            Guid hash = Utils.CalculateGuidHash(stringToHash);
+            var activationId = ActivationId.GetActivationId(UniqueKey.NewKey(hash));
+            return ActivationAddress.GetAddress(siloAddress, clientId, activationId);
+        }
+
+        internal void Start()
+        {
             dropper.Start();
         }
 
@@ -83,9 +90,17 @@ namespace Orleans.Runtime.Messaging
             dropper.Stop();
         }
 
-        internal ICollection<ClientGrainId> GetConnectedClients()
+        long IConnectedClientCollection.Version => clientsCollectionVersion;
+
+        List<GrainId> IConnectedClientCollection.GetConnectedClientIds()
         {
-            return clients.Keys;
+            var result = new List<GrainId>();
+            foreach (var pair in clients)
+            {
+                result.Add(pair.Value.Id.GrainId);
+            }
+
+            return result;
         }
 
         internal void RecordOpenedConnection(GatewayInboundConnection connection, ClientGrainId clientId)
@@ -111,7 +126,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 clientState.RecordConnection(connection);
                 clientConnections[connection] = clientState;
-                clientRegistrar.ClientAdded(clientId);
+                Interlocked.Increment(ref clientsCollectionVersion);
             }
         }
 
@@ -125,6 +140,7 @@ namespace Orleans.Runtime.Messaging
 
                 clientConnections.TryRemove(connection, out _);
                 clientState.RecordDisconnection();
+                Interlocked.Increment(ref clientsCollectionVersion);
                 logger.LogInformation(
                     (int)ErrorCode.GatewayClientClosedSocket,
                     "Recorded closed socket from endpoint {Endpoint}, client ID {clientId}.",
@@ -198,7 +214,6 @@ namespace Orleans.Runtime.Messaging
             }
             
             clients.TryRemove(client.Id, out _);
-            clientRegistrar.ClientDropped(client.Id);
 
             GatewayInboundConnection oldConnection = client.Connection;
             if (oldConnection != null)
@@ -210,6 +225,7 @@ namespace Orleans.Runtime.Messaging
                 oldConnection.CloseAsync(exception: null).Ignore();
             }
             
+            Interlocked.Increment(ref clientsCollectionVersion);
             MessagingStatisticsGroup.ConnectedClientCount.DecrementBy(1);
         }
 
@@ -264,7 +280,9 @@ namespace Orleans.Runtime.Messaging
             internal DateTime DisconnectedSince { get; private set; }
             internal ClientGrainId Id { get; private set; }
 
-            internal bool IsConnected => this.Connection != null;
+            public bool IsConnected => this.Connection != null;
+
+            public TimeSpan LastSeen => IsConnected ? TimeSpan.Zero : DateTime.UtcNow.Subtract(DisconnectedSince);
 
             internal ClientState(ClientGrainId id, TimeSpan clientDropTimeout)
             {

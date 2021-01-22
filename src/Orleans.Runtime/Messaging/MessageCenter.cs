@@ -3,6 +3,7 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.GrainDirectory;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -73,10 +74,10 @@ namespace Orleans.Runtime.Messaging
             OutboundQueue.Start();
         }
 
-        public void StartGateway(ClientObserverRegistrar clientRegistrar)
+        public void StartGateway()
         {
             if (Gateway != null)
-                Gateway.Start(clientRegistrar);
+                Gateway.Start();
         }
 
         private void WaitToRerouteAllQueuedMessages()
