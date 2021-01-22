@@ -33,6 +33,8 @@ namespace Tester
             if (!usingLocalWAS)
             {
                 // Tests are using Azure Cloud Storage, not local WAS emulator.
+                // Force TLS 1.2
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
                 return;
             }
 
