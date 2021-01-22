@@ -2,17 +2,12 @@ using k8s;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Rest;
-using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace Orleans.Hosting.Kubernetes
@@ -150,13 +145,11 @@ namespace Orleans.Hosting.Kubernetes
 
                         if (!_enableMonitoring && chosenSilos.Any(s => s.SiloAddress.Equals(_localSiloDetails.SiloAddress)))
                         {
-                            _logger.LogInformation("Enabling Kubernetes monitoring");
                             _enableMonitoring = true;
                             _pauseMonitoringSemaphore.Release(1);
                         }
                         else if (_enableMonitoring)
                         {
-                            _logger.LogInformation("Pausing Kubernetes monitoring");
                             _enableMonitoring = false;
                         }
 
@@ -175,12 +168,16 @@ namespace Orleans.Hosting.Kubernetes
                                 {
                                     try
                                     {
-                                        _logger.LogInformation("Silo {SiloAddress} is dead, proceeding to delete the corresponding pod, {PodName}, in namespace {PodNamespace}", change.SiloAddress, change.Name, _podNamespace);
+                                        if (_logger.IsEnabled(LogLevel.Information))
+                                        {
+                                            _logger.LogInformation("Silo {SiloAddress} is dead, proceeding to delete the corresponding pod, {PodName}, in namespace {PodNamespace}", change.SiloAddress, change.Name, _podNamespace);
+                                        }
+
                                         await _client.DeleteNamespacedPodAsync(change.Name, _podNamespace);
                                     }
                                     catch (Exception exception)
                                     {
-                                        _logger.LogError(exception, "Error deleting pod {PodName} in namespace {PodNamespace}", change.Name, _podNamespace);
+                                        _logger.LogError(exception, "Error deleting pod {PodName} in namespace {PodNamespace} corresponding to defunct silo {SiloAddress}", change.Name, _podNamespace, change.SiloAddress);
                                     }
                                 }
                             }
@@ -202,13 +199,6 @@ namespace Orleans.Hosting.Kubernetes
 
         private async Task MonitorKubernetesPods()
         {
-            var jsonSettings = new JsonSerializerSettings
-            {
-                DefaultValueHandling = DefaultValueHandling.Ignore,
-                Formatting = Formatting.Indented,
-                NullValueHandling = NullValueHandling.Ignore,
-            };
-
             while (!_shutdownToken.IsCancellationRequested)
             {
                 try
@@ -216,15 +206,12 @@ namespace Orleans.Hosting.Kubernetes
                     if (!_enableMonitoring)
                     {
                         // Pulse the semaphore to avoid spinning in a tight loop.
-                        _logger.LogInformation("Waiting for Kubernetes monitoring to be enabled");
                         await _pauseMonitoringSemaphore.WaitAsync();
-                        _logger.LogInformation("Woke up after slumber");
                         continue;
                     }
 
                     if (_shutdownToken.IsCancellationRequested)
                     {
-                        _logger.LogInformation("Shutdown1");
                         break;
                     }
 
@@ -238,19 +225,8 @@ namespace Orleans.Hosting.Kubernetes
                     {
                         if (!_enableMonitoring || _shutdownToken.IsCancellationRequested)
                         {
-                            _logger.LogInformation("Break loop");
                             break;
                         }
-#if false
-                        _logger.LogInformation(
-                            "Event: {Event} Pod: {Pod}",
-                            eventType.ToString(),
-                            JsonConvert.SerializeObject(pod, jsonSettings));
-#endif
-                        _logger.LogInformation(
-                            "Event: {Event} PodName: {PodName}",
-                            eventType.ToString(),
-                            pod.Metadata.Name);
 
                         if (string.Equals(pod.Metadata.Name, _podName, StringComparison.Ordinal))
                         {
@@ -267,7 +243,11 @@ namespace Orleans.Hosting.Kubernetes
                         {
                             if (this.TryMatchSilo(pod, out var member) && member.Status != SiloStatus.Dead)
                             {
-                                _logger.LogInformation("Declaring server {Silo} dead since its corresponding pod, {Pod}, has been deleted", member.SiloAddress, pod.Metadata.Name);
+                                if (_logger.IsEnabled(LogLevel.Information))
+                                {
+                                    _logger.LogInformation("Declaring server {Silo} dead since its corresponding pod, {Pod}, has been deleted", member.SiloAddress, pod.Metadata.Name);
+                                }
+
                                 await _clusterMembershipService.TryKill(member.SiloAddress);
                             }
                         }
@@ -275,7 +255,11 @@ namespace Orleans.Hosting.Kubernetes
 
                     if (_enableMonitoring && !_shutdownToken.IsCancellationRequested)
                     {
-                        _logger.LogDebug("Unexpected end of stream from Kubernetes API. Will try again.");
+                        if (_logger.IsEnabled(LogLevel.Debug))
+                        {
+                            _logger.LogDebug("Unexpected end of stream from Kubernetes API. Will try again.");
+                        }
+
                         await Task.Delay(5000);
                     }
                 }
@@ -304,59 +288,6 @@ namespace Orleans.Hosting.Kubernetes
 
             server = default;
             return false;
-        }
-    }
-
-    internal static class KubernetesExtensions
-    {
-        public static async IAsyncEnumerable<(WatchEventType EventType, TValue Value)> WatchAsync<TList, TValue>(this HttpOperationResponse<TList> watchList, [EnumeratorCancellation] CancellationToken cancellation)
-        {
-            Channel<(WatchEventType, TValue)> channel = Channel.CreateUnbounded<(WatchEventType, TValue)>(
-                new UnboundedChannelOptions
-                {
-                    AllowSynchronousContinuations = false,
-                    SingleReader = true,
-                    SingleWriter = true
-                });
-
-            var reader = channel.Reader;
-            Watcher<TValue>[] watcher = new Watcher<TValue>[] { default };
-            var cancellationRegistration = cancellation.Register(() =>
-            {
-                _ = channel.Writer.TryComplete();
-                watcher[0]?.Dispose();
-            });
-
-            watcher[0] = watchList.Watch<TValue, TList>((eventType, value) =>
-            {
-                _ = channel.Writer.TryWrite((eventType, value));
-            },
-            exception =>
-            {
-                _ = channel.Writer.TryComplete(exception);
-                cancellationRegistration.Dispose();
-            },
-            () =>
-            {
-                _ = channel.Writer.TryComplete();
-                cancellationRegistration.Dispose();
-            });
-
-            _ = Task.Run(async () =>
-            {
-                await channel.Reader.Completion.ConfigureAwait(false);
-                watcher[0].Dispose();
-                cancellationRegistration.Dispose();
-            });
-
-
-            while (await channel.Reader.WaitToReadAsync(cancellation))
-            {
-                while (reader.TryRead(out var item))
-                {
-                    yield return item;
-                }
-            }
         }
     }
 }
