@@ -543,7 +543,6 @@ namespace Orleans.Runtime
                 this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
             }
 
-            this.messagingTrace.OnDispatcherForwardingMultiple(messages.Count, oldAddress, forwardingAddress, failedOperation, exc);
 
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
             scheduler.QueueAction(
@@ -557,6 +556,7 @@ namespace Orleans.Runtime
                         }
                         else
                         {
+                            this.messagingTrace.OnDispatcherForwardingMultiple(messages.Count, oldAddress, forwardingAddress, failedOperation, exc);
                             TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc);
                         }
                     }
