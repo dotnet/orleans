@@ -33,6 +33,7 @@ namespace Tester
             if (!usingLocalWAS)
             {
                 // Tests are using Azure Cloud Storage, not local WAS emulator.
+                ForceTlsVersion();
                 return;
             }
 
@@ -51,6 +52,13 @@ namespace Tester
             {
                 throw new SkipException("No connection string found. Skipping");
             }
+            ForceTlsVersion();
+        }
+
+        private static void ForceTlsVersion()
+        {
+            // Force TLS 1.2
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
         }
 
         public static double CalibrateTimings()
