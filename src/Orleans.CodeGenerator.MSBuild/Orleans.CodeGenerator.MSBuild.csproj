@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
@@ -24,8 +24,9 @@
 
   <ItemGroup>
     <None Remove="build\Microsoft.Orleans.CodeGenerator.MSBuild.targets" />
+    <None Remove="buildMultiTargeting\Microsoft.Orleans.CodeGenerator.MSBuild.targets" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <Content Include="build\Microsoft.Orleans.CodeGenerator.MSBuild.targets">
       <Pack>true</Pack>
@@ -50,7 +51,7 @@
     <!-- This must come after all other PackageReference elements -->
     <PackageReference Update="@(PackageReference)" PrivateAssets="All" Publish="true" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <ProjectReference Include="..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" PrivateAssets="all" Publish="true" />
     <ProjectReference Include="..\Orleans.CodeGenerator.MSBuild.Tasks\Orleans.CodeGenerator.MSBuild.Tasks.csproj" PrivateAssets="all" ExcludeAssets="compile" Publish="true" />
@@ -61,9 +62,9 @@
     <!-- However, we cannot publish during the cross-targeting build, so we skip that. -->
     <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
   </Target>
-  
+
   <Target Name="PackTaskDependencies" BeforeTargets="GenerateNuspec">
-   <!-- 
+   <!--
     The include needs to happen after output has been copied to build output folder
     but before NuGet generates a nuspec. See https://github.com/NuGet/Home/issues/4704.
    -->

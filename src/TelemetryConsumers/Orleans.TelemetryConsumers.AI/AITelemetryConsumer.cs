@@ -24,7 +24,9 @@ namespace Orleans.TelemetryConsumers.AI
             var instrumentationKey = options.Value.InstrumentationKey;
             this._client = instrumentationKey != null
                 ? new TelemetryClient(new Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration { InstrumentationKey = instrumentationKey })
-                : new TelemetryClient();
+#pragma warning disable CS0618 // Type or member is obsolete
+                : new TelemetryClient(Microsoft.ApplicationInsights.Extensibility.TelemetryConfiguration.Active);
+#pragma warning restore CS0618 // Type or member is obsolete
         }
 
         /// <inheritdoc />
@@ -45,7 +47,7 @@ namespace Orleans.TelemetryConsumers.AI
 
         /// <inheritdoc />
         public virtual void TrackDependency(string dependencyName, string commandName, DateTimeOffset startTime, TimeSpan duration, bool success) =>
-            this._client.TrackDependency(dependencyName, commandName, startTime, duration, success);
+            this._client.TrackDependency("Orleans", dependencyName, commandName, startTime, duration, success);
 
         /// <inheritdoc />
         public virtual void TrackEvent(string eventName, IDictionary<string, string> properties = null, IDictionary<string, double> metrics = null) =>

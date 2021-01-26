@@ -766,7 +766,7 @@ namespace Orleans.Runtime
 
                 foreach (var msg in RunningRequests)
                 {
-                    if (ReferenceEquals(msg, this.Blocking)) continue;
+                    if (ReferenceEquals(msg.Key, this.Blocking)) continue;
                     sb.AppendFormat("   Processing message: {0}", msg);
                 }
 
