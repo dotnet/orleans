@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.Extensions.Logging;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.Analyzers;
 using Orleans.CodeGenerator.Compatibility;
 using Orleans.CodeGenerator.Utilities;
 
@@ -11,7 +12,7 @@ namespace Orleans.CodeGenerator.Analysis
 {
     internal class CompilationAnalyzer
     {
-        private readonly ILogger log;
+        private readonly IGeneratorExecutionContext context;
         private readonly WellKnownTypes wellKnownTypes;
         private readonly INamedTypeSymbol serializableAttribute;
         private readonly INamedTypeSymbol knownBaseTypeAttribute;
@@ -22,26 +23,26 @@ namespace Orleans.CodeGenerator.Analysis
         /// <summary>
         /// Assemblies whose declared types are all considered serializable.
         /// </summary>
-        private readonly HashSet<IAssemblySymbol> assembliesWithForcedSerializability = new HashSet<IAssemblySymbol>();
+        private readonly HashSet<IAssemblySymbol> assembliesWithForcedSerializability = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
 
         /// <summary>
         /// Types whose sub-types are all considered serializable.
         /// </summary>
-        private readonly HashSet<INamedTypeSymbol> knownBaseTypes = new HashSet<INamedTypeSymbol>();
+        private readonly HashSet<INamedTypeSymbol> knownBaseTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
         /// <summary>
         /// Types which were observed in a grain interface.
         /// </summary>
-        private readonly HashSet<ITypeSymbol> dependencyTypes = new HashSet<ITypeSymbol>();
+        private readonly HashSet<ITypeSymbol> dependencyTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
 
-        private readonly HashSet<INamedTypeSymbol> grainInterfacesToProcess = new HashSet<INamedTypeSymbol>();
-        private readonly HashSet<INamedTypeSymbol> grainClassesToProcess = new HashSet<INamedTypeSymbol>();
-        private readonly HashSet<INamedTypeSymbol> serializationTypesToProcess = new HashSet<INamedTypeSymbol>();
-        private readonly HashSet<INamedTypeSymbol> fieldOfSerializableType = new HashSet<INamedTypeSymbol>();
+        private readonly HashSet<INamedTypeSymbol> grainInterfacesToProcess = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        private readonly HashSet<INamedTypeSymbol> grainClassesToProcess = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        private readonly HashSet<INamedTypeSymbol> serializationTypesToProcess = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        private readonly HashSet<INamedTypeSymbol> fieldOfSerializableType = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
-        public CompilationAnalyzer(ILogger log, WellKnownTypes wellKnownTypes, Compilation compilation)
+        public CompilationAnalyzer(IGeneratorExecutionContext context, WellKnownTypes wellKnownTypes, Compilation compilation)
         {
-            this.log = log;
+            this.context = context;
             this.wellKnownTypes = wellKnownTypes;
             this.serializableAttribute = wellKnownTypes.SerializableAttribute;
             this.knownBaseTypeAttribute = wellKnownTypes.KnownBaseTypeAttribute;
@@ -50,33 +51,33 @@ namespace Orleans.CodeGenerator.Analysis
             this.compilation = compilation;
         }
 
-        public HashSet<INamedTypeSymbol> CodeGenerationRequiredTypes { get; } = new HashSet<INamedTypeSymbol>();
+        public HashSet<INamedTypeSymbol> CodeGenerationRequiredTypes { get; } = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
         /// <summary>
         /// All assemblies referenced by this compilation.
         /// </summary>
-        public HashSet<IAssemblySymbol> ReferencedAssemblies = new HashSet<IAssemblySymbol>();
+        public HashSet<IAssemblySymbol> ReferencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
 
         /// <summary>
         /// Assemblies which should be excluded from code generation (eg, because they already contain generated code).
         /// </summary>
-        public HashSet<IAssemblySymbol> AssembliesExcludedFromCodeGeneration = new HashSet<IAssemblySymbol>();
+        public HashSet<IAssemblySymbol> AssembliesExcludedFromCodeGeneration = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
 
         /// <summary>
         /// Assemblies which should be excluded from metadata generation.
         /// </summary>
-        public HashSet<IAssemblySymbol> AssembliesExcludedFromMetadataGeneration = new HashSet<IAssemblySymbol>();
+        public HashSet<IAssemblySymbol> AssembliesExcludedFromMetadataGeneration = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
 
-        public HashSet<IAssemblySymbol> KnownAssemblies { get; } = new HashSet<IAssemblySymbol>();
-        public HashSet<INamedTypeSymbol> KnownTypes { get; } = new HashSet<INamedTypeSymbol>();
+        public HashSet<IAssemblySymbol> KnownAssemblies { get; } = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
+        public HashSet<INamedTypeSymbol> KnownTypes { get; } = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
         public (IEnumerable<INamedTypeSymbol> grainClasses, IEnumerable<INamedTypeSymbol> grainInterfaces, IEnumerable<INamedTypeSymbol> types) GetTypesToProcess() =>
             (this.grainClassesToProcess, this.grainInterfacesToProcess, this.GetSerializationTypesToProcess());
 
         private IEnumerable<INamedTypeSymbol> GetSerializationTypesToProcess()
         {
-            var done = new HashSet<INamedTypeSymbol>();
-            var remaining = new HashSet<INamedTypeSymbol>();
+            var done = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+            var remaining = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
             while (done.Count != this.serializationTypesToProcess.Count)
             {
                 remaining.Clear();
@@ -97,25 +98,21 @@ namespace Orleans.CodeGenerator.Analysis
             var result = false;
             if (type.IsSerializable || type.HasAttribute(this.serializableAttribute))
             {
-                if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} has [Serializable] attribute.");
                 result = true;
             }
 
             if (!result && this.assembliesWithForcedSerializability.Contains(type.ContainingAssembly))
             {
-                if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} is declared in an assembly in which all types are considered serializable");
                 result = true;
             }
 
             if (!result && this.KnownTypes.Contains(type))
             {
-                if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} is a known type");
                 result = true;
             }
 
             if (!result && this.dependencyTypes.Contains(type))
             {
-                if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} was discovered on a grain method signature or in another serializable type");
                 result = true;
             }
 
@@ -125,7 +122,6 @@ namespace Orleans.CodeGenerator.Analysis
                 {
                     if (!knownBaseTypes.Contains(current)) continue;
 
-                    if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} has a known base type");
                     result = true;
                 }
             }
@@ -135,23 +131,16 @@ namespace Orleans.CodeGenerator.Analysis
                 foreach (var iface in type.AllInterfaces)
                 {
                     if (!knownBaseTypes.Contains(iface)) continue;
-
-                    if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} has a known base interface");
                     result = true;
                 }
             }
 
             if (!result && this.fieldOfSerializableType.Contains(type))
             {
-                if (log.IsEnabled(LogLevel.Debug)) log.LogTrace($"Type {type} is used in a field of another serializable type");
                 result = true;
             }
 
-            if (!result)
-            {
-                if (log.IsEnabled(LogLevel.Trace)) log.LogTrace($"Type {type} is not serializable");
-            }
-            else
+            if (result)
             {
                 foreach (var field in type.GetInstanceMembers<IFieldSymbol>())
                 {
@@ -186,11 +175,9 @@ namespace Orleans.CodeGenerator.Analysis
 
                 if (!awaitable && !method.ReturnsVoid)
                 {
-                    var message = $"Grain interface {type} has method {method} which returns a non-awaitable type {method.ReturnType}."
-                        + " All grain interface methods must return awaitable types."
-                        + $" Did you mean to return Task<{method.ReturnType}>?";
-                    this.log.LogError(message);
-                    throw new InvalidOperationException(message);
+                    var declaration = method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as MethodDeclarationSyntax;
+                    this.context.ReportDiagnostic(UnawaitableGrainMethodReturnTypeDiagostic.CreateDiagnostic(declaration));
+                    continue;
                 }
 
                 if (method.ReturnType is INamedTypeSymbol returnType)
@@ -234,7 +221,7 @@ namespace Orleans.CodeGenerator.Analysis
 
         private static IEnumerable<ITypeSymbol> ExpandType(ITypeSymbol symbol)
         {
-            return ExpandTypeInternal(symbol, new HashSet<ITypeSymbol>());
+            return ExpandTypeInternal(symbol, new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default));
             IEnumerable<ITypeSymbol> ExpandTypeInternal(ITypeSymbol s, HashSet<ITypeSymbol> emitted)
             {
                 if (!emitted.Add(s)) yield break;
@@ -266,7 +253,7 @@ namespace Orleans.CodeGenerator.Analysis
             this.serializationTypesToProcess.Add(type);
         }
 
-        public void Analyze()
+        public void Analyze(System.Threading.CancellationToken cancellationToken)
         {
             foreach (var reference in this.compilation.References)
             {
@@ -300,7 +287,6 @@ namespace Orleans.CodeGenerator.Analysis
                     }
 
                     var type = (ITypeSymbol)param.Value;
-                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Known assembly {type.ContainingAssembly} from assembly {asm}");
 
                     // Check if the attribute has the TreatTypesAsSerializable property set.
                     var prop = attr.NamedArguments.FirstOrDefault(a => a.Key.Equals("TreatTypesAsSerializable")).Value;
@@ -343,8 +329,6 @@ namespace Orleans.CodeGenerator.Analysis
                             throwOnFailure = (bool)throwOnFailureParam.Value;
                             if (throwOnFailure) this.CodeGenerationRequiredTypes.Add(type);
                         }
-
-                        if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Known type {type}, Throw on failure: {throwOnFailure}");
                     }
                 }
             }
@@ -412,7 +396,6 @@ namespace Orleans.CodeGenerator.Analysis
 
         public void AddKnownBaseType(INamedTypeSymbol type)
         {
-            if (log.IsEnabled(LogLevel.Debug)) this.log.LogDebug($"Added known base type {type}");
             this.knownBaseTypes.Add(type);
         }
 

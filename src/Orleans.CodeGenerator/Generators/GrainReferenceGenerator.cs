@@ -319,7 +319,12 @@ namespace Orleans.CodeGenerator.Generators
                 var enumType = wellKnownTypes.TransactionOption;
                 var txRequirement = (int)attr.ConstructorArguments.First().Value;
                 var values = enumType.GetMembers().OfType<IFieldSymbol>().ToList();
-                var mapping = values.ToDictionary(m => (int)m.ConstantValue, m => m.Name);
+                var mapping = new Dictionary<int, string>();
+                foreach (var val in values)
+                {
+                    mapping[(int)val.ConstantValue] = val.Name;
+                }
+
                 if (!mapping.TryGetValue(txRequirement, out var value))
                 {
                     throw new NotSupportedException(
