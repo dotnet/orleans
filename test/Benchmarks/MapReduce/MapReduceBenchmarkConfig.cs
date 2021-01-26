@@ -7,7 +7,7 @@ namespace Benchmarks.MapReduce
     {
         public MapReduceBenchmarkConfig()
         {
-            Add(new Job
+            AddJob(new Job
             {
                 Run = {
                     LaunchCount = 1,

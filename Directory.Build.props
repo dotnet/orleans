@@ -43,52 +43,53 @@
   <!-- Shared Package Versions -->
   <PropertyGroup>
     <!-- System packages -->
-    <SystemDataSqlClientVersion>4.8.0</SystemDataSqlClientVersion>
-    <SystemDiagnosticsEventLogVersion>4.7.0</SystemDiagnosticsEventLogVersion>
-    <SystemCollectionsImmutableVersion>1.7.0</SystemCollectionsImmutableVersion>
-    <SystemRuntimeCompilerServicesUnsafeVersion>4.7.0</SystemRuntimeCompilerServicesUnsafeVersion>
-    <SystemDiagnosticsPerformanceCounterVersion>4.7.0</SystemDiagnosticsPerformanceCounterVersion>
+    <SystemDataSqlClientVersion>4.8.2</SystemDataSqlClientVersion>
+    <SystemDiagnosticsEventLogVersion>5.0.0</SystemDiagnosticsEventLogVersion>
+    <SystemCollectionsImmutableVersion>5.0.0</SystemCollectionsImmutableVersion>
+    <SystemRuntimeCompilerServicesUnsafeVersion>5.0.0</SystemRuntimeCompilerServicesUnsafeVersion>
+    <SystemDiagnosticsPerformanceCounterVersion>5.0.0</SystemDiagnosticsPerformanceCounterVersion>
     <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
-    <SystemReflectionMetadataVersion>1.8.0</SystemReflectionMetadataVersion>
+    <SystemReflectionMetadataVersion>5.0.0</SystemReflectionMetadataVersion>
     <SystemValueTupleVersion>4.5.0</SystemValueTupleVersion>
     <SystemReflectionEmitVersion>4.7.0</SystemReflectionEmitVersion>
-    <SystemThreadingChannelsVersion>4.7.0</SystemThreadingChannelsVersion>
-    <SystemIOPipelinesVersion>4.7.0</SystemIOPipelinesVersion>
-    <SystemCodeDomVersion>4.7.0</SystemCodeDomVersion>
-    <SystemDiagnosticsDiagnosticsSourceVersion>4.7.0</SystemDiagnosticsDiagnosticsSourceVersion>
-    <SystemSecurityCryptographyVersion>4.7.0</SystemSecurityCryptographyVersion>
+    <SystemThreadingChannelsVersion>5.0.0</SystemThreadingChannelsVersion>
+    <SystemIOPipelinesVersion>5.0.1</SystemIOPipelinesVersion>
+    <SystemCodeDomVersion>5.0.0</SystemCodeDomVersion>
+    <SystemDiagnosticsDiagnosticsSourceVersion>5.0.1</SystemDiagnosticsDiagnosticsSourceVersion>
+    <SystemSecurityCryptographyVersion>5.0.0</SystemSecurityCryptographyVersion>
 
     <!-- Microsoft packages -->
-    <MicrosoftBuildVersion>16.4.0</MicrosoftBuildVersion>
-    <MicrosoftCodeAnalysisVersion>3.4.0</MicrosoftCodeAnalysisVersion>
+    <MicrosoftBuildVersion>16.8.0</MicrosoftBuildVersion>
+    <MicrosoftCodeAnalysisVersion>3.8.0</MicrosoftCodeAnalysisVersion>
+    <MicrosoftCodeAnalysisAnalyzersVersion>3.3.2</MicrosoftCodeAnalysisAnalyzersVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
-    <MicrosoftBclAsyncInterfacesVersion>1.1.1</MicrosoftBclAsyncInterfacesVersion>
+    <MicrosoftBclAsyncInterfacesVersion>5.0.0</MicrosoftBclAsyncInterfacesVersion>
     <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.0</MicrosoftNETFrameworkReferenceAssembliesVersion>
-    <MicrosoftBclHashCodeVersion>1.0.0</MicrosoftBclHashCodeVersion>
+    <MicrosoftBclHashCodeVersion>1.1.1</MicrosoftBclHashCodeVersion>
 
-    <MicrosoftAspNetCoreConnectionsAbstractionsVersion>3.0.0</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
-    <MicrosoftExtensionsConfigurationBinderVersion>3.0.0</MicrosoftExtensionsConfigurationBinderVersion>
-    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>3.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
-    <MicrosoftExtensionsConfigurationJsonVersion>3.0.0</MicrosoftExtensionsConfigurationJsonVersion>
-    <MicrosoftExtensionsConfigurationVersion>3.0.0</MicrosoftExtensionsConfigurationVersion>
-    <MicrosoftExtensionsDependencyInjectionVersion>3.0.0</MicrosoftExtensionsDependencyInjectionVersion>
-    <MicrosoftExtensionsDependencyModelVersion>3.0.0</MicrosoftExtensionsDependencyModelVersion>
-    <MicrosoftExtensionsLoggingVersion>3.0.0</MicrosoftExtensionsLoggingVersion>
-    <MicrosoftExtensionsObjectPoolVersion>3.0.0</MicrosoftExtensionsObjectPoolVersion>
-    <MicrosoftExtensionsOptionsVersion>3.0.0</MicrosoftExtensionsOptionsVersion>
-    <MicrosoftExtensionsHttpVersion>3.0.0</MicrosoftExtensionsHttpVersion>
-    <MicrosoftExtensionsHostingAbstractionsVersion>3.0.0</MicrosoftExtensionsHostingAbstractionsVersion>
-    <MicrosoftExtensionsHostingVersion>3.0.0</MicrosoftExtensionsHostingVersion>
+    <MicrosoftAspNetCoreConnectionsAbstractionsVersion>5.0.2</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
+    <MicrosoftExtensionsConfigurationBinderVersion>5.0.0</MicrosoftExtensionsConfigurationBinderVersion>
+    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>5.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
+    <MicrosoftExtensionsConfigurationJsonVersion>5.0.0</MicrosoftExtensionsConfigurationJsonVersion>
+    <MicrosoftExtensionsConfigurationVersion>5.0.0</MicrosoftExtensionsConfigurationVersion>
+    <MicrosoftExtensionsDependencyInjectionVersion>5.0.1</MicrosoftExtensionsDependencyInjectionVersion>
+    <MicrosoftExtensionsDependencyModelVersion>5.0.0</MicrosoftExtensionsDependencyModelVersion>
+    <MicrosoftExtensionsLoggingVersion>5.0.0</MicrosoftExtensionsLoggingVersion>
+    <MicrosoftExtensionsObjectPoolVersion>5.0.2</MicrosoftExtensionsObjectPoolVersion>
+    <MicrosoftExtensionsOptionsVersion>5.0.0</MicrosoftExtensionsOptionsVersion>
+    <MicrosoftExtensionsHttpVersion>5.0.0</MicrosoftExtensionsHttpVersion>
+    <MicrosoftExtensionsHostingAbstractionsVersion>5.0.0</MicrosoftExtensionsHostingAbstractionsVersion>
+    <MicrosoftExtensionsHostingVersion>5.0.0</MicrosoftExtensionsHostingVersion>
 
-    <MicrosoftApplicationInsightsVersion>2.4.0</MicrosoftApplicationInsightsVersion>
+    <MicrosoftApplicationInsightsVersion>2.16.0</MicrosoftApplicationInsightsVersion>
     <MicrosoftAzureCosmosTableVersion>1.0.5</MicrosoftAzureCosmosTableVersion>
     <AzureCoreVersion>1.3.0</AzureCoreVersion>
     <AzureIdentityVersion>1.1.1</AzureIdentityVersion>
     <AzureMessagingEventHubs>5.1.0</AzureMessagingEventHubs>
     <AzureStorageBlobsVersion>12.4.4</AzureStorageBlobsVersion>
     <AzureStorageQueuesVersion>12.3.2</AzureStorageQueuesVersion>
-    <MicrosoftDataSQLiteVersion>3.1.0</MicrosoftDataSQLiteVersion>
-    <MicrosoftServiceFabricServicesVersion>3.4.664</MicrosoftServiceFabricServicesVersion>
+    <MicrosoftDataSqliteVersion>5.0.2</MicrosoftDataSqliteVersion>
+    <MicrosoftServiceFabricServicesVersion>4.1.456</MicrosoftServiceFabricServicesVersion>
 
     <FSharpCoreVersion>4.7.0</FSharpCoreVersion>
 
@@ -99,25 +100,30 @@
     <ConsulVersion>0.7.2.3</ConsulVersion>
     <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
     <GoogleProtobufVersion>3.4.0</GoogleProtobufVersion>
-    <ProtobufNetVersion>2.3.7</ProtobufNetVersion>
-    <MySqlDataVersion>8.0.18</MySqlDataVersion>
+    <ProtobufNetVersion>3.0.73</ProtobufNetVersion>
+    <MySqlDataVersion>8.0.23</MySqlDataVersion>
     <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
-    <NewtonsoftJsonVersion>11.0.1</NewtonsoftJsonVersion>
-    <NpgsqlVersion>3.1.9</NpgsqlVersion>
-    <NSubstituteVersion>4.2.0</NSubstituteVersion>
-    <NSubstituteAnalyzersCSharpVersion>1.0.10</NSubstituteAnalyzersCSharpVersion>
-    <ZooKeeperNetExVersion>3.4.12.1</ZooKeeperNetExVersion>
+    <NewtonsoftJsonVersion>12.0.3</NewtonsoftJsonVersion>
+    <NpgsqlVersion>5.0.3</NpgsqlVersion>
+    <NSubstituteVersion>4.2.2</NSubstituteVersion>
+    <NSubstituteAnalyzersCSharpVersion>1.0.14</NSubstituteAnalyzersCSharpVersion>
+    <ZooKeeperNetExVersion>3.4.12.4</ZooKeeperNetExVersion>
     <StackExchangeRedis>2.0.601</StackExchangeRedis>
-    <KubernetesClientVersion>2.0.29</KubernetesClientVersion>
+    <KubernetesClientVersion>4.0.5</KubernetesClientVersion>
 
     <!-- Test related packages -->
     <FluentAssertionsVersion>4.19.4</FluentAssertionsVersion>
-    <MicrosoftTestSdkVersion>16.4.0</MicrosoftTestSdkVersion>
-    <BenchmarkDotNetVersion>0.12.0</BenchmarkDotNetVersion>
-    <XunitSkippableFactVersion>1.3.12</XunitSkippableFactVersion>
+    <MoqVersion>4.16.0</MoqVersion>
+    <MicrosoftTestSdkVersion>16.8.3</MicrosoftTestSdkVersion>
+    <BenchmarkDotNetVersion>0.12.1</BenchmarkDotNetVersion>
+    <XunitSkippableFactVersion>1.4.13</XunitSkippableFactVersion>
     <DotNetxUnitVersion>2.3.1</DotNetxUnitVersion>
     <xUnitVersion>2.4.1</xUnitVersion>
-    <NodaTimeVersion>2.4.7</NodaTimeVersion>
+    <NodaTimeVersion>3.0.5</NodaTimeVersion>
+    <AutofacExtensionsDependencyInjectionVersion>7.1.0</AutofacExtensionsDependencyInjectionVersion>
+    <StructureMapMicrosoftDependencyInjectionVersion>2.0.0</StructureMapMicrosoftDependencyInjectionVersion>
+    <MicrosoftDataSqlClientVersion>2.1.1</MicrosoftDataSqlClientVersion>
+    <MySqlConnectorVersion>1.2.1</MySqlConnectorVersion>
 
     <!-- Tooling related packages -->
     <SourceLinkVersion>2.8.3</SourceLinkVersion>
@@ -160,7 +166,7 @@
     <OrleansAzureCloudServicesVersion>2.3.0</OrleansAzureCloudServicesVersion>
     <OrleansTestingHostVersion>2.3.0</OrleansTestingHostVersion>
     <OrleansTransactionsVersion>2.3.0</OrleansTransactionsVersion>
-    <OrleansServiceFabricVersion>2.3.0</OrleansServiceFabricVersion>
+    <OrleansServiceFabricVersion>4.1.456</OrleansServiceFabricVersion>
     <OrleansSerializersVersion>2.3.0</OrleansSerializersVersion>
     <OrleansToolsVersion>2.3.0</OrleansToolsVersion>
     <OrleansClientVersion>2.3.0</OrleansClientVersion>

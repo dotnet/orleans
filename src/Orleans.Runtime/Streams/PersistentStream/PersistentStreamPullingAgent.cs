@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -766,7 +767,7 @@ namespace Orleans.Streams
             catch (Exception e)
             {
                 logger.Error(ErrorCode.PersistentStreamPullingAgent_17, $"RegisterAsStreamProducer failed due to {e}", e);
-                throw e;
+                throw;
             }
         }
 
