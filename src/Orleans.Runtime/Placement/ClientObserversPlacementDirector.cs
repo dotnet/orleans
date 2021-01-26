@@ -20,18 +20,22 @@ namespace Orleans.Runtime.Placement
             
             var grainId = clientId.GrainId;
             
-            if (context.FastLookup(grainId, out var addresses))
+            if (context.FastLookup(grainId, out var address))
             {
-                var placementResult = ChooseRandomActivation(addresses, context);
-                return new ValueTask<PlacementResult>(placementResult);
+                return new ValueTask<PlacementResult>(PlacementResult.IdentifySelection(address));
             }
 
             return SelectActivationAsync(grainId, context);
 
             async ValueTask<PlacementResult> SelectActivationAsync(GrainId target, IPlacementRuntime context)
             {
-                var places = await context.FullLookup(target);
-                return ChooseRandomActivation(places, context);
+                var address = await context.FullLookup(target);
+                if (address is not null)
+                {
+                    return PlacementResult.IdentifySelection(address);
+                }
+
+                return null;
             }
         }
         

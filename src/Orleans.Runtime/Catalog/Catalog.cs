@@ -344,13 +344,15 @@ namespace Orleans.Runtime
 
         public DetailedGrainReport GetDetailedGrainReport(GrainId grain)
         {
+            directory.LocalLookup(grain, out var address);
+            directory.TryGetCached(grain, out var cached);
             var report = new DetailedGrainReport
             {
                 Grain = grain,
                 SiloAddress = LocalSilo,
                 SiloName = localSiloName,
-                LocalCacheActivationAddresses = directory.GetLocalCacheData(grain),
-                LocalDirectoryActivationAddresses = directory.GetLocalDirectoryData(grain).Addresses,
+                LocalCacheActivationAddress = cached.Address,
+                LocalDirectoryActivationAddress = address.Address,
                 PrimaryForGrain = directory.GetPrimaryForGrain(grain)
             };
             try
@@ -366,10 +368,8 @@ namespace Orleans.Runtime
                 report.GrainClassTypeName = exc.ToString();
             }
 
-            List<ActivationData> acts = activations.FindTargets(grain);
-            report.LocalActivations = acts != null ? 
-                acts.Select(activationData => activationData.ToDetailedString()).ToList() : 
-                new List<string>();
+            var activation = activations.FindTarget(grain);
+            report.LocalActivation = activation?.ToDetailedString();
             return report;
         }
 
@@ -412,14 +412,11 @@ namespace Orleans.Runtime
         /// <param name="grain"></param>
         internal int UnregisterGrainForTesting(GrainId grain)
         {
-            var acts = activations.FindTargets(grain);
-            if (acts == null) return 0;
+            var act = activations.FindTarget(grain);
+            if (act is null) return 0;
 
-            int numActsBefore = acts.Count;
-            foreach (var act in acts)
-                UnregisterMessageTarget(act);
-            
-            return numActsBefore;
+            UnregisterMessageTarget(act);
+            return 1;
         }
 
         public int ActivationCount { get { return activations.Count; } }
@@ -439,7 +436,7 @@ namespace Orleans.Runtime
             bool newPlacement,
             Dictionary<string, object> requestContextData)
         {
-            if (TryGetActivationData(address.Activation, out var result))
+            if (TryGetActivation(address.Grain, out var result))
             {
                 return result;
             }
@@ -447,7 +444,7 @@ namespace Orleans.Runtime
             // Lock over all activations to try to prevent multiple instances of the same activation being created concurrently.
             lock (activations)
             {
-                if (TryGetActivationData(address.Activation, out result))
+                if (TryGetActivation(address.Grain, out result))
                 {
                     return result;
                 }
@@ -459,22 +456,22 @@ namespace Orleans.Runtime
                     if (result.PlacedUsing is StatelessWorkerPlacement st)
                     {
                         // Check if there is already enough StatelessWorker created
-                        if (LocalLookup(address.Grain, out var local) && local.Count > st.MaxLocal)
+                        if (TryGetActivation(address.Grain, out var local))
                         {
                             // Redirect directly to an already created StatelessWorker
                             // It's a bit hacky since we will return an activation with a different
                             // ActivationId than the one requested, but StatelessWorker are local only,
                             // so no need to clear the cache. This will avoid unecessary and costly redirects.
-                            var redirect = StatelessWorkerDirector.PickRandom(local);
                             if (logger.IsEnabled(LogLevel.Debug))
                             {
                                 logger.LogDebug(
                                     (int)ErrorCode.Catalog_DuplicateActivation,
                                     "Trying to create too many {GrainType} activations on this silo. Redirecting to activation {RedirectActivation}",
                                     result.Name,
-                                    redirect.ActivationId);
+                                    local.ActivationId);
                             }
-                            return redirect;
+
+                            return local;
                         }
                         // The newly created StatelessWorker will be registered in RegisterMessageTarget()
                     }
@@ -673,18 +670,6 @@ namespace Orleans.Runtime
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Try to get runtime data for an activation
-        /// </summary>
-        /// <param name="activationId"></param>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        public bool TryGetActivationData(ActivationId activationId, out ActivationData data)
-        {
-            data = activations.FindTarget(activationId);
-            return data != null;
         }
 
         private async Task DeactivateActivationsFromCollector(List<ActivationData> list)
@@ -962,7 +947,7 @@ namespace Orleans.Runtime
                 {
                     // just check in case this activation data is already Invalid or not here at all.
                     ActivationData ignore;
-                    if (TryGetActivationData(activation.ActivationId, out ignore) &&
+                    if (TryGetActivation(activation.GrainId, out ignore) &&
                         activation.State == ActivationState.Deactivating)
                     {
                         RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 
@@ -1061,13 +1046,13 @@ namespace Orleans.Runtime
                 // Some other non-directory, single-activation placement.
                 lock (activations)
                 {
-                    var exists = LocalLookup(address.Grain, out var local);
-                    if (exists && local.Count == 1 && local[0].ActivationId.Equals(activation.ActivationId))
+                    var exists = TryGetActivation(address.Grain, out var local);
+                    if (exists && local.ActivationId.Equals(activation.ActivationId))
                     {
                         return ActivationRegistrationResult.Success;
                     }
 
-                    return new ActivationRegistrationResult(existingActivationAddress: local[0].Address);
+                    return new ActivationRegistrationResult(existingActivationAddress: local.Address);
                 }
             }
 
@@ -1091,9 +1076,10 @@ namespace Orleans.Runtime
             // ActivationData will transition out of ActivationState.Activating via Dispatcher.OnActivationCompletedRequest
         }
 
-        public bool FastLookup(GrainId grain, out List<ActivationAddress> addresses)
+        public bool FastLookup(GrainId grain, out ActivationAddress address)
         {
-            return this.grainLocator.TryLocalLookup(grain, out addresses) && addresses != null && addresses.Count > 0;
+            return this.grainLocator.TryLocalLookup(grain, out address) && address != null;
+
             // NOTE: only check with the local directory cache.
             // DO NOT check in the local activations TargetDirectory!!!
             // The only source of truth about which activation should be legit to is the state of the ditributed directory.
@@ -1102,15 +1088,15 @@ namespace Orleans.Runtime
             // thus volaiting the single-activation semantics and not converging even eventualy!
         }
 
-        public Task<List<ActivationAddress>> FullLookup(GrainId grain)
+        public Task<ActivationAddress> FullLookup(GrainId grain)
         {
             return scheduler.RunOrQueueTask(() => this.grainLocator.Lookup(grain), this);
         }
 
-        public bool LocalLookup(GrainId grain, out List<ActivationData> addresses)
+        public bool TryGetActivation(GrainId grain, out ActivationData address)
         {
-            addresses = activations.FindTargets(grain);
-            return addresses != null;
+            address = activations.FindTarget(grain);
+            return address != null;
         }
 
         public SiloAddress[] AllActiveSilos
@@ -1141,8 +1127,10 @@ namespace Orleans.Runtime
                 foreach (var activationAddress in addresses)
                 {
                     ActivationData data;
-                    if (TryGetActivationData(activationAddress.Activation, out data))
+                    if (TryGetActivation(activationAddress.Grain, out data) && data.ActivationId.Equals(activationAddress.Activation))
+                    {
                         datas.Add(data);
+                    }
                 }
                 return datas;
             }

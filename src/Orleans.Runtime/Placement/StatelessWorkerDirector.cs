@@ -39,32 +39,17 @@ namespace Orleans.Runtime.Placement
             // If there are available (not busy with a request) activations, it returns the first one.
             // If all are busy and the number of local activations reached or exceeded MaxLocal, it randomly returns one of them.
             // Otherwise, it requests creation of a new activation.
-            List<ActivationData> local;
-
             if (context.LocalSiloStatus.IsTerminating())
-                return null;
-
-            if (!context.LocalLookup(target, out local) || local.Count == 0)
-                return null;
-
-            var placement = (StatelessWorkerPlacement)strategy;
-
-            foreach (var activation in local)
             {
-                ActivationData info;
-                if (!context.TryGetActivationData(activation.ActivationId, out info) ||
-                    info.State != ActivationState.Valid || !info.IsInactive) continue;
-
-                return PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, activation.ActivationId));
+                return null;
             }
 
-            if (local.Count >= placement.MaxLocal)
+            if (!context.TryGetActivation(target, out var local))
             {
-                var id = local[local.Count == 1 ? 0 : random.Next(local.Count)].ActivationId;
-                return PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, id));
+                return null;
             }
 
-            return null;
+            return PlacementResult.IdentifySelection(ActivationAddress.GetAddress(context.LocalSilo, target, local.ActivationId));
         }
 
         internal static ActivationData PickRandom(List<ActivationData> local)

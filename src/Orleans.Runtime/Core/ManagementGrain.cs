@@ -159,7 +159,7 @@ namespace Orleans.Runtime.Management
                 tasks.Add(GetSiloControlReference(silo).GetDetailedGrainReport(grainReference.GrainId));
 
             await Task.WhenAll(tasks);
-            return tasks.Select(s => s.Result).Select(r => r.LocalActivations.Count).Sum();
+            return tasks.Select(s => s.Result).Select(r => r.LocalActivation is null ? 0 : 1).Sum();
         }
 
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
@@ -246,18 +246,17 @@ namespace Orleans.Runtime.Management
                 }
             }
 
-            if (this.catalog.FastLookup(grainId, out var addresses))
+            if (this.catalog.FastLookup(grainId, out var address))
             {
-                var placementResult = addresses.FirstOrDefault();
-                return new ValueTask<SiloAddress>(placementResult?.Silo);
+                return new ValueTask<SiloAddress>(address.Silo);
             }
 
             return LookupAsync(grainId, catalog);
 
             async ValueTask<SiloAddress> LookupAsync(GrainId grainId, Catalog catalog)
             {
-                var places = await catalog.FullLookup(grainId);
-                return places.FirstOrDefault()?.Silo;
+                var address = await catalog.FullLookup(grainId);
+                return address?.Silo;
             }
         }
 

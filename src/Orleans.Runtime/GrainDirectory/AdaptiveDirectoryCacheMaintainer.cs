@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 
 
@@ -137,7 +138,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 router.CacheValidationsSent.Increment();
                 // Send all of the items in one large request
-                var validator = this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryCacheValidatorType, silo);
+                var validator = this.grainFactory.GetSystemTarget<IRemoteDhtGrainDirectory>(Constants.DirectoryCacheValidatorType, silo);
 
                 router.Scheduler.QueueTask(async () =>
                 {
@@ -149,30 +150,27 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private void ProcessCacheRefreshResponse(
-            SiloAddress silo,
-            List<Tuple<GrainId, int, List<ActivationAddress>>> refreshResponse)
+        private void ProcessCacheRefreshResponse(SiloAddress silo, List<(GrainId GrainId, int VersionTag, ActivationAddress ActivationAddress)> refreshResponse)
         {
             if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} received ProcessCacheRefreshResponse. #Response entries {1}.", router.MyAddress, refreshResponse.Count);
 
             int cnt1 = 0, cnt2 = 0, cnt3 = 0;
 
             // pass through returned results and update the cache if needed
-            foreach (Tuple<GrainId, int, List<ActivationAddress>> tuple in refreshResponse)
+            foreach (var tuple in refreshResponse)
             {
-                if (tuple.Item3 != null)
+                if (tuple.ActivationAddress != null)
                 {
                     // the server returned an updated entry
-                    var updated = tuple.Item3.Select(a => Tuple.Create(a.Silo, a.Activation)).ToList().AsReadOnly();
-                    cache.AddOrUpdate(tuple.Item1, updated, tuple.Item2);
+                    cache.AddOrUpdate(tuple.GrainId, (tuple.ActivationAddress.Silo, tuple.ActivationAddress.Activation, tuple.VersionTag));
                     cnt1++;
                 }
-                else if (tuple.Item2 == -1)
+                else if (tuple.VersionTag == AddressAndTag.NO_ETAG)
                 {
                     // The server indicates that it does not own the grain anymore.
                     // It could be that by now, the cache has been already updated and contains an entry received from another server (i.e., current owner for the grain).
                     // For simplicity, we do not care about this corner case and simply remove the cache entry.
-                    cache.Remove(tuple.Item1);
+                    cache.Remove(tuple.GrainId);
                     cnt2++;
                 }
                 else
@@ -182,7 +180,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // Validate that the generation number in the request and the response are equal
                     // Contract.Assert(tuple.Item2 == refreshRequest.Find(o => o.Item1 == tuple.Item1).Item2);
                     // refresh the entry in the cache
-                    cache.MarkAsFresh(tuple.Item1);
+                    cache.MarkAsFresh(tuple.GrainId);
                     cnt3++;
                 }
             }
@@ -196,9 +194,9 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="grains">List of grains owned by the same silo</param>
         /// <returns>List of grains in input along with their generation counters stored in the cache </returns>
-        private List<Tuple<GrainId, int>> BuildGrainAndETagList(List<GrainId> grains)
+        private List<(GrainId, int)> BuildGrainAndETagList(List<GrainId> grains)
         {
-            var grainAndETagList = new List<Tuple<GrainId, int>>();
+            var grainAndETagList = new List<(GrainId, int)>();
 
             foreach (GrainId grain in grains)
             {
@@ -207,7 +205,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                 if (entry != null)
                 {
-                    grainAndETagList.Add(new Tuple<GrainId, int>(grain, entry.ETag));
+                    grainAndETagList.Add((grain, entry.Value.VersionTag));
                 }
                 else
                 {

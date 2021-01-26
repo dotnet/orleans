@@ -29,8 +29,8 @@ namespace Orleans.Runtime.Utilities
                         var activations = runtime.ServiceProvider.GetService<ActivationDirectory>();
                         if (activations is null) return null;
 
-                        var grains = activations.FindTargets(reference.GrainId);
-                        return grains?.FirstOrDefault()?.GrainInstance;
+                        var grains = activations.FindTarget(reference.GrainId);
+                        return grains?.GrainInstance;
                     }
                 default:
                     return null;

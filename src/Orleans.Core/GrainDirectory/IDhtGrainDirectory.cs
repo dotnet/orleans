@@ -1,16 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Tracing;
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.GrainDirectory
 {
-
     /// <summary>
     /// Recursive distributed operations on grain directories.
     /// Each operation may forward the request to a remote owner, increasing the hopCount.
     /// 
-    /// The methods here can be called remotely (where extended by IRemoteGrainDirectory) or
+    /// The methods here can be called remotely (where extended by IRemoteDhtGrainDirectory) or
     /// locally (where extended by ILocalGrainDirectory)
     /// </summary>
     interface IDhtGrainDirectory
@@ -20,13 +21,9 @@ namespace Orleans.GrainDirectory
         /// <para>This method must be called from a scheduler thread.</para>
         /// </summary>
         /// <param name="address">The address of the new activation.</param>
-        /// <param name="singleActivation">If true, use single-activation mode: 
-        /// If there is already an activation registered for this grain, then the new activation will
-        /// not be registered and the address of the existing activation will be returned.
-        /// Otherwise, the passed-in address will be returned.</param>
         /// <param name="hopCount">Counts recursion depth across silos</param>
         /// <returns>The registered address and the version associated with this directory mapping.</returns>
-        Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation, int hopCount = 0);
+        Task<AddressAndTag> RegisterAsync(ActivationAddress address, int hopCount = 0);
 
         /// <summary>
         /// Removes the record for an existing activation from the directory service.
@@ -67,23 +64,18 @@ namespace Orleans.GrainDirectory
         /// <param name="grainId">The ID of the grain to look up.</param>
         /// <param name="hopCount">Counts recursion depth across silos</param>
         /// <returns>A list of all known activations of the grain, and the e-tag.</returns>
-        Task<AddressesAndTag> LookupAsync(GrainId grainId, int hopCount = 0);
+        Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0);
     }
-
 
     [Serializable]
     internal struct AddressAndTag
     {
+        internal const int NO_ETAG = -1;
+
         public ActivationAddress Address;
         public int VersionTag;
-    }
-    
 
-    [Serializable]
-    internal struct AddressesAndTag 
-    {
-        public List<ActivationAddress> Addresses;
-        public int VersionTag;
+        public static AddressAndTag None => new AddressAndTag { Address = null, VersionTag = NO_ETAG };
     }
 
     /// <summary>

@@ -38,32 +38,21 @@ namespace Orleans.Runtime.GrainDirectory
 
     internal class NullGrainDirectoryCache : IGrainDirectoryCache
     {
-        private static readonly List<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> EmptyList = new List<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>>();
+        private static readonly List<(GrainId, SiloAddress, ActivationId, int)> EmptyList = new List<(GrainId, SiloAddress, ActivationId, int)>();
 
-        public void AddOrUpdate(GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int version)
-        {
-        }
+        public List<(GrainId GrainId, SiloAddress SiloAddress, ActivationId ActivationId, int VersionTag)> KeyValues => EmptyList; 
 
-        public bool Remove(GrainId key)
+        public void AddOrUpdate(GrainId key, (SiloAddress SiloAddress, ActivationId ActivationId, int VersionTag) value) { }
+
+        public void Clear() { }
+
+        public bool LookUp(GrainId key, out (SiloAddress SiloAddress, ActivationId ActivationId, int VersionTag) result)
         {
+            result = default;
             return false;
         }
 
-        public void Clear()
-        {
-        }
-
-        public bool LookUp(GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result, out int version)
-        {
-            result = default(IReadOnlyList<Tuple<SiloAddress, ActivationId>>);
-            version = default(int);
-            return false;
-        }
-
-        public IReadOnlyList<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> KeyValues
-        {
-            get { return EmptyList; }
-        }
+        public bool Remove(GrainId key) => false; 
     }
 }
 

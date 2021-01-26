@@ -99,11 +99,8 @@ namespace UnitTests.Serialization
                 environment.SerializationManager.HasSerializer(typeof(List<int>)),
                 $"Should be able to serialize internal type {nameof(List<int>)}.");
             Assert.True(
-                environment.SerializationManager.HasSerializer(typeof(AddressesAndTag)),
-                $"Should be able to serialize internal type {nameof(AddressesAndTag)}.");
-            Assert.True(
-                environment.SerializationManager.HasSerializer(typeof(ActivationInfo)),
-                $"Should be able to serialize internal type {nameof(ActivationInfo)}.");
+                environment.SerializationManager.HasSerializer(typeof(GrainInfo)),
+                $"Should be able to serialize internal type {nameof(GrainInfo)}.");
             var grainReferenceType = typeof(RuntimeVersion).Assembly.GetType(
                 "Orleans.OrleansCodeGenRemindableReference",
                 throwOnError: true);

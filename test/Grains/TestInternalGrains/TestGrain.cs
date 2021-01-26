@@ -281,9 +281,9 @@ namespace UnitTests.Grains
         public Task<string> GetActivationAddress(IGrain grain)
         {
             var grainId = ((GrainReference)grain).GrainId;
-            if (this.catalog.FastLookup(grainId, out var addresses))
+            if (this.catalog.FastLookup(grainId, out var address))
             {
-                return Task.FromResult(addresses.Single().ToString());
+                return Task.FromResult(address.ToString());
             }
 
             return Task.FromResult<string>(null);

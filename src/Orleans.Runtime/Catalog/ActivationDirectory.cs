@@ -8,21 +8,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal class ActivationDirectory : IEnumerable<KeyValuePair<ActivationId, ActivationData>>
+    internal class ActivationDirectory : IEnumerable<KeyValuePair<GrainId, ActivationData>>
     {
         private readonly ILogger logger;
 
-        private readonly ConcurrentDictionary<ActivationId, ActivationData> activations;                // Activation data (app grains) only.
+        private readonly ConcurrentDictionary<GrainId, ActivationData> activations;                     // Activation data (app grains) only.
         private readonly ConcurrentDictionary<ActivationId, SystemTarget> systemTargets;                // SystemTarget only.
-        private readonly ConcurrentDictionary<GrainId, List<ActivationData>> grainToActivationsMap;     // Activation data (app grains) only.
         private readonly ConcurrentDictionary<string, CounterStatistic> grainCounts;                    // simple statistics type->count
         private readonly ConcurrentDictionary<string, CounterStatistic> systemTargetCounts;             // simple statistics systemTargetTypeName->count
 
         public ActivationDirectory(ILogger<ActivationDirectory> logger)
         {
-            activations = new ConcurrentDictionary<ActivationId, ActivationData>();
+            activations = new ConcurrentDictionary<GrainId, ActivationData>();
             systemTargets = new ConcurrentDictionary<ActivationId, SystemTarget>();
-            grainToActivationsMap = new ConcurrentDictionary<GrainId, List<ActivationData>>();
             grainCounts = new ConcurrentDictionary<string, CounterStatistic>();
             systemTargetCounts = new ConcurrentDictionary<string, CounterStatistic>();
             this.logger = logger;
@@ -38,10 +36,9 @@ namespace Orleans.Runtime
             return systemTargets.Values;
         }
 
-        public ActivationData FindTarget(ActivationId key)
+        public ActivationData FindTarget(GrainId key)
         {
-            ActivationData target;
-            return activations.TryGetValue(key, out target) ? target : null;
+            return activations.TryGetValue(key, out var target) ? target : null;
         }
 
         public SystemTarget FindSystemTarget(ActivationId key)
@@ -86,11 +83,12 @@ namespace Orleans.Runtime
 
         public void RecordNewTarget(ActivationData target)
         {
-            if (!activations.TryAdd(target.ActivationId, target))
-                return;
-            grainToActivationsMap.AddOrUpdate(target.GrainId,
-                g => new List<ActivationData> { target },
-                (g, list) => { lock (list) { list.Add(target); } return list; });
+            if (!activations.TryAdd(target.GrainId, target))
+            {
+                ThrowActivationExistsException(target.GrainId);
+            }
+
+            static void ThrowActivationExistsException(GrainId grainId) => throw new ArgumentException($"Grain {grainId} already exists.");
         }
 
         public void RecordNewSystemTarget(SystemTarget target)
@@ -115,49 +113,10 @@ namespace Orleans.Runtime
 
         public void RemoveTarget(ActivationData target)
         {
-            ActivationData ignore;
-            if (!activations.TryRemove(target.ActivationId, out ignore))
+            if (!activations.TryRemove(target.GrainId, out _))
+            {
                 return;
-            List<ActivationData> list;
-            if (grainToActivationsMap.TryGetValue(target.GrainId, out list))
-            {
-                lock (list)
-                {
-                    list.Remove(target);
-                    if (list.Count == 0)
-                    {
-                        List<ActivationData> list2; // == list
-                        if (grainToActivationsMap.TryRemove(target.GrainId, out list2))
-                        {
-                            lock (list2)
-                            {
-                                if (list2.Count > 0)
-                                {
-                                    grainToActivationsMap.AddOrUpdate(target.GrainId,
-                                        g => list2,
-                                        (g, list3) => { lock (list3) { list3.AddRange(list2); } return list3; });
-                                }
-                            }
-                        }
-                    }
-                }
             }
-        }
-
-        /// <summary>
-        /// Returns null if no activations exist for this grain ID, rather than an empty list
-        /// </summary>
-        public List<ActivationData> FindTargets(GrainId key)
-        {
-            List<ActivationData> tmp;
-            if (grainToActivationsMap.TryGetValue(key, out tmp))
-            {
-                lock (tmp)
-                {
-                    return tmp.ToList();
-                }
-            }
-            return null;
         }
 
         public IEnumerable<KeyValuePair<string, long>> GetSimpleGrainStatistics()
@@ -179,7 +138,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public IEnumerator<KeyValuePair<ActivationId, ActivationData>> GetEnumerator()
+        public IEnumerator<KeyValuePair<GrainId, ActivationData>> GetEnumerator()
         {
             return activations.GetEnumerator();
         }

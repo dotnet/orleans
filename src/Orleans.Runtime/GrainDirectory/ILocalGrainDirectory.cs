@@ -41,9 +41,9 @@ namespace Orleans.Runtime.GrainDirectory
         /// then this method will return false and leave the list empty.
         /// </summary>
         /// <param name="grain">The ID of the grain to look up.</param>
-        /// <param name="addresses">An output parameter that receives the list of locally-known activations of the grain.</param>
+        /// <param name="addresses">An output parameter that receives the locally-known activation of the grain.</param>
         /// <returns>True if remote addresses are complete within freshness constraint</returns>
-        bool LocalLookup(GrainId grain, out AddressesAndTag addresses);
+        bool LocalLookup(GrainId grain, out AddressAndTag addresses);
 
         /// <summary>
         /// Invalidates cache entry for the given activation address.
@@ -65,21 +65,11 @@ namespace Orleans.Runtime.GrainDirectory
         SiloAddress GetPrimaryForGrain(GrainId grain);
 
         /// <summary>
-        /// Returns the directory information held in a local directory partition for the provided grain ID.
-        /// The result will be null if no information is held.
-        /// </summary>
-        /// <param name="grain"></param>
-        /// <returns></returns>
-        AddressesAndTag GetLocalDirectoryData(GrainId grain);
-
-        /// <summary>
         /// For testing and troubleshooting purposes only.
         /// Returns the directory information held in a local directory cache for the provided grain ID.
         /// The result will be null if no information is held.
         /// </summary>
-        /// <param name="grain"></param>
-        /// <returns></returns>
-        List<ActivationAddress> GetLocalCacheData(GrainId grain);
+        bool TryGetCached(GrainId grain, out AddressAndTag address);
 
         /// <summary>
         /// For determining message forwarding logic, we sometimes check if a silo is part of this cluster or not

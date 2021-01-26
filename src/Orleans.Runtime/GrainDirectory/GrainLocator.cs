@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 
@@ -13,11 +13,11 @@ namespace Orleans.Runtime.GrainDirectory
             _grainLocatorResolver = grainLocatorResolver;
         }
 
-        public Task<List<ActivationAddress>> Lookup(GrainId grainId) => GetGrainLocator(grainId.Type).Lookup(grainId);
+        public Task<ActivationAddress> Lookup(GrainId grainId) => GetGrainLocator(grainId.Type).Lookup(grainId);
 
         public Task<ActivationAddress> Register(ActivationAddress address) => GetGrainLocator(address.Grain.Type).Register(address);
 
-        public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses) => GetGrainLocator(grainId.Type).TryLocalLookup(grainId, out addresses);
+        public bool TryLocalLookup(GrainId grainId, out ActivationAddress address) => GetGrainLocator(grainId.Type).TryLocalLookup(grainId, out address);
 
         public Task Unregister(ActivationAddress address, UnregistrationCause cause) => GetGrainLocator(address.Grain.Type).Unregister(address, cause);
 

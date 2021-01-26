@@ -28,6 +28,8 @@ namespace Orleans.Internal
             return random;
         }
 
+        public static SafeRandom Instance { get; } = new SafeRandom();
+
         public int Next()
         {
             return GetRandom().Next();

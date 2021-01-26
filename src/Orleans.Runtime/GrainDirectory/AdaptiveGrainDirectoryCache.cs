@@ -9,7 +9,7 @@ namespace Orleans.Runtime.GrainDirectory
     {
         internal class GrainDirectoryCacheEntry
         {
-            internal IReadOnlyList<Tuple<SiloAddress, ActivationId>> Value { get; private set; }
+            internal (SiloAddress SiloAddress, ActivationId ActivationId, int VersionTag) Value { get; private set; }
 
             internal DateTime Created { get; set; }
 
@@ -17,18 +17,15 @@ namespace Orleans.Runtime.GrainDirectory
 
             internal TimeSpan ExpirationTimer { get; private set; }
 
-            internal int ETag { get; private set; }
-
             /// <summary>
             /// flag notifying whether this cache entry was accessed lately 
             /// (more precisely, since the last refresh)
             /// </summary>
             internal int NumAccesses { get; set; }
 
-            internal GrainDirectoryCacheEntry(IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int etag, DateTime created, TimeSpan expirationTimer)
+            internal GrainDirectoryCacheEntry((SiloAddress, ActivationId, int) value, DateTime created, TimeSpan expirationTimer)
             {
                 Value = value;
-                ETag = etag;
                 ExpirationTimer = expirationTimer;
                 Created = created;
                 LastRefreshed = DateTime.UtcNow;
@@ -72,9 +69,9 @@ namespace Orleans.Runtime.GrainDirectory
             IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_CACHE_SIZE, () => cache.Count);
         }
 
-        public void AddOrUpdate(GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int version)
+        public void AddOrUpdate(GrainId key, (SiloAddress, ActivationId, int) value)
         {            
-            var entry = new GrainDirectoryCacheEntry(value, version, DateTime.UtcNow, initialExpirationTimer);
+            var entry = new GrainDirectoryCacheEntry(value, DateTime.UtcNow, initialExpirationTimer);
 
             // Notice that LRU should know how to throw the oldest entry if the cache is full
             cache.Add(key, entry);
@@ -90,35 +87,39 @@ namespace Orleans.Runtime.GrainDirectory
             cache.Clear();
         }
 
-        public bool LookUp(GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result, out int version)
+        public bool LookUp(GrainId key, out (SiloAddress, ActivationId, int) result)
         {
-            result = default(IReadOnlyList<Tuple<SiloAddress, ActivationId>>);
-            version = default(int);
-            NumAccesses++;      // for stats
+            // for stats
+            NumAccesses++;
 
             // Here we do not check whether the found entry is expired. 
             // It will be done by the thread managing the cache.
             // This is to avoid situation where the entry was just expired, but the manager still have not run and have not refereshed it.
-            GrainDirectoryCacheEntry tmp;
-            if (!cache.TryGetValue(key, out tmp)) return false;
+            if (!cache.TryGetValue(key, out var cached))
+            {
+                result = default;
+                return false;
+            }
 
-            NumHits++;      // for stats
-            tmp.NumAccesses++;
-            result = tmp.Value;
-            version = tmp.ETag;
+            // for stats
+            NumHits++;
+
+            cached.NumAccesses++;
+            result = cached.Value;
             return true;
         }
 
-        public IReadOnlyList<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> KeyValues
+        public List<(GrainId, SiloAddress, ActivationId, int)> KeyValues
         {
             get
             {
-                var result = new List<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>>();
-                IEnumerator<KeyValuePair<GrainId, GrainDirectoryCacheEntry>> enumerator = GetStoredEntries();
+                var result = new List<(GrainId, SiloAddress, ActivationId, int)>();
+                var enumerator = GetStoredEntries();
                 while (enumerator.MoveNext())
                 {
                     var current = enumerator.Current;
-                    result.Add(new Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>(current.Key, current.Value.Value, current.Value.ETag));
+                    var value = current.Value.Value;
+                    result.Add((current.Key, value.SiloAddress, value.ActivationId, value.VersionTag));
                 }
                 return result;
             }

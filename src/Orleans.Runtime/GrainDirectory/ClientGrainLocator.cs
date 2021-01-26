@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
@@ -18,24 +19,31 @@ namespace Orleans.Runtime.GrainDirectory
             _clientDirectory = clientDirectory;
         }
 
-        public async Task<List<ActivationAddress>> Lookup(GrainId grainId)
+        public async Task<ActivationAddress> Lookup(GrainId grainId)
         {
             if (!ClientGrainId.TryParse(grainId, out _))
             {
                 ThrowNotClientGrainId(grainId);
             }
 
-            return await _clientDirectory.Lookup(grainId);
+            return (await _clientDirectory.Lookup(grainId))?.FirstOrDefault();
         }
 
-        public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses)
+        public bool TryLocalLookup(GrainId grainId, out ActivationAddress address)
         {
             if (!ClientGrainId.TryParse(grainId, out _))
             {
                 ThrowNotClientGrainId(grainId);
             }
 
-            return _clientDirectory.TryLocalLookup(grainId, out addresses);
+            if (_clientDirectory.TryLocalLookup(grainId, out var addresses))
+            {
+                address = addresses.FirstOrDefault();
+                return true;
+            }
+
+            address = null;
+            return false;
         }
 
         public Task<ActivationAddress> Register(ActivationAddress address) => throw new InvalidOperationException($"Cannot register client grain explicitly");

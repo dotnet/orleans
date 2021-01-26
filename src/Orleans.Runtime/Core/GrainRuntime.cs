@@ -83,7 +83,7 @@ namespace Orleans.Runtime
         public void DeactivateOnIdle(Grain grain)
         {
             CheckRuntimeContext();
-            this.runtimeClient.DeactivateOnIdle(grain.Data.ActivationId);
+            this.runtimeClient.DeactivateOnIdle(grain.Data);
         }
 
         public void DelayDeactivation(Grain grain, TimeSpan timeSpan)

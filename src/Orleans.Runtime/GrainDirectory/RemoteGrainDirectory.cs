@@ -7,7 +7,7 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class RemoteGrainDirectory : SystemTarget, IRemoteGrainDirectory
+    internal class RemoteGrainDirectory : SystemTarget, IRemoteDhtGrainDirectory
     {
         private readonly LocalGrainDirectory router;
         private readonly GrainDirectoryPartition partition;
@@ -21,14 +21,14 @@ namespace Orleans.Runtime.GrainDirectory
             logger = loggerFactory.CreateLogger($"{typeof(RemoteGrainDirectory).FullName}.CacheValidator");
         }
 
-        public async Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation, int hopCount)
+        public async Task<AddressAndTag> RegisterAsync(ActivationAddress address, int hopCount)
         {
-            (singleActivation ? router.RegistrationsSingleActRemoteReceived : router.RegistrationsRemoteReceived).Increment();
+            router.RegistrationsSingleActRemoteReceived.Increment();
             
-            return await router.RegisterAsync(address, singleActivation, hopCount);
+            return await router.RegisterAsync(address, hopCount);
         }
 
-        public Task RegisterMany(List<ActivationAddress> addresses, bool singleActivation)
+        public Task RegisterMany(List<ActivationAddress> addresses)
         {
             if (addresses == null || addresses.Count == 0)
                 throw new ArgumentException("addresses cannot be an empty list or null");
@@ -39,7 +39,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("RegisterMany Count={0}", addresses.Count);
 
 
-            return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, singleActivation, 1)));
+            return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, 1)));
         }
 
         public Task UnregisterAsync(ActivationAddress address, UnregistrationCause cause, int hopCount)
@@ -57,41 +57,41 @@ namespace Orleans.Runtime.GrainDirectory
             return router.DeleteGrainAsync(grainId, hopCount);
         }
 
-        public Task<AddressesAndTag> LookupAsync(GrainId grainId, int hopCount)
+        public Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount)
         {
             return router.LookupAsync(grainId, hopCount);
         }
 
-        public Task<List<Tuple<GrainId, int, List<ActivationAddress>>>> LookUpMany(List<Tuple<GrainId, int>> grainAndETagList)
+        public Task<List<(GrainId GrainId, int VersionTag, ActivationAddress ActivationAddress)>> LookUpMany(List<(GrainId GrainId, int VersionTag)> grainAndETagList)
         {
             router.CacheValidationsReceived.Increment();
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("LookUpMany for {0} entries", grainAndETagList.Count);
 
-            var result = new List<Tuple<GrainId, int, List<ActivationAddress>>>();
+            var result = new List<(GrainId, int, ActivationAddress)>();
 
-            foreach (Tuple<GrainId, int> tuple in grainAndETagList)
+            foreach (var query in grainAndETagList)
             {
-                int curGen = partition.GetGrainETag(tuple.Item1);
-                if (curGen == tuple.Item2 || curGen == GrainInfo.NO_ETAG)
+                if (partition.TryLookup(query.GrainId, out var lookupResult) && lookupResult.Address != null)
                 {
-                    // the grain entry either does not exist in the local partition (curGen = -1) or has not been updated
-                    result.Add(new Tuple<GrainId, int, List<ActivationAddress>>(tuple.Item1, curGen, null));
-                }
-                else
-                {
-                    // the grain entry has been updated -- fetch and return its current version
-                    var lookupResult = partition.LookUpActivations(tuple.Item1);
-                    // validate that the entry is still in the directory (i.e., it was not removed concurrently)
-                    if (lookupResult.Addresses != null)
+                    ActivationAddress address;
+                    if (lookupResult.VersionTag == query.VersionTag)
                     {
-                        result.Add(new Tuple<GrainId, int, List<ActivationAddress>>(tuple.Item1, lookupResult.VersionTag, lookupResult.Addresses));
+                        // If the query's VersionTag matches the current registration's VersionTag, do not return the ActivationAddress.
+                        address = null;
                     }
                     else
                     {
-                        result.Add(new Tuple<GrainId, int, List<ActivationAddress>>(tuple.Item1, GrainInfo.NO_ETAG, null));
+                        address = lookupResult.Address;
                     }
+
+                    result.Add((query.GrainId, lookupResult.VersionTag, address));
+                }
+                else
+                {
+                    result.Add((query.GrainId, AddressAndTag.NO_ETAG, null));
                 }
             }
+
             return Task.FromResult(result);
         }
 
@@ -101,9 +101,9 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.CompletedTask;
         }
 
-        public Task AcceptSplitPartition(List<ActivationAddress> singleActivations, List<ActivationAddress> multiActivations)
+        public Task AcceptSplitPartition(List<ActivationAddress> singleActivations)
         {
-            router.HandoffManager.AcceptExistingRegistrations(singleActivations, multiActivations);
+            router.HandoffManager.AcceptExistingRegistrations(singleActivations);
             return Task.CompletedTask;
         }
     }

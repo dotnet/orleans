@@ -13,8 +13,7 @@ using System.Collections.Immutable;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class LocalGrainDirectory :
-        ILocalGrainDirectory, ISiloStatusListener
+    internal class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener
     {
         private readonly AdaptiveDirectoryCacheMaintainer maintainer;
         private readonly ILogger log;
@@ -54,7 +53,6 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly CounterStatistic fullLookups;
         private readonly CounterStatistic cacheLookups;
         private readonly CounterStatistic cacheSuccesses;
-        private readonly CounterStatistic registrationsIssued;
         private readonly CounterStatistic registrationsSingleActIssued;
         private readonly CounterStatistic unregistrationsIssued;
         private readonly CounterStatistic unregistrationsManyIssued;
@@ -66,9 +64,6 @@ namespace Orleans.Runtime.GrainDirectory
         internal readonly CounterStatistic LocalDirectorySuccesses;
         internal readonly CounterStatistic CacheValidationsSent;
         internal readonly CounterStatistic CacheValidationsReceived;
-        internal readonly CounterStatistic RegistrationsLocal;
-        internal readonly CounterStatistic RegistrationsRemoteSent;
-        internal readonly CounterStatistic RegistrationsRemoteReceived;
         internal readonly CounterStatistic RegistrationsSingleActLocal;
         internal readonly CounterStatistic RegistrationsSingleActRemoteSent;
         internal readonly CounterStatistic RegistrationsSingleActRemoteReceived;
@@ -99,15 +94,6 @@ namespace Orleans.Runtime.GrainDirectory
             ClusterId = clusterId;
 
             DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(grainDirectoryOptions.Value);
-            /* TODO - investigate dynamic config changes using IOptions - jbragg
-                        clusterConfig.OnConfigChange("Globals/Caching", () =>
-                        {
-                            lock (membershipCache)
-                            {
-                                DirectoryCache = GrainDirectoryCacheFactory<IReadOnlyList<Tuple<SiloAddress, ActivationId>>>.CreateGrainDirectoryCache(globalConfig);
-                            }
-                        });
-            */
             maintainer =
                 GrainDirectoryCacheFactory.CreateGrainDirectoryCacheMaintainer(
                     this,
@@ -157,11 +143,6 @@ namespace Orleans.Runtime.GrainDirectory
 
             CacheValidationsSent = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_VALIDATIONS_CACHE_SENT);
             CacheValidationsReceived = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_VALIDATIONS_CACHE_RECEIVED);
-
-            registrationsIssued = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_ISSUED);
-            RegistrationsLocal = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_LOCAL);
-            RegistrationsRemoteSent = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_REMOTE_SENT);
-            RegistrationsRemoteReceived = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_REMOTE_RECEIVED);
             registrationsSingleActIssued = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_ISSUED);
             RegistrationsSingleActLocal = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_LOCAL);
             RegistrationsSingleActRemoteSent = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_REGISTRATIONS_SINGLE_ACT_REMOTE_SENT);
@@ -318,17 +299,14 @@ namespace Orleans.Runtime.GrainDirectory
             foreach (var entry in this.DirectoryPartition.GetItems())
             {
                 var (grain, grainInfo) = (entry.Key, entry.Value);
-                foreach (var instance in grainInfo.Instances)
-                {
-                    var (activationId, activationInfo) = (instance.Key, instance.Value);
+                var activationId = grainInfo.ActivationId;
 
-                    // Include any activations from dead silos and from predecessors.
-                    var siloIsDead = dead && activationInfo.SiloAddress.Equals(silo);
-                    var siloIsPredecessor = activationInfo.SiloAddress.IsPredecessorOf(silo);
-                    if (siloIsDead || siloIsPredecessor)
-                    {
-                        activationsToRemove.Add((grain, activationId));
-                    }
+                // Include any activations from dead silos and from predecessors.
+                var siloIsDead = dead && grainInfo.SiloAddress.Equals(silo);
+                var siloIsPredecessor = grainInfo.SiloAddress.IsPredecessorOf(silo);
+                if (siloIsDead || siloIsPredecessor)
+                {
+                    activationsToRemove.Add((grain, activationId));
                 }
             }
 
@@ -349,23 +327,23 @@ namespace Orleans.Runtime.GrainDirectory
         ///     To do that properly, we need to store for each cache entry who was the directory owner that registered this activation (the original partition owner). 
         protected void AdjustLocalCache(SiloAddress silo, bool dead)
         {
-            // For dead silos, remove any activation registered to that silo or one of its predecessors.
-            // For new silos, remove any activation registered to one of its predecessors.
-            Func<Tuple<SiloAddress, ActivationId>, bool> predicate;
-            if (dead) predicate = t => t.Item1.Equals(silo) || t.Item1.IsPredecessorOf(silo);
-            else predicate = t => t.Item1.IsPredecessorOf(silo);
-
             // remove all records of activations located on the removed silo
-            foreach (Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int> tuple in DirectoryCache.KeyValues)
+            foreach (var tuple in DirectoryCache.KeyValues)
             {
                 // 2) remove entries now owned by me (they should be retrieved from my directory partition)
-                if (MyAddress.Equals(CalculateGrainDirectoryPartition(tuple.Item1)))
+                if (MyAddress.Equals(CalculateGrainDirectoryPartition(tuple.GrainId)))
                 {
-                    DirectoryCache.Remove(tuple.Item1);
+                    DirectoryCache.Remove(tuple.GrainId);
                 }
 
                 // 1) remove entries that point to activations located on the removed silo
-                RemoveActivations(DirectoryCache, tuple.Item1, tuple.Item2, tuple.Item3, predicate);
+                var activationSilo = tuple.SiloAddress;
+                if (dead && activationSilo.Equals(silo) || activationSilo.IsPredecessorOf(silo))
+                {
+                    // For dead silos, remove any activation registered to that silo or one of its predecessors.
+                    // For new silos, remove any activation registered to one of its predecessors.
+                    DirectoryCache.Remove(tuple.GrainId);
+                }
             }
         }
 
@@ -530,12 +508,9 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
 
-        public async Task<AddressAndTag> RegisterAsync(ActivationAddress address, bool singleActivation, int hopCount)
+        public async Task<AddressAndTag> RegisterAsync(ActivationAddress address, int hopCount)
         {
-            var counterStatistic = 
-                singleActivation 
-                ? (hopCount > 0 ? this.RegistrationsSingleActRemoteReceived : this.registrationsSingleActIssued)
-                : (hopCount > 0 ? this.RegistrationsRemoteReceived : this.registrationsIssued);
+            var counterStatistic = hopCount > 0 ? this.RegistrationsSingleActRemoteReceived : this.registrationsSingleActIssued;
 
             counterStatistic.Increment();
 
@@ -556,65 +531,28 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (forwardAddress == null)
             {
-                (singleActivation ? RegistrationsSingleActLocal : RegistrationsLocal).Increment();
+                RegistrationsSingleActLocal.Increment();
 
-                if (singleActivation)
-                {
-                    var result = DirectoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo);
-                    return result;
-                }
-                else
-                {
-                    var tag = DirectoryPartition.AddActivation(address.Grain, address.Activation, address.Silo);
-                    return new AddressAndTag() { Address = address, VersionTag = tag };
-                }
+                var result = DirectoryPartition.AddSingleActivation(address.Grain, address.Activation, address.Silo);
+                return result;
             }
             else
             {
-                (singleActivation ? RegistrationsSingleActRemoteSent : RegistrationsRemoteSent).Increment();
+                RegistrationsSingleActRemoteSent.Increment();
 
                 // otherwise, notify the owner
-                AddressAndTag result = await GetDirectoryReference(forwardAddress).RegisterAsync(address, singleActivation, hopCount + 1);
+                AddressAndTag result = await GetDirectoryReference(forwardAddress).RegisterAsync(address, hopCount + 1);
 
-                if (singleActivation)
-                {
-                    // Caching optimization: 
-                    // cache the result of a successfull RegisterSingleActivation call, only if it is not a duplicate activation.
-                    // this way next local lookup will find this ActivationAddress in the cache and we will save a full lookup!
-                    if (result.Address == null) return result;
+                // Caching optimization: 
+                // cache the result of a successfull RegisterSingleActivation call, only if it is not a duplicate activation.
+                // this way next local lookup will find this ActivationAddress in the cache and we will save a full lookup!
+                if (result.Address == null) return result;
 
-                    if (!address.Equals(result.Address) || !IsValidSilo(address.Silo)) return result;
+                if (!address.Equals(result.Address) || !IsValidSilo(address.Silo)) return result;
 
-                    var cached = new List<Tuple<SiloAddress, ActivationId>>(1) { Tuple.Create(address.Silo, address.Activation) };
-                    // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
-                    DirectoryCache.AddOrUpdate(address.Grain, cached, result.VersionTag);
-                }
-                else
-                {
-                    if (IsValidSilo(address.Silo))
-                    {
-                        // Caching optimization:
-                        // cache the result of a successfull RegisterActivation call, only if it is not a duplicate activation.
-                        // this way next local lookup will find this ActivationAddress in the cache and we will save a full lookup!
-                        IReadOnlyList<Tuple<SiloAddress, ActivationId>> cached;
-                        if (!DirectoryCache.LookUp(address.Grain, out cached))
-                        {
-                            cached = new List<Tuple<SiloAddress, ActivationId>>(1)
-                        {
-                            Tuple.Create(address.Silo, address.Activation)
-                        };
-                        }
-                        else
-                        {
-                            var newcached = new List<Tuple<SiloAddress, ActivationId>>(cached.Count + 1);
-                            newcached.AddRange(cached);
-                            newcached.Add(Tuple.Create(address.Silo, address.Activation));
-                            cached = newcached;
-                        }
-                        // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
-                        DirectoryCache.AddOrUpdate(address.Grain, cached, result.VersionTag);
-                    }
-                }
+                // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
+                var cached = (address.Silo, address.Activation, result.VersionTag);
+                DirectoryCache.AddOrUpdate(address.Grain, cached);
 
                 return result;
             }
@@ -741,8 +679,7 @@ namespace Orleans.Runtime.GrainDirectory
             await Task.WhenAll(tasks);
         }
 
-
-        public bool LocalLookup(GrainId grain, out AddressesAndTag result)
+        public bool LocalLookup(GrainId grain, out AddressAndTag result)
         {
             localLookups.Increment();
 
@@ -755,7 +692,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (silo == null)
             {
                 if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup mine {0}=null", grain);
-                result = new AddressesAndTag();
+                result = new AddressAndTag();
                 return false;
             }
 
@@ -763,49 +700,48 @@ namespace Orleans.Runtime.GrainDirectory
             if (silo.Equals(MyAddress))
             {
                 LocalDirectoryLookups.Increment();
-                result = GetLocalDirectoryData(grain);
-                if (result.Addresses == null)
+                if (!DirectoryPartition.TryLookup(grain, out result))
                 {
                     // it can happen that we cannot find the grain in our partition if there were 
                     // some recent changes in the membership
                     if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup mine {0}=null", grain);
+                    result = default;
                     return false;
                 }
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup mine {0}={1}", grain, result.Addresses.ToStrings());
+
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup mine {0}={1}", grain, result.Address.ToString());
                 LocalDirectorySuccesses.Increment();
                 localSuccesses.Increment();
                 return true;
             }
 
             // handle cache
-            result = new AddressesAndTag();
             cacheLookups.Increment();
-            result.Addresses = GetLocalCacheData(grain);
-            if (result.Addresses == null)
+            if (!TryGetCached(grain, out result) || result.Address is null)
             {
                 if (log.IsEnabled(LogLevel.Trace)) log.Trace("TryFullLookup else {0}=null", grain);
                 return false;
             }
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup cache {0}={1}", grain, result.Addresses.ToStrings());
+
+            if (log.IsEnabled(LogLevel.Trace)) log.Trace("LocalLookup cache {0}={1}", grain, result.Address.ToString());
             cacheSuccesses.Increment();
             localSuccesses.Increment();
             return true;
         }
 
-        public AddressesAndTag GetLocalDirectoryData(GrainId grain)
+        public bool TryGetCached(GrainId grain, out AddressAndTag result)
         {
-            return DirectoryPartition.LookUpActivations(grain);
+            if (DirectoryCache.LookUp(grain, out var cached) && IsValidSilo(cached.SiloAddress))
+            {
+                result = new AddressAndTag { Address = ActivationAddress.GetAddress(cached.SiloAddress, grain, cached.ActivationId), VersionTag = cached.VersionTag };
+                return true;
+            }
+
+            result = default;
+            return false;
         }
 
-        public List<ActivationAddress> GetLocalCacheData(GrainId grain)
-        {
-            IReadOnlyList<Tuple<SiloAddress, ActivationId>> cached;
-            return DirectoryCache.LookUp(grain, out cached) ? 
-                cached.Select(elem => ActivationAddress.GetAddress(elem.Item1, grain, elem.Item2)).Where(addr => IsValidSilo(addr.Silo)).ToList() : 
-                null;
-        }
-
-        public async Task<AddressesAndTag> LookupAsync(GrainId grainId, int hopCount = 0)
+        public async Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0)
         {
             (hopCount > 0 ? RemoteLookupsReceived : fullLookups).Increment();
 
@@ -828,18 +764,16 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 // we are the owner
                 LocalDirectoryLookups.Increment();
-                var localResult = DirectoryPartition.LookUpActivations(grainId);
-                if (localResult.Addresses == null)
+                if (!DirectoryPartition.TryLookup(grainId, out var localResult))
                 {
                     // it can happen that we cannot find the grain in our partition if there were 
                     // some recent changes in the membership
                     if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup mine {0}=none", grainId);
-                    localResult.Addresses = new List<ActivationAddress>();
-                    localResult.VersionTag = GrainInfo.NO_ETAG;
+                    localResult = AddressAndTag.None;
                     return localResult;
                 }
 
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup mine {0}={1}", grainId, localResult.Addresses.ToStrings());
+                if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup mine {0}={1}", grainId, localResult.Address.ToString());
                 LocalDirectorySuccesses.Increment();
                 return localResult;
             }
@@ -855,15 +789,19 @@ namespace Orleans.Runtime.GrainDirectory
                 var result = await GetDirectoryReference(forwardAddress).LookupAsync(grainId, hopCount + 1);
 
                 // update the cache
-                result.Addresses = result.Addresses.Where(t => IsValidSilo(t.Silo)).ToList();
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup remote {0}={1}", grainId, result.Addresses.ToStrings());
+                if (result.Address?.Silo is SiloAddress silo && IsValidSilo(silo))
+                {
+                    if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup remote {0}={1}", grainId, result.Address.ToString());
 
-                var entries = result.Addresses.Select(t => Tuple.Create(t.Silo, t.Activation)).ToList();
+                    var address = result.Address;
+                    DirectoryCache.AddOrUpdate(grainId, (address.Silo, address.Activation, result.VersionTag));
 
-                if (entries.Count > 0)
-                    DirectoryCache.AddOrUpdate(grainId, entries, result.VersionTag);
-
-                return result;
+                    return result;
+                }
+                else
+                {
+                    return default;
+                }
             }
         }
 
@@ -895,15 +833,13 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void InvalidateCacheEntry(ActivationAddress activationAddress, bool invalidateDirectoryAlso = false)
         {
-            int version;
-            IReadOnlyList<Tuple<SiloAddress, ActivationId>> list;
             var grainId = activationAddress.Grain;
             var activationId = activationAddress.Activation;
 
             // look up grainId activations
-            if (DirectoryCache.LookUp(grainId, out list, out version))
+            if (DirectoryCache.LookUp(grainId, out var result) && activationId.Equals(result.ActivationId))
             {
-                RemoveActivations(DirectoryCache, grainId, list, version, t => t.Item2.Equals(activationId));
+                DirectoryCache.Remove(grainId);
             }
         }
 
@@ -996,34 +932,14 @@ namespace Orleans.Runtime.GrainDirectory
             return sb.ToString();
         }
 
-        internal IRemoteGrainDirectory GetDirectoryReference(SiloAddress silo)
+        internal IRemoteDhtGrainDirectory GetDirectoryReference(SiloAddress silo)
         {
-            return this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceType, silo);
+            return this.grainFactory.GetSystemTarget<IRemoteDhtGrainDirectory>(Constants.DirectoryServiceType, silo);
         }
 
         private bool IsSiloNextInTheRing(SiloAddress siloAddr, int hash, bool excludeMySelf)
         {
             return siloAddr.GetConsistentHashCode() <= hash && (!excludeMySelf || !siloAddr.Equals(MyAddress));
-        }
-
-        private static void RemoveActivations(IGrainDirectoryCache directoryCache, GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> activations, int version, Func<Tuple<SiloAddress, ActivationId>, bool> doRemove)
-        {
-            int removeCount = activations.Count(doRemove);
-            if (removeCount == 0)
-            {
-                return; // nothing to remove, done here
-            }
-
-            if (activations.Count > removeCount) // still some left, update activation list.  Note: Most of the time there should be only one activation
-            {
-                var newList = new List<Tuple<SiloAddress, ActivationId>>(activations.Count - removeCount);
-                newList.AddRange(activations.Where(t => !doRemove(t)));
-                directoryCache.AddOrUpdate(key, newList, version);
-            }
-            else // no activations left, remove from cache
-            {
-                directoryCache.Remove(key);
-            }
         }
 
         public bool IsSiloInCluster(SiloAddress silo)

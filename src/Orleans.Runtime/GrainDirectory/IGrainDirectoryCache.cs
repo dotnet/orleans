@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 
-
 namespace Orleans.Runtime.GrainDirectory
 {
     interface IGrainDirectoryCache
@@ -13,8 +12,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// </summary>
         /// <param name="key">key to add</param>
         /// <param name="value">value to add</param>
-        /// <param name="version">version for the value</param>
-        void AddOrUpdate(GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int version);
+        void AddOrUpdate(GrainId key, (SiloAddress SiloAddress, ActivationId ActivationId, int VersionTag) value);
 
         /// <summary>
         /// Removes an entry from the cache given its key
@@ -31,30 +29,12 @@ namespace Orleans.Runtime.GrainDirectory
         /// <summary>
         /// Looks up the cached value and version by the given key
         /// </summary>
-        /// <param name="key">key for the lookup</param>
-        /// <param name="result">value if the key is found, undefined otherwise</param>
-        /// <param name="version">version of cached value if the key is found, undefined otherwise</param>
         /// <returns>true if the given key is in the cache</returns>
-        bool LookUp(GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result, out int version);
+        bool LookUp(GrainId key, out (SiloAddress SiloAddress, ActivationId ActivationId, int VersionTag) result);
 
         /// <summary>
         /// Returns list of key-value-version tuples stored currently in the cache.
         /// </summary>
-        IReadOnlyList<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> KeyValues { get; }
-    }
-
-    internal static class GrainDirectoryCacheExtensions
-    {
-        /// <summary>
-        /// Looks up the cached value by the given key.
-        /// </summary>
-        /// <param name="cache">grain directory cache to look up results from</param>
-        /// <param name="key">key for the lookup</param>
-        /// <param name="result">value if the key is found, undefined otherwise</param>
-        /// <returns>true if the given key is in the cache</returns>
-        public static bool LookUp(this IGrainDirectoryCache cache, GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result)
-        {
-            return cache.LookUp(key, out result, out _);
-        }
+        List<(GrainId GrainId, SiloAddress SiloAddress, ActivationId ActivationId, int VersionTag)> KeyValues { get; }
     }
 }

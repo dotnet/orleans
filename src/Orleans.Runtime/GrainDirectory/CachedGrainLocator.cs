@@ -1,11 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.Metadata.Ecma335;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
@@ -43,7 +40,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.cache = new LRUBasedGrainDirectoryCache(GrainDirectoryOptions.DEFAULT_CACHE_SIZE, GrainDirectoryOptions.DEFAULT_MAXIMUM_CACHE_TTL);
         }
 
-        public async Task<List<ActivationAddress>> Lookup(GrainId grainId)
+        public async Task<ActivationAddress> Lookup(GrainId grainId)
         {
             var grainType = grainId.Type;
             if (grainType.IsClient() || grainType.IsSystemTarget())
@@ -51,21 +48,19 @@ namespace Orleans.Runtime.GrainDirectory
                 ThrowUnsupportedGrainType(grainId);
             }
 
-            List<ActivationAddress> results;
-
             // Check cache first
-            if (TryLocalLookup(grainId, out results))
+            if (TryLocalLookup(grainId, out var address))
             {
-                return results;
+                return address;
             }
-
-            results = new List<ActivationAddress>();
 
             var entry = await GetGrainDirectory(grainId.Type).Lookup(grainId.ToString());
 
             // Nothing found
-            if (entry == null)
-                return results;
+            if (entry is null)
+            {
+                return address;
+            }
 
             var activationAddress = entry.ToActivationAddress();
 
@@ -78,11 +73,11 @@ namespace Orleans.Runtime.GrainDirectory
             else
             {
                 // Add to the local cache and return it
-                results.Add(activationAddress);
-                this.cache.AddOrUpdate(grainId, new List<Tuple<SiloAddress, ActivationId>> { Tuple.Create(activationAddress.Silo, activationAddress.Activation) }, 0);
+                address = activationAddress;
+                this.cache.AddOrUpdate(grainId, (activationAddress.Silo, activationAddress.Activation, SafeRandom.Instance.Next()));
             }
 
-            return results;
+            return address;
         }
 
         public async Task<ActivationAddress> Register(ActivationAddress address)
@@ -110,13 +105,12 @@ namespace Orleans.Runtime.GrainDirectory
             // Cache update
             this.cache.AddOrUpdate(
                 activationAddress.Grain,
-                new List<Tuple<SiloAddress, ActivationId>>() { Tuple.Create(activationAddress.Silo, activationAddress.Activation) },
-                0);
+                (activationAddress.Silo, activationAddress.Activation, SafeRandom.Instance.Next()));
 
             return activationAddress;
         }
 
-        public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses)
+        public bool TryLocalLookup(GrainId grainId, out ActivationAddress address)
         {
             var grainType = grainId.Type;
             if (grainType.IsClient() || grainType.IsSystemTarget())
@@ -124,25 +118,22 @@ namespace Orleans.Runtime.GrainDirectory
                 ThrowUnsupportedGrainType(grainId);
             }
 
-            if (this.cache.LookUp(grainId, out var results))
+            if (this.cache.LookUp(grainId, out var result))
             {
-                // IGrainDirectory only supports single activation
-                var result = results[0];
-
                 // If the silo is dead, remove the entry
-                if (this.knownDeadSilos.Contains(result.Item1))
+                if (this.knownDeadSilos.Contains(result.SiloAddress))
                 {
                     this.cache.Remove(grainId);
                 }
                 else
                 {
                     // Entry found and valid -> return it
-                    addresses = new List<ActivationAddress>() { ActivationAddress.GetAddress(result.Item1, grainId, result.Item2) };
+                    address = ActivationAddress.GetAddress(result.SiloAddress, grainId, result.ActivationId);
                     return true;
                 }
             }
 
-            addresses = null;
+            address = null;
             return false;
         }
 
