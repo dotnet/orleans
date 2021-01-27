@@ -300,9 +300,15 @@ namespace Orleans.Hosting
                 sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.LargeMessageWarningThreshold));
             services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
             services.TryAddSingleton<IFieldUtils, FieldUtils>();
+
+            // Register the ISerializable serializer first, so that it takes precedence
+            services.AddSingleton<DotNetSerializableSerializer>();
+            services.AddFromExisting<IKeyedSerializer, DotNetSerializableSerializer>();
+
             services.AddSingleton<BinaryFormatterSerializer>();
             services.AddSingleton<BinaryFormatterISerializableSerializer>();
             services.AddFromExisting<IKeyedSerializer, BinaryFormatterISerializableSerializer>();
+
 #pragma warning disable CS0618 // Type or member is obsolete
             services.AddSingleton<ILBasedSerializer>();
             services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
