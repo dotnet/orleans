@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.Serialization;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -212,7 +213,20 @@ namespace UnitTests.Serialization
 
         private class BaseException : Exception
         {
+            public BaseException() { }
+
+            protected BaseException(SerializationInfo info, StreamingContext context) : base(info, context)
+            {
+                BaseField = (SomeFunObject)info.GetValue("BaseField", typeof(SomeFunObject));
+            }
+
             public SomeFunObject BaseField { get; set; }
+
+            public override void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                base.GetObjectData(info, context);
+                info.AddValue("BaseField", BaseField, typeof(SomeFunObject));
+            }
         }
 
         [Serializable]
@@ -221,6 +235,23 @@ namespace UnitTests.Serialization
             public string SubClassField { get; set; }
             public SomeFunObject OtherField { get; set; }
             public object SomeObject { get; set; }
+
+            public ILExceptionSerializerTestException() : base() { }
+
+            protected ILExceptionSerializerTestException(SerializationInfo info, StreamingContext context) : base(info, context)
+            {
+                SubClassField = info.GetString("SubClassField");
+                SomeObject = info.GetValue("SomeObject", typeof(object));
+                OtherField = (SomeFunObject)info.GetValue("OtherField", typeof(SomeFunObject));
+            }
+
+            public override void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                base.GetObjectData(info, context);
+                info.AddValue("SubClassField", SubClassField);
+                info.AddValue("SomeObject", SomeObject, typeof(object));
+                info.AddValue("OtherField", OtherField, typeof(SomeFunObject));
+            }
         }
 
         private class TestTypeSerializer : TypeSerializer

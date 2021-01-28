@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
+using Orleans.Runtime;
+using Orleans.Utilities;
 
 namespace Orleans.Serialization
 {
@@ -16,20 +20,22 @@ namespace Orleans.Serialization
         private readonly SerializationConstructorFactory _constructorFactory = new SerializationConstructorFactory();
         private readonly SerializationCallbacksFactory _serializationCallbacks = new SerializationCallbacksFactory();
         private readonly ValueTypeSerializerFactory _valueTypeSerializerFactory;
+        private readonly ITypeResolver _typeResolver;
         private readonly ObjectSerializer _objectSerializer;
 
-        public DotNetSerializableSerializer()
+        public DotNetSerializableSerializer(ITypeResolver typeResolver)
         {
+            _typeResolver = typeResolver;
             _objectSerializer = new ObjectSerializer(_constructorFactory, _serializationCallbacks, _formatterConverter);
             _valueTypeSerializerFactory = new ValueTypeSerializerFactory(_constructorFactory, _serializationCallbacks, _formatterConverter);
         }
 
         /// <inheritdoc />
         public KeyedSerializerId SerializerId => KeyedSerializerId.ISerializableSerializer;
-        
+
         /// <inheritdoc />
-        public bool IsSupportedType(Type itemType) => _serializableType.IsAssignableFrom(itemType) && itemType.IsSerializable &&
-                                                      _constructorFactory.GetSerializationConstructor(itemType) != null;
+        public bool IsSupportedType(Type itemType) => _serializableType.IsAssignableFrom(itemType) &&
+                                                      (_constructorFactory.GetSerializationConstructor(itemType) != null || typeof(Exception).IsAssignableFrom(itemType));
 
         /// <inheritdoc />
         public object DeepCopy(object source, ICopyContext context)
@@ -48,14 +54,26 @@ namespace Orleans.Serialization
         public void Serialize(object item, ISerializationContext context, Type expectedType)
         {
             var type = item.GetType();
-            if (type.IsValueType)
+            if (typeof(Exception).IsAssignableFrom(type))
             {
-                var serializer = _valueTypeSerializerFactory.GetSerializer(type);
-                serializer.Serialize(item, context);
+                context.StreamWriter.Write((byte)SerializerTypeToken.Exception);
+                var typeName = RuntimeTypeNameFormatter.Format(type);
+                SerializationManager.SerializeInner(typeName, context);
+                _objectSerializer.Serialize(item, context);
             }
             else
             {
-                _objectSerializer.Serialize(item, context);
+                context.StreamWriter.Write((byte)SerializerTypeToken.Other);
+                SerializationManager.SerializeInner(type, context);
+                if (type.IsValueType)
+                {
+                    var serializer = _valueTypeSerializerFactory.GetSerializer(type);
+                    serializer.Serialize(item, context);
+                }
+                else
+                {
+                    _objectSerializer.Serialize(item, context);
+                }
             }
         }
 
@@ -63,14 +81,32 @@ namespace Orleans.Serialization
         public object Deserialize(Type expectedType, IDeserializationContext context)
         {
             var startOffset = context.CurrentObjectOffset;
-            var type = SerializationManager.DeserializeInner<Type>(context);
-            if (type.IsValueType)
+            var token = (SerializerTypeToken)context.StreamReader.ReadByte();
+            if (token == SerializerTypeToken.Exception)
             {
-                var serializer = _valueTypeSerializerFactory.GetSerializer(type);
-                return serializer.Deserialize(type, startOffset, context);
-            }
+                var typeName = SerializationManager.DeserializeInner<string>(context);
+                if (!_typeResolver.TryResolveType(typeName, out var type))
+                {
+                    // Deserialize into a fallback type for unknown exceptions
+                    // This means that missing fields will not be represented.
+                    var result = (UnavailableExceptionFallbackException)_objectSerializer.Deserialize(typeof(UnavailableExceptionFallbackException), startOffset, context);
+                    result.ExceptionType = typeName;
+                    return result;
+                }
 
-            return _objectSerializer.Deserialize(type, startOffset, context);
+                return _objectSerializer.Deserialize(type, startOffset, context);
+            }
+            else
+            {
+                var type = SerializationManager.DeserializeInner<Type>(context);
+                if (type.IsValueType)
+                {
+                    var serializer = _valueTypeSerializerFactory.GetSerializer(type);
+                    return serializer.Deserialize(type, startOffset, context);
+                }
+
+                return _objectSerializer.Deserialize(type, startOffset, context);
+            }
         }
 
         /// <summary>
@@ -138,7 +174,6 @@ namespace Orleans.Serialization
                 callbacks.OnSerializing?.Invoke(item, streamingContext);
                 ((ISerializable)item).GetObjectData(info, streamingContext);
 
-                SerializationManager.SerializeInner(type, context);
                 SerializationManager.SerializeInner(info.MemberCount, context);
                 foreach (var entry in info)
                 {
@@ -253,7 +288,6 @@ namespace Orleans.Serialization
                 _callbacks.OnSerializing?.Invoke(ref localItem, streamingContext);
                 localItem.GetObjectData(info, streamingContext);
 
-                SerializationManager.SerializeInner(type, context);
                 SerializationManager.SerializeInner(info.MemberCount, context);
                 foreach (var entry in info)
                 {
@@ -384,7 +418,7 @@ namespace Orleans.Serialization
 
             private TConstructor GetSerializationConstructorInvoker<TOwner, TConstructor>(Type type)
             {
-                var constructor = GetSerializationConstructor(type);
+                var constructor = GetSerializationConstructor(type) ?? (typeof(Exception).IsAssignableFrom(type) ? GetSerializationConstructor(typeof(Exception)) : null);
                 if (constructor == null) throw new SerializationException($"{nameof(ISerializable)} constructor not found on type {type}.");
 
                 Type[] parameterTypes;
@@ -520,6 +554,13 @@ namespace Orleans.Serialization
                 public TDelegate OnSerializing { get; }
                 public TDelegate OnSerialized { get; }
             }
+        }
+
+        public enum SerializerTypeToken : byte
+        {
+            None = 0,
+            Exception = 1,
+            Other = 2
         }
     }
 }
