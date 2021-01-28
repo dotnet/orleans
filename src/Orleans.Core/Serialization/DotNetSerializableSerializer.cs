@@ -198,7 +198,7 @@ namespace Orleans.Serialization
         /// Serializer for ISerializable value types.
         /// </summary>
         /// <typeparam name="T">The type which this serializer can serialize.</typeparam>
-        internal class ValueTypeSerializer<T> : ValueTypeSerializer where T : struct
+        internal class ValueTypeSerializer<T> : ValueTypeSerializer where T : struct, ISerializable
         {
             public delegate void ValueConstructor(ref T value, SerializationInfo info, StreamingContext context);
             public delegate void SerializationCallback(ref T value, StreamingContext context);
@@ -246,12 +246,12 @@ namespace Orleans.Serialization
 
             public override void Serialize(object item, ISerializationContext context)
             {
-                var localItem = (T) item;
+                var localItem = (T)item;
                 var type = item.GetType();
                 var info = new SerializationInfo(type, _formatterConverter);
                 var streamingContext = new StreamingContext(StreamingContextStates.All, context);
                 _callbacks.OnSerializing?.Invoke(ref localItem, streamingContext);
-                ((ISerializable)item).GetObjectData(info, streamingContext);
+                localItem.GetObjectData(info, streamingContext);
 
                 SerializationManager.SerializeInner(type, context);
                 SerializationManager.SerializeInner(info.MemberCount, context);
@@ -268,16 +268,15 @@ namespace Orleans.Serialization
 
             public override object DeepCopy(object source, ICopyContext context)
             {
-                var localSource = (T) source;
+                var localSource = (T)source;
                 var type = source.GetType();
-                var serializable = (ISerializable)source;
                 var result = default(T);
 
                 // Shallow-copy the object into the serialization info.
                 var originalInfo = new SerializationInfo(type, _formatterConverter);
                 var streamingContext = new StreamingContext(StreamingContextStates.All, context);
                 _callbacks.OnSerializing?.Invoke(ref localSource, streamingContext);
-                serializable.GetObjectData(originalInfo, streamingContext);
+                localSource.GetObjectData(originalInfo, streamingContext);
 
                 // Deep-copy the serialization info.
                 var copyInfo = new SerializationInfo(type, _formatterConverter);
@@ -334,7 +333,7 @@ namespace Orleans.Serialization
                 return _serializers.GetOrAdd(type, _createSerializerDelegate);
             }
 
-            private ValueTypeSerializer CreateTypedSerializer<T>() where T : struct
+            private ValueTypeSerializer CreateTypedSerializer<T>() where T : struct, ISerializable
             {
                 var constructor = _constructorFactory.GetSerializationConstructorDelegate<T, ValueTypeSerializer<T>.ValueConstructor>();
                 var callbacks =
