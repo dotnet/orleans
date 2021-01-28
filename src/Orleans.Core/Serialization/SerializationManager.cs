@@ -1654,7 +1654,7 @@ namespace Orleans.Serialization
             }
             else
             {
-                serializer = new BinaryFormatterSerializer(this.ServiceProvider);
+                serializer = this.ServiceProvider.GetRequiredService<ILBasedSerializer>();
             }
             return serializer;
         }

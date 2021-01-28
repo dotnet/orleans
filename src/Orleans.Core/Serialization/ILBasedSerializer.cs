@@ -1,14 +1,13 @@
+using System;
+using System.Collections.Concurrent;
+using System.Reflection;
+using Orleans.Runtime;
+
 namespace Orleans.Serialization
 {
-    using System;
-    using System.Collections.Concurrent;
-    using System.Reflection;
-    using Orleans.Runtime;
-
     /// <summary>
     /// Fallback serializer to be used when other serializers are unavailable.
     /// </summary>
-    [Obsolete("Obsolete in favor of other serializers.")]
     public class ILBasedSerializer : IKeyedSerializer
     {
         private static readonly Type ExceptionType = typeof(Exception);

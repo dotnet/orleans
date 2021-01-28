@@ -154,19 +154,6 @@ namespace UnitTests.Serialization
             Assert.Equal(input.Payload, result.Payload, StringComparer.Ordinal);
             Assert.Equal(2, result.Contexts.Count);
             Assert.All(result.Contexts, ctx => Assert.True(ctx.Context is IDeserializationContext));
-
-            // Verify that our behavior conforms to the behavior of BinaryFormatter.
-            var input2 = new SimpleISerializableObject
-            {
-                Payload = "pyjamas"
-            };
-
-            var result2 = (SimpleISerializableObject) BuiltInSerializerTests.DotNetSerializationLoop(
-                input2,
-                this.fixture.SerializationManager);
-
-            Assert.Equal(input2.History, input.History);
-            Assert.Equal(result2.History, result.History.Skip(1).ToList());
         }
 
         /// <summary>
@@ -193,19 +180,6 @@ namespace UnitTests.Serialization
             Assert.Equal(input.Payload, result.Payload, StringComparer.Ordinal);
             Assert.Equal(2, result.Contexts.Count);
             Assert.All(result.Contexts, ctx => Assert.True(ctx.Context is IDeserializationContext));
-
-            // Verify that our behavior conforms to the behavior of BinaryFormatter.
-            var input2 = new SimpleISerializableStruct
-            {
-                Payload = "pyjamas"
-            };
-
-            var result2 = (SimpleISerializableStruct) BuiltInSerializerTests.DotNetSerializationLoop(
-                input2,
-                this.fixture.SerializationManager);
-
-            Assert.Equal(input2.History, input.History);
-            Assert.Equal(result2.History, result.History);
         }
 
         private T SerializerLoop<T>(T input)

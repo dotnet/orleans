@@ -20,15 +20,6 @@ namespace UnitTests.OrleansRuntime
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
-        public void SerializationTests_Exception_DotNet()
-        {
-            var original = new SiloUnavailableException("Some message");
-            var output = TestingUtils.RoundTripDotNetSerializer(original, this.fixture.GrainFactory, this.fixture.SerializationManager);
-
-            Assert.Equal(original.Message, output.Message);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void SerializationTests_Exception_Orleans()
         {
             var original = new SiloUnavailableException("Some message");

@@ -12,9 +12,7 @@ namespace Orleans.Serialization
         /// </summary>
         ILBasedSerializer = 1,
 
-        /// <summary>
-        /// <see cref="Orleans.Serialization.BinaryFormatterISerializableSerializer"/>
-        /// </summary>
+        [Obsolete("Removed")]
         BinaryFormatterISerializable = 2,
 
         /// <summary>

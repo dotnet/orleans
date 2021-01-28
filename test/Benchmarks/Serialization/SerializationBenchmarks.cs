@@ -15,7 +15,6 @@ namespace Benchmarks.Serialization
     public enum SerializerToUse
     {
         Default,
-        BinaryFormatterFallbackSerializer,
         IlBasedFallbackSerializer,
         ProtoBufNet
     }
@@ -31,12 +30,7 @@ namespace Benchmarks.Serialization
                 case SerializerToUse.Default:
                     break;
                 case SerializerToUse.IlBasedFallbackSerializer:
-#pragma warning disable CS0618 // Type or member is obsolete
                     fallback = typeof(ILBasedSerializer);
-#pragma warning restore CS0618 // Type or member is obsolete
-                    break;
-                case SerializerToUse.BinaryFormatterFallbackSerializer:
-                    fallback = typeof(BinaryFormatterSerializer);
                     break;
                 case SerializerToUse.ProtoBufNet:
                     fallback = typeof(ProtobufNetSerializer);
