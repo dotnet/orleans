@@ -180,9 +180,7 @@ namespace Orleans.CodeGenerator.Utilities
                 ConstructorDeclaration(typeName.ToIdentifier())
                     .WithParameterList(ParameterList().AddParameters(constructor.GetParameterListSyntax()));
 
-            syntax.WithModifiers(syntax.Modifiers.AddAccessibilityModifiers(constructor.DeclaredAccessibility));
-
-            return syntax;
+            return syntax.WithModifiers(syntax.Modifiers.AddAccessibilityModifiers(constructor.DeclaredAccessibility));
         }
 
         public static SyntaxTokenList AddAccessibilityModifiers(this SyntaxTokenList syntax, Accessibility accessibility)
