@@ -56,7 +56,6 @@ namespace Orleans
             services.TryAddSingleton<ImrRpcProvider>();
             services.TryAddSingleton<ImrGrainMethodInvokerProvider>();
             services.TryAddSingleton<GrainReferenceSerializer>();
-            services.TryAddSingleton<BinaryFormatterGrainReferenceSurrogateSelector>();
             services.TryAddSingleton<GrainReferenceKeyStringConverter>();
             services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
             services.TryAddSingleton<GrainInterfaceTypeResolver>();
@@ -87,13 +86,8 @@ namespace Orleans
             services.AddSingleton<DotNetSerializableSerializer>();
             services.AddFromExisting<IKeyedSerializer, DotNetSerializableSerializer>();
 
-            services.AddSingleton<BinaryFormatterSerializer>();
-            services.AddSingleton<BinaryFormatterISerializableSerializer>();
-            services.AddFromExisting<IKeyedSerializer, BinaryFormatterISerializableSerializer>();
-#pragma warning disable CS0618 // Type or member is obsolete
             services.TryAddSingleton<ILBasedSerializer>();
             services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
-#pragma warning restore CS0618 // Type or member is obsolete
 
             // Application parts
             var parts = builder.GetApplicationPartManager();

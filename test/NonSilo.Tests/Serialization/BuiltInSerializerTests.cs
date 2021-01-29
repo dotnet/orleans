@@ -2,11 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -14,9 +11,7 @@ using Orleans;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
-using Orleans.GrainReferences;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
@@ -52,17 +47,9 @@ namespace UnitTests.Serialization
         public enum SerializerToUse
         {
             Default,
-            BinaryFormatterFallbackSerializer,
             IlBasedFallbackSerializer,
             NoFallback
         }
-
-        public static IEnumerable<object[]> FallbackSerializers = new[]
-        {
-            new object[] { SerializerToUse.Default },
-            new object[] { SerializerToUse.BinaryFormatterFallbackSerializer },
-            new object[] { SerializerToUse.IlBasedFallbackSerializer }
-        };
 
         private SerializationTestEnvironment InitializeSerializer(SerializerToUse serializerToUse)
         {
@@ -79,12 +66,7 @@ namespace UnitTests.Serialization
                     switch (serializerToUse)
                     {
                         case SerializerToUse.IlBasedFallbackSerializer:
-#pragma warning disable CS0618 // Type or member is obsolete
                             fallback = typeof(ILBasedSerializer);
-#pragma warning restore CS0618 // Type or member is obsolete
-                            break;
-                        case SerializerToUse.BinaryFormatterFallbackSerializer:
-                            fallback = typeof(BinaryFormatterSerializer);
                             break;
                         case SerializerToUse.NoFallback:
                             fallback = typeof(SupportsNothingSerializer);
@@ -148,11 +130,10 @@ namespace UnitTests.Serialization
                 $"Should be able to serialize internal type {nameof(ValueTuple<int, AddressAndTag>)}.");
         }
 
-        [Theory, TestCategory("BVT")]
-        [MemberData(nameof(FallbackSerializers))]
-        public void Serialize_ComplexClass(SerializerToUse serializerToUse)
+        [Fact, TestCategory("BVT")]
+        public void Serialize_ComplexClass()
         {
-            var environment = InitializeSerializer(serializerToUse);
+            var environment = defaultFixture;
             var expected = OuterClass.GetPrivateClassInstance();
             expected.Int = 89;
             expected.String = Guid.NewGuid().ToString();
@@ -695,13 +676,11 @@ namespace UnitTests.Serialization
             Assert.NotSame(list1, list3); //Object identity gained after round trip of string/list dict
         }
 
-        [Theory, TestCategory("Functional")]
-        [MemberData(nameof(FallbackSerializers))]
-        public void Serialize_Unrecognized(SerializerToUse serializerToUse)
+        [Fact, TestCategory("Functional")]
+        public void Serialize_Unrecognized()
         {
-            var environment = InitializeSerializer(serializerToUse);
             var test1 = new Unrecognized { A = 3, B = 27 };
-            var raw = OrleansSerializationLoop(environment.SerializationManager, test1, false);
+            var raw = OrleansSerializationLoop(defaultFixture.SerializationManager, test1, false);
             var result = Assert.IsAssignableFrom<Unrecognized>(raw); //Type is wrong after deep copy of unrecognized
             Assert.Equal(3, result.A);  //Property A is wrong after deep copy of unrecognized"
             Assert.Equal(27, result.B);  //Property B is wrong after deep copy of unrecognized"
@@ -711,7 +690,7 @@ namespace UnitTests.Serialization
             {
                 test2[i] = new Unrecognized { A = i, B = 2 * i };
             }
-            raw = OrleansSerializationLoop(environment.SerializationManager, test2);
+            raw = OrleansSerializationLoop(defaultFixture.SerializationManager, test2);
             Assert.IsAssignableFrom<Unrecognized[]>(raw); //Type is wrong after round trip of array of unrecognized
             var result2 = (Unrecognized[])raw;
             Assert.Equal(3, result2.Length); //Array length is wrong after round trip of array of unrecognized
@@ -823,37 +802,6 @@ namespace UnitTests.Serialization
 
         [Theory, TestCategory("Functional")]
         [InlineData(SerializerToUse.NoFallback)]
-        public void Serialize_GrainReference_ViaStandardSerializer(SerializerToUse serializerToUse)
-        {
-            var environment = InitializeSerializer(serializerToUse);
-            GrainId grainId = LegacyGrainId.NewId();
-            GrainReference input = (GrainReference)environment.InternalGrainFactory.GetGrain(grainId);
-            Assert.True(input.IsBound);
-
-            object deserialized = DotNetSerializationLoop(input, environment.SerializationManager);
-            var grainRef = Assert.IsAssignableFrom<GrainReference>(deserialized); //GrainReference copied as wrong type
-            Assert.True(grainRef.IsBound);
-            Assert.Equal(grainId, grainRef.GrainId); //GrainId different after copy
-            Assert.Equal(input, grainRef); //Wrong contents after round-trip of input
-        }
-        
-        [Theory, TestCategory("Functional")]
-        [InlineData(SerializerToUse.NoFallback)]
-        public void Serialize_GrainBase_ViaStandardSerializer(SerializerToUse serializerToUse)
-        {
-            var environment = InitializeSerializer(serializerToUse);
-            Grain input = new EchoTaskGrain(null, null);
-
-            // Expected exception:
-            // System.Runtime.Serialization.SerializationException: Type 'Echo.Grains.EchoTaskGrain' in Assembly 'UnitTestGrains, Version=1.0.0.0, Culture=neutral, PublicKeyToken=070f47935e3ed133' is not marked as serializable.
-
-            var exc = Assert.Throws<SerializationException>(() => DotNetSerializationLoop(input, environment.SerializationManager));
-
-            Assert.Contains("is not marked as serializable", exc.Message);
-        }
-
-        [Theory, TestCategory("Functional")]
-        [InlineData(SerializerToUse.NoFallback)]
         public void Serialize_ValidateBuildSegmentListWithLengthLimit(SerializerToUse serializerToUse)
         {
             _ = InitializeSerializer(serializerToUse);
@@ -960,28 +908,6 @@ namespace UnitTests.Serialization
                 copy = serializationManager.RoundTripSerializationForTesting(copy);
             }
             return copy;
-        }
-
-        internal static object DotNetSerializationLoop(object input, SerializationManager serializationManager)
-        {
-            byte[] bytes;
-            object deserialized;
-            var formatter = new BinaryFormatter
-            {
-                Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(serializationManager)),
-                SurrogateSelector = new BinaryFormatterGrainReferenceSurrogateSelector(serializationManager.ServiceProvider.GetService<GrainReferenceActivator>())
-            };
-            using (var str = new MemoryStream())
-            {
-                formatter.Serialize(str, input);
-                str.Flush();
-                bytes = str.ToArray();
-            }
-            using (var inStream = new MemoryStream(bytes))
-            {
-                deserialized = formatter.Deserialize(inStream);
-            }
-            return deserialized;
         }
 
         private void ValidateDictionary<K, V>(Dictionary<K, V> source, object deserialized, string type)
@@ -1190,19 +1116,6 @@ namespace UnitTests.Serialization
             Assert.Equal(input.Payload, result.Payload, StringComparer.Ordinal);
             Assert.Equal(3, result.Contexts.Count);
             Assert.All(result.Contexts, ctx => Assert.True(ctx.Context is IDeserializationContext));
-
-            // Verify that our behavior conforms to the behavior of BinaryFormatter.
-            var input2 = new SimpleISerializableObject
-            {
-                Payload = "pyjamas"
-            };
-
-            var result2 = (SimpleISerializableObject)DotNetSerializationLoop(
-                input2,
-                environment.SerializationManager);
-
-            Assert.Equal(input2.History, input.History);
-            Assert.Equal(result2.History, result.History);
         }
 
         /// <summary>
@@ -1230,19 +1143,6 @@ namespace UnitTests.Serialization
             Assert.Equal(input.Payload, result.Payload, StringComparer.Ordinal);
             Assert.Equal(2, result.Contexts.Count);
             Assert.All(result.Contexts, ctx => Assert.True(ctx.Context is IDeserializationContext));
-
-            // Verify that our behavior conforms to the behavior of BinaryFormatter.
-            var input2 = new SimpleISerializableStruct
-            {
-                Payload = "pyjamas"
-            };
-
-            var result2 = (SimpleISerializableStruct)DotNetSerializationLoop(
-                input2,
-                environment.SerializationManager);
-
-            Assert.Equal(input2.History, input.History);
-            Assert.Equal(result2.History, result.History);
         }
 
         [Serializable]

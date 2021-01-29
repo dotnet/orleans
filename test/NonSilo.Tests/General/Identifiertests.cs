@@ -439,9 +439,6 @@ namespace UnitTests.General
 
             roundTripped = this.environment.SerializationManager.RoundTripSerializationForTesting(grainRef);
             Assert.Equal(grainRef, roundTripped); // GrainReference.OrleansSerializer
-
-            roundTripped = TestingUtils.RoundTripDotNetSerializer(grainRef, this.environment.GrainFactory, this.environment.SerializationManager);
-            Assert.Equal(grainRef, roundTripped); // GrainReference.DotNetSerializer
         }
 
         private GrainReference RoundTripGrainReferenceToKey(GrainReference input)

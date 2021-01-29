@@ -105,25 +105,11 @@ namespace DefaultCluster.Tests.General
             Assert.Null(await g2.GetNext());
         }
 
-        [Fact, TestCategory("Serialization")]
-        public void GrainReference_DotNet_Serialization()
-        {
-            int id = random.Next();
-            TestGrainReferenceSerialization(id, false, false);
-        }
-
-        [Fact, TestCategory("Serialization")]
-        public void GrainReference_DotNet_Serialization_Unresolved()
-        {
-            int id = random.Next();
-            TestGrainReferenceSerialization(id, false, false);
-        }
-
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
         public void GrainReference_Json_Serialization()
         {
             int id = random.Next();
-            TestGrainReferenceSerialization(id, true, true);
+            TestGrainReferenceSerialization(id, true);
         }
 
         [Fact, TestCategory("Serialization"), TestCategory("JSON")]
@@ -157,7 +143,7 @@ namespace DefaultCluster.Tests.General
         public void GrainReference_Json_Serialization_Unresolved()
         {
             int id = random.Next();
-            TestGrainReferenceSerialization(id, false, true);
+            TestGrainReferenceSerialization(id, false);
         }
 
         [Fact(Skip = "GrainReference interning is not currently implemented."), TestCategory("Serialization"), TestCategory("Interner")]
@@ -176,7 +162,7 @@ namespace DefaultCluster.Tests.General
             Assert.Same(g3, g2);
         }
 
-        private void TestGrainReferenceSerialization(int id, bool resolveBeforeSerialize, bool useJson)
+        private void TestGrainReferenceSerialization(int id, bool resolveBeforeSerialize)
         {
             // Make sure grain references serialize well through .NET serializer.
             var grain = this.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), UnitTests.Grains.SimpleGrain.SimpleGrainNamePrefix);
@@ -186,17 +172,8 @@ namespace DefaultCluster.Tests.General
                 grain.SetA(id).Wait(); //  Resolve GR
             }
 
-            ISimpleGrain other;
-            if (useJson)
-            {
-                // Serialize + Deserialize through Json serializer
-                other = NewtonsoftJsonSerializeRoundtrip(grain);
-            }
-            else
-            {
-                // Serialize + Deserialize through .NET serializer
-                other = DotNetSerializeRoundtrip(grain);
-            }
+            // Serialize + Deserialize through Json serializer
+            var other = NewtonsoftJsonSerializeRoundtrip(grain);
 
             if (!resolveBeforeSerialize)
             {
@@ -208,24 +185,6 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(grain,  other);  // "Deserialized grain reference equality is preserved"
             int res = other.GetA().Result;
             Assert.Equal(id,  res);  // "Returned values from call to deserialized grain reference"
-        }
-
-        private T DotNetSerializeRoundtrip<T>(T obj)
-        {
-            T other;
-            using (var memoryStream = new MemoryStream())
-            {
-                var formatter = new BinaryFormatter
-                {
-                    Context = new StreamingContext(StreamingContextStates.All, new SerializationContext(this.HostedCluster.SerializationManager)),
-                    SurrogateSelector = this.HostedCluster.Client.ServiceProvider.GetRequiredService<BinaryFormatterGrainReferenceSurrogateSelector>()
-                };
-                formatter.Serialize(memoryStream, obj);
-                memoryStream.Flush();
-                memoryStream.Position = 0; // Reset to start
-                other = (T)formatter.Deserialize(memoryStream);
-            }
-            return other;
         }
 
         private T NewtonsoftJsonSerializeRoundtrip<T>(T obj)
