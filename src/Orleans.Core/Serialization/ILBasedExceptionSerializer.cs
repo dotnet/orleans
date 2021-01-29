@@ -1,12 +1,11 @@
 using System.Runtime.Serialization;
 using Orleans.Utilities;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 
 namespace Orleans.Serialization
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Reflection;
-
     /// <summary>
     /// Methods for serializing instances of <see cref="Exception"/> and its subclasses.
     /// </summary>

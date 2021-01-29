@@ -21,6 +21,7 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
+using Orleans.Utilities;
 using TestExtensions;
 using TestGrainInterfaces;
 using UnitTests.GrainInterfaces;
@@ -596,36 +597,67 @@ namespace UnitTests.Serialization
             ValidateReadOnlyCollectionList(collection, deserialized, "string/string");
         }
 
+        private class BanningTypeResolver : ITypeResolver
+        {
+            private readonly CachedTypeResolver _resolver = new CachedTypeResolver();
+            private readonly HashSet<Type> _blockedTypes;
+
+            public BanningTypeResolver(params Type[] blockedTypes)
+            {
+                _blockedTypes = new HashSet<Type>();
+                foreach (var type in blockedTypes ?? Array.Empty<Type>())
+                {
+                    _blockedTypes.Add(type);
+                }
+            }
+
+            public Type ResolveType(string name)
+            {
+                var result = _resolver.ResolveType(name);
+                if (_blockedTypes.Contains(result))
+                {
+                    result = null;
+                }
+
+                return result;
+            }
+
+            public bool TryResolveType(string name, out Type type)
+            {
+                if (_resolver.TryResolveType(name, out type))
+                {
+                    if (_blockedTypes.Contains(type))
+                    {
+                        type = null;
+                        return false;
+                    }
+
+                    return true;
+                }
+
+                return false;
+            }
+        }
+
         [Fact, TestCategory("Functional")]
         public void Serialize_UnserializableException()
         {
-            // Create an environment which has no keyed serializer. This will cause some exception types to be unserializable.
-            var environment = SerializationTestEnvironment.InitializeWithDefaults(
-                builder => builder.ConfigureServices(
-                    services => services.RemoveAll(typeof(IKeyedSerializer))));
             const string message = "This is a test message";
+            var environment = SerializationTestEnvironment.InitializeWithDefaults(builder =>
+            {
+                builder.ConfigureServices(services =>
+                {
+                    services.Replace(new ServiceDescriptor(typeof(ITypeResolver), new BanningTypeResolver(typeof(UnserializableException))));
+                });
+            });
 
             // throw the exception so that stack trace is populated
             Exception source = Assert.Throws<UnserializableException>((Action)(() => { throw new UnserializableException(message); }));
             object deserialized = OrleansSerializationLoop(environment.SerializationManager, source);
-            var result = Assert.IsAssignableFrom<Exception>(deserialized); //Type is wrong after round trip of unserializable exception
-            var expectedMessage = "Non-serializable exception of type " +
-                                    typeof(UnserializableException).OrleansTypeName() + ": " + message;
-            Assert.Contains(expectedMessage, result.Message); //Exception message is wrong after round trip of unserializable exception
-        }
 
-        [Theory, TestCategory("Functional")]
-        [InlineData(SerializerToUse.IlBasedFallbackSerializer)]
-        public void Serialize_UnserializableException_IlFallback(SerializerToUse serializerToUse)
-        {
-            var environment = InitializeSerializer(serializerToUse);
-            const string Message = "This is a test message";
-
-            // throw the exception so that stack trace is populated
-            var source = Assert.Throws<UnserializableException>((Action)(() => { throw new UnserializableException(Message); }));
-            object deserialized = OrleansSerializationLoop(environment.SerializationManager, source);
-            var result = Assert.IsAssignableFrom<UnserializableException>(deserialized);
-            Assert.Contains(Message, result.Message);
+            var result = Assert.IsAssignableFrom<UnavailableExceptionFallbackException>(deserialized); //Type is wrong after round trip of unserializable exception
+            Assert.Contains(message, result.Message); //Exception message is correct after round trip of unserializable exception
+            Assert.Equal(RuntimeTypeNameFormatter.Format(source.GetType()), result.ExceptionType);
         }
 
         [Theory, TestCategory("Functional")]
