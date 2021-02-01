@@ -716,7 +716,9 @@ namespace Orleans.Runtime
         {
             // The unregistration is normally done in the regular deactivation process, but since this activation seems
             // stuck (it might never run the deactivation process), we remove it from the directory directly
+            logger.LogError("Deactivating stuck grain {Grain}", activationData.ToDetailedString());
             await this.grainLocator.Unregister(activationData.Address, UnregistrationCause.Force);
+            UnregisterMessageTarget(activationData);
             DeactivateActivationImpl(activationData, StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_STUCK_ACTIVATION);
         }
 
@@ -821,8 +823,7 @@ namespace Orleans.Runtime
                 {
                     activationData.SetState(ActivationState.Invalid);
                 }
-                // Capture grainInstance since UnregisterMessageTarget will set it to null...
-                var grainInstance = activationData.GrainInstance;
+
                 UnregisterMessageTarget(activationData);
                 RerouteAllQueuedMessages(activationData, null, "Finished Destroy Activation");
                 await activationData.DisposeAsync();
