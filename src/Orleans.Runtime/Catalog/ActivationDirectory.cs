@@ -13,14 +13,14 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
 
         private readonly ConcurrentDictionary<GrainId, ActivationData> activations;                     // Activation data (app grains) only.
-        private readonly ConcurrentDictionary<ActivationId, SystemTarget> systemTargets;                // SystemTarget only.
+        private readonly ConcurrentDictionary<GrainId, SystemTarget> systemTargets;                // SystemTarget only.
         private readonly ConcurrentDictionary<string, CounterStatistic> grainCounts;                    // simple statistics type->count
         private readonly ConcurrentDictionary<string, CounterStatistic> systemTargetCounts;             // simple statistics systemTargetTypeName->count
 
         public ActivationDirectory(ILogger<ActivationDirectory> logger)
         {
             activations = new ConcurrentDictionary<GrainId, ActivationData>();
-            systemTargets = new ConcurrentDictionary<ActivationId, SystemTarget>();
+            systemTargets = new ConcurrentDictionary<GrainId, SystemTarget>();
             grainCounts = new ConcurrentDictionary<string, CounterStatistic>();
             systemTargetCounts = new ConcurrentDictionary<string, CounterStatistic>();
             this.logger = logger;
@@ -41,7 +41,7 @@ namespace Orleans.Runtime
             return activations.TryGetValue(key, out var target) ? target : null;
         }
 
-        public SystemTarget FindSystemTarget(ActivationId key)
+        public SystemTarget FindSystemTarget(GrainId key)
         {
             SystemTarget target;
             return systemTargets.TryGetValue(key, out target) ? target : null;
@@ -94,29 +94,28 @@ namespace Orleans.Runtime
         public void RecordNewSystemTarget(SystemTarget target)
         {
             var systemTarget = (ISystemTargetBase) target;
-            systemTargets.TryAdd(target.ActivationId, target);
-            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
+            var id = systemTarget.GrainId;
+            systemTargets.TryAdd(id, target);
+            if (!Constants.IsSingletonSystemTarget(id.Type))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId.Type)).Increment();
+                FindSystemTargetCounter(Constants.SystemTargetName(id.Type)).Increment();
             }
         }
 
         public void RemoveSystemTarget(SystemTarget target)
         {
             var systemTarget = (ISystemTargetBase) target;
-            systemTargets.TryRemove(target.ActivationId, out _);
-            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId.Type))
+            var id = systemTarget.GrainId;
+            systemTargets.TryRemove(id, out _);
+            if (!Constants.IsSingletonSystemTarget(id.Type))
             {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId.Type)).DecrementBy(1);
+                FindSystemTargetCounter(Constants.SystemTargetName(id.Type)).DecrementBy(1);
             }
         }
 
         public void RemoveTarget(ActivationData target)
         {
-            if (!activations.TryRemove(target.GrainId, out _))
-            {
-                return;
-            }
+            activations.TryRemove(target.GrainId, out _);
         }
 
         public IEnumerable<KeyValuePair<string, long>> GetSimpleGrainStatistics()

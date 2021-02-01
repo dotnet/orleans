@@ -375,7 +375,7 @@ namespace Orleans.Runtime
             // Find the activation it targets; first check for a system activation, then an app activation
             if (msg.TargetGrain.IsSystemTarget())
             {
-                SystemTarget target = this.activationDirectory.FindSystemTarget(msg.TargetActivation);
+                SystemTarget target = this.activationDirectory.FindSystemTarget(msg.TargetGrain);
                 if (target == null)
                 {
                     MessagingStatisticsGroup.OnRejectedMessage(msg);
