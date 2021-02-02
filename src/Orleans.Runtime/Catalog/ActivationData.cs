@@ -317,6 +317,7 @@ namespace Orleans.Runtime
         {
             // Note: This method is always called while holding lock on this activation, so no need for additional locks here
             RunningRequests.Remove(message);
+            RunningRequestsSenders.Remove(message.SendingActivation);
 
             if (RunningRequests.Count == 0)
             {
