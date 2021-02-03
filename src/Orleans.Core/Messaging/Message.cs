@@ -297,7 +297,7 @@ namespace Orleans.Runtime
             if (!dropExpiredMessages) return false;
 
             GrainId id = TargetGrain;
-            if (id == null) return false;
+            if (id.IsDefault) return false;
 
             // don't set expiration for one way, system target and system grain messages.
             return Direction != Directions.OneWay && !id.IsSystemTarget();
@@ -465,7 +465,7 @@ namespace Orleans.Runtime
             {
                 history.Append(TargetSilo).Append(":");
             }
-            if (TargetGrain != null)
+            if (!TargetGrain.IsDefault)
             {
                 history.Append(TargetGrain).Append(":");
             }

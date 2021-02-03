@@ -100,7 +100,7 @@ namespace Orleans.Runtime
                 TransactionInfo = request.TransactionInfo
             };
 
-            if (request.SendingGrain != null)
+            if (!request.SendingGrain.IsDefault)
             {
                 response.TargetGrain = request.SendingGrain;
                 if (request.SendingActivation != null)
@@ -110,7 +110,7 @@ namespace Orleans.Runtime
             }
 
             response.SendingSilo = request.TargetSilo;
-            if (request.TargetGrain != null)
+            if (!request.TargetGrain.IsDefault)
             {
                 response.SendingGrain = request.TargetGrain;
                 if (request.TargetActivation != null)

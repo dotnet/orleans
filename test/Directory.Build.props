@@ -14,7 +14,7 @@
 
   <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->
   <PropertyGroup>
-    <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">netcoreapp3.1;net461</TestTargetFrameworks>
+    <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">net5.0;netcoreapp3.1;net461</TestTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>

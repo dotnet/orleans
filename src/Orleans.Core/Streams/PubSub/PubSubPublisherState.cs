@@ -40,7 +40,7 @@ namespace Orleans.Streams
         }
         public bool Equals(InternalStreamId streamId, IStreamProducerExtension streamProducer)
         {
-            if (ReferenceEquals(null, Stream)) return false;
+            if (Stream == default) return false;
             if (ReferenceEquals(null, Producer)) return false;
             return Stream.Equals(streamId) && Producer.Equals(streamProducer);
         }
