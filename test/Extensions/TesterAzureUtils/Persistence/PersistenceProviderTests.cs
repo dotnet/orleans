@@ -12,6 +12,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
 using Samples.StorageProviders;
@@ -257,7 +258,9 @@ namespace Tester.AzureUtils.Persistence
 
         private async Task<AzureTableGrainStorage> InitAzureTableGrainStorage(AzureTableStorageOptions options)
         {
-            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, "TestStorage");
+            // TODO change test to include more serializer?
+            var serializer = new OrleansGrainStorageSerializer(this.providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>());
+            AzureTableGrainStorage store = ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(this.providerRuntime.ServiceProvider, options, serializer, "TestStorage");
             ISiloLifecycleSubject lifecycle = ActivatorUtilities.CreateInstance<SiloLifecycleSubject>(this.providerRuntime.ServiceProvider);
             store.Participate(lifecycle);
             await lifecycle.OnStart();

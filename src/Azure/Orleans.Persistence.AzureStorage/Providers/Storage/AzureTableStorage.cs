@@ -29,7 +29,7 @@ namespace Orleans.Storage
     {
         private readonly AzureTableStorageOptions options;
         private readonly ClusterOptions clusterOptions;
-        private readonly SerializationManager serializationManager;
+        private readonly IGrainStorageSerializer storageSerializer;
         private readonly IServiceProvider services;
         private readonly ILogger logger;
 
@@ -51,14 +51,14 @@ namespace Orleans.Storage
             string name,
             AzureTableStorageOptions options,
             IOptions<ClusterOptions> clusterOptions,
-            SerializationManager serializationManager,
+            IGrainStorageSerializer storageSerializer,
             IServiceProvider services,
             ILogger<AzureTableGrainStorage> logger)
         {
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
             this.name = name;
-            this.serializationManager = serializationManager;
+            this.storageSerializer = storageSerializer;
             this.services = services;
             this.logger = logger;
         }
@@ -196,22 +196,22 @@ namespace Orleans.Storage
                 // each Unicode character takes 2 bytes
                 dataSize = data.Length * 2;
 
-                properties = SplitStringData(data).Select(t => new EntityProperty(t));
+                properties = SplitStringData(data.AsMemory()).Select(t => new EntityProperty(t.ToString()));
                 basePropertyName = STRING_DATA_PROPERTY_NAME;
             }
             else
             {
                 // Convert to binary format
-
-                byte[] data = this.serializationManager.SerializeToByteArray(grainState);
+                var (tag, output) = this.storageSerializer.Serialize(grainState.GetType(), grainState);
+                var data = output.ToArray();
 
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
                     data.Length, entity.PartitionKey, entity.RowKey);
 
                 dataSize = data.Length;
 
-                properties = SplitBinaryData(data).Select(t => new EntityProperty(t));
-                basePropertyName = BINARY_DATA_PROPERTY_NAME;
+                properties = SplitBinaryData(data).Select(t => new EntityProperty(t.ToArray()));
+                basePropertyName = ConvertTagToPropertyName(tag);
             }
 
             CheckMaxDataSize(dataSize, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
@@ -233,29 +233,27 @@ namespace Orleans.Storage
             }
         }
 
-        private static IEnumerable<string> SplitStringData(string stringData)
+        private static IEnumerable<ReadOnlyMemory<char>> SplitStringData(ReadOnlyMemory<char> stringData)
         {
             var startIndex = 0;
             while (startIndex < stringData.Length)
             {
                 var chunkSize = Math.Min(MAX_STRING_PROPERTY_LENGTH, stringData.Length - startIndex);
 
-                yield return stringData.Substring(startIndex, chunkSize);
+                yield return stringData.Slice(startIndex, chunkSize);
 
                 startIndex += chunkSize;
             }
         }
 
-        private static IEnumerable<byte[]> SplitBinaryData(byte[] binaryData)
+        private static IEnumerable<ReadOnlyMemory<byte>> SplitBinaryData(ReadOnlyMemory<byte> binaryData)
         {
             var startIndex = 0;
             while (startIndex < binaryData.Length)
             {
                 var chunkSize = Math.Min(MAX_DATA_CHUNK_SIZE, binaryData.Length - startIndex);
 
-                var chunk = new byte[chunkSize];
-                Array.Copy(binaryData, startIndex, chunk, 0, chunkSize);
-                yield return chunk;
+                yield return binaryData.Slice(startIndex, chunkSize);
 
                 startIndex += chunkSize;
             }
@@ -352,7 +350,7 @@ namespace Orleans.Storage
                 if (binaryData.Length > 0)
                 {
                     // Rehydrate
-                    dataValue = this.serializationManager.DeserializeFromByteArray<object>(binaryData);
+                    dataValue = this.storageSerializer.Deserialize(typeof(object), binaryData, ConvertPropertyNameToTag(BINARY_DATA_PROPERTY_NAME));
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {
@@ -505,6 +503,26 @@ namespace Orleans.Storage
         {
             lifecycle.Subscribe(OptionFormattingUtilities.Name<AzureTableGrainStorage>(this.name), this.options.InitStage, Init, Close);
         }
+
+        private static string ConvertTagToPropertyName(string tag)
+        {
+            // TODO handle xml?
+            return tag switch
+            {
+                WellKnownSerializerTag.Json => STRING_DATA_PROPERTY_NAME,
+                _ => BINARY_DATA_PROPERTY_NAME
+            };
+        }
+
+        private static string ConvertPropertyNameToTag(string propertyName)
+        {
+            // TODO handle xml?
+            return propertyName switch
+            {
+                STRING_DATA_PROPERTY_NAME => WellKnownSerializerTag.Json,
+                _ => WellKnownSerializerTag.Binary
+            };
+        }
     }
 
     public static class AzureTableGrainStorageFactory
@@ -513,7 +531,8 @@ namespace Orleans.Storage
         {
             var optionsSnapshot = services.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>();
             var clusterOptions = services.GetProviderClusterOptions(name);
-            return ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(services, name, optionsSnapshot.Get(name), clusterOptions);
+            var storageSerializer = services.GetRequiredServiceByName<IGrainStorageSerializer>(name);
+            return ActivatorUtilities.CreateInstance<AzureTableGrainStorage>(services, name, optionsSnapshot.Get(name), clusterOptions, storageSerializer);
         }
     }
 }

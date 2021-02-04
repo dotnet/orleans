@@ -1,8 +1,10 @@
 using System;
 using Microsoft.Azure.Cosmos.Table;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Configuration
 {
@@ -28,6 +30,7 @@ namespace Orleans.Configuration
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
+        // TODO bpetit: deprecate/remove
         public bool UseJson { get; set; }
         public bool UseFullAssemblyNames { get; set; }
         public bool IndentJson { get; set; }
