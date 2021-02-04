@@ -47,6 +47,7 @@
     <MicrosoftDotNetPlatformAbstractionsVersion>3.1.6</MicrosoftDotNetPlatformAbstractionsVersion>
     <SystemSecurityCryptographyCngVersion>5.0.0</SystemSecurityCryptographyCngVersion>
     <SystemIoPipelinesVersion>5.0.0</SystemIoPipelinesVersion>
+    <SystemMemoryData>1.0.1</SystemMemoryData>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>16.9.0</MicrosoftBuildVersion>

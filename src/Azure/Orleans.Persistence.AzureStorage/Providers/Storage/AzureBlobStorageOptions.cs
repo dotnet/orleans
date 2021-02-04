@@ -1,9 +1,11 @@
 using System;
 using Azure.Core;
 using Microsoft.Azure.Cosmos.Table;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Configuration
 {

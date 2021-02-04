@@ -25,7 +25,11 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloBuilder AddAzureBlobGrainStorage(this ISiloBuilder builder, string name, Action<AzureBlobStorageOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.AddAzureBlobGrainStorage(name, configureOptions));
+            return builder.AddGrainStorage(name, configure =>
+            {
+                configure.UseOrleansSerializer();
+                configure.UseAzureBlob(configureOptions);
+            });
         }
 
         /// <summary>
@@ -41,45 +45,36 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloBuilder AddAzureBlobGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
         {
-            return builder.ConfigureServices(services => services.AddAzureBlobGrainStorage(name, configureOptions));
+            return builder.AddGrainStorage(name, configure =>
+            {
+                configure.UseOrleansSerializer();
+                configure.UseAzureBlob(configureOptions);
+            });
         }
 
         /// <summary>
-        /// Configure silo to use azure blob storage as the default grain storage.
+        /// Use Azure Blob as grain storage
         /// </summary>
-        public static IServiceCollection AddAzureBlobGrainStorageAsDefault(this IServiceCollection services, Action<AzureBlobStorageOptions> configureOptions)
+        public static void UseAzureBlob(this IGrainStorageProviderConfigurator configurator, Action<AzureBlobStorageOptions> options)
         {
-            return services.AddAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, ob => ob.Configure(configureOptions));
+            configurator.UseAzureBlob(builder => builder.Configure(options));
         }
 
         /// <summary>
-        /// Configure silo to use azure blob storage for grain storage.
+        /// Use Azure Blob as grain storage
         /// </summary>
-        public static IServiceCollection AddAzureBlobGrainStorage(this IServiceCollection services, string name, Action<AzureBlobStorageOptions> configureOptions)
+        public static void UseAzureBlob(this IGrainStorageProviderConfigurator configurator, Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions)
         {
-            return services.AddAzureBlobGrainStorage(name, ob => ob.Configure(configureOptions));
-        }
-
-        /// <summary>
-        /// Configure silo to use azure blob storage as the default grain storage.
-        /// </summary>
-        public static IServiceCollection AddAzureBlobGrainStorageAsDefault(this IServiceCollection services, Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
-        {
-            return services.AddAzureBlobGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-        }
-
-        /// <summary>
-        /// Configure silo to use azure blob storage for grain storage.
-        /// </summary>
-        public static IServiceCollection AddAzureBlobGrainStorage(this IServiceCollection services, string name,
-            Action<OptionsBuilder<AzureBlobStorageOptions>> configureOptions = null)
-        {
-            configureOptions?.Invoke(services.AddOptions<AzureBlobStorageOptions>(name));
-            services.AddTransient<IConfigurationValidator>(sp => new AzureBlobStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>().Get(name), name));
-            services.ConfigureNamedOptionForLogging<AzureBlobStorageOptions>(name);
-            services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            return services.AddSingletonNamedService<IGrainStorage>(name, AzureBlobGrainStorageFactory.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+            configurator.ConfigureStorage(AzureBlobGrainStorageFactory.Create, configureOptions);
+            configurator.ConfigureDelegate.Invoke(services =>
+            {
+                services.AddSingletonNamedService(
+                  configurator.Name,
+                  (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+                services
+                .AddTransient<IConfigurationValidator>(
+                    sp => new AzureBlobStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>().Get(configurator.Name), configurator.Name));
+            });
         }
     }
 }
