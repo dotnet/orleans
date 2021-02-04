@@ -7,6 +7,7 @@ using Azure.Storage.Blobs;
 using Newtonsoft.Json;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.Configuration
 {
@@ -33,12 +34,6 @@ namespace Orleans.Configuration
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
-
-        public bool UseJson { get; set; }
-        public bool UseFullAssemblyNames { get; set; }
-        public bool IndentJson { get; set; }
-        public TypeNameHandling? TypeNameHandling { get; set; }
-        public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
 
         /// <summary>
         /// Configures the <see cref="BlobServiceClient"/> using a connection string.

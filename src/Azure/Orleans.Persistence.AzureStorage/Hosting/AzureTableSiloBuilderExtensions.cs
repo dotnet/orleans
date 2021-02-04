@@ -24,7 +24,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloBuilder AddAzureTableGrainStorage(this ISiloBuilder builder, string name, Action<AzureTableStorageOptions> configureOptions)
         {
-            return builder.ConfigureServices(services => services.AddAzureTableGrainStorage(name, ob => ob.Configure(configureOptions)));
+            return builder.AddAzureTableGrainStorage(name, ob => ob.Configure(configureOptions));
         }
 
         /// <summary>
@@ -40,21 +40,40 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloBuilder AddAzureTableGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<AzureTableStorageOptions>> configureOptions = null)
         {
-            return builder.ConfigureServices(services => services.AddAzureTableGrainStorage(name, configureOptions));
+            return builder.AddGrainStorage(name, configure =>
+            {
+                configure.UseAzureTable(configureOptions);
+                configure.UseOrleansSerializer();
+            });
         }
 
-        internal static IServiceCollection AddAzureTableGrainStorage(this IServiceCollection services, string name,
-            Action<OptionsBuilder<AzureTableStorageOptions>> configureOptions = null)
+        /// <summary>
+        /// Use Azure Table as grain storage
+        /// </summary>
+        public static void UseAzureTable(this IGrainStorageProviderConfigurator configurator, Action<AzureTableStorageOptions> options)
         {
-            configureOptions?.Invoke(services.AddOptions<AzureTableStorageOptions>(name));
-            services.AddTransient<IConfigurationValidator>(sp => new AzureTableGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>().Get(name), name));
-            services.ConfigureNamedOptionForLogging<AzureTableStorageOptions>(name);
-            if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
+            configurator.UseAzureTable(builder => builder.Configure(options));
+        }
+
+        /// <summary>
+        /// Use Azure Table as grain storage
+        /// </summary>
+        public static void UseAzureTable(this IGrainStorageProviderConfigurator configurator, Action<OptionsBuilder<AzureTableStorageOptions>> configureOptions)
+        {
+            configurator.ConfigureStorage(AzureTableGrainStorageFactory.Create, configureOptions);
+            configurator.ConfigureDelegate.Invoke(services =>
             {
-                services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
-            }
-            return services.AddSingletonNamedService<IGrainStorage>(name, AzureTableGrainStorageFactory.Create)
-                           .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+                if (string.Equals(configurator.Name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
+                {
+                    services.TryAddSingleton(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+                }
+
+                services.AddSingletonNamedService(
+                    configurator.Name,
+                    (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredServiceByName<IGrainStorage>(n));
+
+                services.AddTransient<IConfigurationValidator>(sp => new AzureTableGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<AzureTableStorageOptions>>().Get(configurator.Name), configurator.Name));
+            });
         }
     }
 }

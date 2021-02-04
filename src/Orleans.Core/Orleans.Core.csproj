@@ -27,6 +27,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(MicrosoftExtensionsHostingAbstractionsVersion)" />
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
     <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="$(SystemDiagnosticsDiagnosticSourceVersion)" />
+    <PackageReference Include="System.Memory.Data" Version="$(SystemMemoryData)" />
   </ItemGroup>
 
 </Project>
