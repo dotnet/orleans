@@ -29,14 +29,8 @@ namespace Orleans.Configuration
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
-
-        // TODO bpetit: deprecate/remove
-        public bool UseJson { get; set; }
-        public bool UseFullAssemblyNames { get; set; }
-        public bool IndentJson { get; set; }
-        public TypeNameHandling? TypeNameHandling { get; set; }
-        public Action<JsonSerializerSettings> ConfigureJsonSerializerSettings { get; set; }
     }
+
     /// <summary>
     /// Configuration validator for AzureTableStorageOptions
     /// </summary>

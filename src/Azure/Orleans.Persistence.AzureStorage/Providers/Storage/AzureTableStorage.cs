@@ -34,7 +34,6 @@ namespace Orleans.Storage
         private readonly ILogger logger;
 
         private GrainStateTableDataManager tableDataManager;
-        private JsonSerializerSettings JsonSettings;
 
         // each property can hold 64KB of data and each entity can take 1MB in total, so 15 full properties take
         // 15 * 64 = 960 KB leaving room for the primary key, timestamp etc
@@ -185,10 +184,13 @@ namespace Orleans.Storage
             IEnumerable<EntityProperty> properties;
             string basePropertyName;
 
-            if (this.options.UseJson)
+            // Convert to binary format
+            var tag = this.storageSerializer.Serialize(grainState.GetType(), grainState, out var output);
+            basePropertyName = ConvertTagToPropertyName(tag);
+
+            if (basePropertyName.Equals(STRING_DATA_PROPERTY_NAME))
             {
-                // http://james.newtonking.com/json/help/index.html?topic=html/T_Newtonsoft_Json_JsonConvert.htm
-                string data = Newtonsoft.Json.JsonConvert.SerializeObject(grainState, this.JsonSettings);
+                var data = output.ToString();
 
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Writing JSON data size = {0} for grain id = Partition={1} / Row={2}",
                     data.Length, entity.PartitionKey, entity.RowKey);
@@ -197,21 +199,17 @@ namespace Orleans.Storage
                 dataSize = data.Length * 2;
 
                 properties = SplitStringData(data.AsMemory()).Select(t => new EntityProperty(t.ToString()));
-                basePropertyName = STRING_DATA_PROPERTY_NAME;
             }
             else
             {
-                // Convert to binary format
-                var (tag, output) = this.storageSerializer.Serialize(grainState.GetType(), grainState);
                 var data = output.ToArray();
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
-                    data.Length, entity.PartitionKey, entity.RowKey);
+                if (logger.IsEnabled(LogLevel.Trace))
+                    logger.Trace("Writing data size = {0} for grain id = Partition={1} / Row={2}", data.Length, entity.PartitionKey, entity.RowKey);
 
                 dataSize = data.Length;
 
                 properties = SplitBinaryData(data).Select(t => new EntityProperty(t.ToArray()));
-                basePropertyName = ConvertTagToPropertyName(tag);
             }
 
             CheckMaxDataSize(dataSize, MAX_DATA_CHUNK_SIZE * MAX_DATA_CHUNKS_COUNT);
@@ -354,7 +352,7 @@ namespace Orleans.Storage
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {
-                    dataValue = Newtonsoft.Json.JsonConvert.DeserializeObject(stringData, stateType, this.JsonSettings);
+                    dataValue = this.storageSerializer.Deserialize(stateType, new BinaryData(stringData), ConvertPropertyNameToTag(STRING_DATA_PROPERTY_NAME));
                 }
 
                 // Else, no data found
@@ -478,8 +476,6 @@ namespace Orleans.Storage
             {
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_InitProvider, $"AzureTableGrainStorage {name} initializing: {this.options.ToString()}");
                 this.logger.LogInformation((int)AzureProviderErrorCode.AzureTableProvider_ParamConnectionString, $"AzureTableGrainStorage {name} is using DataConnectionString: {ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)}");
-                this.JsonSettings = OrleansJsonSerializer.UpdateSerializerSettings(OrleansJsonSerializer.GetDefaultSerializerSettings(this.services), this.options.UseFullAssemblyNames, this.options.IndentJson, this.options.TypeNameHandling);
-                this.options.ConfigureJsonSerializerSettings?.Invoke(this.JsonSettings);
                 this.tableDataManager = new GrainStateTableDataManager(this.options, this.logger);
                 await this.tableDataManager.InitTableAsync();
                 stopWatch.Stop();
