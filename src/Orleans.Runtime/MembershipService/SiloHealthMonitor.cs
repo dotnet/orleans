@@ -135,10 +135,9 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task Run()
         {
-            var random = new SafeRandom();
             ClusterMembershipSnapshot activeMembersSnapshot = default;
             SiloAddress[] otherNodes = default;
-            TimeSpan? overrideDelay = random.NextTimeSpan(_clusterMembershipOptions.CurrentValue.ProbeTimeout);
+            TimeSpan? overrideDelay = ThreadSafeRandom.NextTimeSpan(_clusterMembershipOptions.CurrentValue.ProbeTimeout);
             while (await _pingTimer.NextTick(overrideDelay))
             {
                 ProbeResult probeResult;
@@ -169,7 +168,7 @@ namespace Orleans.Runtime.MembershipService
                     else
                     {
                         // Pick a random other node and probe the target indirectly, using the selected node as an intermediary.
-                        var intermediary = otherNodes[random.Next(0, otherNodes.Length - 1)];
+                        var intermediary = otherNodes[ThreadSafeRandom.Next(otherNodes.Length)];
 
                         // Select a timeout which will allow the intermediary node to attempt to probe the target node and still respond to this node
                         // if the remote node does not respond in time.

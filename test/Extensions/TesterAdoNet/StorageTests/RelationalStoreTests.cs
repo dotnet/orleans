@@ -106,14 +106,13 @@ namespace UnitTests.StorageTests.AdoNet
 
             //Stream in and steam out three binary streams in parallel.
             var streamChecks = new Task<bool>[countOfStreams];
-            var sr = new SafeRandom();
             for(int i = 0; i < countOfStreams; ++i)
             {
                 int streamId = i;
                 streamChecks[i] = Task.Run(async () =>
                 {
                     var rb = new byte[streamSize];
-                    sr.NextBytes(rb);
+                    ThreadSafeRandom.NextBytes(rb);
                     await InsertIntoDatabaseUsingStream(sut, streamId, rb, cancellationToken);
                     var dataStreamFromTheDb = await ReadFromDatabaseUsingAsyncStream(sut, streamId, cancellationToken);
                     return dataStreamFromTheDb.StreamData.SequenceEqual(rb);

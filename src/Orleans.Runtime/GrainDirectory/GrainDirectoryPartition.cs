@@ -63,13 +63,7 @@ namespace Orleans.Runtime.GrainDirectory
         public int VersionTag { get; private set; }
         public bool SingleInstance { get; private set; }
 
-        private static readonly SafeRandom rand;
         internal const int NO_ETAG = -1;
-
-        static GrainInfo()
-        {
-            rand = new SafeRandom();
-        }
 
         internal GrainInfo()
         {
@@ -95,7 +89,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
             Instances[act] = new ActivationInfo(silo);
-            VersionTag = rand.Next();
+            VersionTag = ThreadSafeRandom.Next();
             return true;
         }
 
@@ -110,7 +104,7 @@ namespace Orleans.Runtime.GrainDirectory
             else
             {
                 Instances.Add(act, new ActivationInfo(silo));
-                VersionTag = rand.Next();
+                VersionTag = ThreadSafeRandom.Next();
                 return ActivationAddress.GetAddress(silo, grain, act);
             }
         }
@@ -122,7 +116,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 Instances.Remove(act);
                 wasRemoved = true;
-                VersionTag = rand.Next();
+                VersionTag = ThreadSafeRandom.Next();
             }
             return Instances.Count == 0;
         }
@@ -140,7 +134,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (modified)
             {
-                VersionTag = rand.Next();
+                VersionTag = ThreadSafeRandom.Next();
             }
             
             if (SingleInstance && (Instances.Count > 0))

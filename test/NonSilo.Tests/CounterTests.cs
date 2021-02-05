@@ -8,7 +8,6 @@ namespace UnitTests
 {
     public class CounterTests : IDisposable
     {
-        private static readonly SafeRandom random = new SafeRandom();
         private const string CounterName = "CounterTestsCounter";
         
         public void Dispose()
@@ -30,7 +29,7 @@ namespace UnitTests
         public void Counter_SetValue()
         {
             StatisticName name = new StatisticName(CounterName);
-            int val = random.Next(1000000);
+            int val = ThreadSafeRandom.Next(1000000);
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
             ctr.IncrementBy(val);
             Assert.Equal(val, ctr.GetCurrentValue());
@@ -50,7 +49,7 @@ namespace UnitTests
         public void Counter_IncrementBy()
         {
             StatisticName name = new StatisticName(CounterName);
-            int val = random.Next(1000000);
+            int val = ThreadSafeRandom.Next(1000000);
             CounterStatistic ctr = CounterStatistic.FindOrCreate(name);
             ctr.IncrementBy(val);
             Assert.Equal(val, ctr.GetCurrentValue());

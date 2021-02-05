@@ -221,7 +221,6 @@ namespace Orleans.Internal
         private readonly TimeSpan minDelay;
         private readonly TimeSpan maxDelay;
         private readonly TimeSpan step;
-        private readonly SafeRandom random;
 
         public ExponentialBackoff(TimeSpan minDelay, TimeSpan maxDelay, TimeSpan step)
         {
@@ -233,7 +232,6 @@ namespace Orleans.Internal
             this.minDelay = minDelay;
             this.maxDelay = maxDelay;
             this.step = step;
-            this.random = new SafeRandom();
         }
 
         public TimeSpan Next(int attempt)
@@ -253,7 +251,7 @@ namespace Orleans.Internal
             currMax = StandardExtensions.Min(currMax, maxDelay);
 
             if (minDelay >= currMax) throw new ArgumentOutOfRangeException($"minDelay {minDelay}, currMax = {currMax}");
-            return random.NextTimeSpan(minDelay, currMax);
+            return ThreadSafeRandom.NextTimeSpan(minDelay, currMax);
         }
     }
 }

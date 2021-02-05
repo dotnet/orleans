@@ -16,7 +16,6 @@ namespace UnitTests.OrleansRuntime
     public class AsyncSerialExecutorTests
     {
         public ITestOutputHelper output;
-        private SafeRandom random;
         public int operationsInProgress;
 
         public AsyncSerialExecutorTests(ITestOutputHelper output)
@@ -29,7 +28,6 @@ namespace UnitTests.OrleansRuntime
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
             List<Task> tasks = new List<Task>();
-            random = new SafeRandom();
             operationsInProgress = 0;
 
             tasks.Add(executor.AddNext(() => Operation(1)));
@@ -43,7 +41,6 @@ namespace UnitTests.OrleansRuntime
         public async Task AsyncSerialExecutorTests_SerialSubmit()
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
-            random = new SafeRandom();
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < 10; i++)
             {
@@ -58,7 +55,6 @@ namespace UnitTests.OrleansRuntime
         public async Task AsyncSerialExecutorTests_ParallelSubmit()
         {
             AsyncSerialExecutor executor = new AsyncSerialExecutor();
-            random = new SafeRandom();
             ConcurrentStack<Task> tasks = new ConcurrentStack<Task>();
             List<Task> enqueueTasks = new List<Task>();
             for (int i = 0; i < 10; i++)
@@ -79,7 +75,7 @@ namespace UnitTests.OrleansRuntime
         {
             if (operationsInProgress > 0) Assert.True(false, $"1: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
             operationsInProgress++;
-            var delay = random.NextTimeSpan(TimeSpan.FromSeconds(2));
+            var delay = ThreadSafeRandom.NextTimeSpan(TimeSpan.FromSeconds(2));
 
             output.WriteLine("Task {0} Staring", opNumber);
             await Task.Delay(delay);

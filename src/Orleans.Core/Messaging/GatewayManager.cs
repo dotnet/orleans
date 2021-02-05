@@ -22,7 +22,6 @@ namespace Orleans.Messaging
     internal class GatewayManager : IDisposable
     {
         private readonly object lockable = new object();
-        private readonly SafeRandom rand = new SafeRandom();
         private readonly Dictionary<SiloAddress, DateTime> knownDead = new Dictionary<SiloAddress, DateTime>();
         private readonly Dictionary<SiloAddress, DateTime> knownMasked = new Dictionary<SiloAddress, DateTime>();
         private readonly IGatewayListProvider gatewayListProvider;
@@ -78,7 +77,7 @@ namespace Orleans.Messaging
                 knownGateways.Count,
                 Utils.EnumerableToString(knownGateways));
 
-            this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : this.rand.Next(knownGateways.Count);
+            this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : ThreadSafeRandom.Next(knownGateways.Count);
             this.knownGateways = this.cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
             this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
             this.lastRefreshTime = DateTime.UtcNow;

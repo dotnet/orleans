@@ -28,7 +28,6 @@ namespace Orleans.Runtime.GrainDirectory
     /// </remarks>
     internal sealed class ClientDirectory : SystemTarget, ILocalClientDirectory, IRemoteClientDirectory, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly SafeRandom _random = new SafeRandom();
         private readonly SimpleConsistentRingProvider _consistentRing;
         private readonly IInternalGrainFactory _grainFactory;
         private readonly ILogger<ClientDirectory> _logger;
@@ -88,7 +87,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             async ValueTask<List<ActivationAddress>> LookupClientAsync(GrainId grainId)
             {
-                var seed = _random.Next();
+                var seed = ThreadSafeRandom.Next();
                 var attemptsRemaining = 5;
                 List<ActivationAddress> result = null;
                 while (attemptsRemaining-- > 0 && _remoteDirectories is var remoteDirectories && remoteDirectories.Length > 0)
@@ -350,7 +349,7 @@ namespace Orleans.Runtime.GrainDirectory
             var membershipUpdates = _clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(_shutdownCancellation.Token);
 
             Task<bool> membershipTask = null;
-            Task<bool> timerTask = _refreshTimer.NextTick(new SafeRandom().NextTimeSpan(_messagingOptions.ClientRegistrationRefresh));
+            Task<bool> timerTask = _refreshTimer.NextTick(ThreadSafeRandom.NextTimeSpan(_messagingOptions.ClientRegistrationRefresh));
 
             while (true)
             {

@@ -26,7 +26,6 @@ namespace Orleans.Reminders.DynamoDB
         private const string ETAG_PROPERTY_NAME = "ETag";
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
         private const string SERVICE_ID_INDEX = "ServiceIdIndex";
-        private SafeRandom _random = new SafeRandom();
 
         private readonly ILogger logger;
         private readonly GrainReferenceKeyStringConverter grainReferenceConverter;
@@ -286,7 +285,7 @@ namespace Orleans.Reminders.DynamoDB
                     { PERIOD_PROPERTY_NAME, new AttributeValue(entry.Period.ToString()) },
                     { START_TIME_PROPERTY_NAME, new AttributeValue(entry.StartAt.ToString()) },
                     { REMINDER_NAME_PROPERTY_NAME, new AttributeValue(entry.ReminderName) },
-                    { ETAG_PROPERTY_NAME, new AttributeValue { N = this._random.Next(int.MaxValue).ToString() } }
+                    { ETAG_PROPERTY_NAME, new AttributeValue { N = ThreadSafeRandom.Next().ToString() } }
                 };
 
             try

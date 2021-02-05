@@ -15,12 +15,11 @@ namespace UnitTests.OrleansRuntime.Streams
         private const int ResourceCount = 10;
         private readonly IResourceSelector<string> resourceSelector;
         private readonly List<string> resources;
-        private readonly Random random = new Random();
 
         public RoundRobinSelectorTests(ITestOutputHelper output) : base(output)
         {
             this.resources = Enumerable.Range(0, ResourceCount).Select(i => $"resource_{i}").ToList();
-            this.resourceSelector = new RoundRobinSelector<string>(this.resources, this.random);
+            this.resourceSelector = new RoundRobinSelector<string>(this.resources);
         }
 
         [Fact]
@@ -46,7 +45,7 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             var duplicateResources = new List<string>(this.resources);
             duplicateResources.AddRange(this.resources);
-            var resourceSelectorWithDuplicates = new RoundRobinSelector<string>(duplicateResources, this.random);
+            var resourceSelectorWithDuplicates = new RoundRobinSelector<string>(duplicateResources);
             base.NextSelectionWontReSelectExistingSelections(this.resources, resourceSelectorWithDuplicates);
         }
     }

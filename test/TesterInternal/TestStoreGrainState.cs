@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Globalization;
 using Orleans;
-using TestExtensions;
+using Orleans.Internal;
 
 namespace UnitTests.Persistence
 {
@@ -19,10 +19,10 @@ namespace UnitTests.Persistence
                 State = new TestStoreGrainState
                 {
                     A = aPropertyLength == null
-                        ? TestConstants.random.Next().ToString(CultureInfo.InvariantCulture)
+                        ? ThreadSafeRandom.Next().ToString(CultureInfo.InvariantCulture)
                         : GenerateRandomDigitString(aPropertyLength.Value),
-                    B = TestConstants.random.Next(),
-                    C = TestConstants.random.Next()
+                    B = ThreadSafeRandom.Next(),
+                    C = ThreadSafeRandom.Next()
                 }
             };
         }
@@ -32,7 +32,7 @@ namespace UnitTests.Persistence
             var characters = new char[stringLength];
             for (var i = 0; i < stringLength; ++i)
             {
-                characters[i] = (char)TestConstants.random.Next('0', '9' + 1);
+                characters[i] = (char)ThreadSafeRandom.Next('0', '9' + 1);
             }
             return new string(characters);
         }

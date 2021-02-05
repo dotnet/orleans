@@ -75,7 +75,7 @@ namespace Orleans.Streams
 
             //Selector default to round robin selector now, but we can make a further change to make selector configurable if needed.  Selector algorithm could 
             //be affecting queue balancing stablization time in cluster initializing and auto-scaling
-            this.queueSelector = new RoundRobinSelector<QueueId>(allQueues, new Random(this.GetHashCode()));
+            this.queueSelector = new RoundRobinSelector<QueueId>(allQueues);
             return base.Initialize(queueMapper);
         }
 

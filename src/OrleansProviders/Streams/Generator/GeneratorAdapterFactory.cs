@@ -1,17 +1,16 @@
-
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Orleans.Configuration;
 
 namespace Orleans.Providers.Streams.Generator
 {
@@ -222,7 +221,6 @@ namespace Orleans.Providers.Streams.Generator
         private class Receiver : IQueueAdapterReceiver
         {
             const int MaxDelayMs = 20;
-            private readonly Random random = new Random((int)DateTime.UtcNow.Ticks % int.MaxValue);
             private IQueueAdapterReceiverMonitor receiverMonitor;
             public IStreamGenerator QueueGenerator { private get; set; }
 
@@ -240,7 +238,7 @@ namespace Orleans.Providers.Streams.Generator
             public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
             {
                 var watch = Stopwatch.StartNew();
-                await Task.Delay(random.Next(1,MaxDelayMs));
+                await Task.Delay(ThreadSafeRandom.Next(1,MaxDelayMs));
                 List<IBatchContainer> batches;
                 if (QueueGenerator == null || !QueueGenerator.TryReadEvents(DateTime.UtcNow, maxCount, out batches))
                 {

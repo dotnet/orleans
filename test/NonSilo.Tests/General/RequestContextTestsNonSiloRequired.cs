@@ -23,7 +23,6 @@ namespace UnitTests.General
 
         private static bool oldPropagateActivityId;
 
-        private static readonly SafeRandom random = new SafeRandom();
         private readonly TestEnvironmentFixture fixture;
 
         public RequestContextTests_Local(TestEnvironmentFixture fixture)
@@ -52,7 +51,7 @@ namespace UnitTests.General
         public async Task RequestContext_MultiThreads_ExportToMessage()
         {
             const int NumLoops = 50;
-            string id = "key" + random.Next();
+            string id = "key" + ThreadSafeRandom.Next();
 
             Message msg = new Message();
             Task[] promises = new Task[NumLoops];
@@ -194,7 +193,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task LCC_Basic()
         {
-            string name1 = "Name" + random.Next();
+            string name1 = "Name" + ThreadSafeRandom.Next();
             string data1 = "Main";
             const int NumLoops = 1000;
 
@@ -227,7 +226,7 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task LCC_Dictionary()
         {
-            string name1 = "Name" + random.Next();
+            string name1 = "Name" + ThreadSafeRandom.Next();
             string data1 = "Main";
             const int NumLoops = 1000;
 
@@ -276,7 +275,7 @@ namespace UnitTests.General
         {
             const int NumLoops = 1000;
 
-            string name1 = "Name" + random.Next();
+            string name1 = "Name" + ThreadSafeRandom.Next();
             string data1 = "Main";
 
             CallContext.LogicalSetData(name1, data1);
@@ -308,7 +307,7 @@ namespace UnitTests.General
         {
             const int NumLoops = 1000;
 
-            string name1 = "Name" + random.Next();
+            string name1 = "Name" + ThreadSafeRandom.Next();
             string data1 = "Main";
 
             var dict = new Dictionary<string, string>();
@@ -367,7 +366,7 @@ namespace UnitTests.General
         {
             const int NumLoops = 1000;
 
-            string name1 = "Name" + random.Next();
+            string name1 = "Name" + ThreadSafeRandom.Next();
             string data1 = "Main";
 
             RequestContext.Set(name1, data1);

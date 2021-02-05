@@ -1,6 +1,7 @@
-﻿using Orleans.Storage;
 using System;
 using System.Runtime.Serialization;
+using Orleans.Internal;
+using Orleans.Storage;
 
 namespace Orleans.Transactions.TestKit
 {
@@ -10,23 +11,20 @@ namespace Orleans.Transactions.TestKit
         private readonly double beforeProbability;
         private readonly double afterProbability;
 
-        private readonly Random random;
-
         public RandomErrorInjector(double injectionProbability)
         {
             conflictProbability = injectionProbability / 5;
             beforeProbability = 2 * injectionProbability / 5;
             afterProbability = 2 * injectionProbability / 5;
-            random = new Random();
         }
 
         public void BeforeStore()
         {
-            if (random.NextDouble() < conflictProbability)
+            if (ThreadSafeRandom.NextDouble() < conflictProbability)
             {
                 throw new RandomlyInjectedInconsistentStateException();
             }
-            if (random.NextDouble() < beforeProbability)
+            if (ThreadSafeRandom.NextDouble() < beforeProbability)
             {
                 throw new RandomlyInjectedStorageException();
             }
@@ -34,7 +32,7 @@ namespace Orleans.Transactions.TestKit
 
         public void AfterStore()
         {
-            if (random.NextDouble() < afterProbability)
+            if (ThreadSafeRandom.NextDouble() < afterProbability)
             {
                 throw new RandomlyInjectedStorageException();
             }

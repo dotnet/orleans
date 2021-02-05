@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.TestHooks;
-using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
 {

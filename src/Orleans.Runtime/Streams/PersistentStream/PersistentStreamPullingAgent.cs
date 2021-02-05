@@ -24,7 +24,6 @@ namespace Orleans.Streams
         private readonly IStreamPubSub pubSub;
         private readonly IStreamFilter streamFilter;
         private readonly Dictionary<InternalStreamId, StreamConsumerCollection> pubSubCache;
-        private readonly SafeRandom safeRandom;
         private readonly StreamPullingAgentOptions options;
         private readonly ILogger logger;
         private readonly CounterStatistic numReadMessagesCounter;
@@ -63,7 +62,6 @@ namespace Orleans.Streams
             pubSub = streamPubSub;
             this.streamFilter = streamFilter;
             pubSubCache = new Dictionary<InternalStreamId, StreamConsumerCollection>();
-            safeRandom = new SafeRandom();
             this.options = options;
             numMessages = 0;
 
@@ -144,7 +142,7 @@ namespace Orleans.Streams
             }
             // Setup a reader for a new receiver. 
             // Even if the receiver failed to initialise, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
-            var randomTimerOffset = safeRandom.NextTimeSpan(this.options.GetQueueMsgsTimerPeriod);
+            var randomTimerOffset = ThreadSafeRandom.NextTimeSpan(this.options.GetQueueMsgsTimerPeriod);
             timer = RegisterTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
             IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix), () => pubSubCache.Count);

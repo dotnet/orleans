@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -389,7 +390,7 @@ namespace Tester.AzureUtils.Persistence
                     State = new TestStoreGrainStateWithCustomJsonProperties
                     {
                         String = aPropertyLength == null
-                            ? TestConstants.random.Next().ToString(CultureInfo.InvariantCulture)
+                            ? ThreadSafeRandom.Next().ToString(CultureInfo.InvariantCulture)
                             : GenerateRandomDigitString(aPropertyLength.Value)
                     }
                 };
@@ -400,7 +401,7 @@ namespace Tester.AzureUtils.Persistence
                 var characters = new char[stringLength];
                 for (var i = 0; i < stringLength; ++i)
                 {
-                    characters[i] = (char)TestConstants.random.Next('0', '9' + 1);
+                    characters[i] = (char)ThreadSafeRandom.Next('0', '9' + 1);
                 }
                 return new string(characters);
             }

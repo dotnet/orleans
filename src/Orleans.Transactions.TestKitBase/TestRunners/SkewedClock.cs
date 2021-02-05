@@ -1,11 +1,10 @@
-﻿
 using System;
+using Orleans.Internal;
 
 namespace Orleans.Transactions.TestKit
 {
     public class SkewedClock : IClock
     {
-        private readonly Random rand = new Random(Guid.NewGuid().GetHashCode());
         private readonly TimeSpan minSkew;
         private readonly int skewRangeTicks;
 
@@ -17,9 +16,9 @@ namespace Orleans.Transactions.TestKit
 
         public DateTime UtcNow()
         {
-            TimeSpan skew = TimeSpan.FromTicks(minSkew.Ticks + rand.Next(0, skewRangeTicks));
+            TimeSpan skew = TimeSpan.FromTicks(minSkew.Ticks + ThreadSafeRandom.Next(skewRangeTicks));
             // skew forward in time or backward in time
-            return (rand.Next() > 0)
+            return ((ThreadSafeRandom.Next() & 1) != 0)
                 ? DateTime.UtcNow + skew
                 : DateTime.UtcNow - skew;
         }
