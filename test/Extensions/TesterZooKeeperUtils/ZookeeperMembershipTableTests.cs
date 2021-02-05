@@ -42,8 +42,10 @@ namespace UnitTests.MembershipTests
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
-            return AssemblyLoader.LoadAndCreateInstance<IGatewayListProvider>(Constants.ORLEANS_CLUSTERING_ZOOKEEPER,
-                logger, this.Services);
+            var options = new ZooKeeperGatewayListProviderOptions();
+            options.ConnectionString = this.connectionString;
+
+            return ActivatorUtilities.CreateInstance<ZooKeeperGatewayListProvider>(this.Services, Options.Create(options));
         }
 
         protected override async Task<string> GetConnectionString()

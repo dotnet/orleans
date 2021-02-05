@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
+#if NETCOREAPP
+using System.Runtime.Loader;
+#endif
 using Microsoft.Extensions.DependencyModel;
-using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.ApplicationParts;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -47,8 +48,11 @@ namespace Orleans
             if (!hasApplicationParts)
             {
                 applicationPartsManager.AddFromDependencyContext();
-                applicationPartsManager.AddFromAppDomain();
-                applicationPartsManager.AddFromApplicationBaseDirectory();
+#if NETCOREAPP
+                applicationPartsManager.AddFromAssemblyLoadContext();
+#else
+                applicationPartsManager.AddFromAppDomainWithReferences();
+#endif
             }
 
             return applicationPartsManager;
@@ -113,72 +117,6 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Adds assemblies from the current <see cref="AppDomain.BaseDirectory"/> to the builder.
-        /// </summary>
-        /// <param name="manager">The builder.</param>
-        /// <returns>The builder with the additionally added assemblies.</returns>
-        public static IApplicationPartManagerWithAssemblies AddFromApplicationBaseDirectory(this IApplicationPartManager manager)
-        {
-            var appDomainBase = AppDomain.CurrentDomain.BaseDirectory;
-            if (string.IsNullOrWhiteSpace(appDomainBase) || !Directory.Exists(appDomainBase)) return new ApplicationPartManagerWithAssemblies(manager, Enumerable.Empty<Assembly>());
-
-            var dirs = new Dictionary<string, SearchOption> { [appDomainBase] = SearchOption.TopDirectoryOnly };
-
-            AssemblyLoaderPathNameCriterion[] excludeCriteria =
-            {
-                AssemblyLoaderCriteria.ExcludeResourceAssemblies
-            };
-
-            AssemblyLoaderReflectionCriterion[] loadCriteria =
-            {
-                AssemblyLoaderReflectionCriterion.NewCriterion(ReferencesOrleansOrAbstractionsAssemblyPredicate)
-            };
-
-            var loadedAssemblies = AssemblyLoader.LoadAssemblies(dirs, excludeCriteria, loadCriteria, NullLogger.Instance);
-            foreach (var assembly in loadedAssemblies)
-            {
-                manager.AddApplicationPart(new AssemblyPart(assembly));
-            }
-
-            return new ApplicationPartManagerWithAssemblies(manager, loadedAssemblies);
-
-            // Returns true if the provided assembly references the Orleans core or abstractions assembly.
-            bool ReferencesOrleansOrAbstractionsAssemblyPredicate(Assembly assembly, out IEnumerable<string> complaints)
-            {
-                var referencesOrleans = assembly.GetReferencedAssemblies().Any(ReferencesOrleansOrAbstractions);
-                complaints = referencesOrleans ? null : NoReferenceComplaint;
-                return referencesOrleans;
-
-                bool ReferencesOrleansOrAbstractions(AssemblyName reference)
-                {
-                    return string.Equals(reference.Name, CoreAssemblyName, StringComparison.OrdinalIgnoreCase)
-                           || string.Equals(reference.Name, AbstractionsAssemblyName, StringComparison.OrdinalIgnoreCase);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Adds assemblies from the current <see cref="AppDomain"/> to the builder.
-        /// </summary>
-        /// <param name="manager">The builder.</param>
-        /// <returns>The builder with the added assemblies.</returns>
-        public static IApplicationPartManagerWithAssemblies AddFromAppDomain(this IApplicationPartManager manager)
-        {
-            if (manager == null)
-            {
-                throw new ArgumentNullException(nameof(manager));
-            }
-
-            var processedAssemblies = new HashSet<Assembly>(AppDomain.CurrentDomain.GetAssemblies());
-            foreach (var assembly in processedAssemblies)
-            {
-                manager.AddApplicationPart(new AssemblyPart(assembly));
-            }
-
-            return new ApplicationPartManagerWithAssemblies(manager, processedAssemblies);
-        }
-
-        /// <summary>
         /// Adds all assemblies referenced by the assemblies in the builder's <see cref="IApplicationPartManagerWithAssemblies.Assemblies"/> property.
         /// </summary>
         /// <param name="manager">The builder.</param>
@@ -226,40 +164,67 @@ namespace Orleans
             }
         }
 
-        /// <summary>
-        /// Adds all assemblies referencing Orleans found in the application's <see cref="DependencyContext"/>.
-        /// </summary>
-        /// <param name="manager">The builder.</param>
-        /// <returns>The builder with the additionally included assemblies.</returns>
-        public static IApplicationPartManagerWithAssemblies AddFromDependencyContext(this IApplicationPartManager manager)
+        public static IApplicationPartManagerWithAssemblies AddFromAppDomainWithReferences(this IApplicationPartManager manager)
         {
-            return manager.AddFromDependencyContext(Assembly.GetCallingAssembly())
-                .AddFromDependencyContext(Assembly.GetEntryAssembly())
-                .AddFromDependencyContext(Assembly.GetExecutingAssembly());
+            var assemblies = new List<Assembly>();
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                manager = manager.AddApplicationPart(asm).WithReferences();
+                assemblies.Add(asm);
+            }
+
+            return new ApplicationPartManagerWithAssemblies(manager, assemblies);
+        }
+
+        public static IApplicationPartManagerWithAssemblies AddFromAssemblyLoadContext(this IApplicationPartManager manager, Assembly assembly = null)
+        {
+#if NETCOREAPP
+            assembly ??= typeof(ApplicationPartManagerExtensions).Assembly;
+            var assemblies = new HashSet<Assembly>();
+            var context = AssemblyLoadContext.GetLoadContext(assembly);
+            foreach (var asm in context.Assemblies)
+            {
+                manager = manager.AddApplicationPart(asm);
+                assemblies.Add(asm);
+            }
+
+            return new ApplicationPartManagerWithAssemblies(manager, assemblies);
+#else
+            throw new PlatformNotSupportedException("AssemblyLoadContext is not supported on this platform");
+#endif
         }
 
         /// <summary>
         /// Adds all assemblies referencing Orleans found in the provided assembly's <see cref="DependencyContext"/>.
         /// </summary>
         /// <param name="manager">The builder.</param>
-        /// <param name="entryAssembly">Assembly to start looking for application parts from.</param>
+        /// <param name="assembly">Assembly to start looking for application parts from.</param>
         /// <returns>The builder with the additionally included assemblies.</returns>
-        public static IApplicationPartManagerWithAssemblies AddFromDependencyContext(this IApplicationPartManager manager, Assembly entryAssembly)
+        public static IApplicationPartManagerWithAssemblies AddFromDependencyContext(this IApplicationPartManager manager, Assembly assembly = null)
         {
-            entryAssembly = entryAssembly ?? Assembly.GetCallingAssembly();
-            var dependencyContext = DependencyContext.Default;
-            if (entryAssembly != null)
+            assembly ??= Assembly.GetEntryAssembly();
+            DependencyContext dependencyContext;
+            if (assembly is null || assembly.IsDynamic)
             {
-                dependencyContext = DependencyContext.Load(entryAssembly) ?? DependencyContext.Default;
-                manager = manager.AddApplicationPart(entryAssembly);
+                dependencyContext = DependencyContext.Default;
+            }
+            else
+            {
+                dependencyContext = DependencyContext.Load(assembly);
+            }
+
+            var assemblies = new HashSet<Assembly>();
+            if (assembly != null)
+            {
+                manager = manager.AddApplicationPart(assembly);
+                assemblies.Add(assembly);
             }
 
             if (dependencyContext == null) return new ApplicationPartManagerWithAssemblies(manager, Array.Empty<Assembly>());
 
-            var assemblies = new List<Assembly>();
             foreach (var lib in dependencyContext.RuntimeLibraries)
             {
-                if (!lib.Dependencies.Any(dep => dep.Name.Contains("Orleans"))) continue;
+                if (!lib.Name.Contains("Orleans") && !lib.Dependencies.Any(dep => dep.Name.Contains("Orleans"))) continue;
 
                 try
                 {

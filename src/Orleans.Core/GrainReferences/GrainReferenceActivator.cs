@@ -127,8 +127,8 @@ namespace Orleans.GrainReferences
     {
         private readonly TypeConverter _typeConverter;
         private readonly Dictionary<GrainInterfaceType, (Type ReferenceType, Type InvokerType)> _mapping;
+
         public ImrRpcProvider(
-        IServiceProvider serviceProvider,
         IApplicationPartManager appParts,
         GrainInterfaceTypeResolver resolver,
         TypeConverter typeConverter)

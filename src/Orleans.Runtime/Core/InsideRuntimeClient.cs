@@ -56,7 +56,6 @@ namespace Orleans.Runtime
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
-            TypeMetadataCache typeMetadataCache,
             OrleansTaskScheduler scheduler,
             IServiceProvider serviceProvider,
             MessageFactory messageFactory,
@@ -77,7 +76,7 @@ namespace Orleans.Runtime
             this.messageFactory = messageFactory;
             this.transactionAgent = transactionAgent;
             this.Scheduler = scheduler;
-            this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
+            this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver, invokers);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
             this.invokeExceptionLogger = loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
             this.loggerFactory = loggerFactory;

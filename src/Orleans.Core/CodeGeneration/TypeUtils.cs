@@ -30,8 +30,6 @@ namespace Orleans.Runtime
 
         private static readonly ConcurrentDictionary<Tuple<Type, bool>, List<Type>> ReferencedTypes = new ConcurrentDictionary<Tuple<Type, bool>, List<Type>>();
 
-        private static readonly CachedReflectionOnlyTypeResolver ReflectionOnlyTypeResolver = new CachedReflectionOnlyTypeResolver();
-
         public static string GetSimpleTypeName(Type type, Predicate<Type> fullName = null)
         {
             if (type.IsNestedPublic || type.IsNestedPrivate)
@@ -400,12 +398,6 @@ namespace Orleans.Runtime
             var grainType = typeof(Grain);
             var grainChevronType = typeof(Grain<>);
 
-            if (type.Assembly.ReflectionOnly)
-            {
-                grainType = ToReflectionOnlyType(grainType);
-                grainChevronType = ToReflectionOnlyType(grainChevronType);
-            }
-
             if (grainType == type || grainChevronType == type) return false;
 
             if (!grainType.IsAssignableFrom(type)) return false;
@@ -502,54 +494,7 @@ namespace Orleans.Runtime
         {
             var generalType = typeof(IGrainMethodInvoker);
 
-            if (type.Assembly.ReflectionOnly)
-            {
-                generalType = ToReflectionOnlyType(generalType);
-            }
-
             return generalType.IsAssignableFrom(type) && TypeHasAttribute(type, typeof(MethodInvokerAttribute));
-        }
-
-
-        private static readonly Lazy<bool> canUseReflectionOnly = new Lazy<bool>(() =>
-        {
-#if NETCOREAPP
-            return false;
-#else
-            try
-            {
-                ReflectionOnlyTypeResolver.TryResolveType(typeof(TypeUtils).AssemblyQualifiedName, out _);
-                return true;
-            }
-            catch (PlatformNotSupportedException)
-            {
-                return false;
-            }
-            catch (Exception)
-            {
-                // if other exceptions not related to platform ocurr, assume that ReflectionOnly is supported
-                return true;
-            }
-#endif
-        });
-
-        public static bool CanUseReflectionOnly => canUseReflectionOnly.Value;
-
-        public static Type ResolveReflectionOnlyType(string assemblyQualifiedName)
-        {
-            return ReflectionOnlyTypeResolver.ResolveType(assemblyQualifiedName);
-        }
-
-        public static Type ToReflectionOnlyType(Type type)
-        {
-            if (CanUseReflectionOnly)
-            {
-                return type.Assembly.ReflectionOnly ? type : ResolveReflectionOnlyType(type.AssemblyQualifiedName);
-            }
-            else
-            {
-                return type;
-            }
         }
 
         public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, ILogger logger)
@@ -602,16 +547,6 @@ namespace Orleans.Runtime
 
         public static bool TypeHasAttribute(Type type, Type attribType)
         {
-            if (type.Assembly.ReflectionOnly || attribType.Assembly.ReflectionOnly)
-            {
-                type = ToReflectionOnlyType(type);
-                attribType = ToReflectionOnlyType(attribType);
-
-                // we can't use Type.GetCustomAttributes here because we could potentially be working with a reflection-only type.
-                return CustomAttributeData.GetCustomAttributes(type).Any(
-                        attrib => attribType.IsAssignableFrom(attrib.AttributeType));
-            }
-
             return type.IsDefined(attribType, true);
         }
 
