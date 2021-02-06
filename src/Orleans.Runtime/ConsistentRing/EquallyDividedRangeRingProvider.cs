@@ -9,7 +9,7 @@ namespace Orleans.Runtime.ConsistentRing
     internal sealed class EquallyDividedRangeRingProvider : IConsistentRingProviderForGrains, IRingRangeListener
     {
         private readonly IConsistentRingProvider ringProvider;
-        private readonly List<IAsyncRingRangeListener> grainStatusListeners = new List<IAsyncRingRangeListener>();
+        private readonly List<IAsyncRingRangeListener> grainStatusListeners = new();
         private readonly ILogger logger;
         private readonly int numSubRanges;
         private readonly int mySubRangeIndex;

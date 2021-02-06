@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
@@ -24,8 +23,7 @@ namespace Orleans.Runtime
             }
 
             // use clockwise ... current code in membershipOracle.CalculateTargetSilo() does counter-clockwise ...
-            // use null as a sentinel value that will be substituted by uniformHashCode during the binary search
-            int index = Array.BinarySearch(sortedRingList, null, new Searcher(uniformHashCode));
+            int index = sortedRingList.AsSpan().BinarySearch(new Searcher(uniformHashCode));
             if (index < 0)
             {
                 index = ~index;
@@ -35,12 +33,11 @@ namespace Orleans.Runtime
             return sortedRingList[index];
         }
 
-        private sealed class Searcher : IComparer<T>
+        private readonly struct Searcher : IComparable<T>
         {
             private readonly uint value;
             public Searcher(uint value) => this.value = value;
-
-            public int Compare(T x, T y) => (x?.GetUniformHashCode() ?? value).CompareTo(y?.GetUniformHashCode() ?? value);
+            public int CompareTo(T other) => value.CompareTo(other.GetUniformHashCode());
         }
 
         public override string ToString()

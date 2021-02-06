@@ -142,8 +142,8 @@ namespace Orleans.Runtime
     public static class RangeFactory
     {
         public const long RING_SIZE = ((long)uint.MaxValue) + 1;
-        private static readonly IRingRange EmptyRange = new GeneralMultiRange(new List<SingleRange>());
-        internal static readonly SingleRange FullRange = new SingleRange(0, 0);
+        private static readonly GeneralMultiRange EmptyRange = new(new());
+        internal static readonly SingleRange FullRange = new(0, 0);
 
         public static IRingRange CreateFullRange() => FullRange;
 
@@ -246,7 +246,7 @@ namespace Orleans.Runtime
 
     internal static class EquallyDividedMultiRange
     {
-        internal static SingleRange GetEquallyDividedSubRange(SingleRange singleRange, int numSubRanges, int mySubRangeIndex)
+        private static SingleRange GetEquallyDividedSubRange(SingleRange singleRange, int numSubRanges, int mySubRangeIndex)
         {
             var rangeSize = singleRange.RangeSize();
             uint portion = (uint)(rangeSize / numSubRanges);
@@ -289,7 +289,6 @@ namespace Orleans.Runtime
                         case 1: return GetEquallyDividedSubRange(multiRange.Ranges[0], numSubRanges, mySubRangeIndex);
                         default:
                             // Take each of the single ranges in the multi range and divide each into equal sub ranges.
-                            // Then go over all those and group them by sub range index.
                             var singlesForThisIndex = new List<SingleRange>(multiRange.Ranges.Count);
                             foreach (var singleRange in multiRange.Ranges)
                                 singlesForThisIndex.Add(GetEquallyDividedSubRange(singleRange, numSubRanges, mySubRangeIndex));

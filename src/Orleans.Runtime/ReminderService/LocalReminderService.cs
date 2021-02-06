@@ -14,7 +14,7 @@ namespace Orleans.Runtime.ReminderService
         private static readonly TimeSpan InitialReadMaxWaitTimeForUpdates = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan InitialReadRetryPeriod = TimeSpan.FromSeconds(30);
         private readonly ILogger logger;
-        private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders = new Dictionary<ReminderIdentity, LocalReminderData>();
+        private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders = new();
         private readonly IReminderTable reminderTable;
         private readonly TaskCompletionSource<bool> startedTask;
         private readonly AverageTimeSpanStatistic tardinessStat;

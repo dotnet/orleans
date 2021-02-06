@@ -15,8 +15,8 @@ namespace Orleans.Runtime.ConsistentRing
     internal sealed class VirtualBucketsRingProvider :
         IConsistentRingProvider, ISiloStatusListener
     {
-        private readonly List<IRingRangeListener> statusListeners = new List<IRingRangeListener>();
-        private readonly SortedDictionary<uint, SiloAddress> bucketsMap = new SortedDictionary<uint, SiloAddress>();
+        private readonly List<IRingRangeListener> statusListeners = new();
+        private readonly SortedDictionary<uint, SiloAddress> bucketsMap = new();
         private (uint, SiloAddress)[] sortedBucketsList; // flattened sorted bucket list for fast lock-free calculation of CalculateTargetSilo
         private readonly ILogger logger;
         private readonly SiloAddress myAddress;

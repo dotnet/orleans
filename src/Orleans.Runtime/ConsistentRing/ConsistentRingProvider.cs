@@ -21,11 +21,11 @@ namespace Orleans.Runtime.ConsistentRing
         internal IRingRange MyRange { get; private set; }
 
         /// list of silo members sorted by the hash value of their address
-        private readonly List<SiloAddress> membershipRingList = new List<SiloAddress>();
+        private readonly List<SiloAddress> membershipRingList = new();
         private readonly ILogger log;
         private bool isRunning;
         private readonly int myKey;
-        private readonly List<IRingRangeListener> statusListeners = new List<IRingRangeListener>();
+        private readonly List<IRingRangeListener> statusListeners = new();
 
         public ConsistentRingProvider(SiloAddress siloAddr, ILoggerFactory loggerFactory)
         {
