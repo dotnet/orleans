@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.Remoting;
 using System.Threading;
@@ -25,10 +26,18 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         public override bool IsActive => isActive;
 
+        public static Func<string, IList<IConfigurationSource>, Task<SiloHandle>> CreateWithAssemblies(Assembly[] assemblies)
+        {
+            return (siloName, configurationSources) => Create(siloName, configurationSources, assemblies);
+        }
+
         /// <summary>Creates a new silo in a remote app domain and returns a handle to it.</summary>
-        public static Task<SiloHandle> Create(
+        public static Task<SiloHandle> Create(string siloName, IList<IConfigurationSource> configurationSources) => Create(siloName, configurationSources, Array.Empty<Assembly>());
+
+        private static Task<SiloHandle> Create(
             string siloName,
-            IList<IConfigurationSource> configurationSources)
+            IList<IConfigurationSource> configurationSources,
+            Assembly[] assemblies)
         {
             var configBuilder = new ConfigurationBuilder();
             foreach (var source in configurationSources) configBuilder.Add(source);
@@ -41,8 +50,9 @@ namespace Orleans.TestingHost
             
             try
             {
+                var asms = (assemblies ?? Array.Empty<Assembly>()).Select(asm => asm.GetName().Name).ToArray();
                 var serializedHostConfiguration = TestClusterHostFactory.SerializeConfigurationSources(configurationSources);
-                var args = new object[] {siloName, serializedHostConfiguration };
+                var args = new object[] {siloName, serializedHostConfiguration, asms };
 
                 var siloHost = (AppDomainSiloHost)appDomain.CreateInstanceAndUnwrap(
                     typeof(AppDomainSiloHost).Assembly.FullName,

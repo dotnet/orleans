@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Hosting;
 using System.Net;
+using System.Reflection;
 
 namespace Orleans.TestingHost
 {
@@ -16,11 +17,19 @@ namespace Orleans.TestingHost
         /// <summary>Creates and initializes a silo in the current app domain.</summary>
         /// <param name="appDomainName">Name of this silo.</param>
         /// <param name="serializedConfigurationSources">Silo config data to be used for this silo.</param>
-        public AppDomainSiloHost(string appDomainName, string serializedConfigurationSources)
+        public AppDomainSiloHost(string appDomainName, string serializedConfigurationSources, string[] assemblies)
         {
             // Force TLS 1.2. It should be done by TestUtils.CheckForAzureStorage and TestUtils.CheckForEventHub,
             // but they will not have any effect here since this silo will run on a different AppDomain
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+
+            if (assemblies is object)
+            {
+                foreach (var asm in assemblies)
+                {
+                    Assembly.Load(asm);
+                }
+            }
 
             var deserializedSources = TestClusterHostFactory.DeserializeConfigurationSources(serializedConfigurationSources);
             this.host = TestClusterHostFactory.CreateSiloHost(appDomainName, deserializedSources);

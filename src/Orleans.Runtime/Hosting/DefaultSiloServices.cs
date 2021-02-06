@@ -126,7 +126,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<GrainReferenceSerializer>();
             services.TryAddSingleton<GrainReferenceKeyStringConverter>();
             services.AddSingleton<GrainVersionManifest>();
-            services.TryAddSingleton<TypeMetadataCache>();
             services.TryAddSingleton<GrainBindingsResolver>();
             services.TryAddSingleton<GrainTypeComponentsResolver>();
             services.TryAddSingleton<ActivationDirectory>();

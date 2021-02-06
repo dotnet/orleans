@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Messaging;
@@ -137,7 +137,7 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
-                    services.AddSingleton<IGatewayListProvider, ZooKeeperClusteringClientOptions>();
+                    services.AddSingleton<IGatewayListProvider, ZooKeeperGatewayListProvider>();
                 });
         }
 
@@ -161,7 +161,7 @@ namespace Orleans.Hosting
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<ZooKeeperGatewayListProviderOptions>());
-                    services.AddSingleton<IGatewayListProvider, ZooKeeperClusteringClientOptions>();
+                    services.AddSingleton<IGatewayListProvider, ZooKeeperGatewayListProvider>();
                 });
         }
     }

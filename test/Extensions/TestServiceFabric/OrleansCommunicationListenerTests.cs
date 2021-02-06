@@ -67,7 +67,6 @@ namespace TestServiceFabric
                             services.Replace(ServiceDescriptor.Singleton<ISiloHost>(sp => Substitute.ForPartsOf<MockSiloHost>(sp)));
                         });
 
-                    builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
                     builder.UseLocalhostClustering();
                     builder.Configure<EndpointOptions>(options =>
                     {
@@ -118,7 +117,6 @@ namespace TestServiceFabric
                             services.Replace(ServiceDescriptor.Singleton<ISiloHost>(sp => Substitute.ForPartsOf<MockSiloHost>(sp)));
                         });
 
-                    builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
                     builder.Configure<EndpointOptions>(options =>
                     {
                         options.SiloPort = 9082;
@@ -156,7 +154,6 @@ namespace TestServiceFabric
                             services.Replace(ServiceDescriptor.Singleton<ISiloHost>(sp => Substitute.ForPartsOf<MockSiloHost>(sp)));
                         });
 
-                    builder.ConfigureApplicationParts(parts => parts.AddFromApplicationBaseDirectory());
                     builder.Configure<EndpointOptions>(options =>
                     {
                         options.SiloPort = 9082;
