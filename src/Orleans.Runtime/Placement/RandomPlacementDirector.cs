@@ -7,8 +7,6 @@ namespace Orleans.Runtime.Placement
 {
     internal class RandomPlacementDirector : IPlacementDirector, IActivationSelector
     {
-        private readonly SafeRandom random = new SafeRandom();
-
         public virtual ValueTask<PlacementResult> OnSelectActivation(
             PlacementStrategy strategy,
             GrainId target,
@@ -46,16 +44,16 @@ namespace Orleans.Runtime.Placement
             var here = context.LocalSilo;
             var local = places.Where(a => a.Silo.Equals(here)).ToList();
             if (local.Count > 0)
-                return PlacementResult.IdentifySelection(local[random.Next(local.Count)]);
+                return PlacementResult.IdentifySelection(local[ThreadSafeRandom.Next(local.Count)]);
 
-            return PlacementResult.IdentifySelection(places[random.Next(places.Count)]);
+            return PlacementResult.IdentifySelection(places[ThreadSafeRandom.Next(places.Count)]);
         }
 
         public virtual Task<SiloAddress> OnAddActivation(
             PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
         {
             var allSilos = context.GetCompatibleSilos(target);
-            return Task.FromResult(allSilos[random.Next(allSilos.Length)]);
+            return Task.FromResult(allSilos[ThreadSafeRandom.Next(allSilos.Length)]);
         }
     }
 }

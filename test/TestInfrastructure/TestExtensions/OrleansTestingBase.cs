@@ -6,12 +6,16 @@ namespace TestExtensions
 {
     public abstract class OrleansTestingBase
     {
-        private static readonly SafeRandom safeRandom = new SafeRandom();
-        protected static readonly Random random = new Random();
+        protected static class random
+        {
+            public static int Next() => ThreadSafeRandom.Next();
+            public static int Next(int maxValue) => ThreadSafeRandom.Next(maxValue);
+            public static double NextDouble() => ThreadSafeRandom.NextDouble();
+        }
 
         public static long GetRandomGrainId()
         {
-            return safeRandom.Next();
+            return ThreadSafeRandom.Next();
         }
     }
 }

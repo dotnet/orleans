@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
-using Orleans.Hosting;
 using Orleans.Transactions.TestKit.Correctnesss;
 
 namespace Orleans.Transactions.TestKit
@@ -19,7 +18,6 @@ namespace Orleans.Transactions.TestKit
         // reduce to or remove once we fix timeouts abort
         private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(1);
 
-        private readonly Random random;
         private readonly TestCluster testCluster;
         private readonly ILogger logger;
 
@@ -60,7 +58,6 @@ namespace Orleans.Transactions.TestKit
         {
             this.testCluster = testCluster;
             this.logger = this.testCluster.ServiceProvider.GetService<ILogger<TransactionRecoveryTestsRunner>>();
-            this.random = new Random();
         }
 
         public virtual Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
@@ -97,7 +94,7 @@ namespace Orleans.Transactions.TestKit
             Task<bool> succeeding = RunWhileSucceeding(transactionGroups, getIndex, endOnCommand);
             await Task.Delay(TimeSpan.FromSeconds(2));
 
-            var siloToTerminate = this.testCluster.Silos[this.random.Next(this.testCluster.Silos.Count)];
+            var siloToTerminate = this.testCluster.Silos[ThreadSafeRandom.Next(this.testCluster.Silos.Count)];
             this.Log($"Warmup transaction succeeded. {(gracefulShutdown ? "Stopping" : "Killing")} silo {siloToTerminate.SiloAddress} ({siloToTerminate.Name}) and continuing");
 
             if (gracefulShutdown)

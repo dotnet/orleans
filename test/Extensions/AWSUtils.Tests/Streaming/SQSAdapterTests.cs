@@ -32,8 +32,6 @@ namespace AWSUtils.Tests.Streaming
         private readonly string clusterId;
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
 
-        private static readonly SafeRandom Random = new SafeRandom();
-
         public SQSAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             if (!AWSTestConstants.IsSqsAvailable)
@@ -192,9 +190,9 @@ namespace AWSUtils.Tests.Streaming
             {
                 if (i % 2 == 0)
                 {
-                    return Random.Next(int.MaxValue) as object;
+                    return ThreadSafeRandom.Next(int.MaxValue) as object;
                 }
-                return Random.Next(int.MaxValue).ToString(CultureInfo.InvariantCulture);
+                return ThreadSafeRandom.Next(int.MaxValue).ToString(CultureInfo.InvariantCulture);
             }).ToList();
         }
 

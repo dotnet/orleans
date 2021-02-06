@@ -24,7 +24,6 @@ namespace UnitTests.SchedulerTests
     {
         private static readonly object Lockable = new object();
         private static readonly int WaitFactor = Debugger.IsAttached ? 100 : 1;
-        private static readonly SafeRandom Random = new SafeRandom();
         private readonly ITestOutputHelper output;
         private readonly OrleansTaskScheduler masterScheduler;
         private readonly UnitTestSchedulingContext context;
@@ -327,7 +326,7 @@ namespace UnitTests.SchedulerTests
                     int num1 = 1;
                     while (!pause1.Task.Result) // Infinite busy loop
                     {
-                        num1 = Random.Next();
+                        num1 = ThreadSafeRandom.Next();
                     }
                     this.output.WriteLine("Task-1 Done");
                     return num1;
@@ -339,7 +338,7 @@ namespace UnitTests.SchedulerTests
                     int num2 = 2;
                     while (!pause2.Task.Result) // Infinite busy loop
                     {
-                        num2 = Random.Next();
+                        num2 = ThreadSafeRandom.Next();
                     }
                     this.output.WriteLine("Task-2 Done");
                     return num2;
@@ -549,7 +548,7 @@ namespace UnitTests.SchedulerTests
             for (int i = 0; i < NumChains; i++)
             {
                 int chainNum = i; // Capture
-                int sleepTime = TestConstants.random.Next(100);
+                int sleepTime = ThreadSafeRandom.Next(100);
                 resultHandles[i] = new TaskCompletionSource<bool>();
                 taskChains[i] = new Task(() =>
                 {

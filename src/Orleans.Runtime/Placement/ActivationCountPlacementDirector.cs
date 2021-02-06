@@ -42,8 +42,6 @@ namespace Orleans.Runtime.Placement
         private readonly ILogger logger;
         private readonly SiloAddress localAddress;
         private readonly bool useLocalCache = true;
-        // For: SelectSiloPowerOfK
-        private readonly SafeRandom random = new SafeRandom();
         private int chooseHowMany = 2;
 
         public ActivationCountPlacementDirector(
@@ -112,7 +110,7 @@ namespace Orleans.Runtime.Placement
                 var chooseFromThoseSilos = new List<CachedLocalStat>();
                 while (chooseFromThoseSilos.Count < chooseFrom)
                 {
-                    int index = random.Next(relevantSilos.Count);
+                    int index = ThreadSafeRandom.Next(relevantSilos.Count);
                     var pickedSilo = relevantSilos[index];
                     relevantSilos.RemoveAt(index);
                     chooseFromThoseSilos.Add(pickedSilo);

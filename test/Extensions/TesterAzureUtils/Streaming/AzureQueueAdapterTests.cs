@@ -31,7 +31,6 @@ namespace Tester.AzureUtils.Streaming
         private const int NumMessagesPerBatch = 20;
         public static readonly string AZURE_QUEUE_STREAM_PROVIDER_NAME = "AQAdapterTests";
         private readonly ILoggerFactory loggerFactory;
-        private static readonly SafeRandom Random = new SafeRandom();
         private static List<string> azureQueueNames = AzureQueueUtilities.GenerateQueueNames($"AzureQueueAdapterTests-{Guid.NewGuid()}", 8);
 
         public AzureQueueAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
@@ -198,9 +197,9 @@ namespace Tester.AzureUtils.Streaming
             {
                 if (i % 2 == 0)
                 {
-                    return Random.Next(int.MaxValue) as object;
+                    return ThreadSafeRandom.Next(int.MaxValue) as object;
                 }
-                return Random.Next(int.MaxValue).ToString(CultureInfo.InvariantCulture);
+                return ThreadSafeRandom.Next(int.MaxValue).ToString(CultureInfo.InvariantCulture);
             }).ToList();
         }
 

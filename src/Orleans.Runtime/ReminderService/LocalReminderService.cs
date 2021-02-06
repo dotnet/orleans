@@ -214,8 +214,7 @@ namespace Orleans.Runtime.ReminderService
 
         private async Task RunAsync()
         {
-            var random = new SafeRandom();
-            TimeSpan? overrideDelay = random.NextTimeSpan(InitialReadRetryPeriod);
+            TimeSpan? overrideDelay = ThreadSafeRandom.NextTimeSpan(InitialReadRetryPeriod);
             while (await listRefreshTimer.NextTick(overrideDelay))
             {
                 try
@@ -237,7 +236,7 @@ namespace Orleans.Runtime.ReminderService
                 catch (Exception exception)
                 {
                     this.logger.LogWarning(exception, "Exception while reading reminders: {Exception}", exception);
-                    overrideDelay = random.NextTimeSpan(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20));
+                    overrideDelay = ThreadSafeRandom.NextTimeSpan(TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20));
                 }
             }
         }

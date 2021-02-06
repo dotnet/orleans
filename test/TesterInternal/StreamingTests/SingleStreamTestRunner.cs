@@ -29,7 +29,6 @@ namespace UnitTests.StreamingTests
         private readonly string streamProviderName;
         private readonly int testNumber;
         private readonly bool runFullTest;
-        private readonly SafeRandom random;
         private readonly IInternalClusterClient client;
 
         internal SingleStreamTestRunner(IInternalClusterClient client, string streamProvider, int testNum = 0, bool fullTest = true)
@@ -39,7 +38,6 @@ namespace UnitTests.StreamingTests
             this.logger = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log").CreateLogger<SingleStreamTestRunner>();
             this.testNumber = testNum;
             this.runFullTest = fullTest;
-            this.random = TestConstants.random;
         }
 
         private void Heading(string testName)
@@ -218,7 +216,7 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_13_SameGrain_ConsumerFirstProducerLater");
             Guid streamId = Guid.NewGuid();
-            int grain1 = random.Next();
+            int grain1 = ThreadSafeRandom.Next();
             int[] grainIds = new int[] { grain1 };
             // consumer joins first, producer later
             this.consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
@@ -231,7 +229,7 @@ namespace UnitTests.StreamingTests
         {
             Heading("StreamTest_14_SameGrain_ProducerFirstConsumerLater");
             Guid streamId = Guid.NewGuid();
-            int grain1 = random.Next();
+            int grain1 = ThreadSafeRandom.Next();
             int[] grainIds = new int[] { grain1 };
             // produce joins first, consumer later
             this.producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);

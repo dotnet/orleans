@@ -237,9 +237,8 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var targetMilliseconds = (int)this.clusterMembershipOptions.TableRefreshTimeout.TotalMilliseconds;
-                var random = new SafeRandom();
                 
-                TimeSpan? onceOffDelay = random.NextTimeSpan(this.clusterMembershipOptions.TableRefreshTimeout);
+                TimeSpan? onceOffDelay = ThreadSafeRandom.NextTimeSpan(this.clusterMembershipOptions.TableRefreshTimeout);
                 while (await this.membershipUpdateTimer.NextTick(onceOffDelay))
                 {
                     onceOffDelay = default;

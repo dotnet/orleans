@@ -210,8 +210,6 @@ namespace UnitTests.Grains
         public async Task InterleavingConsistencyTest(int numItems)
         {
             TimeSpan delay = TimeSpan.FromMilliseconds(1);
-            SafeRandom random = new SafeRandom();
-
             List<Task> getFileMetadataPromises = new List<Task>(numItems*2);
             Dictionary<int, string> fileMetadatas = new Dictionary<int, string>(numItems*2);
 
@@ -221,7 +219,7 @@ namespace UnitTests.Grains
                 Func<Task> func = (
                     async () =>
                     {
-                        await Task.Delay(random.NextTimeSpan(delay));
+                        await Task.Delay(ThreadSafeRandom.NextTimeSpan(delay));
                         int fileMetadata = capture;
                         if ((fileMetadata%2) == 0)
                         {
@@ -240,7 +238,7 @@ namespace UnitTests.Grains
                 int fileId = keyValuePair.Key;
                 Func<Task> func = (async () =>
                 {
-                    await Task.Delay(random.NextTimeSpan(delay));
+                    await Task.Delay(ThreadSafeRandom.NextTimeSpan(delay));
                     _ = fileMetadatas[fileId];
                 });
                 tagPromises.Add(func());

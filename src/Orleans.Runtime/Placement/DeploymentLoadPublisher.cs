@@ -72,10 +72,9 @@ namespace Orleans.Runtime
             logger.Info("Starting DeploymentLoadPublisher.");
             if (statisticsRefreshTime > TimeSpan.Zero)
             {
-                var random = new SafeRandom();
                 // Randomize PublishStatistics timer,
                 // but also upon start publish my stats to everyone and take everyone's stats for me to start with something.
-                var randomTimerOffset = random.NextTimeSpan(statisticsRefreshTime);
+                var randomTimerOffset = ThreadSafeRandom.NextTimeSpan(statisticsRefreshTime);
                 this.publishTimer = this.RegisterTimer(PublishStatistics, null, randomTimerOffset, statisticsRefreshTime, "DeploymentLoadPublisher.PublishStatisticsTimer");
             }
             await RefreshStatistics();
