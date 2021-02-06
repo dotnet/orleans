@@ -123,19 +123,48 @@ namespace Orleans.Runtime
 
         internal SingleRange Merge(SingleRange other)
         {
-            return (begin | end) == 0 || (other.begin | other.end) == 0 ? RangeFactory.FullRange
-                : Equals(other) ? this
-                : InRange(other.begin) ? MergeEnds(other)
-                : other.InRange(begin) ? other.MergeEnds(this)
-                : throw new InvalidOperationException("Ranges don't overlap");
+            if ((begin | end) == 0 || (other.begin | other.end) == 0)
+            {
+                return RangeFactory.FullRange;
+            }
+
+            if (Equals(other))
+            {
+                return this;
+            }
+
+            if (InRange(other.begin))
+            {
+                return MergeEnds(other);
+            }
+
+            if (other.InRange(begin))
+            {
+                return other.MergeEnds(this);
+            }
+
+            throw new InvalidOperationException("Ranges don't overlap");
         }
 
         // other range begins inside this range, merge it based on where it ends
         private SingleRange MergeEnds(SingleRange other)
         {
-            return begin == other.end ? RangeFactory.FullRange
-                : !InRange(other.end) ? new SingleRange(begin, other.end)
-                : other.InRange(begin) ? RangeFactory.FullRange : this;
+            if (begin == other.end)
+            {
+                return RangeFactory.FullRange;
+            }
+
+            if (!InRange(other.end))
+            {
+                return new SingleRange(begin, other.end);
+            }
+
+            if (other.InRange(begin))
+            {
+                return RangeFactory.FullRange;
+            }
+
+            return this;
         }
     }
 
@@ -191,7 +220,10 @@ namespace Orleans.Runtime
             {
                 var last = ranges[0];
                 for (var i = 1; i < ranges.Count; i++)
+                {
                     if (last.Overlaps(last = ranges[i])) return true;
+                }
+
                 return false;
             }
 

@@ -18,7 +18,7 @@ namespace Orleans.Runtime.ConsistentRing
     {
         // internal, so that unit tests can access them
         internal SiloAddress MyAddress { get; }
-        internal IRingRange MyRange { get; private set; }
+        private IRingRange myRange;
 
         /// list of silo members sorted by the hash value of their address
         private readonly List<SiloAddress> membershipRingList = new();
@@ -35,7 +35,7 @@ namespace Orleans.Runtime.ConsistentRing
 
             // add myself to the list of members
             AddServer(MyAddress);
-            MyRange = RangeFactory.CreateFullRange(); // i am responsible for the whole range
+            myRange = RangeFactory.CreateFullRange(); // i am responsible for the whole range
 
             Start();
         }
@@ -52,23 +52,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         public IRingRange GetMyRange()
         {
-            return MyRange; // its immutable, so no need to clone
-        }
-
-        /// <summary>
-        /// Returns null if silo is not in the list of members
-        /// </summary>
-        public List<SiloAddress> GetMySucessors(int n = 1)
-        {
-            return FindSuccessors(MyAddress, n);
-        }
-
-        /// <summary>
-        /// Returns null if silo is not in the list of members
-        /// </summary>
-        public List<SiloAddress> GetMyPredecessors(int n = 1)
-        {
-            return FindPredecessors(MyAddress, n);
+            return myRange; // its immutable, so no need to clone
         }
 
         private void Start()
@@ -106,10 +90,10 @@ namespace Orleans.Runtime.ConsistentRing
                 if (index == myOldIndex || // new node was inserted in my place
                     (myOldIndex == 0 && index == membershipRingList.Count - 1)) // I am the first node, and the new server is the last node
                 {
-                    IRingRange oldRange = MyRange;
+                    IRingRange oldRange = myRange;
                     try
                     {
-                        MyRange = RangeFactory.CreateRange(unchecked((uint)hash), unchecked((uint)myKey));
+                        myRange = RangeFactory.CreateRange(unchecked((uint)hash), unchecked((uint)myKey));
                     }
                     catch (OverflowException exc)
                     {
@@ -117,7 +101,7 @@ namespace Orleans.Runtime.ConsistentRing
                             String.Format("OverflowException: hash as int= x{0, 8:X8}, hash as uint= x{1, 8:X8}, myKey as int x{2, 8:X8}, myKey as uint x{3, 8:X8}.",
                             hash, (uint)hash, myKey, (uint)myKey), exc);
                     }
-                    NotifyLocalRangeSubscribers(oldRange, MyRange, false);
+                    NotifyLocalRangeSubscribers(oldRange, myRange, false);
                 }
 
                 log.Info("Added Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
@@ -164,72 +148,22 @@ namespace Orleans.Runtime.ConsistentRing
                 {
                     if (log.IsEnabled(LogLevel.Debug)) log.Debug("Failed server was my pred? {0}, updated view {1}", wasMyPred, this.ToString());
 
-                    IRingRange oldRange = MyRange;
+                    IRingRange oldRange = myRange;
                     if (membershipRingList.Count == 1) // i'm the only one left
                     {
-                        MyRange = RangeFactory.CreateFullRange();
-                        NotifyLocalRangeSubscribers(oldRange, MyRange, true);
+                        myRange = RangeFactory.CreateFullRange();
+                        NotifyLocalRangeSubscribers(oldRange, myRange, true);
                     }
                     else
                     {
                         int myNewPredIndex = myNewIndex == 0 ? membershipRingList.Count - 1 : myNewIndex - 1;
                         int myPredecessorsHash = membershipRingList[myNewPredIndex].GetConsistentHashCode();
 
-                        MyRange = RangeFactory.CreateRange(unchecked((uint)myPredecessorsHash), unchecked((uint)myKey));
-                        NotifyLocalRangeSubscribers(oldRange, MyRange, true);
+                        myRange = RangeFactory.CreateRange(unchecked((uint)myPredecessorsHash), unchecked((uint)myKey));
+                        NotifyLocalRangeSubscribers(oldRange, myRange, true);
                     }
                 }
                 log.Info("Removed Server {0} hash {1}. Current view {2}", silo, silo.GetConsistentHashCode(), this.ToString());
-            }
-        }
-
-        /// <summary>
-        /// Returns null if silo is not in the list of members
-        /// </summary>
-        internal List<SiloAddress> FindPredecessors(SiloAddress silo, int count)
-        {
-            lock (membershipRingList)
-            {
-                int index = membershipRingList.IndexOf(silo);
-                if (index == -1)
-                {
-                    log.Warn(ErrorCode.Runtime_Error_100201, "Got request to find predecessors of silo " + silo + ", which is not in the list of members.");
-                    return null;
-                }
-
-                var result = new List<SiloAddress>();
-                int numMembers = membershipRingList.Count;
-                for (int i = index - 1; ((i + numMembers) % numMembers) != index && result.Count < count; i--)
-                {
-                    result.Add(membershipRingList[(i + numMembers) % numMembers]);
-                }
-
-                return result;
-            }
-        }
-
-        /// <summary>
-        /// Returns null if silo is not in the list of members
-        /// </summary>
-        internal List<SiloAddress> FindSuccessors(SiloAddress silo, int count)
-        {
-            lock (membershipRingList)
-            {
-                int index = membershipRingList.IndexOf(silo);
-                if (index == -1)
-                {
-                    log.Warn(ErrorCode.Runtime_Error_100203, "Got request to find successors of silo " + silo + ", which is not in the list of members.");
-                    return null;
-                }
-
-                var result = new List<SiloAddress>();
-                int numMembers = membershipRingList.Count;
-                for (int i = index + 1; i % numMembers != index && result.Count < count; i++)
-                {
-                    result.Add(membershipRingList[i % numMembers]);
-                }
-
-                return result;
             }
         }
 
@@ -306,7 +240,7 @@ namespace Orleans.Runtime.ConsistentRing
         /// <param name="hash"></param>
         /// <param name="excludeThisSiloIfStopping"></param>
         /// <returns></returns>
-        public SiloAddress CalculateTargetSilo(uint hash, bool excludeThisSiloIfStopping = true)
+        private SiloAddress CalculateTargetSilo(uint hash, bool excludeThisSiloIfStopping = true)
         {
             SiloAddress siloAddress = null;
 

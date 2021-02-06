@@ -32,8 +32,13 @@ namespace Orleans.Streams
         {
             var ls = new List<QueueId>();
             foreach (QueueId queueId in hashRing.GetAllRingMembers())
+            {
                 if (range.InRange(queueId.GetUniformHashCode()))
+                {
                     ls.Add(queueId);
+                }
+            }
+
             return ls;
         }
 
@@ -42,7 +47,6 @@ namespace Orleans.Streams
             return hashRing.GetAllRingMembers();
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
         public QueueId GetQueueForStream(StreamId streamId)
         {
             return hashRing.CalculateResponsible((uint)streamId.GetHashCode());
