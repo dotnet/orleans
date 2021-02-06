@@ -1,10 +1,10 @@
-#if !NETCOREAPP
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -38,7 +38,9 @@ namespace UnitTests.Management
             {
                 // The ActivationCount tests rely on CounterStatistic, which is a shared static value, so isolation
                 // between silos is obtained using AppDomains.
-                builder.CreateSiloAsync = AppDomainSiloHandle.CreateWithAssemblies(new[] { typeof(TestGrain).Assembly, typeof(SimpleGrain).Assembly });
+                builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(this.GetType().Assembly);
+;
+                builder.Properties["GrainAssembly"] = $"{typeof(SimpleGrain).Assembly}";
             }
         }
 
@@ -126,6 +128,3 @@ namespace UnitTests.Management
         }
     }
 }
-
-// ReSharper restore ConvertToConstant.Local
-#endif

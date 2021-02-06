@@ -3,16 +3,34 @@
     <RootNamespace>TestVersionGrains</RootNamespace>
     <AssemblyName>TestVersionGrains</AssemblyName>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <OutputType>Exe</OutputType>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <PublishRoot>bin\$(Configuration)\publish\</PublishRoot>
+    <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
+    <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
+    <SourceDir>$(MSBuildThisFileDirectory)../TestVersionGrains/</SourceDir>
   </PropertyGroup>
 
+  <!-- Declare that this is version 2 of our code. This is used for #ifdefs in the code -->
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);VERSION_2</DefineConstants>
+  </PropertyGroup>
+  
   <ItemGroup>
-    <Compile Include="$(SourceRoot)test\Grains\TestVersionGrains\VersionGrainsSiloBuilderfactory.cs" Link="VersionGrainsSiloBuilderfactory.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Update="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Update="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
   </ItemGroup>
 
+  <!-- Link all .cs files from the TestVersionGrains project, since the only difference between the two is that this defines a different version constant -->
+  <ItemGroup>
+    <Compile Include="$(SourceDir)/**/*.cs" Exclude="$(SourceDir)obj/**/*.cs;$(SourceDir)bin/**/*.cs" />
+  </ItemGroup>
+
+  <Target Name="PostBuildPublish" AfterTargets="Build">
+    <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
+  </Target>
 </Project>

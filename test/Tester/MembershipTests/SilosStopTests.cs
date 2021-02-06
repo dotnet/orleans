@@ -1,4 +1,3 @@
-#if !NETCOREAPP
 using System;
 using System.Linq;
 using System.Net;
@@ -40,7 +39,6 @@ namespace UnitTests.MembershipTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.CreateSiloAsync = AppDomainSiloHandle.Create;
             builder.AddClientBuilderConfigurator<BuilderConfigurator>();
             builder.AddSiloBuilderConfigurator<BuilderConfigurator>();
         }
@@ -76,4 +74,3 @@ namespace UnitTests.MembershipTests
         }
     }
 }
-#endif

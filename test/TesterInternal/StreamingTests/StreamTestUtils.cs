@@ -40,13 +40,33 @@ namespace UnitTests.StreamingTests
         {
             var pubSub = GetStreamPubSub(client);
             var streamId = new InternalStreamId(streamProviderName, StreamId.Create(streamNamespace, streamIdGuid));
+            var totalWait = TimeSpan.Zero;
 
-            int consumerCount = await pubSub.ConsumerCount(streamId);
+            int consumerCount;
+            while ((consumerCount = await pubSub.ConsumerCount(streamId)) != expectedConsumerCount)
+            {
+                await Task.Delay(1000);
+                totalWait += TimeSpan.FromMilliseconds(1000);
+                if (totalWait > TimeSpan.FromMilliseconds(5000))
+                {
+                    break;
+                }
+            }
 
             Assert_AreEqual(output, expectedConsumerCount, consumerCount, "{0} - ConsumerCount for stream {1} = {2}",
                 when, streamId, consumerCount);
 
-            int publisherCount = await pubSub.ProducerCount(streamId);
+            int publisherCount;
+            totalWait = TimeSpan.Zero;
+            while ((publisherCount = await pubSub.ProducerCount(streamId)) != expectedPublisherCount)
+            {
+                await Task.Delay(1000);
+                totalWait += TimeSpan.FromMilliseconds(1000);
+                if (totalWait > TimeSpan.FromMilliseconds(5000))
+                {
+                    break;
+                }
+            }
 
             Assert_AreEqual(output, expectedPublisherCount, publisherCount, "{0} - PublisherCount for stream {1} = {2}",
                 when, streamId, publisherCount);

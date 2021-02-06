@@ -8,7 +8,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Orleans.Hosting;
-using Orleans.Runtime.Providers;
 using Orleans.Runtime.TestHooks;
 using Orleans.Configuration;
 using Orleans.Messaging;
@@ -39,8 +38,19 @@ namespace Orleans.TestingHost
             {
                 configBuilder.Add(source);
             }
-            var configuration = configBuilder.Build();
 
+            var configuration = configBuilder.Build();
+            return CreateSiloHost(hostName, configuration);
+        }
+
+        /// <summary>
+        /// Creates an returns a new silo.
+        /// </summary>
+        /// <param name="hostName">The silo name if it is not already specified in the configuration.</param>
+        /// <param name="configuration">The configuration.</param>
+        /// <returns>A new silo.</returns>
+        public static ISiloHost CreateSiloHost(string hostName, IConfiguration configuration)
+        {
             string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
 
             var hostBuilder = new HostBuilder();
@@ -58,15 +68,7 @@ namespace Orleans.TestingHost
                 .Configure<ClusterOptions>(configuration)
                 .Configure<SiloOptions>(options => options.SiloName = siloName);
 
-            hostBuilder
-                .ConfigureHostConfiguration(cb =>
-                {
-                    // TODO: Instead of passing the sources individually, just chain the pre-built configuration once we upgrade to Microsoft.Extensions.Configuration 2.1
-                    foreach (var source in configBuilder.Sources)
-                    {
-                        cb.Add(source);
-                    }
-                });
+            hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration));
 
             hostBuilder.Properties["Configuration"] = configuration;
             ConfigureAppServices(configuration, hostBuilder, siloBuilder, siloHostBuilder);
@@ -117,26 +119,29 @@ namespace Orleans.TestingHost
             return builder.Build();
         }
 
-        public static string SerializeConfigurationSources(IList<IConfigurationSource> sources)
+        public static string SerializeConfiguration(IConfiguration configuration)
         {
             var settings = new JsonSerializerSettings
             {
                 TypeNameHandling = TypeNameHandling.Auto,
-                Formatting = Formatting.Indented,
+                Formatting = Formatting.None,
             };
 
-            return JsonConvert.SerializeObject(sources, settings);
+            KeyValuePair<string, string>[] enumerated = configuration.AsEnumerable().ToArray();
+            return JsonConvert.SerializeObject(enumerated, settings);
         }
 
-        public static IList<IConfigurationSource> DeserializeConfigurationSources(string serializedSources)
+        public static IConfiguration DeserializeConfiguration(string serializedSources)
         {
             var settings = new JsonSerializerSettings
             {
                 TypeNameHandling = TypeNameHandling.Auto,
-                Formatting = Formatting.Indented,
             };
 
-            return JsonConvert.DeserializeObject<IList<IConfigurationSource>>(serializedSources, settings);
+            var builder = new ConfigurationBuilder();
+            var enumerated = JsonConvert.DeserializeObject<KeyValuePair<string, string>[]>(serializedSources, settings);
+            builder.AddInMemoryCollection(enumerated);
+            return builder.Build();
         }
 
         private static void ConfigureListeningPorts(IConfiguration configuration, IServiceCollection services)

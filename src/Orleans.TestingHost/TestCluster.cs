@@ -117,7 +117,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Delegate used to create and start an individual silo.
         /// </summary>
-        public Func<string, IList<IConfigurationSource>, Task<SiloHandle>> CreateSiloAsync { private get; set; } = InProcessSiloHandle.CreateAsync;
+        public Func<string, IConfiguration, Task<SiloHandle>> CreateSiloAsync { private get; set; } = InProcessSiloHandle.CreateAsync;
 
         /// <summary>
         /// The port allocator.
@@ -610,7 +610,13 @@ namespace Orleans.TestingHost
                 InitialData = siloSpecificOptions.ToDictionary()
             });
 
-            var handle = await this.CreateSiloAsync(siloSpecificOptions.SiloName, configurationSources);
+            var configurationBuilder = new ConfigurationBuilder();
+            foreach (var source in configurationSources)
+            {
+                configurationBuilder.Add(source);
+            }
+            var configuration = configurationBuilder.Build();
+            var handle = await this.CreateSiloAsync(siloSpecificOptions.SiloName, configuration);
             handle.InstanceNumber = (short)instanceNumber;
             Interlocked.Increment(ref this.startedInstances);
             return handle;
