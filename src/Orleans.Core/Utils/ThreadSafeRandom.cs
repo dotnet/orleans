@@ -12,13 +12,13 @@ namespace Orleans.Internal
     {
         [ThreadStatic] private static Random? threadRandom;
 
-        private static Random Instane => threadRandom ?? CreateInstane();
+        private static Random Instance => threadRandom ?? CreateInstance();
 
         [MethodImpl(MethodImplOptions.NoInlining)]
 #if NETCOREAPP
-        private static Random CreateInstane() => threadRandom = new Random();
+        private static Random CreateInstance() => threadRandom = new Random();
 #else
-        private static Random CreateInstane()
+        private static Random CreateInstance()
         {
             var buf = new byte[4];
             globalRandom.GetBytes(buf);
@@ -28,11 +28,11 @@ namespace Orleans.Internal
         private static readonly RandomNumberGenerator globalRandom = RandomNumberGenerator.Create();
 #endif
 
-        public static int Next() => Instane.Next();
-        public static int Next(int maxValue) => Instane.Next(maxValue);
-        public static int Next(int minValue, int maxValue) => Instane.Next(minValue, maxValue);
-        public static void NextBytes(byte[] buffer) => Instane.NextBytes(buffer);
-        public static double NextDouble() => Instane.NextDouble();
+        public static int Next() => Instance.Next();
+        public static int Next(int maxValue) => Instance.Next(maxValue);
+        public static int Next(int minValue, int maxValue) => Instance.Next(minValue, maxValue);
+        public static void NextBytes(byte[] buffer) => Instance.NextBytes(buffer);
+        public static double NextDouble() => Instance.NextDouble();
 
         public static TimeSpan NextTimeSpan(TimeSpan timeSpan)
         {
