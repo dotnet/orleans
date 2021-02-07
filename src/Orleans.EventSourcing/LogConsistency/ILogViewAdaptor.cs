@@ -1,11 +1,8 @@
-using Orleans.MultiCluster;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
-namespace Orleans.LogConsistency
+namespace Orleans.EventSourcing
 {
     /// <summary>
     /// A log view adaptor is the storage interface for <see cref="LogConsistentGrain{T}"/>, whose state is defined as a log view. 

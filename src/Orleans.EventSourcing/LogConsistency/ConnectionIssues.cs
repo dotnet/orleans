@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 
-namespace Orleans.LogConsistency
+namespace Orleans.EventSourcing
 {
- 
+
     /// <summary>
     /// Represents information about connection issues encountered inside log consistency protocols.
     /// It is used both inside the protocol to track retry loops, and is made visible to users 

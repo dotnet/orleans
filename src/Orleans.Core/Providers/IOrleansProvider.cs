@@ -12,8 +12,6 @@ namespace Orleans.Providers
     /// Base interface for all type-specific provider interfaces in Orleans
     /// </summary>
     /// <seealso cref="Orleans.Storage.IStorageProvider"/>
-    /// <seealso cref="Orleans.LogConsistency.ILogConsistencyProvider"/>
-
     public interface IProvider
     {
         /// <summary>The name of this provider instance, as given to it in the config.</summary>

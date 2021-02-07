@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.LogConsistency;
 using System.Collections.Generic;
 
 namespace UnitTests.GrainInterfaces

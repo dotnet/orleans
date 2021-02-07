@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Orleans.LogConsistency
+namespace Orleans.EventSourcing
 {
     /// <summary>
     /// An interface that is implemented by log-consistent grains using virtual protected methods

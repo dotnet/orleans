@@ -1,15 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Orleans.LogConsistency;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Orleans.Serialization;
-using Orleans.MultiCluster;
-using Orleans.Runtime;
-using Orleans.GrainDirectory;
 
 namespace Orleans.EventSourcing.Common
 {

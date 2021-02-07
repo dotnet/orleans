@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Orleans.MultiCluster;
+using Orleans.EventSourcing;
 using Orleans.Runtime;
-using Orleans.Concurrency;
-
 
 namespace Orleans.SystemTargetInterfaces
 {
@@ -18,5 +12,4 @@ namespace Orleans.SystemTargetInterfaces
     {
         Task<ILogConsistencyProtocolMessage> RelayMessage(GrainId id, ILogConsistencyProtocolMessage payload);
     }
-
 }

@@ -1,16 +1,10 @@
 using System;
-using System.Net;
 using System.Runtime.Serialization;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
-using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.MultiCluster;
-using Orleans.GrainDirectory;
 using Orleans.Serialization;
 
-namespace Orleans.LogConsistency
+namespace Orleans.EventSourcing
 {
     /// <summary>
     /// Functionality for use by log view adaptors that use custom consistency or replication protocols.
