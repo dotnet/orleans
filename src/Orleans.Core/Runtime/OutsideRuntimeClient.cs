@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Threading;
@@ -11,13 +10,11 @@ using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
-using Orleans.Internal;
 using Orleans.Messaging;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
-using Orleans.Streams;
 
 namespace Orleans
 {
@@ -66,11 +63,6 @@ namespace Orleans
             get { return CurrentActivationAddress.ToString(); }
         }
 
-        public IStreamProviderRuntime CurrentStreamProviderRuntime
-        {
-            get { return clientProviderRuntime; }
-        }
-
         public IGrainReferenceRuntime GrainReferenceRuntime { get; private set; }
 
         internal ClientMessageCenter MessageCenter { get; private set; }
@@ -115,6 +107,7 @@ namespace Orleans
                 foreach (var handler in connectionLostHandlers)
                 {
                     this.ClusterConnectionLost += handler;
+
                 }
 
                 var gatewayCountChangedHandlers = this.ServiceProvider.GetServices<GatewayCountChangedHandler>();
@@ -205,8 +198,6 @@ namespace Orleans
                 retryFilter);
 
             ClientStatistics.Start(MessageCenter, clientId.GrainId);
-            
-            clientProviderRuntime.StreamingInitialize();
 
             async Task ExecuteWithRetries(Func<Task> task, Func<Exception, Task<bool>> shouldRetry)
             {
@@ -376,13 +367,6 @@ namespace Orleans
 
             Utils.SafeExecute(() =>
             {
-                if (clientProviderRuntime != null)
-                {
-                    clientProviderRuntime.Reset(cleanup).WaitWithThrow(ResetTimeout);
-                }
-            }, logger, "Client.clientProviderRuntime.Reset");
-            Utils.SafeExecute(() =>
-            {
                 incomingMessagesThreadTimeTracking?.OnStopExecution();
             }, logger, "Client.incomingMessagesThreadTimeTracking.OnStopExecution");
 
@@ -413,15 +397,6 @@ namespace Orleans
                 }
             });
             
-            try
-            {
-                if (clientProviderRuntime != null)
-                {
-                    clientProviderRuntime.Reset().WaitWithThrow(ResetTimeout);
-                }
-            }
-            catch (Exception) { }
-
             Utils.SafeExecute(() => this.Dispose());
         }
 

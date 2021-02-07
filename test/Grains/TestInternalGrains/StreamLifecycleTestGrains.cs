@@ -139,7 +139,7 @@ namespace UnitTests.Grains
 
             if (providerToUse != _lastProviderName)
             {
-                _streamProvider = GetStreamProvider(providerToUse);
+                _streamProvider = this.GetStreamProvider(providerToUse);
                 _lastProviderName = providerToUse;
             }
             IAsyncStream<int> stream = _streamProvider.GetStream<int>(streamId);

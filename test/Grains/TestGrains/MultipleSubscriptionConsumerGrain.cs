@@ -52,7 +52,7 @@ namespace UnitTests.Grains
             var error = new Counter();
 
             // get stream
-            IStreamProvider streamProvider = GetStreamProvider(providerToUse);
+            IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             var stream = streamProvider.GetStream<int>(streamId, streamNamespace);
 
             int countCapture = consumerCount;
@@ -112,7 +112,7 @@ namespace UnitTests.Grains
             logger.Info("GetAllSubscriptionHandles");
 
             // get stream
-            IStreamProvider streamProvider = GetStreamProvider(providerToUse);
+            IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             var stream = streamProvider.GetStream<int>(streamId, streamNamespace);
 
             // get all active subscription handles for this stream.

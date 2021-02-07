@@ -1,17 +1,46 @@
-
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.Streams.Core;
+using Orleans.Configuration.Internal;
 
 namespace Orleans.Hosting
 {
-    /// <summary>
-    /// Configure silo to use persistent streams.
-    /// </summary>
-    public static class ClientStreamExtensions
+    public static class ClientBuilderStreamingExtensions
     {
+        public static IClientBuilder AddStreaming(this IClientBuilder builder) => builder.ConfigureServices(AddClientStreaming);
+
+        private static void AddClientStreaming(this IServiceCollection services)
+        {
+            services.AddSingleton<ClientStreamingProviderRuntime>();
+            services.AddFromExisting<IStreamProviderRuntime, ClientStreamingProviderRuntime>();
+            services.AddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
+            services.AddSingleton<ImplicitStreamSubscriberTable>();
+            services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
+            services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
+            services.AddSingletonKeyedService<string, IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
+            services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientStreamingProviderRuntime>();
+        }
+
+        /// <summary>
+        /// Configure cluster client to use memory streams. This return a configurator for further configuration
+        /// </summary>
+        public static IClientBuilder AddMemoryStreams<TSerializer>(
+            this IClientBuilder builder,
+            string name,
+            Action<IClusterClientMemoryStreamConfigurator> configure = null)
+            where TSerializer : class, IMemoryMessageBodySerializer
+        {
+            //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
+            var memoryStreamConfigurator = new ClusterClientMemoryStreamConfigurator<TSerializer>(name, builder);
+            configure?.Invoke(memoryStreamConfigurator);
+            return builder;
+        }
+
         public static IClientBuilder AddPersistentStreams(
             this IClientBuilder builder,
             string name,
@@ -63,5 +92,6 @@ namespace Orleans.Hosting
             return AddSimpleMessageStreamProvider(builder, name, b => b
                 .Configure(configureOptions));
         }
+
     }
 }

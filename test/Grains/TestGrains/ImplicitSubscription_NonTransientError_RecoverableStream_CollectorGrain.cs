@@ -50,7 +50,7 @@ namespace TestGrains
                 await WriteStateAsync();
             }
 
-            var streamProvider = GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
+            var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(State.StreamGuid, State.StreamNamespace);
 
             await stream.SubscribeAsync(OnNextAsync, OnErrorAsync, State.RecoveryToken);

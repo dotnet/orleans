@@ -199,8 +199,8 @@ namespace Orleans.Runtime.Metadata
 
         private Task Initialize(CancellationToken _)
         {
-            var providerRuntime = _services.GetRequiredService<SiloProviderRuntime>();
-            providerRuntime.RegisterSystemTarget(ActivatorUtilities.CreateInstance<ClusterManifestSystemTarget>(_services));
+            var catalog = _services.GetRequiredService<Catalog>();
+            catalog.RegisterSystemTarget(ActivatorUtilities.CreateInstance<ClusterManifestSystemTarget>(_services));
             return Task.CompletedTask;
         }
 

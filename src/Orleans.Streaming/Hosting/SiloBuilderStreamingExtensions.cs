@@ -1,17 +1,45 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orleans.Hosting;
-using Orleans.Streams;
-using Orleans.Configuration;
-using Orleans.Streams.Filtering;
-using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Configuration.Internal;
+using Orleans.Runtime;
+using Orleans.Runtime.Providers;
+using Orleans.Streams;
+using Orleans.Streams.Core;
+using Orleans.Streams.Filtering;
 
 namespace Orleans.Hosting
 {
-    public static class StreamHostingExtensions
+    public static class SiloBuilderStreamingExtensions
     {
+        public static ISiloHostBuilder AddStreaming(this ISiloHostBuilder builder) => builder.ConfigureServices(AddSiloStreaming);
+
+        public static ISiloBuilder AddStreaming(this ISiloBuilder builder) => builder.ConfigureServices(AddSiloStreaming);
+
+        private static void AddSiloStreaming(this IServiceCollection services)
+        {
+            services.TryAddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();
+            services.TryAddSingleton<ImplicitStreamSubscriberTable>();
+            services.AddSingleton<IConfigureGrainContext, StreamConsumerGrainContextAction>();
+            services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
+            services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
+            services.AddSingletonKeyedService<string, IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
+            services.AddTransientKeyedService<Type, IGrainExtension>(typeof(IStreamConsumerExtension), (sp, _) =>
+            {
+                var runtime = sp.GetRequiredService<IStreamProviderRuntime>();
+                var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
+                return new StreamConsumerExtension(runtime, (IStreamSubscriptionObserver) grainContextAccessor.GrainContext?.GrainInstance);
+            });
+            services.TryAddSingleton<IStreamSubscriptionManagerAdmin>(sp =>
+                new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
+            services.TryAddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
+
+            // One stream directory per activation
+            services.AddScoped<StreamDirectory>();
+        }
+
         /// <summary>
         /// Configure silo to use persistent streams.
         /// </summary>
@@ -129,5 +157,6 @@ namespace Orleans.Hosting
             //services.TryAddSingleton<T>();
             return services.AddSingletonNamedService<IStreamFilter, T>(name);
         }
+
     }
 }

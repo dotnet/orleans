@@ -73,7 +73,6 @@ namespace Orleans.Runtime
         internal OrleansTaskScheduler LocalScheduler { get; private set; }
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal IConsistentRingProvider RingProvider { get; private set; }
-        internal ICatalog Catalog => catalog;
         internal List<GrainService> GrainServices => grainServices;
 
         internal SystemStatus SystemStatus { get; set; }
@@ -323,8 +322,6 @@ namespace Orleans.Runtime
             StartTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
 
             StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
-
-            this.runtimeClient.CurrentStreamProviderRuntime = this.Services.GetRequiredService<SiloProviderRuntime>();
 
             // This has to follow the above steps that start the runtime components
             await StartAsyncTaskWithPerfAnalysis("Create system targets and inject dependencies", () =>
@@ -679,11 +676,7 @@ namespace Orleans.Runtime
             this.Stop();
         }
 
-        internal void RegisterSystemTarget(SystemTarget target)
-        {
-            var providerRuntime = this.Services.GetRequiredService<SiloProviderRuntime>();
-            providerRuntime.RegisterSystemTarget(target);
-        }
+        internal void RegisterSystemTarget(SystemTarget target) => this.catalog.RegisterSystemTarget(target);
 
         /// <summary> Return dump of diagnostic data from this silo. </summary>
         /// <param name="all"></param>

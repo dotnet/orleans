@@ -22,7 +22,7 @@ namespace UnitTests.Grains
         public override async Task OnActivateAsync()
         {
             logger.Info("OnActivateAsync");
-            var streamProvider = GetStreamProvider("SMSProvider");
+            var streamProvider = this.GetStreamProvider("SMSProvider");
             var streamNamespaces = new[] { "red1", "red2", "blue3", "blue4" };
             counters = new Dictionary<string, int>();
             foreach (var streamNamespace in streamNamespaces)

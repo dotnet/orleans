@@ -6,14 +6,14 @@
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
   <Choose>
-    <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix)">
+    <When Condition="$(OrleansPersistenceMemoryVersion) == $(VersionPrefix)">
       <ItemGroup>
-        <ProjectReference Include="..\..\..\src\OrleansProviders\OrleansProviders.csproj" />
+        <ProjectReference Include="..\..\..\src\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="$(OrleansProvidersVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.Persistence.Memory" Version="$(OrleansPersistenceMemoryVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>
@@ -27,6 +27,32 @@
     <Otherwise>
       <ItemGroup>
         <PackageReference Include="Microsoft.Orleans.EventSourcing" Version="$(OrleansEventSourcingVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansStreamingVersion) == $(VersionPrefix)">
+      <ItemGroup>
+        <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Streaming" Version="$(OrleansStreamingVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
+  <Choose>
+    <When Condition="$(OrleansStreamingAbstractionsVersion) == $(VersionPrefix)">
+      <ItemGroup>
+        <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming.Abstractions\Orleans.Streaming.Abstractions.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Streaming.Abstractions" Version="$(OrleansStreamingAbstractionsVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>

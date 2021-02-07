@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Streams;
 
 namespace Orleans.Runtime
 {
@@ -29,20 +28,6 @@ namespace Orleans.Runtime
 
         /// <inheritdoc />
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
-
-        /// <inheritdoc />
-        IStreamProviderRuntime IInternalClusterClient.StreamProviderRuntime => this.runtimeClient.CurrentStreamProviderRuntime;
-        
-        /// <inheritdoc />
-        public IStreamProvider GetStreamProvider(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            return this.runtimeClient.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(name);
-        }
 
         /// <inheritdoc />
         public Task Connect(Func<Exception, Task<bool>> retryFilter = null) => Task.CompletedTask;

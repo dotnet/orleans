@@ -1,6 +1,5 @@
 using System;
 using Orleans.Core;
-using Orleans.Streams;
 using Orleans.Timers;
 
 namespace Orleans.Runtime

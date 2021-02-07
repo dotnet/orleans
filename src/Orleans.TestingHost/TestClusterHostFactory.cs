@@ -258,8 +258,8 @@ namespace Orleans.TestingHost
         private static void InitializeTestHooksSystemTarget(ISiloHost host)
         {
             var testHook = host.Services.GetRequiredService<TestHooksSystemTarget>();
-            var providerRuntime = host.Services.GetRequiredService<SiloProviderRuntime>();
-            providerRuntime.RegisterSystemTarget(testHook);
+            var catalog = host.Services.GetRequiredService<Catalog>();
+            catalog.RegisterSystemTarget(testHook);
         }
     }
 }

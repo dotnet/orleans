@@ -153,31 +153,6 @@ namespace Orleans.Runtime
         {
             GrainInstance = grainInstance;
         }
-        
-        private Streams.StreamDirectory streamDirectory;
-        internal Streams.StreamDirectory GetStreamDirectory()
-        {
-            return streamDirectory ?? (streamDirectory = new Streams.StreamDirectory());
-        }
-
-        internal bool IsUsingStreams 
-        {
-            get { return streamDirectory != null; }
-        }
-
-        internal async Task DeactivateStreamResources()
-        {
-            if (streamDirectory == null) return; // No streams - Nothing to do.
-            if (_components == null) return; // No installed extensions - Nothing to do.
-
-            if (StreamResourceTestControl.TestOnlySuppressStreamCleanupOnDeactivate)
-            {
-                logger.Warn(0, "Suppressing cleanup of stream resources during tests for {0}", this);
-                return;
-            }
-
-            await streamDirectory.Cleanup(true, false);
-        }
 
         public IAddressable GrainInstance { get; private set; }
 

@@ -36,7 +36,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         public Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse)
         {
             logger.Info("BecomeProducer");
-            IStreamProvider streamProvider = base.GetStreamProvider(providerToUse);
+            IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             producer = streamProvider.GetStream<T>(streamId, streamNamespace);
             return Task.CompletedTask;
         }

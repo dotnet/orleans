@@ -14,14 +14,14 @@
   </PropertyGroup>
 
   <Choose>
-    <When Condition="$(OrleansProvidersVersion) == $(VersionPrefix) AND $(OrleansProvidersVersion) == $(OrleansCoreVersion)">
+    <When Condition="$(OrleansPersistenceMemoryVersion) == $(VersionPrefix) AND $(OrleansPersistenceMemoryVersion) == $(OrleansCoreVersion)">
       <ItemGroup>
-        <ProjectReference Include="..\OrleansProviders\OrleansProviders.csproj" />
+        <ProjectReference Include="..\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
       </ItemGroup>
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.OrleansProviders" Version="$(OrleansClientVersion)"/>
+        <PackageReference Include="Microsoft.Orleans.Persistence.Memory" Version="$(OrleansClientVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>

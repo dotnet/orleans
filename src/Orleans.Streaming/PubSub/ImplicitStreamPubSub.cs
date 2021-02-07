@@ -98,7 +98,7 @@ namespace Orleans.Streams
 
         internal bool IsImplicitSubscriber(IAddressable addressable, InternalStreamId streamId)
         {
-            return implicitTable.IsImplicitSubscriber(GrainExtensions.GetGrainId(addressable), streamId);
+            return implicitTable.IsImplicitSubscriber(addressable.GetGrainId(), streamId);
         }
 
         internal bool IsImplicitSubscriber(GuidId subscriptionId, InternalStreamId streamId)
@@ -108,7 +108,7 @@ namespace Orleans.Streams
 
         public GuidId CreateSubscriptionId(InternalStreamId streamId, IStreamConsumerExtension streamConsumer)
         {
-            GrainId grainId = GrainExtensions.GetGrainId(streamConsumer);
+            GrainId grainId = streamConsumer.GetGrainId();
             Guid subscriptionGuid;
             if (!implicitTable.TryGetImplicitSubscriptionGuid(grainId, streamId, out subscriptionGuid))
             {

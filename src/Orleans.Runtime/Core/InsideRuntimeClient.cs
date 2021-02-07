@@ -11,7 +11,6 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Storage;
-using Orleans.Streams;
 using Orleans.Transactions;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
@@ -101,8 +100,6 @@ namespace Orleans.Runtime
         }
 
         public IServiceProvider ServiceProvider { get; }
-        
-        public IStreamProviderRuntime CurrentStreamProviderRuntime { get; internal set; }
 
         public OrleansTaskScheduler Scheduler { get; }
 
@@ -690,16 +687,6 @@ namespace Orleans.Runtime
                     callback.Value.OnTargetSiloFail();
                 }
             }
-        }
-
-        public StreamDirectory GetStreamDirectory()
-        {
-            if (RuntimeContext.CurrentGrainContext is ActivationData activation)
-            {
-                return activation.GetStreamDirectory();
-            }
-
-            return this.HostedClient.StreamDirectory;
         }
 
         public void Participate(ISiloLifecycle lifecycle)

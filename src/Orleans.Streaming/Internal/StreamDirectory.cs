@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -11,7 +10,7 @@ namespace Orleans.Streams
     /// <summary>
     /// Stores all streams associated with a specific silo
     /// </summary>
-    internal class StreamDirectory
+    internal class StreamDirectory : IAsyncDisposable
     {
         private readonly ConcurrentDictionary<InternalStreamId, object> allStreams;
 
@@ -34,6 +33,11 @@ namespace Orleans.Streams
 
         internal async Task Cleanup(bool cleanupProducers, bool cleanupConsumers)
         {
+            if (StreamResourceTestControl.TestOnlySuppressStreamCleanupOnDeactivate)
+            {
+                return;
+            }
+
             var promises = new List<Task>();
             List<InternalStreamId> streamIds = GetUsedStreamIds();
             foreach (InternalStreamId s in streamIds)
@@ -42,6 +46,7 @@ namespace Orleans.Streams
                 if (streamControl != null)
                     promises.Add(streamControl.Cleanup(cleanupProducers, cleanupConsumers));
             }
+
             await Task.WhenAll(promises);
         }
 
@@ -62,5 +67,7 @@ namespace Orleans.Streams
         {
             return allStreams.Select(kv => kv.Key).ToList();
         }
+
+        public async ValueTask DisposeAsync() => await this.Cleanup(cleanupProducers: true, cleanupConsumers: false).ConfigureAwait(false);
     }
 }

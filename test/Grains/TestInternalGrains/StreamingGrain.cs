@@ -493,7 +493,7 @@ namespace UnitTests.Grains
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
             ProducerObserver producer = ProducerObserver.NewObserver(_logger, GrainFactory);
-            producer.BecomeProducer(streamId, GetStreamProvider(providerToUse), streamNamespace);
+            producer.BecomeProducer(streamId, this.GetStreamProvider(providerToUse), streamNamespace);
             _producers.Add(producer);
             return Task.CompletedTask;
         }
@@ -598,7 +598,7 @@ namespace UnitTests.Grains
             {
                 foreach (var producer in State.Producers)
                 {
-                    producer.RenewProducer(_logger, GetStreamProvider(producer.ProviderName));
+                    producer.RenewProducer(_logger, this.GetStreamProvider(producer.ProviderName));
                     _producers.Add(producer);
                 }
             }
@@ -670,7 +670,7 @@ namespace UnitTests.Grains
         {
             _providerToUse = providerToUse;
             ConsumerObserver consumerObserver = ConsumerObserver.NewObserver(_logger);
-            await consumerObserver.BecomeConsumer(streamId, GetStreamProvider(providerToUse), streamNamespace);
+            await consumerObserver.BecomeConsumer(streamId, this.GetStreamProvider(providerToUse), streamNamespace);
             _observers.Add(consumerObserver);
         }
 
@@ -690,7 +690,7 @@ namespace UnitTests.Grains
 
         public virtual async Task StopBeingConsumer()
         {
-            var tasks = _observers.Select(obs => obs.StopBeingConsumer(GetStreamProvider(_providerToUse))).ToArray();
+            var tasks = _observers.Select(obs => obs.StopBeingConsumer(this.GetStreamProvider(_providerToUse))).ToArray();
             await Task.WhenAll(tasks);
             _observers.Clear();
         }
@@ -725,7 +725,7 @@ namespace UnitTests.Grains
             {
                 foreach (var consumer in State.Consumers)
                 {
-                    await consumer.RenewConsumer(_logger, GetStreamProvider(consumer.ProviderName));
+                    await consumer.RenewConsumer(_logger, this.GetStreamProvider(consumer.ProviderName));
                     _observers.Add(consumer);
                 }
             }
@@ -788,7 +788,7 @@ namespace UnitTests.Grains
         public Task BecomeProducer(Guid streamId, string providerToUse, string streamNamespace)
         {
             _producer = ProducerObserver.NewObserver(_logger, GrainFactory);
-            _producer.BecomeProducer(streamId, GetStreamProvider(providerToUse), streamNamespace);
+            _producer.BecomeProducer(streamId, this.GetStreamProvider(providerToUse), streamNamespace);
             return Task.CompletedTask;
         }
 
@@ -824,7 +824,7 @@ namespace UnitTests.Grains
         {
             _providerToUseForConsumer = providerToUse;
             _consumer = ConsumerObserver.NewObserver(this._logger);
-            await _consumer.BecomeConsumer(streamId, GetStreamProvider(providerToUse), streamNamespace);
+            await _consumer.BecomeConsumer(streamId, this.GetStreamProvider(providerToUse), streamNamespace);
         }
 
         public async Task<int> GetItemsConsumed()
@@ -849,7 +849,7 @@ namespace UnitTests.Grains
 
         public async Task StopBeingConsumer()
         {
-            await _consumer.StopBeingConsumer(GetStreamProvider(_providerToUseForConsumer));
+            await _consumer.StopBeingConsumer(this.GetStreamProvider(_providerToUseForConsumer));
             _consumer = null;
         }
 
@@ -916,7 +916,7 @@ namespace UnitTests.Grains
             }
 
             ConsumerObserver consumerObserver = ConsumerObserver.NewObserver(_logger);
-            await consumerObserver.BecomeConsumer(streamGuid, GetStreamProvider(providerToUse), streamNamespace);
+            await consumerObserver.BecomeConsumer(streamGuid, this.GetStreamProvider(providerToUse), streamNamespace);
             _observers[providerToUse] = consumerObserver;
         }
 
@@ -948,7 +948,7 @@ namespace UnitTests.Grains
 
         public async Task StopBeingConsumer()
         {
-            await Task.WhenAll(_observers.Select(i => i.Value.StopBeingConsumer(GetStreamProvider(i.Key))));
+            await Task.WhenAll(_observers.Select(i => i.Value.StopBeingConsumer(this.GetStreamProvider(i.Key))));
             _observers = null;
         }
 

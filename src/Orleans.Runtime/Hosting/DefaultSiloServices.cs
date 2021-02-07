@@ -19,8 +19,6 @@ using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
 using Orleans.Serialization;
 using Orleans.Statistics;
-using Orleans.Streams;
-using Orleans.Streams.Core;
 using Orleans.Timers;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
@@ -94,9 +92,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<SchedulerStatisticsGroup>();
             services.TryAddSingleton<SerializationStatisticsGroup>();
             services.TryAddSingleton<OverloadDetector>();
-
-            // queue balancer contructing related
-            services.TryAddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
 
             services.TryAddSingleton<FallbackSystemTarget>();
             services.TryAddSingleton<LifecycleSchedulingSystemTarget>();
@@ -193,18 +188,8 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClientDirectory>();
             
             services.TryAddSingleton<SiloProviderRuntime>();
-            services.TryAddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
-            services.TryAddSingleton<ImplicitStreamSubscriberTable>();
-            services.AddSingleton<IConfigureGrainContext, StreamConsumerGrainContextAction>();
-            services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
-            services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
-            services.AddSingletonKeyedService<string, IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
-            services.AddTransientKeyedService<Type, IGrainExtension>(typeof(IStreamConsumerExtension), (sp, _) =>
-            {
-                var runtime = sp.GetRequiredService<IStreamProviderRuntime>();
-                return new StreamConsumerExtension(runtime, RuntimeContext.CurrentGrainContext?.GrainInstance as IStreamSubscriptionObserver);
-            });
+
             services.TryAddSingleton<MessageFactory>();
 
             services.TryAddSingleton<Factory<Grain, ILogConsistencyProtocolServices>>(FactoryUtility.Create<Grain, ProtocolServices>);
@@ -275,7 +260,6 @@ namespace Orleans.Hosting
             services.AddSingleton<IncomingRequestMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
 
-            services.TryAddSingleton<IStreamSubscriptionManagerAdmin>(sp => new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
             services.TryAddSingleton<IConsistentRingProvider>(
                 sp =>
                 {

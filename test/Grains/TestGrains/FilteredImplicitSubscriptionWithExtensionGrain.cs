@@ -21,7 +21,7 @@ namespace UnitTests.Grains
         public override async Task OnActivateAsync()
         {
             logger.Info("OnActivateAsync");
-            var streamProvider = GetStreamProvider("SMSProvider");
+            var streamProvider = this.GetStreamProvider("SMSProvider");
 
             var streamIdentity = this.GetImplicitStreamIdentity();
             var stream = streamProvider.GetStream<int>(streamIdentity.Guid, streamIdentity.Namespace);
