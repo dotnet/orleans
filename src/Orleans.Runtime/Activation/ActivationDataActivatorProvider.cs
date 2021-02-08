@@ -175,7 +175,7 @@ namespace Orleans.Runtime
                     _sharedComponents,
                     _activationMessageScheduler);
 
-                RuntimeContext.SetExecutionContext(context, out var existingContext);
+                RuntimeContext.SetExecutionContext(context, null, out var existingContext, out var existingCallChainId);
 
                 try
                 {
@@ -187,7 +187,7 @@ namespace Orleans.Runtime
                 }
                 finally
                 {
-                    RuntimeContext.SetExecutionContext(existingContext);
+                    RuntimeContext.SetExecutionContext(existingContext, existingCallChainId);
                 }
 
                 return context;
