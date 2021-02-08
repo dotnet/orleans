@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.Streams.Core;
 using Orleans.Configuration.Internal;
+using System.Linq;
 
 namespace Orleans.Hosting
 {
@@ -16,6 +17,11 @@ namespace Orleans.Hosting
 
         private static void AddClientStreaming(this IServiceCollection services)
         {
+            if (services.Any(service => service.ServiceType.Equals(typeof(ClientStreamingProviderRuntime))))
+            {
+                return;
+            }
+
             services.AddSingleton<ClientStreamingProviderRuntime>();
             services.AddFromExisting<IStreamProviderRuntime, ClientStreamingProviderRuntime>();
             services.AddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
@@ -74,7 +80,6 @@ namespace Orleans.Hosting
             this IClientBuilder builder,
             string name,
             Action<SimpleMessageStreamProviderOptions> configureOptions)
-
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b
                 .Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
@@ -87,11 +92,9 @@ namespace Orleans.Hosting
             this IClientBuilder builder,
             string name,
             Action<OptionsBuilder<SimpleMessageStreamProviderOptions>> configureOptions = null)
-
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b
                 .Configure(configureOptions));
         }
-
     }
 }

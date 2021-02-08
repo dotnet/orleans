@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -18,10 +19,16 @@ namespace Orleans.Hosting
 
         public static ISiloBuilder AddStreaming(this ISiloBuilder builder) => builder.ConfigureServices(AddSiloStreaming);
 
-        private static void AddSiloStreaming(this IServiceCollection services)
+        public static void AddSiloStreaming(this IServiceCollection services)
         {
-            services.TryAddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();
-            services.TryAddSingleton<ImplicitStreamSubscriberTable>();
+            if (services.Any(service => service.ServiceType.Equals(typeof(SiloStreamProviderRuntime))))
+            {
+                return;
+            }
+
+            services.AddSingleton<SiloStreamProviderRuntime>();
+            services.AddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();
+            services.AddSingleton<ImplicitStreamSubscriberTable>();
             services.AddSingleton<IConfigureGrainContext, StreamConsumerGrainContextAction>();
             services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
             services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
@@ -32,9 +39,9 @@ namespace Orleans.Hosting
                 var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
                 return new StreamConsumerExtension(runtime, (IStreamSubscriptionObserver) grainContextAccessor.GrainContext?.GrainInstance);
             });
-            services.TryAddSingleton<IStreamSubscriptionManagerAdmin>(sp =>
+            services.AddSingleton<IStreamSubscriptionManagerAdmin>(sp =>
                 new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
-            services.TryAddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
+            services.AddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
 
             // One stream directory per activation
             services.AddScoped<StreamDirectory>();
@@ -72,7 +79,6 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder AddSimpleMessageStreamProvider(this ISiloHostBuilder builder, string name,
             Action<SimpleMessageStreamProviderOptions> configureOptions)
-
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b
                 .Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
@@ -83,7 +89,6 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder AddSimpleMessageStreamProvider(this ISiloHostBuilder builder, string name,
             Action<OptionsBuilder<SimpleMessageStreamProviderOptions>> configureOptions = null)
-
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b.Configure(configureOptions));
         }
@@ -120,7 +125,6 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloBuilder AddSimpleMessageStreamProvider(this ISiloBuilder builder, string name,
             Action<SimpleMessageStreamProviderOptions> configureOptions)
-
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b
                 .Configure<SimpleMessageStreamProviderOptions>(ob => ob.Configure(configureOptions)));
@@ -131,7 +135,6 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloBuilder AddSimpleMessageStreamProvider(this ISiloBuilder builder, string name,
             Action<OptionsBuilder<SimpleMessageStreamProviderOptions>> configureOptions = null)
-
         {
             return AddSimpleMessageStreamProvider(builder, name, b => b.Configure(configureOptions));
         }
@@ -151,12 +154,9 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(svc => svc.AddStreamFilter<T>(name));
         }
 
-
         public static IServiceCollection AddStreamFilter<T>(this IServiceCollection services, string name) where T : class, IStreamFilter
         {
-            //services.TryAddSingleton<T>();
             return services.AddSingletonNamedService<IStreamFilter, T>(name);
         }
-
     }
 }

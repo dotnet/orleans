@@ -31,6 +31,7 @@ namespace Orleans.Hosting
         public ClusterClientPersistentStreamConfigurator(string name, IClientBuilder clientBuilder, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
             : base(name, configureDelegate => clientBuilder.ConfigureServices(configureDelegate))
         {
+            clientBuilder.AddStreaming();
             this.ConfigureComponent(PersistentStreamProvider.Create);
             this.ConfigureComponent(PersistentStreamProvider.ParticipateIn<IClusterClientLifecycle>);
             this.ConfigureComponent(adapterFactory);

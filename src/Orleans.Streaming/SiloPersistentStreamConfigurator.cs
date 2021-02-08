@@ -45,6 +45,7 @@ namespace Orleans.Hosting
         public SiloPersistentStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, Func<IServiceProvider, string, IQueueAdapterFactory> adapterFactory)
             : base(name, configureDelegate)
         {
+            this.ConfigureDelegate(services => services.AddSiloStreaming());
             this.ConfigureComponent(PersistentStreamProvider.Create);
             this.ConfigureComponent((s, n) => s.GetServiceByName<IStreamProvider>(n) as IControllable);
             this.ConfigureComponent(PersistentStreamProvider.ParticipateIn<ISiloLifecycle>);
