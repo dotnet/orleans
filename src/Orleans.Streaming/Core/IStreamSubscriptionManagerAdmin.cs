@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,6 +13,6 @@ namespace Orleans.Streams.Core
 
     public static class StreamSubscriptionManagerType
     {
-        public readonly static string ExplicitSubscribeOnly = "ExplicitSubscribeOnly";
+        public const string ExplicitSubscribeOnly = "ExplicitSubscribeOnly";
     }
 }

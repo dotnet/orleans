@@ -1,6 +1,8 @@
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
@@ -21,7 +23,8 @@ namespace Tester.AzureUtils.Streaming
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+                builder.AddSiloBuilderConfigurator<TestClusterConfigurator>();
+                builder.AddClientBuilderConfigurator<TestClusterConfigurator>();
             }
 
             public override async Task DisposeAsync()
@@ -40,7 +43,7 @@ namespace Tester.AzureUtils.Streaming
             }
         }
 
-        private class SiloConfigurator : ISiloConfigurator
+        private class TestClusterConfigurator : ISiloConfigurator, IClientBuilderConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
@@ -66,6 +69,8 @@ namespace Tester.AzureUtils.Streaming
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("PubSubStore");
             }
+
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
         }
 
         public AQSubscriptionObserverWithImplicitSubscribingTests(ITestOutputHelper output, Fixture fixture)

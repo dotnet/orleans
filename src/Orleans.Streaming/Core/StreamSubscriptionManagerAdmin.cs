@@ -8,29 +8,23 @@ namespace Orleans.Streams.Core
 {
     internal class StreamSubscriptionManagerAdmin : IStreamSubscriptionManagerAdmin
     {
-        private Dictionary<string, IStreamSubscriptionManager> managerStore;
+        private readonly StreamSubscriptionManager _explicitStreamSubscriptionManager;
+
         public StreamSubscriptionManagerAdmin(IStreamProviderRuntime providerRuntime)
         {
             // using ExplicitGrainBasedAndImplicit pubsub here, so if StreamSubscriptionManager.Add(Remove)Subscription called on a implicit subscribed
             // consumer grain, its subscription will be handled by ImplicitPubsub, and will not be messed into GrainBasedPubsub 
-            var explicitStreamSubscriptionManager = new StreamSubscriptionManager(providerRuntime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit), 
+            _explicitStreamSubscriptionManager = new StreamSubscriptionManager(providerRuntime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit), 
                 StreamSubscriptionManagerType.ExplicitSubscribeOnly);
-            managerStore = new Dictionary<string, IStreamSubscriptionManager>();
-            managerStore.Add(StreamSubscriptionManagerType.ExplicitSubscribeOnly, explicitStreamSubscriptionManager);
         }
 
         public IStreamSubscriptionManager GetStreamSubscriptionManager(string managerType)
         {
-            IStreamSubscriptionManager manager;
-            if (this.managerStore.TryGetValue(managerType, out manager))
+            return managerType switch
             {
-                return manager;
-            }
-            else
-            {
-                throw new KeyNotFoundException($"Cannot find StreamSubscriptionManager with type {managerType}.");
-            }
-                
+                StreamSubscriptionManagerType.ExplicitSubscribeOnly => _explicitStreamSubscriptionManager,
+                _ => throw new KeyNotFoundException($"Cannot find StreamSubscriptionManager with type {managerType}.")
+            };
         }
     }
 }

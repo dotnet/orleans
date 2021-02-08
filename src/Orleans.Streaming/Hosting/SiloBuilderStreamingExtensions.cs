@@ -69,7 +69,7 @@ namespace Orleans.Hosting
             Action<ISimpleMessageStreamConfigurator> configureStream)
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
-            var streamConfigurator = new SimpleMessageStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate));
+            var streamConfigurator = new SimpleMessageStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate), builder);
             configureStream?.Invoke(streamConfigurator);
             return builder;
         }
@@ -115,7 +115,7 @@ namespace Orleans.Hosting
             Action<ISimpleMessageStreamConfigurator> configureStream)
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
-            var streamConfigurator = new SimpleMessageStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate));
+            var streamConfigurator = new SimpleMessageStreamConfigurator(name, configureDelegate => builder.ConfigureServices(configureDelegate), builder);
             configureStream?.Invoke(streamConfigurator);
             return builder;
         }

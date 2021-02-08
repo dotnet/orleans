@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -41,13 +42,14 @@ namespace UnitTests.StreamingTests
         private string StreamNamespace;
         private readonly ITestOutputHelper output;
         private const int queueCount = 8;
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(Orleans.TestingHost.TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.AddSiloBuilderConfigurator<TestClusterBuilder>();
+            builder.AddClientBuilderConfigurator<TestClusterBuilder>();
         }
 
-        private class SiloBuilderConfigurator : ISiloConfigurator
+        private class TestClusterBuilder : ISiloConfigurator, IClientBuilderConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
@@ -78,6 +80,8 @@ namespace UnitTests.StreamingTests
                         }))
                     .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1);
             }
+
+            public void Configure(IConfiguration configuration, Orleans.IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
         }
 
         public StreamLimitTests(ITestOutputHelper output)

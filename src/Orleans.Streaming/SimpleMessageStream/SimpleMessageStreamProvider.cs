@@ -32,7 +32,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             SimpleMessageStreamProviderOptions options,
             IStreamFilter streamFilter,
             ILoggerFactory loggerFactory,
-            IProviderRuntime providerRuntime,
+            IServiceProvider services,
             SerializationManager serializationManager)
         {
             this.loggerFactory = loggerFactory;
@@ -40,7 +40,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             this.logger = loggerFactory.CreateLogger<SimpleMessageStreamProvider>();
             this.options = options;
             this.streamFilter = streamFilter;
-            this.providerRuntime = providerRuntime as IStreamProviderRuntime;
+            this.providerRuntime = services.GetRequiredService<IStreamProviderRuntime>();
             this.runtimeClient = providerRuntime.ServiceProvider.GetService<IRuntimeClient>();
             this.serializationManager = serializationManager;
             if (this.options.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit

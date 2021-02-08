@@ -8,9 +8,22 @@ namespace Orleans.Hosting
 
     public class SimpleMessageStreamConfigurator : NamedServiceConfigurator, ISimpleMessageStreamConfigurator
     {
-        public SimpleMessageStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate)
+        public SimpleMessageStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, IClientBuilder builder)
             : base(name, configureDelegate)
         {
+            builder.AddStreaming();
+            this.ConfigureComponent(SimpleMessageStreamProvider.Create);
+        }
+
+        public SimpleMessageStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, ISiloBuilder builder) : base(name, configureDelegate)
+        {
+            builder.AddStreaming();
+            this.ConfigureComponent(SimpleMessageStreamProvider.Create);
+        }
+
+        public SimpleMessageStreamConfigurator(string name, Action<Action<IServiceCollection>> configureDelegate, ISiloHostBuilder builder) : base(name, configureDelegate)
+        {
+            builder.AddStreaming();
             this.ConfigureComponent(SimpleMessageStreamProvider.Create);
         }
     }
