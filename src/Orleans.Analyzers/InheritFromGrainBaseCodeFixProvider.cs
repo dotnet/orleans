@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
@@ -11,7 +11,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace TestOrleansAnalyzer
+namespace Orleans.Analyzers
 {
     [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(InheritFromGrainBaseCodeFixProvider)), Shared]
     public class InheritFromGrainBaseCodeFixProvider : CodeFixProvider
