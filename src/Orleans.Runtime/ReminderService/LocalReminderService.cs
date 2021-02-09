@@ -8,13 +8,13 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal class LocalReminderService : GrainService, IReminderService
+    internal sealed class LocalReminderService : GrainService, IReminderService
     {
         private const int InitialReadRetryCountBeforeFastFailForUpdates = 2;
         private static readonly TimeSpan InitialReadMaxWaitTimeForUpdates = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan InitialReadRetryPeriod = TimeSpan.FromSeconds(30);
         private readonly ILogger logger;
-        private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders;
+        private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders = new();
         private readonly IReminderTable reminderTable;
         private readonly TaskCompletionSource<bool> startedTask;
         private readonly AverageTimeSpanStatistic tardinessStat;
@@ -34,11 +34,9 @@ namespace Orleans.Runtime.ReminderService
             IAsyncTimerFactory asyncTimerFactory)
             : base(SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, silo.SiloAddress), silo, loggerFactory)
         {
-            localReminders = new Dictionary<ReminderIdentity, LocalReminderData>();
             this.reminderTable = reminderTable;
             this.initTimeout = initTimeout;
             this.asyncTimerFactory = asyncTimerFactory;
-            localTableSequence = 0;
             tardinessStat = AverageTimeSpanStatistic.FindOrCreate(StatisticNames.REMINDERS_AVERAGE_TARDINESS_SECONDS);
             IntValueStatistic.FindOrCreate(StatisticNames.REMINDERS_NUMBER_ACTIVE_REMINDERS, () => localReminders.Count);
             ticksDeliveredStat = CounterStatistic.FindOrCreate(StatisticNames.REMINDERS_COUNTERS_TICKS_DELIVERED);
@@ -169,9 +167,9 @@ namespace Orleans.Runtime.ReminderService
         /// <summary>
         /// Attempt to retrieve reminders from the global reminder table
         /// </summary>
-        private async Task ReadAndUpdateReminders()
+        private Task ReadAndUpdateReminders()
         {
-            if (StoppedCancellationTokenSource.IsCancellationRequested) return;
+            if (StoppedCancellationTokenSource.IsCancellationRequested) return Task.CompletedTask;
 
             RemoveOutOfRangeReminders();
 
@@ -183,8 +181,9 @@ namespace Orleans.Runtime.ReminderService
             {
                 acks.Add(ReadTableAndStartTimers(range, rangeSerialNumberCopy));
             }
-            await Task.WhenAll(acks);
-            if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();
+            var task = Task.WhenAll(acks);
+            if (logger.IsEnabled(LogLevel.Trace)) task.ContinueWith(_ => PrintReminders(), TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
+            return task;
         }
 
         private void RemoveOutOfRangeReminders()
@@ -203,13 +202,13 @@ namespace Orleans.Runtime.ReminderService
             if (logger.IsEnabled(LogLevel.Information) && remindersOutOfRange.Length > 0) logger.Info($"Removed {remindersOutOfRange.Length} local reminders that are now out of my range.");
         }
 
-        public override async Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
+        public override Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
-            await base.OnRangeChange(oldRange, newRange, increased);
+            _ = base.OnRangeChange(oldRange, newRange, increased);
             if (Status == GrainServiceStatus.Started)
-                await ReadAndUpdateReminders();
-            else
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Ignoring range change until ReminderService is Started -- Current status = {0}", Status);
+                return ReadAndUpdateReminders();
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Ignoring range change until ReminderService is Started -- Current status = {0}", Status);
+            return Task.CompletedTask;
         }
 
         private async Task RunAsync()
@@ -422,7 +421,7 @@ namespace Orleans.Runtime.ReminderService
             return true;
         }
 
-        private async Task DoResponsibilitySanityCheck(GrainReference grainRef, string debugInfo)
+        private Task DoResponsibilitySanityCheck(GrainReference grainRef, string debugInfo)
         {
             switch (Status)
             {
@@ -433,18 +432,23 @@ namespace Orleans.Runtime.ReminderService
                     if (task.IsCompleted)
                     {
                         // task at this point is already Faulted
-                        await task;
+                        task.GetAwaiter().GetResult();
                     }
                     else
                     {
-                        try
+                        return WaitForInitCompletion();
+                        async Task WaitForInitCompletion()
                         {
-                            // wait for the initial load task to complete (with a timeout)
-                            await task.WithTimeout(InitialReadMaxWaitTimeForUpdates);
-                        }
-                        catch (TimeoutException ex)
-                        {
-                            throw new OrleansException("Reminder Service is still initializing and it is taking a long time. Please retry again later.", ex);
+                            try
+                            {
+                                // wait for the initial load task to complete (with a timeout)
+                                await task.WithTimeout(InitialReadMaxWaitTimeForUpdates);
+                            }
+                            catch (TimeoutException ex)
+                            {
+                                throw new OrleansException("Reminder Service is still initializing and it is taking a long time. Please retry again later.", ex);
+                            }
+                            CheckRange();
                         }
                     }
                     break;
@@ -455,13 +459,18 @@ namespace Orleans.Runtime.ReminderService
                 default:
                     throw new InvalidOperationException("status");
             }
+            CheckRange();
+            return Task.CompletedTask;
 
-            if (!RingRange.InRange(grainRef))
+            void CheckRange()
             {
-                logger.Warn(ErrorCode.RS_NotResponsible, "I shouldn't have received request '{0}' for {1}. It is not in my responsibility range: {2}",
-                    debugInfo, grainRef.ToString(), RingRange);
-                // For now, we still let the caller proceed without throwing an exception... the periodical mechanism will take care of reminders being registered at the wrong silo
-                // otherwise, we can either reject the request, or re-route the request
+                if (!RingRange.InRange(grainRef))
+                {
+                    logger.Warn(ErrorCode.RS_NotResponsible, "I shouldn't have received request '{0}' for {1}. It is not in my responsibility range: {2}",
+                        debugInfo, grainRef.ToString(), RingRange);
+                    // For now, we still let the caller proceed without throwing an exception... the periodical mechanism will take care of reminders being registered at the wrong silo
+                    // otherwise, we can either reject the request, or re-route the request
+                }
             }
         }
 

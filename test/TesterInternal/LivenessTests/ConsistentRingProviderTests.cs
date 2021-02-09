@@ -54,8 +54,7 @@ namespace UnitTests.LivenessTests
             for (int i = 1; i <= 10; i++)
             {
                 ring.SiloStatusChangeNotification(SiloAddressUtils.NewLocalSiloAddress(i), SiloStatus.Active);
-                var range = RangeFactory.CreateEquallyDividedMultiRange(ring.GetMyRange(), 5);
-                output.WriteLine("\n\n*** Silo1 range: {0}. \n*** The whole ring with {1} silos is:\n{2}\n\n", range.ToCompactString(), i + 1, ring.ToString());
+                output.WriteLine("\n\n*** Silo1 range: {0}.\n*** The whole ring with {1} silos is:\n{2}\n\n", ring.GetMyRange(), i + 1, ring.ToString());
             }
         }
 
@@ -76,22 +75,20 @@ namespace UnitTests.LivenessTests
                 ring.SiloStatusChangeNotification(SiloAddressUtils.NewLocalSiloAddress(random.Next(100000)), SiloStatus.Active);
             }
   
-            IDictionary<SiloAddress, IRingRangeInternal> siloRanges = ring.GetRanges();
-            List<Tuple<SiloAddress, IRingRangeInternal>> sortedSiloRanges =
-                siloRanges.Select(kv => new Tuple<SiloAddress, IRingRangeInternal>(kv.Key, kv.Value)).ToList();
+            var siloRanges = ring.GetRanges();
+            var sortedSiloRanges = siloRanges.ToList();
             sortedSiloRanges.Sort((t1, t2) => t1.Item2.RangePercentage().CompareTo(t2.Item2.RangePercentage()));
 
-            Dictionary<SiloAddress, List<IRingRangeInternal>> allAgentRanges = new Dictionary<SiloAddress, List<IRingRangeInternal>>();
+            var allAgentRanges = new List<(SiloAddress, List<IRingRangeInternal>)>();
             foreach (var siloRange in siloRanges)
             {
-                var multiRange = RangeFactory.CreateEquallyDividedMultiRange(siloRange.Value, NUM_AGENTS);
                 List<IRingRangeInternal> agentRanges = new List<IRingRangeInternal>();
                 for(int i=0; i < NUM_AGENTS; i++)
                 {
-                    IRingRangeInternal agentRange = (IRingRangeInternal)multiRange.GetSubRange(i);
+                    IRingRangeInternal agentRange = (IRingRangeInternal)RangeFactory.GetEquallyDividedSubRange(siloRange.Value, NUM_AGENTS, i);
                     agentRanges.Add(agentRange);
                 }
-                allAgentRanges.Add(siloRange.Key, agentRanges);
+                allAgentRanges.Add((siloRange.Key, agentRanges));
             }
 
             Dictionary<SiloAddress, List<int>> queueHistogram = GetQueueHistogram(allAgentRanges, (int)NUM_QUEUES);
@@ -104,14 +101,14 @@ namespace UnitTests.LivenessTests
 
             output.WriteLine("\n\n*** The whole ring with {0} silos is:\n{1}\n\n", NUM_SILOS, str);
 
-            output.WriteLine("Total number of queues is: {0}", queueHistogram.Values.Select(list => list.Sum()).Sum());
+            output.WriteLine("Total number of queues is: {0}", queueHistogram.Values.Sum(list => list.Sum()));
             output.WriteLine("Expected average range per silo is: {0:0.00}%, expected #queues per silo is: {1:0.00}, expected #queues per agent is: {2:0.000}.",
                 100.0 / NUM_SILOS, NUM_QUEUES / NUM_SILOS, NUM_QUEUES / (NUM_SILOS * NUM_AGENTS));
             output.WriteLine("Min #queues per silo is: {0}, Max #queues per silo is: {1}.",
-                queueHistogram.Values.Select(list => list.Sum()).ToList().Min(), queueHistogram.Values.Select(list => list.Sum()).ToList().Max());
+                queueHistogram.Values.Min(list => list.Sum()), queueHistogram.Values.Max(list => list.Sum()));
         }
 
-        private Dictionary<SiloAddress, List<int>> GetQueueHistogram(Dictionary<SiloAddress, List<IRingRangeInternal>> siloRanges, int totalNumQueues)
+        private Dictionary<SiloAddress, List<int>> GetQueueHistogram(List<(SiloAddress Key, List<IRingRangeInternal> Value)> siloRanges, int totalNumQueues)
         {
             var options = new HashRingStreamQueueMapperOptions();
             options.TotalQueueCount = totalNumQueues;

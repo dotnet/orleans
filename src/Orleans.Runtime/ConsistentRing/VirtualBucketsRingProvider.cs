@@ -12,16 +12,15 @@ namespace Orleans.Runtime.ConsistentRing
     /// Note: MembershipOracle uses 'forward/counter-clockwise' definition to assign responsibilities. 
     /// E.g. in a ring of nodes {5, 10, 15}, the responsible of key 7 is node 5 (the node is responsible for its sucessing range)..
     /// </summary>
-    internal class VirtualBucketsRingProvider :
+    internal sealed class VirtualBucketsRingProvider :
         IConsistentRingProvider, ISiloStatusListener
     {
-        private readonly List<IRingRangeListener> statusListeners;
-        private readonly SortedDictionary<uint, SiloAddress> bucketsMap;
-        private List<Tuple<uint, SiloAddress>> sortedBucketsList; // flattened sorted bucket list for fast lock-free calculation of CalculateTargetSilo
+        private readonly List<IRingRangeListener> statusListeners = new();
+        private readonly SortedDictionary<uint, SiloAddress> bucketsMap = new();
+        private (uint Hash, SiloAddress SiloAddress)[] sortedBucketsList; // flattened sorted bucket list for fast lock-free calculation of CalculateTargetSilo
         private readonly ILogger logger;
         private readonly SiloAddress myAddress;
         private readonly int numBucketsPerSilo;
-        private readonly object lockable;
         private bool running;
         private IRingRange myRange;
 
@@ -29,20 +28,16 @@ namespace Orleans.Runtime.ConsistentRing
         {
             numBucketsPerSilo = numVirtualBuckets;
 
-            if (numBucketsPerSilo <= 0 )
+            if (numBucketsPerSilo <= 0)
                 throw new IndexOutOfRangeException("numBucketsPerSilo is out of the range. numBucketsPerSilo = " + numBucketsPerSilo);
 
             logger = loggerFactory.CreateLogger<VirtualBucketsRingProvider>();
-                        
-            statusListeners = new List<IRingRangeListener>();
-            bucketsMap = new SortedDictionary<uint, SiloAddress>();
-            sortedBucketsList = new List<Tuple<uint, SiloAddress>>();
+
             myAddress = siloAddress;
-            lockable = new object();
             running = true;
             myRange = RangeFactory.CreateFullRange();
 
-            logger.Info("Starting {0} on silo {1}.", typeof(VirtualBucketsRingProvider).Name, siloAddress.ToStringWithHashCode());
+            logger.Info("Starting {0} on silo {1}.", nameof(VirtualBucketsRingProvider), siloAddress.ToStringWithHashCode());
 
             StringValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RING, ToString);
             IntValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_RINGSIZE, () => GetRingSize());
@@ -51,8 +46,8 @@ namespace Orleans.Runtime.ConsistentRing
             FloatValueStatistic.FindOrCreate(StatisticNames.CONSISTENTRING_AVERAGERINGPERCENTAGE, () =>
             {
                 int size = GetRingSize();
-                return size == 0 ? 0 : ((float)100.0/(float) size);
-            });           
+                return size == 0 ? 0 : ((float)100.0 / (float)size);
+            });
 
             // add myself to the list of members
             AddServer(myAddress);
@@ -70,7 +65,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         private int GetRingSize()
         {
-            lock (lockable)
+            lock (bucketsMap)
             {
                 return bucketsMap.Values.Distinct().Count();
             }
@@ -91,17 +86,17 @@ namespace Orleans.Runtime.ConsistentRing
         {
             lock (statusListeners)
             {
-                return statusListeners.Contains(observer) && statusListeners.Remove(observer);
+                return statusListeners.Remove(observer);
             }
         }
 
         private void NotifyLocalRangeSubscribers(IRingRange old, IRingRange now, bool increased)
         {
             logger.Info(ErrorCode.CRP_Notify, "-NotifyLocalRangeSubscribers about old {0} new {1} increased? {2}", old.ToString(), now.ToString(), increased);
-            List<IRingRangeListener> copy;
+            IRingRangeListener[] copy;
             lock (statusListeners)
             {
-                copy = statusListeners.ToList();
+                copy = statusListeners.ToArray();
             }
             foreach (IRingRangeListener listener in copy)
             {
@@ -120,9 +115,9 @@ namespace Orleans.Runtime.ConsistentRing
 
         private void AddServer(SiloAddress silo)
         {
-            lock (lockable)
+            var hashes = silo.GetUniformHashCodes(numBucketsPerSilo);
+            lock (bucketsMap)
             {
-                List<uint> hashes = silo.GetUniformHashCodes(numBucketsPerSilo);
                 foreach (var hash in hashes)
                 {
                     if (bucketsMap.TryGetValue(hash, out var other))
@@ -134,21 +129,16 @@ namespace Orleans.Runtime.ConsistentRing
                 }
 
                 var myOldRange = myRange;
-                var bucketsList = bucketsMap.Select(pair => new Tuple<uint, SiloAddress>(pair.Key, pair.Value)).ToList();
-                var myNewRange = CalculateRange(bucketsList, myAddress);
-
-                // capture my range and sortedBucketsList for later lock-free access.
-                myRange = myNewRange;
-                sortedBucketsList = bucketsList;
+                var myNewRange = UpdateRange();
                 logger.Info(ErrorCode.CRP_Added_Silo, "Added Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
 
                 NotifyLocalRangeSubscribers(myOldRange, myNewRange, true);
             }
         }
-        
-        internal void RemoveServer(SiloAddress silo)
+
+        private void RemoveServer(SiloAddress silo)
         {
-            lock (lockable)
+            lock (bucketsMap)
             {
                 if (!bucketsMap.ContainsValue(silo)) return; // we have already removed this silo
 
@@ -159,61 +149,68 @@ namespace Orleans.Runtime.ConsistentRing
                 }
 
                 var myOldRange = this.myRange;
-                var bucketsList = bucketsMap.Select(pair => new Tuple<uint, SiloAddress>(pair.Key, pair.Value)).ToList();
-                var myNewRange = CalculateRange(bucketsList, myAddress);
-
-                // capture my range and sortedBucketsList for later lock-free access.
-                myRange = myNewRange;
-                sortedBucketsList = bucketsList;
+                var myNewRange = UpdateRange();
                 logger.Info(ErrorCode.CRP_Removed_Silo, "Removed Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
 
                 NotifyLocalRangeSubscribers(myOldRange, myNewRange, true);
             }
         }
 
-        private static IRingRange CalculateRange(List<Tuple<uint, SiloAddress>> list, SiloAddress silo)
+        private IRingRange UpdateRange()
+        {
+            var bucketsList = new (uint, SiloAddress)[bucketsMap.Count];
+            var idx = 0;
+            foreach (var pair in bucketsMap) bucketsList[idx++] = (pair.Key, pair.Value);
+            var myNewRange = CalculateRange(bucketsList, myAddress);
+
+            // capture my range and sortedBucketsList for later lock-free access.
+            myRange = myNewRange;
+            sortedBucketsList = bucketsList;
+            return myNewRange;
+        }
+
+        private static IRingRange CalculateRange((uint Hash, SiloAddress SiloAddress)[] list, SiloAddress silo)
         {
             var ranges = new List<IRingRange>();
-            for (int i = 0; i < list.Count; i++)
+            for (int i = 0; i < list.Length; i++)
             {
                 var curr = list[i];
-                var next = list[(i + 1) % list.Count];
+                var next = list[(i + 1) % list.Length];
                 // 'backward/clockwise' definition to assign responsibilities on the ring.
-                if (next.Item2.Equals(silo))
+                if (next.SiloAddress.Equals(silo))
                 {
-                    IRingRange range = RangeFactory.CreateRange(curr.Item1, next.Item1);
+                    IRingRange range = RangeFactory.CreateRange(curr.Hash, next.Hash);
                     ranges.Add(range);
                 }
             }
             return RangeFactory.CreateRange(ranges);
         }
 
-        // just for debugging
+        // for debugging/logging
         public override string ToString()
         {
-            Dictionary<SiloAddress, IRingRangeInternal> ranges = GetRanges();
-            List<KeyValuePair<SiloAddress, IRingRangeInternal>> sortedList = ranges.AsEnumerable().ToList();
+            var sortedList = GetRanges();
             sortedList.Sort((t1, t2) => t1.Value.RangePercentage().CompareTo(t2.Value.RangePercentage()));
             return Utils.EnumerableToString(sortedList, kv => String.Format("{0} -> {1}", kv.Key, kv.Value.ToString()));
         }
 
-        // Internal: for testing only!
-        internal Dictionary<SiloAddress, IRingRangeInternal> GetRanges()
+        // Internal: for testing/logging only!
+        internal List<(SiloAddress Key, IRingRangeInternal Value)> GetRanges()
         {
             List<SiloAddress> silos;
-            List<Tuple<uint, SiloAddress>> snapshotBucketsList;
-            lock (lockable)
+            (uint, SiloAddress)[] snapshotBucketsList;
+            lock (bucketsMap)
             {
                 silos = bucketsMap.Values.Distinct().ToList();
                 snapshotBucketsList = sortedBucketsList;
             }
-            var ranges = new Dictionary<SiloAddress, IRingRangeInternal>();
+            var ranges = new List<(SiloAddress, IRingRangeInternal)>(silos.Count);
             foreach (var silo in silos)
             {
                 var range = (IRingRangeInternal)CalculateRange(snapshotBucketsList, silo);
-                ranges.Add(silo, range);
+                ranges.Add((silo, range));
             }
-            
+
             return ranges;
         }
 
@@ -239,6 +236,7 @@ namespace Orleans.Runtime.ConsistentRing
                 }
             }
         }
+
         public SiloAddress GetPrimaryTargetSilo(uint key)
         {
             return CalculateTargetSilo(key);
@@ -257,12 +255,12 @@ namespace Orleans.Runtime.ConsistentRing
             // put a private reference to point to sortedBucketsList, 
             // so if someone is changing the sortedBucketsList reference, we won't get it changed in the middle of our operation.
             // The tricks of writing lock-free code!
-            var snapshotBucketsList = sortedBucketsList; 
+            var snapshotBucketsList = sortedBucketsList;
 
             // excludeMySelf from being a TargetSilo if we're not running and the excludeThisSIloIfStopping flag is true. see the comment in the Stop method.
             bool excludeMySelf = excludeThisSiloIfStopping && !running;
 
-            if (snapshotBucketsList.Count == 0)
+            if (snapshotBucketsList.Length == 0)
             {
                 // If the membership ring is empty, then we're the owner by default unless we're stopping.
                 return excludeMySelf ? null : myAddress;
@@ -271,23 +269,31 @@ namespace Orleans.Runtime.ConsistentRing
             // use clockwise ... current code in membershipOracle.CalculateTargetSilo() does counter-clockwise ...
             // if you want to stick to counter-clockwise, change the responsibility definition in 'In()' method & responsibility defs in OrleansReminderMemory
             // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
-            Tuple<uint, SiloAddress> s = snapshotBucketsList.Find(tuple => (tuple.Item1 >= hash) && // <= hash for counter-clockwise responsibilities
-                                (!tuple.Item2.Equals(myAddress) || !excludeMySelf));
+            (uint Hash, SiloAddress SiloAddress) s = default;
+            foreach (var tuple in snapshotBucketsList)
+            {
+                if (tuple.Hash >= hash && // <= hash for counter-clockwise responsibilities
+                    (!tuple.SiloAddress.Equals(myAddress) || !excludeMySelf))
+                {
+                    s = tuple;
+                    break;
+                }
+            }
 
-            if (s == null)
+            if (s.SiloAddress == null)
             {
                 // if not found in traversal, then first silo should be returned (we are on a ring)
                 // if you go back to their counter-clockwise policy, then change the 'In()' method in OrleansReminderMemory
                 s = snapshotBucketsList[0]; // vs [membershipRingList.Count - 1]; for counter-clockwise policy
                 // Make sure it's not us...
-                if (s.Item2.Equals(myAddress) && excludeMySelf)
+                if (s.SiloAddress.Equals(myAddress) && excludeMySelf)
                 {
                     // vs [membershipRingList.Count - 2]; for counter-clockwise policy
-                    s = snapshotBucketsList.Count > 1 ? snapshotBucketsList[1] : null;
+                    s = snapshotBucketsList.Length > 1 ? snapshotBucketsList[1] : default;
                 }
             }
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Calculated ring partition owner silo {0} for key {1}: {2} --> {3}", s.Item2, hash, hash, s.Item1);
-            return s.Item2;
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Calculated ring partition owner silo {0} for key {1}: {2} --> {3}", s.SiloAddress, hash, hash, s.Hash);
+            return s.SiloAddress;
         }
     }
 }

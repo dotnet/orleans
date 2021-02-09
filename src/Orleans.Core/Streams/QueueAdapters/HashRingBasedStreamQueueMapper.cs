@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -7,17 +6,15 @@ namespace Orleans.Streams
 {
     public class HashRingBasedStreamQueueMapper : IConsistentRingStreamQueueMapper
     {
-        private readonly int numQueues;
         private readonly HashRing<QueueId> hashRing;
 
         public HashRingBasedStreamQueueMapper(HashRingStreamQueueMapperOptions options, string queueNamePrefix)
         {
-            numQueues = options.TotalQueueCount;
-            var queueIds = new List<QueueId>(numQueues);
+            var numQueues = options.TotalQueueCount;
+            var queueIds = new QueueId[numQueues];
             if (numQueues == 1)
             {
-                uint uniformHashCode = 0;
-                queueIds.Add(QueueId.GetQueueId(queueNamePrefix, 0, uniformHashCode));
+                queueIds[0] = QueueId.GetQueueId(queueNamePrefix, 0, 0);
             }
             else
             {
@@ -25,7 +22,7 @@ namespace Orleans.Streams
                 for (uint i = 0; i < numQueues; i++)
                 {
                     uint uniformHashCode = checked(portion * i);
-                    queueIds.Add(QueueId.GetQueueId(queueNamePrefix, i, uniformHashCode));
+                    queueIds[i] = QueueId.GetQueueId(queueNamePrefix, i, uniformHashCode);
                 }
             }
             this.hashRing = new HashRing<QueueId>(queueIds);
@@ -33,9 +30,16 @@ namespace Orleans.Streams
 
         public IEnumerable<QueueId> GetQueuesForRange(IRingRange range)
         {
+            var ls = new List<QueueId>();
             foreach (QueueId queueId in hashRing.GetAllRingMembers())
+            {
                 if (range.InRange(queueId.GetUniformHashCode()))
-                    yield return queueId;
+                {
+                    ls.Add(queueId);
+                }
+            }
+
+            return ls;
         }
 
         public IEnumerable<QueueId> GetAllQueues()
@@ -43,10 +47,9 @@ namespace Orleans.Streams
             return hashRing.GetAllRingMembers();
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
         public QueueId GetQueueForStream(StreamId streamId)
         {
-            return hashRing.CalculateResponsible((uint) streamId.GetHashCode());
+            return hashRing.CalculateResponsible((uint)streamId.GetHashCode());
         }
 
         public override string ToString()
