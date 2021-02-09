@@ -27,7 +27,5 @@
     <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="$(MicrosoftAzureCosmosTableVersion)" />
     <PackageReference Include="System.Net.NameResolution" Version="$(SystemNetNameResolutionVersion)" />
     <PackageReference Include="Azure.Messaging.EventHubs" Version="$(AzureMessagingEventHubs)" />
-    <!-- Should not be needed donce AzureMessagingEventHubs is upgraded to 5.3.0 -->
-    <PackageReference Include="Microsoft.Azure.Amqp" Version="$(MicrosoftAzureAmqp)" />
   </ItemGroup>
 </Project>
