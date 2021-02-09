@@ -42,6 +42,7 @@ using Orleans.Networking.Shared;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime.Metadata;
 using Orleans.GrainReferences;
+using Orleans.Storage;
 
 namespace Orleans.Hosting
 {

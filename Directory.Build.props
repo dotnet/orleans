@@ -57,6 +57,7 @@
     <SystemCodeDomVersion>5.0.0</SystemCodeDomVersion>
     <SystemDiagnosticsDiagnosticsSourceVersion>5.0.1</SystemDiagnosticsDiagnosticsSourceVersion>
     <SystemSecurityCryptographyVersion>5.0.0</SystemSecurityCryptographyVersion>
+    <SystemMemoryData>1.0.1</SystemMemoryData>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>16.8.0</MicrosoftBuildVersion>
