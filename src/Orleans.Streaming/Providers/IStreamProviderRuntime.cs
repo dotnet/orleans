@@ -28,12 +28,6 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns></returns>
         IStreamPubSub PubSub(StreamPubSubType pubSubType);
-
-        /// <summary>A consistent ring interface.</summary>
-        /// <param name="mySubRangeIndex">Index of the silo in the ring.</param>
-        /// <param name="numSubRanges">Total number of sub ranges within this silo range.</param>
-        /// <returns></returns>
-        IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges);
     }
 
     /// <summary>

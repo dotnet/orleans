@@ -64,11 +64,6 @@ namespace Orleans.Runtime.Providers
             }
         }
 
-        public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
-        {
-            return new EquallyDividedRangeRingProvider(this.consistentRingProvider, this.loggerFactory, mySubRangeIndex, numSubRanges);
-        }
-
         public async Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
             IQueueAdapterFactory adapterFactory,

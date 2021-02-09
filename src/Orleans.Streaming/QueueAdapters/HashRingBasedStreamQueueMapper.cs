@@ -25,6 +25,7 @@ namespace Orleans.Streams
                     queueIds[i] = QueueId.GetQueueId(queueNamePrefix, i, uniformHashCode);
                 }
             }
+
             this.hashRing = new HashRing<QueueId>(queueIds);
         }
 

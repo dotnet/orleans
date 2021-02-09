@@ -66,16 +66,6 @@ namespace Orleans.Providers
             return this.runtimeClient.CurrentActivationIdentity;
         }
 
-        public void RegisterSystemTarget(ISystemTarget target)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void UnregisterSystemTarget(ISystemTarget target)
-        {
-            throw new NotImplementedException();
-        }
-
         public (TExtension, TExtensionInterface) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
             where TExtension : TExtensionInterface
             where TExtensionInterface : IGrainExtension
@@ -96,11 +86,6 @@ namespace Orleans.Providers
                 default:
                     return null;
             }
-        }
-
-        public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
-        {
-            throw new NotImplementedException("GetConsistentRingProvider");
         }
 
         public void Participate(IClusterClientLifecycle lifecycle)
