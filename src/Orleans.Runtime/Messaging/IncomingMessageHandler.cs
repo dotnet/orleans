@@ -43,10 +43,21 @@ namespace Orleans.Runtime.Messaging
                 if (target == null)
                 {
                     MessagingStatisticsGroup.OnRejectedMessage(msg);
-                    Message response = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
-                        string.Format("SystemTarget {0} not active on this silo. Msg={1}", msg.TargetGrain, msg));
-                    this.messageCenter.SendMessage(response);
-                    this.log.Warn(ErrorCode.MessagingMessageFromUnknownActivation, "Received a message {0} for an unknown SystemTarget: {1}", msg, msg.TargetAddress);
+                    this.log.LogWarning(
+                        (int)ErrorCode.MessagingMessageFromUnknownActivation,
+                        "Received a message {Message} for an unknown SystemTarget: {Target}",
+                         msg, msg.TargetAddress);
+
+                    // Send a rejection only on a request
+                    if (msg.Direction == Message.Directions.Request)
+                    {
+                        var response = this.messageFactory.CreateRejectionResponse(
+                            msg,
+                            Message.RejectionTypes.Unrecoverable,
+                            $"SystemTarget {msg.TargetGrain} not active on this silo. Msg={msg}");
+
+                        this.messageCenter.SendMessage(response);
+                    }
                     return;
                 }
                 context = target;
