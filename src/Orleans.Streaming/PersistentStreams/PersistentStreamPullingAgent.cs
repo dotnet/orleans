@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -13,7 +12,6 @@ using Orleans.Streams.Filtering;
 
 namespace Orleans.Streams
 {
-
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
         private static readonly IBackoffProvider DeliveryBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
@@ -45,7 +43,6 @@ namespace Orleans.Streams
         internal PersistentStreamPullingAgent(
             SystemTargetGrainId id,
             string strProviderName,
-            IStreamProviderRuntime runtime,
             ILoggerFactory loggerFactory,
             IStreamPubSub streamPubSub,
             IStreamFilter streamFilter,
@@ -54,7 +51,6 @@ namespace Orleans.Streams
             SiloAddress siloAddress)
             : base(id, siloAddress, true, loggerFactory)
         {
-            if (runtime == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: runtime reference should not be null");
             if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
 
             QueueId = queueId;
@@ -65,7 +61,7 @@ namespace Orleans.Streams
             this.options = options;
             numMessages = 0;
 
-            logger = runtime.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
+            logger = loggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
             logger.Info(ErrorCode.PersistentStreamPullingAgent_01,
                 "Created {0} {1} for Stream Provider {2} on silo {3} for Queue {4}.",
                 GetType().Name, ((ISystemTargetBase)this).GrainId.ToString(), streamProviderName, Silo, QueueId.ToStringWithHashCode());

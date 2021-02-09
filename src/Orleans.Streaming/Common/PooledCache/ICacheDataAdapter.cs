@@ -1,5 +1,3 @@
-
-using System;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common

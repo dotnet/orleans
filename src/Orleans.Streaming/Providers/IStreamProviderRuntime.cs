@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Providers;
@@ -23,10 +22,6 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns>The stream directory.</returns>
         StreamDirectory GetStreamDirectory();
-
-        void RegisterSystemTarget(ISystemTarget target);
-
-        void UnregisterSystemTarget(ISystemTarget target);
 
         /// <summary>
         /// A Pub Sub runtime interface.

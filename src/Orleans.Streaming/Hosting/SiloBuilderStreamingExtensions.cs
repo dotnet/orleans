@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
@@ -15,10 +14,19 @@ namespace Orleans.Hosting
 {
     public static class SiloBuilderStreamingExtensions
     {
+        /// <summary>
+        /// Add support for streaming to this application.
+        /// </summary>
         public static ISiloHostBuilder AddStreaming(this ISiloHostBuilder builder) => builder.ConfigureServices(AddSiloStreaming);
 
+        /// <summary>
+        /// Add support for streaming to this application.
+        /// </summary>
         public static ISiloBuilder AddStreaming(this ISiloBuilder builder) => builder.ConfigureServices(AddSiloStreaming);
 
+        /// <summary>
+        /// Add support for streaming to this silo.
+        /// </summary>
         public static void AddSiloStreaming(this IServiceCollection services)
         {
             if (services.Any(service => service.ServiceType.Equals(typeof(SiloStreamProviderRuntime))))

@@ -4,29 +4,32 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Orleans.Runtime.ConsistentRing;
 
 namespace Orleans.Streams
 {
     internal class ConsistentRingQueueBalancer : QueueBalancerBase, IAsyncRingRangeListener, IStreamQueueBalancer
     {
-        private IConsistentRingStreamQueueMapper streamQueueMapper;
-        private IRingRange myRange;
+        private readonly EquallyDividedRangeRingProvider _ringProvider;
+        private IConsistentRingStreamQueueMapper _streamQueueMapper;
+        private IRingRange _myRange;
 
         public static IStreamQueueBalancer Create(IServiceProvider services, string name)
         {
             return ActivatorUtilities.CreateInstance<ConsistentRingQueueBalancer>(services);
         }
 
-        public ConsistentRingQueueBalancer(IStreamProviderRuntime streamProviderRuntime, IServiceProvider services, ILogger<ConsistentRingQueueBalancer> logger)
+        public ConsistentRingQueueBalancer(IConsistentRingProvider consistentRingProvider, ILoggerFactory loggerFactory, IServiceProvider services, ILogger<ConsistentRingQueueBalancer> logger)
             : base(services,  logger)
         {
-            if (streamProviderRuntime == null)
+            if (consistentRingProvider == null)
             {
                 throw new ArgumentNullException("streamProviderRuntime");
             }
-            var ringProvider = streamProviderRuntime.GetConsistentRingProvider(0, 1);
-            myRange = ringProvider.GetMyRange();
-            ringProvider.SubscribeToRangeChangeEvents(this);
+
+            _ringProvider = new EquallyDividedRangeRingProvider(consistentRingProvider, loggerFactory, 0, 1);
+            _myRange = _ringProvider.GetMyRange();
+            _ringProvider.SubscribeToRangeChangeEvents(this);
         }
 
         public override Task Initialize(IStreamQueueMapper queueMapper)
@@ -39,19 +42,19 @@ namespace Orleans.Streams
             {
                 throw new ArgumentException("queueMapper for ConsistentRingQueueBalancer should implement IConsistentRingStreamQueueMapper", "queueMapper");
             }
-            streamQueueMapper = (IConsistentRingStreamQueueMapper)queueMapper;
+            _streamQueueMapper = (IConsistentRingStreamQueueMapper)queueMapper;
             return base.Initialize(queueMapper);
         }
 
         public Task RangeChangeNotification(IRingRange old, IRingRange now)
         {
-            myRange = now;
+            _myRange = now;
             return base.NotifyListeners();
         }
 
         public override IEnumerable<QueueId> GetMyQueues()
         {
-            return streamQueueMapper.GetQueuesForRange(myRange);
+            return _streamQueueMapper.GetQueuesForRange(_myRange);
         }
 
         protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)

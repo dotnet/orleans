@@ -9,14 +9,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Streams.Filtering;
-using System.IO;
 
 namespace Orleans.Runtime.Providers
 {
     internal class SiloStreamProviderRuntime : ISiloSideStreamProviderRuntime
     {
-        private readonly OrleansTaskScheduler scheduler;
-        private readonly ActivationDirectory activationDirectory;
         private readonly IConsistentRingProvider consistentRingProvider;
         private readonly InsideRuntimeClient runtimeClient;
         private readonly IStreamPubSub grainBasedPubSub;
@@ -36,7 +33,6 @@ namespace Orleans.Runtime.Providers
             InsideRuntimeClient runtimeClient,
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
             OrleansTaskScheduler scheduler,
-            ActivationDirectory activationDirectory,
             ILoggerFactory loggerFactory,
             ILocalSiloDetails siloDetails,
             IGrainContextAccessor grainContextAccessor)
@@ -44,8 +40,6 @@ namespace Orleans.Runtime.Providers
             this.loggerFactory = loggerFactory;
             this.siloDetails = siloDetails;
             this.grainContextAccessor = grainContextAccessor;
-            this.scheduler = scheduler;
-            this.activationDirectory = activationDirectory;
             this.consistentRingProvider = consistentRingProvider;
             this.runtimeClient = runtimeClient;
             this.logger = this.loggerFactory.CreateLogger<SiloProviderRuntime>();
@@ -53,23 +47,6 @@ namespace Orleans.Runtime.Providers
             var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
             this.implictPubSub = tmp;
             this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
-        }
-
-        public void RegisterSystemTarget(ISystemTarget target)
-        {
-            var systemTarget = target as SystemTarget;
-            if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
-            systemTarget.RuntimeClient = this.runtimeClient;
-            scheduler.RegisterWorkContext(systemTarget);
-            activationDirectory.RecordNewSystemTarget(systemTarget);
-        }
-
-        public void UnregisterSystemTarget(ISystemTarget target)
-        {
-            var systemTarget = target as SystemTarget;
-            if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
-            activationDirectory.RemoveSystemTarget(systemTarget);
-            scheduler.UnregisterWorkContext(systemTarget);
         }
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
@@ -105,7 +82,6 @@ namespace Orleans.Runtime.Providers
             var manager = new PersistentStreamPullingManager(
                 managerId,
                 streamProviderName,
-                this,
                 this.PubSub(pubsubOptions.PubSubType),
                 adapterFactory,
                 queueBalancer,
@@ -113,7 +89,10 @@ namespace Orleans.Runtime.Providers
                 pullingAgentOptions,
                 this.loggerFactory,
                 this.siloDetails.SiloAddress);
-            this.RegisterSystemTarget(manager);
+
+            var catalog = this.ServiceProvider.GetRequiredService<Catalog>();
+            catalog.RegisterSystemTarget(manager);
+
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
             // Need to call it as a grain reference though.

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Streams;
-using System;
 
 namespace Orleans.Providers.Streams.Common
 {

@@ -10,8 +10,8 @@ using Orleans.Configuration;
 using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
 using Orleans.Internal;
 using System.Threading;
-using System.Globalization;
 using Orleans.Streams.Filtering;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Streams
 {
@@ -21,7 +21,6 @@ namespace Orleans.Streams
 
         private readonly Dictionary<QueueId, PersistentStreamPullingAgent> queuesToAgentsMap;
         private readonly string streamProviderName;
-        private readonly IStreamProviderRuntime providerRuntime;
         private readonly IStreamPubSub pubSub;
 
         private readonly StreamPullingAgentOptions options;
@@ -43,7 +42,6 @@ namespace Orleans.Streams
         internal PersistentStreamPullingManager(
             SystemTargetGrainId managerId,
             string strProviderName, 
-            IStreamProviderRuntime runtime,
             IStreamPubSub streamPubSub,
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
@@ -57,14 +55,12 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("strProviderName");
             }
-            if (runtime == null)
-            {
-                throw new ArgumentNullException("runtime", "IStreamProviderRuntime runtime reference should not be null");
-            }
+
             if (streamPubSub == null)
             {
                 throw new ArgumentNullException("streamPubSub", "StreamPubSub reference should not be null");
             }
+
             if (streamQueueBalancer == null)
             {
                 throw new ArgumentNullException("streamQueueBalancer", "IStreamQueueBalancer streamQueueBalancer reference should not be null");
@@ -72,7 +68,6 @@ namespace Orleans.Streams
 
             queuesToAgentsMap = new Dictionary<QueueId, PersistentStreamPullingAgent>();
             streamProviderName = strProviderName;
-            providerRuntime = runtime;
             pubSub = streamPubSub;
             this.options = options;
             nonReentrancyGuarantor = new AsyncSerialExecutor();
@@ -228,8 +223,8 @@ namespace Orleans.Streams
                 {
                     var agentIdNumber = Interlocked.Increment(ref nextAgentId);
                     var agentId = SystemTargetGrainId.Create(Constants.StreamPullingAgentType, this.Silo, $"{streamProviderName}_{agentIdNumber}_{queueId.ToStringWithHashCode()}");
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, pubSub, streamFilter, queueId, this.options, this.Silo);
-                    providerRuntime.RegisterSystemTarget(agent);
+                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, this.loggerFactory, pubSub, streamFilter, queueId, this.options, this.Silo);
+                    this.ActivationServices.GetRequiredService<Catalog>().RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);
                     agents.Add(agent);
                 }
@@ -311,11 +306,12 @@ namespace Orleans.Streams
                 // We already logged individual exceptions for individual calls to Shutdown. No need to log again.
             }
 
+            var catalog = ActivationServices.GetRequiredService<Catalog>();
             foreach (var agent in agents)
             {
                 try
                 {
-                    providerRuntime.UnregisterSystemTarget(agent);
+                    catalog.UnregisterSystemTarget(agent);
                 }
                 catch (Exception exc)
                 {

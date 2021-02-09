@@ -6,7 +6,6 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers

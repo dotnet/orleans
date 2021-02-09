@@ -13,9 +13,15 @@ namespace Orleans.Hosting
 {
     public static class ClientBuilderStreamingExtensions
     {
+        /// <summary>
+        /// Add support for streaming to this client.
+        /// </summary>
         public static IClientBuilder AddStreaming(this IClientBuilder builder) => builder.ConfigureServices(AddClientStreaming);
 
-        private static void AddClientStreaming(this IServiceCollection services)
+        /// <summary>
+        /// Add support for streaming to this client.
+        /// </summary>
+        public static void AddClientStreaming(this IServiceCollection services)
         {
             if (services.Any(service => service.ServiceType.Equals(typeof(ClientStreamingProviderRuntime))))
             {

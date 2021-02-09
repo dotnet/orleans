@@ -6,7 +6,6 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Microsoft.Extensions.Logging;
-using System.Threading;
 using Orleans.Streams.Filtering;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
