@@ -4,6 +4,8 @@ using Orleans.Hosting;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
+using Microsoft.Extensions.Configuration;
+using Orleans;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 {
@@ -14,11 +16,12 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+                builder.AddSiloBuilderConfigurator<TestClusterConfigurator>();
+                builder.AddClientBuilderConfigurator<TestClusterConfigurator>();
             }
         }
 
-        private class SiloConfigurator : ISiloConfigurator
+        private class TestClusterConfigurator : ISiloConfigurator, IClientBuilderConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
@@ -29,10 +32,11 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("PubSubStore");
             }
+
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
         }
         
-        public SubscriptionObserverWithImplicitSubscribingTestsUsingSMS(ITestOutputHelper output, Fixture fixture)
-            :base(fixture)
+        public SubscriptionObserverWithImplicitSubscribingTestsUsingSMS(ITestOutputHelper output, Fixture fixture) : base(fixture)
         {
         }
     }

@@ -7,7 +7,6 @@ namespace Orleans.Hosting
 {
     public static class SiloBuilderExtensions
     {
-
         /// <summary>
         /// Configure silo to use PubSub persistent streams.
         /// </summary>

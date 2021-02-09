@@ -48,8 +48,6 @@ namespace Orleans.Runtime
         IAddressable CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
 
         void DeleteObjectReference(IAddressable obj);
-        
-        Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
 
         IGrainReferenceRuntime GrainReferenceRuntime { get; }
 

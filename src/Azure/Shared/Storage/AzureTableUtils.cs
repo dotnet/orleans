@@ -36,7 +36,7 @@ namespace Orleans.GrainDirectory.AzureStorage
     /// </summary>
     internal static class AzureTableConstants
     {
-        public const string ANY_ETAG = StorageProviderUtils.ANY_ETAG;
+        public const string ANY_ETAG = "*";
 
         public const string PKProperty = nameof(TableEntity.PartitionKey);
         public const string RKProperty = nameof(TableEntity.RowKey);

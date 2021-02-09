@@ -297,7 +297,6 @@ namespace Tester.StreamingTests
 
     public class SubscriptionManager
     {
-
         private IGrainFactory grainFactory;
         private IServiceProvider serviceProvider;
         private IStreamSubscriptionManager subManager;
@@ -305,7 +304,8 @@ namespace Tester.StreamingTests
         {
             this.grainFactory = cluster.GrainFactory;
             this.serviceProvider = cluster.ServiceProvider;
-            this.subManager = serviceProvider.GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+            var admin = serviceProvider.GetRequiredService<IStreamSubscriptionManagerAdmin>();
+            this.subManager = admin.GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
         }
 
         public async Task<List<StreamSubscription>> SetupStreamingSubscriptionForStream<TGrainInterface>(FullStreamIdentity streamIdentity, int grainCount)

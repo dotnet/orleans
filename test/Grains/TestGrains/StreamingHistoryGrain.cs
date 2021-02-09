@@ -16,7 +16,7 @@ namespace UnitTests.Grains
 
         public async Task BecomeConsumer(StreamId streamId, string provider, string filterData = null)
         {
-            var stream = base.GetStreamProvider(provider).GetStream<int>(streamId);
+            var stream = this.GetStreamProvider(provider).GetStream<int>(streamId);
             this.subscriptionHandles.Add(await stream.SubscribeAsync(this, null, filterData));
         }
 

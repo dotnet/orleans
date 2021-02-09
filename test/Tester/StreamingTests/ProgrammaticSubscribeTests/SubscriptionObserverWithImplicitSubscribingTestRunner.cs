@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,7 +13,7 @@ using Xunit;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 {
-    public class SubscriptionObserverWithImplicitSubscribingTestRunner: OrleansTestingBase
+    public abstract class SubscriptionObserverWithImplicitSubscribingTestRunner : OrleansTestingBase
     {
         private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
         //test utilities and statics

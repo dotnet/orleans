@@ -12,7 +12,6 @@ using Orleans.Internal;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
-using Orleans.Streams;
 
 namespace Orleans.Runtime
 {
@@ -74,9 +73,6 @@ namespace Orleans.Runtime
 
         /// <inheritdoc />
         public ClientGrainId ClientId { get; }
-
-        /// <inheritdoc />
-        public StreamDirectory StreamDirectory { get; } = new StreamDirectory();
 
         public GrainReference GrainReference { get; }
 

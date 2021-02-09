@@ -1,6 +1,7 @@
 using System;
+using Microsoft.Extensions.Configuration;
+using Orleans;
 using Orleans.Hosting;
-using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
@@ -19,10 +20,11 @@ namespace ServiceBus.Tests.Streaming
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+                builder.AddSiloBuilderConfigurator<TestClusterConfigurator>();
+                builder.AddClientBuilderConfigurator<TestClusterConfigurator>();
             }
 
-            private class MySiloBuilderConfigurator : ISiloConfigurator
+            private class TestClusterConfigurator : ISiloConfigurator, IClientBuilderConfigurator
             {
                 public void Configure(ISiloBuilder hostBuilder)
                 {
@@ -62,6 +64,8 @@ namespace ServiceBus.Tests.Streaming
                     hostBuilder
                           .AddMemoryGrainStorage("PubSubStore");
                 }
+
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
             }
         }
 

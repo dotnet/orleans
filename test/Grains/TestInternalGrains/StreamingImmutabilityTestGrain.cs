@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Streams;
@@ -13,7 +13,7 @@ namespace UnitTests.Grains
 
         public async Task SubscribeToStream(Guid guid, string providerName)
         {
-            var stream = GetStreamProvider(providerName).GetStream<StreamImmutabilityTestObject>(guid, "Namespace");
+            var stream = this.GetStreamProvider(providerName).GetStream<StreamImmutabilityTestObject>(guid, "Namespace");
             _streamSubscriptionHandle = await stream.SubscribeAsync(OnNextAsync);
         }
 
@@ -25,7 +25,7 @@ namespace UnitTests.Grains
 
         public async Task SendTestObject(string providerName)
         {
-            var stream = GetStreamProvider(providerName).GetStream<StreamImmutabilityTestObject>(this.GetPrimaryKey(), "Namespace");
+            var stream = this.GetStreamProvider(providerName).GetStream<StreamImmutabilityTestObject>(this.GetPrimaryKey(), "Namespace");
             await stream.OnNextAsync(_myObject);
         }
 

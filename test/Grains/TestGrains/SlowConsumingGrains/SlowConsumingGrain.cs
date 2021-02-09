@@ -41,7 +41,7 @@ namespace UnitTests.Grains
         {
             logger.Info("BecomeConsumer");
             ConsumerObserver = new SlowObserver<int>(this, logger);
-            IStreamProvider streamProvider = base.GetStreamProvider(providerToUse);
+            IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             var consumer = streamProvider.GetStream<int>(streamId, streamNamespace);
             ConsumerHandle = await consumer.SubscribeAsync(ConsumerObserver);
         }

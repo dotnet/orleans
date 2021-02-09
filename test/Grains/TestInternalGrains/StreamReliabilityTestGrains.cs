@@ -271,7 +271,7 @@ namespace UnitTests.Grains
             {
                 logger.Info("InitStream StreamId={0} StreamProvider={1}", streamId, providerName);
 
-                IStreamProvider streamProvider = GetStreamProvider(providerName);
+                IStreamProvider streamProvider = this.GetStreamProvider(providerName);
 #if USE_GENERICS
                 State.Stream = streamProvider.GetStream<T>(streamId);
 #else
@@ -370,7 +370,7 @@ namespace UnitTests.Grains
             if (State.Stream == null)
             {
                 logger.Info("InitStream StreamId={0} StreamProvider={1}", streamId, providerName);
-                IStreamProvider streamProvider = GetStreamProvider(providerName);
+                IStreamProvider streamProvider = this.GetStreamProvider(providerName);
                 State.Stream = streamProvider.GetStream<int>(streamId, StreamNamespace);
             }
 

@@ -64,8 +64,6 @@ namespace UnitTests.StorageTests.Relational
             DefaultProviderRuntime = new ClientProviderRuntime(
                 this.InternalGrainFactory,
                 this.Services,
-                NullLoggerFactory.Instance,
-                this.Services.GetRequiredService<ImplicitStreamSubscriberTable>(),
                 this.Services.GetRequiredService<ClientGrainContext>());
         }
 

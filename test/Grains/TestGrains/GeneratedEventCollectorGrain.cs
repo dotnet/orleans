@@ -31,7 +31,7 @@ namespace TestGrains
         {
             logger.Info("OnActivateAsync");
 
-            var streamProvider = GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
+            var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(this.GetPrimaryKey(), StreamNamespace);
 
             IList<StreamSubscriptionHandle<GeneratedEvent>> handles = await stream.GetAllSubscriptionHandles();

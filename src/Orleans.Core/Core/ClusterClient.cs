@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Streams;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 
@@ -81,9 +80,6 @@ namespace Orleans
         public IServiceProvider ServiceProvider => this.runtimeClient.ServiceProvider;
 
         /// <inheritdoc />
-        IStreamProviderRuntime IInternalClusterClient.StreamProviderRuntime => this.runtimeClient.CurrentStreamProviderRuntime;
-
-        /// <inheritdoc />
         private IInternalGrainFactory InternalGrainFactory
         {
             get
@@ -103,18 +99,6 @@ namespace Orleans
             LifecycleState.Invalid => true,
             _ => false
         };
-
-        /// <inheritdoc />
-        public IStreamProvider GetStreamProvider(string name)
-        {
-            this.ThrowIfDisposedOrNotInitialized();
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            return this.runtimeClient.ServiceProvider.GetRequiredServiceByName<IStreamProvider>(name);
-        }
 
         /// <inheritdoc />
         public async Task Connect(Func<Exception, Task<bool>> retryFilter = null)

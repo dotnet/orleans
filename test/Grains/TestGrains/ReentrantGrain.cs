@@ -151,7 +151,7 @@ namespace UnitTests.Grains
         }
 
         IAsyncStream<string> GetStream() => 
-            GetStreamProvider("sms").GetStream<string>(Guid.Empty, "test-stream-interleave");
+            this.GetStreamProvider("sms").GetStream<string>(Guid.Empty, "test-stream-interleave");
 
         public Task SetSelf(IMayInterleavePredicateGrain self)
         {

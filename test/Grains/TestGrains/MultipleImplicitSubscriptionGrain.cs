@@ -26,7 +26,7 @@ namespace UnitTests.Grains
         {
             logger.Info("OnActivateAsync");
 
-            var streamProvider = GetStreamProvider("SMSProvider");
+            var streamProvider = this.GetStreamProvider("SMSProvider");
             redStream = streamProvider.GetStream<int>(this.GetPrimaryKey(), "red");
             blueStream = streamProvider.GetStream<int>(this.GetPrimaryKey(), "blue");
 

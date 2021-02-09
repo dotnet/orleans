@@ -28,7 +28,4 @@
     <PackageReference Include="System.Net.NameResolution" Version="$(SystemNetNameResolutionVersion)" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\OrleansProviders\OrleansProviders.csproj" />
-  </ItemGroup>
 </Project>

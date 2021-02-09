@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 
-
 namespace Orleans.Runtime
 {
     // This is the public interface to be used by the consistent ring

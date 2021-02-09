@@ -8,6 +8,7 @@ using Xunit;
 using Xunit.Abstractions;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace UnitTests.StreamingTests
 {
@@ -31,7 +32,8 @@ namespace UnitTests.StreamingTests
 
         internal static IStreamPubSub GetStreamPubSub(IInternalClusterClient client)
         {
-            return client.StreamProviderRuntime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit);
+            var runtime = client.ServiceProvider.GetRequiredService<IStreamProviderRuntime>();
+            return runtime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit);
         }
 
         internal static async Task CheckPubSubCounts(IInternalClusterClient client, ITestOutputHelper output, string when, int expectedPublisherCount, int expectedConsumerCount, Guid streamIdGuid, string streamProviderName, string streamNamespace)

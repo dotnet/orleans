@@ -38,8 +38,6 @@ namespace AWSUtils.Tests.StorageTests
             this.providerRuntime = new ClientProviderRuntime(
                 fixture.InternalGrainFactory,
                 fixture.Services,
-                NullLoggerFactory.Instance,
-                fixture.Services.GetRequiredService<ImplicitStreamSubscriberTable>(),
                 fixture.Services.GetRequiredService<ClientGrainContext>());
         }
 

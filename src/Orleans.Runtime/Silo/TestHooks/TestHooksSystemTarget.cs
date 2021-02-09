@@ -10,7 +10,6 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Storage;
 using Orleans.Hosting;
 using Orleans.Statistics;
-using Orleans.Streams;
 
 namespace Orleans.Runtime.TestHooks
 {
@@ -85,23 +84,6 @@ namespace Orleans.Runtime.TestHooks
         {
             var storageProviderCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string, IGrainStorage>>();
             return Task.FromResult<ICollection<string>>(storageProviderCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key).ToArray());
-        }
-
-        public Task<ICollection<string>> GetStreamProviderNames()
-        {
-            var streamProviderCollection = this.host.Services.GetRequiredService<IKeyedServiceCollection<string, IStreamProvider>>();
-            return Task.FromResult<ICollection<string>>(streamProviderCollection.GetServices(this.host.Services).Select(keyedService => keyedService.Key).ToArray());
-        }
-
-        public async Task<ICollection<string>> GetAllSiloProviderNames()
-        {
-            List<string> allProviders = new List<string>();
-
-            allProviders.AddRange(await GetStorageProviderNames());
-
-            allProviders.AddRange(await GetStreamProviderNames());
-            
-            return allProviders;
         }
 
         public Task<int> UnregisterGrainForTesting(GrainId grain) => Task.FromResult(this.host.Services.GetRequiredService<Catalog>().UnregisterGrainForTesting(grain));

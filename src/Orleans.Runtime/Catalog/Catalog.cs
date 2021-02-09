@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.ExceptionServices;
-using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -19,7 +19,6 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Serialization;
-using Orleans.Streams;
 
 namespace Orleans.Runtime
 {
@@ -37,7 +36,6 @@ namespace Orleans.Runtime
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activations;
         private readonly LRU<ActivationAddress, Exception> failedActivations = new LRU<ActivationAddress, Exception>(1000, TimeSpan.FromSeconds(5), null);
-        private IStreamProviderRuntime providerRuntime;
         private IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private int collectionNumber;
@@ -75,7 +73,6 @@ namespace Orleans.Runtime
             MessageCenter messageCenter,
             MessageFactory messageFactory,
             SerializationManager serializationManager,
-            IStreamProviderRuntime providerRuntime,
             IServiceProvider serviceProvider,
             CachedVersionSelectorManager versionSelectorManager,
             ILoggerFactory loggerFactory,
@@ -104,7 +101,6 @@ namespace Orleans.Runtime
             this.grainCreator = grainCreator;
             this.serializationManager = serializationManager;
             this.versionSelectorManager = versionSelectorManager;
-            this.providerRuntime = providerRuntime;
             this.serviceProvider = serviceProvider;
             this.collectionOptions = collectionOptions;
             this.messagingOptions = messagingOptions;
@@ -152,6 +148,7 @@ namespace Orleans.Runtime
             maxRequestProcessingTime = this.messagingOptions.CurrentValue.MaxRequestProcessingTime;
             grainDirectory.SetSiloRemovedCatalogCallback(this.OnSiloStatusChange);
             this.gcTimer = timerFactory.Create(this.activationCollector.Quantum, "Catalog.GCTimer");
+            this.RuntimeClient = serviceProvider.GetRequiredService<InsideRuntimeClient>();
         }
 
         /// <summary>
@@ -420,6 +417,23 @@ namespace Orleans.Runtime
                 UnregisterMessageTarget(act);
             
             return numActsBefore;
+        }
+
+        public void RegisterSystemTarget(ISystemTarget target)
+        {
+            var systemTarget = target as SystemTarget;
+            if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
+            systemTarget.RuntimeClient = this.RuntimeClient;
+            scheduler.RegisterWorkContext(systemTarget);
+            activations.RecordNewSystemTarget(systemTarget);
+        }
+
+        public void UnregisterSystemTarget(ISystemTarget target)
+        {
+            var systemTarget = target as SystemTarget;
+            if (systemTarget == null) throw new ArgumentException($"Parameter must be of type {typeof(SystemTarget)}", nameof(target));
+            activations.RemoveSystemTarget(systemTarget);
+            scheduler.UnregisterWorkContext(systemTarget);
         }
 
         public int ActivationCount { get { return activations.Count; } }
@@ -974,18 +988,6 @@ namespace Orleans.Runtime
                 {
                     logger.Error(ErrorCode.Catalog_ErrorCallingDeactivate,
                         string.Format("Error calling grain's OnDeactivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
-                }
-
-                if (activation.IsUsingStreams)
-                {
-                    try
-                    {
-                        await activation.DeactivateStreamResources();
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Warn(ErrorCode.Catalog_DeactivateStreamResources_Exception, String.Format("DeactivateStreamResources Grain type = {0} Activation = {1} failed.", grainTypeName, activation), exc);
-                    }
                 }
 
                 if (activation.GrainInstance is ILogConsistencyProtocolParticipant)

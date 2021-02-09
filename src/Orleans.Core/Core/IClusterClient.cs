@@ -1,8 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams;
 
 namespace Orleans
 {
@@ -20,13 +17,6 @@ namespace Orleans
         /// Gets the service provider used by this client.
         /// </summary>
         IServiceProvider ServiceProvider { get; }
-
-        /// <summary>
-        /// Returns the <see cref="IStreamProvider"/> with the specified <paramref name="name"/>.
-        /// </summary>
-        /// <param name="name">The name of the stream provider.</param>
-        /// <returns>The <see cref="IStreamProvider"/> with the specified <paramref name="name"/>.</returns>
-        IStreamProvider GetStreamProvider(string name);
 
         /// <summary>
         /// Starts the client and connects to the configured cluster.
