@@ -12,7 +12,7 @@
          Orleans_CodeGeneratorTargetFramework;">
 
   <PropertyGroup>
-    <Orleans_CodeGeneratorTargetFramework>netcoreapp3.1</Orleans_CodeGeneratorTargetFramework>
+    <Orleans_CodeGeneratorTargetFramework>net5.0</Orleans_CodeGeneratorTargetFramework>
     <Orleans_DotNetHost Condition="'$(DotNetFromPath)' == 'true'">dotnet</Orleans_DotNetHost>
     <Orleans_CoreAssembly Condition="'$(OrleansCodeGenCoreAssembly)' != ''">$(OrleansCodeGenCoreAssembly)</Orleans_CoreAssembly>
     <Orleans_CoreAssembly Condition="'$(Orleans_CoreAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\$(Orleans_CodeGeneratorTargetFramework)\Orleans.CodeGenerator.MSBuild.dll</Orleans_CoreAssembly>
@@ -43,7 +43,7 @@
     TaskName="Orleans.CodeGenerator.MSBuild.Tasks.GetDotNetHost"
     AssemblyFile="$(Orleans_TaskAssembly)"
     Condition="'$(Orleans_CodeGeneratorEnabled)' == 'true' and '$(Orleans_DotNetHost)' == '' and '$(Orleans_MSBuildIsCore)' == 'true'" />
-  
+
   <!--
     Input to the code generator should not include its output.
   -->
@@ -105,7 +105,7 @@
     <ItemGroup>
       <FileWrites Include="$(Orleans_ArgsFile)" Condition="Exists('$(Orleans_ArgsFile)')" />
     </ItemGroup>
-    
+
   </Target>
 
   <Target Name="OrleansGenerateCode"
