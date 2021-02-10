@@ -988,8 +988,6 @@ namespace Orleans.Runtime
                     logger.Error(ErrorCode.Catalog_ErrorCallingDeactivate,
                         string.Format("Error calling grain's OnDeactivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
                 }
-
-                }
             }
             catch (Exception exc)
             {
