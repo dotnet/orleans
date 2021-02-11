@@ -17,9 +17,8 @@ namespace UnitTests
         {
             const int maxSize = 10;
             var maxAge = new TimeSpan(0, 1, 0, 0);
-            LRU<string, string>.FetchValueDelegate f = null;
 
-            var target = new LRU<string, string>(maxSize, maxAge, f);
+            var target = new LRU<string, string>(maxSize, maxAge);
             Assert.Equal(0, target.Count);  // "Count wrong after construction"
 
             target.Add("1", "one");
@@ -34,9 +33,8 @@ namespace UnitTests
         {
             const int maxSize = 10;
             var maxAge = new TimeSpan(0, 1, 0, 0);
-            LRU<string, string>.FetchValueDelegate f = null;
 
-            var target = new LRU<string, string>(maxSize, maxAge, f);
+            var target = new LRU<string, string>(maxSize, maxAge);
             for (var i = 1; i <= maxSize + 5; i++)
             {
                 var s = i.ToString();
@@ -57,9 +55,8 @@ namespace UnitTests
         {
             const int maxSize = 10;
             var maxAge = new TimeSpan(0, 1, 0, 0);
-            LRU<string, string>.FetchValueDelegate f = null;
 
-            var target = new LRU<string, string>(maxSize, maxAge, f);
+            var target = new LRU<string, string>(maxSize, maxAge);
 
             // Fill the LRU with "1" through "10"
             for (var i = 1; i <= maxSize; i++)
@@ -96,11 +93,10 @@ namespace UnitTests
             const int n = 10;
             const int maxSize = n*2;
             var maxAge = TimeSpan.FromMilliseconds(500);
-            LRU<string, string>.FetchValueDelegate f = null;
             var flushCounter = 0;
 
-            var target = new LRU<string, string>(maxSize, maxAge, f);
-            target.RaiseFlushEvent += (object o, LRU<string, string>.FlushEventArgs args) => flushCounter++;
+            var target = new LRU<string, string>(maxSize, maxAge);
+            target.RaiseFlushEvent += () => flushCounter++;
 
             for (int i = 0; i < n; i++)
             {
