@@ -35,7 +35,7 @@ namespace Orleans.Runtime
         private readonly ILocalGrainDirectory directory;
         private readonly OrleansTaskScheduler scheduler;
         private readonly ActivationDirectory activations;
-        private readonly LRU<ActivationAddress, Exception> failedActivations = new LRU<ActivationAddress, Exception>(1000, TimeSpan.FromSeconds(5), null);
+        private readonly LRU<ActivationAddress, ExceptionDispatchInfo> failedActivations = new(1000, TimeSpan.FromSeconds(5));
         private IServiceProvider serviceProvider;
         private readonly ILogger logger;
         private int collectionNumber;
@@ -508,7 +508,7 @@ namespace Orleans.Runtime
                 if (failedActivations.TryGetValue(address, out var ex))
                 {
                     logger.Warn(ErrorCode.Catalog_ActivationException, "Call to an activation that failed during OnActivateAsync()");
-                    throw ex;
+                    ex.Throw();
                 }
 
                 // Did not find and did not start placing new
@@ -672,7 +672,7 @@ namespace Orleans.Runtime
                     UnregisterMessageTarget(activation);
                     if (initStage == ActivationInitializationStage.InvokeActivate)
                     {
-                        failedActivations.Add(activation.Address, exception);
+                        failedActivations.Add(activation.Address, ExceptionDispatchInfo.Capture(exception));
                         activation.SetState(ActivationState.FailedToActivate);
                         logger.Warn(ErrorCode.Catalog_Failed_InvokeActivate, string.Format("Failed to InvokeActivate for {0}.", activation), exception);
                         // Reject all of the messages queued for this activation.

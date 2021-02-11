@@ -63,7 +63,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public AdaptiveGrainDirectoryCache(TimeSpan initialExpirationTimer, TimeSpan maxExpirationTimer, double exponentialTimerGrowth, int maxCacheSize)
         {
-            cache = new LRU<GrainId, GrainDirectoryCacheEntry>(maxCacheSize, TimeSpan.MaxValue, null);
+            cache = new(maxCacheSize, TimeSpan.MaxValue);
 
             this.initialExpirationTimer = initialExpirationTimer;
             this.maxExpirationTimer = maxExpirationTimer;
@@ -80,15 +80,9 @@ namespace Orleans.Runtime.GrainDirectory
             cache.Add(key, entry);
         }
 
-        public bool Remove(GrainId key)
-        {
-            return cache.RemoveKey(key, out _);
-        }
+        public bool Remove(GrainId key) => cache.RemoveKey(key);
 
-        public void Clear()
-        {
-            cache.Clear();
-        }
+        public void Clear() => cache.Clear();
 
         public bool LookUp(GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result, out int version)
         {
