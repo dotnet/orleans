@@ -1,18 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Orleans;
 using TestGrainInterfaces;
 using Orleans.Providers;
 using Orleans.EventSourcing;
-using Orleans.MultiCluster;
 
 namespace TestGrains
 {
-
-
     /// <summary>
     /// An example of a journaled grain that records seat reservations.
     /// 
@@ -24,7 +18,7 @@ namespace TestGrains
     /// It is not necessary here to persist all events, as the state already stores all the successful reservations.
     /// 
     /// </summary>
-    
+
     [StorageProvider(ProviderName = "Default")]
     [LogConsistencyProvider(ProviderName = "StateStorage")]
     public class SeatReservationGrain : JournaledGrain<ReservationState,SeatReservation>, ISeatReservationGrain

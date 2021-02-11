@@ -1,7 +1,7 @@
 ﻿
 using Orleans.Storage;
 
-namespace Orleans.LogConsistency
+namespace Orleans.EventSourcing
 {
     /// <summary>
     /// Interface to be implemented for a log-view adaptor factory

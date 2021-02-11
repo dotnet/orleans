@@ -2,10 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans;
-using Orleans.LogConsistency;
-using UnitTests.GrainInterfaces;
 using Orleans.EventSourcing;
+using UnitTests.GrainInterfaces;
 
 namespace TestGrains
 {

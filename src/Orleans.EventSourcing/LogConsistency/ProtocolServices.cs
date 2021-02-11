@@ -1,14 +1,6 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.LogConsistency;
-using Orleans.MultiCluster;
-using Orleans.SystemTargetInterfaces;
-using Orleans.GrainDirectory;
+using Orleans.EventSourcing;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime.LogConsistency
@@ -23,14 +15,14 @@ namespace Orleans.Runtime.LogConsistency
         private static readonly object[] EmptyObjectArray = new object[0];
 
         private readonly ILogger log;
-        private readonly IInternalGrainFactory grainFactory;
+        private readonly IGrainFactory grainFactory;
         private readonly Grain grain;   // links to the grain that owns this service object
 
         public ProtocolServices(
             Grain gr,
             ILoggerFactory loggerFactory,
             SerializationManager serializationManager,
-            IInternalGrainFactory grainFactory,
+            IGrainFactory grainFactory,
             ILocalSiloDetails siloDetails)
         {
             this.grain = gr;

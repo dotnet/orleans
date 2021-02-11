@@ -4,14 +4,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Storage;
-using Orleans.GrainDirectory;
 using Orleans.Providers;
-using Orleans.MultiCluster;
 
-namespace Orleans.LogConsistency
+namespace Orleans.EventSourcing
 {
     /// <summary>
     /// Base class for all grains that use log-consistency for managing  the state.
@@ -40,11 +37,19 @@ namespace Orleans.LogConsistency
         public override void Participate(IGrainLifecycle lifecycle)
         {
             base.Participate(lifecycle);
-            lifecycle.Subscribe<ClientOptionsLogger>(GrainLifecycleStage.SetupState, OnSetupState);
-            if(this is ILogConsistencyProtocolParticipant)
+            lifecycle.Subscribe<LogConsistentGrain<TView>>(GrainLifecycleStage.SetupState, OnSetupState, OnDeactivateState);
+            if (this is ILogConsistencyProtocolParticipant)
             {
                 lifecycle.Subscribe<LogConsistentGrain<TView>>(GrainLifecycleStage.Activate - 1, PreActivate);
                 lifecycle.Subscribe<LogConsistentGrain<TView>>(GrainLifecycleStage.Activate + 1, PostActivate);
+            }
+        }
+
+        private async Task OnDeactivateState(CancellationToken ct)
+        {
+            if (this is ILogConsistencyProtocolParticipant participant)
+            {
+                await participant.DeactivateProtocolParticipant();
             }
         }
 
@@ -81,7 +86,6 @@ namespace Orleans.LogConsistency
 
             this.InstallAdaptor(factory, state, this.GetType().FullName, grainStorage, svc);
         }
-
 
         private ILogViewAdaptorFactory SetupLogConsistencyProvider(IGrainContext activationContext)
         {

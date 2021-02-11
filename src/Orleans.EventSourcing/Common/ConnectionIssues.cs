@@ -1,10 +1,8 @@
 using System;
 using Orleans.Internal;
-using Orleans.LogConsistency;
 
 namespace Orleans.EventSourcing.Common
 {
-
     /// <summary>
     /// Describes a connection issue that occurred when sending update notifications to remote instances.
     /// </summary>

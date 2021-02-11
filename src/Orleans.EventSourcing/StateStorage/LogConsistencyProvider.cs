@@ -1,6 +1,4 @@
-﻿
-using Orleans.LogConsistency;
-using Orleans.Storage;
+﻿using Orleans.Storage;
 
 namespace Orleans.EventSourcing.StateStorage
 {

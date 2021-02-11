@@ -11,7 +11,6 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Metadata;
-using Orleans.MultiCluster;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
@@ -988,11 +987,6 @@ namespace Orleans.Runtime
                 {
                     logger.Error(ErrorCode.Catalog_ErrorCallingDeactivate,
                         string.Format("Error calling grain's OnDeactivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
-                }
-
-                if (activation.GrainInstance is ILogConsistencyProtocolParticipant)
-                {
-                    await ((ILogConsistencyProtocolParticipant)activation.GrainInstance).DeactivateProtocolParticipant();
                 }
             }
             catch (Exception exc)

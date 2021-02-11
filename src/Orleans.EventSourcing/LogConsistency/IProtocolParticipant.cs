@@ -1,7 +1,6 @@
 using System.Threading.Tasks;
-using Orleans.Concurrency;
 
-namespace Orleans.MultiCluster
+namespace Orleans.EventSourcing
 {
     /// <summary>
     /// Grain interface for grains that participate in multi-cluster log-consistency protocols.

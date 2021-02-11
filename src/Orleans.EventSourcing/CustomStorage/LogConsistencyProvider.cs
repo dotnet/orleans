@@ -1,5 +1,3 @@
-
-using Orleans.LogConsistency;
 using Orleans.Storage;
 using Orleans.Configuration;
 using System;

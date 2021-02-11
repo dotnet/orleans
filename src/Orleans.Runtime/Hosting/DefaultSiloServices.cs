@@ -6,7 +6,6 @@ using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.LogConsistency;
 using Orleans.Runtime.MembershipService;
 using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
@@ -26,7 +25,6 @@ using Orleans.Versions.Selector;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Transactions;
-using Orleans.LogConsistency;
 using Microsoft.Extensions.Logging;
 using Orleans.ApplicationParts;
 using Orleans.Runtime.Utilities;
@@ -192,7 +190,6 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<MessageFactory>();
 
-            services.TryAddSingleton<Factory<Grain, ILogConsistencyProtocolServices>>(FactoryUtility.Create<Grain, ProtocolServices>);
             services.TryAddSingleton(FactoryUtility.Create<GrainDirectoryPartition>);
 
             // Placement
