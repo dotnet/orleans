@@ -144,7 +144,7 @@ namespace Orleans.Runtime
 
         private void AdjustSize()
         {
-            while (cache.Count >= MaximumSize)
+            while (Count >= MaximumSize)
             {
                 long generationToDelete = Interlocked.Increment(ref generationToFree);
                 foreach (var e in cache)
