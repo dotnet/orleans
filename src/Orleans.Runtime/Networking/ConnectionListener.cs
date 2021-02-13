@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,7 +16,7 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly IConnectionListenerFactory listenerFactory;
         private readonly ConnectionManager connectionManager;
-        protected readonly ConcurrentDictionary<Connection, Task> connections = new ConcurrentDictionary<Connection, Task>(ReferenceEqualsComparer.Instance);
+        protected readonly ConcurrentDictionary<Connection, object> connections = new(ReferenceEqualsComparer.Instance);
         private readonly ConnectionCommon connectionShared;
         private TaskCompletionSource<object> acceptLoopTcs;
         private IConnectionListener listener;
@@ -41,8 +40,6 @@ namespace Orleans.Runtime.Messaging
 
         protected NetworkingTrace NetworkingTrace => this.connectionShared.NetworkingTrace;
 
-        public int ConnectionCount => this.connections.Count;
-
         protected ConnectionOptions ConnectionOptions { get; }
 
         protected abstract Connection CreateConnection(ConnectionContext context);
@@ -61,10 +58,10 @@ namespace Orleans.Runtime.Messaging
                     var connectionBuilder = new ConnectionBuilder(this.ServiceProvider);
                     connectionBuilder.Use(next =>
                     {
-                        return async context =>
+                        return context =>
                         {
                             context.Features.Set<IUnderlyingTransportFeature>(new UnderlyingConnectionTransportFeature { Transport = context.Transport });
-                            await next(context);
+                            return next(context);
                         };
                     });
                     this.ConfigureConnectionBuilder(connectionBuilder);
@@ -131,23 +128,23 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 var cycles = 0;
-                var closeTasks = new List<Task>();
                 var cancellationTask = cancellationToken.WhenCancelled();
-                while (this.ConnectionCount > 0)
+                for (var closeTasks = new List<Task>(); ; closeTasks.Clear())
                 {
-                    closeTasks.Clear();
-                    foreach (var connection in this.connections.Keys.ToImmutableList())
+                    foreach (var kv in connections)
                     {
-                        closeTasks.Add(connection.CloseAsync(exception: null));
+                        closeTasks.Add(kv.Key.CloseAsync(exception: null));
                     }
+
+                    if (closeTasks.Count == 0) break;
 
                     await Task.WhenAny(Task.WhenAll(closeTasks), cancellationTask);
 
                     if (cancellationToken.IsCancellationRequested) break;
 
-                    if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount > 0)
+                    if (++cycles > 100 && cycles % 500 == 0 && connections.Count is var remaining and > 0)
                     {
-                        this.NetworkingTrace.LogWarning("Waiting for {NumRemaining} connections to terminate", this.ConnectionCount);
+                        this.NetworkingTrace.LogWarning("Waiting for {NumRemaining} connections to terminate", remaining);
                     }
                 }
 
@@ -166,26 +163,22 @@ namespace Orleans.Runtime.Messaging
 
         private void StartConnection(Connection connection)
         {
-            ThreadPool.UnsafeQueueUserWorkItem(this.StartConnectionCore, connection);
-        }
+            connections.TryAdd(connection, null);
 
-        private void StartConnectionCore(object state)
-        {
-            var connection = (Connection)state;
-            _ = this.RunConnectionAsync(connection);
+            ThreadPool.UnsafeQueueUserWorkItem(state =>
+            {
+                var (t, connection) = ((ConnectionListener, Connection))state;
+                _ = t.RunConnectionAsync(connection);
+            }, (this, connection));
         }
 
         private async Task RunConnectionAsync(Connection connection)
         {
-            await Task.Yield();
-
             using (this.BeginConnectionScope(connection))
             {
                 try
                 {
-                    var connectionTask = connection.Run();
-                    this.connections.TryAdd(connection, connectionTask);
-                    await connectionTask;
+                    await connection.Run();
                     this.NetworkingTrace.LogInformation("Connection {Connection} terminated", connection);
                 }
                 catch (Exception exception)

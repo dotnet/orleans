@@ -187,7 +187,7 @@ namespace Orleans.Providers.Streams.Generator
         {
             var dimensions = new ReceiverMonitorDimensions(queueId.ToString());
             var receiverMonitor = this.ReceiverMonitorFactory(dimensions, this.telemetryProducer);
-            Receiver receiver = receivers.GetOrAdd(queueId, qid => new Receiver(receiverMonitor));
+            var receiver = receivers.GetOrAdd(queueId, new Receiver(receiverMonitor));
             SetGeneratorOnReceiver(receiver);
             return receiver;
         }
@@ -210,9 +210,9 @@ namespace Orleans.Providers.Streams.Generator
             }
 
             // update generator on receivers
-            foreach (Receiver receiver in receivers.Values)
+            foreach (var receiver in receivers)
             {
-                SetGeneratorOnReceiver(receiver);
+                SetGeneratorOnReceiver(receiver.Value);
             }
 
             return Task.FromResult<object>(true);
@@ -221,7 +221,7 @@ namespace Orleans.Providers.Streams.Generator
         private class Receiver : IQueueAdapterReceiver
         {
             const int MaxDelayMs = 20;
-            private IQueueAdapterReceiverMonitor receiverMonitor;
+            private readonly IQueueAdapterReceiverMonitor receiverMonitor;
             public IStreamGenerator QueueGenerator { private get; set; }
 
             public Receiver(IQueueAdapterReceiverMonitor receiverMonitor)

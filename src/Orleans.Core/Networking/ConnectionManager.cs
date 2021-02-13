@@ -2,9 +2,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -17,13 +17,13 @@ namespace Orleans.Runtime.Messaging
         [ThreadStatic]
         private static int nextConnection;
 
-        private readonly ConcurrentDictionary<SiloAddress, ConnectionEntry> connections = new ConcurrentDictionary<SiloAddress, ConnectionEntry>();
+        private readonly ConcurrentDictionary<SiloAddress, ConnectionEntry> connections = new();
         private readonly ConnectionOptions connectionOptions;
         private readonly ConnectionFactory connectionFactory;
         private readonly NetworkingTrace trace;
-        private readonly CancellationTokenSource shutdownCancellation = new CancellationTokenSource();
+        private readonly CancellationTokenSource shutdownCancellation = new();
         private readonly object lockObj = new object();
-        private readonly TaskCompletionSource<int> closedTaskCompletionSource = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<int> closedTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ConnectionManager(
             IOptions<ConnectionOptions> connectionOptions,
@@ -53,7 +53,7 @@ namespace Orleans.Runtime.Messaging
 
         public Task Closed => this.closedTaskCompletionSource.Task;
 
-        public ImmutableArray<SiloAddress> GetConnectedAddresses() => this.connections.Keys.ToImmutableArray();
+        public List<SiloAddress> GetConnectedAddresses() => connections.Select(i => i.Key).ToList();
 
         public ValueTask<Connection> GetConnection(SiloAddress endpoint)
         {
@@ -341,13 +341,13 @@ namespace Orleans.Runtime.Messaging
                 this.shutdownCancellation.Cancel(throwOnFirstException: false);
 
                 var cycles = 0;
-                while (this.ConnectionCount > 0)
+                for (var closeTasks = new List<Task>(); ; closeTasks.Clear())
                 {
-                    var closeTasks = new List<Task>();
-                    foreach (var entry in this.connections.Values.ToImmutableList())
+                    foreach (var kv in connections)
                     {
-                        if (entry.Connections.IsDefaultOrEmpty) continue;
-                        foreach (var connection in entry.Connections)
+                        var entry = kv.Value.Connections;
+                        if (entry.IsDefaultOrEmpty) continue;
+                        foreach (var connection in entry)
                         {
                             try
                             {
@@ -359,13 +359,15 @@ namespace Orleans.Runtime.Messaging
                         }
                     }
 
+                    if (closeTasks.Count == 0) break;
+
                     await Task.WhenAny(Task.WhenAll(closeTasks), ct.WhenCancelled());
                     if (ct.IsCancellationRequested) break;
 
                     await Task.Delay(10);
-                    if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount > 0)
+                    if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount is var remaining and > 0)
                     {
-                        this.trace?.LogWarning("Waiting for {NumRemaining} connections to terminate", this.ConnectionCount);
+                        this.trace?.LogWarning("Waiting for {NumRemaining} connections to terminate", remaining);
                     }
                 }
             }

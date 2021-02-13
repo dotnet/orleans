@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Internal;
@@ -26,32 +25,29 @@ namespace Orleans.Runtime
 
             // propagate the exception from the _cancellationTokenSource.Cancel back to the caller
             // but also cancel _targetGrainReferences.
-            Task localCancellationTask;
+            Task localTask = null;
             try
             {
                 // Cancel the token now, preventing recursion.
                 tokenSource.Cancel();
-                localCancellationTask = Task.CompletedTask;
             }
             catch (Exception exception)
             {
-                localCancellationTask = Task.FromException(exception);
+                localTask = Task.FromException(exception);
             }
 
-            if (grainReferences.IsEmpty)
-            {
-                return localCancellationTask;
-            }
-
-            var tasks = new List<Task>();
-            tasks.Add(localCancellationTask);
-
+            List<Task> tasks = null;
             foreach (var reference in grainReferences)
             {
+                if (tasks is null)
+                {
+                    tasks = new();
+                    if (localTask != null) tasks.Add(localTask);
+                }
                 tasks.Add(CancelTokenWithRetries(id, grainReferences, reference.Key, reference.Value.AsReference<ICancellationSourcesExtension>()));
             }
 
-            return Task.WhenAll(tasks);
+            return tasks is null ? localTask ?? Task.CompletedTask : Task.WhenAll(tasks);
         }
 
          private async Task CancelTokenWithRetries(

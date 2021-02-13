@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
@@ -15,7 +14,7 @@ namespace Orleans.TestingHost.Logging
     /// </summary>
     public class FileLoggingOutput : IDisposable
     {
-        private static readonly ConcurrentDictionary<FileLoggingOutput, FileLoggingOutput> Instances = new ConcurrentDictionary<FileLoggingOutput, FileLoggingOutput>();
+        private static readonly ConcurrentDictionary<FileLoggingOutput, object> Instances = new();
         private readonly TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
         private readonly object lockObj = new object();
         private readonly string logFileName;
@@ -28,9 +27,9 @@ namespace Orleans.TestingHost.Logging
 
             static void CurrentDomain_ProcessExit(object sender, EventArgs args)
             {
-                foreach (var indstance in Instances.Keys.ToList())
+                foreach (var instance in Instances)
                 {
-                    indstance.Dispose();
+                    instance.Key.Dispose();
                 }
             }
         }
@@ -43,7 +42,7 @@ namespace Orleans.TestingHost.Logging
         {
             this.logFileName = fileName;
             logOutput = new StreamWriter(File.Open(fileName, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8);
-            Instances[this] = this;
+            Instances[this] = null;
         }
 
         /// <summary>

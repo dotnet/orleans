@@ -30,7 +30,7 @@ namespace UnitTests.TesterInternal
             var serviceProvider = services.BuildServiceProvider();
 
             var scheduler = ActivatorUtilities.CreateInstance<OrleansTaskScheduler>(serviceProvider);
-            WorkItemGroup ignore = scheduler.RegisterWorkContext(context);
+            scheduler.RegisterWorkContext(context);
             return scheduler;
         }
     }

@@ -1,8 +1,6 @@
-﻿using Orleans.Concurrency;
-using ProtoBuf;
 using System;
-using System.Collections.Generic;
-using System.Text;
+using Orleans.Concurrency;
+using ProtoBuf;
 
 namespace Orleans.Serialization.ProtobufNet
 {
@@ -13,8 +11,8 @@ namespace Orleans.Serialization.ProtobufNet
 
         public ProtobufTypeCacheItem(Type type)
         {
-            IsSupported = Attribute.GetCustomAttribute(type, typeof(ProtoContractAttribute), false) != null;
-            IsImmutable = Attribute.GetCustomAttribute(type, typeof(ImmutableAttribute), false) != null;
+            IsSupported = type.IsDefined(typeof(ProtoContractAttribute), false);
+            IsImmutable = type.IsDefined(typeof(ImmutableAttribute), false);
         }
     }
 }
