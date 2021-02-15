@@ -8,11 +8,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.PersistentStreams;
 using Orleans.Serialization;
-using Orleans.Streaming.AzureStorage;
+using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 using TestExtensions;
 
-namespace Tester.TestStreamProviders
+namespace ServiceBus.Tests.TestStreamProviders
 {
     public class TestAzureTableStorageStreamFailureHandler : AzureTableStorageStreamFailureHandler<StreamDeliveryFailureEntity>
     {
@@ -30,11 +30,9 @@ namespace Tester.TestStreamProviders
             return failureHandler;
         }
 
-        public static async Task<int> GetDeliveryFailureCount(string streamProviderName, ILoggerFactory loggerFactory)
+        public static async Task<int> GetDeliveryFailureCount(string streamProviderName)
         {
-            var dataManager = new AzureTableDataManager<TableEntity>(
-                new AzureStorageOperationOptions { TableName = TableName }.ConfigureTestDefaults(),
-                loggerFactory.CreateLogger<AzureTableDataManager<TableEntity>>());
+            var dataManager = GetDataManager();
             await dataManager.InitTableAsync();
             IEnumerable<Tuple<TableEntity, string>> deliveryErrors =
                 await
@@ -43,20 +41,9 @@ namespace Tester.TestStreamProviders
             return deliveryErrors.Count();
         }
 
-        public static async Task DeleteAll()
+        private static AzureTableDataManager<TableEntity> GetDataManager()
         {
-            var dataManager = new AzureTableDataManager<TableEntity>(
-                new AzureStorageOperationOptions { TableName = TableName }.ConfigureTestDefaults(),
-                NullLoggerFactory.Instance.CreateLogger<AzureTableDataManager<TableEntity>>());
-            await dataManager.InitTableAsync();
-            await dataManager.DeleteTableAsync();
-        }
-    }
-
-    internal static class AzureStorageOperationOptionsExtensions
-    {
-        public static AzureStorageOperationOptions ConfigureTestDefaults(this AzureStorageOperationOptions options)
-        {
+            var options = new AzureStorageOperationOptions { TableName = TableName };
             if (TestDefaultConfiguration.UseAadAuthentication)
             {
                 options.TableEndpoint = TestDefaultConfiguration.TableEndpoint;
@@ -67,8 +54,7 @@ namespace Tester.TestStreamProviders
             {
                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             }
-
-            return options;
+            return new AzureTableDataManager<TableEntity>(options, NullLoggerFactory.Instance.CreateLogger<AzureTableDataManager<TableEntity>>());
         }
     }
 }

@@ -10,19 +10,6 @@
   </PropertyGroup>
 
   <Choose>
-    <When Condition="$(OrleansPersistenceMemoryVersion) == $(VersionPrefix) AND $(OrleansPersistenceMemoryVersion) == $(OrleansEventHubProviderVersion)">
-      <ItemGroup>
-        <ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Persistence.Memory" Version="$(OrleansPersistenceMemoryVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
-  <Choose>
     <When Condition="$(OrleansStreamingVersion) == $(VersionPrefix) AND $(OrleansStreamingVersion) == $(OrleansEventHubProviderVersion)">
       <ItemGroup>
         <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
@@ -31,19 +18,6 @@
     <Otherwise>
       <ItemGroup>
         <PackageReference Include="Microsoft.Orleans.Streaming" Version="$(OrleansStreamingVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
-  <Choose>
-    <When Condition="$(OrleansStreamingAbstractionsVersion) == $(VersionPrefix) AND $(OrleansStreamingAbstractionsVersion) == $(OrleansEventHubProviderVersion)">
-      <ItemGroup>
-        <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming.Abstractions\Orleans.Streaming.Abstractions.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Streaming.Abstractions" Version="$(OrleansStreamingAbstractionsVersion)"/>
       </ItemGroup>
     </Otherwise>
   </Choose>

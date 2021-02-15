@@ -18,7 +18,8 @@
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <IncludeSource>true</IncludeSource>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>9.0</LangVersion>
+    <Features>strict</Features>
   </PropertyGroup>
 
   <ItemGroup>
@@ -43,36 +44,16 @@
   <!-- Shared Package Versions -->
   <PropertyGroup>
     <!-- System packages -->
-    <SystemDataSqlClientVersion>4.8.2</SystemDataSqlClientVersion>
-    <SystemDiagnosticsEventLogVersion>5.0.0</SystemDiagnosticsEventLogVersion>
-    <SystemCollectionsImmutableVersion>5.0.0</SystemCollectionsImmutableVersion>
-    <SystemRuntimeCompilerServicesUnsafeVersion>5.0.0</SystemRuntimeCompilerServicesUnsafeVersion>
     <SystemDiagnosticsPerformanceCounterVersion>5.0.0</SystemDiagnosticsPerformanceCounterVersion>
     <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
-    <SystemReflectionMetadataVersion>5.0.0</SystemReflectionMetadataVersion>
-    <SystemValueTupleVersion>4.5.0</SystemValueTupleVersion>
-    <SystemReflectionEmitVersion>4.7.0</SystemReflectionEmitVersion>
-    <SystemThreadingChannelsVersion>5.0.0</SystemThreadingChannelsVersion>
-    <SystemIOPipelinesVersion>5.0.1</SystemIOPipelinesVersion>
-    <SystemCodeDomVersion>5.0.0</SystemCodeDomVersion>
-    <SystemDiagnosticsDiagnosticsSourceVersion>5.0.1</SystemDiagnosticsDiagnosticsSourceVersion>
-    <SystemSecurityCryptographyVersion>5.0.0</SystemSecurityCryptographyVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>16.8.0</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>3.8.0</MicrosoftCodeAnalysisVersion>
-    <MicrosoftCodeAnalysisAnalyzersVersion>3.3.2</MicrosoftCodeAnalysisAnalyzersVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
-    <MicrosoftBclAsyncInterfacesVersion>5.0.0</MicrosoftBclAsyncInterfacesVersion>
-    <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.0</MicrosoftNETFrameworkReferenceAssembliesVersion>
-    <MicrosoftBclHashCodeVersion>1.1.1</MicrosoftBclHashCodeVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>5.0.2</MicrosoftAspNetCoreConnectionsAbstractionsVersion>
-    <MicrosoftExtensionsConfigurationBinderVersion>5.0.0</MicrosoftExtensionsConfigurationBinderVersion>
-    <MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>5.0.0</MicrosoftExtensionsConfigurationEnvironmentVariablesVersion>
-    <MicrosoftExtensionsConfigurationJsonVersion>5.0.0</MicrosoftExtensionsConfigurationJsonVersion>
     <MicrosoftExtensionsConfigurationVersion>5.0.0</MicrosoftExtensionsConfigurationVersion>
-    <MicrosoftExtensionsDependencyInjectionVersion>5.0.1</MicrosoftExtensionsDependencyInjectionVersion>
     <MicrosoftExtensionsDependencyModelVersion>5.0.0</MicrosoftExtensionsDependencyModelVersion>
     <MicrosoftExtensionsLoggingVersion>5.0.0</MicrosoftExtensionsLoggingVersion>
     <MicrosoftExtensionsObjectPoolVersion>5.0.2</MicrosoftExtensionsObjectPoolVersion>
@@ -84,14 +65,18 @@
     <MicrosoftApplicationInsightsVersion>2.16.0</MicrosoftApplicationInsightsVersion>
     <MicrosoftAzureCosmosTableVersion>1.0.5</MicrosoftAzureCosmosTableVersion>
     <AzureCoreVersion>1.9.0</AzureCoreVersion>
-    <AzureIdentityVersion>1.1.1</AzureIdentityVersion>
     <AzureMessagingEventHubs>5.3.0</AzureMessagingEventHubs>
     <AzureStorageBlobsVersion>12.4.4</AzureStorageBlobsVersion>
     <AzureStorageQueuesVersion>12.3.2</AzureStorageQueuesVersion>
-    <MicrosoftDataSqliteVersion>5.0.2</MicrosoftDataSqliteVersion>
     <MicrosoftServiceFabricServicesVersion>4.1.456</MicrosoftServiceFabricServicesVersion>
 
-    <FSharpCoreVersion>4.7.0</FSharpCoreVersion>
+    <!-- used only in netstandard2.0 targets - dot not upgrade unless necessary -->
+    <!-- on .NET Core 3.1+ runtimes these are inbox, so these versions are actually used only on .NET Framework 4.6.2+ -->
+    <SystemCollectionsImmutableVersion>1.7.0</SystemCollectionsImmutableVersion>
+    <SystemReflectionEmitVersion>4.7.0</SystemReflectionEmitVersion>
+    <SystemReflectionMetadataVersion>1.8.0</SystemReflectionMetadataVersion>
+    <SystemThreadingChannelsVersion>4.7.0</SystemThreadingChannelsVersion>
+    <MicrosoftBclHashCodeVersion>1.0.0</MicrosoftBclHashCodeVersion>
 
     <!-- 3rd party packages -->
     <AWSSDKDynamoDBv2Version>3.3.102.2</AWSSDKDynamoDBv2Version>
@@ -101,12 +86,8 @@
     <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
     <GoogleProtobufVersion>3.4.0</GoogleProtobufVersion>
     <ProtobufNetVersion>3.0.73</ProtobufNetVersion>
-    <MySqlDataVersion>8.0.23</MySqlDataVersion>
     <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
     <NewtonsoftJsonVersion>12.0.3</NewtonsoftJsonVersion>
-    <NpgsqlVersion>5.0.3</NpgsqlVersion>
-    <NSubstituteVersion>4.2.2</NSubstituteVersion>
-    <NSubstituteAnalyzersCSharpVersion>1.0.14</NSubstituteAnalyzersCSharpVersion>
     <ZooKeeperNetExVersion>3.4.12.4</ZooKeeperNetExVersion>
     <StackExchangeRedis>2.0.601</StackExchangeRedis>
     <KubernetesClientVersion>4.0.5</KubernetesClientVersion>
@@ -117,13 +98,16 @@
     <MicrosoftTestSdkVersion>16.8.3</MicrosoftTestSdkVersion>
     <BenchmarkDotNetVersion>0.12.1</BenchmarkDotNetVersion>
     <XunitSkippableFactVersion>1.4.13</XunitSkippableFactVersion>
-    <DotNetxUnitVersion>2.3.1</DotNetxUnitVersion>
     <xUnitVersion>2.4.1</xUnitVersion>
     <NodaTimeVersion>3.0.5</NodaTimeVersion>
     <AutofacExtensionsDependencyInjectionVersion>7.1.0</AutofacExtensionsDependencyInjectionVersion>
     <StructureMapMicrosoftDependencyInjectionVersion>2.0.0</StructureMapMicrosoftDependencyInjectionVersion>
-    <MicrosoftDataSqlClientVersion>2.1.1</MicrosoftDataSqlClientVersion>
-    <MySqlConnectorVersion>1.2.1</MySqlConnectorVersion>
+    <SystemCodeDomVersion>5.0.0</SystemCodeDomVersion>
+    <MicrosoftNETFrameworkReferenceAssembliesVersion>1.0.0</MicrosoftNETFrameworkReferenceAssembliesVersion>
+    <AzureIdentityVersion>1.3.0</AzureIdentityVersion>
+    <FSharpCoreVersion>4.7.0</FSharpCoreVersion>
+    <NSubstituteVersion>4.2.2</NSubstituteVersion>
+    <NSubstituteAnalyzersCSharpVersion>1.0.14</NSubstituteAnalyzersCSharpVersion>
 
     <!-- Tooling related packages -->
     <SourceLinkVersion>2.8.3</SourceLinkVersion>

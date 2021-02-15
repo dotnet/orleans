@@ -1,13 +1,8 @@
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using Orleans.GrainDirectory.Redis;
 using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.TestingHost;
-using StackExchange.Redis;
 using TestExtensions;
 using UnitTests.GrainInterfaces.Directories;
 using UnitTests.Grains.Directories;
@@ -29,41 +24,6 @@ namespace Tester.Directories
         }
 
         protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForAzureStorage();
-
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            base.ConfigureTestCluster(builder);
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-        }
-    }
-
-    [TestCategory("Redis")]
-    public class RedisMultipleGrainDirectoriesTests : MultipleGrainDirectoriesTests
-    {
-        public class SiloConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder siloBuilder)
-            {
-                siloBuilder
-                    .AddRedisGrainDirectory(
-                        CustomDirectoryGrain.DIRECTORY,
-                        options =>
-                        {
-                            options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
-                            options.EntryExpiry = TimeSpan.FromMinutes(5);
-                        })
-                    .ConfigureLogging(builder => builder.AddFilter(typeof(RedisGrainDirectory).FullName, LogLevel.Debug));
-
-            }
-        }
-
-        protected override void CheckPreconditionsOrThrow()
-        {
-            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
-            {
-                throw new SkipException("TestDefaultConfiguration.RedisConnectionString is empty");
-            }
-        }
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {

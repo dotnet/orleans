@@ -133,8 +133,13 @@ namespace Orleans.Runtime
                 keyExt = keyString.Slice(33).GetUtf8String();
                 keyString = keyString.Slice(0, 32);
             }
+            else if(keyString.Length != 32)
+            {
+                key = default;
+                return false;
+            }
 
-            return keyString.Length == 32 && Utf8Parser.TryParse(keyString, out key, out var len, 'N') && len == 32;
+            return Utf8Parser.TryParse(keyString, out key, out var len, 'N') && len == 32;
         }
 
         /// <summary>
@@ -144,9 +149,16 @@ namespace Orleans.Runtime
         {
             var keyString = grainId.Key.AsSpan();
             if (keyString.Length > 32 && keyString[32] == (byte)'+')
+            {
                 keyString = keyString.Slice(0, 32);
+            }
+            else if (keyString.Length != 32)
+            {
+                key = default;
+                return false;
+            }
 
-            return keyString.Length == 32 && Utf8Parser.TryParse(keyString, out key, out var len, 'N') && len == 32;
+            return Utf8Parser.TryParse(keyString, out key, out var len, 'N') && len == 32;
         }
 
         /// <summary>

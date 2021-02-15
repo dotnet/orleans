@@ -149,6 +149,7 @@ namespace Orleans.TestingHost.Utils
         /// <returns>A new <see cref="ProcessStartInfo">ProcessStartInfo</see> that has the given arguments.</returns>
         private static ProcessStartInfo CreateProcessArguments(string arguments)
         {
+#pragma warning disable CA1416 // Validate platform compatibility
             return new ProcessStartInfo(GetStorageEmulatorPath())
             {
                 WindowStyle = ProcessWindowStyle.Hidden,
@@ -160,6 +161,7 @@ namespace Orleans.TestingHost.Utils
                 RedirectStandardError = true,
                 Arguments = arguments
             };
+#pragma warning restore CA1416
         }
 
         /// <summary>

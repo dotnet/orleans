@@ -4,16 +4,8 @@
     <PackageId>Microsoft.Orleans.Runtime.Abstractions</PackageId>
     <Title>Microsoft Orleans Runtime Abstractions</Title>
     <Description>Library with core types shared between silo and extensions.</Description>
-  </PropertyGroup>
-  <PropertyGroup>
     <RootNamespace>Orleans.Runtime</RootNamespace>
-    <AssemblyName>Orleans.Runtime.Abstractions</AssemblyName>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="$(MicrosoftBclAsyncInterfacesVersion)" />
-  </ItemGroup>
-
 </Project>

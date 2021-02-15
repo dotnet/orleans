@@ -17,7 +17,7 @@ trim_trailing_whitespace = true
 indent_style = tab
 
 # XML Project Files
-[*.{csproj,vbproj,vcxproj,vcxproj.filters,proj,projitems,shproj}]
+[*.{csproj,vbproj,vcxproj,vcxproj.filters,proj,projitems,shproj,fsproj}]
 indent_size = 2
 
 # Configuration Files
