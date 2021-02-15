@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos.Table;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.PersistentStreams;
 using Orleans.Serialization;
@@ -12,7 +11,7 @@ using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
 using TestExtensions;
 
-namespace ServiceBus.Tests.TestStreamProviders
+namespace ServiceBus.Tests.TestStreamProviders.EventHub
 {
     public class TestAzureTableStorageStreamFailureHandler : AzureTableStorageStreamFailureHandler<StreamDeliveryFailureEntity>
     {
@@ -54,7 +53,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             {
                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             }
-            return new AzureTableDataManager<TableEntity>(options, NullLoggerFactory.Instance.CreateLogger<AzureTableDataManager<TableEntity>>());
+            return new AzureTableDataManager<TableEntity>(options, NullLogger.Instance);
         }
     }
 }

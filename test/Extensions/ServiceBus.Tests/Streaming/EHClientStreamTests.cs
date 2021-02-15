@@ -9,7 +9,6 @@ using Orleans.Runtime;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using ServiceBus.Tests.TestStreamProviders;
 using ServiceBus.Tests.TestStreamProviders.EventHub;
 using Tester;
 using Tester.StreamingTests;

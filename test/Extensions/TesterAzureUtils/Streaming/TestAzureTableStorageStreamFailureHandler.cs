@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Azure.Identity;
 using Microsoft.Azure.Cosmos.Table;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Providers.Streams.PersistentStreams;
@@ -48,7 +47,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
             }
-            return new AzureTableDataManager<TableEntity>(options, NullLoggerFactory.Instance.CreateLogger<AzureTableDataManager<TableEntity>>());
+            return new AzureTableDataManager<TableEntity>(options, NullLogger.Instance);
         }
     }
 }
