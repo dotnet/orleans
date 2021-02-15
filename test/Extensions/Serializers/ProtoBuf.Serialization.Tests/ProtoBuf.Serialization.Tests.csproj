@@ -12,12 +12,4 @@
     <ProjectReference Include="$(SourceRoot)src\Serializers\Orleans.Serialization.ProtobufNet\Orleans.Serialization.ProtobufNet.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <None Include="App.config" />
-    <None Include="ProtoBuf.Serialization.Tests.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-  
 </Project>

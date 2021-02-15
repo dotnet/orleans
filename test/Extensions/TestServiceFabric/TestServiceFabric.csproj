@@ -1,9 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
 
@@ -17,12 +14,5 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Hosting.ServiceFabric\Orleans.Hosting.ServiceFabric.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="App.config" />
-    <None Include="TestServiceFabric.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 </Project>

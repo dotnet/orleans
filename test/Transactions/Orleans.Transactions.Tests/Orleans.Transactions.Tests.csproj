@@ -14,10 +14,4 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Transactions.TestKit.xUnit\Orleans.Transactions.TestKit.xUnit.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <None Include="Orleans.Transactions.Tests.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
 </Project>

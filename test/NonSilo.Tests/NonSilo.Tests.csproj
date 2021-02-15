@@ -17,8 +17,5 @@
 
   <ItemGroup>
     <Content Include="*.xml" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="NonSilo.Tests.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 </Project>

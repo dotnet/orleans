@@ -20,12 +20,6 @@
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="App.config" />
-    <None Include="AWSUtils.Tests.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
     <None Update="Config_AWS_DynamoDB_Storage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

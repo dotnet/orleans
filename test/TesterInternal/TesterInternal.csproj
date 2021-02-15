@@ -13,11 +13,4 @@
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <None Include="App.config" />
-    <Content Include="TesterInternal.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
 </Project>

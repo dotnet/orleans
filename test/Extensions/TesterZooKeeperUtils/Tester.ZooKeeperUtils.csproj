@@ -11,11 +11,4 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.ZooKeeper\Orleans.Clustering.ZooKeeper.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <None Include="App.config" />
-    <None Include="Tester.ZooKeeperUtils.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
 </Project>

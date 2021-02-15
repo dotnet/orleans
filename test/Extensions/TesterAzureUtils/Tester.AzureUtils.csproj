@@ -19,13 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="App.config" />
-    <None Include="Tester.AzureUtils.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
-  <ItemGroup>
     <Content Include="Config_AzureBlobStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

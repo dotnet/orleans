@@ -18,16 +18,4 @@
     <ProjectReference Include="$(SourceRoot)test\Grains\TestVersionGrains\TestVersionGrains.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestFSharp\TestFSharp.fsproj" />
   </ItemGroup>
-
-  <ItemGroup Condition="$(TargetFramework.StartsWith('net4'))">
-    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\Orleans.TestingHost.AppDomain\Orleans.TestingHost.AppDomain.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="App.config" />
-    <None Include="Tester.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>

@@ -15,12 +15,4 @@
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <None Include="App.config" />
-    <None Include="DependencyInjection.Tests.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>

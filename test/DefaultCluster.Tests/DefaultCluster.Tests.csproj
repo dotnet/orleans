@@ -5,12 +5,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="DefaultCluster.Tests.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="NodaTime" Version="$(NodaTimeVersion)" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
   </ItemGroup>
@@ -18,9 +12,5 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Misc\TestInternalDtosRefOrleans\TestInternalDtosRefOrleans.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="App.config" />
   </ItemGroup>
 </Project>

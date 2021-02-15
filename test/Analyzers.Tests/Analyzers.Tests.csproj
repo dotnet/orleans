@@ -15,11 +15,4 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Analyzers\Orleans.Analyzers.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <None Include="Analyzers.Tests.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>

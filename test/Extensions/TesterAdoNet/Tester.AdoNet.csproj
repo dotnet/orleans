@@ -27,11 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="App.config" />
     <None Include="Data\TestDb.mdf">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="Tester.AdoNet.xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

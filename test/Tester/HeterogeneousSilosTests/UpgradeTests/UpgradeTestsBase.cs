@@ -258,7 +258,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             try
             {
-                if (!deployedSilos.Any()) return;
+                if (deployedSilos.Count == 0) return;
 
                 var primarySilo = this.deployedSilos[0];
                 foreach (var silo in this.deployedSilos.Skip(1))
@@ -281,17 +281,20 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         public async Task DisposeAsync()
         {
+            if (deployedSilos.Count == 0) return;
+
             var primarySilo = this.deployedSilos[0];
             foreach (var silo in this.deployedSilos.Skip(1))
             {
-                await silo.StopSiloAsync(true);
-                silo.Dispose();
+                await silo.DisposeAsync();
             }
 
-            await primarySilo.StopSiloAsync(true);
-            primarySilo.Dispose();
-            if (this.Client != null) await this.Client.Close();
-            this.Client?.Dispose();
+            await primarySilo.DisposeAsync();
+            if (Client is { } client)
+            {
+                await client.Close();
+                await client.DisposeAsync();
+            }
         }
     }
 }

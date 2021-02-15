@@ -11,10 +11,4 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.Consul\Orleans.Clustering.Consul.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TesterInternal\TesterInternal.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <None Include="Consul.Tests.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
 </Project>

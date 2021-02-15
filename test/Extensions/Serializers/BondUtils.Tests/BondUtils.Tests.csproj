@@ -11,11 +11,4 @@
     <ProjectReference Include="$(SourceRoot)src\Serializers\Orleans.Serialization.Bond\Orleans.Serialization.Bond.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Tester\Tester.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <None Include="App.config" />
-    <None Include="BondUtils.Tests.xunit.runner.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
 </Project>
