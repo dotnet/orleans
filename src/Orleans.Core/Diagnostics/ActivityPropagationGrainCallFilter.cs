@@ -10,142 +10,69 @@ namespace Orleans.Runtime
     {
         private const string TraceParentHeaderName = "traceparent";
         private const string TraceStateHeaderName = "tracestate";
-        private const string TraceBaggageHeaderName = "tracebaggage";
-        
-        internal const string DiagnosticListenerName = "Orleans.Runtime.GrainCall";
+
+        internal const string ActivitySourceName = "orleans.runtime.graincall";
         internal const string ActivityNameIn = "Orleans.Runtime.GrainCall.In";
-        internal const string ActivityStartNameIn = "Orleans.Runtime.GrainCall.In.Start";
-        internal const string ExceptionEventNameIn = "Orleans.Runtime.GrainCall.In.Exception";
-
         internal const string ActivityNameOut = "Orleans.Runtime.GrainCall.Out";
-        internal const string ActivityStartNameOut = "Orleans.Runtime.GrainCall.Out.Start";
-        internal const string ExceptionEventNameOut = "Orleans.Runtime.GrainCall.Out.Exception";
 
-        private static readonly DiagnosticListener DiagnosticListener = new DiagnosticListener(DiagnosticListenerName);
-        
+        private static readonly ActivitySource activitySource = new(ActivitySourceName);
+
+        private static async Task ProcessNewActivity(IGrainCallContext context, string activityName, ActivityKind activityKind, ActivityContext activityContext)
+        {
+            // rpc attributes from https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/rpc.md
+            ActivityTagsCollection tags = null;
+            if (activitySource.HasListeners())
+                tags = new ActivityTagsCollection
+                {
+                    {"rpc.service", context.InterfaceMethod?.DeclaringType},
+                    {"rpc.method", context.InterfaceMethod?.Name},
+                    {"net.peer.name", context.Grain},
+                };
+
+            using var activity = activitySource.StartActivity(activityName, activityKind, activityContext, tags);
+            if (activity is not null)
+                RequestContext.Set(TraceParentHeaderName, activity.Id);
+
+            try
+            {
+                await context.Invoke();
+            }
+            catch (Exception e)
+            {
+                if (activity is not null && activity.IsAllDataRequested)
+                {
+                    // exception attributes from https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/exceptions.md
+                    activity.SetTag("exception.type", e.GetType());
+                    activity.SetTag("exception.message", e.Message);
+                    activity.SetTag("exception.stacktrace", e.StackTrace);
+                    activity.SetTag("exception.escaped", true);
+                }
+                throw;
+            }
+        }
+
         public class ActivityPropagationOutgoingGrainCallFilter : IOutgoingGrainCallFilter
         {
             public Task Invoke(IOutgoingGrainCallContext context)
             {
                 if (Activity.Current != null)
                     return ProcessCurrentActivity(context); // Copy existing activity to RequestContext
-
-                if (DiagnosticListener.IsEnabled(ActivityNameOut, context))
-                    return ProcessDiagnosticSource(context); //Create activity using DiagnosticListener
-
-                return ProcessNewActivity(context); // Create activity directly
+                return ProcessNewActivity(context, ActivityNameOut, ActivityKind.Client, new ActivityContext()); // Create new activity
             }
 
             private static Task ProcessCurrentActivity(IOutgoingGrainCallContext context)
             {
                 var currentActivity = Activity.Current;
 
-                if (currentActivity != null &&
+                if (currentActivity is not null &&
                     currentActivity.IdFormat == ActivityIdFormat.W3C)
                 {
                     RequestContext.Set(TraceParentHeaderName, currentActivity.Id);
-                    if (Activity.Current.TraceStateString != null)
+                    if (currentActivity.TraceStateString is not null)
                         RequestContext.Set(TraceStateHeaderName, currentActivity.TraceStateString);
-
-                    using var e = currentActivity.Baggage.GetEnumerator();
-                    if (e.MoveNext())
-                    {
-                        var baggage = new List<KeyValuePair<string, string>>();
-
-                        do
-                        {
-                            baggage.Add(e.Current);
-                        }
-                        while (e.MoveNext());
-
-                        baggage.TrimExcess();
-                        RequestContext.Set(TraceBaggageHeaderName, baggage);
-                    }
                 }
 
                 return context.Invoke();
-            }
-
-            private async Task ProcessDiagnosticSource(IOutgoingGrainCallContext context)
-            {
-                var activity = new Activity(ActivityNameOut);
-                // Only send start event to users who subscribed for it, but start activity anyway
-                if (DiagnosticListener.IsEnabled(ActivityStartNameOut))
-                {
-                    DiagnosticListener.StartActivity(activity, new ActivityStartData(context));
-                }
-                else
-                {
-                    activity.Start();
-                }
-                RequestContext.Set(TraceParentHeaderName, activity.Id);
-                try
-                {
-                    await context.Invoke();
-                }
-                catch (Exception ex)
-                {
-                    if (DiagnosticListener.IsEnabled(ExceptionEventNameOut))
-                    {
-                        // If request was initially instrumented, Activity.Current has all necessary context for logging
-                        // Request is passed to provide some context if instrumentation was disabled and to avoid
-                        // extensive Activity.Tags usage to tunnel request properties
-                        DiagnosticListener.Write(ExceptionEventNameOut, new ExceptionData(ex, context));
-                    }
-                    throw;
-                }
-                finally
-                {
-                    DiagnosticListener.StopActivity(activity, new ActivityStopData(context));
-                }
-            }
-
-            private static async Task ProcessNewActivity(IOutgoingGrainCallContext context)
-            {
-                var activity = new Activity(ActivityNameOut);
-                activity.Start();
-                RequestContext.Set(TraceParentHeaderName, activity.Id);
-
-                try
-                {
-                    await context.Invoke();
-                }
-                finally
-                {
-                    activity.Stop();
-                }
-            }
-
-            private sealed class ActivityStartData
-            {
-                internal ActivityStartData(IOutgoingGrainCallContext context) => Context = context;
-
-                public IOutgoingGrainCallContext Context { get; }
-
-                public override string ToString() => $"{{ {nameof(Context)} = {Context.InterfaceMethod} }}";
-            }
-
-            private sealed class ActivityStopData
-            {
-                internal ActivityStopData(IOutgoingGrainCallContext context) => Context = context;
-
-                public IOutgoingGrainCallContext Context { get; }
-
-                public override string ToString() => $"{{ {nameof(Context)} = {Context.InterfaceMethod} }}";
-            }
-
-            private sealed class ExceptionData
-            {
-                internal ExceptionData(Exception exception, IOutgoingGrainCallContext context)
-                {
-                    Exception = exception;
-                    Context = context;
-                }
-
-                public Exception Exception { get; }
-                public IOutgoingGrainCallContext Context { get; }
-
-                public override string ToString() => $"{{ {nameof(Exception)} = {Exception}, {nameof(Context)} = {Context.InterfaceMethod} }}";
             }
         }
 
@@ -153,107 +80,14 @@ namespace Orleans.Runtime
         {
             public Task Invoke(IIncomingGrainCallContext context)
             {
-                if (DiagnosticListener.IsEnabled(ActivityNameIn, context))
-                    return ProcessDiagnosticSource(context); //Create activity from context using DiagnosticListener
-
-                return ProcessActivity(context); // Create activity from context directly
-            }
-
-            private async Task ProcessDiagnosticSource(IIncomingGrainCallContext context)
-            {
-                var activity = CreateActivity();
-                // Only send start event to users who subscribed for it, but start activity anyway
-                if (DiagnosticListener.IsEnabled(ActivityStartNameIn))
-                {
-                    DiagnosticListener.StartActivity(activity, new ActivityStartData(context));
-                }
-                else
-                {
-                    activity.Start();
-                }
-                RequestContext.Set(TraceParentHeaderName, activity.Id);
-                try
-                {
-                    await context.Invoke();
-                }
-                catch (Exception ex)
-                {
-                    if (DiagnosticListener.IsEnabled(ExceptionEventNameIn))
-                    {
-                        // If request was initially instrumented, Activity.Current has all necessary context for logging
-                        // Request is passed to provide some context if instrumentation was disabled and to avoid
-                        // extensive Activity.Tags usage to tunnel request properties
-                        DiagnosticListener.Write(ExceptionEventNameIn, new ExceptionData(ex, context));
-                    }
-                    throw;
-                }
-                finally
-                {
-                    DiagnosticListener.StopActivity(activity, new ActivityStopData(context));
-                }
-            }
-
-            private static async Task ProcessActivity(IIncomingGrainCallContext context)
-            {
-                var activity = CreateActivity();
-                activity.Start();
-                RequestContext.Set(TraceParentHeaderName, activity.Id);
-
-                try
-                {
-                    await context.Invoke();
-                }
-                finally
-                {
-                    activity.Stop();
-                }
-            }
-
-            private static Activity CreateActivity()
-            {
-                var currentActivity = new Activity(ActivityNameIn);
-                currentActivity.TraceStateString = (string)RequestContext.Get(TraceStateHeaderName);
-                currentActivity.SetParentId((string)RequestContext.Get(TraceParentHeaderName));
-
-                if (RequestContext.Get(TraceBaggageHeaderName) is List<KeyValuePair<string, string>> baggage)
-                {
-                    foreach (var pair in baggage)
-                        currentActivity.AddBaggage(pair.Key, pair.Value);
-                }
-
-                return currentActivity;
-            }
-
-            private sealed class ActivityStartData
-            {
-                internal ActivityStartData(IIncomingGrainCallContext context) => Context = context;
-
-                public IIncomingGrainCallContext Context { get; }
-
-                public override string ToString() => $"{{ {nameof(Context)} = {Context.ImplementationMethod ?? Context.InterfaceMethod} }}";
-            }
-
-            private sealed class ActivityStopData
-            {
-                internal ActivityStopData(IIncomingGrainCallContext context) => Context = context;
-
-                public IIncomingGrainCallContext Context { get; }
-
-                public override string ToString() => $"{{ {nameof(Context)} = {Context.ImplementationMethod ?? Context.InterfaceMethod} }}";
-            }
-
-            private sealed class ExceptionData
-            {
-                internal ExceptionData(Exception exception, IIncomingGrainCallContext context)
-                {
-                    Exception = exception;
-                    Context = context;
-                }
-
-                public Exception Exception { get; }
-                public IIncomingGrainCallContext Context { get; }
-
-                public override string ToString() => $"{{ {nameof(Exception)} = {Exception}, {nameof(Context)} = {Context.ImplementationMethod ?? Context.InterfaceMethod} }}";
+                // Create activity from context directly
+                var traceParent = RequestContext.Get(TraceParentHeaderName) as string;
+                var traceState = RequestContext.Get(TraceStateHeaderName) as string;
+                var parentContext = new ActivityContext();
+                
+                if (traceParent is not null)
+                    parentContext = ActivityContext.Parse(traceParent, traceState);
+                return ProcessNewActivity(context, ActivityNameIn, ActivityKind.Server, parentContext);
             }
         }
     }

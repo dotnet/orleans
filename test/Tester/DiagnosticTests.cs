@@ -4,13 +4,11 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
-using UnitTests.General;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
@@ -18,6 +16,19 @@ namespace UnitTests.General
 {
     public class DiagnosticTests : OrleansTestingBase, IClassFixture<DiagnosticTests.Fixture>
     {
+        private static readonly ActivityListener activityListener;
+
+        static DiagnosticTests()
+        {
+            activityListener = new()
+            {
+                ShouldListenTo = p => p.Name == ActivityPropagationGrainCallFilter.ActivitySourceName,
+                Sample = Sample,
+                SampleUsingParentId = SampleUsingParentId
+            };
+            static ActivitySamplingResult Sample(ref ActivityCreationOptions<ActivityContext> options) => ActivitySamplingResult.PropagationData;
+            static ActivitySamplingResult SampleUsingParentId(ref ActivityCreationOptions<string> options) => ActivitySamplingResult.PropagationData;
+        }
         public class Fixture : BaseTestClusterFixture
         {
             private readonly ActivityIdFormat format = Activity.DefaultIdFormat;
@@ -61,7 +72,11 @@ namespace UnitTests.General
 
         private readonly Fixture fixture;
 
-        public DiagnosticTests(Fixture fixture) => this.fixture = fixture;
+        public DiagnosticTests(Fixture fixture)
+        {
+            this.fixture = fixture;
+            ActivitySource.AddActivityListener(activityListener);
+        }
 
         [Fact]
         public async Task WithoutParentActivity()
@@ -84,10 +99,8 @@ namespace UnitTests.General
         [Fact]
         public async Task WithParentActivity()
         {
-            var baggage = new KeyValuePair<string, string>("key", "value");
             var activity = new Activity("SomeName");
             activity.TraceStateString = "traceState";
-            activity.AddBaggage(baggage.Key, baggage.Value);
             activity.Start();
 
             try
@@ -110,59 +123,7 @@ namespace UnitTests.General
                 Assert.NotNull(result.Id);
                 Assert.Contains(activity.TraceId.ToHexString(), result.Id); // ensure, that trace id is persisted.
                 Assert.Equal(result.TraceState, activity.TraceStateString);
-                Assert.Contains(baggage, result.Baggage);
             }
-        }
-
-        [Fact]
-        public async Task WithDiagnosticListener()
-        {
-            await Test(fixture.GrainFactory);
-            await Test(fixture.Client);
-
-            async Task Test(IGrainFactory grainFactory)
-            {
-                var grain = grainFactory.GetGrain<IActivityGrain>(random.Next());
-
-                var eventNames = new List<string>();
-                var observer = new DiagnosticListenerObserver((k, v) => eventNames.Add(k));
-                using (DiagnosticListener.AllListeners.Subscribe(observer))
-                {
-                    var result = await grain.GetActivityId();
-                    Assert.NotNull(result);
-                    Assert.NotNull(result.Id);
-                }
-
-                Assert.Contains(ActivityPropagationGrainCallFilter.ActivityStartNameIn, eventNames);
-                Assert.Contains(ActivityPropagationGrainCallFilter.ActivityStartNameOut, eventNames);
-                Assert.Contains(ActivityPropagationGrainCallFilter.ActivityNameIn + ".Stop", eventNames);
-                Assert.Contains(ActivityPropagationGrainCallFilter.ActivityNameOut + ".Stop", eventNames);
-            }
-        }
-
-        private class DiagnosticListenerObserver : IObserver<DiagnosticListener>,
-            IObserver<KeyValuePair<string, object>>
-        {
-            private readonly Action<string, object> next;
-
-            public DiagnosticListenerObserver(Action<string, object> next)
-            {
-                this.next = next;
-            }
-
-            public void OnCompleted() { }
-
-            public void OnError(Exception error) { }
-
-            public void OnNext(DiagnosticListener value)
-            {
-                if (value.Name == ActivityPropagationGrainCallFilter.DiagnosticListenerName)
-                {
-                    value.Subscribe(this);
-                }
-            }
-
-            public void OnNext(KeyValuePair<string, object> value) => next(value.Key, value.Value);
         }
     }
 }

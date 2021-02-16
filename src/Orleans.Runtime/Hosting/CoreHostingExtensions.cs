@@ -23,6 +23,7 @@ namespace Orleans.Hosting
 
         /// <summary>
         /// Add <see cref="Activity.Current"/> propagation through grain calls.
+        /// Note: according to <see cref="ActivitySource.StartActivity(string, ActivityKind)"/> activity will be created only when any listener for activity exists <see cref="ActivitySource.HasListeners()"/> and <see cref="ActivityListener.Sample"/> returns <see cref="ActivitySamplingResult.PropagationData"/>.
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <returns>The builder.</returns>

@@ -17,7 +17,7 @@ namespace UnitTests.Grains
             if (activity == null)
                 return null;
 
-            var result = new ActivityData() { Id = activity.Id, TraceState = activity.TraceStateString, Baggage = activity.Baggage.ToList() };
+            var result = new ActivityData() { Id = activity.Id, TraceState = activity.TraceStateString };
 
             return Task.FromResult(result);
         }
