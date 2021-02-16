@@ -110,7 +110,15 @@ namespace Orleans.ServiceBus.Providers
                 await dataManager.ReadSingleTableEntryAsync(entity.PartitionKey, entity.RowKey);
             if (results != null)
             {
-                entity = results.Item1;
+                var offset = results.Item1.Offset;
+                if (long.TryParse(offset, out _))
+                {
+                    entity = results.Item1;
+                }
+                else
+                {
+                    this.logger.LogError("Wrong format for offset value, ignoring value read from storage. Value :\"{Offset}\"", offset);
+                }
             }
             return entity.Offset;
         }
@@ -132,6 +140,14 @@ namespace Orleans.ServiceBus.Providers
             if (throttleSavesUntilUtc.HasValue && (throttleSavesUntilUtc.Value > utcNow || !inProgressSave.IsCompleted))
             {
                 return;
+            }
+
+            if (!long.TryParse(offset, out _))
+            {
+                this.logger.LogError(
+                    "Wrong format for offset value, ignoring update. Value :\"{Offset}\".\n{Stacktrace}",
+                    offset,
+                    Environment.StackTrace);
             }
 
             entity.Offset = offset;
