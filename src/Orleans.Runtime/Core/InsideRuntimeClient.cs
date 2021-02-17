@@ -32,7 +32,7 @@ namespace Orleans.Runtime
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly List<IDisposable> disposables;
-        private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
+        private readonly ConcurrentDictionary<(GrainId, CorrelationId), CallbackData> callbacks;
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
         private SafeTimer callbackTimer;
@@ -73,7 +73,7 @@ namespace Orleans.Runtime
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
             this.disposables = new List<IDisposable>();
-            this.callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
+            this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
             this.typeManager = typeManager;
             this.messageFactory = messageFactory;
             this.transactionAgent = transactionAgent;
@@ -89,14 +89,14 @@ namespace Orleans.Runtime
             this.schedulingOptions = schedulerOptions.Value;
 
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
+                msg => this.UnregisterCallback(msg.TargetGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.messagingOptions,
                 this.appRequestStatistics,
                 this.messagingOptions.ResponseTimeout);
 
             this.systemSharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
+                msg => this.UnregisterCallback(msg.TargetGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.messagingOptions,
                 this.appRequestStatistics,
@@ -193,7 +193,7 @@ namespace Orleans.Runtime
             if (!oneWay)
             {
                 var callbackData = new CallbackData(sharedData, context, message);
-                callbacks.TryAdd(message.Id, callbackData);
+                callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
             }
 
             this.messagingTrace.OnSendRequest(message);
@@ -226,11 +226,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// UnRegister a callback.
         /// </summary>
-        /// <param name="id"></param>
-        private void UnregisterCallback(CorrelationId id)
+        private void UnregisterCallback(GrainId grainId, CorrelationId correlationId)
         {
-            CallbackData ignore;
-            callbacks.TryRemove(id, out ignore);
+            callbacks.TryRemove((grainId, correlationId), out _);
         }
 
         public void SniffIncomingMessage(Message message)
@@ -629,7 +627,7 @@ namespace Orleans.Runtime
             else if (message.Result == Message.ResponseTypes.Status)
             {
                 var status = (StatusResponse)message.BodyObject;
-                callbacks.TryGetValue(message.Id, out var callback);
+                callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
                 var request = callback?.Message;
                 if (!(request is null))
                 {
@@ -659,7 +657,7 @@ namespace Orleans.Runtime
             }
 
             CallbackData callbackData;
-            bool found = callbacks.TryRemove(message.Id, out callbackData);
+            bool found = callbacks.TryRemove((message.TargetGrain, message.Id), out callbackData);
             if (found)
             {
                 if (message.TransactionInfo != null)
