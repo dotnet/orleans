@@ -11,7 +11,6 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
-using Tester.TestStreamProviders;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -96,7 +95,7 @@ namespace Tester.AzureUtils.Streaming
         {
             logger.Info("************************ AQStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(AQStreamProviderName, StreamNamespace, output,
-                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(AQStreamProviderName, NullLoggerFactory.Instance));
+                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(AQStreamProviderName));
         }
     }
 }

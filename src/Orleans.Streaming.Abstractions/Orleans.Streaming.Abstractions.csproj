@@ -6,16 +6,6 @@
     <Description>Streaming abstractions library for Microsoft Orleans</Description>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <AssemblyName>Orleans.Streaming.Abstractions</AssemblyName>
     <RootNamespace>Orleans</RootNamespace>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Bcl.HashCode" Version="$(MicrosoftBclHashCodeVersion)" />
-    <PackageReference Include="System.Collections.Immutable" Version="$(SystemCollectionsImmutableVersion)" />
-  </ItemGroup>
-
 </Project>

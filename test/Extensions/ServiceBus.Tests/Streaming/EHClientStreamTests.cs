@@ -1,22 +1,20 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
-using Orleans.Runtime;
-using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Runtime;
+using Orleans.ServiceBus.Providers;
+using Orleans.Streams;
 using Orleans.TestingHost;
-using Tester.TestStreamProviders;
 using ServiceBus.Tests.TestStreamProviders.EventHub;
+using Tester;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Streams;
-using Orleans.ServiceBus.Providers;
-using Tester;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -103,7 +101,7 @@ namespace ServiceBus.Tests.StreamingTests
         {
             logger.Info("************************ EHStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(StreamProviderName, StreamNamespace, output,
-                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName, NullLoggerFactory.Instance), true);
+                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName), true);
         }
     }
 }

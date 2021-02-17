@@ -26,17 +26,4 @@
     </Otherwise>
   </Choose>
 
-  <Choose>
-    <When Condition="$(OrleansPersistenceMemoryVersion) == $(VersionPrefix) AND $(OrleansPersistenceMemoryVersion) == $(OrleansTransactionsVersion)">
-      <ItemGroup>
-        <ProjectReference Include="..\..\Orleans.Persistence.Memory\Orleans.Persistence.Memory.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Persistence.Memory" Version="$(OrleansPersistenceMemoryVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
 </Project>

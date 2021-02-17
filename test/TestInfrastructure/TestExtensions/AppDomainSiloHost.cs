@@ -1,3 +1,4 @@
+#if NETFRAMEWORK
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
@@ -58,3 +59,4 @@ namespace Orleans.TestingHost
         }
     }
 }
+#endif

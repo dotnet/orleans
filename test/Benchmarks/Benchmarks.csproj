@@ -15,13 +15,13 @@
     <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="$(BenchmarkDotNetVersion)" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="All" Version="$(MicrosoftNETFrameworkReferenceAssembliesVersion)" />
     <!-- Temporarily kept to resolve a conflict between Microsoft.Azure.DocumentDB.Core's dependencies -->
-    <PackageReference Include="System.Net.NameResolution" Version="$(SystemNetNameResolutionVersion)" />
-    <PackageReference Include="System.Diagnostics.EventLog" Version="$(SystemDiagnosticsEventLogVersion)" />
     <PackageReference Include="System.CodeDom" Version="$(SystemCodeDomVersion)" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Azure\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />
+    <ProjectReference Include="..\..\src\Serializers\Orleans.Serialization.ProtobufNet\Orleans.Serialization.ProtobufNet.csproj" />
     <ProjectReference Include="..\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="..\Grains\BenchmarkGrains\BenchmarkGrains.csproj" />
     <ProjectReference Include="..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />

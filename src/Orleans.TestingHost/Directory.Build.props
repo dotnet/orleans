@@ -52,17 +52,4 @@
     </Otherwise>
   </Choose>
 
-  <Choose>
-    <When Condition="$(OrleansStreamingAbstractionsVersion) == $(VersionPrefix) AND $(OrleansStreamingAbstractionsVersion) == $(OrleansTestingHostVersion)">
-      <ItemGroup>
-        <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming.Abstractions\Orleans.Streaming.Abstractions.csproj" />
-      </ItemGroup>
-    </When>
-    <Otherwise>
-      <ItemGroup>
-        <PackageReference Include="Microsoft.Orleans.Streaming.Abstractions" Version="$(OrleansStreamingAbstractionsVersion)"/>
-      </ItemGroup>
-    </Otherwise>
-  </Choose>
-
 </Project>
