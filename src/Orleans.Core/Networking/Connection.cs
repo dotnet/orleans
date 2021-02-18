@@ -112,12 +112,12 @@ namespace Orleans.Runtime.Messaging
             return connection.RunInternal();
         }
 
-        protected virtual Task RunInternal()
+        protected virtual async Task RunInternal()
         {
             _transport = this.Context.Transport;
             _processIncomingTask = this.ProcessIncoming();
             _processOutgoingTask = this.ProcessOutgoing();
-            return Task.WhenAll(_processIncomingTask, _processOutgoingTask);
+            await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
         }
 
         /// <summary>
@@ -129,10 +129,10 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void RetryMessage(Message msg, Exception ex = null);
 
-        public Task CloseAsync(Exception exception)
+        public async Task CloseAsync(Exception exception)
         {
             StartClosing(exception);
-            return _closeTask;
+            await _closeTask;
         }
 
         private void OnTransportConnectionClosed()
@@ -338,7 +338,7 @@ namespace Orleans.Runtime.Messaging
         {
             await Task.Yield();
 
-            Exception error = default;   
+            Exception error = default;
             var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
             try
             {

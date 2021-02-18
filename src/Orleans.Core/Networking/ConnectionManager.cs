@@ -293,14 +293,14 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public Task CloseAsync(SiloAddress endpoint)
+        public async Task CloseAsync(SiloAddress endpoint)
         {
             ConnectionEntry entry;
             lock (this.lockObj)
             {
                 if (!this.connections.TryGetValue(endpoint, out entry))
                 {
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 if (entry.PendingConnection is null)
@@ -323,9 +323,8 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
 
-                return Task.WhenAll(closeTasks);
+                await Task.WhenAll(closeTasks);
             }
-            return Task.CompletedTask;
         }
 
         public async Task Close(CancellationToken ct)
