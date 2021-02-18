@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,37 +16,21 @@ namespace Orleans.Runtime
         internal Action<GrainId> Debug_OnDecideToCollectActivation;
         private readonly TimeSpan quantum;
         private readonly TimeSpan shortestAgeLimit;
-        private readonly ConcurrentDictionary<DateTime, Bucket> buckets;
-        private readonly object nextTicketLock;
+        private readonly ConcurrentDictionary<DateTime, Bucket> buckets = new();
         private DateTime nextTicket;
-        private static readonly List<ActivationData> nothing = new List<ActivationData> { Capacity = 0 };
+        private static readonly List<ActivationData> nothing = new(0);
         private readonly ILogger logger;
 
         public ActivationCollector(IOptions<GrainCollectionOptions> options, ILogger<ActivationCollector> logger)
         {
-            quantum = options.Value.CollectionQuantum;
-            shortestAgeLimit = TimeSpan.FromTicks(options.Value.ClassSpecificCollectionAge.Values
-                .Aggregate(options.Value.CollectionAge.Ticks, (a,v) => Math.Min(a,v.Ticks)));
-            buckets = new ConcurrentDictionary<DateTime, Bucket>();
+            var o = options.Value;
+            quantum = o.CollectionQuantum;
+            shortestAgeLimit = new(o.ClassSpecificCollectionAge.Values.Aggregate(o.CollectionAge.Ticks, (a, v) => Math.Min(a, v.Ticks)));
             nextTicket = MakeTicketFromDateTime(DateTime.UtcNow);
-            nextTicketLock = new object();
             this.logger = logger;
         }
 
-        public TimeSpan Quantum { get { return quantum; } }
-
-        private int ApproximateCount 
-        { 
-            get
-            {
-                int sum = 0;
-                foreach (var bucket in buckets.Values)
-                {
-                    sum += bucket.ApproximateCount;
-                }
-                return sum;
-            } 
-        }
+        public TimeSpan Quantum => quantum;
 
         // Return the number of activations that were used (touched) in the last recencyPeriod.
         public int GetNumRecentlyUsed(TimeSpan recencyPeriod)
@@ -150,7 +133,7 @@ namespace Orleans.Runtime
         private bool DequeueQuantum(out IEnumerable<ActivationData> items, DateTime now)
         {
             DateTime key;
-            lock (nextTicketLock)
+            lock (buckets)
             {
                 if (nextTicket > now)
                 {
@@ -176,11 +159,12 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             var now = DateTime.UtcNow;
-            return string.Format("<#Activations={0}, #Buckets={1}, buckets={2}>", 
-                    ApproximateCount, 
-                    buckets.Count,       
+            var all = buckets.ToList();
+            return string.Format("<#Activations={0}, #Buckets={1}, buckets={2}>",
+                    all.Sum(b => b.Value.ApproximateCount),
+                    all.Count,
                     Utils.EnumerableToString(
-                        buckets.Values.OrderBy(bucket => bucket.Key), bucket => Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.ApproximateCount + " items"));
+                        all.Select(i => i.Value).OrderBy(bucket => bucket.Key), bucket => Utils.TimeSpanToString(bucket.Key - now) + "->" + bucket.ApproximateCount + " items"));
         }
 
         /// <summary>
@@ -256,19 +240,12 @@ namespace Orleans.Runtime
         {
             List<ActivationData> result = null;
             var now = DateTime.UtcNow;
-            int bucketCount = buckets.Count;
-            int i = 0;
-            foreach (var bucket in buckets.Values)
+            foreach (var kv in buckets)
             {
-                if (i >= bucketCount) break;
-
-                int notToExceed = bucket.ApproximateCount; 
-                int j = 0;
-                foreach (var activation in bucket)
+                var bucket = kv.Value;
+                foreach (var kvp in bucket.Items)
                 {
-                    // theoretically, we could iterate forever on the ConcurrentDictionary. we limit ourselves to an approximation of the bucket's Count property to limit the number of iterations we perform.
-                    if (j >= notToExceed) break;
-
+                    var activation = kvp.Value;
                     lock (activation)
                     {
                         if (activation.State != ActivationState.Valid)
@@ -301,9 +278,7 @@ namespace Orleans.Runtime
                             }
                         }
                     }
-                    ++j;
                 }
-                ++i;
             }
             return result ?? nothing;
         }
@@ -322,25 +297,12 @@ namespace Orleans.Runtime
             this.Debug_OnDecideToCollectActivation?.Invoke(activation.GrainId);
         }
 
-        private static void ThrowIfTicketIsInvalid(DateTime ticket, TimeSpan quantum)
+        private void ThrowIfTicketIsInvalid(DateTime ticket)
         {
-            ThrowIfDefault(ticket, "ticket");
+            if (ticket.Ticks == 0) throw new ArgumentException("Empty ticket is not allowed in this context.");
             if (0 != ticket.Ticks % quantum.Ticks)
             {
                 throw new ArgumentException(string.Format("invalid ticket ({0})", ticket));
-            }
-        }
-
-        private void ThrowIfTicketIsInvalid(DateTime ticket)
-        {
-            ThrowIfTicketIsInvalid(ticket, quantum);
-        }
-
-        private void ThrowIfExemptFromCollection(ActivationData activation, string name)
-        {
-            if (activation.IsExemptFromCollection)
-            {
-                throw new ArgumentException(string.Format("{0} should not refer to a system target or system grain.", name), name);
             }
         }
 
@@ -375,37 +337,22 @@ namespace Orleans.Runtime
             // note: we expect the activation lock to be held.
 
             item.ResetCollectionCancelledFlag();
-            Bucket bucket = 
-                buckets.GetOrAdd(
-                    ticket, 
-                    key => 
-                        new Bucket(key, quantum));
+
+            var bucket = buckets.GetOrAdd(ticket, key => new Bucket(key));
             bucket.Add(item);
             item.SetCollectionTicket(ticket);
         }
 
-        static private void ThrowIfDefault<T>(T value, string name) where T : IEquatable<T>
-        {
-            if (value.Equals(default(T)))
-            {
-                throw new ArgumentException(string.Format("default({0}) is not allowed in this context.", typeof(T).Name), name);
-            }
-        }
-        
-        private class Bucket : IEnumerable<ActivationData>
+        private class Bucket
         {
             private readonly DateTime key;
-            private readonly ConcurrentDictionary<ActivationId, ActivationData> items;
+            private readonly ConcurrentDictionary<ActivationId, ActivationData> items = new();
 
-            public DateTime Key { get { return key; } }
-            public int ApproximateCount { get {  return items.Count; } }
+            public DateTime Key => key;
+            public int ApproximateCount => items.Count;
+            public ConcurrentDictionary<ActivationId, ActivationData> Items => items;
 
-            public Bucket(DateTime key, TimeSpan quantum)
-            {
-                ThrowIfTicketIsInvalid(key, quantum);
-                this.key = key;
-                items = new ConcurrentDictionary<ActivationId, ActivationData>();
-            }
+            public Bucket(DateTime key) => this.key = key;
 
             public void Add(ActivationData item)
             {
@@ -439,16 +386,6 @@ namespace Orleans.Runtime
                 }
 
                 return result ?? nothing;
-            }
-
-            public IEnumerator<ActivationData> GetEnumerator()
-            {
-                return items.Values.GetEnumerator();
-            }
-
-            IEnumerator IEnumerable.GetEnumerator()
-            {
-                return GetEnumerator();
             }
         }
     }

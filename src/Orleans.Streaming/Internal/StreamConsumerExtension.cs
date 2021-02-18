@@ -31,7 +31,7 @@ namespace Orleans.Streams
     internal class StreamConsumerExtension : IStreamConsumerExtension
     {
         private readonly IStreamProviderRuntime providerRuntime;
-        private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers; // map to different ObserversCollection<T> of different Ts.
+        private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers = new(); // map to different ObserversCollection<T> of different Ts.
         private readonly ILogger logger;
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
         // if this extension is attached to a cosnumer grain which implements IOnSubscriptionActioner,
@@ -43,7 +43,6 @@ namespace Orleans.Streams
         {
             this.streamSubscriptionObserver = streamSubscriptionObserver;
             providerRuntime = providerRt;
-            allStreamObservers = new ConcurrentDictionary<GuidId, IStreamSubscriptionHandle>();
             logger = providerRt.ServiceProvider.GetRequiredService<ILogger<StreamConsumerExtension>>();
         }
 
@@ -63,7 +62,8 @@ namespace Orleans.Streams
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
                 var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, batchObserver, stream, token, filterData);
-                return allStreamObservers.AddOrUpdate(subscriptionId, handle, (key, old) => handle) as StreamSubscriptionHandleImpl<T>;
+                allStreamObservers[subscriptionId] = handle;
+                return handle;
             }
             catch (Exception exc)
             {
@@ -187,17 +187,17 @@ namespace Orleans.Streams
 
         internal int DiagCountStreamObservers<T>(InternalStreamId streamId)
         {
-            return allStreamObservers.Values
-                                     .OfType<StreamSubscriptionHandleImpl<T>>()
-                                     .Aggregate(0, (count, o) => count + (o.SameStreamId(streamId) ? 1 : 0));
+            return allStreamObservers.Count(o => o.Value is StreamSubscriptionHandleImpl<T> i && i.SameStreamId(streamId));
         }
 
-        internal IList<StreamSubscriptionHandleImpl<T>> GetAllStreamHandles<T>()
+        internal List<StreamSubscriptionHandleImpl<T>> GetAllStreamHandles<T>()
         {
-            return allStreamObservers.Values
-                .OfType<StreamSubscriptionHandleImpl<T>>()
-                .Where(o => o != null)
-                .ToList();
+            var ls = new List<StreamSubscriptionHandleImpl<T>>();
+            foreach (var o in allStreamObservers)
+            {
+                if (o.Value is StreamSubscriptionHandleImpl<T> i) ls.Add(i);
+            }
+            return ls;
         }
     }
 }

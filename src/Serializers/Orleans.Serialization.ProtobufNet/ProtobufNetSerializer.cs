@@ -1,8 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.IO;
-using Orleans.Concurrency;
-using ProtoBuf;
 
 namespace Orleans.Serialization.ProtobufNet
 {
@@ -11,7 +9,7 @@ namespace Orleans.Serialization.ProtobufNet
     /// </summary>
     public class ProtobufNetSerializer : IExternalSerializer
     {
-        private static readonly ConcurrentDictionary<RuntimeTypeHandle, ProtobufTypeCacheItem> Cache = new ConcurrentDictionary<RuntimeTypeHandle, ProtobufTypeCacheItem>();
+        private static readonly ConcurrentDictionary<RuntimeTypeHandle, ProtobufTypeCacheItem> Cache = new();
 
         /// <summary>
         /// Determines whether this serializer has the ability to serialize a particular type.
@@ -24,9 +22,7 @@ namespace Orleans.Serialization.ProtobufNet
             {
                 return cacheItem.IsSupported;
             }
-            cacheItem = new ProtobufTypeCacheItem(itemType);
-            Cache.AddOrUpdate(itemType.TypeHandle, cacheItem, (type, val) => cacheItem);
-            return cacheItem.IsSupported;
+            return Cache.GetOrAdd(itemType.TypeHandle, new ProtobufTypeCacheItem(itemType)).IsSupported;
         }
 
         /// <inheritdoc />

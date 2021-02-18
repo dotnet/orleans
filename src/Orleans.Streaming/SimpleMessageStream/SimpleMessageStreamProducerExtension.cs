@@ -165,7 +165,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         [Serializable]
         internal class StreamConsumerExtensionCollection
         {
-            private readonly ConcurrentDictionary<GuidId, (IStreamConsumerExtension StreamConsumer, string FilterData)> consumers;
+            private readonly ConcurrentDictionary<GuidId, (IStreamConsumerExtension StreamConsumer, string FilterData)> consumers = new();
             private readonly IStreamPubSub streamPubSub;
             private readonly ILogger logger;
 
@@ -173,7 +173,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             {
                 this.streamPubSub = pubSub;
                 this.logger = logger;
-                this.consumers = new ConcurrentDictionary<GuidId, (IStreamConsumerExtension StreamConsumer, string FilterData)>();
             }
 
             internal void AddRemoteSubscriber(GuidId subscriptionId, IStreamConsumerExtension streamConsumer, string filterData)
@@ -184,10 +183,8 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             internal void RemoveRemoteSubscriber(GuidId subscriptionId)
             {
                 consumers.TryRemove(subscriptionId, out _);
-                if (consumers.Count == 0)
-                {
-                    // Unsubscribe from PubSub?
-                }
+                
+                // Unsubscribe from PubSub if the consumers collection is empty?
             }
 
             internal Task DeliverItem(InternalStreamId streamId, IStreamFilter streamFilter, object item, bool fireAndForgetDelivery, bool optimizeForImmutableData)
