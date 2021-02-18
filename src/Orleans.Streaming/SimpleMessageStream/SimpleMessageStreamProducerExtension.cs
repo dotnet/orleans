@@ -183,10 +183,8 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             internal void RemoveRemoteSubscriber(GuidId subscriptionId)
             {
                 consumers.TryRemove(subscriptionId, out _);
-                //if (consumers.IsEmpty)
-                //{
-                //    // Unsubscribe from PubSub?
-                //}
+                
+                // Unsubscribe from PubSub if the consumers collection is empty?
             }
 
             internal Task DeliverItem(InternalStreamId streamId, IStreamFilter streamFilter, object item, bool fireAndForgetDelivery, bool optimizeForImmutableData)
