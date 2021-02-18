@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
-using Microsoft.Extensions.Logging;
+using Orleans.CodeGenerator.Analysis;
 
 namespace Orleans.CodeGenerator.MSBuild
 {
@@ -28,8 +28,6 @@ namespace Orleans.CodeGenerator.MSBuild
             1591, // CS1591 - Missing XML comment for publicly visible type or member 'Type_or_Member'
             1998 // CS1998 - This async method lacks 'await' operators and will run synchronously
         };
-
-        public ILogger Log { get; set; }
 
         /// <summary>
         /// The MSBuild project path.
@@ -89,18 +87,6 @@ namespace Orleans.CodeGenerator.MSBuild
                 ? ProjectId.CreateFromSerialized(projectIdGuid)
                 : ProjectId.CreateNewId();
 
-            this.Log.LogDebug($"AssemblyName: {this.AssemblyName}");
-            if (!string.IsNullOrWhiteSpace(this.ProjectGuid)) this.Log.LogDebug($"ProjectGuid: {this.ProjectGuid}");
-            this.Log.LogDebug($"ProjectID: {projectId}");
-            this.Log.LogDebug($"ProjectName: {projectName}");
-            this.Log.LogDebug($"CodeGenOutputFile: {this.CodeGenOutputFile}");
-            this.Log.LogDebug($"ProjectPath: {this.ProjectPath}");
-            this.Log.LogDebug($"OutputType: {this.OutputType}");
-            this.Log.LogDebug($"TargetPath: {this.TargetPath}");
-            this.Log.LogDebug($"DefineConstants ({this.DefineConstants.Count}): {string.Join(", ", this.DefineConstants)}");
-            this.Log.LogDebug($"Sources ({this.Compile.Count}): {string.Join(", ", this.Compile)}");
-            this.Log.LogDebug($"References ({this.Reference.Count}): {string.Join(", ", this.Reference)}");
-
             var languageName = GetLanguageName(ProjectPath);
 
             var projectInfo = ProjectInfo.Create(
@@ -121,22 +107,20 @@ namespace Orleans.CodeGenerator.MSBuild
             workspace.AddProject(projectInfo);
 
             var project = workspace.CurrentSolution.Projects.Single();
-            this.Log.LogDebug($"Workspace creation completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
 
             var compilation = await project.GetCompilationAsync(cancellationToken);
-            this.Log.LogDebug($"GetCompilation completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
 
             if (!compilation.SyntaxTrees.Any())
             {
-                this.Log.LogWarning($"Skipping empty project, {compilation.AssemblyName}.");
+                Console.WriteLine($"Skipping empty project, {compilation.AssemblyName}.");
                 return true;
             }
 
             if (compilation.ReferencedAssemblyNames.All(name => name.Name != AbstractionsAssemblyShortName))
             {
-                this.Log.LogWarning($"Project {compilation.AssemblyName} does not reference {AbstractionsAssemblyShortName} (references: {string.Join(", ", compilation.ReferencedAssemblyNames)})");
+                Console.WriteLine($"Project {compilation.AssemblyName} does not reference {AbstractionsAssemblyShortName} (references: {string.Join(", ", compilation.ReferencedAssemblyNames)})");
                 return false;
             }
 
@@ -144,13 +128,11 @@ namespace Orleans.CodeGenerator.MSBuild
             {
                 DebuggerStepThrough = this.DebuggerStepThrough
             };
-            var generator = new CodeGenerator(compilation, options, this.Log);
+            var generator = new CodeGenerator(new CodeGeneratorExecutionContext { Compilation = compilation }, options);
             var syntax = generator.GenerateCode(cancellationToken);
-            this.Log.LogDebug($"GenerateCode completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
 
             var normalized = syntax.NormalizeWhitespace();
-            this.Log.LogDebug($"NormalizeWhitespace completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
             
             var sourceBuilder = new StringBuilder();
@@ -162,7 +144,6 @@ namespace Orleans.CodeGenerator.MSBuild
             sourceBuilder.AppendLine("#endif");
             var source = sourceBuilder.ToString();
 
-            this.Log.LogDebug($"Generate source from syntax completed in {stopwatch.ElapsedMilliseconds}ms.");
             stopwatch.Restart();
 
             if (File.Exists(this.CodeGenOutputFile))
@@ -172,7 +153,6 @@ namespace Orleans.CodeGenerator.MSBuild
                     var existing = await reader.ReadToEndAsync();
                     if (string.Equals(source, existing, StringComparison.Ordinal))
                     {
-                        this.Log.LogDebug("Generated code matches existing code.");
                         return true;
                     }
                 }
@@ -182,8 +162,6 @@ namespace Orleans.CodeGenerator.MSBuild
             {
                 await sourceWriter.WriteAsync(source);
             }
-
-            this.Log.LogDebug($"Write source to disk completed in {stopwatch.ElapsedMilliseconds}ms.");
 
             return true;
         }
@@ -246,6 +224,18 @@ namespace Orleans.CodeGenerator.MSBuild
                 .WithAllowUnsafe(true)
                 .WithConcurrentBuild(true)
                 .WithOptimizationLevel(OptimizationLevel.Debug);
+        }
+    }
+
+    public class CodeGeneratorExecutionContext : IGeneratorExecutionContext
+    {
+        public Compilation Compilation { get; init; }
+
+        public CancellationToken CancellationToken => CancellationToken.None;
+
+        public void ReportDiagnostic(Diagnostic diagnostic)
+        {
+            Console.WriteLine($"[{diagnostic.Id}] {diagnostic.Severity} at {diagnostic.Location}: {diagnostic.GetMessage()}");
         }
     }
 }

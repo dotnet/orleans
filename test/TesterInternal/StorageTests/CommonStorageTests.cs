@@ -38,12 +38,14 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         public IGrainStorage Storage { get; }
 
+
         /// <summary>
         /// Creates a new grain and a grain reference pair.
         /// </summary>
         /// <param name="grainId">The grain ID.</param>
         /// <param name="version">The initial version of the state.</param>
         /// <returns>A grain reference and a state pair.</returns>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0022")]
         internal Tuple<GrainReference, GrainState<TestState1>> GetTestReferenceAndState(long grainId, string version)
         {
             return Tuple.Create((GrainReference)this.grainFactory.GetGrain(LegacyGrainId.GetGrainId(UniqueKey.NewKey(grainId, UniqueKey.Category.Grain))), new GrainState<TestState1> { State = new TestState1(), ETag = version });

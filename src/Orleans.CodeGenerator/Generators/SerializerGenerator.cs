@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.Extensions.Logging;
+using Orleans.CodeGenerator.Analyzers;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.Utilities;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -60,7 +60,7 @@ namespace Orleans.CodeGenerator.Generators
             this.wellKnownTypes = wellKnownTypes;
         }
 
-        private readonly ConcurrentDictionary<ITypeSymbol, bool> ShallowCopyableTypes = new ConcurrentDictionary<ITypeSymbol, bool>();
+        private readonly ConcurrentDictionary<ITypeSymbol, bool> ShallowCopyableTypes = new ConcurrentDictionary<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
 
         /// <summary>
         /// Returns the name of the generated class for the provided type.
@@ -104,7 +104,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Generates the non serializer class for the provided grain types.
         /// </summary>
-        internal (TypeDeclarationSyntax, TypeSyntax) GenerateClass(SemanticModel model, SerializerTypeDescription description, ILogger logger)
+        internal (TypeDeclarationSyntax, TypeSyntax) GenerateClass(IGeneratorExecutionContext context, SemanticModel model, SerializerTypeDescription description)
         {
             var className = GetGeneratedClassName(description.Target);
             var type = description.Target;
@@ -119,7 +119,7 @@ namespace Orleans.CodeGenerator.Generators
                         AttributeArgument(TypeOfExpression(type.WithoutTypeParameters().ToTypeSyntax())))
             };
 
-            var fields = GetFields(model, type, logger);
+            var fields = GetFields(context, model, type);
 
             var members = new List<MemberDeclarationSyntax>(GenerateFields(fields))
             {
@@ -510,7 +510,7 @@ namespace Orleans.CodeGenerator.Generators
         /// <summary>
         /// Returns a sorted list of the fields of the provided type.
         /// </summary>
-        private List<FieldInfoMember> GetFields(SemanticModel model, INamedTypeSymbol type, ILogger logger)
+        private List<FieldInfoMember> GetFields(IGeneratorExecutionContext context, SemanticModel model, INamedTypeSymbol type)
         {
             var result = new List<FieldInfoMember>();
             foreach (var field in type.GetDeclaredInstanceMembers<IFieldSymbol>())
@@ -554,27 +554,8 @@ namespace Orleans.CodeGenerator.Generators
 
                 if (hasUnsupportedRefAsmBase && !referenceAssemblyHasFields)
                 {
-                    var fileLocation = string.Empty;
-                    var declaration = type.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as ClassDeclarationSyntax;
-                    if (declaration != null)
-                    {
-                        var location = declaration.Identifier.GetLocation();
-                        if (location.IsInSource)
-                        {
-                            var pos = location.GetLineSpan();
-                            fileLocation = string.Format(
-                                "{0}({1},{2},{3},{4}): ",
-                                pos.Path,
-                                pos.StartLinePosition.Line + 1,
-                                pos.StartLinePosition.Character + 1,
-                                pos.EndLinePosition.Line + 1,
-                                pos.EndLinePosition.Character + 1);
-                        }
-                    }
-
-                    logger.LogWarning(
-                        $"{fileLocation}warning ORL1001: Type {type} has a base type which belongs to a reference assembly."
-                        + " Serializer generation for this type may not include important base type fields.");
+                    var declaration = type.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as TypeDeclarationSyntax;
+                    context.ReportDiagnostic(RefAssemblyBaseTypeDiagnosticAnalyzer.CreateDiagnostic(declaration));
                 }
 
                 bool IsSupportedRefAsmType(INamedTypeSymbol t)

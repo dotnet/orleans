@@ -1,8 +1,6 @@
-﻿using Orleans;
-using Orleans.Runtime;
+using Orleans;
 using System;
 using System.Collections.Generic;
-
 
 namespace UnitTests.StorageTests.Relational.TestDataSets
 {
@@ -13,21 +11,29 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         /// </summary>
         private class NotApplicable { };
 
+        public interface ITestGrainWithIntegerKey: IGrainWithIntegerKey { }
 
-        private interface ITestGrainWithIntegerKey: IGrainWithIntegerKey { }
-        private interface ITestGrainGenericWithIntegerKey<T>: IGrainWithIntegerKey { }
-        private class TestGrainWithIntegerKey: Grain, ITestGrainWithIntegerKey { }
-        private class TestGrainGenericWithIntegerKey<T>: Grain, ITestGrainGenericWithIntegerKey<T> { }
+        public interface ITestGrainGenericWithIntegerKey<T>: IGrainWithIntegerKey { }
 
-        private interface ITestGrainWithGuidKey: IGrainWithGuidKey { }
-        private interface ITestGrainGenericWithGuidKey<T>: IGrainWithGuidKey { }
-        private class TestGrainWithGuidKey: Grain, ITestGrainWithGuidKey { }
-        private class TestGrainGenericWithGuidKey<T>: Grain, ITestGrainGenericWithGuidKey<T> { }
+        public class TestGrainWithIntegerKey: Grain, ITestGrainWithIntegerKey { }
 
-        private interface ITestGrainWithStringKey: IGrainWithStringKey { }
-        private interface ITestGrainGenericWithStringKey<T>: IGrainWithStringKey { }
-        private class TestGrainWithStringKey: Grain, ITestGrainWithStringKey { }
-        private class TestGrainGenericWithStringKey<T>: Grain, ITestGrainGenericWithStringKey<T> { }
+        public class TestGrainGenericWithIntegerKey<T>: Grain, ITestGrainGenericWithIntegerKey<T> { }
+
+        public interface ITestGrainWithGuidKey: IGrainWithGuidKey { }
+
+        public interface ITestGrainGenericWithGuidKey<T>: IGrainWithGuidKey { }
+
+        public class TestGrainWithGuidKey: Grain, ITestGrainWithGuidKey { }
+
+        public class TestGrainGenericWithGuidKey<T>: Grain, ITestGrainGenericWithGuidKey<T> { }
+
+        public interface ITestGrainWithStringKey: IGrainWithStringKey { }
+
+        public interface ITestGrainGenericWithStringKey<T>: IGrainWithStringKey { }
+
+        public class TestGrainWithStringKey: Grain, ITestGrainWithStringKey { }
+
+        public class TestGrainGenericWithStringKey<T>: Grain, ITestGrainGenericWithStringKey<T> { }
 
         private static Dictionary<Type, Func<Type, Type, Type>> GrainTypeSwitch { get; } = new Dictionary<Type, Func<Type, Type, Type>>
         {
@@ -89,3 +95,5 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         }
     }
 }
+
+#pragma warning restore ORLEANS0102

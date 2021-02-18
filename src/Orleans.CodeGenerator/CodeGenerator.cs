@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.Extensions.Logging;
 using Orleans.CodeGenerator.Analysis;
+using Orleans.CodeGenerator.Analyzers;
 using Orleans.CodeGenerator.Compatibility;
 using Orleans.CodeGenerator.Generators;
 using Orleans.CodeGenerator.Model;
@@ -19,9 +20,8 @@ namespace Orleans.CodeGenerator
     {
         public const string ToolName = "OrleansCodeGen";
         public static readonly string Version = typeof(CodeGenerator).Assembly.GetName().Version.ToString();
-
+        private readonly IGeneratorExecutionContext context;
         private readonly Compilation compilation;
-        private readonly ILogger log;
         private readonly WellKnownTypes wellKnownTypes;
         private readonly SemanticModel semanticModelForAccessibility;
         private readonly CompilationAnalyzer compilationAnalyzer;
@@ -31,13 +31,13 @@ namespace Orleans.CodeGenerator
         private readonly GrainReferenceGenerator grainReferenceGenerator;
         private readonly CodeGeneratorOptions options;
 
-        public CodeGenerator(Compilation compilation, CodeGeneratorOptions options, ILogger log)
+        public CodeGenerator(IGeneratorExecutionContext context, CodeGeneratorOptions options)
         {
-            this.compilation = compilation;
+            this.context = context;
+            this.compilation = context.Compilation;
             this.options = options;
-            this.log = log;
             this.wellKnownTypes = new WellKnownTypes(compilation);
-            this.compilationAnalyzer = new CompilationAnalyzer(log, this.wellKnownTypes, compilation);
+            this.compilationAnalyzer = new CompilationAnalyzer(context, this.wellKnownTypes, compilation);
 
             var firstSyntaxTree = compilation.SyntaxTrees.FirstOrDefault() ?? throw new InvalidOperationException("Compilation has no syntax trees.");
             this.semanticModelForAccessibility = compilation.GetSemanticModel(firstSyntaxTree);
@@ -47,29 +47,30 @@ namespace Orleans.CodeGenerator
             this.grainReferenceGenerator = new GrainReferenceGenerator(this.options, this.wellKnownTypes);
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public CompilationUnitSyntax GenerateCode(CancellationToken cancellationToken)
         {
             // Create a model of the code to generate from the collection of types.
-            var model = this.AnalyzeCompilation();
+            var model = this.AnalyzeCompilation(cancellationToken);
 
             // Perform some validation against the generated model.
-            this.ValidateModel(model);
+            this.ValidateModel(model, cancellationToken);
 
             // Finally, generate code for the model.
-            return this.GenerateSyntax(model);
+            return this.GenerateSyntax(model, cancellationToken);
         }
 
-        private AggregatedModel AnalyzeCompilation()
+        private AggregatedModel AnalyzeCompilation(CancellationToken cancellationToken)
         {
             // Inspect the target assembly to discover known assemblies and known types.
-            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug($"Main assembly {this.compilation.Assembly}");
-            this.compilationAnalyzer.Analyze();
+            this.compilationAnalyzer.Analyze(cancellationToken);
 
             // Create a list of all distinct types from all known assemblies.
             var types = this.compilationAnalyzer
                 .KnownAssemblies.SelectMany(a => a.GetDeclaredTypes())
                 .Concat(this.compilationAnalyzer.KnownTypes)
-                .Distinct()
+                .Distinct(SymbolEqualityComparer.Default)
+                .Cast<INamedTypeSymbol>()
                 .ToList();
 
             var model = new AggregatedModel();
@@ -106,7 +107,6 @@ namespace Orleans.CodeGenerator
                 if (this.compilationAnalyzer.AssembliesExcludedFromCodeGeneration.Contains(asm)
                     || this.compilationAnalyzer.AssembliesExcludedFromMetadataGeneration.Contains(asm))
                 {
-                    this.log.LogDebug($"Skipping adding known types for assembly {asm.Identity.Name} since a referenced assembly already includes its types.");
                     continue;
                 }
 
@@ -115,7 +115,6 @@ namespace Orleans.CodeGenerator
 
             foreach (var asm in assembliesToScan)
             {
-                this.log.LogDebug($"Generating metadata for referenced assembly {asm.Identity.Name}.");
                 foreach (var type in asm.GetDeclaredTypes())
                 {
                     if (this.ValidForKnownTypes(type))
@@ -126,7 +125,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private void ValidateModel(AggregatedModel model)
+        private void ValidateModel(AggregatedModel model, CancellationToken cancellationToken)
         {
             // Check that all types which the developer marked as requiring code generation have had code generation.
             foreach (var required in this.compilationAnalyzer.CodeGenerationRequiredTypes)
@@ -140,9 +139,9 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private CompilationUnitSyntax GenerateSyntax(AggregatedModel model)
+        private CompilationUnitSyntax GenerateSyntax(AggregatedModel model, CancellationToken cancellationToken)
         {
-            var namespaceGroupings = new Dictionary<INamespaceSymbol, List<MemberDeclarationSyntax>>();
+            var namespaceGroupings = new Dictionary<INamespaceSymbol, List<MemberDeclarationSyntax>>(SymbolEqualityComparer.Default);
 
             // Pass the relevant elements of the model to each of the code generators.
             foreach (var grainInterface in model.GrainInterfaces)
@@ -159,7 +158,7 @@ namespace Orleans.CodeGenerator
             {
                 var nsMembers = GetNamespace(namespaceGroupings, serializerType.Target.ContainingNamespace);
                 TypeDeclarationSyntax generated;
-                (generated, serializerType.SerializerTypeSyntax) = this.serializerGenerator.GenerateClass(this.semanticModelForAccessibility, serializerType, this.log);
+                (generated, serializerType.SerializerTypeSyntax) = this.serializerGenerator.GenerateClass(this.context, this.semanticModelForAccessibility, serializerType);
                 nsMembers.Add(generated);
             }
 
@@ -218,7 +217,6 @@ namespace Orleans.CodeGenerator
                 AttributeSyntax GenerateAttribute(IAssemblySymbol assembly)
                 {
                     var assemblyName = assembly.Identity.GetDisplayName(fullKey: true);
-                    this.log.LogTrace($"Adding [assembly: OrleansCodeGenerationTarget(\"{assemblyName}\")]");
                     var nameSyntax = this.wellKnownTypes.OrleansCodeGenerationTargetAttribute.ToNameSyntax();
                     return Attribute(nameSyntax)
                         .AddArgumentListArguments(AttributeArgument(assemblyName.ToLiteralExpression()));
@@ -230,23 +228,13 @@ namespace Orleans.CodeGenerator
         {
             var accessible = this.semanticModelForAccessibility.IsAccessible(0, type);
 
-            if (this.log.IsEnabled(LogLevel.Debug))
-            {
-                this.log.LogDebug($"Found grain interface {type.ToDisplayString()}{(accessible ? string.Empty : ", but it is inaccessible")}");
-            }
-
             if (accessible)
             {
                 var genericMethod = type.GetInstanceMembers<IMethodSymbol>().FirstOrDefault(m => m.IsGenericMethod);
                 if (genericMethod != null && this.wellKnownTypes.GenericMethodInvoker is WellKnownTypes.None)
                 {
-                    if (this.log.IsEnabled(LogLevel.Warning))
-                    {
-                        var message = $"Grain interface {type} has a generic method, {genericMethod}." +
-                                      " Support for generic methods requires the project to reference Microsoft.Orleans.Core, but this project does not reference it.";
-                        this.log.LogError(message);
-                        throw new CodeGenerationException(message);
-                    }
+                    var declaration = genericMethod.GetDeclarationSyntax();
+                    this.context.ReportDiagnostic(GenericMethodRequireOrleansCoreDiagnostic.CreateDiagnostic(declaration));
                 }
 
                 var methods = GetGrainMethodDescriptions(type);
@@ -282,14 +270,14 @@ namespace Orleans.CodeGenerator
         {
             var accessible = this.semanticModelForAccessibility.IsAccessible(0, type);
 
-            if (this.log.IsEnabled(LogLevel.Debug))
-            {
-                this.log.LogDebug($"Found grain class {type.ToDisplayString()}{(accessible ? string.Empty : ", but it is inaccessible")}");
-            }
-
             if (accessible)
             {
                 model.GrainClasses.Add(new GrainClassDescription(type, this.wellKnownTypes.GetTypeId(type)));
+            }
+            else
+            {
+                var declaration = type.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as TypeDeclarationSyntax;
+                this.context.ReportDiagnostic(InaccessibleGrainClassDiagnostic.CreateDiagnostic(declaration));
             }
         }
 
@@ -297,7 +285,6 @@ namespace Orleans.CodeGenerator
         {
             if (!ValidForKnownTypes(type))
             {
-                if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ProcessSerializableType)} skipping abstract type {type}");
                 return;
             }
 
@@ -307,7 +294,6 @@ namespace Orleans.CodeGenerator
 
             if (type.IsAbstract)
             {
-                if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ProcessSerializableType)} skipping abstract type {type}");
                 return;
             }
 
@@ -315,25 +301,21 @@ namespace Orleans.CodeGenerator
             var accessible = this.semanticModelForAccessibility.IsAccessible(0, type);
             if (!accessible)
             {
-                if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ProcessSerializableType)} skipping inaccessible type {type}");
                 return;
             }
 
             if (type.HasBaseType(this.wellKnownTypes.Exception))
             {
-                if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ProcessSerializableType)} skipping Exception type {type}");
                 return;
             }
 
             if (type.HasBaseType(this.wellKnownTypes.Delegate))
             {
-                if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ProcessSerializableType)} skipping Delegate type {type}");
                 return;
             }
 
             if (type.AllInterfaces.Contains(this.wellKnownTypes.IAddressable))
             {
-                if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ProcessSerializableType)} skipping IAddressable type {type}");
                 return;
             }
 
@@ -344,11 +326,6 @@ namespace Orleans.CodeGenerator
                 var typeSyntax = type.ToTypeSyntax();
                 foreach (var target in serializerTargets)
                 {
-                    if (this.log.IsEnabled(LogLevel.Trace))
-                    {
-                        this.log.LogTrace($"{nameof(ProcessSerializableType)} type {type} is a serializer for {target}");
-                    }
-
                     if (SymbolEqualityComparer.Default.Equals(target, type))
                     {
                         selfSerializing = true;
@@ -366,43 +343,26 @@ namespace Orleans.CodeGenerator
 
             if (selfSerializing)
             {
-                if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ProcessSerializableType)} skipping serializer generation for self-serializing type {type}");
                 return;
             }
 
             if (type.HasAttribute(this.wellKnownTypes.GeneratedCodeAttribute))
             {
-                if (this.log.IsEnabled(LogLevel.Trace))
-                {
-                    this.log.LogTrace($"{nameof(ProcessSerializableType)} type {type} is a generated type and no serializer will be generated for it");
-                }
-
                 return;
             }
 
             if (type.IsStatic)
             {
-                if (this.log.IsEnabled(LogLevel.Trace))
-                {
-                    this.log.LogTrace($"{nameof(ProcessSerializableType)} type {type} is a static type and no serializer will be generated for it");
-                }
-
                 return;
             }
 
             if (type.TypeKind == TypeKind.Enum)
             {
-                if (this.log.IsEnabled(LogLevel.Trace))
-                {
-                    this.log.LogTrace($"{nameof(ProcessSerializableType)} type {type} is an enum type and no serializer will be generated for it");
-                }
-
                 return;
             }
 
             if (type.TypeParameters.Any(p => p.ConstraintTypes.Any(c => SymbolEqualityComparer.Default.Equals(c, this.wellKnownTypes.Delegate))))
             {
-                if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ProcessSerializableType)} skipping type with Delegate parameter constraint, {type}");
                 return;
             }
 
@@ -415,23 +375,13 @@ namespace Orleans.CodeGenerator
                     // Ignore fields which won't be serialized anyway.
                     if (!this.serializerGenerator.ShouldSerializeField(field))
                     {
-                        if (this.log.IsEnabled(LogLevel.Trace))
-                        {
-                            this.log.LogTrace($"{nameof(ProcessSerializableType)} skipping non-serialized field {field} in type {type}");
-                        }
-
-                        continue;
+                                                continue;
                     }
 
                     // Check field type accessibility.
                     var fieldAccessible = this.semanticModelForAccessibility.IsAccessible(0, field.Type);
                     if (!fieldAccessible)
                     {
-                        if (this.log.IsEnabled(LogLevel.Trace))
-                        {
-                            this.log.LogTrace($"{nameof(ProcessSerializableType)} skipping type {type} with inaccessible field type {field.Type} (field: {field})");
-                        }
-
                         return;
                     }
                 }
@@ -439,19 +389,10 @@ namespace Orleans.CodeGenerator
                 // Add the type that needs generation.
                 // The serializer generator will fill in the missing SerializerTypeSyntax field with the
                 // generated type.
-                if (this.log.IsEnabled(LogLevel.Trace))
-                {
-                    this.log.LogTrace($"{nameof(ProcessSerializableType)} will generate a serializer for type {type}");
-                }
-
                 serializerModel.SerializerTypes.Add(new SerializerTypeDescription
                 {
                     Target = type
                 });
-            }
-            else if (this.log.IsEnabled(LogLevel.Trace))
-            {
-                this.log.LogTrace($"{nameof(ProcessSerializableType)} will not generate a serializer for type {type}");
             }
         }
 
@@ -506,8 +447,6 @@ namespace Orleans.CodeGenerator
             {
                 return false;
             }
-
-            if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace($"{nameof(ValidForKnownTypes)} adding type {type}");
 
             return true;
         }

@@ -310,12 +310,12 @@ namespace DefaultCluster.Tests.General
             await Assert.ThrowsAsync<ArgumentException>(() => this.Client.CreateObjectReference<ISimpleGrainObserver>(reference));
         }
 
-        private class DummyObserverGrain : Grain, ISimpleGrainObserver
+        public class DummyObserverGrain : Grain, ISimpleGrainObserver
         {
             public void StateChanged(int a, int b) { }
         }
 
-        private class DummyObserver : ISimpleGrainObserver
+        public class DummyObserver : ISimpleGrainObserver
         {
             public void StateChanged(int a, int b) { }
         }

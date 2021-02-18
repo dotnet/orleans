@@ -51,6 +51,7 @@
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>16.8.0</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>3.8.0</MicrosoftCodeAnalysisVersion>
+    <MicrosoftCodeAnalysisAnalyzersVersion>3.3.2</MicrosoftCodeAnalysisAnalyzersVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>5.0.2</MicrosoftAspNetCoreConnectionsAbstractionsVersion>

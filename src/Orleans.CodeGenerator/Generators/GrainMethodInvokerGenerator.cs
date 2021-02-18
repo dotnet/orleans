@@ -287,9 +287,9 @@ namespace Orleans.CodeGenerator.Generators
         /// </summary>
         private Dictionary<IMethodSymbol, GenericInvokerField> GenerateGenericInvokerFields(WellKnownTypes wellKnownTypes, List<GrainMethodDescription> methodDescriptions)
         {
-            if (!(wellKnownTypes.GenericMethodInvoker is WellKnownTypes.Some genericMethodInvoker)) return new Dictionary<IMethodSymbol, GenericInvokerField>();
+            if (!(wellKnownTypes.GenericMethodInvoker is WellKnownTypes.Some genericMethodInvoker)) return new Dictionary<IMethodSymbol, GenericInvokerField>(SymbolEqualityComparer.Default);
 
-            var result = new Dictionary<IMethodSymbol, GenericInvokerField>(methodDescriptions.Count);
+            var result = new Dictionary<IMethodSymbol, GenericInvokerField>(methodDescriptions.Count, SymbolEqualityComparer.Default);
             foreach (var description in methodDescriptions)
             {
                 var method = description.Method;

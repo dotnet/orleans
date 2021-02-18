@@ -39,6 +39,11 @@ namespace Orleans.Metadata
         public bool TryGetGrainProperties(GrainType grainType, out GrainProperties properties)
         {
             var clusterManifest = _clusterManifestProvider.Current;
+            if (clusterManifest is null)
+            {
+                properties = default;
+                return false;
+            }
 
             GrainType lookupKey;
             if (GenericGrainType.TryParse(grainType, out var generic))
@@ -60,11 +65,6 @@ namespace Orleans.Metadata
 
             properties = default;
             return false;
-        }
-
-        private static void ThrowNotFoundException(GrainType grainType)
-        {
-            throw new KeyNotFoundException($"Could not find grain properties for grain type {grainType}");
         }
     }
 }

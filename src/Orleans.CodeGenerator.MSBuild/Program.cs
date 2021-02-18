@@ -4,8 +4,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Orleans.CodeGenerator.MSBuild;
 
 namespace Microsoft.Orleans.CodeGenerator.MSBuild
@@ -87,8 +85,6 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
             using (new AssemblyResolver())
             {
                 var cmd = new CodeGeneratorCommand();
-                var logLevel = LogLevel.Warning;
-
                 var argsFile = args[0].Trim('"');
                 if (!File.Exists(argsFile)) throw new ArgumentException($"Arguments file \"{argsFile}\" does not exist.");
 
@@ -146,14 +142,7 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
                             break;
                         case "InputHash":
                             break;
-                        case nameof(LogLevel):
-                            if (!Enum.TryParse(ignoreCase: true, value: value, result: out logLevel))
-                            {
-                                var validValues = string.Join(", ", Enum.GetNames(typeof(LogLevel)).Select(v => v.ToString()));
-                                Console.WriteLine($"ERROR: \"{value}\" is not a valid log level. Valid values are {validValues}");
-                                return -3;
-                            }
-
+                        case "LogLevel":
                             break;
                         default:
                             PrintUsage();
@@ -161,20 +150,7 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
                     }
                 }
 
-                var services = new ServiceCollection()
-                    .AddLogging(logging =>
-                    {
-                        logging
-                        .SetMinimumLevel(logLevel)
-                        .AddConsole()
-                        .AddDebug();
-                    })
-                    .BuildServiceProvider();
-                cmd.Log = services.GetRequiredService<ILoggerFactory>().CreateLogger("Orleans.CodeGenerator");
-                var stopwatch = Stopwatch.StartNew();
                 var ok = cmd.Execute(CancellationToken.None).GetAwaiter().GetResult();
-                cmd.Log.LogInformation($"Total code generation time: {stopwatch.ElapsedMilliseconds}ms.");
-
                 if (ok) return 0;
             }
 
