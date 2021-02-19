@@ -10,6 +10,7 @@ namespace Orleans.CodeGenerator
         public WellKnownTypes(Compilation compilation)
         {
             Attribute = Type("System.Attribute");
+            ApplicationPartAttribute = Type("Orleans.Metadata.ApplicationPartAttribute");
             Action_2 = Type("System.Action`2");
             AlwaysInterleaveAttribute = Type("Orleans.Concurrency.AlwaysInterleaveAttribute");
             CopierMethodAttribute = Type("Orleans.CodeGeneration.CopierMethodAttribute");
@@ -151,6 +152,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol[] SupportedRefAsmBaseTypes { get; }
         public INamedTypeSymbol[] TupleTypes { get; }
         public INamedTypeSymbol Attribute { get; }
+        public INamedTypeSymbol ApplicationPartAttribute { get; }
         public INamedTypeSymbol TimeSpan { get; }
         public INamedTypeSymbol GrainClassMetadata { get; }
         public INamedTypeSymbol GrainInterfaceMetadata { get; }

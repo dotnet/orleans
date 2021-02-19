@@ -2,6 +2,7 @@
   <PropertyGroup>
     <DefineConstants>$(DefineConstants);TESTER_SQLUTILS</DefineConstants>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>

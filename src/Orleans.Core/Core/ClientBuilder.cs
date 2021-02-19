@@ -43,7 +43,6 @@ namespace Orleans
             CreateHostingEnvironment();
             CreateHostBuilderContext();
             BuildAppConfiguration();
-            this.ConfigureApplicationParts(parts => parts.ConfigureDefaults());
 
             this.ConfigureServices(
                 services =>

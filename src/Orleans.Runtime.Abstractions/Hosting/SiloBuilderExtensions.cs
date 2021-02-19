@@ -72,13 +72,6 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Returns the <see cref="ApplicationPartManager"/> for this instance.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <returns>The <see cref="ApplicationPartManager"/> for this instance.</returns>
-        public static IApplicationPartManager GetApplicationPartManager(this ISiloBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(properties: builder.Properties);
-
-        /// <summary>
         /// Configures the <see cref="ApplicationPartManager"/> using the given <see cref="Action{IApplicationPartBuilder}"/>.
         /// </summary>
         /// <param name="builder">The builder.</param>
@@ -96,7 +89,7 @@ namespace Orleans.Hosting
                 throw new ArgumentNullException(nameof(configure));
             }
 
-            configure(builder.GetApplicationPartManager());
+            builder.ConfigureServices(services => configure(services.GetApplicationPartManager()));
             return builder;
         }
     }

@@ -4,7 +4,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.ApplicationParts;
-using Orleans.Configuration;
 
 namespace Orleans.Hosting
 {
@@ -125,13 +124,6 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
-        /// Returns the <see cref="ApplicationPartManager"/> for this instance.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <returns>The <see cref="ApplicationPartManager"/> for this instance.</returns>
-        public static IApplicationPartManager GetApplicationPartManager(this ISiloHostBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(builder.Properties);
-        
-        /// <summary>
         /// Configures the <see cref="ApplicationPartManager"/> using the given <see cref="Action{IApplicationPartBuilder}"/>.
         /// </summary>
         /// <param name="builder">The builder.</param>
@@ -149,8 +141,7 @@ namespace Orleans.Hosting
                 throw new ArgumentNullException(nameof(configure));
             }
 
-            configure(builder.GetApplicationPartManager());
-            return builder;
+            return builder.ConfigureServices((_, services) => configure(services.GetApplicationPartManager()));
         }
     }
 }

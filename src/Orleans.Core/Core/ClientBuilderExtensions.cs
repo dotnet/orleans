@@ -33,7 +33,7 @@ namespace Orleans
                 const string key = "OrleansClientServicesAdded";
                 if (!builder.Properties.ContainsKey(key))
                 {
-                    DefaultClientServices.AddDefaultServices(builder, services);
+                    DefaultClientServices.AddDefaultServices(services);
                     builder.Properties.Add(key, true);
                 }
             });
@@ -243,13 +243,6 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Returns the <see cref="ApplicationPartManager"/> for this builder.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <returns>The <see cref="ApplicationPartManager"/> for this builder.</returns>
-        public static IApplicationPartManager GetApplicationPartManager(this IClientBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(builder.Properties);
-        
-        /// <summary>
         /// Configures the <see cref="ApplicationPartManager"/> for this builder.
         /// </summary>
         /// <param name="builder">The builder.</param>
@@ -267,8 +260,7 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(configure));
             }
 
-            configure(builder.GetApplicationPartManager());
-            return builder;
+            return builder.ConfigureServices(services => configure(services.GetApplicationPartManager()));
         }
     }
 }

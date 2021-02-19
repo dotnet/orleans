@@ -90,7 +90,10 @@ namespace NonSilo.Tests
             // Add only an assembly with generated serializers but no grain interfaces
             var clientBuilder = new ClientBuilder()
                 .UseLocalhostClustering()
-                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ClassReferencingOrleansTypeDto).Assembly))
+                .ConfigureApplicationParts(parts =>
+                {
+                    parts.ClearApplicationParts();
+                })
                 .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
 
             Assert.Throws<OrleansConfigurationException>(() => clientBuilder.Build());

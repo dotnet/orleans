@@ -20,7 +20,7 @@ namespace Orleans
 {
     internal static class DefaultClientServices
     {
-        public static void AddDefaultServices(IClientBuilder builder, IServiceCollection services)
+        public static void AddDefaultServices(IServiceCollection services)
         {
             // Options logging
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
@@ -81,7 +81,7 @@ namespace Orleans
             services.AddFromExisting<IKeyedSerializer, ILBasedSerializer>();
 
             // Application parts
-            var parts = builder.GetApplicationPartManager();
+            var parts = services.GetApplicationPartManager();
             services.TryAddSingleton<IApplicationPartManager>(parts);
             parts.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) { IsFrameworkAssembly = true });
             parts.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());

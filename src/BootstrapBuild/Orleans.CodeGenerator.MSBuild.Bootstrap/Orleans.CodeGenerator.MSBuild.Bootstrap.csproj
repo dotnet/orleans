@@ -17,8 +17,9 @@
     <SourceDir>$(MSBuildThisFileDirectory)..\..\Orleans.CodeGenerator.MSBuild\</SourceDir>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
     <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
   </PropertyGroup>
-  
+
   <ItemGroup>
     <Compile Include="$(SourceDir)**/*.cs" Exclude="$(SourceDir)obj/**/*.cs;$(SourceDir)bin/**/*.cs" Condition="'$(DesignTimeBuild)' != 'true'">
       <!-- Hide the files and folder structure in the editor. -->
@@ -28,14 +29,13 @@
     <ProjectReference Include="..\..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\..\Orleans.CodeGenerator.MSBuild.Tasks\Orleans.CodeGenerator.MSBuild.Tasks.csproj" PrivateAssets="all" ExcludeAssets="compile" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="5.0.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
   </ItemGroup>
-
 
   <Target Name="PostBuildPublish" AfterTargets="Build">
     <!-- So that we can create a nuget package which includes all dependencies, we publish the build. -->

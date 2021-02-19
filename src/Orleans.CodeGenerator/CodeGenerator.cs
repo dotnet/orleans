@@ -91,6 +91,11 @@ namespace Orleans.CodeGenerator
 
             foreach (var type in serializationTypes) this.ProcessSerializableType(model, type);
 
+            foreach (var part in this.compilationAnalyzer.ApplicationParts)
+            {
+                model.ApplicationParts.Add(part);
+            }
+
             this.AddAssemblyMetadata(model);
 
             return model;
@@ -182,6 +187,8 @@ namespace Orleans.CodeGenerator
             // Add and generate feature populators to tie everything together.
             var (attributes, featurePopulators) = FeaturePopulatorGenerator.GenerateSyntax(this.wellKnownTypes, model, this.compilation);
             compilationMembers.AddRange(featurePopulators);
+
+            attributes.AddRange(ApplicationPartAttributeGenerator.GenerateSyntax(this.wellKnownTypes, model));
 
             // Add some attributes detailing which assemblies this generated code targets.
             attributes.Add(AttributeList(

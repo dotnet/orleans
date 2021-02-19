@@ -88,8 +88,6 @@ namespace Orleans.TestingHost
                 }
             });
 
-            siloBuilder.GetApplicationPartManager().ConfigureDefaults();
-
             var host = hostBuilder.Build();
             var silo = host.Services.GetRequiredService<ISiloHost>();
             InitializeTestHooksSystemTarget(silo);
@@ -116,7 +114,6 @@ namespace Orleans.TestingHost
             });
 
             ConfigureAppServices(configuration, builder);
-            builder.GetApplicationPartManager().ConfigureDefaults();
             return builder.Build();
         }
 

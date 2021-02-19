@@ -4,6 +4,7 @@
     <PackageId>Microsoft.Orleans.CodeGenerator.MSBuild</PackageId>
     <Title>Microsoft Orleans Build-time Code Generator</Title>
     <Description>Microsoft Orleans build-time code generator to install in all grain interface &amp; implementation projects.</Description>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
   </PropertyGroup>
 
   <PropertyGroup>

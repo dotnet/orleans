@@ -344,7 +344,10 @@ namespace NonSilo.Tests
                 {
                     // Add only an assembly with generated serializers but no grain interfaces or grain classes
                     siloBuilder.UseLocalhostClustering()
-                    .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ClassReferencingOrleansTypeDto).Assembly));
+                    .ConfigureApplicationParts(parts =>
+                    {
+                        parts.ClearApplicationParts();
+                    });
                 }).Build();
 
             await Assert.ThrowsAsync<OrleansConfigurationException>(() => host.StartAsync());

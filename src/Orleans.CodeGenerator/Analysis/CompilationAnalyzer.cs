@@ -69,6 +69,7 @@ namespace Orleans.CodeGenerator.Analysis
         public HashSet<IAssemblySymbol> AssembliesExcludedFromMetadataGeneration = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
 
         public HashSet<IAssemblySymbol> KnownAssemblies { get; } = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
+        public HashSet<string> ApplicationParts { get; } = new HashSet<string>(StringComparer.Ordinal);
         public HashSet<INamedTypeSymbol> KnownTypes { get; } = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
         public (IEnumerable<INamedTypeSymbol> grainClasses, IEnumerable<INamedTypeSymbol> grainInterfaces, IEnumerable<INamedTypeSymbol> types) GetTypesToProcess() =>
@@ -255,10 +256,12 @@ namespace Orleans.CodeGenerator.Analysis
 
         public void Analyze(System.Threading.CancellationToken cancellationToken)
         {
+            ApplicationParts.Add(this.compilation.Assembly.MetadataName);
             foreach (var reference in this.compilation.References)
             {
-                if (!(this.compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol asm)) continue;
+                if (this.compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol asm) continue;
                 this.ReferencedAssemblies.Add(asm);
+                AddApplicationParts(asm);
             }
 
             // Recursively all assemblies considered known from the inspected assembly.
@@ -266,6 +269,11 @@ namespace Orleans.CodeGenerator.Analysis
 
             // Add all types considered known from each known assembly.
             ExpandKnownTypes(this.KnownAssemblies);
+
+            foreach (var asm in this.KnownAssemblies)
+            {
+                AddApplicationParts(asm);
+            }
 
             this.ExpandAssembliesWithGeneratedCode();
 
@@ -329,6 +337,18 @@ namespace Orleans.CodeGenerator.Analysis
                             throwOnFailure = (bool)throwOnFailureParam.Value;
                             if (throwOnFailure) this.CodeGenerationRequiredTypes.Add(type);
                         }
+                    }
+                }
+            }
+
+            void AddApplicationParts(IAssemblySymbol asm)
+            {
+                if (asm.GetAttributes(this.wellKnownTypes.ApplicationPartAttribute, out var attrs))
+                {
+                    ApplicationParts.Add(asm.MetadataName);
+                    foreach (var attr in attrs)
+                    {
+                        ApplicationParts.Add((string)attr.ConstructorArguments.First().Value);
                     }
                 }
             }
