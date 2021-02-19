@@ -6,9 +6,8 @@
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
   <PropertyGroup>
-    <NetCoreAppTargetFrameworks>netcoreapp3.1;net5.0</NetCoreAppTargetFrameworks>
-    <StandardTargetFrameworks>netstandard2.0</StandardTargetFrameworks>
-    <MultiTargetFrameworks>$(StandardTargetFrameworks);$(NetCoreAppTargetFrameworks)</MultiTargetFrameworks>
+    <StandardTargetFrameworks>netcoreapp3.1;net5.0</StandardTargetFrameworks>
+    <MultiTargetFrameworks>netcoreapp3.1;net5.0</MultiTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
