@@ -12,6 +12,5 @@ namespace UnitTests.General
             var m = new Message();
             Assert.Equal(TimeSpan.Zero, m.Elapsed);
         }
-
     }
 }
