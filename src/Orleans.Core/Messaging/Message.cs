@@ -516,17 +516,6 @@ namespace Orleans.Runtime
             };
         }
 
-        private static int BufferLength(List<ArraySegment<byte>> buffer)
-        {
-            var result = 0;
-            for (var i = 0; i < buffer.Count; i++)
-            {
-                result += buffer[i].Count;
-            }
-
-            return result;
-        }
-
         [Serializable]
         public class HeadersContainer
         {
