@@ -500,10 +500,7 @@ namespace Orleans.Runtime
             timeInterval.Restart();
         }
 
-        public TimeSpan Elapsed
-        {
-            get { return timeInterval.Elapsed; }
-        }
+        public TimeSpan Elapsed => timeInterval == null ? TimeSpan.Zero : timeInterval.Elapsed;
 
         public static Message CreatePromptExceptionResponse(Message request, Exception exception)
         {
