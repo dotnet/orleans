@@ -146,7 +146,7 @@ namespace Orleans.Tests.SqlUtils
                     {
                         GrainRef = grainReferenceConverter.FromKeyString(grainId),
                         ReminderName = record.GetValue<string>(nameof(Columns.ReminderName)),
-                        StartAt = record.GetValue<DateTime>(nameof(Columns.StartTime)),
+                        StartAt = record.GetDateTimeValue(nameof(Columns.StartTime)),
 
                         //Use the GetInt64 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
                         //GetValue<int> causes an InvalidCastException with oracle data provider. See https://github.com/dotnet/orleans/issues/3561
@@ -160,7 +160,7 @@ namespace Orleans.Tests.SqlUtils
             internal static Tuple<MembershipEntry, int> GetMembershipEntry(IDataRecord record)
             {
                 //TODO: This is a bit of hack way to check in the current version if there's membership data or not, but if there's a start time, there's member.            
-                DateTime? startTime = record.GetValueOrDefault<DateTime?>(nameof(Columns.StartTime));
+                DateTime? startTime = record.GetDateTimeValueOrDefault(nameof(Columns.StartTime));
                 MembershipEntry entry = null;
                 if (startTime.HasValue)
                 {
@@ -172,7 +172,7 @@ namespace Orleans.Tests.SqlUtils
                         Status = (SiloStatus)Enum.Parse(typeof(SiloStatus), record.GetInt32(nameof(Columns.Status)).ToString()),
                         ProxyPort = record.GetInt32(nameof(Columns.ProxyPort)),
                         StartTime = startTime.Value,
-                        IAmAliveTime = record.GetValue<DateTime>(nameof(Columns.IAmAliveTime))
+                        IAmAliveTime = record.GetDateTimeValue(nameof(Columns.IAmAliveTime))
                     };
 
                     string suspectingSilos = record.GetValueOrDefault<string>(nameof(Columns.SuspectTimes));
