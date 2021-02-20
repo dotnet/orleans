@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.OrleansServiceBus</PackageId>
+    <PackageId>Microsoft.Orleans.Streaming.EventHubs</PackageId>
     <Title>Microsoft Orleans EventHubs Provider</Title>
     <Description>Microsoft Orleans. streaming provider for Azure EventHubs</Description>
     <PackageTags>$(PackageTags) Azure EventHubs</PackageTags>
@@ -10,7 +10,7 @@
 
   <PropertyGroup>
     <AssemblyName>Orleans.Streaming.EventHubs</AssemblyName>
-    <RootNamespace>OrleansServiceBus</RootNamespace>
+    <RootNamespace>Orleans.Streaming.EventHubs</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
