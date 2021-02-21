@@ -67,6 +67,31 @@ namespace UnitTests.CancellationTests
             await Task.WhenAll(grainTasks);
         }
 
+        [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
+        [InlineData(0)]
+        [InlineData(10)]
+        [InlineData(300)]
+        public async Task GrainTaskMultipleCancellations(int delay)
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+            var grainTasks = Enumerable.Range(0, 5)
+                .Select(async i =>
+                {
+                    var tcs = new GrainCancellationTokenSource();
+                    var task = grain.LongWait(tcs.Token, TimeSpan.FromSeconds(10));
+                    await Task.WhenAny(task, Task.Delay(TimeSpan.FromMilliseconds(delay)));
+                    await tcs.Cancel();
+                    try
+                    {
+                        await task;
+                        Assert.True(false, "Expected TaskCancelledException, but message completed");
+                    }
+                    catch (TaskCanceledException) { }
+                })
+                .ToList();
+            await Task.WhenAll(grainTasks);
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
         public async Task TokenPassingWithoutCancellation_NoExceptionShouldBeThrown()
         {
