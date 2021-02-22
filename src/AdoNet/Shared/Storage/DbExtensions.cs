@@ -139,7 +139,7 @@ namespace Orleans.Tests.SqlUtils
             }
         }
 
-        public static DateTime? GetDateTimeValueOrDefault(this IDataRecord record, string fieldName, DateTime @default = default)
+        public static DateTime? GetDateTimeValueOrDefault(this IDataRecord record, string fieldName, DateTime? @default = default)
         {
 
             try
