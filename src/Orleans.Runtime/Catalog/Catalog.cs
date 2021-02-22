@@ -630,8 +630,6 @@ namespace Orleans.Runtime
                 initStage = ActivationInitializationStage.InvokeActivate;
                 await InvokeActivate(activation, requestContextData);
 
-                this.activationCollector.ScheduleCollection(activation);
-
                 // Success!! Log the result, and start processing messages
                 initStage = ActivationInitializationStage.Completed;
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InitActivation is done: {0}", activation.Address);
@@ -1052,6 +1050,7 @@ namespace Orleans.Runtime
                     {
                         activation.SetState(ActivationState.Valid); // Activate calls on this activation are finished
                     }
+                    this.activationCollector.ScheduleCollection(activation);
                     if (!activation.IsCurrentlyExecuting)
                     {
                         activation.RunOnInactive();
