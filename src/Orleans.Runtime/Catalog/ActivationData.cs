@@ -94,6 +94,8 @@ namespace Orleans.Runtime
                     this.SetState(ActivationState.Valid); // Activate calls on this activation are finished
                 }
 
+                this.collector.ScheduleCollection(this);
+
                 if (!this.IsCurrentlyExecuting)
                 {
                     this.RunOnInactive();
