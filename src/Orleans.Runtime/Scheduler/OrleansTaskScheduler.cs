@@ -131,12 +131,11 @@ namespace Orleans.Runtime.Scheduler
                 return;
             }
 
-            if (workItemGroup?.TaskScheduler is TaskScheduler scheduler)
+            if (workItemGroup?.TaskScheduler is { } scheduler)
             {
                 // This will make sure the TaskScheduler.Current is set correctly on any task that is created implicitly in the execution of this workItem.
                 // We must wrap any work item in Task and enqueue it as a task to the right scheduler via Task.Start.
-                Task t = new Task(action);
-                t.Start(scheduler);
+                scheduler.QueueAction(action);
             }
             else
             {
@@ -160,17 +159,16 @@ namespace Orleans.Runtime.Scheduler
             if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystemGroup)
             {
                 // Drop the task on the floor if it's an application work item and application turns are stopped
-                var msg = string.Format("Dropping work item {0} because application turns are stopped", workItem);
+                var msg = $"Dropping work item {workItem} because application turns are stopped";
                 logger.Warn(ErrorCode.SchedulerAppTurnsStopped_1, msg);
                 return;
             }
 
-            if (workItemGroup?.TaskScheduler is TaskScheduler scheduler)
+            if (workItemGroup?.TaskScheduler is { } scheduler)
             {
                 // This will make sure the TaskScheduler.Current is set correctly on any task that is created implicitly in the execution of this workItem.
                 // We must wrap any work item in Task and enqueue it as a task to the right scheduler via Task.Start.
-                Task t = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
-                t.Start(scheduler);
+                scheduler.QueueWorkItem(workItem);
             }
             else
             {
@@ -192,7 +190,7 @@ namespace Orleans.Runtime.Scheduler
                 return;
             }
 
-            var wg = new WorkItemGroup(
+            var workItemGroup = new WorkItemGroup(
                 this,
                 context,
                 this.workItemGroupLogger,
@@ -201,20 +199,19 @@ namespace Orleans.Runtime.Scheduler
                 this.schedulerStatistics,
                 this.statisticsOptions);
 
-
             if (context is SystemTarget systemTarget)
             {
-                systemTarget.WorkItemGroup = wg;
+                systemTarget.WorkItemGroup = workItemGroup;
             }
 
             if (context is ActivationData activation)
             {
-                activation.WorkItemGroup = wg;
+                activation.WorkItemGroup = workItemGroup;
             }
 
-            if (!workgroupDirectory.TryAdd(context, wg))
+            if (!workgroupDirectory.TryAdd(context, workItemGroup))
             {
-                wg.Stop();
+                workItemGroup.Stop();
             }
         }
 
@@ -226,8 +223,7 @@ namespace Orleans.Runtime.Scheduler
                 return;
             }
 
-            WorkItemGroup workGroup;
-            if (workgroupDirectory.TryRemove(context, out workGroup))
+            if (workgroupDirectory.TryRemove(context, out var workGroup))
             {
                 workGroup.Stop();
             }
@@ -267,7 +263,7 @@ namespace Orleans.Runtime.Scheduler
         [MethodImpl(MethodImplOptions.NoInlining)]
         private void ThrowNoWorkItemGroup(IGrainContext context)
         {
-            var error = string.Format("QueueWorkItem was called on a non-null context {0} but there is no valid WorkItemGroup for it.", context);
+            var error = $"QueueWorkItem was called on a non-null context {context} but there is no valid WorkItemGroup for it.";
             logger.Error(ErrorCode.SchedulerQueueWorkItemWrongContext, error);
             throw new InvalidSchedulingContextException(error);
         }

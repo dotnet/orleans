@@ -226,8 +226,7 @@ namespace Orleans.Runtime
                     {
                         this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
                         var workItem = new RequestWorkItem(this, msg);
-                        Task task = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
-                        task.Start(this.WorkItemGroup.TaskScheduler);
+                        this.WorkItemGroup.TaskScheduler.QueueWorkItem(workItem);
                         break;
                     }
 
@@ -235,8 +234,7 @@ namespace Orleans.Runtime
                     {
                         this.MessagingTrace.OnEnqueueMessageOnActivation(msg, this);
                         var workItem = new ResponseWorkItem(this, msg);
-                        Task task = TaskSchedulerUtils.WrapWorkItemAsTask(workItem);
-                        task.Start(this.WorkItemGroup.TaskScheduler);
+                        this.WorkItemGroup.TaskScheduler.QueueWorkItem(workItem);
                         break;
                     }
 
