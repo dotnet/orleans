@@ -160,10 +160,7 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public override string ToString()
         {
-            var type = GrainTypeNameMapper != null
-                ? GrainTypeNameMapper.GetGrainTypeName(Type)
-                : Type.ToStringUtf8();
-
+            var type = GrainTypeNameMapper?.GetGrainTypeName(Type) ?? Type.ToStringUtf8();
             return $"{type}/{Key.ToStringUtf8()}";
         }
 
