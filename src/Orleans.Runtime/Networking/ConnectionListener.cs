@@ -18,7 +18,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionManager connectionManager;
         protected readonly ConcurrentDictionary<Connection, object> connections = new(ReferenceEqualsComparer.Instance);
         private readonly ConnectionCommon connectionShared;
-        private TaskCompletionSource<object> acceptLoopTcs;
+        private Task acceptLoopTask;
         private IConnectionListener listener;
         private ConnectionDelegate connectionDelegate;
 
@@ -70,90 +70,64 @@ namespace Orleans.Runtime.Messaging
                 }
             }
         }
+
         protected virtual void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder) { }
 
-        public async Task BindAsync(CancellationToken cancellationToken)
+        protected async Task BindAsync()
         {
-            this.listener = await this.listenerFactory.BindAsync(this.Endpoint, cancellationToken);
+            this.listener = await this.listenerFactory.BindAsync(this.Endpoint);
         }
 
-        public void Start()
+        protected void Start()
         {
             if (this.listener is null) throw new InvalidOperationException("Listener is not bound");
-            this.acceptLoopTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-            ThreadPool.UnsafeQueueUserWorkItem(this.StartAcceptingConnections, this.acceptLoopTcs);
+            acceptLoopTask = RunAcceptLoop();
         }
 
-        private void StartAcceptingConnections(object completionObj)
+        private async Task RunAcceptLoop()
         {
-            _ = RunAcceptLoop((TaskCompletionSource<object>)completionObj);
-
-            async Task RunAcceptLoop(TaskCompletionSource<object> completion)
+            await Task.Yield();
+            try
             {
-                try
+                while (true)
                 {
-                    while (true)
-                    {
-                        var context = await this.listener.AcceptAsync();
-                        if (context == null) break;
+                    var context = await this.listener.AcceptAsync();
+                    if (context == null) break;
 
-                        var connection = this.CreateConnection(context);
-                        this.StartConnection(connection);
-                    }
+                    var connection = this.CreateConnection(context);
+                    this.StartConnection(connection);
                 }
-                catch (Exception exception)
-                {
-                    this.NetworkingTrace.LogCritical("Exception in AcceptAsync: {Exception}", exception);
-                }
-                finally
-                {
-                    completion.TrySetResult(null);
-                }
+            }
+            catch (Exception exception)
+            {
+                this.NetworkingTrace.LogCritical("Exception in AcceptAsync: {Exception}", exception);
             }
         }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
+        protected async Task StopAsync(CancellationToken cancellationToken)
         {
             try
             {
-                if (this.acceptLoopTcs is object)
+                await listener.UnbindAsync(cancellationToken);
+
+                if (acceptLoopTask is object)
                 {
-                    await Task.WhenAll(
-                        this.listener.UnbindAsync(cancellationToken).AsTask(),
-                        this.acceptLoopTcs.Task);
-                }
-                else
-                {
-                    await this.listener.UnbindAsync(cancellationToken);
+                    await acceptLoopTask;
                 }
 
-                var cycles = 0;
-                var cancellationTask = cancellationToken.WhenCancelled();
-                for (var closeTasks = new List<Task>(); ; closeTasks.Clear())
+                var closeTasks = new List<Task>();
+                foreach (var kv in connections)
                 {
-                    foreach (var kv in connections)
-                    {
-                        closeTasks.Add(kv.Key.CloseAsync(exception: null));
-                    }
+                    closeTasks.Add(kv.Key.CloseAsync(exception: null));
+                }
 
-                    if (closeTasks.Count == 0) break;
-
-                    await Task.WhenAny(Task.WhenAll(closeTasks), cancellationTask);
-
-                    if (cancellationToken.IsCancellationRequested) break;
-
-                    if (++cycles > 100 && cycles % 500 == 0 && connections.Count is var remaining and > 0)
-                    {
-                        this.NetworkingTrace.LogWarning("Waiting for {NumRemaining} connections to terminate", remaining);
-                    }
+                if (closeTasks.Count > 0)
+                {
+                    await Task.WhenAny(Task.WhenAll(closeTasks), cancellationToken.WhenCancelled());
                 }
 
                 await this.connectionManager.Closed;
-
-                if (this.listener != null)
-                {
-                    await this.listener.DisposeAsync();
-                }
+                await this.listener.DisposeAsync();
             }
             catch (Exception exception)
             {

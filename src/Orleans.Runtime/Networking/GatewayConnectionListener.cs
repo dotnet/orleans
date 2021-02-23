@@ -5,14 +5,12 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.ClientObservers;
-using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class GatewayConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class GatewayConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver
     {
         internal static readonly object ServicesKey = new object();
         private readonly ILocalSiloDetails localSiloDetails;
@@ -73,24 +71,11 @@ namespace Orleans.Runtime.Messaging
         {
             if (this.Endpoint is null) return;
 
-            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.RuntimeInitialize-1, this.OnRuntimeInitializeStart, this.OnRuntimeInitializeStop);
-            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, this.OnActive, _ => Task.CompletedTask);
+            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
+            lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, _ => Task.Run(Start));
         }
 
-        private async Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
-        {
-            await Task.Run(() => this.BindAsync(cancellationToken));
-        }
-
-        private async Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
-        {
-            await Task.Run(() => this.StopAsync(cancellationToken));
-        }
-
-        private async Task OnActive(CancellationToken cancellationToken)
-        {
-            // Start accepting connections
-            await Task.Run(() => this.Start());
-        }
+        Task ILifecycleObserver.OnStart(CancellationToken ct) => Task.Run(BindAsync);
+        Task ILifecycleObserver.OnStop(CancellationToken ct) => Task.Run(() => StopAsync(ct));
     }
 }

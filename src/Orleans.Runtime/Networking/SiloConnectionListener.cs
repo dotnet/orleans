@@ -9,7 +9,7 @@ using Orleans.Hosting;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class SiloConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class SiloConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver
     {
         internal static readonly object ServicesKey = new object();
         private readonly ILocalSiloDetails localSiloDetails;
@@ -68,20 +68,16 @@ namespace Orleans.Runtime.Messaging
         {
             if (this.Endpoint is null) return;
 
-            lifecycle.Subscribe(nameof(SiloConnectionListener), ServiceLifecycleStage.RuntimeInitialize-1, this.OnRuntimeInitializeStart, this.OnRuntimeInitializeStop);
+            lifecycle.Subscribe(nameof(SiloConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
         }
 
-        private async Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
+        Task ILifecycleObserver.OnStart(CancellationToken ct) => Task.Run(async () =>
         {
-            await Task.Run(() => this.BindAsync(cancellationToken));
-
+            await BindAsync();
             // Start accepting connections immediately.
-            await Task.Run(() => this.Start());
-        }
+            Start();
+        });
 
-        private async Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
-        {
-            await Task.Run(() => this.StopAsync(cancellationToken));
-        }
+        Task ILifecycleObserver.OnStop(CancellationToken ct) => Task.Run(() => StopAsync(ct));
     }
 }
