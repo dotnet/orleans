@@ -285,25 +285,22 @@ namespace Orleans.Runtime.GrainDirectory
         {
             lock (this.writeLock)
             {
+                try
+                {
+                    // Only notify the catalog once. Order is important: call BEFORE updating membershipRingList.
+                    this.catalogOnSiloRemoved?.Invoke(silo, status);
+                }
+                catch (Exception exc)
+                {
+                    log.Error(ErrorCode.Directory_SiloStatusChangeNotification_Exception,
+                        String.Format("CatalogSiloStatusListener.SiloStatusChangeNotification has thrown an exception when notified about removed silo {0}.", silo.ToStringWithHashCode()), exc);
+                }
+
                 var existing = this.directoryMembership;
                 if (!existing.MembershipCache.Contains(silo))
                 {
                     // we have already removed this silo
                     return;
-                }
-
-                if (this.catalogOnSiloRemoved != null)
-                {
-                    try
-                    {
-                        // Only notify the catalog once. Order is important: call BEFORE updating membershipRingList.
-                        this.catalogOnSiloRemoved(silo, status);
-                    }
-                    catch (Exception exc)
-                    {
-                        log.Error(ErrorCode.Directory_SiloStatusChangeNotification_Exception,
-                            String.Format("CatalogSiloStatusListener.SiloStatusChangeNotification has thrown an exception when notified about removed silo {0}.", silo.ToStringWithHashCode()), exc);
-                    }
                 }
 
                 // the call order is important
