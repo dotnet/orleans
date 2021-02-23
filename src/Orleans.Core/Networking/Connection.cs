@@ -129,10 +129,10 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void RetryMessage(Message msg, Exception ex = null);
 
-        public async Task CloseAsync(Exception exception)
+        public Task CloseAsync(Exception exception)
         {
             StartClosing(exception);
-            await _closeTask;
+            return _closeTask;
         }
 
         private void OnTransportConnectionClosed()
@@ -148,7 +148,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            var task = new Task<Task>(FinishClosing);
+            var task = new Task<Task>(CloseAsync);
             if (Interlocked.CompareExchange(ref _closeTask, task.Unwrap(), null) is object)
             {
                 return;
@@ -162,13 +162,13 @@ namespace Orleans.Runtime.Messaging
                     this);
             }
 
-            task.Start();
+            task.Start(TaskScheduler.Default);
         }
 
         /// <summary>
         /// Close the connection. This method should only be called by <see cref="StartClosing(Exception)"/>.
         /// </summary>
-        private async Task FinishClosing()
+        private async Task CloseAsync()
         {
             NetworkingStatisticsGroup.OnClosedSocket(this.ConnectionDirection);
 
@@ -181,31 +181,27 @@ namespace Orleans.Runtime.Messaging
             await transport.Output.CompleteAsync();
 
             // Try to gracefully stop the reader/writer loops, if they are running.
-            try
-            {
-                if (_processIncomingTask is Task task && !task.IsCompleted)
+            if (_processIncomingTask is { IsCompleted: false } incoming)
+                try
                 {
-                    await task.ConfigureAwait(false);
+                    await incoming;
                 }
-            }
-            catch (Exception processIncomingException)
-            {
-                // Swallow any exceptions here.
-                this.Log.LogWarning(processIncomingException, "Exception processing incoming messages on connection {Connection}", this);
-            }
+                catch (Exception processIncomingException)
+                {
+                    // Swallow any exceptions here.
+                    this.Log.LogWarning(processIncomingException, "Exception processing incoming messages on connection {Connection}", this);
+                }
 
-            try
-            {
-                if (_processOutgoingTask is Task task && !task.IsCompleted)
+            if (_processOutgoingTask is { IsCompleted: false } outgoing)
+                try
                 {
-                    await task.ConfigureAwait(false);
+                    await outgoing;
                 }
-            }
-            catch (Exception processOutgoingException)
-            {
-                // Swallow any exceptions here.
-                this.Log.LogWarning(processOutgoingException, "Exception processing outgoing messages on connection {Connection}", this);
-            }
+                catch (Exception processOutgoingException)
+                {
+                    // Swallow any exceptions here.
+                    this.Log.LogWarning(processOutgoingException, "Exception processing outgoing messages on connection {Connection}", this);
+                }
 
             // Wait for the transport to signal that it's closed before disposing it.
             await _transportConnectionClosed.Task;
@@ -232,14 +228,11 @@ namespace Orleans.Runtime.Messaging
             var i = 0;
             while (this.outgoingMessages.Reader.TryRead(out var message))
             {
-                if (i == 0)
+                if (i == 0 && Log.IsEnabled(LogLevel.Information))
                 {
-                    if (this.Log.IsEnabled(LogLevel.Information))
-                    {
-                        this.Log.LogInformation(
-                            "Rerouting messages for remote endpoint {EndPoint}",
-                            this.RemoteEndPoint?.ToString() ?? "(never connected)");
-                    }
+                    this.Log.LogInformation(
+                        "Rerouting messages for remote endpoint {EndPoint}",
+                        this.RemoteEndPoint?.ToString() ?? "(never connected)");
                 }
 
                 ++i;
