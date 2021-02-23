@@ -31,7 +31,6 @@ namespace Orleans.Hosting
 
             serviceCollection.AddHostedService<SiloHostedService>();
             this.ConfigureDefaults();
-            this.ConfigureApplicationParts(parts => parts.ConfigureDefaults());
 
             foreach (var configurationDelegate in this.configureServicesDelegates)
             {

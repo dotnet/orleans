@@ -2,13 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 #if NETCOREAPP
 using System.Runtime.Loader;
 #endif
 using Microsoft.Extensions.DependencyModel;
+using Microsoft.Extensions.Hosting;
 using Orleans.ApplicationParts;
+using Orleans.CodeGeneration;
 using Orleans.Hosting;
+using Orleans.Metadata;
 using Orleans.Runtime;
+using System.IO;
+using System.Runtime.InteropServices;
 
 namespace Orleans
 {
@@ -17,45 +23,53 @@ namespace Orleans
     /// </summary>
     public static class ApplicationPartManagerExtensions
     {
-        private static readonly string CoreAssemblyName = typeof(RuntimeVersion).Assembly.GetName().Name;
-        private static readonly string AbstractionsAssemblyName = typeof(IGrain).Assembly.GetName().Name;
-        private static readonly IEnumerable<string> NoReferenceComplaint = new[] { $"Assembly does not reference {CoreAssemblyName} or {AbstractionsAssemblyName}" };
-        private static readonly object ApplicationPartsKey = new object();
+        /// <summary>
+        /// Returns the <see cref="IApplicationPartManager"/> for the provided context.
+        /// </summary>
+        /// <returns>The <see cref="IApplicationPartManager"/> belonging to the provided context.</returns>
+        public static IApplicationPartManager GetApplicationPartManager(this IServiceProvider services) => services.GetRequiredService<IApplicationPartManager>();
 
         /// <summary>
-        /// Returns the <see cref="ApplicationPartManager"/> for the provided context.
+        /// Returns the <see cref="IApplicationPartManager"/> for the provided context.
         /// </summary>
-        /// <param name="context">The context.</param>
-        /// <returns>The <see cref="ApplicationPartManager"/> belonging to the provided context.</returns>
-        public static ApplicationPartManager GetApplicationPartManager(this Microsoft.Extensions.Hosting.HostBuilderContext context) => GetApplicationPartManager(context.Properties);
-
-        /// <summary>
-        /// Returns the <see cref="ApplicationPartManager"/> for the provided context.
-        /// </summary>
-        /// <param name="context">The context.</param>
-        /// <returns>The <see cref="ApplicationPartManager"/> belonging to the provided context.</returns>
-        public static ApplicationPartManager GetApplicationPartManager(this HostBuilderContext context) => GetApplicationPartManager(context.Properties);
-
-        /// <summary>
-        /// Adds default application parts if no non-framework parts have been added.
-        /// </summary>
-        /// <param name="applicationPartsManager">The application part manager.</param>
-        /// <returns>The application part manager.</returns>
-        public static IApplicationPartManager ConfigureDefaults(this IApplicationPartManager applicationPartsManager)
+        /// <returns>The <see cref="IApplicationPartManager"/> belonging to the provided context.</returns>
+        public static IApplicationPartManager GetApplicationPartManager(this IServiceCollection services)
         {
-            var hasApplicationParts = applicationPartsManager.ApplicationParts.OfType<AssemblyPart>()
-                .Any(part => !part.IsFrameworkAssembly);
-            if (!hasApplicationParts)
+            var manager = GetServiceFromCollection<IApplicationPartManager>(services);
+
+            if (manager is null)
             {
-                applicationPartsManager.AddFromDependencyContext();
+                manager = new ApplicationPartManager();
+                services.AddSingleton(manager);
+                services.AddSingleton<IApplicationPartManager>(manager);
+
 #if NETCOREAPP
-                applicationPartsManager.AddFromAssemblyLoadContext();
+                manager.AddFromDependencyContext();
+                manager.AddFromAssemblyLoadContext();
 #else
-                applicationPartsManager.AddFromAppDomainWithReferences();
+                manager.AddFromAppDomainWithReferences();
 #endif
+
+                if (GetServiceFromCollection<IHostEnvironment>(services)?.ApplicationName is string applicationName)
+                {
+                    try
+                    {
+                        var entryAssembly = Assembly.Load(new AssemblyName(applicationName));
+                        manager.AddApplicationPart(entryAssembly);
+                    }
+                    catch
+                    {
+                        // Ignore exceptions here.
+                    }
+                }
+
+                if (Assembly.GetEntryAssembly() is Assembly asm)
+                {
+                    manager.AddApplicationPart(asm);
+                }
             }
 
-            return applicationPartsManager;
+            return manager;
         }
 
         /// <summary>
@@ -72,12 +86,22 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Removes all application parts.
+        /// </summary>
+        public static IApplicationPartManager ClearApplicationParts(this IApplicationPartManager applicationPartManager) => applicationPartManager.RemoveApplicationParts(_ => true);
+
+        /// <summary>
+        /// Removes all feature providers.
+        /// </summary>
+        public static IApplicationPartManager ClearFeatureProviders(this IApplicationPartManager applicationPartManager) => applicationPartManager.RemoveFeatureProviders(_ => true);
+
+        /// <summary>
         /// Adds the provided assembly to the builder as a framework assembly.
         /// </summary>
         /// <param name="manager">The builder.</param>
         /// <param name="assembly">The assembly.</param>
         /// <returns>The builder with the additionally added assembly.</returns>
-        public static IApplicationPartManagerWithAssemblies AddFrameworkPart(this IApplicationPartManager manager, Assembly assembly)
+        public static IApplicationPartManager AddFrameworkPart(this IApplicationPartManager manager, Assembly assembly)
         {
             if (manager == null)
             {
@@ -89,10 +113,7 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(assembly));
             }
 
-            return new ApplicationPartManagerWithAssemblies(
-                manager.AddApplicationPart(
-                    new AssemblyPart(assembly) {IsFrameworkAssembly = true}),
-                new[] {assembly});
+            return manager.AddApplicationPart(new AssemblyPart(assembly) { IsFrameworkAssembly = true });
         }
 
         /// <summary>
@@ -101,7 +122,7 @@ namespace Orleans
         /// <param name="manager">The builder.</param>
         /// <param name="assembly">The assembly.</param>
         /// <returns>The builder with the additionally added assembly.</returns>
-        public static IApplicationPartManagerWithAssemblies AddApplicationPart(this IApplicationPartManager manager, Assembly assembly)
+        public static IApplicationPartManager AddApplicationPart(this IApplicationPartManager manager, Assembly assembly)
         {
             if (manager == null)
             {
@@ -113,18 +134,33 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(assembly));
             }
 
-            return new ApplicationPartManagerWithAssemblies(manager.AddApplicationPart(new AssemblyPart(assembly)), new[] { assembly });
+            // Always add the provided part, whether or not it contains generated code. 
+            manager.AddApplicationPart(new AssemblyPart(assembly));
+
+            // Add all referenced application parts.
+            foreach (var referencedAsm in GetApplicationPartAssemblies(assembly))
+            {
+                var part = new AssemblyPart(referencedAsm);
+                if (manager.ApplicationParts.Contains(part))
+                {
+                    continue;
+                }
+
+                manager.AddApplicationPart(part);
+            }
+
+            return manager;
         }
 
         /// <summary>
-        /// Adds all assemblies referenced by the assemblies in the builder's <see cref="IApplicationPartManagerWithAssemblies.Assemblies"/> property.
+        /// Adds all assemblies referenced by the assemblies already contained in the application part manager.
         /// </summary>
         /// <param name="manager">The builder.</param>
         /// <returns>The builder with the additionally included assemblies.</returns>
-        public static IApplicationPartManagerWithAssemblies WithReferences(this IApplicationPartManagerWithAssemblies manager)
+        public static IApplicationPartManager WithReferences(this IApplicationPartManager manager)
         {
-            var referencedAssemblies = new HashSet<Assembly>(manager.Assemblies);
-            foreach (var scopedAssembly in manager.Assemblies)
+            var referencedAssemblies = new HashSet<Assembly>(manager.GetAssemblies());
+            foreach (var scopedAssembly in manager.GetAssemblies())
             {
                 LoadReferencedAssemblies(scopedAssembly, referencedAssemblies);
             }
@@ -134,7 +170,7 @@ namespace Orleans
                 manager.AddApplicationPart(new AssemblyPart(includedAsm));
             }
 
-            return new ApplicationPartManagerWithAssemblies(manager, referencedAssemblies);
+            return manager;
 
             void LoadReferencedAssemblies(Assembly asm, HashSet<Assembly> includedAssemblies)
             {
@@ -164,7 +200,7 @@ namespace Orleans
             }
         }
 
-        public static IApplicationPartManagerWithAssemblies AddFromAppDomainWithReferences(this IApplicationPartManager manager)
+        public static IApplicationPartManager AddFromAppDomainWithReferences(this IApplicationPartManager manager)
         {
             var assemblies = new List<Assembly>();
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -173,25 +209,52 @@ namespace Orleans
                 assemblies.Add(asm);
             }
 
-            return new ApplicationPartManagerWithAssemblies(manager, assemblies);
+            return manager;
         }
 
-        public static IApplicationPartManagerWithAssemblies AddFromAssemblyLoadContext(this IApplicationPartManager manager, Assembly assembly = null)
+        private static IEnumerable<Assembly> GetAssemblies(this IApplicationPartManager manager)
         {
+            foreach (var part in manager.ApplicationParts.ToList())
+            {
+                if (part is AssemblyPart asmPart)
+                {
+                    yield return asmPart.Assembly;
+                }
+            }
+        }
+
 #if NETCOREAPP
-            assembly ??= typeof(ApplicationPartManagerExtensions).Assembly;
+        public static IApplicationPartManager AddFromAssemblyLoadContext(this IApplicationPartManager manager, AssemblyLoadContext context)
+        {
+            if (context is null) throw new ArgumentNullException(nameof(context));
+
             var assemblies = new HashSet<Assembly>();
-            var context = AssemblyLoadContext.GetLoadContext(assembly);
             foreach (var asm in context.Assemblies)
             {
                 manager = manager.AddApplicationPart(asm);
                 assemblies.Add(asm);
             }
 
-            return new ApplicationPartManagerWithAssemblies(manager, assemblies);
-#else
-            throw new PlatformNotSupportedException("AssemblyLoadContext is not supported on this platform");
-#endif
+            return manager;
+        }
+
+        public static IApplicationPartManager AddFromAssemblyLoadContext(this IApplicationPartManager manager, Assembly assembly = null)
+        {
+            assembly ??= typeof(ApplicationPartManagerExtensions).Assembly;
+            var assemblies = new HashSet<Assembly>();
+            var context = AssemblyLoadContext.GetLoadContext(assembly);
+            foreach (var asm in context.Assemblies)
+            {
+                // Skip assemblies which have not had code generation executed against them and already-seen assemblies.
+                if (!asm.IsDefined(typeof(ApplicationPartAttribute)) || !assemblies.Add(asm))
+                {
+                    continue;
+                } 
+
+                manager.AddApplicationPart(asm);
+            }
+
+            return manager;
         }
 
         /// <summary>
@@ -200,7 +263,7 @@ namespace Orleans
         /// <param name="manager">The builder.</param>
         /// <param name="assembly">Assembly to start looking for application parts from.</param>
         /// <returns>The builder with the additionally included assemblies.</returns>
-        public static IApplicationPartManagerWithAssemblies AddFromDependencyContext(this IApplicationPartManager manager, Assembly assembly = null)
+        public static IApplicationPartManager AddFromDependencyContext(this IApplicationPartManager manager, Assembly assembly = null)
         {
             assembly ??= Assembly.GetEntryAssembly();
             DependencyContext dependencyContext;
@@ -214,13 +277,17 @@ namespace Orleans
             }
 
             var assemblies = new HashSet<Assembly>();
-            if (assembly != null)
+            if (assembly != null && assembly.IsDefined(typeof(ApplicationPartAttribute)))
             {
                 manager = manager.AddApplicationPart(assembly);
                 assemblies.Add(assembly);
             }
 
-            if (dependencyContext == null) return new ApplicationPartManagerWithAssemblies(manager, Array.Empty<Assembly>());
+            if (dependencyContext == null) return manager;
+
+            var assemblyContext = assembly is not null
+                ? AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default
+                : AssemblyLoadContext.Default;
 
             foreach (var lib in dependencyContext.RuntimeLibraries)
             {
@@ -228,9 +295,19 @@ namespace Orleans
 
                 try
                 {
-                    var asm = Assembly.Load(lib.Name);
-                    manager.AddApplicationPart(new AssemblyPart(asm));
-                    assemblies.Add(asm);
+#if NET5_0
+                    var name = lib.GetRuntimeAssemblyNames(dependencyContext, RuntimeInformation.RuntimeIdentifier).FirstOrDefault();
+                    if (name is null) continue;
+                    var asm = assemblyContext.LoadFromAssemblyName(name);
+#else
+                    var name = lib.GetRuntimeAssemblyNames(dependencyContext, Microsoft.DotNet.PlatformAbstractions.RuntimeEnvironment.GetRuntimeIdentifier()).FirstOrDefault();
+                    if (name is null) continue;
+                    var asm = assemblyContext.LoadFromAssemblyName(name);
+#endif
+                    if (asm.IsDefined(typeof(ApplicationPartAttribute)) && assemblies.Add(asm))
+                    {
+                        manager.AddApplicationPart(new AssemblyPart(asm));
+                    }
                 }
                 catch
                 {
@@ -238,66 +315,64 @@ namespace Orleans
                 }
             }
 
-            return new ApplicationPartManagerWithAssemblies(manager, assemblies);
+            return manager;
+        }
+#endif
+
+        private static IEnumerable<Assembly> GetApplicationPartAssemblies(Assembly assembly)
+        {
+            if (!assembly.IsDefined(typeof(ApplicationPartAttribute)))
+            {
+                return Array.Empty<Assembly>();
+            }
+
+            return ExpandApplicationParts(
+                new[] { assembly }.Concat(assembly.GetCustomAttributes<ApplicationPartAttribute>()
+                    .Select(name => Assembly.Load(new AssemblyName(name.AssemblyName)))));
+
+            static IEnumerable<Assembly> ExpandApplicationParts(IEnumerable<Assembly> assemblies)
+            {
+                if (assemblies == null)
+                {
+                    throw new ArgumentNullException(nameof(assemblies));
+                }
+
+                var relatedAssemblies = new HashSet<Assembly>();
+                foreach (var assembly in assemblies)
+                {
+                    if (relatedAssemblies.Add(assembly))
+                    {
+                        ExpandAssembly(relatedAssemblies, assembly);
+                    }
+                }
+
+                return relatedAssemblies.OrderBy(assembly => assembly.FullName, StringComparer.Ordinal);
+
+                static void ExpandAssembly(HashSet<Assembly> assemblies, Assembly assembly)
+                {
+                    var attributes = assembly.GetCustomAttributes<ApplicationPartAttribute>().ToArray();
+                    if (attributes.Length == 0)
+                    {
+                        return;
+                    }
+
+                    foreach (var attribute in attributes)
+                    {
+                        var referenced = Assembly.Load(new AssemblyName(attribute.AssemblyName));
+                        if (assemblies.Add(referenced))
+                        {
+                            ExpandAssembly(assemblies, referenced);
+                        }
+                    }
+                }
+            }
         }
 
-        /// <summary>
-        /// Returns the <see cref="ApplicationPartManager"/> for the provided properties.
-        /// </summary>
-        /// <param name="properties">The properties.</param>
-        /// <returns>The <see cref="ApplicationPartManager"/> belonging to the provided properties.</returns>
-        internal static ApplicationPartManager GetApplicationPartManager(IDictionary<object, object> properties)
+        private static T GetServiceFromCollection<T>(IServiceCollection services)
         {
-            ApplicationPartManager result;
-            if (properties.TryGetValue(ApplicationPartsKey, out var value))
-            {
-                result = value as ApplicationPartManager;
-                if (result == null) throw new InvalidOperationException($"The ApplicationPartManager value is of the wrong type {value.GetType()}. It should be {nameof(ApplicationPartManager)}");
-            }
-            else
-            {
-                properties[ApplicationPartsKey] = result = new ApplicationPartManager();
-            }
-
-            return result;
-        }
-
-        private class ApplicationPartManagerWithAssemblies : IApplicationPartManagerWithAssemblies
-        {
-            private readonly IApplicationPartManager manager;
-
-            public ApplicationPartManagerWithAssemblies(IApplicationPartManager manager, IEnumerable<Assembly> additionalAssemblies)
-            {
-                if (manager is ApplicationPartManagerWithAssemblies builderWithAssemblies)
-                {
-                    this.manager = builderWithAssemblies.manager;
-                    this.Assemblies = builderWithAssemblies.Assemblies.Concat(additionalAssemblies).Distinct().ToList();
-                }
-                else
-                {
-                    this.manager = manager;
-                    this.Assemblies = additionalAssemblies;
-                }
-            }
-
-            public IEnumerable<Assembly> Assemblies { get; }
-            public IReadOnlyList<IApplicationFeatureProvider> FeatureProviders => this.manager.FeatureProviders;
-
-            public IReadOnlyList<IApplicationPart> ApplicationParts => this.manager.ApplicationParts;
-
-            public IApplicationPartManager AddApplicationPart(IApplicationPart part)
-            {
-                this.manager.AddApplicationPart(part);
-                return this;
-            }
-
-            public IApplicationPartManager AddFeatureProvider(IApplicationFeatureProvider featureProvider)
-            {
-                this.manager.AddFeatureProvider(featureProvider);
-                return this;
-            }
-
-            public void PopulateFeature<TFeature>(TFeature feature) => this.manager.PopulateFeature(feature);
+            return (T)services
+                .LastOrDefault(d => d.ServiceType == typeof(T))
+                ?.ImplementationInstance;
         }
     }
 }

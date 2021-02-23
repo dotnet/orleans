@@ -26,9 +26,23 @@ namespace Orleans.ApplicationParts
         }
 
         /// <inheritdoc />
+        public IApplicationPartManager RemoveApplicationParts(Func<IApplicationPart, bool> predicate)
+        {
+            this.applicationParts.RemoveAll(part => predicate(part));
+            return this;
+        }
+
+        /// <inheritdoc />
         public IApplicationPartManager AddFeatureProvider(IApplicationFeatureProvider featureProvider)
         {
             if (!this.featureProviders.Contains(featureProvider)) this.featureProviders.Add(featureProvider);
+            return this;
+        }
+
+        /// <inheritdoc />
+        public IApplicationPartManager RemoveFeatureProviders(Func<IApplicationFeatureProvider, bool> predicate)
+        {
+            this.featureProviders.RemoveAll(provider => predicate(provider));
             return this;
         }
 

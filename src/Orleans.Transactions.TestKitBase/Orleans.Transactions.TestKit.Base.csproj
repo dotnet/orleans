@@ -6,6 +6,7 @@
     <Description>Testkit base library for transactions</Description>
     <PackageTags>$(PackageTags) TransactionTestkKit</PackageTags>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 

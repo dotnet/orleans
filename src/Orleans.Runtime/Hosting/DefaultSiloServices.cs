@@ -43,7 +43,7 @@ namespace Orleans.Hosting
 {
     internal static class DefaultSiloServices
     {
-        internal static void AddDefaultServices(IApplicationPartManager applicationPartManager, IServiceCollection services)
+        internal static void AddDefaultServices(IServiceCollection services)
         {
             services.AddOptions();
 
@@ -292,7 +292,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ITransactionAgent, DisabledTransactionAgent>();
 
             // Application Parts
-            services.TryAddSingleton<IApplicationPartManager>(applicationPartManager);
+            var applicationPartManager = services.GetApplicationPartManager();
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(RuntimeVersion).Assembly) { IsFrameworkAssembly = true });
             applicationPartManager.AddApplicationPart(new AssemblyPart(typeof(Silo).Assembly) { IsFrameworkAssembly = true });
             applicationPartManager.AddFeatureProvider(new BuiltInTypesSerializationFeaturePopulator());

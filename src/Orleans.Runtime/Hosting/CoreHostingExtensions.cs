@@ -31,7 +31,7 @@ namespace Orleans.Hosting
                             options.SiloName ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
                     services.TryAddSingleton<Silo>();
-                    DefaultSiloServices.AddDefaultServices(context.GetApplicationPartManager(), services);
+                    DefaultSiloServices.AddDefaultServices(services);
 
                     context.Properties.Add("OrleansServicesAdded", true);
                 }
@@ -156,7 +156,7 @@ namespace Orleans.Hosting
                             options.SiloName ?? $"Silo_{Guid.NewGuid().ToString("N").Substring(0, 5)}");
 
                     services.TryAddSingleton<Silo>();
-                    DefaultSiloServices.AddDefaultServices(context.GetApplicationPartManager(), services);
+                    DefaultSiloServices.AddDefaultServices(services);
 
                     context.Properties.Add("OrleansServicesAdded", true);
                 }

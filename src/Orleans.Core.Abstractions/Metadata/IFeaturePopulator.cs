@@ -1,4 +1,6 @@
-﻿namespace Orleans.Metadata
+using System;
+
+namespace Orleans.Metadata
 {
     /// <summary>
     /// Populates a specified kind of feature.

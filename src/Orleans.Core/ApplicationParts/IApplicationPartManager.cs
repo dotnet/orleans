@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Orleans.ApplicationParts
@@ -24,10 +25,22 @@ namespace Orleans.ApplicationParts
         IApplicationPartManager AddApplicationPart(IApplicationPart part);
 
         /// <summary>
+        /// Removes application parts matching a predicate.
+        /// </summary>
+        /// <param name="predicate">The predicate used to select which application parts to remove.</param>
+        IApplicationPartManager RemoveApplicationParts(Func<IApplicationPart, bool> predicate);
+
+        /// <summary>
         /// Adds a feature provider.
         /// </summary>
         /// <param name="featureProvider">The feature provider.</param>
         IApplicationPartManager AddFeatureProvider(IApplicationFeatureProvider featureProvider);
+
+        /// <summary>
+        /// Removes feature providers matching a predicate.
+        /// </summary>
+        /// <param name="predicate">The predicate used to select which feature providers to remove.</param>
+        IApplicationPartManager RemoveFeatureProviders(Func<IApplicationFeatureProvider, bool> predicate);
 
         /// <summary>
         /// Populates the given <paramref name="feature"/> using the list of

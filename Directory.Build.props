@@ -47,6 +47,7 @@
     <!-- System packages -->
     <SystemDiagnosticsPerformanceCounterVersion>5.0.0</SystemDiagnosticsPerformanceCounterVersion>
     <SystemNetNameResolutionVersion>4.3.0</SystemNetNameResolutionVersion>
+    <MicrosoftDotNetPlatformAbstractionsVersion>3.1.6</MicrosoftDotNetPlatformAbstractionsVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>16.8.0</MicrosoftBuildVersion>

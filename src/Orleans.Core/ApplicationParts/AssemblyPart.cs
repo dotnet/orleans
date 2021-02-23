@@ -22,6 +22,10 @@ namespace Orleans.ApplicationParts
             }
 
             this.Assembly = assembly;
+            if (assembly.IsDefined(typeof(FrameworkPartAttribute)))
+            {
+                IsFrameworkAssembly = true;
+            }
         }
 
         /// <summary>

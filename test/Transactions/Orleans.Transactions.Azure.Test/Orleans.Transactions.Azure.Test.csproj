@@ -3,6 +3,7 @@
     <RootNamespace>Orleans.Transactions.Azure.Tests</RootNamespace>
     <AssemblyName>Orleans.Transactions.Azure.Tests</AssemblyName>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <ItemGroup>
