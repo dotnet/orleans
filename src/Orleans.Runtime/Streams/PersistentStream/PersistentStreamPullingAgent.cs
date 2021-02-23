@@ -578,7 +578,8 @@ namespace Orleans.Streams
                             StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                                 i => DeliverBatchToConsumer(consumerData, batch),
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
-                                (exception, i) => !(exception is ClientNotAvailableException) || IsShutdown,
+                                // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
+                                (exception, i) => !(exception is ClientNotAvailableException) && !IsShutdown, 
                                 this.options.MaxEventDeliveryTime,
                                 DeliveryBackoffProvider);
                             if (newToken != null)
