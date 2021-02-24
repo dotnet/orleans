@@ -1,12 +1,28 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <OutputType>Exe</OutputType>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <PublishRoot>bin\$(Configuration)\publish\</PublishRoot>
+    <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
+    <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
   </PropertyGroup>
 
+  <!-- Declare that this is version 1 of our code. This is used for #ifdefs in the code -->
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);VERSION_1</DefineConstants>
+  </PropertyGroup>
+  
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Update="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Update="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
   </ItemGroup>
 
+  <Target Name="PostBuildPublish" AfterTargets="Build">
+    <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
+  </Target>
 </Project>

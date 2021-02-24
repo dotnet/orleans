@@ -1,4 +1,3 @@
-#if !NETCOREAPP
 using System;
 using System.Threading.Tasks;
 using Orleans.Versions.Compatibility;
@@ -105,4 +104,3 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         }
     }
 }
-#endif

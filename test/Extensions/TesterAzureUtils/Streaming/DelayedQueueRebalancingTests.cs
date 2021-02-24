@@ -1,4 +1,3 @@
-#if !NETCOREAPP
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,7 +34,7 @@ namespace Tester.AzureUtils.Streaming
             TestUtils.CheckForAzureStorage();
 
             // Define a cluster of 4, but 2 will be stopped.
-            builder.CreateSiloAsync = AppDomainSiloHandle.Create;
+            builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(this.GetType().Assembly);
             builder.Options.InitialSilosCount = 2;
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
         }
@@ -124,4 +123,3 @@ namespace Tester.AzureUtils.Streaming
         }
     }
 }
-#endif

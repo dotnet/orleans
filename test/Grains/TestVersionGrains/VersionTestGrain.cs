@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.CodeGeneration;
 using TestVersionGrainInterfaces;
 using UnitTests.GrainInterfaces;
 
@@ -14,7 +10,11 @@ namespace TestVersionGrains
     {
         public Task<int> GetVersion()
         {
+#if VERSION_1
             return Task.FromResult(1);
+#else
+            return Task.FromResult(2);
+#endif
         }
 
         public Task<int> ProxyGetVersion(IVersionUpgradeTestGrain other)
@@ -34,7 +34,11 @@ namespace TestVersionGrains
     {
         public Task<int> GetVersion()
         {
+#if VERSION_1
             return Task.FromResult(1);
+#else
+            return Task.FromResult(2);
+#endif
         }
     }
 }

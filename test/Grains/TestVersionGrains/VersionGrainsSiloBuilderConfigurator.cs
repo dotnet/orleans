@@ -1,14 +1,13 @@
-using System;
+﻿using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
+using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
-using UnitTests.GrainInterfaces;
-using Orleans.Hosting;
 using Orleans.TestingHost;
+using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
-using Orleans.Configuration;
-using Microsoft.Extensions.Configuration;
 
 namespace TestVersionGrains
 {
@@ -25,22 +24,14 @@ namespace TestVersionGrains
                 options.DefaultVersionSelectorStrategy = cfg["VersionSelectorStrategy"];
             });
 
-            hostBuilder.ConfigureServices(this.ConfigureServices)
-                 .AddMemoryGrainStorageAsDefault();
+            hostBuilder.ConfigureServices(ConfigureServices)
+                .AddMemoryGrainStorageAsDefault();
         }
 
         private void ConfigureServices(IServiceCollection services)
         {
             services.AddSingletonNamedService<PlacementStrategy, VersionAwarePlacementStrategy>(nameof(VersionAwarePlacementStrategy));
             services.AddSingletonKeyedService<Type, IPlacementDirector, VersionAwarePlacementDirector>(typeof(VersionAwarePlacementStrategy));
-        }
-    }
-
-    public class VersionGrainsClientConfigurator : IClientBuilderConfigurator
-    {
-        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-        {
-            clientBuilder.Configure<GatewayOptions>(options => options.PreferedGatewayIndex = 0);
         }
     }
 }

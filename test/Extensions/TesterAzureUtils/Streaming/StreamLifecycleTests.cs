@@ -1,4 +1,3 @@
-#if !NETCOREAPP
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -39,7 +38,7 @@ namespace UnitTests.StreamingTests
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
-            builder.CreateSiloAsync = AppDomainSiloHandle.Create;
+            builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(typeof(StreamLifecycleTests).Assembly);
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
         }
@@ -312,4 +311,3 @@ namespace UnitTests.StreamingTests
         }
     }
 }
-#endif

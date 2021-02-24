@@ -65,7 +65,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Delegate used to create and start an individual silo.
         /// </summary>
-        public Func<string, IList<IConfigurationSource>, Task<SiloHandle>> CreateSiloAsync { private get; set; }
+        public Func<string, IConfiguration, Task<SiloHandle>> CreateSiloAsync { private get; set; }
 
         public TestClusterBuilder ConfigureBuilder(Action configureDelegate)
         {

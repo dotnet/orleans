@@ -22,18 +22,13 @@ namespace Orleans.TestingHost
         /// <inheritdoc />
         public override bool IsActive => isActive;
 
-        /// <summary>Creates a new silo and returns a handle to it.</summary>
-        /// <param name="siloName">The name for the new silo.</param>
-        /// <param name="configurationSources">
-        /// The configuration sources, interpreted by <see cref="TestClusterHostFactory.CreateSiloHost"/>.
-        /// </param>
         public static async Task<SiloHandle> CreateAsync(
             string siloName,
-            IList<IConfigurationSource> configurationSources)
+            IConfiguration configuration)
         {
             var host = await Task.Run(async () =>
             {
-                var result = TestClusterHostFactory.CreateSiloHost(siloName, configurationSources);
+                var result = TestClusterHostFactory.CreateSiloHost(siloName, configuration);
                 await result.StartAsync();
                 return result;
             });

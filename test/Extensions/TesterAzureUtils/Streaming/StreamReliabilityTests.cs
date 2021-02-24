@@ -1,4 +1,3 @@
-#if !NETCOREAPP
 //#define USE_GENERICS
 //#define DELETE_AFTER_TEST
 
@@ -50,7 +49,7 @@ namespace UnitTests.Streaming.Reliability
             TestUtils.CheckForAzureStorage();
 
             this.numExpectedSilos = 2;
-            builder.CreateSiloAsync = AppDomainSiloHandle.Create;
+            builder.CreateSiloAsync = StandaloneSiloHandle.CreateForAssembly(this.GetType().Assembly);
             builder.Options.InitialSilosCount = (short) this.numExpectedSilos;
             builder.Options.UseTestClusterMembership = false;
 
@@ -1142,6 +1141,3 @@ namespace UnitTests.Streaming.Reliability
         }
     }
 }
-
-// ReSharper restore ConvertToConstant.Local
-#endif
