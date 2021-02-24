@@ -136,22 +136,6 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Parse a Uri as a Silo address, including the IPEndpoint and generation identifier.
-        /// </summary>
-        /// <param name="uri">The input Uri</param>
-        /// <returns></returns>
-        public static SiloAddress ToSiloAddress(this Uri uri)
-        {
-            switch (uri.Scheme)
-            {
-                case "gwy.tcp":
-                    var path = uri.AbsolutePath;
-                    return SiloAddress.New(uri.ToIPEndPoint(), path.Length > 1 ? int.Parse(path.Substring(1), NumberStyles.None) : 0);
-            }
-            return null;
-        }
-
-        /// <summary>
         /// Parse a Uri as a Silo address, excluding the generation identifier.
         /// </summary>
         /// <param name="uri">The input Uri</param>
@@ -187,7 +171,6 @@ namespace Orleans.Runtime
         /// <returns>An integer hash for the string.</returns>
         public static int CalculateIdHash(string text)
         {
-#if NETCOREAPP
             var input = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(text.AsSpan()) : Encoding.Unicode.GetBytes(text);
 
             Span<int> result = stackalloc int[256 / 8 / sizeof(int)];
@@ -198,14 +181,6 @@ namespace Orleans.Runtime
             var hash = 0;
             for (var i = 0; i < result.Length; i++) hash ^= result[i];
             return BitConverter.IsLittleEndian ? BinaryPrimitives.ReverseEndianness(hash) : hash;
-#else
-            using var sha = SHA256.Create();
-            var result = sha.ComputeHash(Encoding.Unicode.GetBytes(text));
-            var hash = 0;
-            for (int i = 0; i < result.Length; i += 4)
-                hash ^= (result[i] << 24) | (result[i + 1] << 16) | (result[i + 2] << 8) | (result[i + 3]);
-            return hash;
-#endif
         }
 
         /// <summary>
@@ -215,7 +190,6 @@ namespace Orleans.Runtime
         /// <returns>An integer hash for the string.</returns>
         internal static Guid CalculateGuidHash(string text)
         {
-#if NETCOREAPP
             var input = BitConverter.IsLittleEndian ? MemoryMarshal.AsBytes(text.AsSpan()) : Encoding.Unicode.GetBytes(text);
 
             Span<byte> result = stackalloc byte[256 / 8];
@@ -226,48 +200,6 @@ namespace Orleans.Runtime
             MemoryMarshal.AsRef<long>(result) ^= MemoryMarshal.Read<long>(result.Slice(16));
             MemoryMarshal.AsRef<long>(result.Slice(8)) ^= MemoryMarshal.Read<long>(result.Slice(24));
             return BitConverter.IsLittleEndian ? MemoryMarshal.Read<Guid>(result) : new Guid(result.Slice(0, 16));
-#else
-            using var sha = SHA256.Create();
-            var result = sha.ComputeHash(Encoding.Unicode.GetBytes(text));
-            var hash = new byte[16];
-            for (int i = 0; i < result.Length; i++)
-            {
-                hash[i & 15] ^= result[i];
-            }
-            return new Guid(hash);
-#endif
-        }
-
-        public static bool TryFindException(Exception original, Type targetType, out Exception target)
-        {
-            if (original.GetType() == targetType)
-            {
-                target = original;
-                return true;
-            }
-            else if (original is AggregateException)
-            {
-                var baseEx = original.GetBaseException();
-                if (baseEx.GetType() == targetType)
-                {
-                    target = baseEx;
-                    return true;
-                }
-                else
-                {
-                    var newEx = ((AggregateException)original).Flatten();
-                    foreach (var exc in newEx.InnerExceptions)
-                    {
-                        if (exc.GetType() == targetType)
-                        {
-                            target = newEx;
-                            return true;
-                        }
-                    }
-                }
-            }
-            target = null;
-            return false;
         }
 
         public static void SafeExecute(Action action, ILogger logger = null, string caller = null)
@@ -338,15 +270,6 @@ namespace Orleans.Runtime
             return result;
         }
 
-        public static AggregateException Flatten(this ReflectionTypeLoadException rtle)
-        {
-            // if ReflectionTypeLoadException is thrown, we need to provide the
-            // LoaderExceptions property in order to make it meaningful.
-            var all = new List<Exception> { rtle };
-            all.AddRange(rtle.LoaderExceptions);
-            throw new AggregateException("A ReflectionTypeLoadException has been thrown. The original exception and the contents of the LoaderExceptions property have been aggregated for your convenience.", all);
-        }
-
         /// <summary>
         /// </summary>
         public static IEnumerable<List<T>> BatchIEnumerable<T>(this IEnumerable<T> sequence, int batchSize)
@@ -372,17 +295,7 @@ namespace Orleans.Runtime
         public static string GetStackTrace(int skipFrames = 0)
         {
             skipFrames += 1; //skip this method from the stack trace
-#if NETSTANDARD
-            skipFrames += 2; //skip the 2 Environment.StackTrace related methods.
-            var stackTrace = Environment.StackTrace;
-            for (int i = 0; i < skipFrames; i++)
-            {
-                stackTrace = stackTrace.Substring(stackTrace.IndexOf(Environment.NewLine) + Environment.NewLine.Length);
-            }
-            return stackTrace;
-#else
             return new System.Diagnostics.StackTrace(skipFrames).ToString();
-#endif
         }
     }
 }

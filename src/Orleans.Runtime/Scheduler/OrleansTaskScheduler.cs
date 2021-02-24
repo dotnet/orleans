@@ -141,11 +141,7 @@ namespace Orleans.Runtime.Scheduler
             {
                 // Note that we do not use UnsafeQueueUserWorkItem here because we typically want to propagate execution context,
                 // which includes async locals.
-#if NETCOREAPP
                 ThreadPool.QueueUserWorkItem(ExecuteActionCallback, action, preferLocal: true);
-#else
-                ThreadPool.QueueUserWorkItem(ExecuteAction, action);
-#endif
             }
         }
 
@@ -174,11 +170,7 @@ namespace Orleans.Runtime.Scheduler
             {
                 // Note that we do not use UnsafeQueueUserWorkItem here because we typically want to propagate execution context,
                 // which includes async locals.
-#if NETCOREAPP
                 ThreadPool.QueueUserWorkItem(ExecuteWorkItemAction, workItem, preferLocal: true);
-#else
-                ThreadPool.QueueUserWorkItem(ExecuteWorkItemCallback, workItem);
-#endif
             }
         }
 

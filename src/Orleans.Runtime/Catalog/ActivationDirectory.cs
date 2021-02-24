@@ -62,15 +62,9 @@ namespace Orleans.Runtime
             if (!activations.TryAdd(target.ActivationId, target))
                 return;
 
-#if NETCOREAPP
             grainToActivationsMap.AddOrUpdate(target.GrainId,
                 (_, t) => new() { t },
                 (_, list, t) => { lock (list) list.Add(t); return list; }, target);
-#else
-            grainToActivationsMap.AddOrUpdate(target.GrainId,
-                new List<ActivationData> { target },
-                (g, list) => { lock (list) list.Add(target); return list; });
-#endif
         }
 
         public void RecordNewSystemTarget(SystemTarget target)

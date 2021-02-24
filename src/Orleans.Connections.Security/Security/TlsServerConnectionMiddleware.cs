@@ -1,16 +1,12 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.IO.Pipelines;
 using System.Net.Security;
-using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.Extensions.Logging;
-using Orleans.Connections.Security.Internal;
 
 namespace Orleans.Connections.Security
 {
@@ -132,7 +128,7 @@ namespace Orleans.Connections.Security
             var sslStream = tlsDuplexPipe.Stream;
 
             using (var cancellationTokeSource = new CancellationTokenSource(_options.HandshakeTimeout))
-            using (cancellationTokeSource.Token.UnsafeRegisterCancellation(state => ((ConnectionContext)state).Abort(), context))
+            using (cancellationTokeSource.Token.UnsafeRegister(state => ((ConnectionContext)state).Abort(), context))
             {
                 try
                 {
@@ -164,41 +160,23 @@ namespace Orleans.Connections.Security
 
                     _options.OnAuthenticateAsServer?.Invoke(context, sslOptions);
 
-#if NETCOREAPP
                     await sslStream.AuthenticateAsServerAsync(sslOptions.Value, cancellationTokeSource.Token);
-#else
-                    await sslStream.AuthenticateAsServerAsync(
-                        sslOptions.ServerCertificate,
-                        sslOptions.ClientCertificateRequired,
-                        sslOptions.EnabledSslProtocols,
-                        sslOptions.CertificateRevocationCheckMode == X509RevocationMode.Online);
-#endif
                 }
                 catch (OperationCanceledException ex)
                 {
                     _logger?.LogWarning(2, ex, "Authentication timed out");
-#if NETCOREAPP
                     await sslStream.DisposeAsync();
-#else
-                    sslStream.Dispose();
-#endif
                     return;
                 }
                 catch (Exception ex)
                 {
                     _logger?.LogWarning(1, ex, "Authentication failed");
-#if NETCOREAPP
                     await sslStream.DisposeAsync();
-#else
-                    sslStream.Dispose();
-#endif
                     return;
                 }
             }
 
-#if NETCOREAPP
             feature.ApplicationProtocol = sslStream.NegotiatedApplicationProtocol.Protocol;
-#endif
 
             context.Features.Set<ITlsApplicationProtocolFeature>(feature);
             feature.LocalCertificate = ConvertToX509Certificate2(sslStream.LocalCertificate);
@@ -218,13 +196,8 @@ namespace Orleans.Connections.Security
                 context.Transport = tlsDuplexPipe;
 
                 // Disposing the stream will dispose the TlsDuplexPipe
-#if NETCOREAPP
                 await using (sslStream)
                 await using (tlsDuplexPipe)
-#else
-                using (sslStream)
-                using (tlsDuplexPipe)
-#endif
                 {
                     await _next(context);
                     // Dispose the inner stream (TlsDuplexPipe) before disposing the SslStream

@@ -3,17 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-#if NETCOREAPP
 using System.Runtime.Loader;
-#endif
 using Microsoft.Extensions.DependencyModel;
 using Microsoft.Extensions.Hosting;
 using Orleans.ApplicationParts;
-using Orleans.CodeGeneration;
-using Orleans.Hosting;
 using Orleans.Metadata;
-using Orleans.Runtime;
-using System.IO;
 using System.Runtime.InteropServices;
 
 namespace Orleans
@@ -43,12 +37,8 @@ namespace Orleans
                 services.AddSingleton(manager);
                 services.AddSingleton<IApplicationPartManager>(manager);
 
-#if NETCOREAPP
                 manager.AddFromDependencyContext();
                 manager.AddFromAssemblyLoadContext();
-#else
-                manager.AddFromAppDomainWithReferences();
-#endif
 
                 if (GetServiceFromCollection<IHostEnvironment>(services)?.ApplicationName is string applicationName)
                 {
@@ -152,78 +142,6 @@ namespace Orleans
             return manager;
         }
 
-        /// <summary>
-        /// Adds all assemblies referenced by the assemblies already contained in the application part manager.
-        /// </summary>
-        /// <param name="manager">The builder.</param>
-        /// <returns>The builder with the additionally included assemblies.</returns>
-        public static IApplicationPartManager WithReferences(this IApplicationPartManager manager)
-        {
-            var referencedAssemblies = new HashSet<Assembly>(manager.GetAssemblies());
-            foreach (var scopedAssembly in manager.GetAssemblies())
-            {
-                LoadReferencedAssemblies(scopedAssembly, referencedAssemblies);
-            }
-
-            foreach (var includedAsm in referencedAssemblies)
-            {
-                manager.AddApplicationPart(new AssemblyPart(includedAsm));
-            }
-
-            return manager;
-
-            void LoadReferencedAssemblies(Assembly asm, HashSet<Assembly> includedAssemblies)
-            {
-                if (asm == null)
-                {
-                    throw new ArgumentNullException(nameof(asm));
-                }
-
-                if (includedAssemblies == null)
-                {
-                    throw new ArgumentNullException(nameof(includedAssemblies));
-                }
-
-                var referenced = asm.GetReferencedAssemblies();
-                foreach (var asmName in referenced)
-                {
-                    try
-                    {
-                        var refAsm = Assembly.Load(asmName);
-                        if (includedAssemblies.Add(refAsm)) LoadReferencedAssemblies(refAsm, includedAssemblies);
-                    }
-                    catch
-                    {
-                        // Ignore loading exceptions.
-                    }
-                }
-            }
-        }
-
-        public static IApplicationPartManager AddFromAppDomainWithReferences(this IApplicationPartManager manager)
-        {
-            var assemblies = new List<Assembly>();
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                manager = manager.AddApplicationPart(asm).WithReferences();
-                assemblies.Add(asm);
-            }
-
-            return manager;
-        }
-
-        private static IEnumerable<Assembly> GetAssemblies(this IApplicationPartManager manager)
-        {
-            foreach (var part in manager.ApplicationParts.ToList())
-            {
-                if (part is AssemblyPart asmPart)
-                {
-                    yield return asmPart.Assembly;
-                }
-            }
-        }
-
-#if NETCOREAPP
         public static IApplicationPartManager AddFromAssemblyLoadContext(this IApplicationPartManager manager, AssemblyLoadContext context)
         {
             if (context is null) throw new ArgumentNullException(nameof(context));
@@ -317,7 +235,6 @@ namespace Orleans
 
             return manager;
         }
-#endif
 
         private static IEnumerable<Assembly> GetApplicationPartAssemblies(Assembly assembly)
         {

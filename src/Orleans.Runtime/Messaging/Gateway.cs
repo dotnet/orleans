@@ -132,12 +132,7 @@ namespace Orleans.Runtime.Messaging
             ClientState clientState;
             lock (clients)
             {
-#if NETCOREAPP
                 if (!clientConnections.Remove(connection, out clientState)) return;
-#else
-                if (!clientConnections.TryGetValue(connection, out clientState)) return;
-                clientConnections.Remove(connection);
-#endif
 
                 clientState.RecordDisconnection();
                 clientsCollectionVersion++;

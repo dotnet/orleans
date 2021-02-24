@@ -18,7 +18,6 @@ namespace Orleans.Networking.Shared
 
         private static string GenerateId(long id)
         {
-#if NETCOREAPP
             return string.Create(13, id, (buffer, value) =>
             {
                 char[] encode32Chars = s_encode32Chars;
@@ -37,24 +36,6 @@ namespace Orleans.Networking.Shared
                 buffer[1] = encode32Chars[(value >> 55) & 31];
                 buffer[0] = encode32Chars[(value >> 60) & 31];
             });
-#else
-            var encode32Chars = s_encode32Chars;
-            var buffer = new char[13];
-            buffer[12] = encode32Chars[id & 31];
-            buffer[11] = encode32Chars[(id >> 5) & 31];
-            buffer[10] = encode32Chars[(id >> 10) & 31];
-            buffer[9] = encode32Chars[(id >> 15) & 31];
-            buffer[8] = encode32Chars[(id >> 20) & 31];
-            buffer[7] = encode32Chars[(id >> 25) & 31];
-            buffer[6] = encode32Chars[(id >> 30) & 31];
-            buffer[5] = encode32Chars[(id >> 35) & 31];
-            buffer[4] = encode32Chars[(id >> 40) & 31];
-            buffer[3] = encode32Chars[(id >> 45) & 31];
-            buffer[2] = encode32Chars[(id >> 50) & 31];
-            buffer[1] = encode32Chars[(id >> 55) & 31];
-            buffer[0] = encode32Chars[(id >> 60) & 31];
-            return new string(buffer);
-#endif
         }
     }
 }
