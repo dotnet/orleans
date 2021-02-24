@@ -9,23 +9,17 @@
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);FS2003;1591</NoWarn>
-    <GenerateBindingRedirectsOutputType Condition="$(TargetFramework.StartsWith('net4'))">true</GenerateBindingRedirectsOutputType>
     <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>
 
   <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->
   <PropertyGroup>
-    <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">net5.0;netcoreapp3.1;net461</TestTargetFrameworks>
+    <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">net5.0;netcoreapp3.1</TestTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
-
-  <!-- All .NET Framework projects should link to the reference assemblies package so that .NET Targeting Packs are not needed -->
-  <ItemGroup Condition="$(TargetFramework.StartsWith('net4'))" >
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="All" Version="$(MicrosoftNETFrameworkReferenceAssembliesVersion)" />
-  </ItemGroup>
 
   <ItemGroup>
     <None Include="*.xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />

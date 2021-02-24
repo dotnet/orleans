@@ -37,6 +37,18 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("BVT")]
+        public async Task ExceptionsPropagatedFromGrainToClient()
+        {
+            var grain = this.fixture.Client.GetGrain<IExceptionGrain>(0);
+
+            var invalidOperationException = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.ThrowsInvalidOperationException());
+            Assert.Equal("Test exception", invalidOperationException.Message);
+
+            var nullReferenceException = await Assert.ThrowsAsync<NullReferenceException>(() => grain.ThrowsNullReferenceException());
+            Assert.Equal("null null null", nullReferenceException.Message);
+        }
+
+        [Fact, TestCategory("BVT")]
         public async Task BasicExceptionPropagation()
         {
             IExceptionGrain grain = this.fixture.GrainFactory.GetGrain<IExceptionGrain>(GetRandomGrainId());

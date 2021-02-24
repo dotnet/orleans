@@ -12,7 +12,7 @@ set CMDHOME=%CMDHOME:~0,-1%
 set Platform=
 
 :: Disable multilevel lookup https://github.com/dotnet/core-setup/blob/master/Documentation/design-docs/multilevel-sharedfx-lookup.md
-set DOTNET_MULTILEVEL_LOOKUP=0 
+set DOTNET_MULTILEVEL_LOOKUP=0
 
 call Ensure-DotNetSdk.cmd
 
@@ -44,7 +44,6 @@ set TESTS=^
 %CMDHOME%\test\TestInfrastructure\Orleans.TestingHost.Tests,^
 %CMDHOME%\test\DependencyInjection.Tests,^
 %CMDHOME%\test\Orleans.Connections.Security.Tests,^
-%CMDHOME%\test\NetCore.Tests,^
 %CMDHOME%\test\Analyzers.Tests,^
 %CMDHOME%\test\CodeGeneration\CodeGenerator.Tests
 
