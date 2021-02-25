@@ -238,46 +238,5 @@ namespace Orleans.Runtime
         {
             logger.LogError(LoggingUtils.CreateEventId(logCode), exception, message);
         }
-
-
-        public static void Assert(this ILogger logger, ErrorCode errorCode, bool condition, string message = null)
-        {
-            if (condition) return;
-
-            if (message == null)
-            {
-                message = "Internal contract assertion has failed!";
-            }
-
-            logger.Fail(errorCode, "Assert failed with message = " + message);
-        }
-
-        public static void Fail(this ILogger logger, ErrorCode errorCode, string message)
-        {
-            if (message == null)
-            {
-                message = "Internal Fail!";
-            }
-
-            if (errorCode == 0)
-            {
-                errorCode = ErrorCode.Runtime;
-            }
-
-            logger.Error(errorCode, "INTERNAL FAILURE! About to crash! Fail message is: " + message + Environment.NewLine + Environment.StackTrace);
-
-            // Kill process
-            if (Debugger.IsAttached)
-            {
-                Debugger.Break();
-            }
-            else
-            {
-                logger.Error(ErrorCode.Logger_ProcessCrashing, "INTERNAL FAILURE! Process crashing!");
-
-                // Environment.FailFast triggers a popup on some machine "xxx has stopped working"
-                Environment.Exit(128);
-            }
-        }
     }
 }
