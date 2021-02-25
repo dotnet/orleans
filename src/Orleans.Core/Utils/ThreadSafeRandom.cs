@@ -15,18 +15,7 @@ namespace Orleans.Internal
         private static Random Instance => threadRandom ?? CreateInstance();
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-#if NETCOREAPP
         private static Random CreateInstance() => threadRandom = new Random();
-#else
-        private static Random CreateInstance()
-        {
-            var buf = new byte[4];
-            globalRandom.GetBytes(buf);
-            return threadRandom = new Random(BitConverter.ToInt32(buf, 0));
-        }
-
-        private static readonly RandomNumberGenerator globalRandom = RandomNumberGenerator.Create();
-#endif
 
         public static int Next() => Instance.Next();
         public static int Next(int maxValue) => Instance.Next(maxValue);

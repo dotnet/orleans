@@ -264,12 +264,6 @@ namespace Orleans.Runtime.Scheduler
                     )?.GetValue(o) is Action continuation)
                 return DumpAsyncState(continuation);
 
-#if !NETCOREAPP
-            if (o?.GetType() is { Name: "MoveNextRunner" } runner
-                && runner.GetField("m_stateMachine", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(o) is object stateMachine)
-                return DumpAsyncState(stateMachine);
-#endif
-
             return o;
         }
 
@@ -482,11 +476,7 @@ namespace Orleans.Runtime.Scheduler
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ScheduleExecution(WorkItemGroup workItem)
         {
-#if NETCOREAPP
             ThreadPool.UnsafeQueueUserWorkItem(workItem, preferLocal: true);
-#else
-            ThreadPool.UnsafeQueueUserWorkItem(ExecuteWorkItemCallback, workItem);
-#endif
         }
     }
 }

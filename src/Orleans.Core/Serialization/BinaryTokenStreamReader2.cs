@@ -196,18 +196,10 @@ namespace Orleans.Serialization
         private static void ThrowInsufficientData() => throw new InvalidOperationException("Insufficient data present in buffer.");
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#if NETCOREAPP
         public float ReadFloat() => BitConverter.Int32BitsToSingle(ReadInt32());
-#else
-        public float ReadFloat() => BitConverter.ToSingle(BitConverter.GetBytes(this.ReadInt32()), 0);
-#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#if NETCOREAPP
         public double ReadDouble() => BitConverter.Int64BitsToDouble(ReadInt64());
-#else
-        public double ReadDouble() => BitConverter.ToDouble(BitConverter.GetBytes(this.ReadInt64()), 0);
-#endif
 
         public decimal ReadDecimal()
         {
@@ -296,7 +288,6 @@ namespace Orleans.Serialization
                 if (n == -1) return null;
             }
 
-#if NETCOREAPP
             if (this.bufferSize - this.bufferPos >= n)
             {
                 var s = Encoding.UTF8.GetString(this.currentSpan.Slice(this.bufferPos, n).Span);
@@ -314,10 +305,6 @@ namespace Orleans.Serialization
                 var bytes = this.ReadBytes((uint)n);
                 return Encoding.UTF8.GetString(bytes);
             }
-#else
-            var bytes = this.ReadBytes((uint)n);
-            return Encoding.UTF8.GetString(bytes);
-#endif
         }
 
         /// <summary> Read the next bytes from the stream. </summary>
@@ -370,42 +357,19 @@ namespace Orleans.Serialization
 
             if (v4)
             {
-#if NETCOREAPP
                 return new IPAddress(buff.Slice(12));
-#else
-                var v4Bytes = new byte[4];
-                for (var i = 0; i < 4; i++)
-                {
-                    v4Bytes[i] = buff[12 + i];
-                }
-                return new IPAddress(v4Bytes);
-#endif
             }
             else
             {
-#if NETCOREAPP
                 return new IPAddress(buff);
-#else
-                var v6Bytes = new byte[16];
-                for (var i = 0; i < 16; i++)
-                {
-                    v6Bytes[i] = buff[i];
-                }
-                return new IPAddress(v6Bytes);
-#endif
             }
         }
 
         public Guid ReadGuid()
         {
-#if NETCOREAPP
             Span<byte> bytes = stackalloc byte[16];
             this.ReadBytes(in bytes);
             return new Guid(bytes);
-#else
-            byte[] bytes = ReadBytes(16);
-            return new Guid(bytes);
-#endif
         }
 
         /// <summary> Read an <c>IPEndPoint</c> value from the stream. </summary>

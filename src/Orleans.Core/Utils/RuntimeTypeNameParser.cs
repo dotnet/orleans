@@ -154,11 +154,7 @@ namespace Orleans.Utilities
                 // The generic arity is additive, so that a generic class nested in a generic class has an arity
                 // equal to the sum of specified arity values. For example, "C`1+N`2" has an arity of 3.
                 var aritySlice = s.Input.Slice(genericArityStart, s.Index - genericArityStart);
-#if NETCOREAPP
                 var arity = int.Parse(aritySlice);
-#else
-                var arity = int.Parse(aritySlice.ToString());
-#endif
                 s.TotalGenericArity += arity;
                 if (s.TotalGenericArity > MaxAllowedGenericArity)
                 {

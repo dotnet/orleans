@@ -49,11 +49,7 @@ namespace Orleans.TestingHost
             Process = new Process();
             Process.StartInfo = new ProcessStartInfo(executablePath)
             {
-#if NETCOREAPP
                 ArgumentList = { Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture), serializedConfiguration },
-#else
-                Arguments = Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture) + " " + EscapeArgument(serializedConfiguration),
-#endif
                 CreateNoWindow = true,
                 RedirectStandardError = true,
                 RedirectStandardOutput = true,
@@ -61,13 +57,6 @@ namespace Orleans.TestingHost
                 WorkingDirectory = new FileInfo(executablePath).Directory.FullName,
                 UseShellExecute = false,
             };
-
-#if !NETCOREAPP
-            static string EscapeArgument(string input)
-            {
-                return "\"" + input.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
-            }
-#endif
 
             _outputBuilder = new StringBuilder();
             _outputCloseEvent = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -130,11 +119,7 @@ namespace Orleans.TestingHost
                 {
                     try
                     {
-#if NETCOREAPP
                         target.Process.Kill(entireProcessTree: true);
-#else
-                        target.Process.Kill();
-#endif
                     }
                     catch
                     {

@@ -35,13 +35,11 @@ namespace Orleans.Connections.Security
             base.Dispose(disposing);
         }
 
-#if NETCOREAPP
         public override async ValueTask DisposeAsync()
         {
             await _reader.CompleteAsync().ConfigureAwait(false);
             await _writer.CompleteAsync().ConfigureAwait(false);
         }
-#endif
 
         public override void Flush()
         {
@@ -71,11 +69,7 @@ namespace Orleans.Connections.Security
             return ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
         }
 
-        public
-#if NETCOREAPP
-        override
-#endif
-        async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
             ReadResult result = await _reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 
@@ -148,11 +142,7 @@ namespace Orleans.Connections.Security
             return WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
         }
 
-        public
-#if NETCOREAPP
-            override
-#endif
-        async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             FlushResult r = await _writer.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
             if (r.IsCanceled) throw new OperationCanceledException(cancellationToken);

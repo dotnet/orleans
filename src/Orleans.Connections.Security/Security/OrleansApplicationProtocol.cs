@@ -1,4 +1,3 @@
-#if NETCOREAPP
 using System.Net.Security;
 
 namespace Orleans.Connections.Security
@@ -8,4 +7,3 @@ namespace Orleans.Connections.Security
         public static readonly SslApplicationProtocol Orleans1 = new SslApplicationProtocol("Orleans1");
     }
 }
-#endif

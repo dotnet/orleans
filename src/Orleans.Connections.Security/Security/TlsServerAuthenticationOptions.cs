@@ -9,7 +9,6 @@ namespace Orleans.Connections.Security
 
     public class TlsServerAuthenticationOptions
     {
-#if NETCOREAPP
         internal SslServerAuthenticationOptions Value { get; } = new SslServerAuthenticationOptions
         {
             ApplicationProtocols = new List<SslApplicationProtocol>
@@ -49,18 +48,5 @@ namespace Orleans.Connections.Security
         }
 
         public object SslServerAuthenticationOptions => this.Value;
-#else
-        public X509Certificate ServerCertificate { get; set; }
-
-        public ServerCertificateSelectionCallback ServerCertificateSelectionCallback { get; set; }
-
-        public bool ClientCertificateRequired { get; set; }
-
-        public SslProtocols EnabledSslProtocols { get; set; }
-
-        public X509RevocationMode CertificateRevocationCheckMode { get; set; }
-
-        public object SslServerAuthenticationOptions => null;
-#endif
     }
 }

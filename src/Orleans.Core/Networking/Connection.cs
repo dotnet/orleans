@@ -11,9 +11,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
 
-#if NETCOREAPP
 using Microsoft.Extensions.ObjectPool;
-#endif
 
 namespace Orleans.Runtime.Messaging
 {
@@ -28,11 +26,7 @@ namespace Orleans.Runtime.Messaging
             AllowSynchronousContinuations = false
         };
 
-#if NETCOREAPP
         private static readonly ObjectPool<MessageHandler> MessageHandlerPool = ObjectPool.Create(new MessageHandlerPoolPolicy());
-#else
-        private readonly WaitCallback handleMessageCallback;
-#endif
         private readonly ConnectionCommon shared;
         private readonly ConnectionDelegate middleware;
         private readonly Channel<Message> outgoingMessages;
@@ -49,9 +43,6 @@ namespace Orleans.Runtime.Messaging
             ConnectionDelegate middleware,
             ConnectionCommon shared)
         {
-#if !NETCOREAPP
-            this.handleMessageCallback = obj => this.OnReceivedMessage((Message)obj);
-#endif
             this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
             this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
             this.shared = shared;
@@ -289,13 +280,9 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     MessagingStatisticsGroup.OnMessageReceive(this.MessageReceivedCounter, message, bodyLength + headerLength, headerLength, this.ConnectionDirection);
-#if NETCOREAPP
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(message, this);
                                     ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
-#else
-                                    ThreadPool.UnsafeQueueUserWorkItem(this.handleMessageCallback, message);
-#endif
                                     message = null;
                                 }
                             }
@@ -506,7 +493,6 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-#if NETCOREAPP
         private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>
         {
             public override MessageHandler Create() => new MessageHandler();
@@ -540,6 +526,5 @@ namespace Orleans.Runtime.Messaging
                 this.connection = null;
             }
         }
-#endif
     }
 }

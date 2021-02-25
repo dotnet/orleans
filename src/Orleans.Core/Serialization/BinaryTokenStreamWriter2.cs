@@ -146,7 +146,6 @@ namespace Orleans.Serialization
             }
             else
             {
-#if NETCOREAPP
                 var enc = this.utf8Encoder;
                 enc.Reset();
 
@@ -154,7 +153,7 @@ namespace Orleans.Serialization
                 // but that requires an additional scan over the string. We could determine an upper bound here, too, but that may
                 // be wasteful. Instead, we will fall back to a slower and more accurate method if it is not.
                 var writableSpan = this.TryGetContiguous(256);
-                enc.Convert(s, writableSpan.Slice(4), true, out var charsUsed, out var bytesUsed, out var completed);
+                enc.Convert(s, writableSpan.Slice(4), true, out _, out var bytesUsed, out var completed);
 
                 if (completed)
                 {
@@ -165,15 +164,9 @@ namespace Orleans.Serialization
 
                 // Otherwise, try again more slowly, overwriting whatever data was just copied to the output buffer.
                 this.WriteStringInternalSlower(s);
-#else
-                var bytes = Encoding.UTF8.GetBytes(s);
-                this.Write(bytes.Length);
-                this.Write(bytes);
-#endif
             }
         }
 
-#if NETCOREAPP
         [MethodImpl(MethodImplOptions.NoInlining)]
         private void WriteStringInternalSlower(string s)
         {
@@ -191,7 +184,6 @@ namespace Orleans.Serialization
                 this.WriteMultiSegment(bytes);
             }
         }
-#endif
 
         public void Write(char c)
         {

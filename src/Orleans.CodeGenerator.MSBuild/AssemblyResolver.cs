@@ -17,9 +17,7 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
         private readonly ICompilationAssemblyResolver assemblyResolver;
 
         private readonly DependencyContext resolverRependencyContext;
-#if NETCOREAPP
         private readonly AssemblyLoadContext loadContext;
-#endif
 
         public AssemblyResolver()
         {
@@ -34,27 +32,23 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
                 });
 
             AppDomain.CurrentDomain.AssemblyResolve += this.ResolveAssembly;
-#if NETCOREAPP
             this.loadContext = AssemblyLoadContext.GetLoadContext(typeof(AssemblyResolver).Assembly);
             this.loadContext.Resolving += this.AssemblyLoadContextResolving;
             if (this.loadContext != AssemblyLoadContext.Default)
             {
                 AssemblyLoadContext.Default.Resolving += this.AssemblyLoadContextResolving;
             }
-#endif
         }
 
         public void Dispose()
         {
             AppDomain.CurrentDomain.AssemblyResolve -= this.ResolveAssembly;
 
-#if NETCOREAPP
             this.loadContext.Resolving -= this.AssemblyLoadContextResolving;
             if (this.loadContext != AssemblyLoadContext.Default)
             {
                 AssemblyLoadContext.Default.Resolving -= this.AssemblyLoadContextResolving;
             }
-#endif
         }
 
         /// <summary>
@@ -107,22 +101,12 @@ namespace Microsoft.Orleans.CodeGenerator.MSBuild
         {
             try
             {
-#if NETCOREAPP
                 return this.loadContext.LoadFromAssemblyPath(path);
-#else
-                return Assembly.LoadFrom(path);
-#endif
             }
             catch
             {
                 return null;
             }
         }
-
-#if !NETCOREAPP
-        internal class AssemblyLoadContext
-        {
-        }
-#endif
     }
 }
