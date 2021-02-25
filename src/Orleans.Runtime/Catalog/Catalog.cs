@@ -472,7 +472,7 @@ namespace Orleans.Runtime
                     if (result.PlacedUsing is StatelessWorkerPlacement st)
                     {
                         // Check if there is already enough StatelessWorker created
-                        if (LocalLookup(address.Grain, out var local) && local.Count > st.MaxLocal)
+                        if (LocalLookup(address.Grain, out var local) && local.Count >= st.MaxLocal)
                         {
                             // Redirect directly to an already created StatelessWorker
                             // It's a bit hacky since we will return an activation with a different
