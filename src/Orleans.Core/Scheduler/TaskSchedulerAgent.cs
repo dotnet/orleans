@@ -7,28 +7,27 @@ namespace Orleans.Runtime
 {
     internal abstract class TaskSchedulerAgent : IDisposable
     {
-        public enum FaultBehavior
+        protected enum FaultBehavior
         {
-            CrashOnFault,   // Crash the process if the agent faults
             RestartOnFault, // Restart the agent if it faults
             IgnoreFault     // Allow the agent to stop if it faults, but take no other action (other than logging)
         }
 
-        public enum AgentState
+        private enum AgentState
         {
             Stopped,
             Running,
             StopRequested
         }
                
-        protected CancellationTokenSource Cts;
-        protected object Lockable;
-        protected ILogger Log;
-        protected FaultBehavior OnFault;
-        protected bool disposed;
+        protected CancellationTokenSource Cts { get; private set; }
+        private readonly object lockable;
+        protected ILogger Log { get; }
+        protected FaultBehavior OnFault { get; set; }
+        private bool disposed;
 
-        public AgentState State { get; private set; }
-        internal string Name { get; private set; }
+        private AgentState State { get; set; }
+        private string Name { get; set; }
 
         protected TaskSchedulerAgent(ILoggerFactory loggerFactory)
         {
@@ -43,31 +42,14 @@ namespace Orleans.Runtime
 
             Name = typeName;
 
-            Lockable = new object();
+            lockable = new object();
             OnFault = FaultBehavior.IgnoreFault;
-        }
-
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private void CurrentDomain_DomainUnload(object sender, EventArgs e)
-        {
-            try
-            {
-                if (State != AgentState.Stopped)
-                {
-                    Stop();
-                }
-            }
-            catch (Exception exc)
-            {
-                // ignore. Just make sure DomainUnload handler does not throw.
-                Log.Debug("Ignoring error during Stop: {0}", exc);
-            }
         }
 
         public virtual void Start()
         {
             ThrowIfDisposed();
-            lock (Lockable)
+            lock (lockable)
             {
                 if (State == AgentState.Running)
                 {
@@ -79,8 +61,6 @@ namespace Orleans.Runtime
                     Cts = new CancellationTokenSource();
                 }
 
-                AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
-                LogStatus(Log, "Starting AsyncAgent {0} on managed thread {1}", Name, Thread.CurrentThread.ManagedThreadId);
                 State = AgentState.Running;
             }
 
@@ -130,7 +110,7 @@ namespace Orleans.Runtime
             try
             {
                 ThrowIfDisposed();
-                lock (Lockable)
+                lock (lockable)
                 {
                     if (State == AgentState.Running)
                     {
@@ -139,8 +119,6 @@ namespace Orleans.Runtime
                         State = AgentState.Stopped;
                     }
                 }
-
-                AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
             }
             catch (Exception exc)
             {
@@ -173,8 +151,6 @@ namespace Orleans.Runtime
         {
             return Name;
         }
-        
-        internal static bool IsStarting { get; set; }
         
         /// <summary>
         /// Handles fault
@@ -220,12 +196,6 @@ namespace Orleans.Runtime
             var logMessagePrefix = $"Asynch agent {Name} encountered unexpected exception";
             switch (OnFault)
             {
-                case FaultBehavior.CrashOnFault:
-                    var logMessage = $"{logMessagePrefix} The process will be terminated.";
-                    Console.WriteLine(logMessage, exc);
-                    Log.Error(ErrorCode.Runtime_Error_100023, logMessage, exc);
-                    Log.Fail(ErrorCode.Runtime_Error_100024, logMessage);
-                    break;
                 case FaultBehavior.IgnoreFault:
                     Log.Error(ErrorCode.Runtime_Error_100025, $"{logMessagePrefix} The executor will exit.", exc);
                     break;
@@ -234,20 +204,6 @@ namespace Orleans.Runtime
                     break;
                 default:
                     throw new NotImplementedException();
-            }
-        }
-
-        private static void LogStatus(ILogger log, string msg, params object[] args)
-        {
-            if (IsStarting)
-            {
-                // Reduce log noise during silo startup
-                if (log.IsEnabled(LogLevel.Debug)) log.Debug(msg, args);
-            }
-            else
-            {
-                // Changes in agent threads during all operations aside for initial creation are usually important diag events.
-                log.Info(msg, args);
             }
         }
 
