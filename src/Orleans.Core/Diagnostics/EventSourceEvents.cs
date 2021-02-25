@@ -177,49 +177,6 @@ namespace Orleans.Runtime
         private void SendResponse() => WriteEvent(3);
     }
 
-    [EventSource(Name = "Microsoft-Orleans-GatewayAcceptor")]
-    internal sealed class OrleansGatewayAcceptorEvent : EventSource
-    {
-        public static readonly OrleansGatewayAcceptorEvent Log = new OrleansGatewayAcceptorEvent();
-
-        [NonEvent]
-        public void HandleMessage(Message message)
-        {
-            if (this.IsEnabled())
-            {
-                using (message.SetThreadActivityId())
-                {
-                    this.HandleMessage();
-                }
-            }
-        }
-
-        [Event(1, Level = EventLevel.Verbose)]
-        private void HandleMessage() => WriteEvent(1);
-
-    }
-
-    [EventSource(Name = "Microsoft-Orleans-IncomingMessageAcceptor")]
-    internal sealed class OrleansIncomingMessageAcceptorEvent : EventSource
-    {
-        public static readonly OrleansIncomingMessageAcceptorEvent Log = new OrleansIncomingMessageAcceptorEvent();
-
-        [NonEvent]
-        public void HandleMessage(Message message)
-        {
-            if (this.IsEnabled())
-            {
-                using (message.SetThreadActivityId())
-                {
-                    this.HandleMessage();
-                }
-            }
-        }
-
-        [Event(1, Level = EventLevel.Verbose)]
-        private void HandleMessage() => WriteEvent(1);
-    }
-
     [EventSource(Name = "Microsoft-Orleans-IncomingMessageAgent")]
     internal sealed class OrleansIncomingMessageAgentEvent : EventSource
     {

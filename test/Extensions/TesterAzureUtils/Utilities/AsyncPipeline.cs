@@ -2,26 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans;
 
-namespace Orleans.Runtime
+namespace Tester.AzureUtils.Utilities
 {
-    /// <summary>
-    /// A utility interface that allows to control the rate of generation of asynchronous activities.
-    /// </summary>
-    /// <seealso cref="AsyncPipeline"/>   
-    public interface IPipeline
-    {
-        /// <summary>Adds a new task to the pipeline</summary>
-        /// <param name="task">The task to add</param>
-        void Add(Task task);
-
-        /// <summary>Waits until all currently queued asynchronous operations are done. Blocks the calling thread.</summary>
-        void Wait();
-
-        /// <summary>The number of items currently enqueued into this pipeline.</summary>
-        int Count { get; }
-    }
-
     /// <summary>
     /// A helper utility class that allows to control the rate of generation of asynchronous activities.
     /// Maintains a pipeline of asynchronous operations up to a given maximal capacity and blocks the calling thread if the pipeline 
@@ -29,7 +13,7 @@ namespace Orleans.Runtime
     /// Effectively adds a back-pressure to the caller.
     /// This is mainly useful for stress-testing grains under controlled load and should never be used from within a grain code! 
     /// </summary>
-    public class AsyncPipeline : IPipeline
+    public class AsyncPipeline
     {
         /// <summary>
         /// The Default Capacity of this AsyncPipeline. Equals to 10.

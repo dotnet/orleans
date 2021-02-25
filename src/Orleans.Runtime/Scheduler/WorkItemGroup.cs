@@ -16,7 +16,6 @@ namespace Orleans.Runtime.Scheduler
     [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
     internal class WorkItemGroup : IWorkItem
     {
-        private static readonly WaitCallback ExecuteWorkItemCallback = obj => ((WorkItemGroup)obj).Execute();
         private enum WorkGroupStatus
         {
             Waiting = 0,

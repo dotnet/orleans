@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal abstract class HistogramValueStatistic
     {
-        protected Object    Lockable;
+        protected object    Lockable;
         protected CounterStatistic[] Buckets;
         
         public abstract void AddData(long data);

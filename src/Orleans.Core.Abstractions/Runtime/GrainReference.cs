@@ -46,11 +46,6 @@ namespace Orleans.Runtime
 
         internal IGrainReferenceRuntime Runtime => Shared.Runtime;
 
-        /// <summary>
-        /// Gets a value indicating whether this instance is bound to a runtime and hence valid for making requests.
-        /// </summary>
-        internal bool IsBound => _shared is object;
-
         public GrainId GrainId => GrainId.Create(_shared.GrainType, _key);
 
         public GrainInterfaceType InterfaceType => _shared.InterfaceType;

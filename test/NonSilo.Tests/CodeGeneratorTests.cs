@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom.Compiler;
 using System.Linq;
 using Orleans;
 using Orleans.ApplicationParts;
@@ -93,7 +94,7 @@ namespace UnitTests.CodeGeneration
                 !systemTargetType.IsAssignableFrom(type)) return false;
 
             // exclude generated classes.
-            return !TypeUtils.IsGeneratedType(type);
+            return !type.IsDefined(typeof(GeneratedCodeAttribute), true);
         }
     }
 }

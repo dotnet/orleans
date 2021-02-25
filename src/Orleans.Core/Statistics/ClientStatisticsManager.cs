@@ -8,9 +8,8 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    internal class ClientStatisticsManager : IStatisticsManager, IDisposable
+    internal class ClientStatisticsManager : IDisposable
     {
-        private readonly StatisticsOptions statisticsOptions;
         private readonly LogStatistics logStatistics;
 
         public ClientStatisticsManager(
@@ -18,8 +17,7 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory, 
             IOptions<StatisticsOptions> statisticsOptions)
         {
-            this.statisticsOptions = statisticsOptions.Value;
-            this.logStatistics = new LogStatistics(this.statisticsOptions.LogWriteInterval, false, serializationStatistics, loggerFactory);
+            this.logStatistics = new LogStatistics(statisticsOptions.Value.LogWriteInterval, false, serializationStatistics, loggerFactory);
             MessagingStatisticsGroup.Init();
             NetworkingStatisticsGroup.Init();
         }

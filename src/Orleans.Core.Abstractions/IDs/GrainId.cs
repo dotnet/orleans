@@ -152,12 +152,6 @@ namespace Orleans.Runtime
         public static bool operator !=(GrainId a, GrainId b) => !a.Equals(b);
 
         /// <inheritdoc/>
-        public static bool operator >(GrainId a, GrainId b) => a.CompareTo(b) > 0;
-
-        /// <inheritdoc/>
-        public static bool operator <(GrainId a, GrainId b) => a.CompareTo(b) < 0;
-
-        /// <inheritdoc/>
         public override string ToString()
         {
             var type = GrainTypeNameMapper?.GetGrainTypeName(Type) ?? Type.ToStringUtf8();

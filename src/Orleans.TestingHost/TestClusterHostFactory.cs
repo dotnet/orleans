@@ -29,24 +29,6 @@ namespace Orleans.TestingHost
         /// Creates an returns a new silo.
         /// </summary>
         /// <param name="hostName">The silo name if it is not already specified in the configuration.</param>
-        /// <param name="configurationSources">The configuration.</param>
-        /// <returns>A new silo.</returns>
-        public static ISiloHost CreateSiloHost(string hostName, IEnumerable<IConfigurationSource> configurationSources)
-        {
-            var configBuilder = new ConfigurationBuilder();
-            foreach (var source in configurationSources)
-            {
-                configBuilder.Add(source);
-            }
-
-            var configuration = configBuilder.Build();
-            return CreateSiloHost(hostName, configuration);
-        }
-
-        /// <summary>
-        /// Creates an returns a new silo.
-        /// </summary>
-        /// <param name="hostName">The silo name if it is not already specified in the configuration.</param>
         /// <param name="configuration">The configuration.</param>
         /// <returns>A new silo.</returns>
         public static ISiloHost CreateSiloHost(string hostName, IConfiguration configuration)

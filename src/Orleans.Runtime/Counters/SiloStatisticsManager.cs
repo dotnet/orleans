@@ -5,7 +5,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.Counters
 {
-    internal class SiloStatisticsManager : IStatisticsManager
+    internal class SiloStatisticsManager
     {
         private LogStatistics logStatistics;
         private CountersStatistics countersPublisher;

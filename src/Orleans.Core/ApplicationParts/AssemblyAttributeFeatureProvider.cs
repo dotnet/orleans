@@ -12,15 +12,6 @@ namespace Orleans.ApplicationParts
     /// <typeparam name="TFeature">The feature type.</typeparam>
     public sealed class AssemblyAttributeFeatureProvider<TFeature> : IApplicationFeatureProvider<TFeature>
     {
-        /// <summary>
-        /// Returns <see langword="true"/> if this instance is equivalent to the provided instance, <see langword="false"/> otherwise.
-        /// </summary>
-        /// <param name="other">The other instance.</param>
-        /// <returns>
-        /// <see langword="true"/> if this instance is equivalent to the provided instance, <see langword="false"/> otherwise.
-        /// </returns>
-        public bool Equals(AssemblyAttributeFeatureProvider<TFeature> other) => true;
-
         /// <inheritdoc />
         public override bool Equals(object obj)
         {

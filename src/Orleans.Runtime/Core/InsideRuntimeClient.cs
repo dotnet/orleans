@@ -492,24 +492,6 @@ namespace Orleans.Runtime
             }
         }
 
-        // assumes deadlock information was already loaded into RequestContext from the message
-        private static void UpdateDeadlockInfoInRequestContext(RequestInvocationHistory thisInvocation)
-        {
-            IList prevChain;
-            object obj = RequestContext.Get(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER);
-            if (obj != null)
-            {
-                prevChain = ((IList)obj);
-            }
-            else
-            {
-                prevChain = new List<RequestInvocationHistory>();
-                RequestContext.Set(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER, prevChain);
-            }
-            // append this call to the end of the call chain. Update in place.
-            prevChain.Add(thisInvocation);
-        }
-
         public void ReceiveResponse(Message message)
         {
             OrleansInsideRuntimeClientEvent.Log.ReceiveResponse(message);

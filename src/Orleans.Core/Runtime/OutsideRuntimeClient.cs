@@ -36,8 +36,6 @@ namespace Orleans
         private readonly ClientGrainId clientId;
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
-        private static readonly TimeSpan ResetTimeout = TimeSpan.FromMinutes(1);
-
         private const string BARS = "----------";
         
         public IInternalGrainFactory InternalGrainFactory { get; private set; }

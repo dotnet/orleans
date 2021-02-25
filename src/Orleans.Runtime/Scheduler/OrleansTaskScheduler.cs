@@ -15,7 +15,6 @@ namespace Orleans.Runtime.Scheduler
     internal class OrleansTaskScheduler
     {
         private static readonly Action<IWorkItem> ExecuteWorkItemAction = workItem => workItem.Execute();
-        private static readonly WaitCallback ExecuteWorkItemCallback = obj => ((IWorkItem)obj).Execute();
         private readonly ILogger logger;
         private readonly SchedulerStatisticsGroup schedulerStatistics;
         private readonly IOptions<StatisticsOptions> statisticsOptions;
@@ -117,7 +116,6 @@ namespace Orleans.Runtime.Scheduler
         }
 
         private static readonly Action<Action> ExecuteActionCallback = obj => obj.Invoke();
-        private static readonly WaitCallback ExecuteAction = obj => ((Action)obj).Invoke();
         public void QueueAction(Action action, IGrainContext context)
         {
 #if DEBUG

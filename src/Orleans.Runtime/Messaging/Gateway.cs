@@ -266,8 +266,6 @@ namespace Orleans.Runtime.Messaging
 
             public bool IsConnected => this.Connection != null;
 
-            public TimeSpan LastSeen => IsConnected ? TimeSpan.Zero : DateTime.UtcNow.Subtract(DisconnectedSince);
-
             internal ClientState(ClientGrainId id, TimeSpan clientDropTimeout)
             {
                 Id = id;

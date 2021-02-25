@@ -540,7 +540,6 @@ namespace Orleans.Runtime
         {
             None,
             Register,
-            SetupState,
             InvokeActivate,
             Completed
         }
@@ -972,8 +971,7 @@ namespace Orleans.Runtime
                 try
                 {
                     // just check in case this activation data is already Invalid or not here at all.
-                    ActivationData ignore;
-                    if (TryGetActivationData(activation.ActivationId, out ignore) &&
+                    if (TryGetActivationData(activation.ActivationId, out _) &&
                         activation.State == ActivationState.Deactivating)
                     {
                         RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake. 

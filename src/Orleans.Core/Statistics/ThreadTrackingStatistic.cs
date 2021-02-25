@@ -1,8 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
@@ -18,9 +16,7 @@ namespace Orleans.Runtime
         public ulong NumRequests;
         public string Name;
 
-        private const string CONTEXT_SWTICH_COUNTER_NAME = "Context Switches/sec";
         public static bool ClientConnected = false;
-        private bool firstStart;
 
         private static readonly List<FloatValueStatistic> allExecutingCpuCycleTime = new List<FloatValueStatistic>();
         private static readonly List<FloatValueStatistic> allExecutingWallClockTime = new List<FloatValueStatistic>();
@@ -53,7 +49,6 @@ namespace Orleans.Runtime
             ProcessingWallClockTime = TimeIntervalFactory.CreateTimeInterval(true);
 
             NumRequests = 0;
-            firstStart = true;
             Name = threadName;
 
             statisticsLevel = statisticsOptions.Value.CollectionLevel;
@@ -127,11 +122,6 @@ namespace Orleans.Runtime
             return 0;
         }
 
-        public static void FirstClientConnectedStartTracking()
-        {
-            ClientConnected = true;
-        }
-
         /// <summary>
         /// Call once when the thread is started, must be called from the thread being tracked
         /// </summary>
@@ -155,61 +145,6 @@ namespace Orleans.Runtime
             {
                 ExecutingCpuCycleTime.Stop();
                 ExecutingWallClockTime.Stop();
-            }
-        }
-
-        /// <summary>
-        /// Call once before processing a request, must be called from the thread being tracked
-        /// </summary>
-        public void OnStartProcessing()
-        {
-            // Only once a client has connected do we start tracking statistics
-            if (!ClientConnected) return;
-
-            // As this function is called constantly, we perform two additional tasks in this function which require calls from the thread being tracked (the constructor is not called from the tracked thread)
-            if (firstStart)
-            {
-                // If this is the first function call where client has connected, we ensure execution timers are started and context switches are tracked
-                firstStart = false;
-                OnStartExecution();
-            }
-            else
-            {
-                // Must toggle this counter as its "Elapsed" value contains the value when it was last stopped, this is a limitation of our techniques for CPU tracking of threads
-                ExecutingCpuCycleTime.Stop();
-                ExecutingCpuCycleTime.Start();
-            }
-
-            ProcessingCpuCycleTime.Start();
-            ProcessingWallClockTime.Start();
-        }
-
-        /// <summary>
-        /// Call once after processing multiple requests as a batch or a single request, must be called from the thread being tracked
-        /// </summary>
-        public void OnStopProcessing()
-        {
-            // Only once a client has connected do we start tracking statistics
-            if (ClientConnected)
-            {
-                ProcessingCpuCycleTime.Stop();
-                ProcessingWallClockTime.Stop();
-            }
-        }
-
-        /// <summary>
-        /// Call once to just increment the statistic of processed requests
-        /// </summary>
-        /// <param name="num">Number of processed requests</param>
-        public void IncrementNumberOfProcessed(int num = 1)
-        {
-            // Only once a client has connected do we start tracking statistics
-            if (ClientConnected)
-            {
-                if (num > 0)
-                {
-                    NumRequests += (ulong)num;
-                }
             }
         }
     }

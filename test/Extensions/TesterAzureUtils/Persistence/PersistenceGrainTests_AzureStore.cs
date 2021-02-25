@@ -59,13 +59,6 @@ namespace Tester.AzureUtils.Persistence
             }
         }
 
-        public static IProviderConfiguration GetNamedProviderConfigForShardedProvider(IEnumerable<KeyValuePair<string, IProviderConfiguration>> providers, string providerName)
-        {
-            var providerConfig = providers.Where(o => o.Key.Equals(providerName)).Select(o => o.Value);
-
-            return providerConfig.First();
-        }
-
         public Base_PersistenceGrainTests_AzureStore(ITestOutputHelper output, BaseTestClusterFixture fixture, string grainNamespace = "UnitTests.Grains")
         {
             this.output = output;

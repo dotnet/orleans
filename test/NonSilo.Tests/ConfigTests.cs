@@ -18,34 +18,6 @@ namespace UnitTests
             this.output = output;
         }
 
-        [Fact, TestCategory("Functional"), TestCategory("Config")]
-        public void Config_ParseTimeSpan()
-        {
-            string str = "1ms";
-            TimeSpan ts = TimeSpan.FromMilliseconds(1);
-            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
-
-            str = "2s";
-            ts = TimeSpan.FromSeconds(2);
-            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
-
-            str = "3m";
-            ts = TimeSpan.FromMinutes(3);
-            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
-
-            str = "4hr";
-            ts = TimeSpan.FromHours(4);
-            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
-
-            str = "5"; // Default unit is seconds
-            ts = TimeSpan.FromSeconds(5);
-            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
-
-            str = "922337203685477.5807ms";
-            ts = TimeSpan.MaxValue;
-            Assert.Equal(ts, ConfigUtilities.ParseTimeSpan(str, str));
-        }
-        
         [Fact, TestCategory("Functional"), TestCategory("Config"), TestCategory("Azure")]
         public void Config_AzureConnectionInfo()
         {

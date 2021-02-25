@@ -33,8 +33,6 @@ namespace Orleans.EventSourcing.CustomStorage
 
         private string primaryCluster;
 
-        private const int slowpollinterval = 10000;
-
         private TLogView cached;
         private int version;
 

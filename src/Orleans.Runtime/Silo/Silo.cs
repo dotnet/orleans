@@ -32,18 +32,7 @@ namespace Orleans.Runtime
     {
         /// <summary> Standard name for Primary silo. </summary>
         public const string PrimarySiloName = "Primary";
-        private static TimeSpan WaitForMessageToBeQueuedForOutbound = TimeSpan.FromSeconds(2);
-        /// <summary> Silo Types. </summary>
-        public enum SiloType
-        {
-            /// <summary> No silo type specified. </summary>
-            None = 0,
-            /// <summary> Primary silo. </summary>
-            Primary,
-            /// <summary> Secondary silo. </summary>
-            Secondary,
-        }
-
+        private static readonly TimeSpan WaitForMessageToBeQueuedForOutbound = TimeSpan.FromSeconds(2);
         private readonly ILocalSiloDetails siloDetails;
         private readonly MessageCenter messageCenter;
         private readonly LocalGrainDirectory localGrainDirectory;
@@ -119,7 +108,7 @@ namespace Orleans.Runtime
             services.GetService<SerializationManager>().RegisterSerializers(services.GetService<IApplicationPartManager>());
 
             this.Services = services;
-            this.Services.InitializeSiloUnobservedExceptionsHandler();
+
             //set PropagateActivityId flag from node config
             IOptions<SiloMessagingOptions> messagingOptions = services.GetRequiredService<IOptions<SiloMessagingOptions>>();
             RequestContext.PropagateActivityId = messagingOptions.Value.PropagateActivityId;
@@ -668,51 +657,7 @@ namespace Orleans.Runtime
             Utils.SafeExecute(action, logger, "Silo.Stop");
         }
 
-        private void HandleProcessExit(object sender, EventArgs e)
-        {
-            // NOTE: We need to minimize the amount of processing occurring on this code path -- we only have under approx 2-3 seconds before process exit will occur
-            this.logger.Warn(ErrorCode.Runtime_Error_100220, "Process is exiting");
-            this.isFastKilledNeeded = true;
-            this.Stop();
-        }
-
         internal void RegisterSystemTarget(SystemTarget target) => this.catalog.RegisterSystemTarget(target);
-
-        /// <summary> Return dump of diagnostic data from this silo. </summary>
-        /// <param name="all"></param>
-        /// <returns>Debug data for this silo.</returns>
-        public string GetDebugDump(bool all = true)
-        {
-            var sb = new StringBuilder();
-            foreach (var systemTarget in activationDirectory.AllSystemTargets())
-                sb.AppendFormat("System target {0}:", ((ISystemTargetBase)systemTarget).GrainId.ToString()).AppendLine();
-
-            var enumerator = activationDirectory.GetEnumerator();
-            while(enumerator.MoveNext())
-            {
-                Utils.SafeExecute(() =>
-                {
-                    var activationData = enumerator.Current.Value;
-                    var workItemGroup = LocalScheduler.GetWorkItemGroup(activationData);
-                    if (workItemGroup == null)
-                    {
-                        sb.AppendFormat("Activation with no work item group!! Grain {0}, activation {1}.",
-                            activationData.GrainId,
-                            activationData.ActivationId);
-                        sb.AppendLine();
-                        return;
-                    }
-
-                    if (all || activationData.State.Equals(ActivationState.Valid))
-                    {
-                        sb.AppendLine(workItemGroup.DumpStatus());
-                        sb.AppendLine(activationData.DumpStatus());
-                    }
-                });
-            }
-            logger.Info(ErrorCode.SiloDebugDump, sb.ToString());
-            return sb.ToString();
-        }
 
         /// <summary> Object.ToString override -- summary info for this silo. </summary>
         public override string ToString()

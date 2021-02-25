@@ -9,9 +9,6 @@ namespace Orleans.Serialization
         /// <summary>Current read position in the stream.</summary>
         int CurrentPosition { get; }
 
-        /// <summary>Gets the total length of the stream.</summary>
-        long Length { get; }
-
         /// <summary>
         /// Creates a copy of the current stream reader.
         /// </summary>

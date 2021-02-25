@@ -724,12 +724,11 @@ namespace Orleans.Serialization
         {
             lock (serializers)
             {
-                Serializer ser;
-                if (serializers.TryGetValue(t, out ser)) return true;
+                if (serializers.TryGetValue(t, out _)) return true;
                 if (t.IsOrleansPrimitive()) return true;
                 if (!t.IsGenericType) return false;
                 var genericTypeDefinition = t.GetGenericTypeDefinition();
-                return this.serializers.TryGetValue(genericTypeDefinition, out ser) &&
+                return this.serializers.TryGetValue(genericTypeDefinition, out _) &&
                        t.GetGenericArguments().All(type => this.HasSerializer(type));
             }
         }
@@ -1504,50 +1503,6 @@ namespace Orleans.Serialization
             return result;
         }
 
-        internal static void SerializeMessageHeaders(Message.HeadersContainer headers, SerializationContext context)
-        {
-            var sm = context.SerializationManager;
-            Stopwatch timer = null;
-            if (sm.serializationStatistics.CollectSerializationStats)
-            {
-                timer = new Stopwatch();
-                timer.Start();
-            }
-
-            var ser = sm.GetSerializer(typeof(Message.HeadersContainer));
-            ser(headers, context, typeof(Message.HeadersContainer));
-
-            if (timer != null)
-            {
-                timer.Stop();
-                sm.serializationStatistics.HeaderSers.Increment();
-                sm.serializationStatistics.HeaderSerTime.IncrementBy(timer.ElapsedTicks);
-            }
-        }
-
-        internal static Message.HeadersContainer DeserializeMessageHeaders(IDeserializationContext context)
-        {
-            var sm = context.GetSerializationManager();
-            Stopwatch timer = null;
-            if (sm.serializationStatistics.CollectSerializationStats)
-            {
-                timer = new Stopwatch();
-                timer.Start();
-            }
-
-            var des = sm.GetDeserializer(typeof(Message.HeadersContainer));
-            var headers = (Message.HeadersContainer)des(typeof(Message.HeadersContainer), context);
-
-            if (timer != null)
-            {
-                timer.Stop();
-                sm.serializationStatistics.HeaderDesers.Increment();
-                sm.serializationStatistics.HeaderDeserTime.IncrementBy(timer.ElapsedTicks);
-            }
-
-            return headers;
-        }
-
         private bool TryLookupExternalSerializer(Type t, out IExternalSerializer serializer)
         {
             // essentially a no-op if there are no external serializers registered
@@ -1752,46 +1707,6 @@ namespace Orleans.Serialization
         {
             byte[] data = this.SerializeToByteArray(source);
             return this.DeserializeFromByteArray<T>(data);
-        }
-
-        public void LogRegisteredTypes()
-        {
-            int count = 0;
-            var lines = new StringBuilder();
-            foreach (var name in types.Keys.OrderBy(k => k))
-            {
-                var line = new StringBuilder();
-                var type = types[name];
-                bool discardLine = true;
-
-                line.Append("    - ");
-                line.Append(name);
-                line.Append(" :");
-                if (copiers.ContainsKey(type))
-                {
-                    line.Append(" copier");
-                    discardLine = false;
-                }
-                if (deserializers.ContainsKey(type))
-                {
-                    line.Append(" deserializer");
-                    discardLine = false;
-                }
-                if (serializers.ContainsKey(type))
-                {
-                    line.Append(" serializer");
-                    discardLine = false;
-                }
-                if (!discardLine)
-                {
-                    line.AppendLine();
-                    lines.Append(line);
-                    ++count;
-                }
-            }
-
-            var report = String.Format("Registered artifacts for {0} types:" + Environment.NewLine + "{1}", count, lines);
-            logger.Debug(ErrorCode.SerMgr_ArtifactReport, report);
         }
 
         /// <summary>

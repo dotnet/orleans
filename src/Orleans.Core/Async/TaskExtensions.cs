@@ -196,12 +196,6 @@ namespace Orleans.Internal
             return t == null ? "null" : string.Format("[Id={0}, Status={1}]", t.Id, Enum.GetName(typeof(TaskStatus), t.Status));
         }
 
-        internal static String ToString<T>(this Task<T> t)
-        {
-            return t == null ? "null" : string.Format("[Id={0}, Status={1}]", t.Id, Enum.GetName(typeof(TaskStatus), t.Status));
-        }
-
-
         public static void WaitWithThrow(this Task task, TimeSpan timeout)
         {
             if (!task.Wait(timeout))
@@ -353,29 +347,6 @@ namespace Orleans.Internal
         /// <typeparam name="T"></typeparam>
         /// <param name="taskToComplete">The task to wait for unless cancelled</param>
         /// <param name="cancellationToken">A cancellation token for cancelling the wait</param>
-        /// <param name="message">Message to set in the exception</param>
-        /// <returns></returns>
-        internal static async Task<T> WithCancellation<T>(
-            this Task<T> taskToComplete, 
-            CancellationToken cancellationToken,
-            string message)
-        {
-            try
-            {
-                return await taskToComplete.WithCancellation(cancellationToken);
-            }
-            catch (TaskCanceledException ex)
-            {
-                throw new TaskCanceledException(message, ex);
-            }
-        }
-
-        /// <summary>
-        /// For making an uncancellable task cancellable, by ignoring its result.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="taskToComplete">The task to wait for unless cancelled</param>
-        /// <param name="cancellationToken">A cancellation token for cancelling the wait</param>
         /// <returns></returns>
         internal static Task<T> WithCancellation<T>(this Task<T> taskToComplete, CancellationToken cancellationToken)
         {
@@ -423,56 +394,11 @@ namespace Orleans.Internal
             }
         }
 
-        internal static Task<T> ConvertTaskViaTcs<T>(Task<T> task)
-        {
-            if (task == null) return Task.FromResult(default(T));
-
-            var resolver = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            if (task.Status == TaskStatus.RanToCompletion)
-            {
-                resolver.TrySetResult(task.Result);
-            }
-            else if (task.IsFaulted)
-            {
-                resolver.TrySetException(task.Exception.InnerExceptions);
-            }
-            else if (task.IsCanceled)
-            {
-                resolver.TrySetException(new TaskCanceledException(task));
-            }
-            else
-            {
-                if (task.Status == TaskStatus.Created) task.Start();
-
-                task.ContinueWith(t =>
-                {
-                    if (t.IsFaulted)
-                    {
-                        resolver.TrySetException(t.Exception.InnerExceptions);
-                    }
-                    else if (t.IsCanceled)
-                    {
-                        resolver.TrySetException(new TaskCanceledException(t));
-                    }
-                    else
-                    {
-                        resolver.TrySetResult(t.GetResult());
-                    }
-                });
-            }
-            return resolver.Task;
-        }
-
         //The rationale for GetAwaiter().GetResult() instead of .Result
         //is presented at https://github.com/aspnet/Security/issues/59.      
         internal static T GetResult<T>(this Task<T> task)
         {
             return task.GetAwaiter().GetResult();
-        }
-        internal static void GetResult(this Task task)
-        {
-            task.GetAwaiter().GetResult();
         }
 
         internal static Task WhenCancelled(this CancellationToken token)
@@ -491,21 +417,5 @@ namespace Orleans.Internal
 
             return waitForCancellation.Task;
         }
-    }
-}
-
-namespace Orleans
-{
-    /// <summary>
-    /// A special void 'Done' Task that is already in the RunToCompletion state.
-    /// Equivalent to Task.FromResult(1).
-    /// </summary>
-    public static class TaskDone
-    {
-        /// <summary>
-        /// A special 'Done' Task that is already in the RunToCompletion state
-        /// </summary>
-        [Obsolete("Use Task.CompletedTask")]
-        public static Task Done => Task.CompletedTask;
     }
 }

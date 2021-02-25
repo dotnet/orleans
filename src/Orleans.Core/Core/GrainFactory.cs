@@ -69,7 +69,7 @@ namespace Orleans
         public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithGuidCompoundKey
         {
-            GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
+            DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
 
             var grainKey = GrainIdKeyExtensions.CreateGuidKey(primaryKey, keyExtension);
             return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
@@ -79,7 +79,7 @@ namespace Orleans
         public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
             where TGrainInterface : IGrainWithIntegerCompoundKey
         {
-            GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
+            DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
 
             var grainKey = GrainIdKeyExtensions.CreateIntegerKey(primaryKey, keyExtension);
             return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: grainClassNamePrefix);
@@ -256,6 +256,18 @@ namespace Orleans
             }
 
             return this.Cast(this.runtimeClient.CreateObjectReference(obj, invoker), interfaceType);
+        }
+
+        private static void DisallowNullOrWhiteSpaceKeyExtensions(string keyExt)
+        {
+            if (!string.IsNullOrWhiteSpace(keyExt)) return;
+
+            if (null == keyExt)
+            {
+                throw new ArgumentNullException(nameof(keyExt)); 
+            }
+            
+            throw new ArgumentException("Key extension is empty or white space.", nameof(keyExt));
         }
     }
 }

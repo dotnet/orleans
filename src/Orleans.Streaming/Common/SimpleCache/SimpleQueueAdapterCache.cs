@@ -39,16 +39,5 @@ namespace Orleans.Providers.Streams.Common
         {
             return new SimpleQueueCache(cacheSize, this.loggerFactory.CreateLogger($"{typeof(SimpleQueueCache).FullName}.{providerName}.{queueId}"));
         }
-
-        /// <summary>
-        /// Parse the size property from configuration
-        /// </summary>
-        /// <param name="config"></param>
-        /// <param name="defaultSize"></param>
-        /// <returns></returns>
-        public static int ParseSize(IProviderConfiguration config, int defaultSize)
-        {
-            return config.GetIntProperty(CacheSizePropertyName, defaultSize);
-        }
     }
 }

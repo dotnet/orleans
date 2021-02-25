@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Reflection;
@@ -45,11 +45,6 @@ namespace Orleans.Runtime
         public static string PrintException(Exception exception)
         {
             return exception == null ? String.Empty : PrintException_Helper(exception, 0, true);
-        }
-
-        public static string PrintExceptionWithoutStackTrace(Exception exception)
-        {
-            return exception == null ? String.Empty : PrintException_Helper(exception, 0, false);
         }
 
         public static void SetExceptionDecoder(Type exceptionType, Func<Exception, string> decoder)

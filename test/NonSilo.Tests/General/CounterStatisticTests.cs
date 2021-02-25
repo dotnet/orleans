@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Xunit;
@@ -32,8 +32,6 @@ namespace UnitTests.General
 
             Parallel.For(0, Environment.ProcessorCount, j =>
             {
-                CounterStatistic.SetOrleansManagedThread();
-
                 for (int i = 0; i < counters.Length; i++)
                 {
                     counters[i] = CounterStatistic.FindOrCreate(new StatisticName("test" + i));

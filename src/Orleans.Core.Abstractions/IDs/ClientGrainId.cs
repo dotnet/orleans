@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
@@ -76,37 +75,5 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public static bool operator !=(ClientGrainId left, ClientGrainId right) => !(left == right);
-
-        /// <inheritdoc/>
-        public static bool operator <(ClientGrainId left, ClientGrainId right) => left.CompareTo(right) < 0;
-
-        /// <inheritdoc/>
-        public static bool operator <=(ClientGrainId left, ClientGrainId right) => left.CompareTo(right) <= 0;
-
-        /// <inheritdoc/>
-        public static bool operator >(ClientGrainId left, ClientGrainId right) => left.CompareTo(right) > 0;
-
-        /// <inheritdoc/>
-        public static bool operator >=(ClientGrainId left, ClientGrainId right) => left.CompareTo(right) >= 0;
-
-        /// <summary>
-        /// An <see cref="IEqualityComparer{T}"/> and <see cref="IComparer{T}"/> implementation for <see cref="ClientGrainId"/>.
-        /// </summary>
-        public sealed class Comparer : IEqualityComparer<ClientGrainId>, IComparer<ClientGrainId>
-        {
-            /// <summary>
-            /// A singleton <see cref="Comparer"/> instance.
-            /// </summary>
-            public static Comparer Instance { get; } = new Comparer();
-
-            /// <inheritdoc/>
-            public int Compare(ClientGrainId x, ClientGrainId y) => x.CompareTo(y);
-
-            /// <inheritdoc/>
-            public bool Equals(ClientGrainId x, ClientGrainId y) => x.Equals(y);
-
-            /// <inheritdoc/>
-            public int GetHashCode(ClientGrainId obj) => obj.GetHashCode();
-        }
     }
 }

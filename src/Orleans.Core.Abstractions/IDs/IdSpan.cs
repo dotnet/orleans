@@ -123,12 +123,6 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public static bool operator !=(IdSpan a, IdSpan b) => !a.Equals(b);
 
-        /// <inheritdoc/>
-        public static bool operator >(IdSpan a, IdSpan b) => a.CompareTo(b) > 0;
-
-        /// <inheritdoc/>
-        public static bool operator <(IdSpan a, IdSpan b) => a.CompareTo(b) < 0;
-
         private static int GetHashCode(byte[] value) => (int)JenkinsHash.ComputeHash(value);
 
         /// <summary>

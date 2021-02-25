@@ -1,10 +1,10 @@
-using System;
+using System.Globalization;
 
 namespace Orleans.Runtime
 {
     public class StatisticName
     {
-        public string Name { get; private set; }
+        public string Name { get; }
 
         public StatisticName(string name)
         {
@@ -13,7 +13,7 @@ namespace Orleans.Runtime
 
         public StatisticName(StatisticNameFormat nameFormat, params object[] args)
         {
-            Name = String.Format(nameFormat.Name, args);
+            Name = string.Format(CultureInfo.InvariantCulture, nameFormat.Name, args);
         }
 
         public override string ToString()
@@ -22,14 +22,17 @@ namespace Orleans.Runtime
         }
     }
 
-    public class StatisticNameFormat : StatisticName
+    public class StatisticNameFormat
     {
-        public StatisticNameFormat(string name) : base(name)
+        public string Name { get; }
+
+        public StatisticNameFormat(string name)
         {
+            Name = name;
         }
     }
 
-    public class StatisticNames
+    internal class StatisticNames
     {
         // Networking
         public static readonly StatisticName NETWORKING_SOCKETS_SILO_CLOSED         = new StatisticName("Networking.Sockets.Silo.Closed");
@@ -67,7 +70,6 @@ namespace Orleans.Runtime
 
         public static readonly StatisticNameFormat MESSAGING_DISPATCHER_PROCESSED_OK_PER_DIRECTION         = new StatisticNameFormat("Messaging.Processing.Dispatcher.Processed.Ok.Direction.{0}");
         public static readonly StatisticNameFormat MESSAGING_DISPATCHER_PROCESSED_ERRORS_PER_DIRECTION     = new StatisticNameFormat("Messaging.Processing.Dispatcher.Processed.Errors.Direction.{0}");
-        public static readonly StatisticNameFormat MESSAGING_DISPATCHER_PROCESSED_REROUTE_PER_DIRECTION    = new StatisticNameFormat("Messaging.Processing.Dispatcher.Processed.ReRoute.Direction.{0}");
         public static readonly StatisticName MESSAGING_DISPATCHER_PROCESSED_TOTAL                           = new StatisticName("Messaging.Processing.Dispatcher.Processed.Total");
        
         public static readonly StatisticName MESSAGING_IMA_RECEIVED                                 = new StatisticName("Messaging.Processing.IMA.Received");
@@ -90,15 +92,9 @@ namespace Orleans.Runtime
         public static readonly StatisticNameFormat MESSAGING_REJECTED_PER_DIRECTION            = new StatisticNameFormat("Messaging.Rejected.{0}");
         public static readonly StatisticNameFormat MESSAGING_REROUTED_PER_DIRECTION            = new StatisticNameFormat("Messaging.Rerouted.{0}");
         public static readonly StatisticName MESSAGING_SENT_LOCALMESSAGES                       = new StatisticName("Messaging.Sent.LocalMessages");
-        public static readonly StatisticName MESSAGING_SENT_BATCH_SIZE                          = new StatisticName("Messaging.Sent.BatchSize");
-
-        // MessageCenter
-        public static readonly StatisticName MESSAGE_CENTER_SEND_QUEUE_LENGTH                   = new StatisticName("MessageCenter.SendQueueLength");
-        public static readonly StatisticName MESSAGE_CENTER_RECEIVE_QUEUE_LENGTH                = new StatisticName("MessageCenter.ReceiveQueueLength");
 
         // Queues
         public static readonly StatisticNameFormat QUEUES_QUEUE_SIZE_AVERAGE_PER_QUEUE          = new StatisticNameFormat("Queues.QueueSize.Average.{0}");
-        public static readonly StatisticNameFormat QUEUES_QUEUE_SIZE_INSTANTANEOUS_PER_QUEUE    = new StatisticNameFormat("Queues.QueueSize.Instantaneous.{0}");
         public static readonly StatisticNameFormat QUEUES_ENQUEUED_PER_QUEUE                    = new StatisticNameFormat("Queues.EnQueued.{0}");
         public static readonly StatisticNameFormat QUEUES_AVERAGE_ARRIVAL_RATE_PER_QUEUE        = new StatisticNameFormat("Queues.AverageArrivalRate.RequestsPerSecond.{0}");
         public static readonly StatisticNameFormat QUEUES_TIME_IN_QUEUE_AVERAGE_MILLIS_PER_QUEUE = new StatisticNameFormat("Queues.TimeInQueue.Average.Milliseconds.{0}");
@@ -115,7 +111,6 @@ namespace Orleans.Runtime
         public static readonly StatisticNameFormat THREADS_EXECUTION_TIME_AVERAGE_WALL_CLOCK    = new StatisticNameFormat("Thread.ExecutionTime.Average.WallClock.Milliseconds.{0}");
         public static readonly StatisticNameFormat THREADS_PROCESSING_TIME_AVERAGE_CPU_CYCLES   = new StatisticNameFormat("Thread.ProcessingTime.Average.CPUCycles.Milliseconds.{0}");
         public static readonly StatisticNameFormat THREADS_PROCESSING_TIME_AVERAGE_WALL_CLOCK   = new StatisticNameFormat("Thread.ProcessingTime.Average.WallClock.Milliseconds.{0}");
-        public static readonly StatisticNameFormat THREADS_CONTEXT_SWITCHES                    = new StatisticNameFormat("Thread.ContextSwitches.Total.SwitchCount.{0}");
 
         // Stage analysis
         public static readonly StatisticName STAGE_ANALYSIS                                     = new StatisticName("Thread.StageAnalysis");
@@ -129,50 +124,17 @@ namespace Orleans.Runtime
         // Runtime
         public static readonly StatisticName RUNTIME_CPUUSAGE                                           = new StatisticName("Runtime.CpuUsage");
         public static readonly StatisticName RUNTIME_GC_TOTALMEMORYKB                                   = new StatisticName("Runtime.GC.TotalMemoryKb");
-        public static readonly StatisticName RUNTIME_GC_GENCOLLECTIONCOUNT                              = new StatisticName("Runtime.GC.GenCollectonCount");
-        public static readonly StatisticName RUNTIME_GC_GENSIZESKB                                      = new StatisticName("Runtime.GC.GenSizesKb");
-        public static readonly StatisticName RUNTIME_GC_PERCENTOFTIMEINGC                               = new StatisticName("Runtime.GC.PercentOfTimeInGC");
-        public static readonly StatisticName RUNTIME_GC_ALLOCATEDBYTESINKBPERSEC                        = new StatisticName("Runtime.GC.AllocatedBytesInKbPerSec");
-        public static readonly StatisticName RUNTIME_GC_PROMOTEDMEMORYFROMGEN1KB                        = new StatisticName("Runtime.GC.PromotedMemoryFromGen1Kb");
-        public static readonly StatisticName RUNTIME_GC_LARGEOBJECTHEAPSIZEKB                           = new StatisticName("Runtime.GC.LargeObjectHeapSizeKb");
-        public static readonly StatisticName RUNTIME_GC_PROMOTEDMEMORYFROMGEN0KB                        = new StatisticName("Runtime.GC.PromotedFinalizationMemoryFromGen0Kb");
-        public static readonly StatisticName RUNTIME_GC_NUMBEROFINDUCEDGCS                              = new StatisticName("Runtime.GC.NumberOfInducedGCs");
         public static readonly StatisticName RUNTIME_MEMORY_TOTALPHYSICALMEMORYMB                       = new StatisticName("Runtime.Memory.TotalPhysicalMemoryMb");
         public static readonly StatisticName RUNTIME_MEMORY_AVAILABLEMEMORYMB                           = new StatisticName("Runtime.Memory.AvailableMemoryMb");
         public static readonly StatisticName RUNTIME_DOT_NET_THREADPOOL_INUSE_WORKERTHREADS             = new StatisticName("Runtime.DOT.NET.ThreadPool.InUse.WorkerThreads");
         public static readonly StatisticName RUNTIME_DOT_NET_THREADPOOL_INUSE_COMPLETIONPORTTHREADS     = new StatisticName("Runtime.DOT.NET.ThreadPool.InUse.CompletionPortThreads");
         public static readonly StatisticName RUNTIME_IS_OVERLOADED                                      = new StatisticName("Runtime.IsOverloaded");
-        public static readonly StatisticNameFormat RUNTIME_THREADS_ASYNC_AGENT_PERAGENTTYPE            = new StatisticNameFormat("Runtime.Threads.AsynchAgent.{0}");
-        public static readonly StatisticName RUNTIME_THREADS_ASYNC_AGENT_TOTAL_THREADS_CREATED          = new StatisticNameFormat("Runtime.Threads.AsynchAgent.TotalThreadsCreated");
-
-        // Scheduler
-        public static readonly StatisticName SCHEDULER_TURNSEXECUTED_APPLICATION_BYALLWORKERTHREADS     = new StatisticName("Scheduler.TurnsExecuted.Application.ByAllWorkerThreads");
-        public static readonly StatisticName SCHEDULER_TURNSEXECUTED_APPLICATION_BYALLWORKITEMGROUPS    = new StatisticName("Scheduler.TurnsExecuted.Application.ByAllWorkItemGroups");
-        public static readonly StatisticNameFormat SCHEDULER_TURNSEXECUTED_APPLICATION_PERTHREAD       = new StatisticNameFormat("Scheduler.TurnsExecuted.Application.ByThread.{0}");
-        public static readonly StatisticName SCHEDULER_TURNSEXECUTED_SYSTEM_BYALLWORKERTHREADS          = new StatisticName("Scheduler.TurnsExecuted.System.ByAllWorkerThreads");
-        public static readonly StatisticName SCHEDULER_TURNSEXECUTED_SYSTEM_BYALLWORKITEMGROUPS         = new StatisticName("Scheduler.TurnsExecuted.System.ByAllWorkItemGroups");
-        public static readonly StatisticNameFormat SCHEDULER_TURNSEXECUTED_SYSTEM_PERTHREAD            = new StatisticNameFormat("Scheduler.TurnsExecuted.System.ByThread.{0}");
-        public static readonly StatisticName SCHEDULER_TURNSEXECUTED_NULL_BYALLWORKERTHREADS            = new StatisticName("Scheduler.TurnsExecuted.Null.ByAllWorkerThreads");
-        public static readonly StatisticNameFormat SCHEDULER_TURNSEXECUTED_NULL_PERTHREAD              = new StatisticNameFormat("Scheduler.TurnsExecuted.Null.ByThread.{0}");
-        public static readonly StatisticName SCHEDULER_TURNSEXECUTED_TOTAL_START                        = new StatisticName("Scheduler.TurnsExecuted.Total.Start");
-        public static readonly StatisticName SCHEDULER_TURNSEXECUTED_TOTAL_END                          = new StatisticName("Scheduler.TurnsExecuted.Total.End");
        
         public static readonly StatisticNameFormat SCHEDULER_ACTIVATION_TURNSEXECUTED_PERACTIVATION    = new StatisticNameFormat("Scheduler.Activation.TurnsExecuted.ByActivation.{0}");
         public static readonly StatisticNameFormat SCHEDULER_ACTIVATION_STATUS_PERACTIVATION           = new StatisticNameFormat("Scheduler.Activation.Status.ByActivation.{0}");
-        public static readonly StatisticName SCHEDULER_TURN_LENGTH_HISTOGRAM                            = new StatisticName("Scheduler.TurnLengthHistogram.Ticks");
-        public static readonly StatisticName SCHEDULER_PENDINGWORKITEMS                                 = new StatisticName("Scheduler.PendingWorkItems");
         public static readonly StatisticName SCHEDULER_WORKITEMGROUP_COUNT                              = new StatisticName("Scheduler.WorkItemGroupCount");
         public static readonly StatisticName SCHEDULER_NUM_LONG_RUNNING_TURNS                           = new StatisticName("Scheduler.NumLongRunningTurns");
         public static readonly StatisticName SCHEDULER_NUM_LONG_QUEUE_WAIT_TIMES                        = new StatisticName("Scheduler.NumLongQueueWaitTimes");
-        //public static readonly StatisticName SCHEDULER_RUN_QUEUE_LENGTH_LEVEL_ONE                       = new StatisticName("Scheduler.RunQueueLength.LevelOne");
-        //public static readonly StatisticName SCHEDULER_RUN_QUEUE_LENGTH_LEVEL_TWO                       = new StatisticName("Scheduler.RunQueueLength.LevelTwo");
-        //public static readonly StatisticName SCHEDULER_RUN_QUEUE_LENGTH_TOTAL                           = new StatisticName("Scheduler.RunQueueLength.Total");
-
-        public static readonly StatisticName SCHEDULER_ITEMS_ENQUEUED_TOTAL                             = new StatisticName("Scheduler.Items.EnQueued");
-        public static readonly StatisticName SCHEDULER_ITEMS_DEQUEUED_TOTAL                             = new StatisticName("Scheduler.Items.DeQueued");
-        public static readonly StatisticName SCHEDULER_ITEMS_DROPPED_TOTAL                              = new StatisticName("Scheduler.Items.Dropped");
-        public static readonly StatisticName SCHEDULER_CLOSURE_WORK_ITEMS_CREATED                       = new StatisticName("Scheduler.ClosureWorkItems.Created");
-        public static readonly StatisticName SCHEDULER_CLOSURE_WORK_ITEMS_EXECUTED                      = new StatisticName("Scheduler.ClosureWorkItems.Executed");
 
         // Serialization
         public static readonly StatisticName SERIALIZATION_BUFFERPOOL_BUFFERS_INPOOL                            = new StatisticName("Serialization.BufferPool.BuffersInPool");
@@ -212,7 +174,6 @@ namespace Orleans.Runtime
         public static readonly StatisticName CATALOG_ACTIVATION_COLLECTION_NUMBER_OF_COLLECTIONS                    = new StatisticName("Catalog.Activation.Collection.NumberOfCollections");
         public static readonly StatisticName CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION                             = new StatisticName("Catalog.Activation.Shutdown.ViaCollection");
         public static readonly StatisticName CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_ON_IDLE                     = new StatisticName("Catalog.Activation.Shutdown.ViaDeactivateOnIdle");
-        public static readonly StatisticName CATALOG_ACTIVATION_SHUTDOWN_VIA_DIRECT_SHUTDOWN                        = new StatisticName("Catalog.Activation.Shutdown.ViaDirectShutdown");
         public static readonly StatisticName CATALOG_ACTIVATION_SHUTDOWN_VIA_DEACTIVATE_STUCK_ACTIVATION            = new StatisticName("Catalog.Activation.Shutdown.ViaDeactivateStuckActivation");
         public static readonly StatisticName CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS                            = new StatisticName("Catalog.Activation.NonExistentActivations");
         public static readonly StatisticName CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS                    = new StatisticName("Catalog.Activation.ConcurrentRegistrationAttempts");
@@ -265,10 +226,6 @@ namespace Orleans.Runtime
         public static readonly StatisticName CONSISTENTRING_MYRANGE_RINGDISTANCE              = new StatisticName("ConsistentRing.MyRange.RingDistance");
         public static readonly StatisticName CONSISTENTRING_MYRANGE_RINGPERCENTAGE            = new StatisticName("ConsistentRing.MyRange.RingPercentage");
         public static readonly StatisticName CONSISTENTRING_AVERAGERINGPERCENTAGE     = new StatisticName("ConsistentRing.AverageRangePercentage");
-
-        // Membership
-        public static readonly StatisticName MEMBERSHIP_ACTIVE_CLUSTER                  = new StatisticName("Membership.ActiveCluster");
-        public static readonly StatisticName MEMBERSHIP_ACTIVE_CLUSTER_SIZE             = new StatisticName("Membership.ActiveClusterSize");
         
         // Watchdog
         public static readonly StatisticName WATCHDOG_NUM_HEALTH_CHECKS                 = new StatisticName("Watchdog.NumHealthChecks");
@@ -290,8 +247,6 @@ namespace Orleans.Runtime
         public static readonly StatisticName APP_REQUESTS_LATENCY_TOTAL                 = new StatisticName("App.Requests.Latency.Total.Millis");
         public static readonly StatisticName APP_REQUESTS_TIMED_OUT                     = new StatisticName("App.Requests.TimedOut");
         public static readonly StatisticName APP_REQUESTS_TOTAL_NUMBER_OF_REQUESTS      = new StatisticName("App.Requests.Total.Requests");
-        public static readonly StatisticName APP_REQUESTS_TPS_LATEST                    = new StatisticName("App.Requests.TPS.Latest");
-        public static readonly StatisticName APP_REQUESTS_TPS_TOTAL_SINCE_START         = new StatisticName("App.Requests.TPS.Total.SinceStart");
 
         // Reminders
         public static readonly StatisticName REMINDERS_AVERAGE_TARDINESS_SECONDS        = new StatisticName("Reminders.AverageTardiness.Seconds");
@@ -311,9 +266,6 @@ namespace Orleans.Runtime
         public static readonly StatisticName STORAGE_CLEAR_ERRORS = new StatisticName("Storage.Clear.Errors");
         public static readonly StatisticName STORAGE_CLEAR_LATENCY = new StatisticName("Storage.Clear.Latency");
 
-        // Azure
-        public static readonly StatisticName AZURE_SERVER_BUSY = new StatisticName("Storage.Azure.Table.ServerBusy");
-
         // Streams
         public static readonly StatisticName STREAMS_PUBSUB_PRODUCERS_ADDED   = new StatisticName("Streams.PubSub.Producers.Added");
         public static readonly StatisticName STREAMS_PUBSUB_PRODUCERS_REMOVED = new StatisticName("Streams.PubSub.Producers.Removed");
@@ -326,13 +278,5 @@ namespace Orleans.Runtime
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_READ_MESSAGES = new StatisticNameFormat("Streams.PersistentStream.{0}.NumReadMessages");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES = new StatisticNameFormat("Streams.PersistentStream.{0}.NumSentMessages");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.PubSubCacheSize");
-        public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.QueueCacheSize");
-
-        // Incoming message acceptor
-        public static readonly StatisticName MESSAGE_ACCEPTOR_ALLOCATED_SOCKET_EVENT_ARGS = new StatisticName("Messaging.Acceptor.AllocatedSocketEventArgs");
-        public static readonly StatisticName MESSAGE_ACCEPTOR_CHECKED_IN_SOCKET_EVENT_ARGS = new StatisticName("Messaging.Acceptor.CheckedInSocketEventArgs");
-        public static readonly StatisticName MESSAGE_ACCEPTOR_CHECKED_OUT_SOCKET_EVENT_ARGS = new StatisticName("Messaging.Acceptor.CheckedOutSocketEventArgs");
-        public static readonly StatisticName MESSAGE_ACCEPTOR_IN_USE_SOCKET_EVENT_ARGS = new StatisticName("Messaging.Acceptor.InUseSocketEventArgs");
     }
 }
- 
