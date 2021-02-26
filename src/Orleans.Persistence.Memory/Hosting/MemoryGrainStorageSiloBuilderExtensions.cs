@@ -49,7 +49,7 @@ namespace Orleans.Hosting
                 {
                     configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));
                     services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
-                    services.AddTransient<IConfigurationValidator>(sp => new MemoryGrainStorageOptions(sp.GetRequiredService<IOptionsMonitor<MemoryGrainStorageOptions>>().Get(name), name));
+                    services.AddTransient<IConfigurationValidator>(sp => new MemoryGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<MemoryGrainStorageOptions>>().Get(name), name));
                     if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME))
                         services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
                     services.AddSingletonNamedService<IGrainStorage>(name, MemoryGrainStorageFactory.Create);
