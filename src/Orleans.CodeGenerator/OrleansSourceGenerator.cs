@@ -44,6 +44,18 @@ namespace Orleans.CodeGenerator
 
         public void Execute(GeneratorExecutionContext context)
         {
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_debugsourcegenerator", out var attachDebuggerValue)
+                && string.Equals("true", attachDebuggerValue, StringComparison.OrdinalIgnoreCase))
+            {
+                System.Diagnostics.Debugger.Launch();
+            }
+
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_designtimebuild", out var isDesignTimeBuild)
+                && string.Equals("true", isDesignTimeBuild, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             try
             {
                 ExecuteInner(context);

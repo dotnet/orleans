@@ -1,0 +1,15 @@
+<Project>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="Orleans_DebugSourceGenerator" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="Orleans_DesignTimeBuild" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <Orleans_DesignTimeBuild>$(DesignTimeBuild)</Orleans_DesignTimeBuild>
+  </PropertyGroup>
+
+</Project>
