@@ -21,7 +21,12 @@ namespace Orleans.Metadata
             {
                 if (!IsGrainInterface(@interface)) continue;
 
-                var interfaceId = this.interfaceTypeResolver.GetGrainInterfaceType(@interface);
+                var type = @interface switch
+                {
+                    { IsGenericType: true } when grainClass is { IsGenericType: true } => @interface.GetGenericTypeDefinition(),
+                    _ => @interface
+                };
+                var interfaceId = this.interfaceTypeResolver.GetGrainInterfaceType(type);
                 var key = WellKnownGrainTypeProperties.ImplementedInterfacePrefix + counter.ToString(CultureInfo.InvariantCulture);
                 properties[key] = interfaceId.ToStringUtf8();
                 ++counter;

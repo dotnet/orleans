@@ -6,13 +6,15 @@ namespace UnitTests.GrainInterfaces
 {
     using System;
     using Orleans;
+    using Orleans.Runtime;
 
-    [TypeCodeOverride(6548972)]
+    [GrainInterfaceType("method-interception-custom-name")]
     public interface IMethodInterceptionGrain : IGrainWithIntegerKey, IMethodFromAnotherInterface
     {
-        [MethodId(14142)]
+        [Id(14142)]
         Task<string> One();
-        [MethodId(-14142)]
+
+        [Id(4142)]
         Task<string> Echo(string someArg);
         Task<string> NotIntercepted();
         Task<string> Throw();
@@ -20,7 +22,7 @@ namespace UnitTests.GrainInterfaces
         Task FilterThrows();
     }
 
-    [TypeCodeOverride(-6548972)]
+    [GrainInterfaceType("custom-outgoing-interception-grain")]
     public interface IOutgoingMethodInterceptionGrain : IGrainWithIntegerKey
     {
         Task<Dictionary<string, object>> EchoViaOtherGrain(IMethodInterceptionGrain otherGrain, string message);
@@ -71,6 +73,7 @@ namespace UnitTests.GrainInterfaces
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class Apple { }
 
     public interface ICaterpillarGrain : IHungryGrain<Apple>, IOmnivoreGrain

@@ -2,7 +2,6 @@ using System;
 using System.Runtime.Serialization;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
-using Orleans.Serialization;
 
 namespace Orleans.EventSourcing
 {
@@ -18,9 +17,9 @@ namespace Orleans.EventSourcing
         GrainReference GrainReference { get;  }
 
         /// <summary>
-        /// The serialization manager.
+        /// Copies the provided argument.
         /// </summary>
-        SerializationManager SerializationManager { get; }
+        T DeepCopy<T>(T value);
 
         /// <summary>
         /// The id of this cluster. Returns "I" if no multi-cluster network is present.
@@ -56,6 +55,7 @@ namespace Orleans.EventSourcing
     /// Exception thrown by protocol messaging layer.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class ProtocolTransportException : OrleansException
     {
         public ProtocolTransportException()

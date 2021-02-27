@@ -15,19 +15,25 @@ namespace UnitTests.StorageTests.Relational
 {
     [Serializable]
     [DebuggerDisplay("StorageInvariant = {StorageInvariant}, ConnectionString = {ConnectionString}")]
+    [Orleans.GenerateSerializer]
     public struct StorageConnection
     {
+        [Orleans.Id(0)]
         public string StorageInvariant { get; set; }
 
+        [Orleans.Id(1)]
         public string ConnectionString { get; set; }
     }
 
 
     [Serializable]
+    [Orleans.GenerateSerializer]
     public class TestEnvironmentSettings
     {
+        [Orleans.Id(0)]
         public ICollection<StorageConnection> ConnectionStrings { get; set; }
 
+        [Orleans.Id(1)]
         public string EnvironmentId { get; set; }
     }
 

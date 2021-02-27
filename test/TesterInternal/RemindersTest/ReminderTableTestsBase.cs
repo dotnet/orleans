@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Orleans;
 using Orleans.Runtime;
 using TestExtensions;
@@ -74,7 +73,7 @@ namespace UnitTests.RemindersTest
                 var reminder = CreateReminder(MakeTestGrainReference(), i.ToString());
                 return Task.WhenAll(Enumerable.Range(1, 5).Select(j =>
                 {
-                    return RetryHelper.RetryOnExceptionAsync<string>(5, RetryOperation.Sigmoid, async () =>
+                    return RetryHelper.RetryOnExceptionAsync(5, RetryOperation.Sigmoid, async () =>
                     {
                         return await remindersTable.UpsertRow(reminder);
                     });
@@ -117,7 +116,7 @@ namespace UnitTests.RemindersTest
             {
                 GrainReference grainRef = MakeTestGrainReference();
 
-                await RetryHelper.RetryOnExceptionAsync<Task>(10, RetryOperation.Sigmoid, async () =>
+                await RetryHelper.RetryOnExceptionAsync(10, RetryOperation.Sigmoid, async () =>
                 {
                     await remindersTable.UpsertRow(CreateReminder(grainRef, i.ToString()));
                     return Task.CompletedTask;

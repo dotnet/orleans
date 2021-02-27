@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -39,15 +39,16 @@ namespace Orleans.Transactions.Abstractions
         Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource);
     }
 
-
-
     /// <summary>
     /// Counts read and write accesses on a transaction participant.
     /// </summary>
+    [GenerateSerializer]
     [Serializable]
     public struct AccessCounter
     {
+        [Id(0)]
         public int Reads;
+        [Id(1)]
         public int Writes;
 
         public static AccessCounter operator +(AccessCounter c1, AccessCounter c2)

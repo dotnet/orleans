@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -78,9 +78,11 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
-        private class NoAttributionGrain : ITransactionAttributionGrain
+        [GenerateSerializer]
+        public class NoAttributionGrain : ITransactionAttributionGrain
         {
-            private INoAttributionGrain grain;
+            [Id(0)]
+            public INoAttributionGrain grain;
 
             public NoAttributionGrain(INoAttributionGrain grain)
             {
@@ -93,9 +95,11 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
-        private class SuppressAttributionGrain : ITransactionAttributionGrain
+        [GenerateSerializer]
+        public class SuppressAttributionGrain : ITransactionAttributionGrain
         {
-            private ISuppressAttributionGrain grain;
+            [Id(0)]
+            public ISuppressAttributionGrain grain;
 
             public SuppressAttributionGrain(ISuppressAttributionGrain grain)
             {
@@ -108,9 +112,11 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
-        private class CreateOrJoinAttributionGrain : ITransactionAttributionGrain
+        [GenerateSerializer]
+        public class CreateOrJoinAttributionGrain : ITransactionAttributionGrain
         {
-            private ICreateOrJoinAttributionGrain grain;
+            [Id(0)]
+            public ICreateOrJoinAttributionGrain grain;
 
             public CreateOrJoinAttributionGrain(ICreateOrJoinAttributionGrain grain)
             {
@@ -123,9 +129,11 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
-        private class CreateAttributionGrain : ITransactionAttributionGrain
+        [GenerateSerializer]
+        public class CreateAttributionGrain : ITransactionAttributionGrain
         {
-            private ICreateAttributionGrain grain;
+            [Id(0)]
+            public ICreateAttributionGrain grain;
 
             public CreateAttributionGrain(ICreateAttributionGrain grain)
             {
@@ -138,9 +146,11 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
-        private class JoinAttributionGrain : ITransactionAttributionGrain
+        [GenerateSerializer]
+        public class JoinAttributionGrain : ITransactionAttributionGrain
         {
-            private IJoinAttributionGrain grain;
+            [Id(0)]
+            public IJoinAttributionGrain grain;
 
             public JoinAttributionGrain(IJoinAttributionGrain grain)
             {
@@ -153,9 +163,11 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
-        private class SupportedAttributionGrain : ITransactionAttributionGrain
+        [GenerateSerializer]
+        public class SupportedAttributionGrain : ITransactionAttributionGrain
         {
-            private ISupportedAttributionGrain grain;
+            [Id(0)]
+            public ISupportedAttributionGrain grain;
 
             public SupportedAttributionGrain(ISupportedAttributionGrain grain)
             {
@@ -168,9 +180,11 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
-        private class NotAllowedAttributionGrain : ITransactionAttributionGrain
+        [GenerateSerializer]
+        public class NotAllowedAttributionGrain : ITransactionAttributionGrain
         {
-            private INotAllowedAttributionGrain grain;
+            [Id(0)]
+            public INotAllowedAttributionGrain grain;
 
             public NotAllowedAttributionGrain(INotAllowedAttributionGrain grain)
             {

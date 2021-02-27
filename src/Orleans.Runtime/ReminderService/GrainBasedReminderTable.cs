@@ -9,12 +9,12 @@ namespace Orleans.Runtime.ReminderService
 {
     [Reentrant]
     [KeepAlive]
-    internal class GrainBasedReminderTable : Grain, IReminderTableGrain
+    internal class ReminderTableGrain : Grain, IReminderTableGrain
     {
         private readonly Dictionary<GrainReference, Dictionary<string, ReminderEntry>> reminderTable = new Dictionary<GrainReference, Dictionary<string, ReminderEntry>>();
         private readonly ILogger logger;
 
-        public GrainBasedReminderTable(ILogger<GrainBasedReminderTable> logger)
+        public ReminderTableGrain(ILogger<ReminderTableGrain> logger)
         {
             this.logger = logger;
         }
@@ -22,7 +22,7 @@ namespace Orleans.Runtime.ReminderService
         public override Task OnActivateAsync()
         {
             logger.LogInformation("Activated");
-            base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation for GrainBasedReminderTable virtually indefinitely.
+            base.DelayDeactivation(TimeSpan.FromDays(10 * 365)); // Delay Deactivation virtually indefinitely.
             return Task.CompletedTask;
         }
 

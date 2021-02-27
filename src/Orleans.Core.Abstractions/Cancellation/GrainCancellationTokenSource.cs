@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
@@ -41,7 +41,7 @@ namespace Orleans
         /// <para>
         /// This property indicates whether cancellation has been requested for this token source, such as
         /// due to a call to its
-        /// <see cref="GrainCancellationTokenSource.Cancel()">Cancel</see> method.
+        /// <see cref="Cancel()">Cancel</see> method.
         /// </para>
         /// <para>
         /// If this property returns true, it only guarantees that cancellation has been requested. It does not
@@ -95,24 +95,6 @@ namespace Orleans
         public void Dispose()
         {
             _grainCancellationToken.Dispose();
-        }
-
-        [SerializerMethod]
-        internal static void SerializeGrainCancellationTokenSource(object obj, ISerializationContext context, Type expected)
-        {
-            throw new NotSupportedException("GrainCancellationTokenSource can not be serialized");
-        }
-
-        [DeserializerMethod]
-        internal static object DeserializeGrainCancellationTokenSource(Type expected, IDeserializationContext context)
-        {
-            throw new NotSupportedException("GrainCancellationTokenSource can not be deserialized");
-        }
-
-        [CopierMethod]
-        internal static object CopyGrainCancellationTokenSource(object obj, ICopyContext context)
-        {
-            throw new NotSupportedException("GrainCancellationTokenSource can not be deep copied");
         }
     }
 }

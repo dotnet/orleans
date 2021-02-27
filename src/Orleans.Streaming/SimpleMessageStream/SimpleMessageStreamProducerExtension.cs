@@ -2,11 +2,11 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams.Filtering;
+using Orleans.Concurrency;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
@@ -18,14 +18,22 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
     /// On the client, we have one extension per stream (we bind an extension for every StreamProducer, therefore every stream has its own extension).
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     internal class SimpleMessageStreamProducerExtension : IStreamProducerExtension
     {
+        [Id(0)]
         private readonly Dictionary<InternalStreamId, StreamConsumerExtensionCollection> remoteConsumers;
+        [Id(1)]
         private readonly IStreamProviderRuntime     providerRuntime;
+        [Id(2)]
         private readonly IStreamPubSub              streamPubSub;
+        [Id(3)]
         private readonly IStreamFilter              streamFilter;
+        [Id(4)]
         private readonly bool                       fireAndForgetDelivery;
+        [Id(5)]
         private readonly bool                       optimizeForImmutableData;
+        [Id(6)]
         private readonly ILogger                    logger;
 
         internal SimpleMessageStreamProducerExtension(IStreamProviderRuntime providerRt, IStreamPubSub pubsub, IStreamFilter streamFilter, ILogger logger, bool fireAndForget, bool optimizeForImmutable)
@@ -163,10 +171,14 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
 
         [Serializable]
+        [GenerateSerializer]
         internal class StreamConsumerExtensionCollection
         {
+            [Id(0)]
             private readonly ConcurrentDictionary<GuidId, (IStreamConsumerExtension StreamConsumer, string FilterData)> consumers = new();
+            [Id(1)]
             private readonly IStreamPubSub streamPubSub;
+            [Id(2)]
             private readonly ILogger logger;
 
             internal StreamConsumerExtensionCollection(IStreamPubSub pubSub, ILogger logger)

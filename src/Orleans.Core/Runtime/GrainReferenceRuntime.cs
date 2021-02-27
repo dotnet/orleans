@@ -1,41 +1,40 @@
 using Orleans.CodeGeneration;
 using Orleans.GrainReferences;
-using Orleans.Internal;
 using Orleans.Metadata;
 using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
     internal class GrainReferenceRuntime : IGrainReferenceRuntime
     {
-        private readonly Func<GrainReference, InvokeMethodRequest, InvokeMethodOptions, Task<object>> sendRequestDelegate;
-        private readonly SerializationManager serializationManager;
         private readonly GrainReferenceActivator referenceActivator;
         private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
         private readonly IOutgoingGrainCallFilter[] filters;
-        private readonly InterfaceToImplementationMappingCache grainReferenceMethodCache;
+        private readonly Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions> sendRequest;
+        private readonly DeepCopier deepCopier;
 
         public GrainReferenceRuntime(
             IRuntimeClient runtimeClient,
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
-            SerializationManager serializationManager,
             IEnumerable<IOutgoingGrainCallFilter> outgoingCallFilters,
             GrainReferenceActivator referenceActivator,
-            GrainInterfaceTypeResolver interfaceTypeResolver)
+            GrainInterfaceTypeResolver interfaceTypeResolver,
+            DeepCopier deepCopier)
         {
-            this.grainReferenceMethodCache = new InterfaceToImplementationMappingCache();
-            this.sendRequestDelegate = SendRequest;
             this.RuntimeClient = runtimeClient;
             this.cancellationTokenRuntime = cancellationTokenRuntime;
-            this.serializationManager = serializationManager;
             this.referenceActivator = referenceActivator;
             this.interfaceTypeResolver = interfaceTypeResolver;
             this.filters = outgoingCallFilters.ToArray();
+            this.sendRequest = this.SendRequest;
+            this.deepCopier = deepCopier;
         }
 
         public IRuntimeClient RuntimeClient { get; private set; }
@@ -43,39 +42,53 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public void InvokeOneWayMethod(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options)
         {
-            Task<object> resultTask = InvokeMethodAsync<object>(reference, methodId, arguments, options | InvokeMethodOptions.OneWay);
-            if (!resultTask.IsCompleted && resultTask.Result != null)
-            {
-                throw new OrleansException("Unexpected return value: one way InvokeMethod is expected to return null.");
-            }
+            throw new NotSupportedException();
         }
 
         /// <inheritdoc />
         public Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options)
         {
-            if (arguments != null)
+            throw new NotSupportedException();
+        }
+
+        public void SendRequest(GrainReference reference, IResponseCompletionSource callback, IInvokable body, InvokeMethodOptions options)
+        {
+            SetGrainCancellationTokensTarget(reference, body);
+            var copy = body;//this.deepCopier.Copy(body);
+            this.RuntimeClient.SendRequest(reference, copy, callback, options);
+        }
+
+        public async ValueTask<TResult> InvokeMethodAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            // TODO: Remove expensive interface type check
+            if (this.filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
-                CheckForGrainArguments(arguments);
-                SetGrainCancellationTokensTarget(arguments, reference);
-                this.serializationManager.DeepCopyElementsInPlace(arguments);
-            }
-
-            var request = new InvokeMethodRequest(reference.InterfaceTypeCode, methodId, arguments);
-
-            Task<object> resultTask = InvokeMethod_Impl(reference, request, options);
-
-            if (resultTask == null)
-            {
-                if (typeof(T) == typeof(object))
+                SetGrainCancellationTokensTarget(reference, request);
+                var copy = this.deepCopier.Copy(request);
+                var responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
+                try
                 {
-                    // optimize for most common case when using one way calls.
-                    return OrleansTaskExtentions.CompletedTask as Task<T>;
+                    SendRequest(reference, responseCompletionSource, copy, options);
+                    return await responseCompletionSource.AsValueTask();
                 }
-
-                return Task.FromResult(default(T));
+                finally
+                {
+                    ResponseCompletionSourcePool.Return(responseCompletionSource);
+                }
             }
+            else
+            {
+                return await InvokeMethodWithFiltersAsync<TResult>(reference, request, options);
+            }
+        }
 
-            return resultTask.ToTypedTask<T>();
+        private async ValueTask<TResult> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            SetGrainCancellationTokensTarget(reference, request);
+            var copy = this.deepCopier.Copy(request);
+            var invoker = new OutgoingCallInvoker<TResult>(reference, copy, options, this.sendRequest, this.filters);
+            await invoker.Invoke();
+            return invoker.Response.GetResult<TResult>();
         }
 
         public object Cast(IAddressable grain, Type grainInterface)
@@ -90,54 +103,20 @@ namespace Orleans.Runtime
             return this.referenceActivator.CreateReference(grainId, interfaceType);
         }
 
-        private Task<object> InvokeMethod_Impl(GrainReference reference, InvokeMethodRequest request, InvokeMethodOptions options)
-        {
-            if (this.filters?.Length > 0)
-            {
-                return InvokeWithFilters(reference, request, options);
-            }
-            
-            return SendRequest(reference, request, options);
-        }
-
-        private Task<object> SendRequest(GrainReference reference, InvokeMethodRequest request, InvokeMethodOptions options)
-        {
-            bool isOneWayCall = (options & InvokeMethodOptions.OneWay) != 0;
-
-            var resolver = isOneWayCall ? null : new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-            this.RuntimeClient.SendRequest(reference, request, resolver, options);
-            return isOneWayCall ? null : resolver.Task;
-        }
-
-        private async Task<object> InvokeWithFilters(GrainReference reference, InvokeMethodRequest request, InvokeMethodOptions options)
-        {
-            var invoker = new OutgoingCallInvoker(reference, request, options, this.sendRequestDelegate, this.grainReferenceMethodCache, this.filters);
-            await invoker.Invoke();
-            return invoker.Result;
-        }
-
-        private static void CheckForGrainArguments(object[] arguments)
-        {
-            foreach (var argument in arguments)
-            {
-                if (argument is Grain)
-                {
-                    throw new ArgumentException(String.Format("Cannot pass a grain object {0} as an argument to a method. Pass this.AsReference<GrainInterface>() instead.", argument.GetType().FullName));
-                }
-            }
-        }
-
         /// <summary>
         /// Sets target grain to the found instances of type GrainCancellationToken
         /// </summary>
-        /// <param name="arguments"> Grain method arguments list</param>
-        /// <param name="target"> Target grain reference</param>
-        private void SetGrainCancellationTokensTarget(object[] arguments, GrainReference target)
+        private void SetGrainCancellationTokensTarget(GrainReference target, IInvokable request)
         {
-            if (arguments == null) return;
-            foreach (var argument in arguments)
+            for (var i = 0; i < request.ArgumentCount; i++)
             {
-                (argument as GrainCancellationToken)?.AddGrainReference(this.cancellationTokenRuntime, target);
+                var arg = request.GetArgument<object>(i);
+                if (arg is not GrainCancellationToken grainToken)
+                {
+                    continue;
+                }
+
+                grainToken.AddGrainReference(this.cancellationTokenRuntime, target);
             }
         }
     }

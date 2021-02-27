@@ -20,6 +20,7 @@ namespace Orleans.Hosting
         public SiloBuilder(IHostBuilder hostBuilder)
         {
             this.hostBuilder = hostBuilder;
+            this.ConfigureDefaults();
         }
 
         public void Build(Microsoft.Extensions.Hosting.HostBuilderContext context, IServiceCollection serviceCollection)
@@ -30,7 +31,6 @@ namespace Orleans.Hosting
             }
 
             serviceCollection.AddHostedService<SiloHostedService>();
-            this.ConfigureDefaults();
 
             foreach (var configurationDelegate in this.configureServicesDelegates)
             {

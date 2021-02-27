@@ -3,11 +3,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Orleans.Concurrency;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams.Core;
+using Orleans.Concurrency;
 
 namespace Orleans.Streams
 {
@@ -28,10 +28,14 @@ namespace Orleans.Streams
     /// On the client, we have one extension per stream (we bind an extension for every StreamConsumer, therefore every stream has its own extension).
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     internal class StreamConsumerExtension : IStreamConsumerExtension
     {
+        [Id(0)]
         private readonly IStreamProviderRuntime providerRuntime;
+        [Id(1)]
         private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers = new(); // map to different ObserversCollection<T> of different Ts.
+        [Id(2)]
         private readonly ILogger logger;
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
         // if this extension is attached to a cosnumer grain which implements IOnSubscriptionActioner,

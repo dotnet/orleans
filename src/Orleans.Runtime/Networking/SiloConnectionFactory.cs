@@ -14,6 +14,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly ConnectionCommon connectionShared;
         private readonly ProbeRequestMonitor probeRequestMonitor;
+        private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly IServiceProvider serviceProvider;
         private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly object initializationLock = new object();
@@ -28,7 +29,8 @@ namespace Orleans.Runtime.Messaging
             IOptions<SiloConnectionOptions> siloConnectionOptions,
             ILocalSiloDetails localSiloDetails,
             ConnectionCommon connectionShared,
-            ProbeRequestMonitor probeRequestMonitor)
+            ProbeRequestMonitor probeRequestMonitor,
+            ConnectionPreambleHelper connectionPreambleHelper)
             : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionFactory>(ServicesKey), serviceProvider, connectionOptions)
         {
             this.serviceProvider = serviceProvider;
@@ -36,6 +38,7 @@ namespace Orleans.Runtime.Messaging
             this.localSiloDetails = localSiloDetails;
             this.connectionShared = connectionShared;
             this.probeRequestMonitor = probeRequestMonitor;
+            this.connectionPreambleHelper = connectionPreambleHelper;
         }
 
         public override ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
@@ -63,7 +66,8 @@ namespace Orleans.Runtime.Messaging
                 this.connectionManager,
                 this.ConnectionOptions,
                 this.connectionShared,
-                this.probeRequestMonitor);
+                this.probeRequestMonitor,
+                this.connectionPreambleHelper);
         }
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)

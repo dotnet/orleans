@@ -2,7 +2,6 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
-using Orleans.ApplicationParts;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Configuration;
@@ -43,10 +42,9 @@ namespace Orleans.Hosting
 
     public class SiloAzureQueueStreamConfigurator : SiloPersistentStreamConfigurator, ISiloAzureQueueStreamConfigurator
     {
-        public SiloAzureQueueStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
+        public SiloAzureQueueStreamConfigurator(string name, Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, AzureQueueAdapterFactory.Create)
         {
-            configureAppPartsDelegate(AzureQueueStreamConfiguratorCommon.AddParts);
             this.ConfigureComponent(AzureQueueOptionsValidator.Create);
             this.ConfigureComponent(SimpleQueueCacheOptionsValidator.Create);
 
@@ -71,7 +69,6 @@ namespace Orleans.Hosting
         public ClusterClientAzureQueueStreamConfigurator(string name, IClientBuilder builder)
             : base(name, builder, AzureQueueAdapterFactory.Create)
         {
-            builder.ConfigureApplicationParts(AzureQueueStreamConfiguratorCommon.AddParts);
             this.ConfigureComponent(AzureQueueOptionsValidator.Create);
 
             //configure default queue names
@@ -84,15 +81,6 @@ namespace Orleans.Hosting
                 }
             }));
             this.ConfigureDelegate(services => services.TryAddSingleton<IQueueDataAdapter<string, IBatchContainer>, AzureQueueDataAdapterV2>());
-        }
-    }
-
-    public static class AzureQueueStreamConfiguratorCommon
-    {
-        public static void AddParts(IApplicationPartManager parts)
-        {
-            parts.AddFrameworkPart(typeof(AzureQueueAdapterFactory).Assembly)
-                 .AddFrameworkPart(typeof(EventSequenceTokenV2).Assembly);
         }
     }
 }

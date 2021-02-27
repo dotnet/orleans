@@ -4,15 +4,12 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
 using Orleans.Transactions.TOC;
-
-[assembly: GenerateSerializer(typeof(Orleans.Transactions.TransactionCommitter<>.OperationState))]
 
 namespace Orleans.Transactions
 {
@@ -54,7 +51,7 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("cannot perform an update operation from within another operation");
             }
 
-            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
+            var info = TransactionContext.GetRequiredTransactionInfo();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"StartWrite {info}");
@@ -147,8 +144,10 @@ namespace Orleans.Transactions
         }
 
         [Serializable]
+        [GenerateSerializer]
         public class OperationState
         {
+            [Id(0)]
             public ITransactionCommitOperation<TService> Operation { get; set; }
         }
     }

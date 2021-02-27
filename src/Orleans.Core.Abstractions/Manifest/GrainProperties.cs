@@ -11,6 +11,7 @@ namespace Orleans.Metadata
     /// Information about a logical grain type <see cref="GrainType"/>.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class GrainProperties
     {
         /// <summary>
@@ -24,6 +25,7 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the properties.
         /// </summary>
+        [Id(1)]
         public ImmutableDictionary<string, string> Properties { get; }
 
         /// <summary>
@@ -154,7 +156,7 @@ namespace Orleans.Metadata
     }
 
     /// <summary>
-    /// Interface for <see cref="System.Attribute"/> classes which provide information about a grain.
+    /// Interface for <see cref="Attribute"/> classes which provide information about a grain.
     /// </summary>
     public interface IGrainPropertiesProviderAttribute
     {
@@ -193,7 +195,7 @@ namespace Orleans.Metadata
     }
 
     /// <summary>
-    /// Interface for <see cref="System.Attribute"/> classes which provide information about a grain.
+    /// Interface for <see cref="Attribute"/> classes which provide information about a grain.
     /// </summary>
     public interface IGrainBindingsProviderAttribute
     {

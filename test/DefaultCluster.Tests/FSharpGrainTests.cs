@@ -69,7 +69,7 @@ namespace DefaultCluster.Tests.General
         public async Task FSharpGrains_Ping_GenericRecord_ofIntOption_Some()
         {
             var input = GenericRecord<FSharpOption<int>>.ofT(FSharpOption<int>.Some(0));
-            await PingTest< GenericRecord<FSharpOption<int>>>(input);
+            await PingTest<GenericRecord<FSharpOption<int>>>(input);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Generics"), TestCategory("FSharp"), TestCategory("Serialization")]

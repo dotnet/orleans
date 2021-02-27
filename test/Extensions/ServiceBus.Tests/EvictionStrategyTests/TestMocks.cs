@@ -1,5 +1,4 @@
 using Orleans.Providers.Streams.Common;
-using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using System;
@@ -33,8 +32,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         private long sequenceNumberCounter = 0;
         private int eventIndex = 1;
         private string eventHubOffset = "OffSet";
-        public MockEventHubCacheAdaptor(SerializationManager serializationManager)
-            : base(serializationManager)
+        public MockEventHubCacheAdaptor(Orleans.Serialization.Serializer serializer) : base(serializer)
         { }
 
         public override StreamPosition GetStreamPosition(string partition, EventData queueMessage)

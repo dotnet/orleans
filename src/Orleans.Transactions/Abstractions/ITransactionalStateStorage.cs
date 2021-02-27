@@ -1,12 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
-using Orleans.Concurrency;
-using Orleans.Runtime;
-
-[assembly: GenerateSerializer(typeof(Orleans.Transactions.Abstractions.PendingTransactionState<>))]
-[assembly: GenerateSerializer(typeof(Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<>))]
 
 namespace Orleans.Transactions.Abstractions
 {
@@ -35,6 +29,7 @@ namespace Orleans.Transactions.Abstractions
         );
     }
 
+    [GenerateSerializer]
     [Serializable]
     [Immutable]
     public class PendingTransactionState<TState>
@@ -45,17 +40,20 @@ namespace Orleans.Transactions.Abstractions
         /// If a new transaction is prepared with the same sequence number as a 
         /// previously prepared transaction, it replaces it.
         /// </summary>
+        [Id(0)]
         public long SequenceId { get; set; }
 
         /// <summary>
         /// A globally unique identifier of the transaction. 
         /// </summary>
+        [Id(1)]
         public string TransactionId { get; set; }
 
         /// <summary>
         /// The logical timestamp of the transaction.
         /// Timestamps are guaranteed to be monotonically increasing.
         /// </summary>
+        [Id(2)]
         public DateTime TimeStamp { get; set; }
 
         /// <summary>
@@ -63,14 +61,17 @@ namespace Orleans.Transactions.Abstractions
         /// or null if this is the transaction manager.
         /// Used during recovery to inquire about the fate of the transaction.
         /// </summary>
+        [Id(3)]
         public ParticipantId TransactionManager { get; set; }
 
         /// <summary>
         /// A snapshot of the state after this transaction executed
         /// </summary>
+        [Id(4)]
         public TState State { get; set; }
     }
 
+    [GenerateSerializer]
     [Serializable]
     [Immutable]
     public class TransactionalStorageLoadResponse<TState>
@@ -87,43 +88,54 @@ namespace Orleans.Transactions.Abstractions
             this.PendingStates = pendingStates;
         }
 
+        [Id(0)]
         public string ETag { get; set; }
 
+        [Id(1)]
         public TState CommittedState { get; set; }
 
         /// <summary>
         /// The local sequence id of the last committed transaction, or zero if none
         /// </summary>
+        [Id(2)]
         public long CommittedSequenceId { get; set; }
 
         /// <summary>
         /// Additional state maintained by the transaction algorithm, such as commit records
         /// </summary>
+        [Id(3)]
         public TransactionalStateMetaData Metadata { get; set; }
 
         /// <summary>
         /// List of pending states, ordered by sequence id
         /// </summary>
+        [Id(4)]
         public IReadOnlyList<PendingTransactionState<TState>> PendingStates { get; set; }
     }
 
     /// <summary>
     /// Metadata is stored in storage, as a JSON object
     /// </summary>
+    [GenerateSerializer]
     [Serializable]
     public class TransactionalStateMetaData
     {
+        [Id(0)]
         public DateTime TimeStamp { get; set; } = default;
 
+        [Id(1)]
         public Dictionary<Guid, CommitRecord> CommitRecords { get; set; } = new Dictionary<Guid, CommitRecord>();
     }
 
+    [GenerateSerializer]
     [Serializable]
     [Immutable]
     public class CommitRecord
     {
+        [Id(0)]
         public DateTime Timestamp { get; set; }
 
+        [Id(1)]
         public List<ParticipantId> WriteParticipants { get; set; }
     }
 }

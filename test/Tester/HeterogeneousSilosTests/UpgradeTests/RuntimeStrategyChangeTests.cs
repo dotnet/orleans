@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
 using Orleans.Metadata;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;

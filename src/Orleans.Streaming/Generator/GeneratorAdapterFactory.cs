@@ -9,7 +9,6 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Generator
@@ -38,7 +37,7 @@ namespace Orleans.Providers.Streams.Generator
         private readonly HashRingStreamQueueMapperOptions queueMapperOptions;
         private readonly StreamStatisticOptions statisticOptions;
         private readonly IServiceProvider serviceProvider;
-        private readonly SerializationManager serializationManager;
+        private readonly Serialization.Serializer serializer;
         private readonly ITelemetryProducer telemetryProducer;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger<GeneratorAdapterFactory> logger;
@@ -83,13 +82,13 @@ namespace Orleans.Providers.Streams.Generator
         /// </summary>
         protected Func<ReceiverMonitorDimensions, ITelemetryProducer, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
 
-        public GeneratorAdapterFactory(string providerName, HashRingStreamQueueMapperOptions queueMapperOptions, StreamStatisticOptions statisticOptions, IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
+        public GeneratorAdapterFactory(string providerName, HashRingStreamQueueMapperOptions queueMapperOptions, StreamStatisticOptions statisticOptions, IServiceProvider serviceProvider, Serialization.Serializer serializer, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
         {
             this.Name = providerName;
             this.queueMapperOptions = queueMapperOptions ?? throw new ArgumentNullException(nameof(queueMapperOptions));
             this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            this.serializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
+            this.serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
             this.telemetryProducer = telemetryProducer ?? throw new ArgumentNullException(nameof(telemetryProducer));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = loggerFactory.CreateLogger<GeneratorAdapterFactory>();
@@ -297,7 +296,7 @@ namespace Orleans.Providers.Streams.Generator
             return new GeneratorPooledCache(
                 bufferPool,
                 this.loggerFactory.CreateLogger($"{typeof(GeneratorPooledCache).FullName}.{this.Name}.{queueId}"),
-                serializationManager,
+                serializer,
                 cacheMonitor,
                 this.statisticOptions.StatisticMonitorWriteInterval);
         }

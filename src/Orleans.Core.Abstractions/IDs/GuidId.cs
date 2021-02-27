@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.Serialization;
-using Orleans.Concurrency;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -11,10 +10,12 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [Immutable]
+    [GenerateSerializer]
     public sealed class GuidId : IEquatable<GuidId>, IComparable<GuidId>, ISerializable
     {
         private static readonly Interner<Guid, GuidId> guidIdInternCache = new Interner<Guid, GuidId>(InternerConstants.SIZE_LARGE);
 
+        [Id(1)]
         public readonly Guid Guid;
 
         // TODO: Need to integrate with Orleans serializer to really use Interner.
@@ -77,17 +78,6 @@ namespace Orleans.Runtime
         {
             Guid id = System.Guid.Parse(guidId);
             return GetGuidId(id);
-        }
-
-        public void SerializeToStream(IBinaryTokenStreamWriter stream)
-        {
-            stream.Write(this.Guid);
-        }
-
-        internal static GuidId DeserializeFromStream(IBinaryTokenStreamReader stream)
-        {
-            Guid guid = stream.ReadGuid();
-            return GuidId.GetGuidId(guid);
         }
 
         public static bool operator ==(GuidId a, GuidId b)

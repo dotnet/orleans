@@ -220,6 +220,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// Describes a connection issue that occurred when updating the primary storage.
         /// </summary>
         [Serializable]
+        [GenerateSerializer]
         public class UpdateLogStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -234,6 +235,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// Describes a connection issue that occurred when reading from the primary storage.
         /// </summary>
         [Serializable]
+        [GenerateSerializer]
         public class ReadFromLogStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -248,18 +250,23 @@ namespace Orleans.EventSourcing.LogStorage
         /// A notification message sent to remote instances after updating this grain in storage.
         /// </summary>
         [Serializable]
+        [GenerateSerializer]
         protected class UpdateNotificationMessage : INotificationMessage 
         {
             /// <inheritdoc/>
+            [Id(0)]
             public int Version { get; set; }
 
             /// <summary> The cluster that performed the update </summary>
+            [Id(1)]
             public string Origin { get; set; }
 
             /// <summary> The list of updates that were applied </summary>
+            [Id(2)]
             public List<TLogEntry> Updates { get; set; }
 
             /// <summary> The e-tag of the storage after applying the updates</summary>
+            [Id(3)]
             public string ETag { get; set; }
 
             /// <inheritdoc/>

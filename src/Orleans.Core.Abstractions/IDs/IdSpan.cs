@@ -1,22 +1,158 @@
 using System;
+using System.Buffers;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
-using Orleans.Concurrency;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Runtime
 {
+    [RegisterSerializer]
+    public sealed class IdSpanCodec : IFieldCodec<IdSpan>
+    {
+        private static readonly ConcurrentDictionary<int, IdSpan> _cache = new ConcurrentDictionary<int, IdSpan>();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteField<TBufferWriter>(
+          ref Writer<TBufferWriter> writer,
+          uint fieldIdDelta,
+          Type expectedType,
+          IdSpan value)
+          where TBufferWriter : IBufferWriter<byte>
+        {
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteFieldHeaderExpected(fieldIdDelta, WireType.LengthPrefixed);
+            var hashCode = value.GetHashCode();
+            var bytes = IdSpan.UnsafeGetArray(value);
+            var bytesLength = value.IsDefault ? 0 : bytes.Length;
+            writer.WriteVarUInt32((uint)(sizeof(int) + bytesLength));
+            writer.WriteInt32(hashCode);
+            writer.Write(bytes);
+        }
+
+        public static void WriteRaw<TBufferWriter>(
+          ref Writer<TBufferWriter> writer,
+          IdSpan value)
+          where TBufferWriter : IBufferWriter<byte>
+        {
+            var hashCode = value.GetHashCode();
+            var bytes = IdSpan.UnsafeGetArray(value);
+            writer.WriteInt32(hashCode);
+            var bytesLength = value.IsDefault ? 0 : bytes.Length;
+            writer.WriteVarUInt32((uint)bytesLength);
+            writer.Write(bytes);
+        }
+
+        public static unsafe IdSpan ReadRaw<TInput>(ref Reader<TInput> reader)
+        {
+            byte[] payloadArray = default;
+            var hashCode = reader.ReadInt32();
+            var length = reader.ReadVarUInt32();
+            if (!reader.TryReadBytes((int)length, out var payloadSpan))
+            {
+                payloadSpan = payloadArray = reader.ReadBytes(length);
+            }
+
+            // Search through 
+            var candidateHashCode = hashCode;
+            while (_cache.TryGetValue(candidateHashCode, out var existing))
+            {
+                if (existing.GetHashCode() != hashCode)
+                {
+                    break;
+                }
+
+                var existingSpan = new ReadOnlySpan<byte>(IdSpan.UnsafeGetArray(existing));
+                if (existingSpan.SequenceEqual(payloadSpan))
+                {
+                    return existing;
+                }
+
+                // Try the next slot. 
+                ++candidateHashCode;
+            }
+
+            if (payloadArray is null)
+            {
+                payloadArray = new byte[length];
+                payloadSpan.CopyTo(payloadArray);
+            }
+
+            var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
+            while (!_cache.TryAdd(candidateHashCode++, value))
+            {
+                // Insert the value at the first available position.
+            }
+
+            return value;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe IdSpan ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            ReferenceCodec.MarkValueField(reader.Session);
+
+            byte[] payloadArray = default;
+            var length = reader.ReadVarUInt32() - sizeof(int);
+            var hashCode = reader.ReadInt32();
+            if (!reader.TryReadBytes((int)length, out var payloadSpan))
+            {
+                payloadSpan = payloadArray = reader.ReadBytes(length);
+            }
+
+            // Search through 
+            var candidateHashCode = hashCode;
+            while (_cache.TryGetValue(candidateHashCode, out var existing))
+            {
+                if (existing.GetHashCode() != hashCode)
+                {
+                    break;
+                }
+
+                var existingSpan = new ReadOnlySpan<byte>(IdSpan.UnsafeGetArray(existing));
+                if (existingSpan.SequenceEqual(payloadSpan))
+                {
+                    return existing;
+                }
+
+                // Try the next slot. 
+                ++candidateHashCode;
+            }
+
+            if (payloadArray is null)
+            {
+                payloadArray = new byte[length];
+                payloadSpan.CopyTo(payloadArray);
+            }
+
+            var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
+            while (!_cache.TryAdd(candidateHashCode++, value))
+            {
+                // Insert the value at the first available position.
+            }
+
+            return value;
+        }
+    }
+
     /// <summary>
     /// Primitive type for identities, representing a sequence of bytes.
     /// </summary>
     [Immutable]
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
+    [GenerateSerializer]
     public readonly struct IdSpan : IEquatable<IdSpan>, IComparable<IdSpan>, ISerializable
     {
-        private readonly byte[] _value;
+        [Id(0)]
         private readonly int _hashCode;
+        [Id(1)]
+        private readonly byte[] _value;
 
         /// <summary>
         /// Creates a new <see cref="IdSpan"/> instance from the provided value.

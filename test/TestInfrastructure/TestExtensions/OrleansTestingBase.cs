@@ -1,6 +1,4 @@
-using System;
 using Orleans.Internal;
-using Orleans.Runtime;
 
 namespace TestExtensions
 {

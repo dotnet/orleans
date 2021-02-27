@@ -44,7 +44,6 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder AddMemoryGrainStorage(this ISiloHostBuilder builder, string name, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null)
         {
             return builder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryStorageGrain).Assembly))
                 .ConfigureServices(services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));
@@ -86,7 +85,6 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddMemoryGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null)
         {
             return builder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryStorageGrain).Assembly))
                 .ConfigureServices(services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));

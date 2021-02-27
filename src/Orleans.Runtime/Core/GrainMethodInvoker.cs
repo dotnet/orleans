@@ -1,20 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
-using Orleans.CodeGeneration;
+using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Invokes a request on a grain.
     /// </summary>
-    internal class GrainMethodInvoker : IIncomingGrainCallContext
+    internal class GrainMethodInvoker : IIncomingGrainCallContext, IMethodArguments
     {
-        private readonly InvokeMethodRequest request;
-        private readonly IGrainMethodInvoker rootInvoker;
+        private readonly IInvokable request;
         private readonly List<IIncomingGrainCallFilter> filters;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
+        private readonly DeepCopier<Response> responseCopier;
         private readonly IGrainContext grainContext;
         private int stage;
 
@@ -23,40 +25,63 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="grainContext">The grain.</param>
         /// <param name="request">The request.</param>
-        /// <param name="rootInvoker">The generated invoker.</param>
         /// <param name="filters">The invocation interceptors.</param>
         /// <param name="interfaceToImplementationMapping">The implementation map.</param>
+        /// <param name="responseCopier">The response copier.</param>
         public GrainMethodInvoker(
             IGrainContext grainContext,
-            InvokeMethodRequest request,
-            IGrainMethodInvoker rootInvoker,
+            IInvokable request,
             List<IIncomingGrainCallFilter> filters,
-            InterfaceToImplementationMappingCache interfaceToImplementationMapping)
+            InterfaceToImplementationMappingCache interfaceToImplementationMapping,
+            DeepCopier<Response> responseCopier)
         {
             this.request = request;
-            this.rootInvoker = rootInvoker;
             this.grainContext = grainContext;
             this.filters = filters;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
+            this.responseCopier = responseCopier;
         }
 
         /// <inheritdoc />
-        public IAddressable Grain => this.grainContext.GrainInstance;
+        public IAddressable Grain => grainContext.GrainInstance;
 
         /// <inheritdoc />
-        public MethodInfo Method => GetMethodEntry().ImplementationMethod;
+        public MethodInfo Method => request.Method;
 
         /// <inheritdoc />
-        public MethodInfo InterfaceMethod => GetMethodEntry().InterfaceMethod;
+        public MethodInfo InterfaceMethod => request.Method;
 
         /// <inheritdoc />
         public MethodInfo ImplementationMethod => GetMethodEntry().ImplementationMethod;
 
         /// <inheritdoc />
-        public object[] Arguments => request.Arguments;
+        public IMethodArguments Arguments => this;
         
         /// <inheritdoc />
-        public object Result { get; set; }
+        public object Result
+        {
+            get => Response switch
+            {
+                { Exception: null } response => response.Result,
+                _ => null
+            };
+            set => Response = Response.FromResult(value);
+        }
+
+        /// <inheritdoc />
+        public Response Response { get; set; }
+
+        object IMethodArguments.this[int index]
+        {
+            get => request.GetArgument<object>(index);
+            set => request.SetArgument(index, value);
+        }
+
+        T IMethodArguments.GetArgument<T>(int index) => request.GetArgument<T>(index);
+
+        void IMethodArguments.SetArgument<T>(int index, T value) => request.SetArgument(index, value);
+
+        int IMethodArguments.Length => request.ArgumentCount;
 
         /// <inheritdoc />
         public async Task Invoke()
@@ -91,7 +116,16 @@ namespace Orleans.Runtime
                 {
                     // Finally call the root-level invoker.
                     stage++;
-                    this.Result = await rootInvoker.Invoke(this.grainContext, this.request);
+                    this.Response = await request.Invoke();
+
+                    // Propagate exceptions to other filters.
+                    if (this.Response.Exception is { } exception)
+                    {
+                        ExceptionDispatchInfo.Capture(exception).Throw();
+                    }
+
+                    this.Response = this.responseCopier.Copy(this.Response);
+
                     return;
                 }
             }
@@ -103,12 +137,17 @@ namespace Orleans.Runtime
             // If this method has been called more than the expected number of times, that is invalid.
             ThrowInvalidCall();
         }
-        
+
+        private static void ThrowInvalidCall()
+        {
+            throw new InvalidOperationException(
+                $"{nameof(GrainMethodInvoker)}.{nameof(Invoke)}() received an invalid call.");
+        }
+
         private InterfaceToImplementationMappingCache.Entry GetMethodEntry()
         {
-            // Determine if the object being invoked is a grain or a grain extension.
-            var interfaceType = this.rootInvoker?.InterfaceType;
-            var implementationType = this.rootInvoker?.GetTarget(this.grainContext)?.GetType();
+            var interfaceType = this.request.InterfaceType;
+            var implementationType = this.request.GetTarget<object>().GetType();
 
             // Get or create the implementation map for this object.
             var implementationMap = interfaceToImplementationMapping.GetOrCreate(
@@ -116,23 +155,17 @@ namespace Orleans.Runtime
                 interfaceType);
 
             // Get the method info for the method being invoked.
-            if (!implementationMap.TryGetValue(request.MethodId, out var method))
+            if (!implementationMap.TryGetValue(request.Method, out var method))
             {
-                false.ToString();
+                return default;
             }
 
             if (method.InterfaceMethod is null)
             {
-                false.ToString();
+                return default;
             }
 
             return method;
-        }
-
-        private static void ThrowInvalidCall()
-        {
-            throw new InvalidOperationException(
-                $"{nameof(GrainMethodInvoker)}.{nameof(Invoke)}() received an invalid call.");
         }
     }
 }

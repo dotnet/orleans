@@ -1,14 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.CodeGenerator.MSBuild</PackageId>
-    <Title>Microsoft Orleans Build-time Code Generator</Title>
-    <Description>Microsoft Orleans build-time code generator to install in all grain interface &amp; implementation projects.</Description>
-    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
+    <PackageDescription>Code generator for projects using Orleans.Serialization with MSBuild</PackageDescription>
     <OutputType>Exe</OutputType>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
@@ -16,51 +11,52 @@
     <RootNamespace>Orleans.CodeGenerator.MSBuild</RootNamespace>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <PreserveCompilationContext>true</PreserveCompilationContext>
-    <PublishRoot>bin\$(Configuration)\publish\</PublishRoot>
-    <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <DevelopmentDependency>true</DevelopmentDependency>
+    <PublishRoot>bin\$(Configuration)\publish\</PublishRoot>
+    <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="build\Microsoft.Orleans.CodeGenerator.MSBuild.targets" />
-    <None Remove="buildMultiTargeting\Microsoft.Orleans.CodeGenerator.MSBuild.targets" />
+    <None Remove="buildMultiTargeting\Orleans.CodeGenerator.MSBuild.props" />
+    <None Remove="build\Orleans.CodeGenerator.MSBuild.props" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="build\Microsoft.Orleans.CodeGenerator.MSBuild.targets">
-      <Pack>true</Pack>
-      <PackagePath>%(Identity)</PackagePath>
-      <Visible>true</Visible>
-    </Content>
-    <Content Include="buildMultiTargeting\Microsoft.Orleans.CodeGenerator.MSBuild.targets">
-      <Pack>true</Pack>
-      <PackagePath>%(Identity)</PackagePath>
-      <Visible>true</Visible>
-    </Content>
+    <ProjectReference Include="..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftExtensionsDependencyModelVersion)" />
+    <PackageReference Include="Microsoft.Build" Version="$(MicrosoftBuildVersion)" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="$(MicrosoftCodeAnalysisVersion)" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
+    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="$(MicrosoftExtensionsDependencyModelVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsLoggingVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="$(MicrosoftExtensionsLoggingVersion)" />
+    <PackageReference Include="System.Collections.Immutable" Version="$(SystemCollectionsImmutableVersion)" />
+    <PackageReference Include="System.Reflection.Metadata" Version="$(SystemReflectionMetadataVersion)" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- This must come after all other PackageReference elements -->
     <PackageReference Update="@(PackageReference)" PrivateAssets="All" Publish="true" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" PrivateAssets="all" Publish="true" />
-    <ProjectReference Include="..\Orleans.CodeGenerator.MSBuild.Tasks\Orleans.CodeGenerator.MSBuild.Tasks.csproj" PrivateAssets="all" ExcludeAssets="compile" Publish="true" />
-  </ItemGroup>
+  <Target Name="PostBuildPublish" AfterTargets="Build" DependsOnTargets="ResolveAssemblyReferences;Publish" Inputs="@(PostBuildPublishInputs)" Outputs="$(PublishCacheFile)" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''">
 
-  <Target Name="PostBuildPublish" AfterTargets="Build">
-    <!-- So that we can create a nuget package which includes all dependencies, we publish the build. -->
-    <!-- However, we cannot publish during the cross-targeting build, so we skip that. -->
-    <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
+    <Hash ItemsToHash="@(PostBuildPublishInputs)">
+      <Output TaskParameter="HashResult" PropertyName="Orleans_UpdatedInputPubCacheContents" />
+    </Hash>
+
+    <WriteLinesToFile Overwrite="true" File="$(PublishCacheFile)" Lines="$(Orleans_UpdatedInputPubCacheContents)" WriteOnlyWhenDifferent="True" />
+
+    <ItemGroup>
+      <FileWrites Include="$(PublishCacheFile)" />
+    </ItemGroup>
   </Target>
+  <!-- END: PostBuildPublish -->
 
   <Target Name="PackTaskDependencies" BeforeTargets="GenerateNuspec">
    <!--
@@ -69,9 +65,8 @@
    -->
     <ItemGroup>
       <PublishedFiles Include="$(PublishRoot)**/*" Exclude="$(PublishRoot)**/$(AssemblyName).*;$(PublishRoot)*/refs/**/*" />
-      <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).Tasks.*" />
       <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).deps.json" />
-      <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).*.config" Exclude="$(PublishRoot)**/$(AssemblyName).Tasks.*" />
+      <PublishedFiles Include="$(PublishRoot)**/$(AssemblyName).*.config" />
       <_PackageFiles Include="@(PublishedFiles)">
         <PackagePath>tasks/$(RecursiveDir)</PackagePath>
         <Visible>false</Visible>
@@ -79,4 +74,5 @@
       </_PackageFiles>
     </ItemGroup>
   </Target>
+
 </Project>

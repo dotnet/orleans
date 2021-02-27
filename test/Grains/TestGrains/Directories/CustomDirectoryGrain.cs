@@ -1,17 +1,14 @@
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using UnitTests.GrainInterfaces.Directories;
 
 namespace UnitTests.Grains.Directories
 {
-    [GrainDirectory(GrainDirectoryName = DIRECTORY), TypeCodeOverride(TYPECODE)]
+    [GrainDirectory(GrainDirectoryName = DIRECTORY), GrainType(DIRECTORY)]
     public class CustomDirectoryGrain : Grain, ICustomDirectoryGrain
     {
         private int counter = 0;
-
-        public const int TYPECODE = 1000;
 
         public const string DIRECTORY = "CustomGrainDirectory";
 

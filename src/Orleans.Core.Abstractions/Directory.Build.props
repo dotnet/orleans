@@ -12,4 +12,18 @@
   <PropertyGroup>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
+
+  <Choose>
+    <When Condition="$(OrleansSerializationVersion) == $(VersionPrefix) AND $(OrleansSerializationVersion) == $(OrleansCoreAbstractionsVersion)">
+      <ItemGroup>
+        <ProjectReference Include="..\Orleans.Serialization\Orleans.Serialization.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Serialization" Version="$(OrleansSerializationVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
 </Project>

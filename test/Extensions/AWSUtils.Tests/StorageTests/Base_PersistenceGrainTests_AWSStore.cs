@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Tester;
 using TestExtensions;
-using Orleans.Internal;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;

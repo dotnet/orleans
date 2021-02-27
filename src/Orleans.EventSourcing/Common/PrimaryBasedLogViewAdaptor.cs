@@ -496,8 +496,8 @@ namespace Orleans.EventSourcing.Common
 
         private void CalculateTentativeState()
         {
-            // copy the master
-            this.tentativeStateInternal = (TLogView)Services.SerializationManager.DeepCopy(LastConfirmedView());
+            // copy the confirmed view
+            this.tentativeStateInternal = Services.DeepCopy(LastConfirmedView());
 
             // Now apply all operations in pending 
             foreach (var u in this.pending)

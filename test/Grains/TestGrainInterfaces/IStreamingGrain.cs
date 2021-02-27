@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace UnitTests.GrainInterfaces
@@ -45,21 +44,28 @@ namespace UnitTests.GrainInterfaces
     //------- STATE interfaces ----//
 
     [Serializable]
+    [GenerateSerializer]
     public class Streaming_ProducerGrain_State
     {
+        [Id(0)]
         public List<IProducerObserver> Producers { get; set; }
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class Streaming_ConsumerGrain_State
     {
+        [Id(0)]
         public List<IConsumerObserver> Consumers { get; set; }
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class Streaming_ProducerConsumerGrain_State
     {
+        [Id(0)]
         public List<IProducerObserver> Producers { get; set; }
+        [Id(1)]
         public List<IConsumerObserver> Consumers { get; set; }
     }
 

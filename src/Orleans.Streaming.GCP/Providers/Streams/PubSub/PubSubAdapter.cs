@@ -6,7 +6,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using System.IO;
 
 namespace Orleans.Providers.GCP.Streams.PubSub
 {
@@ -14,7 +13,6 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         where TDataAdapter : IPubSubDataAdapter
     {
         protected readonly string ServiceId;
-        private readonly SerializationManager _serializationManager;
         protected readonly string ProjectId;
         protected readonly string TopicId;
         protected readonly TimeSpan? Deadline;
@@ -30,7 +28,6 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public PubSubAdapter(
             TDataAdapter dataAdapter,
-            SerializationManager serializationManager,
             ILoggerFactory loggerFactory,
             HashRingBasedStreamQueueMapper streamQueueMapper,
             string projectId,
@@ -46,7 +43,6 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             _logger = loggerFactory.CreateLogger($"{this.GetType().FullName}.{providerName}");
             this.loggerFactory = loggerFactory;
-            _serializationManager = serializationManager;
             ProjectId = projectId;
             TopicId = topicId;
             ServiceId = serviceId;
@@ -59,7 +55,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return PubSubAdapterReceiver.Create(_serializationManager, this.loggerFactory, queueId, ProjectId, TopicId, ServiceId, _dataAdapter, Deadline, _customEndpoint);
+            return PubSubAdapterReceiver.Create(this.loggerFactory, queueId, ProjectId, TopicId, ServiceId, _dataAdapter, Deadline, _customEndpoint);
         }
 
         public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)

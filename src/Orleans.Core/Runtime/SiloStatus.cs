@@ -3,6 +3,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Possible statuses of a silo.
     /// </summary>
+    [GenerateSerializer]
     public enum SiloStatus
     {
         None = 0,

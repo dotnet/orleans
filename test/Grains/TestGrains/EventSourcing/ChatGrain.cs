@@ -1,18 +1,12 @@
-﻿using Orleans;
 using Orleans.EventSourcing;
 using Orleans.Providers;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using TestGrainInterfaces;
 
 namespace TestGrains
 {
-
-
     /// <summary>
     /// An example of a journaled grain implementing a chat.
     /// The state of the grain is an XML document (System.Xml.Linq.XDocument).
@@ -29,7 +23,6 @@ namespace TestGrains
     [LogConsistencyProvider(ProviderName = "LogStorage")]
     public class ChatGrain : JournaledGrain<XDocument, IChatEvent>, IChatGrain
     {
-
         // we want to ensure chats are correctly initialized when first used
         // so we override the default activation, to insert a creation event if needed
         public override async Task OnActivateAsync()
@@ -59,7 +52,6 @@ namespace TestGrains
         {
             @event.Update(state);
         }
-
 
         public Task<XDocument> GetChat()
         {

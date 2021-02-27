@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -11,6 +10,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
+using Orleans.Serialization.TypeSystem;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester;
@@ -393,9 +393,9 @@ namespace UnitTests.StreamingTests
                 streamIds[i] = StreamId.Create(this.StreamNamespace, Guid.NewGuid());
             }
 
-            int activeConsumerGrains = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain).FullName);
+            int activeConsumerGrains = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain));
             Assert.Equal(0,  activeConsumerGrains);  //  "Initial Consumer count should be zero"
-            int activeProducerGrains = ActiveGrainCount(typeof(StreamLifecycleProducerGrain).FullName);
+            int activeProducerGrains = ActiveGrainCount(typeof(StreamLifecycleProducerGrain));
             Assert.Equal(0,  activeProducerGrains);  //  "Initial Producer count should be zero"
 
             if (warmUpPubSub)
@@ -404,7 +404,7 @@ namespace UnitTests.StreamingTests
 
                 pipeline.Wait();
 
-                int activePubSubGrains = ActiveGrainCount(typeof(PubSubRendezvousGrain).FullName);
+                int activePubSubGrains = ActiveGrainCount(typeof(PubSubRendezvousGrain));
                 Assert.Equal(streamIds.Length,  activePubSubGrains);  //  "Initial PubSub count -- should all be warmed up"
             }
 
@@ -423,7 +423,7 @@ namespace UnitTests.StreamingTests
                 }
                 pipeline.Wait();
 
-                int activePublisherGrains = this.ActiveGrainCount(typeof(StreamLifecycleProducerGrain).FullName);
+                int activePublisherGrains = this.ActiveGrainCount(typeof(StreamLifecycleProducerGrain));
                 Assert.Equal(numProducers,  activePublisherGrains);  //  "Initial Publisher count -- should all be warmed up"
             }
 
@@ -462,13 +462,13 @@ namespace UnitTests.StreamingTests
             Task.WhenAll(promises).Wait();
             sw.Stop();
 
-            int consumerCount = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain).FullName);
+            int consumerCount = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain));
             Assert.Equal(activeConsumerGrains + (numStreams * numConsumers),  consumerCount);  //  "The right number of Consumer grains are active"
 
-            int producerCount = ActiveGrainCount(typeof(StreamLifecycleProducerGrain).FullName);
+            int producerCount = ActiveGrainCount(typeof(StreamLifecycleProducerGrain));
             Assert.Equal(activeProducerGrains + (numStreams * numProducers),  producerCount);  //  "The right number of Producer grains are active"
 
-            int pubSubCount = ActiveGrainCount(typeof(PubSubRendezvousGrain).FullName);
+            int pubSubCount = ActiveGrainCount(typeof(PubSubRendezvousGrain));
             Assert.Equal(streamIds.Length,  pubSubCount);  //  "Final PubSub count -- no more started"
 
             TimeSpan elapsed = sw.Elapsed;
@@ -507,11 +507,11 @@ namespace UnitTests.StreamingTests
 
                 pipeline.Wait();
 
-                int activePubSubGrains = ActiveGrainCount(typeof(PubSubRendezvousGrain).FullName);
+                int activePubSubGrains = ActiveGrainCount(typeof(PubSubRendezvousGrain));
                 Assert.Equal(streamIds.Length,  activePubSubGrains);  //  "Initial PubSub count -- should all be warmed up"
             }
 
-            int activeConsumerGrains = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain).FullName);
+            int activeConsumerGrains = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain));
             Assert.Equal(0,  activeConsumerGrains);  //  "Initial Consumer count should be zero"
 
             Stopwatch sw = Stopwatch.StartNew();
@@ -524,7 +524,7 @@ namespace UnitTests.StreamingTests
             Task.WhenAll(promises).Wait();
             sw.Stop();
 
-            int consumerCount = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain).FullName);
+            int consumerCount = ActiveGrainCount(typeof(StreamLifecycleConsumerGrain));
             Assert.Equal(activeConsumerGrains + (numStreams * numConsumers),  consumerCount);  //  "The correct number of new Consumer grains are active"
 
             TimeSpan elapsed = sw.Elapsed;
@@ -865,8 +865,9 @@ namespace UnitTests.StreamingTests
             //nextGrainId += numProducers;
         }
 
-        private int ActiveGrainCount(string grainTypeName)
+        private int ActiveGrainCount(Type grainType)
         {
+            var grainTypeName = RuntimeTypeNameFormatter.Format(grainType);
             grainCounts = mgmtGrain.GetSimpleGrainStatistics().Result; // Blocking Wait
             int grainCount = grainCounts
                 .Where(g => g.GrainType == grainTypeName)

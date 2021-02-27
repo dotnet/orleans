@@ -1,9 +1,7 @@
 using System;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Configuration.Internal;
 using Orleans.GrainDirectory;
 using Orleans.GrainDirectory.AzureStorage;
 using Orleans.Runtime;

@@ -7,16 +7,18 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class SiloConnection : Connection
     {
-        private static readonly Response PingResponse = new Response(null);
+        private static readonly Response PingResponse = Response.Completed;
         private readonly MessageCenter messageCenter;
         private readonly ConnectionManager connectionManager;
         private readonly ConnectionOptions connectionOptions;
         private readonly ProbeRequestMonitor probeMonitor;
+        private readonly ConnectionPreambleHelper connectionPreambleHelper;
 
         public SiloConnection(
             SiloAddress remoteSiloAddress,
@@ -27,13 +29,15 @@ namespace Orleans.Runtime.Messaging
             ConnectionManager connectionManager,
             ConnectionOptions connectionOptions,
             ConnectionCommon connectionShared,
-            ProbeRequestMonitor probeMonitor)
+            ProbeRequestMonitor probeMonitor,
+            ConnectionPreambleHelper connectionPreambleHelper)
             : base(connection, middleware, connectionShared)
         {
             this.messageCenter = messageCenter;
             this.connectionManager = connectionManager;
             this.connectionOptions = connectionOptions;
             this.probeMonitor = probeMonitor;
+            this.connectionPreambleHelper = connectionPreambleHelper;
             this.LocalSiloAddress = localSiloDetails.SiloAddress;
             this.RemoteSiloAddress = remoteSiloAddress;
         }
@@ -239,31 +243,34 @@ namespace Orleans.Runtime.Messaging
 
             async Task WritePreamble()
             {
-                await ConnectionPreamble.Write(
+                await connectionPreambleHelper.Write(
                     this.Context,
-                    Constants.SiloDirectConnectionId,
-                    this.connectionOptions.ProtocolVersion,
-                    this.LocalSiloAddress);
+                    new ConnectionPreamble
+                    {
+                        NodeIdentity = Constants.SiloDirectConnectionId,
+                        NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
+                        SiloAddress = this.LocalSiloAddress
+                    });
             }
 
             async ValueTask<NetworkProtocolVersion> ReadPreamble()
             {
-                var (grainId, protocolVersion, siloAddress) = await ConnectionPreamble.Read(this.Context);
+                var preamble = await connectionPreambleHelper.Read(this.Context);
 
-                if (!grainId.Equals(Constants.SiloDirectConnectionId))
+                if (!preamble.NodeIdentity.Equals(Constants.SiloDirectConnectionId))
                 {
                     throw new InvalidOperationException("Unexpected non-proxied connection on silo endpoint.");
                 }
 
-                if (siloAddress is object)
+                if (preamble.SiloAddress is object)
                 {
-                    this.RemoteSiloAddress = siloAddress;
-                    this.connectionManager.OnConnected(siloAddress, this);
+                    this.RemoteSiloAddress = preamble.SiloAddress;
+                    this.connectionManager.OnConnected(preamble.SiloAddress, this);
                 }
 
-                this.RemoteProtocolVersion = protocolVersion;
+                this.RemoteProtocolVersion = preamble.NetworkProtocolVersion;
 
-                return protocolVersion;
+                return this.RemoteProtocolVersion;
             }
         }
 

@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -31,7 +30,7 @@ namespace DependencyInjection.Tests
 
                     // explicitly register a grain class to assert that it will NOT use the registration, 
                     // as by design this is not supported.
-                    services.AddTransient<ExplicitlyRegisteredSimpleDIGrain>(
+                    services.AddTransient(
                         sp => new ExplicitlyRegisteredSimpleDIGrain(
                             sp.GetRequiredService<IInjectedService>(),
                             "some value",

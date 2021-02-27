@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
-using System;
 
 namespace Orleans.Configuration
 {

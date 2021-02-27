@@ -1,4 +1,3 @@
-﻿using Orleans.Serialization;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -12,12 +11,12 @@ namespace Orleans.Storage
     [DebuggerDisplay("CanStream = {CanStream}, Tag = {Tag}")]
     public class OrleansStorageDefaultBinaryDeserializer: IStorageDeserializer
     {
-        private readonly SerializationManager serializationManager;
+        private readonly Serialization.Serializer serializer;
 
         /// <summary>
         /// <see cref="IStorageDeserializer.CanStream"/>
         /// </summary>
-        public bool CanStream { get; } = false;
+        public bool CanStream { get; } = true;
 
         /// <summary>
         /// <see cref="IStorageDeserializer.Tag"/>
@@ -28,11 +27,11 @@ namespace Orleans.Storage
         /// <summary>
         /// Constructs this deserializer from the given parameters.
         /// </summary>
-        /// <param name="serializationManager"></param>
+        /// <param name="serializer"></param>
         /// <param name="tag"><see cref="IStorageDeserializer.Tag"/>.</param>
-        public OrleansStorageDefaultBinaryDeserializer(SerializationManager serializationManager, string tag)
+        public OrleansStorageDefaultBinaryDeserializer(Serialization.Serializer serializer, string tag)
         {
-            this.serializationManager = serializationManager;
+            this.serializer = serializer;
             if(string.IsNullOrWhiteSpace(tag))
             {
                 throw new ArgumentException("The parameter should contain characters.", nameof(tag));
@@ -47,7 +46,7 @@ namespace Orleans.Storage
         /// <exception cref="NotSupportedException"/>
         public object Deserialize(Stream dataStream, Type grainStateType)
         {
-            throw new NotSupportedException($"{nameof(OrleansStorageDefaultBinaryDeserializer)} does not support stream deserialization.");
+            return this.serializer.Deserialize<object>(dataStream);
         }
 
 
@@ -56,7 +55,7 @@ namespace Orleans.Storage
         /// </summary>
         public object Deserialize(object data, Type grainStateType)
         {
-            return this.serializationManager.DeserializeFromByteArray<object>((byte[])data);
+            return this.serializer.Deserialize<object>((byte[])data);
         }
 
 

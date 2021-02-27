@@ -16,6 +16,7 @@ using Orleans.Providers.Azure;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.Serialization.TypeSystem;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Storage
@@ -31,24 +32,24 @@ namespace Orleans.Storage
         private ILogger logger;
         private readonly string name;
         private AzureBlobStorageOptions options;
-        private SerializationManager serializationManager;
+        private Serializer serializationManager;
         private IGrainFactory grainFactory;
-        private ITypeResolver typeResolver;
+        private TypeResolver typeResolver;
         private readonly IServiceProvider services;
 
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(
             string name,
             AzureBlobStorageOptions options,
-            SerializationManager serializationManager,
+            Serializer serializer,
             IGrainFactory grainFactory,
-            ITypeResolver typeResolver,
+            TypeResolver typeResolver,
             IServiceProvider services,
             ILogger<AzureBlobGrainStorage> logger)
         {
             this.name = name;
             this.options = options;
-            this.serializationManager = serializationManager;
+            this.serializationManager = serializer;
             this.grainFactory = grainFactory;
             this.typeResolver = typeResolver;
             this.services = services;
@@ -262,7 +263,7 @@ namespace Orleans.Storage
             }
             else
             {
-                data = this.serializationManager.SerializeToByteArray(grainState);
+                data = this.serializationManager.SerializeToArray(grainState);
                 mimeType = "application/octet-stream";
             }
 
@@ -288,7 +289,7 @@ namespace Orleans.Storage
             }
             else
             {
-                result = this.serializationManager.DeserializeFromByteArray<object>(contents);
+                result = this.serializationManager.Deserialize<object>(contents);
             }
 
             return result;

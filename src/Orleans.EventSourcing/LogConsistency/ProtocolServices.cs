@@ -12,32 +12,27 @@ namespace Orleans.Runtime.LogConsistency
     /// </summary>
     internal class ProtocolServices : ILogConsistencyProtocolServices
     {
-        private static readonly object[] EmptyObjectArray = new object[0];
-
         private readonly ILogger log;
-        private readonly IGrainFactory grainFactory;
+        private readonly DeepCopier deepCopier;
         private readonly Grain grain;   // links to the grain that owns this service object
 
         public ProtocolServices(
             Grain gr,
             ILoggerFactory loggerFactory,
-            SerializationManager serializationManager,
-            IGrainFactory grainFactory,
+            DeepCopier deepCopier,
             ILocalSiloDetails siloDetails)
         {
             this.grain = gr;
             this.log = loggerFactory.CreateLogger<ProtocolServices>();
-            this.grainFactory = grainFactory;
-            this.SerializationManager = serializationManager;
+            this.deepCopier = deepCopier;
             this.MyClusterId = siloDetails.ClusterId;
         }
         
         public GrainReference GrainReference => grain.GrainReference;
 
-        /// <inheritdoc />
-        public SerializationManager SerializationManager { get; }
-
         public string MyClusterId { get; }
+
+        public T DeepCopy<T>(T value) => this.deepCopier.Copy(value);
 
         public void ProtocolError(string msg, bool throwexception)
         {

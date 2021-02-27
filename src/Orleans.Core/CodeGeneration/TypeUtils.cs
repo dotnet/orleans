@@ -12,7 +12,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// A collection of utility functions for dealing with Type information.
     /// </summary>
-    internal static class TypeUtils
+    internal static class XXXXTypeUtils
     {
         private static readonly ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string> ParseableNameCache = new ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string>();
 

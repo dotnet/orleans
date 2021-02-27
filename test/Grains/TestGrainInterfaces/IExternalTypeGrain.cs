@@ -7,8 +7,10 @@ using Orleans;
 namespace UnitTests.GrainInterfaces
 {
     [Serializable]
+    [GenerateSerializer]
     public class EnumClass
     {
+        [Id(0)]
         public IEnumerable<DateTimeKind> EnumsList { get; set; }
     }
 

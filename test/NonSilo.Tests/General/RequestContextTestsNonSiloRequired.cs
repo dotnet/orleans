@@ -59,7 +59,7 @@ namespace UnitTests.General
                 promises[i] = Task.Run(() =>
                 {
                     flag.Wait();
-                    msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
+                    msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
                 });
                 flag.Set();
                 Thread.Sleep(1);
@@ -76,7 +76,7 @@ namespace UnitTests.General
             Guid nullActivityId = Guid.Empty;
 
             Message msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
+            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -86,7 +86,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(activityId);
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
+            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -100,7 +100,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(nullActivityId);
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
+            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
                     headers.Add(kvp.Key, kvp.Value);
@@ -110,7 +110,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(activityId2);
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
+            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             foreach (var kvp in msg.RequestContextData)
             {
                 headers.Add(kvp.Key, kvp.Value);
@@ -132,7 +132,7 @@ namespace UnitTests.General
             Guid nullActivityId = Guid.Empty;
 
             Message msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
+            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
             var actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
@@ -141,7 +141,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(activityId);
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
+            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
@@ -158,7 +158,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(nullActivityId);
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
+            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);
@@ -167,7 +167,7 @@ namespace UnitTests.General
 
             RequestContextTestUtils.SetActivityId(activityId2);
             msg = new Message();
-            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
+            msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
             actId = RequestContext.Get(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER);

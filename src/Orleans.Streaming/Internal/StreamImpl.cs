@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
@@ -10,9 +9,13 @@ namespace Orleans.Streams
 {
     [Serializable]
     [Immutable]
-    internal sealed class StreamImpl<T> : IAsyncStream<T>, IStreamControl, ISerializable, IOnDeserialized
+    [GenerateSerializer]
+    [SerializationCallbacks(typeof(OnDeserializedCallbacks))]
+    internal sealed class StreamImpl<T> : IAsyncStream<T>, IStreamControl, IOnDeserialized
     {
+        [Id(1)]
         private readonly InternalStreamId                       streamId;
+        [Id(2)]
         private readonly bool                                   isRewindable;
         [NonSerialized]
         private IInternalStreamProvider                         provider;
@@ -162,7 +165,7 @@ namespace Orleans.Streams
                         if (provider == null)
                             provider = GetStreamProvider();
                         
-                        consumerInterface = provider.GetConsumerInterface<T>(this);
+                        consumerInterface = provider.GetConsumerInterface(this);
                     }
                 }
             }
@@ -202,29 +205,9 @@ namespace Orleans.Streams
             return streamId.ToString();
         }
 
-        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        void IOnDeserialized.OnDeserialized(DeserializationContext  context)
         {
-            // Use the AddValue method to specify serialized values.
-            info.AddValue("StreamId", streamId, typeof(InternalStreamId));
-            info.AddValue("IsRewindable", isRewindable, typeof(bool));
-        }
-
-        // The special constructor is used to deserialize values. 
-        private StreamImpl(SerializationInfo info, StreamingContext context)
-        {
-            // Reset the property value using the GetValue method.
-            streamId = (InternalStreamId)info.GetValue("StreamId", typeof(InternalStreamId));
-            isRewindable = info.GetBoolean("IsRewindable");
-            initLock = new object();
-
-            var serializerContext = context.Context as ISerializerContext;
-            ((IOnDeserialized)this).OnDeserialized(serializerContext);
-
-        }
-
-        void IOnDeserialized.OnDeserialized(ISerializerContext context)
-        {
-            this.runtimeClient = context?.AdditionalContext as IRuntimeClient;
+            this.runtimeClient = context?.RuntimeClient as IRuntimeClient;
         }
     }
 }

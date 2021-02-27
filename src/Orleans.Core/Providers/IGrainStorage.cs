@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -54,6 +54,7 @@ namespace Orleans.Storage
     /// Exception thrown whenever a grain call is attempted with a bad / missing storage configuration settings for that grain.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class BadGrainStorageConfigException : BadProviderConfigException
     {
         public BadGrainStorageConfigException()
@@ -74,17 +75,21 @@ namespace Orleans.Storage
     /// Exception thrown when a storage detects an Etag inconsistency when attempting to perform a WriteStateAsync operation.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class InconsistentStateException : OrleansException
     {
         /// <summary>
         /// Whether or not this exception occurred on the current activation.
         /// </summary>
+        [Id(0)]
         internal bool IsSourceActivation { get; set; } = true;
 
         /// <summary>The Etag value currently held in persistent storage.</summary>
+        [Id(1)]
         public string StoredEtag { get; private set; }
 
         /// <summary>The Etag value currently help in memory, and attempting to be updated.</summary>
+        [Id(2)]
         public string CurrentEtag { get; private set; }
 
         public InconsistentStateException()

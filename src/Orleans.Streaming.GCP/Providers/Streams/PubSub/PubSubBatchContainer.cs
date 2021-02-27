@@ -9,17 +9,22 @@ using System.Linq;
 namespace Orleans.Providers.GCP.Streams.PubSub
 {
     [Serializable]
+    [GenerateSerializer]
     public class PubSubBatchContainer : IBatchContainer
     {
         [JsonProperty]
+        [Id(0)]
         private EventSequenceTokenV2 sequenceToken;
 
         [JsonProperty]
+        [Id(1)]
         private readonly List<object> events;
 
         [JsonProperty]
+        [Id(2)]
         private readonly Dictionary<string, object> requestContext;
 
+        [Id(3)]
         public StreamId StreamId { get; }
 
         public StreamSequenceToken SequenceToken => sequenceToken;

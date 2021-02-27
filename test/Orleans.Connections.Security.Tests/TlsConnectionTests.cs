@@ -30,8 +30,6 @@ namespace Orleans.Connections.Security.Tests
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IPingGrain).Assembly));
-
                 var encodedCertificate = configuration[CertificateConfigKey];
                 var localCertificate = TestCertificateHelper.ConvertFromBase64(encodedCertificate);
 
@@ -54,8 +52,6 @@ namespace Orleans.Connections.Security.Tests
 
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IPingGrain).Assembly));
-
                 var config = hostBuilder.GetConfiguration();
                 var encodedCertificate = config[CertificateConfigKey];
                 var localCertificate = TestCertificateHelper.ConvertFromBase64(encodedCertificate);

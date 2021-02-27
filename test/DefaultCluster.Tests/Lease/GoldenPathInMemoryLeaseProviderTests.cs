@@ -1,7 +1,6 @@
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Runtime.Development;
-using Orleans.TestingHost;
 using TestExtensions;
 using TestExtensions.Runners;
 

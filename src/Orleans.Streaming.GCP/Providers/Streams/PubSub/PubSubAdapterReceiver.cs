@@ -1,4 +1,4 @@
-﻿using Google.Cloud.PubSub.V1;
+using Google.Cloud.PubSub.V1;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -12,7 +12,6 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 {
     public class PubSubAdapterReceiver : IQueueAdapterReceiver
     {
-        private readonly SerializationManager _serializationManager;
         private PubSubDataManager _pubSub;
         private long _lastReadMessage;
         private Task _outstandingTask;
@@ -22,22 +21,20 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public QueueId Id { get; }
 
-        public static IQueueAdapterReceiver Create(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, string projectId, string topicId,
+        public static IQueueAdapterReceiver Create(ILoggerFactory loggerFactory, QueueId queueId, string projectId, string topicId,
             string serviceId, IPubSubDataAdapter dataAdapter, TimeSpan? deadline = null, string customEndpoint = "")
         {
             if (queueId == null) throw new ArgumentNullException(nameof(queueId));
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
-            if (serializationManager == null) throw new ArgumentNullException(nameof(serializationManager));
 
             var pubSub = new PubSubDataManager(loggerFactory, projectId, topicId, queueId.ToString(), serviceId, deadline, customEndpoint);
-            return new PubSubAdapterReceiver(serializationManager, loggerFactory, queueId, topicId, pubSub, dataAdapter);
+            return new PubSubAdapterReceiver(loggerFactory, queueId, topicId, pubSub, dataAdapter);
         }
 
-        private PubSubAdapterReceiver(SerializationManager serializationManager, ILoggerFactory loggerFactory, QueueId queueId, string topicId, PubSubDataManager pubSub, IPubSubDataAdapter dataAdapter)
+        private PubSubAdapterReceiver(ILoggerFactory loggerFactory, QueueId queueId, string topicId, PubSubDataManager pubSub, IPubSubDataAdapter dataAdapter)
         {
             if (queueId == null) throw new ArgumentNullException(nameof(queueId));
             Id = queueId;
-            _serializationManager = serializationManager;
             if (pubSub == null) throw new ArgumentNullException(nameof(pubSub));
             _pubSub = pubSub;
 

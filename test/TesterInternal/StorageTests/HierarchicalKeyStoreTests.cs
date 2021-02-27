@@ -15,7 +15,6 @@ namespace UnitTests.StorageTests
         {
             public Fixture()
             {
-                BufferPool.InitGlobalBufferPool(new SiloMessagingOptions());
             }
         }
 

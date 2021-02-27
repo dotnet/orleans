@@ -1,10 +1,6 @@
 using System;
-using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 using Orleans.GrainDirectory;
-using Orleans.Runtime;
-using System.Collections.Generic;
 
 namespace Orleans.SystemTargetInterfaces
 {
@@ -19,6 +15,7 @@ namespace Orleans.SystemTargetInterfaces
     /// Response message used by Global Single Instance Protocol
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     internal class RemoteClusterActivationResponse
     {
         public static readonly RemoteClusterActivationResponse Pass = new RemoteClusterActivationResponse(ActivationResponseStatus.Pass);
@@ -27,10 +24,16 @@ namespace Orleans.SystemTargetInterfaces
         {
             this.ResponseStatus = responseStatus;
         }
+
+        [Id(1)]
         public ActivationResponseStatus ResponseStatus { get; private set; }
+        [Id(2)]
         public AddressAndTag ExistingActivationAddress { get; set; }
+        [Id(3)]
         public string ClusterId { get; set; }
+        [Id(4)]
         public bool Owned { get; set; }
+        [Id(5)]
         public Exception ResponseException { get; set; }
 
         public override string ToString()

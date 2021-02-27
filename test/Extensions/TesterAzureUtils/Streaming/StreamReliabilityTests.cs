@@ -24,6 +24,7 @@ using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
 using Tester.AzureUtils;
+using Orleans.Serialization.TypeSystem;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -1078,9 +1079,9 @@ namespace UnitTests.Streaming.Reliability
         protected async Task<bool> CheckGrainCounts()
         {
 #if USE_GENERICS
-            string grainType = typeof(StreamReliabilityTestGrain<int>).FullName;
+            string grainType = RuntimeTypeNameFormatter.Format(typeof(StreamReliabilityTestGrain<int>));
 #else
-            string grainType = typeof(StreamReliabilityTestGrain).FullName;
+            string grainType = RuntimeTypeNameFormatter.Format(typeof(StreamReliabilityTestGrain));
 #endif
             IManagementGrain mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
 

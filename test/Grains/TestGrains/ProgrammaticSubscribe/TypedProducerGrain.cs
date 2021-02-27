@@ -4,15 +4,12 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains.ProgrammaticSubscribe
 {
-
     public class TypedProducerGrain<T> : Grain, ITypedProducerGrain
     {
         private IAsyncStream<T> producer;
@@ -20,6 +17,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         private IDisposable producerTimer;
         internal ILogger logger;
         private static readonly TimeSpan defaultFirePeriod = TimeSpan.FromMilliseconds(10);
+        private readonly List<Exception> producerExceptions = new();
 
         public TypedProducerGrain(ILoggerFactory loggerFactory)
         {
@@ -54,6 +52,11 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             logger.Info("StopPeriodicProducing");
             producerTimer.Dispose();
             producerTimer = null;
+            if (producerExceptions is { Count: > 0 } exceptions)
+            {
+                throw new AggregateException("Exceptions occurred while producing messages to stream", exceptions.ToArray());
+            }
+
             return Task.CompletedTask;
         }
 
@@ -79,9 +82,17 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
             return producerTimer != null ? Fire() : Task.CompletedTask;
         }
 
-        protected virtual Task ProducerOnNextAsync(IAsyncStream<T> theProducer)
+        protected virtual async Task ProducerOnNextAsync(IAsyncStream<T> theProducer)
         {
-            return theProducer.OnNextAsync(Activator.CreateInstance<T>());
+            try
+            {
+                await theProducer.OnNextAsync(Activator.CreateInstance<T>());
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "Exception producing to stream {StreamId}", theProducer.StreamId);
+                producerExceptions.Add(exception);
+            }
         }
 
         private async Task Fire([CallerMemberName] string caller = null)
@@ -121,9 +132,12 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
         }
     }
 
+    [GenerateSerializer]
     public class Apple : IFruit
     {
+        [Id(0)]
         int number;
+
         public Apple(int number)
         {
             this.number = number;

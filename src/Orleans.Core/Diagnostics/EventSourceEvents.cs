@@ -1,4 +1,3 @@
-using System;
 using System.Diagnostics.Tracing;
 
 namespace Orleans.Runtime
@@ -13,10 +12,7 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                using (message.SetThreadActivityId())
-                {
-                    this.OnTimeout();
-                }
+                this.OnTimeout();
             }
         }
 
@@ -28,10 +24,7 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                using (message.SetThreadActivityId())
-                {
-                    this.OnTargetSiloFail();
-                }
+                this.OnTargetSiloFail();
             }
         }
 
@@ -43,10 +36,7 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                using (message.SetThreadActivityId())
-                {
-                    this.DoCallback();
-                }
+                this.DoCallback();
             }
         }
 
@@ -64,10 +54,7 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                using (message.SetThreadActivityId())
-                {
-                    this.SendRequest();
-                }
+                this.SendRequest();
             }
         }
 
@@ -79,10 +66,7 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                using (message.SetThreadActivityId())
-                {
-                    this.ReceiveResponse();
-                }
+                this.ReceiveResponse();
             }
         }
 
@@ -94,10 +78,7 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                using (message.SetThreadActivityId())
-                {
-                    this.SendResponse();
-                }
+                this.SendResponse();
             }
         }
 
@@ -115,10 +96,7 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                using (message.SetThreadActivityId())
-                {
-                    this.ReceiveMessage();
-                }
+                this.ReceiveMessage();
             }
         }
 
@@ -136,10 +114,7 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                using (message.SetThreadActivityId())
-                {
-                    this.SendRequest();
-                }
+                this.SendRequest();
             }
         }
 
@@ -151,10 +126,7 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                using (message.SetThreadActivityId())
-                {
-                    this.ReceiveResponse();
-                }
+                this.ReceiveResponse();
             }
         }
 
@@ -166,10 +138,7 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                using (message.SetThreadActivityId())
-                {
-                    this.SendResponse();
-                }
+                this.SendResponse();
             }
         }
 
@@ -187,51 +156,11 @@ namespace Orleans.Runtime
         {
             if (this.IsEnabled())
             {
-                using (message.SetThreadActivityId())
-                {
-                    this.ReceiveMessage();
-                }
+                this.ReceiveMessage();
             }
         }
 
         [Event(1, Level = EventLevel.Verbose)]
         private void ReceiveMessage() => WriteEvent(1);
-    }
-
-    internal static class EventSourceMessageExtensions
-    {
-        public static ActivityIdScope SetThreadActivityId(this Message message)
-        {
-            var activityId = message?.TraceContext?.ActivityId;
-
-            if (!(activityId is Guid messageActivityId) || messageActivityId == Guid.Empty)
-            {
-                return new ActivityIdScope(Guid.Empty, shouldReset: false);
-            }
-
-            EventSource.SetCurrentThreadActivityId(messageActivityId, out var oldActivity);
-            return new ActivityIdScope(oldActivity, shouldReset: messageActivityId != oldActivity);
-
-        }
-
-        internal readonly ref struct ActivityIdScope
-        {
-            private readonly Guid oldActivity;
-            private readonly bool shouldReset;
-
-            public ActivityIdScope(Guid oldActivity, bool shouldReset)
-            {
-                this.oldActivity = oldActivity;
-                this.shouldReset = shouldReset;
-            }
-
-            public void Dispose()
-            {
-                if (shouldReset)
-                {
-                    EventSource.SetCurrentThreadActivityId(oldActivity);
-                }
-            }
-        }
     }
 }

@@ -1,5 +1,3 @@
-
-using Orleans;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;

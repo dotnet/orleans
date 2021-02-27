@@ -29,7 +29,7 @@ namespace Orleans.Storage
     {
         private readonly AzureTableStorageOptions options;
         private readonly ClusterOptions clusterOptions;
-        private readonly SerializationManager serializationManager;
+        private readonly Serializer serializer;
         private readonly IServiceProvider services;
         private readonly ILogger logger;
 
@@ -51,14 +51,14 @@ namespace Orleans.Storage
             string name,
             AzureTableStorageOptions options,
             IOptions<ClusterOptions> clusterOptions,
-            SerializationManager serializationManager,
+            Serializer serializer,
             IServiceProvider services,
             ILogger<AzureTableGrainStorage> logger)
         {
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
             this.name = name;
-            this.serializationManager = serializationManager;
+            this.serializer = serializer;
             this.services = services;
             this.logger = logger;
         }
@@ -203,7 +203,7 @@ namespace Orleans.Storage
             {
                 // Convert to binary format
 
-                byte[] data = this.serializationManager.SerializeToByteArray(grainState);
+                byte[] data = this.serializer.SerializeToArray(grainState);
 
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
                     data.Length, entity.PartitionKey, entity.RowKey);
@@ -352,7 +352,7 @@ namespace Orleans.Storage
                 if (binaryData.Length > 0)
                 {
                     // Rehydrate
-                    dataValue = this.serializationManager.DeserializeFromByteArray<object>(binaryData);
+                    dataValue = this.serializer.Deserialize<object>(binaryData);
                 }
                 else if (!string.IsNullOrEmpty(stringData))
                 {

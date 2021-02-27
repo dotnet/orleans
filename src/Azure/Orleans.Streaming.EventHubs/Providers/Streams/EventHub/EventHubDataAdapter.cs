@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Azure.Messaging.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers
@@ -13,15 +12,14 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public class EventHubDataAdapter : IEventHubDataAdapter
     {
-        private readonly SerializationManager serializationManager;
+        private readonly Serialization.Serializer serializer;
 
         /// <summary>
         /// Cache data adapter that adapts EventHub's EventData to CachedEventHubMessage used in cache
         /// </summary>
-        /// <param name="serializationManager"></param>
-        public EventHubDataAdapter(SerializationManager serializationManager)
+        public EventHubDataAdapter(Serialization.Serializer serializer)
         {
-            this.serializationManager = serializationManager;
+            this.serializer = serializer;
         }
 
         /// <summary>
@@ -31,7 +29,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public virtual IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
         {
-            var evenHubMessage = new EventHubMessage(cachedMessage, this.serializationManager);
+            var evenHubMessage = new EventHubMessage(cachedMessage, this.serializer);
             return GetBatchContainer(evenHubMessage);
         }
 
@@ -42,7 +40,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage)
         {
-            return new EventHubBatchContainer(eventHubMessage, this.serializationManager);
+            return new EventHubBatchContainer(eventHubMessage, this.serializer);
         }
 
         /// <summary>
@@ -58,7 +56,7 @@ namespace Orleans.ServiceBus.Providers
         public virtual EventData ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
             if (token != null) throw new ArgumentException("EventHub streams currently does not support non-null StreamSequenceToken.", nameof(token));
-            return EventHubBatchContainer.ToEventData(this.serializationManager, streamId, events, requestContext);
+            return EventHubBatchContainer.ToEventData(this.serializer, streamId, events, requestContext);
         }
 
         public virtual CachedMessage FromQueueMessage(StreamPosition streamPosition, EventData queueMessage, DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
@@ -114,7 +112,7 @@ namespace Orleans.ServiceBus.Providers
         // Placed object message payload into a segment.
         protected virtual ArraySegment<byte> EncodeMessageIntoSegment(EventData queueMessage, Func<int, ArraySegment<byte>> getSegment)
         {
-            byte[] propertiesBytes = queueMessage.SerializeProperties(this.serializationManager);
+            byte[] propertiesBytes = queueMessage.SerializeProperties(this.serializer);
             var payload = queueMessage.Body;
             // get size of namespace, offset, partitionkey, properties, and payload
             int size = SegmentBuilder.CalculateAppendSize(queueMessage.Offset.ToString()) +

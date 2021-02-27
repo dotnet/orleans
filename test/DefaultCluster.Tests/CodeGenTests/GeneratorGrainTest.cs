@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 using System.Text;
 using System.Threading.Tasks;
 using Orleans;
@@ -18,78 +17,6 @@ namespace Tester.CodeGenTests
     {
         public GeneratorGrainTest(DefaultClusterFixture fixture) : base(fixture)
         {
-        }
-
-        [Fact]
-        public async Task CodeGenRoundTripSerialization()
-        {
-            var grain = this.GrainFactory.GetGrain<ISerializationGenerationGrain>(GetRandomGrainId());
-
-            // Test struct serialization.
-            var expectedStruct = new SomeStruct(10) { Id = Guid.NewGuid(), PublicValue = 6, ValueWithPrivateGetter = 7 };
-            expectedStruct.SetValueWithPrivateSetter(8);
-            expectedStruct.SetPrivateValue(9);
-            var actualStruct = await grain.RoundTripStruct(expectedStruct);
-            Assert.Equal(expectedStruct.Id, actualStruct.Id);
-            Assert.Equal(expectedStruct.ReadonlyField, actualStruct.ReadonlyField);
-            Assert.Equal(expectedStruct.PublicValue, actualStruct.PublicValue);
-            Assert.Equal(expectedStruct.ValueWithPrivateSetter, actualStruct.ValueWithPrivateSetter);
-            Assert.Equal(expectedStruct.GetPrivateValue(), actualStruct.GetPrivateValue());
-            Assert.Equal(expectedStruct.GetValueWithPrivateGetter(), actualStruct.GetValueWithPrivateGetter());
-
-            // Test abstract class serialization.
-            var input = new OuterClass.SomeConcreteClass { Int = 89, String = Guid.NewGuid().ToString() };
-            input.Classes = new SomeAbstractClass[]
-            {
-                input,
-                new AnotherConcreteClass
-                {
-                    AnotherString = "hi",
-                    Interfaces = new List<ISomeInterface> { input }
-                }
-            };
-            input.SetObsoleteInt(38);
-            input.Enum = SomeAbstractClass.SomeEnum.SomethingElse;
-            input.NonSerializedInt = 39;
-
-            var output = await grain.RoundTripClass(input);
-
-            Assert.Equal(input.Int, output.Int);
-            Assert.Equal(input.Enum, output.Enum);
-            Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output).String);
-            Assert.Equal(input.Classes.Length, output.Classes.Length);
-            Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
-            Assert.Equal(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
-            Assert.Equal(input.GetObsoleteInt(), output.GetObsoleteInt());
-
-            Assert.Equal(0, output.NonSerializedInt);
-
-            // Test abstract class serialization with state.
-            await grain.SetState(input);
-            output = await grain.GetState();
-            Assert.Equal(input.Int, output.Int);
-            Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output).String);
-            Assert.Equal(input.Classes.Length, output.Classes.Length);
-            Assert.Equal(input.String, ((OuterClass.SomeConcreteClass)output.Classes[0]).String);
-            Assert.Equal(input.Classes[1].Interfaces[0].Int, output.Classes[1].Interfaces[0].Int);
-            Assert.Equal(input.GetObsoleteInt(), output.GetObsoleteInt());
-            Assert.Equal(0, output.NonSerializedInt);
-
-            // Test interface serialization.
-            var expectedInterface = input;
-            var actualInterface = await grain.RoundTripInterface(expectedInterface);
-            Assert.Equal(input.Int, actualInterface.Int);
-
-            // Test enum serialization.
-            const SomeAbstractClass.SomeEnum ExpectedEnum = SomeAbstractClass.SomeEnum.Something;
-            var actualEnum = await grain.RoundTripEnum(ExpectedEnum);
-            Assert.Equal(ExpectedEnum, actualEnum);
-
-            // Test serialization of a generic class which has a value-type constraint.
-            var expectedStructConstraintObject = new ClassWithStructConstraint<int> { Value = 38 };
-            var actualStructConstraintObject =
-                (ClassWithStructConstraint<int>)await grain.RoundTripObject(expectedStructConstraintObject);
-            Assert.Equal(expectedStructConstraintObject.Value, actualStructConstraintObject.Value);
         }
 
         [Fact]

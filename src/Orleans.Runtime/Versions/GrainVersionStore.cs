@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Storage;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;

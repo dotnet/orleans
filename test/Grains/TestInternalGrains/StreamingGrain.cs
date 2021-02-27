@@ -16,9 +16,12 @@ using UnitTests.TestHelper;
 namespace UnitTests.Grains
 {
     [Serializable]
+    [GenerateSerializer]
     public class StreamItem
     {
+        [Id(0)]
         public string       Data;
+        [Id(1)]
         public Guid         StreamId;
 
         public StreamItem(string data, Guid streamId)
@@ -34,14 +37,18 @@ namespace UnitTests.Grains
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class ConsumerObserver : IAsyncObserver<StreamItem>, IConsumerObserver
     {
         [NonSerialized]
         private ILogger _logger;
         [NonSerialized]
         private StreamSubscriptionHandle<StreamItem> _subscription;
+        [Id(0)]
         private int _itemsConsumed;
+        [Id(1)]
         private Guid _streamId;
+        [Id(2)]
         private string _streamNamespace;
 
         public Task<int> ItemsConsumed
@@ -136,10 +143,12 @@ namespace UnitTests.Grains
             get { return Task.FromResult(_subscription == null ? 0 : 1); }
         }
 
+        [Id(3)]
         public string ProviderName { get; private set; }
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class ProducerObserver : IProducerObserver
     {
         [NonSerialized]
@@ -148,12 +157,17 @@ namespace UnitTests.Grains
         private IAsyncObserver<StreamItem> _observer;
         [NonSerialized]
         private Dictionary<IDisposable, TimerState> _timers;
-
+        [Id(0)]
         private int _itemsProduced;
+        [Id(1)]
         private int _expectedItemsProduced;
+        [Id(2)]
         private Guid _streamId;
+        [Id(3)]
         private string _streamNamespace;
+        [Id(4)]
         private string _providerName;
+        [Id(5)]
         private readonly InterlockedFlag _cleanedUpFlag;
         [NonSerialized]
         private bool _observerDisposedYet;

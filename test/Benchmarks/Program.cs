@@ -4,13 +4,9 @@ using System.Diagnostics;
 using System.Linq;
 using BenchmarkDotNet.Running;
 using Benchmarks.MapReduce;
-using Benchmarks.Serialization;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
-using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Jobs;
-using BenchmarkDotNet.Toolchains.CsProj;
 
 namespace Benchmarks
 {
@@ -30,10 +26,6 @@ namespace Benchmarks
                 },
                 benchmark => benchmark.Bench().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
-            },
-            ["Serialization"] = () =>
-            {
-                BenchmarkRunner.Run<SerializationBenchmarks>();
             },
             ["Transactions.Memory"] = () =>
             {
@@ -147,13 +139,52 @@ namespace Benchmarks
             {
                 new PingBenchmark(numSilos: 1, startClient: false).PingConcurrentHostedClient().GetAwaiter().GetResult();
             },
+            ["ConcurrentPing_HostedClient_Forever"] = () =>
+            {
+                var benchmark = new PingBenchmark(numSilos: 1, startClient: false);
+                Console.WriteLine("Press any key to begin.");
+                Console.ReadKey();
+                Console.WriteLine("Press any key to end.");
+                Console.WriteLine("## Hosted Client ##");
+                while (!Console.KeyAvailable)
+                {
+                    benchmark.PingConcurrentHostedClient().GetAwaiter().GetResult();
+                }
+
+                Console.WriteLine("Interrupted by user");
+            },
             ["ConcurrentPing_SiloToSilo"] = () =>
             {
                 new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 10).GetAwaiter().GetResult();                
             },
+            ["ConcurrentPing_SiloToSilo_Forever"] = () =>
+            {
+                Console.WriteLine("Press any key to begin.");
+                Console.ReadKey();
+                Console.WriteLine("Press any key to end.");
+                Console.WriteLine("## Silo to Silo ##");
+                while (!Console.KeyAvailable)
+                {
+                    var test = new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true);
+                    Console.WriteLine("Starting");
+                    test.PingConcurrentHostedClient(blocksPerWorker: 10).GetAwaiter().GetResult();
+                    Console.WriteLine("Stopping");
+                    test.Shutdown().GetAwaiter().GetResult();
+                }
+
+                Console.WriteLine("Interrupted by user");
+            },
             ["ConcurrentPing_SiloToSilo_Long"] = () =>
             {
                 new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 1000).GetAwaiter().GetResult();
+            },
+            ["ConcurrentPing_OneSilo_Forever"] = () =>
+            {
+                new PingBenchmark(numSilos: 1, startClient: true).PingConcurrentForever().GetAwaiter().GetResult();
+            },
+            ["PingOnce"] = () =>
+            {
+                new PingBenchmark().Ping().GetAwaiter().GetResult();
             },
             ["PingForever"] = () =>
             {

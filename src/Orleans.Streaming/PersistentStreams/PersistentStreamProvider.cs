@@ -33,7 +33,7 @@ namespace Orleans.Providers.Streams.Common
     {
         private readonly ILogger logger;
         private readonly IStreamProviderRuntime runtime;
-        private readonly SerializationManager serializationManager;
+        private readonly DeepCopier deepCopier;
         private readonly IRuntimeClient runtimeClient;
         private readonly ProviderStateManager stateManager = new ProviderStateManager();
         private IQueueAdapterFactory    adapterFactory;
@@ -45,7 +45,13 @@ namespace Orleans.Providers.Streams.Common
         public string Name { get; private set; }
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
-        public PersistentStreamProvider(string name, StreamPubSubOptions pubsubOptions, StreamLifecycleOptions lifeCycleOptions, IProviderRuntime runtime, SerializationManager serializationManager, ILogger<PersistentStreamProvider> logger)
+        public PersistentStreamProvider(
+            string name,
+            StreamPubSubOptions pubsubOptions,
+            StreamLifecycleOptions lifeCycleOptions,
+            IProviderRuntime runtime,
+            DeepCopier deepCopier,
+            ILogger<PersistentStreamProvider> logger)
         {
             if (String.IsNullOrEmpty(name)) throw new ArgumentNullException(nameof(name));
             if (runtime == null) throw new ArgumentNullException(nameof(runtime));
@@ -54,7 +60,7 @@ namespace Orleans.Providers.Streams.Common
             this.lifeCycleOptions = lifeCycleOptions ?? throw new ArgumentNullException(nameof(lifeCycleOptions));
             this.runtime = runtime.ServiceProvider.GetRequiredService<IStreamProviderRuntime>();
             this.runtimeClient = runtime.ServiceProvider.GetRequiredService<IRuntimeClient>();
-            this.serializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
+            this.deepCopier = deepCopier ?? throw new ArgumentNullException(nameof(deepCopier));
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -123,7 +129,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 throw new InvalidOperationException($"Stream provider {queueAdapter.Name} is ReadOnly.");
             }
-            return new PersistentStreamProducer<T>((StreamImpl<T>)stream, this.runtime, queueAdapter, IsRewindable, this.serializationManager);
+            return new PersistentStreamProducer<T>((StreamImpl<T>)stream, this.runtime, queueAdapter, IsRewindable, this.deepCopier);
         }
 
         IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)

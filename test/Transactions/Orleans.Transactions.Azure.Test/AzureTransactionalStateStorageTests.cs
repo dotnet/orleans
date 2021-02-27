@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.AzureStorage;
 using Orleans.Transactions.AzureStorage.Tests;

@@ -1,32 +1,32 @@
-﻿namespace UnitTests.FSharpTypes
+namespace UnitTests.FSharpTypes
 
-open System
-open Orleans.Concurrency
+open Orleans
 
-[<Serializable; Immutable>]
+[<Immutable; GenerateSerializer>]
 type SingleCaseDU = 
-    private 
-    | SingleCaseDU of int
+    | SingleCaseDU of int 
+    | OtherCase of string
     static member ofInt i = SingleCaseDU i
 
-[<Serializable; Immutable>]
-type Record = { A: SingleCaseDU } with
+[<Immutable; GenerateSerializer>]
+type Record = {  [<Id(1us)>] A: SingleCaseDU } with
     static member ofInt x = { A = SingleCaseDU.ofInt x }
 
-[<Serializable; Immutable>]
-type RecordOfIntOption = { A: int option } with
+[<Immutable; GenerateSerializer>]
+type RecordOfIntOption = {  [<Id(1us)>] A: int option } with
     static member Empty = { A = None }
     static member ofInt x = { A = Some x}
 
-type RecordOfIntOptionWithNoAttributes = { A: int option } with
+[<Immutable; GenerateSerializer>]
+type RecordOfIntOptionWithNoAttributes = {  [<Id(1us)>] A: int option } with
     static member Empty = { A = None }
     static member ofInt x = { A = Some x}
 
-[<Serializable; Immutable>]
-type GenericRecord<'T> = { Value: 'T } with
+[<Immutable; GenerateSerializer>]
+type GenericRecord<'T> = { [<Id(1us)>] Value: 'T } with
     static member ofT x = { Value = x }
 
-[<Serializable>]
+[<Immutable; GenerateSerializer>]
 type DiscriminatedUnion = 
     | ArrayFieldCase of int array
     | ListFieldCase of int list

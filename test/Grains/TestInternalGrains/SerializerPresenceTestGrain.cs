@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -11,7 +11,7 @@ namespace UnitTests.Grains
     {
         public Task<bool> SerializerExistsForType(Type t)
         {
-            return Task.FromResult(this.ServiceProvider.GetRequiredService<SerializationManager>().HasSerializer(t));
+            return Task.FromResult(this.ServiceProvider.GetRequiredService<Serializer>().CanSerialize(t));
         }
 
         public Task TakeSerializedData(object data)

@@ -9,7 +9,6 @@ using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers.Testing
 {
@@ -31,10 +30,9 @@ namespace Orleans.ServiceBus.Providers.Testing
             StreamStatisticOptions statisticOptions,
             IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider,
-            SerializationManager serializationManager,
             ITelemetryProducer telemetryProducer,
             ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, telemetryProducer, loggerFactory)
         {
             this.ehGeneratorOptions = options;
         }
@@ -131,16 +129,19 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// Args for RandomlyPlaceStreamToQueue method
         /// </summary>
         [Serializable]
+        [GenerateSerializer]
         public class StreamRandomPlacementArg
         {
             /// <summary>
             /// StreamId
             /// </summary>
+            [Id(0)]
             public StreamId StreamId { get; set; }
 
             /// <summary>
             /// A random number
             /// </summary>
+            [Id(1)]
             public int RandomNumber { get; set; }
 
             /// <summary>

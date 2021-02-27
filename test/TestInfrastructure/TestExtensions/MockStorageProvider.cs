@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,12 +30,12 @@ namespace UnitTests.StorageTests
 
                 if (typeof(ILifecycleParticipant<ISiloLifecycle>).IsAssignableFrom(typeof(T)))
                 {
-                    services.AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (svc, n) => (ILifecycleParticipant<ISiloLifecycle>)svc.GetRequiredServiceByName<IGrainStorage>(name));
+                    services.AddSingletonNamedService(name, (svc, n) => (ILifecycleParticipant<ISiloLifecycle>)svc.GetRequiredServiceByName<IGrainStorage>(name));
                 }
 
                 if (typeof(IControllable).IsAssignableFrom(typeof(T)))
                 {
-                    services.AddSingletonNamedService<IControllable>(name, (svc, n) => (IControllable)svc.GetRequiredServiceByName<IGrainStorage>(name));
+                    services.AddSingletonNamedService(name, (svc, n) => (IControllable)svc.GetRequiredServiceByName<IGrainStorage>(name));
                 }
             });
         }
@@ -55,12 +54,18 @@ namespace UnitTests.StorageTests
             ResetHistory
         }
         [Serializable]
+        [GenerateSerializer]
         public class StateForTest 
         {
+            [Id(0)]
             public int InitCount { get; set; }
+            [Id(1)]
             public int CloseCount { get; set; }
+            [Id(2)]
             public int ReadCount { get; set; }
+            [Id(3)]
             public int WriteCount { get; set; }
+            [Id(4)]
             public int DeleteCount { get; set; }
         }
 
@@ -70,8 +75,8 @@ namespace UnitTests.StorageTests
         private int initCount, closeCount, readCount, writeCount, deleteCount;
 
         private readonly int numKeys;
+        private readonly DeepCopier copier;
         private ILocalDataStore StateStore;
-        private SerializationManager serializationManager;
         private const string stateStoreKey = "State";
         private ILogger logger;
         public string LastId { get; private set; }
@@ -79,24 +84,23 @@ namespace UnitTests.StorageTests
 
         public string Name { get; private set; }
 
-        public MockStorageProvider(ILoggerFactory loggerFactory, SerializationManager serializationManager)
-            : this(Guid.NewGuid().ToString(), 2, loggerFactory, serializationManager)
+        public MockStorageProvider(ILoggerFactory loggerFactory, DeepCopier copier)
+            : this(Guid.NewGuid().ToString(), 2, loggerFactory, copier)
         { }
 
-        public MockStorageProvider(string name, ILoggerFactory loggerFactory, SerializationManager serializationManager)
-            : this(name, 2, loggerFactory, serializationManager)
+        public MockStorageProvider(string name, ILoggerFactory loggerFactory, DeepCopier copier)
+            : this(name, 2, loggerFactory, copier)
         { }
 
-        public MockStorageProvider(string name, int numKeys, ILoggerFactory loggerFactory, SerializationManager serializationManager)
+        public MockStorageProvider(string name, int numKeys, ILoggerFactory loggerFactory, DeepCopier copier)
         {
             _id = ++_instanceNum;
             this.numKeys = numKeys;
-
+            this.copier = copier;
             this.Name = name;
             this.logger = loggerFactory.CreateLogger(string.Format("Storage.{0}-{1}", this.GetType().Name, this._id));
 
             logger.Info(0, "Init Name={0}", name);
-            this.serializationManager = serializationManager;
             Interlocked.Increment(ref initCount);
 
             StateStore = new HierarchicalKeyStore(numKeys);
@@ -116,12 +120,18 @@ namespace UnitTests.StorageTests
         }
 
         [Serializable]
+        [GenerateSerializer]
         public class SetValueArgs
         {
+            [Id(0)]
             public Type StateType { get; set; }
+            [Id(1)]
             public string GrainType { get; set; }
+            [Id(2)]
             public GrainReference GrainReference { get; set; }
+            [Id(3)]
             public string Name { get; set; }
+            [Id(4)]
             public object Val { get; set; }
 
         }
@@ -195,7 +205,7 @@ namespace UnitTests.StorageTests
             {
                 var storedState = GetLastState(grainType, grainReference, grainState);
                 grainState.RecordExists = storedState != null;
-                grainState.State = this.serializationManager.DeepCopy(storedState); // Read current state data
+                grainState.State = this.copier.Copy(storedState); // Read current state data
             }
             return Task.CompletedTask;
         }
@@ -206,7 +216,7 @@ namespace UnitTests.StorageTests
             Interlocked.Increment(ref writeCount);
             lock (StateStore)
             {
-                var storedState = this.serializationManager.DeepCopy(grainState.State); // Store current state data
+                var storedState = this.copier.Copy(grainState.State); // Store current state data
                 var stateStore = new Dictionary<string, object> {{ stateStoreKey, storedState }};
                 StateStore.WriteRow(MakeGrainStateKeys(grainType, grainReference), stateStore, grainState.ETag);
 

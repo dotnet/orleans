@@ -1,7 +1,3 @@
-
-using System.Xml.Serialization;
-using Orleans.Concurrency;
-
 namespace Orleans.Transactions.Abstractions
 {
     public class TransactionalStateConfiguration : ITransactionalStateConfiguration

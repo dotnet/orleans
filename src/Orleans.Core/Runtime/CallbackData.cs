@@ -1,32 +1,27 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks;
-using Orleans.CodeGeneration;
-using Orleans.Transactions;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
     internal class CallbackData
     {
         private readonly SharedCallbackData shared;
-        private readonly TaskCompletionSource<object> context;
+        private readonly IResponseCompletionSource context;
         private int completed;
         private StatusResponse lastKnownStatus;
         private ValueStopwatch stopwatch;
 
         public CallbackData(
             SharedCallbackData shared,
-            TaskCompletionSource<object> ctx, 
+            IResponseCompletionSource ctx, 
             Message msg)
         {
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
-            this.TransactionInfo = TransactionContext.GetTransactionInfo();
             this.stopwatch = ValueStopwatch.StartNew();
         }
-
-        public ITransactionInfo TransactionInfo { get; set; }
 
         public Message Message { get; } // might hold metadata used by response pipeline
 
@@ -45,8 +40,20 @@ namespace Orleans.Runtime
 
         public void OnTimeout(TimeSpan timeout)
         {
-            if (this.IsCompleted)
+            if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
+            {
                 return;
+            }
+
+            this.shared.Unregister(this.Message);
+
+            var requestStatistics = this.shared.RequestStatistics;
+            if (requestStatistics.CollectApplicationRequestsStats)
+            {
+                this.stopwatch.Stop();
+                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
+                requestStatistics.OnAppRequestsTimedOut();
+            }
 
             OrleansCallBackDataEvent.Log.OnTimeout(this.Message);
 
@@ -58,73 +65,104 @@ namespace Orleans.Runtime
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
             var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
-            OnFail(msg, error, isOnTimeout: true);
+            ResponseCallback(error, this.context);
+            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void OnTargetSiloFail()
         {
-            if (this.IsCompleted)
+            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
+            {
                 return;
+            }
+
+            this.shared.Unregister(this.Message);
+            var requestStatistics = this.shared.RequestStatistics;
+            if (requestStatistics.CollectApplicationRequestsStats)
+            {
+                this.stopwatch.Stop();
+                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
+            }
+
             OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
             var msg = this.Message;
             var messageHistory = msg.GetTargetHistory();
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            string errorMsg = 
+            var errorMsg =
                 $"The target silo became unavailable for message: {msg}. {statusMessage}Target History is: {messageHistory}. See {Constants.TroubleshootingHelpLink} for troubleshooting help.";
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
-
             var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
-            OnFail(msg, error, isOnTimeout: false);
+            ResponseCallback(error, this.context);
+            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void DoCallback(Message response)
         {
-            if (this.IsCompleted)
+            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
+            {
                 return;
+            }
 
             OrleansCallBackDataEvent.Log.DoCallback(this.Message);
 
-            if (Interlocked.CompareExchange(ref this.completed, 1, 0) == 0)
+            var requestStatistics = this.shared.RequestStatistics;
+            if (requestStatistics.CollectApplicationRequestsStats)
             {
-                var requestStatistics = this.shared.RequestStatistics;
-                if (requestStatistics.CollectApplicationRequestsStats)
-                {
-                    this.stopwatch.Stop();
-                }
+                this.stopwatch.Stop();
+                requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
+            }
 
-                if (requestStatistics.CollectApplicationRequestsStats)
-                {
-                    requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-                }
+            // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
+            ResponseCallback(response, this.context);
+            //(this.Message.BodyObject as IDisposable)?.Dispose();
+        }
 
-                // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-                this.shared.ResponseCallback(response, this.context);
+        public static void ResponseCallback(Message message, IResponseCompletionSource context)
+        {
+            if (message.Result != Message.ResponseTypes.Rejection)
+            {
+                try
+                {
+                    var response = (Response)message.BodyObject;
+                    context.Complete(response);
+                }
+                catch (Exception exc)
+                {
+                    // catch the exception and break the promise with it.
+                    context.Complete(Response.FromException(exc));
+                }
+            }
+            else
+            {
+                OnRejection(message, context);
             }
         }
 
-        private void OnFail(Message msg, Message error, bool isOnTimeout = false)
+        private static void OnRejection(Message message, IResponseCompletionSource context)
         {
-            if (Interlocked.CompareExchange(ref this.completed, 1, 0) == 0)
+            Exception rejection;
+            switch (message.RejectionType)
             {
-                var requestStatistics = this.shared.RequestStatistics;
-                if (requestStatistics.CollectApplicationRequestsStats)
-                {
-                    this.stopwatch.Stop();
-                }
+                case Message.RejectionTypes.GatewayTooBusy:
+                    rejection = new GatewayTooBusyException();
+                    break;
+                case Message.RejectionTypes.DuplicateRequest:
+                    return; // Ignore duplicates
 
-                this.shared.Unregister(this.Message);
-
-                if (requestStatistics.CollectApplicationRequestsStats)
-                {
-                    requestStatistics.OnAppRequestsEnd(this.stopwatch.Elapsed);
-                    if (isOnTimeout)
+                default:
+                    rejection = message.BodyObject as Exception;
+                    if (rejection == null)
                     {
-                        requestStatistics.OnAppRequestsTimedOut();
+                        if (string.IsNullOrEmpty(message.RejectionInfo))
+                        {
+                            message.RejectionInfo = "Unable to send request - no rejection info available";
+                        }
+                        rejection = new OrleansMessageRejectionException(message.RejectionInfo);
                     }
-                }
-
-                this.shared.ResponseCallback(error, this.context);
+                    break;
             }
+
+            context.Complete(Response.FromException(rejection));
         }
     }
 }

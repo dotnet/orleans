@@ -44,8 +44,6 @@ namespace Orleans.TestingHost
                 AssumeHomogenousSilosForTesting = true
             };
 
-            this.AddClientBuilderConfigurator<AddTestHooksApplicationParts>();
-            this.AddSiloBuilderConfigurator<AddTestHooksApplicationParts>();
             this.AddSiloBuilderConfigurator<ConfigureStaticClusterDeploymentOptions>();
             this.ConfigureBuilder(ConfigureDefaultPorts);
         }
@@ -151,19 +149,6 @@ namespace Orleans.TestingHost
             (int baseSiloPort, int baseGatewayPort) = this.PortAllocator.AllocateConsecutivePortPairs(this.Options.InitialSilosCount + 3);
             if (this.Options.BaseSiloPort == 0) this.Options.BaseSiloPort = baseSiloPort;
             if (this.Options.BaseGatewayPort == 0) this.Options.BaseGatewayPort = baseGatewayPort;
-        }
-
-        internal class AddTestHooksApplicationParts : IClientBuilderConfigurator, ISiloConfigurator
-        {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
-            }
-
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
-            }
         }
 
         internal class ConfigureStaticClusterDeploymentOptions : ISiloConfigurator

@@ -15,9 +15,12 @@ using Xunit;
 namespace UnitTests.Grains
 {
     [Serializable]
+    [GenerateSerializer]
     public class EchoTaskGrainState
     {
+        [Id(0)]
         public int MyId { get; set; }
+        [Id(1)]
         public string LastEcho { get; set; }
     }
 

@@ -11,10 +11,14 @@ namespace UnitTests.GrainInterfaces
     }
 
     [Serializable]
+    [GenerateSerializer]
     public struct MemberVariables
     {
+        [Id(0)]
         public byte[] byteArray;
+        [Id(1)]
         public string stringVar;
+        [Id(2)]
         public ReturnCode code;
 
         public MemberVariables(byte[] bytes, string str, ReturnCode codeInput)

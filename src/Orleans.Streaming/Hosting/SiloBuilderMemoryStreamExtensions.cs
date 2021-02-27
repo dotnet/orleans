@@ -14,8 +14,7 @@ namespace Orleans.Hosting
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
             var memoryStreamConfiguretor = new SiloMemoryStreamConfigurator<TSerializer>(name,
-                configureDelegate => builder.ConfigureServices(configureDelegate),
-                configureDelegate => builder.ConfigureApplicationParts(configureDelegate)
+                configureDelegate => builder.ConfigureServices(configureDelegate)
             );
             configure?.Invoke(memoryStreamConfiguretor);
             return builder;
@@ -30,8 +29,7 @@ namespace Orleans.Hosting
         {
             //the constructor wire up DI with all default components of the streams , so need to be called regardless of configureStream null or not
             var memoryStreamConfiguretor = new SiloMemoryStreamConfigurator<TSerializer>(name,
-                configureDelegate => builder.ConfigureServices(configureDelegate),
-                configureDelegate => builder.ConfigureApplicationParts(configureDelegate)
+                configureDelegate => builder.ConfigureServices(configureDelegate)
             );
             configure?.Invoke(memoryStreamConfiguretor);
             return builder;

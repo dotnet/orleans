@@ -1,6 +1,5 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Providers;
 
@@ -22,11 +21,10 @@ namespace Orleans.Hosting
           where TSerializer : class, IMemoryMessageBodySerializer
     {
         public SiloMemoryStreamConfigurator(
-            string name, Action<Action<IServiceCollection>> configureServicesDelegate, Action<Action<IApplicationPartManager>> configureAppPartsDelegate)
+            string name, Action<Action<IServiceCollection>> configureServicesDelegate)
             : base(name, configureServicesDelegate, MemoryAdapterFactory<TSerializer>.Create)
         {
             this.ConfigureDelegate(services => services.ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
-            configureAppPartsDelegate(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
         }
     }
 
@@ -38,8 +36,6 @@ namespace Orleans.Hosting
         public ClusterClientMemoryStreamConfigurator(string name, IClientBuilder builder)
          : base(name, builder, MemoryAdapterFactory<TSerializer>.Create)
         {
-            builder
-                .ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(MemoryAdapterFactory<>).Assembly));
         }
     }
 }

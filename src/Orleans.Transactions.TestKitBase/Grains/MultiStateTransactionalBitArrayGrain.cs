@@ -11,6 +11,7 @@ using Orleans.Transactions.Abstractions;
 namespace Orleans.Transactions.TestKit.Correctnesss
 {
     [Serializable]
+    [GenerateSerializer]
     public class BitArrayState
     {
         protected bool Equals(BitArrayState other)
@@ -45,6 +46,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         private static readonly int BitsInInt = sizeof(int) * 8;
 
         [JsonProperty("v")]
+        [Id(0)]
         private int[] value = { 0 };
 
         [JsonIgnore]
@@ -160,6 +162,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         }
     }
 
+    [GrainType("txn-correctness-MaxStateTransactionalGrain")]
     public class MaxStateTransactionalGrain : MultiStateTransactionalBitArrayGrain
     {
         public MaxStateTransactionalGrain(ITransactionalStateFactory stateFactory,
@@ -172,6 +175,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         }
     }
 
+    [GrainType("txn-correctness-DoubleStateTransactionalGrain")]
     public class DoubleStateTransactionalGrain : MultiStateTransactionalBitArrayGrain
     {
         public DoubleStateTransactionalGrain(
@@ -185,6 +189,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         }
     }
 
+    [GrainType("txn-correctness-SingleStateTransactionalGrain")]
     public class SingleStateTransactionalGrain : MultiStateTransactionalBitArrayGrain
     {
         public SingleStateTransactionalGrain(
@@ -196,6 +201,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         }
     }
 
+    [GrainType("txn-correctness-MultiStateTransactionalBitArrayGrain")]
     public class MultiStateTransactionalBitArrayGrain : Grain, ITransactionalBitArrayGrain
     {
         protected ITransactionalState<BitArrayState>[] dataArray;

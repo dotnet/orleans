@@ -11,9 +11,13 @@ namespace UnitTests.GrainInterfaces
         public const string NonBatchingNameSpace = "nonbatching";
     }
 
+    [GenerateSerializer]
     public class ConsumptionReport
     {
+        [Id(0)]
         public int Consumed { get; set; }
+
+        [Id(1)]
         public int MaxBatchSize { get; set; }
     }
 

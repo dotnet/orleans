@@ -4,7 +4,6 @@ using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
@@ -13,7 +12,6 @@ namespace UnitTests.StreamingTests
 {
     public class SMSSubscriptionMultiplicityTests : OrleansTestingBase, IClassFixture<SMSSubscriptionMultiplicityTests.Fixture>
     {
-       
         public class Fixture : BaseTestClusterFixture
         {
             public const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;

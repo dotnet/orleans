@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using Orleans.ApplicationParts;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Metadata;
 
 namespace Orleans.Runtime
@@ -11,12 +12,12 @@ namespace Orleans.Runtime
         public ClientManifestProvider(
             IEnumerable<IGrainPropertiesProvider> grainPropertiesProviders,
             IEnumerable<IGrainInterfacePropertiesProvider> grainInterfacePropertiesProviders,
-            IApplicationPartManager applicationPartManager,
+            IOptions<GrainTypeOptions> grainTypeOptions,
             GrainTypeResolver grainTypeResolver,
             GrainInterfaceTypeResolver interfaceTypeResolver)
         {
-            var grainProperties = CreateGrainManifest(grainPropertiesProviders, applicationPartManager, grainTypeResolver);
-            var interfaces = CreateInterfaceManifest(grainInterfacePropertiesProviders, applicationPartManager, interfaceTypeResolver);
+            var grainProperties = CreateGrainManifest(grainPropertiesProviders, grainTypeOptions, grainTypeResolver);
+            var interfaces = CreateInterfaceManifest(grainInterfacePropertiesProviders, grainTypeOptions, interfaceTypeResolver);
             this.ClientManifest = new GrainManifest(grainProperties, interfaces);
         }
 
@@ -24,29 +25,28 @@ namespace Orleans.Runtime
 
         private static ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> CreateInterfaceManifest(
             IEnumerable<IGrainInterfacePropertiesProvider> propertyProviders,
-            IApplicationPartManager applicationPartManager,
+            IOptions<GrainTypeOptions> grainTypeOptions,
             GrainInterfaceTypeResolver interfgaceTypeResolver)
         {
-            var feature = applicationPartManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
             var builder = ImmutableDictionary.CreateBuilder<GrainInterfaceType, GrainInterfaceProperties>();
-            foreach (var value in feature.Interfaces)
+            foreach (var grainInterface in grainTypeOptions.Value.Interfaces)
             {
-                var interfaceType = interfgaceTypeResolver.GetGrainInterfaceType(value.InterfaceType);
+                var interfaceId = interfgaceTypeResolver.GetGrainInterfaceType(grainInterface);
                 var properties = new Dictionary<string, string>();
                 foreach (var provider in propertyProviders)
                 {
-                    provider.Populate(value.InterfaceType, interfaceType, properties);
+                    provider.Populate(grainInterface, interfaceId, properties);
                 }
 
                 var result = new GrainInterfaceProperties(properties.ToImmutableDictionary());
-                if (builder.ContainsKey(interfaceType))
+                if (builder.ContainsKey(interfaceId))
                 {
-                    throw new InvalidOperationException($"An entry with the key {interfaceType} is already present."
-                        + $"\nExisting: {builder[interfaceType].ToDetailedString()}\nTrying to add: {result.ToDetailedString()}"
+                    throw new InvalidOperationException($"An entry with the key {interfaceId} is already present."
+                        + $"\nExisting: {builder[interfaceId].ToDetailedString()}\nTrying to add: {result.ToDetailedString()}"
                         + "\nConsider using the [GrainInterfaceType(\"name\")] attribute to give these interfaces unique names.");
                 }
 
-                builder.Add(interfaceType, result);
+                builder.Add(interfaceId, result);
             }
 
             return builder.ToImmutable();
@@ -54,19 +54,17 @@ namespace Orleans.Runtime
 
         private static ImmutableDictionary<GrainType, GrainProperties> CreateGrainManifest(
             IEnumerable<IGrainPropertiesProvider> grainMetadataProviders,
-            IApplicationPartManager applicationPartManager,
+            IOptions<GrainTypeOptions> grainTypeOptions,
             GrainTypeResolver grainTypeProvider)
         {
-            var feature = applicationPartManager.CreateAndPopulateFeature<GrainClassFeature>();
             var propertiesMap = ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
-            foreach (var value in feature.Classes)
+            foreach (var grainClass in grainTypeOptions.Value.Classes)
             {
-                var grainClass = value.ClassType;
-                var grainType = grainTypeProvider.GetGrainType(grainClass);
+                var grainType = grainTypeProvider.GetGrainType((Type)grainClass);
                 var properties = new Dictionary<string, string>();
                 foreach (var provider in grainMetadataProviders)
                 {
-                    provider.Populate(grainClass, grainType, properties);
+                    provider.Populate((Type)grainClass, grainType, properties);
                 }
 
                 var result = new GrainProperties(properties.ToImmutableDictionary());

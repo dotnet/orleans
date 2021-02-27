@@ -5,13 +5,10 @@ using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
-using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
-using System.Transactions;
 
 namespace Orleans.Transactions
 {
-    [Reentrant]
     internal class TransactionAgent : ITransactionAgent
     {
         private readonly ILogger logger;
@@ -28,7 +25,7 @@ namespace Orleans.Transactions
             this.overloadDetector = overloadDetector;
         }
 
-        public Task<ITransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
+        public Task<TransactionInfo> StartTransaction(bool readOnly, TimeSpan timeout)
         {
             if (overloadDetector.IsOverloaded())
             {
@@ -42,13 +39,11 @@ namespace Orleans.Transactions
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} start transaction {guid} at {ts:o}");
             this.statistics.TrackTransactionStarted();
-            return Task.FromResult<ITransactionInfo>(new TransactionInfo(guid, ts, ts));
+            return Task.FromResult<TransactionInfo>(new TransactionInfo(guid, ts, ts));
         }
 
-        public async Task<(TransactionalStatus, Exception)> Resolve(ITransactionInfo info)
+        public async Task<(TransactionalStatus, Exception)> Resolve(TransactionInfo transactionInfo)
         {
-            var transactionInfo = (TransactionInfo)info;
-
             transactionInfo.TimeStamp = this.clock.MergeUtcNow(transactionInfo.TimeStamp);
 
             if (logger.IsEnabled(LogLevel.Trace))
@@ -219,10 +214,9 @@ namespace Orleans.Transactions
             return (status, exception);
         }
 
-        public async Task Abort(ITransactionInfo info)
+        public async Task Abort(TransactionInfo transactionInfo)
         {
             this.statistics.TrackTransactionFailed();
-            var transactionInfo = (TransactionInfo)info;
 
             List<ParticipantId> participants = transactionInfo.Participants.Keys.ToList();
 

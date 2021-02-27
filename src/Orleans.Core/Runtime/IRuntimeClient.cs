@@ -1,6 +1,8 @@
 using System;
-using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
+using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -37,7 +39,7 @@ namespace Orleans.Runtime
         /// <param name="timeout">New response timeout value</param>
         void SetResponseTimeout(TimeSpan timeout);
 
-        void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, InvokeMethodOptions options);
+        void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options);
 
         void SendResponse(Message request, Response response);
 
@@ -45,12 +47,30 @@ namespace Orleans.Runtime
 
         void Reset(bool cleanup);
 
-        IAddressable CreateObjectReference(IAddressable obj, IGrainMethodInvoker invoker);
+        IAddressable CreateObjectReference(IAddressable obj);
 
         void DeleteObjectReference(IAddressable obj);
 
         IGrainReferenceRuntime GrainReferenceRuntime { get; }
 
         void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo);
+    }
+
+    public class OnDeserializedCallbacks : DeserializationContext
+    {
+        private readonly IServiceProvider _serviceProvider;
+        private readonly IRuntimeClient _runtimeClient;
+
+        public OnDeserializedCallbacks(IServiceProvider serviceProvider)
+        {
+            _serviceProvider = serviceProvider;
+            _runtimeClient = serviceProvider.GetRequiredService<IRuntimeClient>();
+        }
+
+        public override IServiceProvider ServiceProvider => _serviceProvider;
+
+        public override object RuntimeClient => _runtimeClient;
+
+        public void OnDeserialized(IOnDeserialized value) => value.OnDeserialized(this);
     }
 }

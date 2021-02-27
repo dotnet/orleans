@@ -1,11 +1,9 @@
-﻿using Orleans;
-using Orleans.CodeGeneration;
-using Orleans.Serialization;
+using Orleans;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Serializers;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -27,38 +25,28 @@ namespace TestGrainInterfaces
 
         /// <summary> Edit a specific post. </summary>
         Task Edit(Guid guid, string text);
-
     }
-
 
     /// <summary>
     /// Since XDocument does not seem to serialize automatically, we provide the necessary methods
     /// </summary>
-    [Serializer(typeof(XDocument))]
-    public class XDocumentSerialization
+    [RegisterSerializer]
+    [RegisterCopier]
+    public class XDocumentSerialization : GeneralizedReferenceTypeSurrogateCodec<XDocument, XDocumentSurrogate>, IDeepCopier<XDocument>
     {
-        [CopierMethod]
-        public static object DeepCopier(object original, ICopyContext context)
+        public XDocumentSerialization(IValueSerializer<XDocumentSurrogate> surrogateSerializer) : base(surrogateSerializer)
         {
-            return new XDocument((XDocument)original);
         }
 
-        [SerializerMethod]
-        public static void Serialize(object untypedInput, ISerializationContext context, Type expected)
-        {
-            var document = (XDocument)untypedInput;
-            var stream = context.StreamWriter;
-            stream.Write(document.ToString());
-        }
-
-        [DeserializerMethod]
-        public static object Deserialize(Type expected, IDeserializationContext context)
-        {
-            var stream = context.StreamReader;
-            var text = stream.ReadString();
-            return XDocument.Load(new StringReader(text));
-        }
-
+        public override XDocument ConvertFromSurrogate(ref XDocumentSurrogate surrogate) => XDocument.Load(new StringReader(surrogate.Value));
+        public override void ConvertToSurrogate(XDocument value, ref XDocumentSurrogate surrogate) => surrogate.Value = value.ToString();
+        public XDocument DeepCopy(XDocument input, CopyContext context) => new(input);
     }
 
+    [GenerateSerializer]
+    public struct XDocumentSurrogate
+    {
+        [Id(0)]
+        public string Value { get; set; }
+    }
 }

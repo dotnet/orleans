@@ -5,6 +5,7 @@
     <Description>Base types for creating Microsoft Orleans grains with event-sourced state.</Description>
     <PackageTags>$(PackageTags) EventSourcing</PackageTags>
     <TargetFrameworks>$(StandardTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
   <PropertyGroup>

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Diagnostics;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -53,18 +54,20 @@ namespace Orleans.Runtime
         /// <param name="request"></param>
         internal static void RegisterCancellationTokens(
             IGrainContext target,
-            InvokeMethodRequest request)
+            IInvokable request)
         {
-            for (var i = 0; i < request.Arguments.Length; i++)
+            for (var i = 0; i < request.ArgumentCount; i++)
             {
-                var arg = request.Arguments[i];
-                if (!(arg is GrainCancellationToken)) continue;
-                var grainToken = ((GrainCancellationToken) request.Arguments[i]);
+                var arg = request.GetArgument<object>(i);
+                if (arg is not GrainCancellationToken grainToken)
+                {
+                    continue;
+                }
 
-                var cancellationExtension = (CancellationSourcesExtension)target.GetGrainExtension<ICancellationSourcesExtension>(); 
+                var cancellationExtension = (CancellationSourcesExtension)target.GetGrainExtension<ICancellationSourcesExtension>();
 
                 // Replacing the half baked GrainCancellationToken that came from the wire with locally fully created one.
-                request.Arguments[i] = cancellationExtension.RecordCancellationToken(grainToken.Id, grainToken.IsCancellationRequested);
+                request.SetArgument(i, cancellationExtension.RecordCancellationToken(grainToken.Id, grainToken.IsCancellationRequested));
             }
         }
 

@@ -7,12 +7,15 @@ namespace Orleans.EventSourcing.Common
     /// Describes a connection issue that occurred when sending update notifications to remote instances.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class NotificationFailed : ConnectionIssue
     {
         /// <summary> The destination cluster which we could not reach successfully. </summary>
+        [Id(0)]
         public string RemoteCluster { get; set; }
 
         /// <summary> The exception we caught when trying to send the notification message. </summary>
+        [Id(1)]
         public Exception Exception { get; set; }
 
         /// <inheritdoc/>
@@ -28,11 +31,13 @@ namespace Orleans.EventSourcing.Common
     /// Describes a connection issue that occurred when communicating with primary storage.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class PrimaryOperationFailed : ConnectionIssue
     {
         /// <summary>
         /// The exception that was caught when communicating with the primary.
         /// </summary>
+        [Id(0)]
         public Exception Exception { get; set; }
 
         /// <inheritdoc/>

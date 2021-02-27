@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Messaging
     /// This type is used for inserting the length of list in the header when the length is not known beforehand.
     /// It is optimized to minimize or avoid copying.
     /// </remarks>
-    public class PrefixingBufferWriter<T, TBufferWriter> : IBufferWriter<T> where TBufferWriter : IBufferWriter<T>
+    public class PrefixingBufferWriter<T, TBufferWriter> : IBufferWriter<T>, IDisposable where TBufferWriter : IBufferWriter<T> 
     {
         private readonly MemoryPool<T> memoryPool;
 
@@ -184,6 +184,11 @@ namespace Orleans.Runtime.Messaging
             if (writer.Equals(default(TBufferWriter))) ThrowInnerWriter();
             void ThrowInnerWriter() => throw new ArgumentNullException(nameof(writer));
             this.innerWriter = writer;
+        }
+
+        public void Dispose()
+        {
+            this.privateWriter?.Dispose();
         }
 
         /// <summary>

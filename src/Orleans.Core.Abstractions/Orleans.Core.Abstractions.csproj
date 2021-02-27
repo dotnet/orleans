@@ -10,9 +10,9 @@
     <RootNamespace>Orleans</RootNamespace>
   </PropertyGroup>
 
-  <ItemGroup Condition="$(TargetFrameworkIdentifier)=='.NETStandard'">
+  <ItemGroup>
     <PackageReference Include="Microsoft.Bcl.HashCode" Version="$(MicrosoftBclHashCodeVersion)" />
     <PackageReference Include="System.Collections.Immutable" Version="$(SystemCollectionsImmutableVersion)" />
   </ItemGroup>
-  
+
 </Project>

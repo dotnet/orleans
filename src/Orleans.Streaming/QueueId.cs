@@ -1,5 +1,4 @@
 using System;
-using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -10,12 +9,15 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [Immutable]
+    [GenerateSerializer]
     public sealed class QueueId : IRingIdentifier<QueueId>, IEquatable<QueueId>, IComparable<QueueId>
     {
         private static readonly Interner<QueueId, QueueId> queueIdInternCache = new Interner<QueueId, QueueId>(InternerConstants.SIZE_LARGE);
-
+        [Id(1)]
         private readonly string queueNamePrefix;
+        [Id(2)]
         private readonly uint queueId;
+        [Id(3)]
         private readonly uint uniformHashCache;
 
         // TODO: Need to integrate with Orleans serializer to really use Interner.

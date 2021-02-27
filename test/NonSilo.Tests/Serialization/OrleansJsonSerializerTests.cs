@@ -1,19 +1,20 @@
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using TestExtensions;
 using Xunit;
 
 namespace UnitTests.Serialization
 {
+    using System;
     using System.Text;
-
+    using FluentAssertions.Common;
+    using Microsoft.OData.Json;
     using Newtonsoft.Json;
 
     using Orleans.Serialization;
+    using Orleans.Serialization.Serializers;
 
     [TestCategory("Serialization"), TestCategory("BVT")]
     public class OrleansJsonSerializerTests
@@ -23,14 +24,16 @@ namespace UnitTests.Serialization
         public OrleansJsonSerializerTests()
         {
             this.environment = SerializationTestEnvironment.InitializeWithDefaults(
-                builder => builder.Configure<SerializationProviderOptions>(
-                    options => options.SerializationProviders.Add(typeof(OrleansJsonSerializer))));
+                builder => builder.ConfigureServices(services =>
+                {
+                    services.AddSingleton<IGeneralizedCodec>(new NewtonsoftJsonCodec(isSupportedFunc: type => type.HasAttribute<JsonTypeAttribute>()));
+                }));
         }
 
         [Fact]
         public void OrleansJsonSerializer_ExternalSerializer_Client()
         {
-            TestSerializationRoundTrip(this.environment.SerializationManager);
+            TestSerializationRoundTrip(this.environment.Serializer);
         }
 
         [Fact]
@@ -39,23 +42,26 @@ namespace UnitTests.Serialization
             var silo = new SiloHostBuilder()
                 .Configure<ClusterOptions>(o => o.ClusterId = o.ServiceId = "s")
                 .UseLocalhostClustering()
-                .Configure<SerializationProviderOptions>(o =>
-                    o.SerializationProviders.Add(typeof(OrleansJsonSerializer)))
+                .ConfigureServices(
+                services =>
+                {
+                    services.AddSingleton<IGeneralizedCodec>(new NewtonsoftJsonCodec(isSupportedFunc: type => type.HasAttribute<JsonTypeAttribute>()));
+                })
                 .Build();
-            var serializationManager = silo.Services.GetRequiredService<SerializationManager>();
-            TestSerializationRoundTrip(serializationManager);
+            var serializer = silo.Services.GetRequiredService<Serializer>();
+            TestSerializationRoundTrip(serializer);
         }
 
-        private static void TestSerializationRoundTrip(SerializationManager serializationManager)
+        private static void TestSerializationRoundTrip(Serializer serializer)
         {
             var data = new JsonPoco {Prop = "some data"};
-            var serialized = serializationManager.SerializeToByteArray(data);
+            var serialized = serializer.SerializeToArray(data);
             var subSequence = Encoding.UTF8.GetBytes("crazy_name");
 
             // The serialized data should have our custom [JsonProperty] name, 'crazy_name', in it.
             Assert.Contains(ToString(subSequence), ToString(serialized));
 
-            var deserialized = serializationManager.DeserializeFromByteArray<JsonPoco>(serialized);
+            var deserialized = serializer.Deserialize<JsonPoco>(serialized);
 
             Assert.Equal(data.Prop, deserialized.Prop);
         }
@@ -71,6 +77,15 @@ namespace UnitTests.Serialization
             return result.ToString();
         }
 
+        /// <summary>
+        /// Use a custom attribute to distinguish types which should be serialized using the JSON codec.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+        internal class JsonTypeAttribute : Attribute
+        {
+        }
+
+        [JsonType]
         public class JsonPoco
         {
             [JsonProperty("crazy_name")]

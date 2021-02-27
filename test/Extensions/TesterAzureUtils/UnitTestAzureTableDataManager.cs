@@ -9,9 +9,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Tester.AzureUtils
 {
     [Serializable]
+    [Orleans.GenerateSerializer]
     public class UnitTestAzureTableData : TableEntity
     {
+        [Orleans.Id(0)]
         public byte[] Data { get; set; }
+        [Orleans.Id(1)]
         public string StringData { get; set; }
 
         public UnitTestAzureTableData()

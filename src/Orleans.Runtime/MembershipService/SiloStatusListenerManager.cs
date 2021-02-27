@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Collections.Immutable;
-using Orleans.Runtime.Utilities;
 using Orleans.Internal;
 
 namespace Orleans.Runtime.MembershipService

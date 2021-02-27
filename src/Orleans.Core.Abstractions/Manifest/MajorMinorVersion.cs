@@ -1,5 +1,4 @@
 using System;
-using Orleans.Concurrency;
 
 namespace Orleans.Metadata
 {
@@ -7,6 +6,7 @@ namespace Orleans.Metadata
     /// Represents a version with two components, a major (most-significant) component, and a minor (least-significant) component.
     /// </summary>
     [Serializable, Immutable]
+    [GenerateSerializer]
     public readonly struct MajorMinorVersion : IComparable<MajorMinorVersion>, IEquatable<MajorMinorVersion>
     {
         public MajorMinorVersion(long majorVersion, long minorVersion)
@@ -23,11 +23,13 @@ namespace Orleans.Metadata
         /// <summary>
         /// Gets the most significant version component.
         /// </summary>
+        [Id(1)]
         public long Major { get; }
 
         /// <summary>
         /// Gets the least significant version component.
         /// </summary>
+        [Id(2)]
         public long Minor { get; }
 
         /// <summary>

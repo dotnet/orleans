@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Xml;
 using Microsoft.Extensions.Logging;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
@@ -126,6 +125,7 @@ namespace Orleans.Runtime.Management
         }
 
         public async Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(SiloAddress[] hostsIds)
+
         {
             var all = GetSiloAddresses(hostsIds).Select(s =>
                 GetSiloControlReference(s).GetSimpleGrainStatistics()).ToList();

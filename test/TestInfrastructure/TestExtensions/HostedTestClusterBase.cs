@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Serialization;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -23,6 +24,26 @@ namespace TestExtensions
         protected HostedTestClusterEnsureDefaultStarted(DefaultClusterFixture fixture)
         {
             this.Fixture = fixture;
+        }
+    }
+
+    public static class TestClusterExtensions
+    {
+        public static T RoundTripSerializationForTesting<T>(this TestCluster cluster, T value)
+        {
+            var serializer = cluster.ServiceProvider.GetRequiredService<Serializer>();
+            return serializer.Deserialize<T>(serializer.SerializeToArray(value));
+        }
+
+        public static T DeepCopy<T>(this TestCluster cluster, T value)
+        {
+            var copier = cluster.ServiceProvider.GetRequiredService<DeepCopier>();
+            return copier.Copy(value);
+        }
+
+        public static Serializer GetSerializer(this TestCluster cluster)
+        {
+            return cluster.ServiceProvider.GetRequiredService<Serializer>();
         }
     }
 }

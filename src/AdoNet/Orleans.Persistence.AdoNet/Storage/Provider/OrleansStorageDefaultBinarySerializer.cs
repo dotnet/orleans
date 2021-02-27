@@ -1,4 +1,3 @@
-﻿using Orleans.Serialization;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -12,12 +11,12 @@ namespace Orleans.Storage
     [DebuggerDisplay("CanStream = {CanStream}, Tag = {Tag}")]
     public class OrleansStorageDefaultBinarySerializer: IStorageSerializer
     {
-        private readonly SerializationManager serializationManager;
+        private readonly Serialization.Serializer serializer;
 
         /// <summary>
         /// <see cref="IStorageSerializer.CanStream"/>
         /// </summary>
-        public bool CanStream { get; } = false;
+        public bool CanStream { get; } = true;
 
         /// <summary>
         /// <see cref="IStorageSerializer.Tag"/>
@@ -28,11 +27,11 @@ namespace Orleans.Storage
         /// <summary>
         /// Constructs this serializer from the given parameters.
         /// </summary>
-        /// <param name="serializationManager"></param>
+        /// <param name="serializer"></param>
         /// <param name="tag"><see cref="IStorageSerializer.Tag"/>.</param>
-        public OrleansStorageDefaultBinarySerializer(SerializationManager serializationManager, string tag)
+        public OrleansStorageDefaultBinarySerializer(Serialization.Serializer serializer, string tag)
         {
-            this.serializationManager = serializationManager;
+            this.serializer = serializer;
             if(string.IsNullOrWhiteSpace(tag))
             {
                 throw new ArgumentException("The parameter should contain characters.", nameof(tag));
@@ -48,7 +47,8 @@ namespace Orleans.Storage
         /// <exception cref="NotSupportedException"/>
         public object Serialize(Stream stream, object data)
         {
-            throw new NotSupportedException($"{nameof(OrleansStorageDefaultBinarySerializer)} does not support stream deserialization.");
+            this.serializer.Serialize(data, stream);
+            return stream;
         }
 
 
@@ -57,7 +57,7 @@ namespace Orleans.Storage
         /// </summary>
         public object Serialize(object data)
         {
-            return this.serializationManager.SerializeToByteArray(data);
+            return this.serializer.SerializeToArray(data);
         }
 
 

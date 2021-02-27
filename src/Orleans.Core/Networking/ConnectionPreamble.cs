@@ -5,34 +5,41 @@ using System.IO.Pipelines;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Session;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal static class ConnectionPreamble
+    [GenerateSerializer]
+    internal class ConnectionPreamble
+    {
+        [Id(0)]
+        public NetworkProtocolVersion NetworkProtocolVersion { get; set; }
+
+        [Id(1)]
+        public GrainId NodeIdentity { get; set; }
+
+        [Id(2)]
+        public SiloAddress SiloAddress { get; set; }
+    }
+
+    internal class ConnectionPreambleHelper
     {
         private const int MaxPreambleLength = 1024;
+        private readonly Serializer<ConnectionPreamble> _preambleSerializer;
+        public ConnectionPreambleHelper(Serializer<ConnectionPreamble> preambleSerializer)
+        {
+            _preambleSerializer = preambleSerializer;
+        }
 
-        internal static async ValueTask Write(ConnectionContext connection, GrainId nodeIdentity, NetworkProtocolVersion protocolVersion, SiloAddress siloAddress)
+        internal async ValueTask Write(ConnectionContext connection, ConnectionPreamble preamble)
         {
             var output = connection.Transport.Output;
-            var outputWriter = new PrefixingBufferWriter<byte, PipeWriter>(sizeof(int), 1024, MemoryPool<byte>.Shared);
+            using var outputWriter = new PrefixingBufferWriter<byte, PipeWriter>(sizeof(int), 1024, MemoryPool<byte>.Shared);
             outputWriter.Reset(output);
-            var writer = new BinaryTokenStreamWriter2<PrefixingBufferWriter<byte, PipeWriter>>(outputWriter);
-
-            writer.Write(nodeIdentity);
-            writer.Write((byte)protocolVersion);
-
-            if (siloAddress is null)
-            {
-                writer.WriteNull();
-            }
-            else
-            {
-                writer.Write((byte)SerializationTokenType.SiloAddress);
-                writer.Write(siloAddress);
-            }
-
-            writer.Commit();
+            _preambleSerializer.Serialize(
+                preamble,
+                outputWriter);
 
             var length = outputWriter.CommittedBytes;
 
@@ -59,7 +66,7 @@ namespace Orleans.Runtime.Messaging
             outputWriter.Complete(lengthSpan);
         }
 
-        internal static async ValueTask<(GrainId, NetworkProtocolVersion, SiloAddress)> Read(ConnectionContext connection)
+        internal async ValueTask<ConnectionPreamble> Read(ConnectionContext connection)
         {
             var input = connection.Transport.Input;
 
@@ -100,31 +107,8 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
-                var reader = new BinaryTokenStreamReader2(payloadBuffer);
-                var grainId = reader.ReadGrainId();
-
-                if (reader.Position >= payloadBuffer.Length)
-                {
-                    return (grainId, NetworkProtocolVersion.Version1, default);
-                }
-
-                var protocolVersion = (NetworkProtocolVersion)reader.ReadByte();
-
-                SiloAddress siloAddress;
-                var token = reader.ReadToken();
-                switch (token)
-                {
-                    case SerializationTokenType.Null:
-                        siloAddress = null;
-                        break;
-                    case SerializationTokenType.SiloAddress:
-                        siloAddress = reader.ReadSiloAddress();
-                        break;
-                    default:
-                        throw new NotSupportedException("Unexpected token while reading connection preamble. Expected SiloAddress, encountered " + token);
-                }
-
-                return (grainId, protocolVersion, siloAddress);
+                var preamble = _preambleSerializer.Deserialize(payloadBuffer);
+                return preamble;
             }
             finally
             {

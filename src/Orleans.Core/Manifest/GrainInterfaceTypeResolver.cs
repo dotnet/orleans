@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Orleans.Runtime;
-using Orleans.Utilities;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Metadata
 {
@@ -38,7 +38,7 @@ namespace Orleans.Metadata
             }
 
             // Configured providers take precedence
-            foreach (var provider in this._providers)
+            foreach (var provider in _providers)
             {
                 if (provider.TryGetGrainInterfaceType(type, out var interfaceType))
                 {

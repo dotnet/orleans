@@ -1,5 +1,4 @@
 using System;
-using Orleans.Concurrency;
 using ProtoBuf;
 
 namespace Orleans.Serialization.ProtobufNet

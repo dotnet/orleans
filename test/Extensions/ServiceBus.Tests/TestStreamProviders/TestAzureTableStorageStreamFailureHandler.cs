@@ -17,14 +17,14 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
     {
         private const string TableName = "TestStreamFailures";
         private const string DeploymentId = "TestDeployment";
-        private TestAzureTableStorageStreamFailureHandler(SerializationManager serializationManager)
-            : base(serializationManager, NullLoggerFactory.Instance, false, DeploymentId, TableName, TestDefaultConfiguration.DataConnectionString)
+        private TestAzureTableStorageStreamFailureHandler(Serializer<StreamSequenceToken> serializer)
+            : base(serializer, NullLoggerFactory.Instance, false, DeploymentId, TableName, TestDefaultConfiguration.DataConnectionString)
         {
         }
 
-        public static async Task<IStreamFailureHandler> Create(SerializationManager serializationManager)
+        public static async Task<IStreamFailureHandler> Create(Serializer<StreamSequenceToken> serializer)
         {
-            var failureHandler = new TestAzureTableStorageStreamFailureHandler(serializationManager);
+            var failureHandler = new TestAzureTableStorageStreamFailureHandler(serializer);
             await failureHandler.InitAsync();
             return failureHandler;
         }

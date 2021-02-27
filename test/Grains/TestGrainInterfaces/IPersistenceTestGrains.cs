@@ -209,22 +209,16 @@ namespace UnitTests.GrainInterfaces
         Task SetValue(int val);
     }
 
-    public interface ISerializationTestGrain : IGrainWithGuidKey
-    {
-        Task Test_Serialize_Func();
-        Task Test_Serialize_Predicate();
-        Task Test_Serialize_Predicate_Class();
-        Task Test_Serialize_Predicate_Class_Param(IMyPredicate pred);
-    }
-
     public interface IMyPredicate
     {
         bool FilterFunc(int i);
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class MyPredicate : IMyPredicate
     {
+        [Id(0)]
         private readonly int filterValue;
 
         public MyPredicate(int filter)

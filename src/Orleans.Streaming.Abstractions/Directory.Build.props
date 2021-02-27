@@ -26,4 +26,17 @@
     </Otherwise>
   </Choose>
 
+  <Choose>
+    <When Condition="$(OrleansSerializationVersion) == $(VersionPrefix) AND $(OrleansSerializationVersion) == $(OrleansStreamingAbstractionsVersion)">
+      <ItemGroup>
+        <ProjectReference Include="..\Orleans.Serialization\Orleans.Serialization.csproj" />
+      </ItemGroup>
+    </When>
+    <Otherwise>
+      <ItemGroup>
+        <PackageReference Include="Microsoft.Orleans.Serialization" Version="$(OrleansSerializationVersion)"/>
+      </ItemGroup>
+    </Otherwise>
+  </Choose>
+
 </Project>

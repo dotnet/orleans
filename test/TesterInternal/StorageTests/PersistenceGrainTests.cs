@@ -1086,7 +1086,7 @@ namespace UnitTests.StorageTests
                 initialState.GrainDict.Add(g.GetPrimaryKey().ToString(), g);
             }
 
-            var copy = (GrainStateContainingGrainReferences)this.HostedCluster.SerializationManager.DeepCopy(initialState);
+            var copy = (GrainStateContainingGrainReferences)this.HostedCluster.DeepCopy(initialState);
             Assert.NotSame(initialState.GrainDict, copy.GrainDict); // Dictionary
             Assert.NotSame(initialState.GrainList, copy.GrainList); // List
         }
@@ -1109,8 +1109,8 @@ namespace UnitTests.StorageTests
             for (int i = 0; i < loops; i++)
             {
                 int idx = random.Next(num);
-                tasks.Add(Task.Run(() => { var copy = this.HostedCluster.SerializationManager.DeepCopy(states[idx]); }));
-                tasks.Add(Task.Run(() => { var other = this.HostedCluster.SerializationManager.RoundTripSerializationForTesting(states[idx]); }));
+                tasks.Add(Task.Run(() => { var copy = this.HostedCluster.DeepCopy(states[idx]); }));
+                tasks.Add(Task.Run(() => { var other = this.HostedCluster.RoundTripSerializationForTesting(states[idx]); }));
             }
             await Task.WhenAll(tasks);
 

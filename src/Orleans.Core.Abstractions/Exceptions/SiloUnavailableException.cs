@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 
 namespace Orleans.Runtime
@@ -7,6 +7,7 @@ namespace Orleans.Runtime
     /// Signifies that an request was cancelled due to target silo unavailability.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class SiloUnavailableException : OrleansMessageRejectionException
     {
         public SiloUnavailableException() : base("SiloUnavailableException") { }

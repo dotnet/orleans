@@ -13,16 +13,19 @@ namespace Orleans.ServiceBus.Providers
     /// Batch container that is delivers payload and stream position information for a set of events in an EventHub EventData.
     /// </summary>
     [Serializable]
-    public class EventHubBatchContainer : IBatchContainer, IOnDeserialized
+    [GenerateSerializer]
+    public class EventHubBatchContainer : IBatchContainer
     {
         [JsonProperty]
+        [Id(0)]
         private readonly EventHubMessage eventHubMessage;
 
         [JsonIgnore]
-        [NonSerialized]
-        private SerializationManager serializationManager;
+        [field: NonSerialized]
+        internal Serializer Serializer { get; set; }
 
         [JsonProperty]
+        [Id(1)]
         private readonly EventHubSequenceToken token;
 
         /// <summary>
@@ -39,25 +42,32 @@ namespace Orleans.ServiceBus.Providers
         [NonSerialized]
         private Body payload;
 
-        private Body GetPayload() => payload ?? (payload = this.serializationManager.DeserializeFromByteArray<Body>(eventHubMessage.Payload));
+        private Body GetPayload() => payload ?? (payload = this.Serializer.Deserialize<Body>(eventHubMessage.Payload));
 
         [Serializable]
-        private class Body
+        [GenerateSerializer]
+        internal class Body
         {
+            [Id(0)]
             public List<object> Events { get; set; }
+            [Id(1)]
             public Dictionary<string, object> RequestContext { get; set; }
         }
 
         /// <summary>
         /// Batch container that delivers events from cached EventHub data associated with an orleans stream
         /// </summary>
-        /// <param name="eventHubMessage"></param>
-        /// <param name="serializationManager"></param>
-        public EventHubBatchContainer(EventHubMessage eventHubMessage, SerializationManager serializationManager)
+        public EventHubBatchContainer(EventHubMessage eventHubMessage, Serializer serializer)
         {
             this.eventHubMessage = eventHubMessage;
-            this.serializationManager = serializationManager;
+            this.Serializer = serializer;
             token = new EventHubSequenceTokenV2(eventHubMessage.Offset, eventHubMessage.SequenceNumber, 0);
+        }
+
+        [GeneratedActivatorConstructor]
+        internal EventHubBatchContainer(Serializer serializer)
+        {
+            this.Serializer = serializer;
         }
 
         /// <summary>
@@ -88,29 +98,18 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Put events list and its context into a EventData object
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="serializationManager"></param>
-        /// <param name="streamId"></param>
-        /// <param name="events"></param>
-        /// <param name="requestContext"></param>
-        /// <returns></returns>
-        public static EventData ToEventData<T>(SerializationManager serializationManager, StreamId streamId, IEnumerable<T> events, Dictionary<string, object> requestContext)
+        public static EventData ToEventData<T>(Serializer bodySerializer, StreamId streamId, IEnumerable<T> events, Dictionary<string, object> requestContext)
         {
             var payload = new Body
             {
                 Events = events.Cast<object>().ToList(),
                 RequestContext = requestContext
             };
-            var bytes = serializationManager.SerializeToByteArray(payload);
+            var bytes = bodySerializer.SerializeToArray(payload);
             var eventData = new EventData(bytes);
 
             eventData.SetStreamNamespaceProperty(streamId.GetNamespace());
             return eventData;
-        }
-
-        void IOnDeserialized.OnDeserialized(ISerializerContext context)
-        {
-            this.serializationManager = context.GetSerializationManager();
         }
     }
 }

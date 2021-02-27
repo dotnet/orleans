@@ -44,8 +44,7 @@ set TESTS=^
 %CMDHOME%\test\TestInfrastructure\Orleans.TestingHost.Tests,^
 %CMDHOME%\test\DependencyInjection.Tests,^
 %CMDHOME%\test\Orleans.Connections.Security.Tests,^
-%CMDHOME%\test\Analyzers.Tests,^
-%CMDHOME%\test\CodeGeneration\CodeGenerator.Tests
+%CMDHOME%\test\Analyzers.Tests
 
 @Echo Test assemblies = %TESTS%
 

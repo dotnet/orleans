@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Orleans.Runtime;
-using Orleans.Utilities;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Metadata
 {

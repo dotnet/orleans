@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
-using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
@@ -13,6 +12,7 @@ namespace Orleans.Runtime
     [Immutable]
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
+    [GenerateSerializer]
     public readonly struct GrainType : IEquatable<GrainType>, IComparable<GrainType>, ISerializable
     {
         /// <summary>
@@ -36,6 +36,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// The underlying value.
         /// </summary>
+        [Id(1)]
         public IdSpan Value { get; }
 
         /// <summary>

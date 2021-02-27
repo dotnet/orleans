@@ -10,16 +10,19 @@ namespace Orleans.EventSourcing.LogStorage
     /// </summary>
     /// <typeparam name="TEntry">The type used for log entries</typeparam>
     [Serializable]
+    [GenerateSerializer]
     public class LogStateWithMetaDataAndETag<TEntry> : IGrainState where TEntry : class
     {
         /// <summary>
         /// Gets and Sets StateAndMetaData
         /// </summary>
+        [Id(0)]
         public LogStateWithMetaData<TEntry> StateAndMetaData { get; set; }
 
         /// <summary>
         /// Gets and Sets Etag
         /// </summary>
+        [Id(1)]
         public string ETag { get; set; }
 
         /// <summary>
@@ -39,6 +42,7 @@ namespace Orleans.EventSourcing.LogStorage
             }
         }
 
+        [Id(2)]
         public bool RecordExists { get; set; }
 
         /// <summary>
@@ -65,11 +69,13 @@ namespace Orleans.EventSourcing.LogStorage
     /// </summary>
     /// <typeparam name="TEntry"></typeparam>
     [Serializable]
+    [GenerateSerializer]
     public class LogStateWithMetaData<TEntry> where TEntry : class
     {
         /// <summary>
         /// The stored view of the log
         /// </summary>
+        [Id(0)]
         public List<TEntry> Log { get; set; }
 
         /// <summary>
@@ -86,6 +92,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// Bits are toggled when writing, so that the retry logic can avoid appending an entry twice
         /// when retrying a failed append.
         /// </summary>
+        [Id(1)]
         public string WriteVector { get; set; }
 
         /// <summary>

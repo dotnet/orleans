@@ -35,26 +35,31 @@ namespace Orleans.Runtime
     /// Represents the result of probing a node via an intermediary node.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public struct IndirectProbeResponse
     {
         /// <summary>
         /// The health score of the intermediary node.
         /// </summary>
+        [Id(1)]
         public int IntermediaryHealthScore { get; set; }
 
         /// <summary>
         /// <see langword="true"/> if the probe succeeded; otherwise, <see langword="false"/>.
         /// </summary>
+        [Id(2)]
         public bool Succeeded { get; set; }
 
         /// <summary>
         /// The duration of the probe attempt.
         /// </summary>
+        [Id(3)]
         public TimeSpan ProbeResponseTime { get; set; }
 
         /// <summary>
         /// The failure message if the probe did not succeed.
         /// </summary>
+        [Id(4)]
         public string FailureMessage { get; set; }
 
         /// <inheritdoc />

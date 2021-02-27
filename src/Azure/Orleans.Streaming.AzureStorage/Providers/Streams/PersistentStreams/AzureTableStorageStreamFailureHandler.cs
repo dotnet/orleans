@@ -15,7 +15,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
     public class AzureTableStorageStreamFailureHandler<TEntity> : IStreamFailureHandler where TEntity : StreamDeliveryFailureEntity, new()
     {
         private static readonly Func<TEntity> DefaultCreateEntity = () => new TEntity();
-        private readonly SerializationManager serializationManager;
+        private readonly Serializer<StreamSequenceToken> serializer;
         private readonly string clusterId;
         private readonly AzureTableDataManager<TEntity> dataManager;
         private readonly Func<TEntity> createEntity;
@@ -23,28 +23,28 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// <summary>
         /// Delivery failure handler that writes failures to azure table storage.
         /// </summary>
-        /// <param name="serializationManager"></param>
+        /// <param name="serializer"></param>
         /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="faultOnFailure"></param>
         /// <param name="clusterId"></param>
         /// <param name="tableName"></param>
         /// <param name="storageConnectionString"></param>
         /// <param name="createEntity"></param>
-        public AzureTableStorageStreamFailureHandler(SerializationManager serializationManager, ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, string tableName, string storageConnectionString, Func<TEntity> createEntity = null)
-            : this (serializationManager, loggerFactory, faultOnFailure, clusterId, new AzureStorageOperationOptions { TableName = tableName, ConnectionString = storageConnectionString }, createEntity)
+        public AzureTableStorageStreamFailureHandler(Serializer<StreamSequenceToken> serializer, ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, string tableName, string storageConnectionString, Func<TEntity> createEntity = null)
+            : this (serializer, loggerFactory, faultOnFailure, clusterId, new AzureStorageOperationOptions { TableName = tableName, ConnectionString = storageConnectionString }, createEntity)
         {
         }
 
         /// <summary>
         /// Delivery failure handler that writes failures to azure table storage.
         /// </summary>
-        /// <param name="serializationManager"></param>
+        /// <param name="serializer"></param>
         /// <param name="loggerFactory">logger factory to use</param>
         /// <param name="faultOnFailure"></param>
         /// <param name="clusterId"></param>
         /// <param name="azureStorageOptions"></param>
         /// <param name="createEntity"></param>
-        public AzureTableStorageStreamFailureHandler(SerializationManager serializationManager, ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, AzureStorageOperationOptions azureStorageOptions, Func<TEntity> createEntity = null)
+        public AzureTableStorageStreamFailureHandler(Serializer<StreamSequenceToken> serializer, ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, AzureStorageOperationOptions azureStorageOptions, Func<TEntity> createEntity = null)
         {
             if (string.IsNullOrEmpty(clusterId))
             {
@@ -58,7 +58,8 @@ namespace Orleans.Providers.Streams.PersistentStreams
             {
                 throw new ArgumentNullException(nameof(azureStorageOptions.ConnectionString));
             }
-            this.serializationManager = serializationManager;
+
+            this.serializer = serializer;
             this.clusterId = clusterId;
             ShouldFaultSubsriptionOnError = faultOnFailure;
             this.createEntity = createEntity ?? DefaultCreateEntity;
@@ -126,7 +127,7 @@ namespace Orleans.Providers.Streams.PersistentStreams
             failureEntity.StreamProviderName = streamProviderName;
             failureEntity.StreamGuid = streamId.GetKeyAsString();
             failureEntity.StreamNamespace = streamId.GetNamespace();
-            failureEntity.SetSequenceToken(this.serializationManager, sequenceToken);
+            failureEntity.SetSequenceToken(this.serializer, sequenceToken);
             failureEntity.SetPartitionKey(this.clusterId);
             failureEntity.SetRowkey();
             await dataManager.CreateTableEntryAsync(failureEntity);

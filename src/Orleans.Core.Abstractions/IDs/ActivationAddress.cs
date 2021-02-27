@@ -1,13 +1,17 @@
 using System;
-using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
     [Serializable, Immutable]
+    [GenerateSerializer]
+    [SuppressReferenceTracking]
     public sealed class ActivationAddress : IEquatable<ActivationAddress>
     {
+        [Id(1)]
         public GrainId Grain { get; private set; }
+        [Id(2)]
         public ActivationId Activation { get; private set; }
+        [Id(3)]
         public SiloAddress Silo { get; private set; }
 
         public bool IsComplete => !Grain.IsDefault && Activation != null && Silo != null;

@@ -5,12 +5,18 @@ using Orleans.Streams;
 namespace TestGrains
 {
     [Serializable]
+    [Orleans.GenerateSerializer]
     public class StreamCheckpoint<TState>
     {
+        [Orleans.Id(0)]
         public Guid StreamGuid { get; set; }
+        [Orleans.Id(1)]
         public string StreamNamespace { get; set; }
+        [Orleans.Id(2)]
         public StreamSequenceToken StartToken { get; set; }
+        [Orleans.Id(3)]
         public StreamSequenceToken LastProcessedToken { get; set; }
+        [Orleans.Id(4)]
         public TState Accumulator { get; set; }
 
         public StreamSequenceToken RecoveryToken { get { return LastProcessedToken ?? StartToken; } }

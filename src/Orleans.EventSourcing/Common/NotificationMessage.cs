@@ -19,18 +19,22 @@ namespace Orleans.EventSourcing.Common
 
     /// <summary>A simple notification message containing only the version.</summary>
     [Serializable]
+    [GenerateSerializer]
     public class VersionNotificationMessage : INotificationMessage
     {
         /// <inheritdoc/>
+        [Id(0)]
         public int Version { get; set;  }
     }
 
 
     /// <summary>A notification message containing a batch of notification messages.</summary>
     [Serializable]
+    [GenerateSerializer]
     public class BatchedNotificationMessage : INotificationMessage
     {
         /// <summary>The notification messages contained in this batch.</summary>
+        [Id(0)]
         public List<INotificationMessage> Notifications { get; set; }
 
         /// <summary>The version number - for a batch, this is the maximum version contained.</summary>

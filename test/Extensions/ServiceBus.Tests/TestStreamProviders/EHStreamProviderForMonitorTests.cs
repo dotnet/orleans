@@ -16,7 +16,6 @@ namespace ServiceBus.Tests.TestStreamProviders
     public class EHStreamProviderForMonitorTestsAdapterFactory : EventDataGeneratorAdapterFactory
     {
         private CachePressureInjectionMonitor cachePressureInjectionMonitor;
-        private readonly SerializationManager serializationManager;
         private readonly EventHubStreamCachePressureOptions cacheOptions;
         private readonly StreamCacheEvictionOptions evictionOptions;
         private readonly StreamStatisticOptions staticticOptions;
@@ -26,12 +25,20 @@ namespace ServiceBus.Tests.TestStreamProviders
         private readonly BlockPoolMonitorForTesting blockPoolMonitorForTesting = new BlockPoolMonitorForTesting();
 
 
-        public EHStreamProviderForMonitorTestsAdapterFactory(string name, EventDataGeneratorStreamOptions options, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions,
-            EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions streamCacheEvictionOptions, StreamStatisticOptions statisticOptions,
-            IEventHubDataAdapter dataAdapter, IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, options, ehOptions, receiverOptions, cacheOptions, streamCacheEvictionOptions, statisticOptions, dataAdapter, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+        public EHStreamProviderForMonitorTestsAdapterFactory(
+            string name,
+            EventDataGeneratorStreamOptions options,
+            EventHubOptions ehOptions,
+            EventHubReceiverOptions receiverOptions,
+            EventHubStreamCachePressureOptions cacheOptions,
+            StreamCacheEvictionOptions streamCacheEvictionOptions,
+            StreamStatisticOptions statisticOptions,
+            IEventHubDataAdapter dataAdapter,
+            IServiceProvider serviceProvider,
+            ITelemetryProducer telemetryProducer,
+            ILoggerFactory loggerFactory)
+            : base(name, options, ehOptions, receiverOptions, cacheOptions, streamCacheEvictionOptions, statisticOptions, dataAdapter, serviceProvider, telemetryProducer, loggerFactory)
         {
-            this.serializationManager = serializationManager;
             this.cacheOptions = cacheOptions;
             this.staticticOptions = statisticOptions;
             this.ehOptions = ehOptions;
@@ -74,8 +81,16 @@ namespace ServiceBus.Tests.TestStreamProviders
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
             Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = (dimensions, logger, telemetryProducer) => this.cacheMonitorForTesting;
             Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = (dimensions, logger, telemetryProducer) => this.blockPoolMonitorForTesting;
-            return new CacheFactoryForMonitorTesting(this.cachePressureInjectionMonitor, this.cacheOptions, this.evictionOptions, this.staticticOptions, base.dataAdapter, this.serializationManager,
-                sharedDimensions, loggerFactory, cacheMonitorFactory, blockPoolMonitorFactory);
+            return new CacheFactoryForMonitorTesting(
+                this.cachePressureInjectionMonitor,
+                this.cacheOptions,
+                this.evictionOptions,
+                this.staticticOptions,
+                base.dataAdapter,
+                sharedDimensions,
+                loggerFactory,
+                cacheMonitorFactory,
+                blockPoolMonitorFactory);
         }
 
         private class CacheFactoryForMonitorTesting : EventHubQueueCacheFactory
@@ -87,12 +102,11 @@ namespace ServiceBus.Tests.TestStreamProviders
                 StreamCacheEvictionOptions streamCacheEviction,
                 StreamStatisticOptions statisticOptions,
                 IEventHubDataAdapter dataAdater,
-                SerializationManager serializationManager,
                 EventHubMonitorAggregationDimensions sharedDimensions,
                 ILoggerFactory loggerFactory,
                 Func<EventHubCacheMonitorDimensions, ILoggerFactory, ITelemetryProducer, ICacheMonitor> cacheMonitorFactory = null,
                 Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = null)
-                : base(cacheOptions, streamCacheEviction, statisticOptions, dataAdater, serializationManager, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
+                : base(cacheOptions, streamCacheEviction, statisticOptions, dataAdater, sharedDimensions, cacheMonitorFactory, blockPoolMonitorFactory)
             {
                 this.cachePressureInjectionMonitor = cachePressureInjectionMonitor;
             }

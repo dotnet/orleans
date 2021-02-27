@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Text;
-using Orleans.Concurrency;
 using Orleans.Streams;
 
 namespace Orleans.Runtime
@@ -15,10 +14,16 @@ namespace Orleans.Runtime
     [Immutable]
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
+    [GenerateSerializer]
     public readonly struct StreamId : IEquatable<StreamId>, IComparable<StreamId>, ISerializable
     {
+        [Id(0)]
         private readonly byte[] fullKey;
+        
+        [Id(1)]
         private readonly ushort keyIndex;
+        
+        [Id(2)]
         private readonly int hash;
 
         public ReadOnlyMemory<byte> FullKey => fullKey;

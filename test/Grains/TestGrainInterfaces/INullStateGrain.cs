@@ -1,10 +1,12 @@
-﻿using Orleans;
+using Orleans;
 using System.Threading.Tasks;
 
 namespace UnitTests.GrainInterfaces
 {
+    [GenerateSerializer]
     public class NullableState
     {
+        [Id(0)]
         public string Name { get; set; }
     }
 

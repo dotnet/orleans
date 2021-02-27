@@ -1,12 +1,10 @@
 
 using System;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using Xunit;
 
@@ -181,8 +179,10 @@ namespace UnitTests.StreamingTests
         }
 
         [Serializable]
+        [Orleans.GenerateSerializer]
         private class DummyStreamProducerExtension : IStreamProducerExtension
         {
+            [Orleans.Id(0)]
             private readonly Guid id;
 
             public DummyStreamProducerExtension()

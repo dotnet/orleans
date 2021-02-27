@@ -11,11 +11,7 @@ using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Scheduler;
-using Orleans.Runtime.Utilities;
 using TestExtensions;
-using UnitTests.SchedulerTests;
-using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -40,7 +36,7 @@ namespace UnitTests.Directory
             this.grainDirectory = Substitute.For<IGrainDirectory>();
             var services = new ServiceCollection()
                 .AddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>))
-                .AddSingletonKeyedService<string, IGrainDirectory>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (sp, name) => this.grainDirectory)
+                .AddSingletonKeyedService(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (sp, name) => this.grainDirectory)
                 .BuildServiceProvider();
 
             this.grainDirectoryResolver = new GrainDirectoryResolver(

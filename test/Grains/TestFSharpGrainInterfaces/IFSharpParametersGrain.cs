@@ -1,5 +1,8 @@
-﻿using Orleans;
+using Orleans;
+using UnitTests.FSharpGrains;
 using UnitTests.FSharpInterfaces;
+
+[assembly: GenerateCodeForDeclaringAssembly(typeof(Generic1ArgumentGrain<>))]
 
 namespace UnitTests.GrainInterfaces
 {

@@ -7,8 +7,10 @@ using UnitTests.GrainInterfaces;
 namespace UnitTests.Grains
 {
     [Serializable]
+    [GenerateSerializer]
     public class Initialized_State
     {
+        [Id(0)]
         public List<string> Names { get; set; }
         public Initialized_State()
         {

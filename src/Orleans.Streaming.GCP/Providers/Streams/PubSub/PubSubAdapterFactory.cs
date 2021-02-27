@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -23,11 +23,6 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         private IQueueAdapterCache _adapterCache;
 
         /// <summary>
-        /// Gets the serialization manager.
-        /// </summary>
-        public SerializationManager SerializationManager { get; private set; }
-
-        /// <summary>
         /// Application level failure handler override.
         /// </summary>
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
@@ -39,13 +34,11 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             SimpleQueueCacheOptions cacheOptions,
             IServiceProvider serviceProvider, 
             IOptions<ClusterOptions> clusterOptions, 
-            SerializationManager serializationManager, 
             ILoggerFactory loggerFactory)
         {
             this._providerName = name;
             this.options = options;
             this.clusterOptions = clusterOptions.Value;
-            this.SerializationManager = serializationManager;
             this.loggerFactory = loggerFactory;
             this._adaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
             this._streamQueueMapper = new HashRingBasedStreamQueueMapper(queueMapperOptions, this._providerName);
@@ -64,7 +57,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new PubSubAdapter<TDataAdapter>(_adaptorFactory(), SerializationManager, this.loggerFactory, _streamQueueMapper,
+            var adapter = new PubSubAdapter<TDataAdapter>(_adaptorFactory(), this.loggerFactory, _streamQueueMapper,
                 this.options.ProjectId, this.options.TopicId, this.clusterOptions.ServiceId, this._providerName, this.options.Deadline, this.options.CustomEndpoint);
             return Task.FromResult<IQueueAdapter>(adapter);
         }

@@ -5,12 +5,15 @@ namespace Orleans.Storage.Internal
 {
     /// <summary>Exception used to communicate with the storage provider, so that it throws this exception to its caller.</summary>
     [Serializable]
+    [GenerateSerializer]
     internal class MemoryStorageEtagMismatchException : Exception
     {
         /// <summary>The Etag value currently held in persistent storage.</summary>
+        [Id(0)]
         public string StoredEtag { get; private set; }
 
         /// <summary>The Etag value currently help in memory, and attempting to be updated.</summary>
+        [Id(1)]
         public string ReceivedEtag { get; private set; }
 
         public MemoryStorageEtagMismatchException(string storedEtag, string receivedEtag)

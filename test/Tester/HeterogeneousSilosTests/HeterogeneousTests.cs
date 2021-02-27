@@ -7,9 +7,8 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Serialization.TypeSystem;
 using Orleans.TestingHost;
-using Orleans.Utilities;
-using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -29,7 +28,7 @@ namespace Tester.HeterogeneousSilosTests
             cluster?.StopAllSilos();
             var builder = new TestClusterBuilder(1);
             builder.Properties["DefaultPlacementStrategy"] = RuntimeTypeNameFormatter.Format(defaultPlacementStrategy);
-            builder.Properties["BlacklistedGrainTypes"] = string.Join("|", blackListedTypes.Select(t => t.FullName));
+            builder.Properties["BlockedGrainTypes"] = string.Join("|", blackListedTypes.Select(t => RuntimeTypeNameFormatter.Format(t)));
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             builder.AddClientBuilderConfigurator<ClientConfigurator>();
             cluster = builder.Build();
@@ -42,7 +41,7 @@ namespace Tester.HeterogeneousSilosTests
             {
                 hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
                 hostBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = RefreshInterval);
-                hostBuilder.Configure<GrainClassOptions>(options =>
+                hostBuilder.Configure<GrainTypeOptions>(options =>
                 {
                     var cfg = hostBuilder.GetConfiguration();
                     var siloOptions = new TestSiloSpecificOptions();
@@ -51,8 +50,12 @@ namespace Tester.HeterogeneousSilosTests
                     // The blacklist is only intended for the primary silo in these tests.
                     if (string.Equals(siloOptions.SiloName, Silo.PrimarySiloName))
                     {
-                        var blacklistedTypesList = cfg["BlacklistedGrainTypes"].Split('|').ToList();
-                        options.ExcludedGrainTypes.AddRange(blacklistedTypesList);
+                        var typeNames = cfg["BlockedGrainTypes"].Split('|').ToList();
+                        foreach (var typeName in typeNames)
+                        {
+                            var type = Type.GetType(typeName);
+                            options.Classes.Remove(type);
+                        }
                     }
                 });
                 hostBuilder.ConfigureServices(services =>

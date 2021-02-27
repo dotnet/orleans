@@ -3,11 +3,12 @@ using System.Buffers.Binary;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
     [Serializable, Immutable]
+    [GenerateSerializer]
+    [SuppressReferenceTracking]
     public sealed class UniqueKey : IComparable<UniqueKey>, IEquatable<UniqueKey>
     {
         /// <summary>
@@ -25,9 +26,13 @@ namespace Orleans.Runtime
             KeyExtSystemTarget = 8,
         }
 
+        [Id(1)]
         public UInt64 N0 { get; private set; }
+        [Id(2)]
         public UInt64 N1 { get; private set; }
+        [Id(3)]
         public UInt64 TypeCodeData { get; private set; }
+        [Id(4)]
         public string KeyExt { get; private set; }
 
         [NonSerialized]

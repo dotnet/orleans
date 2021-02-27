@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Orleans;
 
 namespace UnitTests.GrainInterfaces
@@ -20,8 +20,10 @@ namespace UnitTests.GrainInterfaces
         Task PassNullNested(ChainGrainHolder next);
     }
     
+    [GenerateSerializer]
     public class ChainGrainHolder
     {
+        [Id(0)]
         public IChainedGrain Next { get; set; }
     }
 }

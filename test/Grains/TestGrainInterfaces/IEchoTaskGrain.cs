@@ -17,6 +17,7 @@ namespace UnitTests.GrainInterfaces
         Task<Nullable<DateTime>> EchoNullable(Nullable<DateTime> value);
     }
 
+    [GenerateMethodSerializers(typeof(NewGrainReference))]
     public interface IEchoTaskGrain : IGrainWithGuidKey
     {
         Task<int> GetMyIdAsync();

@@ -13,7 +13,9 @@ using UnitTests.TestHelper;
 
 namespace UnitTests.StreamingTests
 {
+#pragma warning disable ORLEANS0003 // Non-abstract classes that implement IGrain should derive from the base class Orleans.Grain
     public class Streaming_ConsumerClientObject : IAsyncObserver<StreamItem>, IStreaming_ConsumerGrain
+#pragma warning restore ORLEANS0003 // Non-abstract classes that implement IGrain should derive from the base class Orleans.Grain
     {
         private readonly IClusterClient client;
         private readonly ConsumerObserver _consumer;
@@ -78,7 +80,9 @@ namespace UnitTests.StreamingTests
         }
     }
 
+#pragma warning disable ORLEANS0003 // Non-abstract classes that implement IGrain should derive from the base class Orleans.Grain
     public class Streaming_ProducerClientObject : IStreaming_ProducerGrain
+#pragma warning restore ORLEANS0003 // Non-abstract classes that implement IGrain should derive from the base class Orleans.Grain
     {
         private readonly ProducerObserver producer;
         private readonly IClusterClient client;

@@ -18,6 +18,7 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Serialization;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Runtime
 {
@@ -48,7 +49,6 @@ namespace Orleans.Runtime
         private readonly CounterStatistic collectionCounter;
         private readonly TimeSpan maxRequestProcessingTime;
         private readonly TimeSpan maxWarningRequestProcessingTime;
-        private readonly SerializationManager serializationManager;
         private readonly CachedVersionSelectorManager versionSelectorManager;
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
@@ -67,7 +67,6 @@ namespace Orleans.Runtime
             ActivationCollector activationCollector,
             MessageCenter messageCenter,
             MessageFactory messageFactory,
-            SerializationManager serializationManager,
             IServiceProvider serviceProvider,
             CachedVersionSelectorManager versionSelectorManager,
             ILoggerFactory loggerFactory,
@@ -92,7 +91,6 @@ namespace Orleans.Runtime
             this.scheduler = scheduler;
             this.loggerFactory = loggerFactory;
             this.collectionNumber = 0;
-            this.serializationManager = serializationManager;
             this.versionSelectorManager = versionSelectorManager;
             this.serviceProvider = serviceProvider;
             this.collectionOptions = collectionOptions;
@@ -240,7 +238,7 @@ namespace Orleans.Runtime
                     if (data == null || data.GrainInstance == null) continue;
 
                     // TODO: generic type expansion
-                    var grainTypeName = TypeUtils.GetFullName(data.GrainInstance.GetType());
+                    var grainTypeName = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
                     
                     Dictionary<GrainId, int> grains;
                     int n;
@@ -269,7 +267,7 @@ namespace Orleans.Runtime
                     ActivationData data = activation.Value;
                     if (data == null || data.GrainInstance == null) continue;
 
-                    var grainType = TypeUtils.GetFullName(data.GrainInstance.GetType());
+                    var grainType = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
                     if (types==null || types.Contains(grainType))
                     {
                         stats.Add(new DetailedGrainStatistic()
@@ -347,7 +345,7 @@ namespace Orleans.Runtime
 
             if (activation.GrainInstance is object grainInstance)
             {
-                var grainTypeName = TypeUtils.GetFullName(grainInstance.GetType());
+                var grainTypeName = RuntimeTypeNameFormatter.Format(grainInstance.GetType());
                 activations.DecrementGrainCounter(grainTypeName);
                 activation.SetGrainInstance(null);
             }
@@ -445,7 +443,7 @@ namespace Orleans.Runtime
 
                     if (result.GrainInstance is object grainInstance)
                     {
-                        var grainTypeName = TypeUtils.GetFullName(grainInstance.GetType());
+                        var grainTypeName = RuntimeTypeNameFormatter.Format(grainInstance.GetType());
                         activations.IncrementGrainCounter(grainTypeName);
                     }
 
@@ -780,6 +778,9 @@ namespace Orleans.Runtime
                     try
                     {
                         await DestroyActivation(activationData, cts.Token);
+                    }
+                    catch
+                    {
                     }
                     finally
                     {

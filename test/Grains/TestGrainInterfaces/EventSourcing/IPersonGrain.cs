@@ -10,10 +10,14 @@ namespace TestGrainInterfaces
     }
 
     [Serializable]
+    [Orleans.GenerateSerializer]
     public class PersonAttributes
     {
+        [Orleans.Id(0)]
         public string FirstName { get; set; }
+        [Orleans.Id(1)]
         public string LastName { get; set; }
+        [Orleans.Id(2)]
         public GenderType Gender { get; set; }
     }
 

@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers.Testing
 {
@@ -24,21 +23,17 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// <inheritdoc />
         public bool ShouldProduce { private get; set; }
 
-        private ILogger logger;
-        private SerializationManager serializationManager;
+        private readonly ILogger logger;
+        private readonly DeepCopier deepCopier;
+        private readonly Serializer serializer;
 
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="streamId"></param>
-        /// <param name="logger"></param>
-        /// <param name="serializationManager"></param>
-        public SimpleStreamEventDataGenerator(StreamId streamId, ILogger<SimpleStreamEventDataGenerator> logger, SerializationManager serializationManager)
+        public SimpleStreamEventDataGenerator(StreamId streamId, ILogger<SimpleStreamEventDataGenerator> logger, DeepCopier deepCopier, Serializer serializer)
         {
             this.StreamId = streamId;
             this.logger = logger;
             this.ShouldProduce = true;
-            this.serializationManager = serializationManager;
+            this.deepCopier = deepCopier;
+            this.serializer = serializer;
         }
 
         /// <inheritdoc />
@@ -55,11 +50,11 @@ namespace Orleans.ServiceBus.Providers.Testing
             {
                 this.SequenceNumberCounter.Increment();
 
-                var eventData = EventHubBatchContainer.ToEventData<int>(
-                    this.serializationManager,
+                var eventData = EventHubBatchContainer.ToEventData(
+                    this.serializer,
                     this.StreamId,
                     this.GenerateEvent(this.SequenceNumberCounter.Value),
-                    RequestContextExtensions.Export(this.serializationManager));
+                    RequestContextExtensions.Export(this.deepCopier));
 
                var wrapper = new WrappedEventData(
                     eventData.Body,

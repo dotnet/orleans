@@ -29,7 +29,7 @@ namespace Orleans.Transactions
         private ParticipantId participantId;
         private TransactionQueue<TState> queue;
 
-        public string CurrentTransactionId => TransactionContext.GetRequiredTransactionInfo<TransactionInfo>().Id;
+        public string CurrentTransactionId => TransactionContext.GetRequiredTransactionInfo().Id;
 
         private bool detectReentrancy;
 
@@ -60,7 +60,7 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("cannot perform a read operation from within another operation");
             }
 
-            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
+            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"StartRead {info}");
@@ -120,7 +120,7 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("cannot perform an update operation from within another operation");
             }
 
-            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
+            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo();
 
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.Trace($"StartWrite {info}");

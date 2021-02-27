@@ -1,14 +1,16 @@
 using System;
 using System.Runtime.Serialization;
-using Orleans.Concurrency;
 
 namespace Orleans.Runtime
 {
     [Serializable, Immutable]
+    [GenerateSerializer]
+    [SuppressReferenceTracking]
     public sealed class ActivationId : IEquatable<ActivationId>
     {
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         [DataMember]
+        [Id(1)]
         internal readonly UniqueKey Key;
 
         public bool IsSystem { get { return Key.IsSystemTargetKey; } }

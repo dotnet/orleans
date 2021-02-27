@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Configuration;
@@ -28,10 +27,10 @@ namespace Orleans.Streams
         private readonly CounterStatistic numSentMessagesCounter;
         private int numMessages;
 
-        private IQueueAdapter queueAdapter;
+        private readonly IQueueAdapter queueAdapter;
+        private readonly IStreamFailureHandler streamFailureHandler;
         private IQueueCache queueCache;
         private IQueueAdapterReceiver receiver;
-        private IStreamFailureHandler streamFailureHandler;
         private DateTime lastTimeCleanedPubSubCache;
         private IDisposable timer;
 
@@ -48,7 +47,10 @@ namespace Orleans.Streams
             IStreamFilter streamFilter,
             QueueId queueId,
             StreamPullingAgentOptions options,
-            SiloAddress siloAddress)
+            SiloAddress siloAddress,
+            IQueueAdapter queueAdapter,
+            IQueueAdapterCache queueAdapterCache,
+            IStreamFailureHandler streamFailureHandler)
             : base(id, siloAddress, true, loggerFactory)
         {
             if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
@@ -59,6 +61,8 @@ namespace Orleans.Streams
             this.streamFilter = streamFilter;
             pubSubCache = new Dictionary<InternalStreamId, StreamConsumerCollection>();
             this.options = options;
+            this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
+            this.streamFailureHandler = streamFailureHandler ?? throw new ArgumentNullException(nameof(streamFailureHandler)); ;
             numMessages = 0;
 
             logger = loggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
@@ -69,38 +73,6 @@ namespace Orleans.Streams
             numSentMessagesCounter = CounterStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES, StatisticUniquePostfix));
             // TODO: move queue cache size statistics tracking into queue cache implementation once Telemetry APIs and LogStatistics have been reconciled.
             //IntValueStatistic.FindOrCreate(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE, statUniquePostfix), () => queueCache != null ? queueCache.Size : 0);
-        }
-
-        /// <summary>
-        /// Take responsibility for a new queues that was assigned to me via a new range.
-        /// We first store the new queue in our internal data structure, try to initialize it and start a pumping timer.
-        /// ERROR HANDLING:
-        ///     The responsibility to handle initialization and shutdown failures is inside the INewQueueAdapterReceiver code.
-        ///     The agent will call Initialize once and log an error. It will not call initialize again.
-        ///     The receiver itself may attempt later to recover from this error and do initialization again. 
-        ///     The agent will assume initialization has succeeded and will subsequently start calling pumping receive.
-        ///     Same applies to shutdown.
-        /// </summary>
-        /// <param name="qAdapter"></param>
-        /// <param name="queueAdapterCache"></param>
-        /// <param name="failureHandler"></param>
-        /// <returns></returns>
-        public Task Initialize(Immutable<IQueueAdapter> qAdapter, Immutable<IQueueAdapterCache> queueAdapterCache, Immutable<IStreamFailureHandler> failureHandler)
-        {
-            if (qAdapter.Value == null) throw new ArgumentNullException("qAdapter", "Init: queueAdapter should not be null");
-            if (failureHandler.Value == null) throw new ArgumentNullException("failureHandler", "Init: streamDeliveryFailureHandler should not be null");
-            return OrleansTaskExtentions.WrapInTask(() => InitializeInternal(qAdapter.Value, queueAdapterCache.Value, failureHandler.Value));
-        }
-
-        private void InitializeInternal(IQueueAdapter qAdapter, IQueueAdapterCache queueAdapterCache, IStreamFailureHandler failureHandler)
-        {
-            logger.Info(ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
-                GetType().Name, ((ISystemTargetBase)this).GrainId.ToString(), Silo, QueueId.ToStringWithHashCode());
-
-            // Remove cast once we cleanup
-            queueAdapter = qAdapter;
-            streamFailureHandler = failureHandler;
-            lastTimeCleanedPubSubCache = DateTime.UtcNow;
 
             try
             {
@@ -124,6 +96,30 @@ namespace Orleans.Streams
                 logger.Error(ErrorCode.PersistentStreamPullingAgent_23, "Exception while calling IQueueAdapterCache.CreateQueueCache.", exc);
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Take responsibility for a new queues that was assigned to me via a new range.
+        /// We first store the new queue in our internal data structure, try to initialize it and start a pumping timer.
+        /// ERROR HANDLING:
+        ///     The responsibility to handle initialization and shutdown failures is inside the INewQueueAdapterReceiver code.
+        ///     The agent will call Initialize once and log an error. It will not call initialize again.
+        ///     The receiver itself may attempt later to recover from this error and do initialization again. 
+        ///     The agent will assume initialization has succeeded and will subsequently start calling pumping receive.
+        ///     Same applies to shutdown.
+        /// </summary>
+        /// <returns></returns>
+        public Task Initialize()
+        {
+            return OrleansTaskExtentions.WrapInTask(() => InitializeInternal());
+        }
+
+        private void InitializeInternal()
+        {
+            logger.Info(ErrorCode.PersistentStreamPullingAgent_02, "Init of {0} {1} on silo {2} for queue {3}.",
+                GetType().Name, ((ISystemTargetBase)this).GrainId.ToString(), Silo, QueueId.ToStringWithHashCode());
+
+            lastTimeCleanedPubSubCache = DateTime.UtcNow;
 
             try
             {
@@ -136,6 +132,7 @@ namespace Orleans.Streams
                 // Just ignore this exception and proceed as if Initialize has succeeded.
                 // We already logged individual exceptions for individual calls to Initialize. No need to log again.
             }
+
             // Setup a reader for a new receiver. 
             // Even if the receiver failed to initialise, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = ThreadSafeRandom.NextTimeSpan(this.options.GetQueueMsgsTimerPeriod);

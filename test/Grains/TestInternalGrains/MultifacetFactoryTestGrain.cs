@@ -6,9 +6,12 @@ using UnitTests.GrainInterfaces;
 namespace UnitTests.Grains
 {
     [Serializable]
+    [GenerateSerializer]
     public class MultifacetFactoryTestGrainState
     {
+        [Id(0)]
         public IMultifacetReader Reader { get; set; }
+        [Id(1)]
         public IMultifacetWriter Writer { get; set; }
     }
 

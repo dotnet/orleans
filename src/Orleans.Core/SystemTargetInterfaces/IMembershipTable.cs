@@ -110,16 +110,19 @@ namespace Orleans
 
     [Serializable]
     [Immutable]
+    [GenerateSerializer]
     public class TableVersion
     {
         /// <summary>
         /// The version part of this TableVersion. Monotonically increasing number.
         /// </summary>
+        [Id(1)]
         public int Version { get; private set; }
 
         /// <summary>
         /// The etag of this TableVersion, used for validation of table update operations.
         /// </summary>
+        [Id(2)]
         public string VersionEtag { get; private set; }
 
         public TableVersion(int version, string eTag)
@@ -140,10 +143,13 @@ namespace Orleans
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class MembershipTableData
     {
+        [Id(1)]
         public IReadOnlyList<Tuple<MembershipEntry, string>> Members { get; private set; }
 
+        [Id(2)]
         public TableVersion Version { get; private set; }
 
         public MembershipTableData(List<Tuple<MembershipEntry, string>> list, TableVersion version)
@@ -246,52 +252,64 @@ namespace Orleans
         }
     }
 
+    [GenerateSerializer]
     [Serializable]
     public class MembershipEntry
     {
         /// <summary>
         /// The silo unique identity (ip:port:epoch). Used mainly by the Membership Protocol.
         /// </summary>
+        [Id(1)]
         public SiloAddress SiloAddress { get; set; }
 
         /// <summary>
         /// The silo status. Managed by the Membership Protocol.
         /// </summary>
+        [Id(2)]
         public SiloStatus Status { get; set; }
 
         /// <summary>
         /// The list of silos that suspect this silo. Managed by the Membership Protocol.
         /// </summary>
+        [Id(3)]
         public List<Tuple<SiloAddress, DateTime>> SuspectTimes { get; set; }
 
         /// <summary>
         /// Silo to clients TCP port. Set on silo startup.
         /// </summary>    
+        [Id(4)]
         public int ProxyPort { get; set; }
 
         /// <summary>
         /// The DNS host name of the silo. Equals to Dns.GetHostName(). Set on silo startup.
         /// </summary>
+        [Id(5)]
         public string HostName { get; set; }
 
         /// <summary>
         /// the name of the specific silo instance within a cluster. 
         /// If running in Azure - the name of this role instance. Set on silo startup.
         /// </summary>
+        [Id(6)]
         public string SiloName { get; set; }
 
+        [Id(7)]
         public string RoleName { get; set; } // Optional - only for Azure role  
+        [Id(8)]
         public int UpdateZone { get; set; }  // Optional - only for Azure role
+        [Id(9)]
         public int FaultZone { get; set; }   // Optional - only for Azure role
 
         /// <summary>
         /// Time this silo was started. For diagnostics and troubleshooting only.
         /// </summary>
+        [Id(10)]
         public DateTime StartTime { get; set; }
 
         /// <summary>
         /// the last time this silo reported that it is alive. For diagnostics and troubleshooting only.
         /// </summary>
+        [Id(11)]
         public DateTime IAmAliveTime { get; set; }
         
         public void AddSuspector(SiloAddress suspectingSilo, DateTime suspectingTime)

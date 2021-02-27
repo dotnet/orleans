@@ -14,6 +14,7 @@ namespace Orleans.ServiceBus.Providers
     ///   and ordering of application layer events within an EventHub message.
     /// </summary>
     [Serializable]
+    [GenerateSerializer]
     public class EventHubSequenceTokenV2 : EventHubSequenceToken
     {
         /// <summary>
@@ -25,63 +26,6 @@ namespace Orleans.ServiceBus.Providers
         public EventHubSequenceTokenV2(string eventHubOffset, long sequenceNumber, int eventIndex)
             : base(eventHubOffset, sequenceNumber, eventIndex)
         {
-        }
-
-        /// <summary>
-        /// Create a deep copy of the token.
-        /// </summary>
-        /// <param name="original">The token to copy</param>
-        /// <param name="context">The serialization context.</param>
-        /// <returns>A copy</returns>
-        [CopierMethod]
-        public static object DeepCopy(object original, ICopyContext context)
-        {
-            var source = original as EventHubSequenceTokenV2;
-            if (source == null)
-            {
-                return null;
-            }
-
-            var copy = new EventHubSequenceTokenV2(source.EventHubOffset, source.SequenceNumber, source.EventIndex);
-            context.RecordCopy(original, copy);
-            return copy;
-        }
-
-        /// <summary>
-        /// Serialize the event sequence token.
-        /// </summary>
-        /// <param name="untypedInput">The object to serialize.</param>
-        /// <param name="context">The serialization context.</param>
-        /// <param name="expected">The expected type.</param>
-        [SerializerMethod]
-        public static void Serialize(object untypedInput, ISerializationContext context, Type expected)
-        {
-            var typed = untypedInput as EventHubSequenceTokenV2;
-            var writer = context.StreamWriter;
-            if (typed == null)
-            {
-                writer.WriteNull();
-                return;
-            }
-
-            writer.Write(typed.EventHubOffset);
-            writer.Write(typed.SequenceNumber);
-            writer.Write(typed.EventIndex);
-        }
-
-        /// <summary>
-        /// Deserializes an event sequence token
-        /// </summary>
-        /// <param name="expected">The expected type.</param>
-        /// <param name="context">The deserialization context.</param>
-        /// <returns></returns>
-        [DeserializerMethod]
-        public static object Deserialize(Type expected, IDeserializationContext context)
-        {
-            var reader = context.StreamReader;
-            var deserialized = new EventHubSequenceTokenV2(reader.ReadString(), reader.ReadLong(), reader.ReadInt());
-            context.RecordObject(deserialized);
-            return deserialized;
         }
     }
 }

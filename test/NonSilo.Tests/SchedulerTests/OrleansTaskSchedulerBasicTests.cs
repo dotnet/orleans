@@ -4,13 +4,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
-using TestExtensions;
 using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
 using Orleans.Internal;
-using Orleans;
 using System.Collections.Generic;
 
 // ReSharper disable ConvertToConstant.Local
@@ -38,7 +36,7 @@ namespace UnitTests.SchedulerTests
         IAddressable IGrainContext.GrainInstance => throw new NotImplementedException();
 
         public TComponent GetComponent<TComponent>() => throw new NotImplementedException();
-
+        public TTarget GetTarget<TTarget>() => throw new NotImplementedException();
         public void ReceiveMessage(object message) => throw new NotImplementedException();
 
         public void SetComponent<TComponent>(TComponent value) => throw new NotImplementedException();

@@ -1,5 +1,3 @@
-using Orleans;
-using Orleans.CodeGeneration;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Orleans.CodeGeneration")]
@@ -16,7 +14,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("GoogleUtils.Tests")]
 [assembly: InternalsVisibleTo("LoadTestGrains")]
 [assembly: InternalsVisibleTo("NonSilo.Tests")]
-[assembly: InternalsVisibleTo("OrleansBenchmarks")]
+[assembly: InternalsVisibleTo("Benchmarks")]
 [assembly: InternalsVisibleTo("Tester")]
 [assembly: InternalsVisibleTo("Tester.AzureUtils")]
 [assembly: InternalsVisibleTo("Tester.AdoNet")]

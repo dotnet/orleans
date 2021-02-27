@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans
 {
@@ -17,26 +18,26 @@ namespace Orleans
         private readonly IGrainContext rootGrainContext;
         private readonly IRuntimeClient runtimeClient;
         private readonly ILogger logger;
-        private readonly SerializationManager serializationManager;
+        private readonly DeepCopier deepCopier;
         private readonly MessagingTrace messagingTrace;
 
         public InvokableObjectManager(
             IGrainContext rootGrainContext,
             IRuntimeClient runtimeClient,
-            SerializationManager serializationManager,
+            DeepCopier deepCopier,
             MessagingTrace messagingTrace,
             ILogger logger)
         {
             this.rootGrainContext = rootGrainContext;
             this.runtimeClient = runtimeClient;
-            this.serializationManager = serializationManager;
+            this.deepCopier = deepCopier;
             this.messagingTrace = messagingTrace;
             this.logger = logger;
         }
 
-        public bool TryRegister(IAddressable obj, ObserverGrainId objectId, IGrainMethodInvoker invoker)
+        public bool TryRegister(IAddressable obj, ObserverGrainId objectId)
         {
-            return this.localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, invoker, this));
+            return this.localObjects.TryAdd(objectId, new LocalObjectData(obj, objectId, this));
         }
 
         public bool TryDeregister(ObserverGrainId objectId)
@@ -81,18 +82,16 @@ namespace Orleans
             private static readonly Func<object, Task> HandleFunc = self => ((LocalObjectData)self).LocalObjectMessagePumpAsync();
             private readonly InvokableObjectManager _manager;
 
-            internal LocalObjectData(IAddressable obj, ObserverGrainId observerId, IGrainMethodInvoker invoker, InvokableObjectManager manager)
+            internal LocalObjectData(IAddressable obj, ObserverGrainId observerId, InvokableObjectManager manager)
             {
                 this.LocalObject = new WeakReference(obj);
                 this.ObserverId = observerId;
-                this.Invoker = invoker;
                 this.Messages = new Queue<Message>();
                 this.Running = false;
                 _manager = manager;
             }
 
             internal WeakReference LocalObject { get; }
-            internal IGrainMethodInvoker Invoker { get; }
             internal ObserverGrainId ObserverId { get; }
             internal Queue<Message> Messages { get; }
             internal bool Running { get; set; }
@@ -121,7 +120,7 @@ namespace Orleans
                 _manager.rootGrainContext.SetComponent(value);
             }
 
-            TComponent IGrainContext.GetComponent<TComponent>()
+            public TComponent GetComponent<TComponent>()
             {
                 if (this.LocalObject.Target is TComponent component)
                 {
@@ -130,6 +129,8 @@ namespace Orleans
 
                 return _manager.rootGrainContext.GetComponent<TComponent>();
             }
+
+            public TTarget GetTarget<TTarget>() => (TTarget)(object)this.LocalObject.Target;
 
             bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
 
@@ -216,10 +217,10 @@ namespace Orleans
                         }
 
                         RequestContextExtensions.Import(message.RequestContextData);
-                        InvokeMethodRequest request = null;
+                        IInvokable request = null;
                         try
                         {
-                            request = (InvokeMethodRequest)message.BodyObject;
+                            request = (IInvokable)message.BodyObject;
                         }
                         catch (Exception deserializationException)
                         {
@@ -231,34 +232,23 @@ namespace Orleans
                                     message);
                             }
 
-                            _manager.runtimeClient.SendResponse(message, Response.ExceptionResponse(deserializationException));
+                            _manager.runtimeClient.SendResponse(message, Response.FromException(deserializationException));
                             continue;
                         }
 
-                        var targetOb = (IAddressable)this.LocalObject.Target;
-                        object resultObject = null;
-                        Exception caught = null;
                         try
                         {
-
-                            // exceptions thrown within this scope are not considered to be thrown from user code
-                            // and not from runtime code.
-                            var resultPromise = this.Invoker.Invoke(this, request);
-                            if (resultPromise != null) // it will be null for one way messages
+                            request.SetTarget(this);
+                            var response = await request.Invoke();
+                            if (message.Direction != Message.Directions.OneWay)
                             {
-                                resultObject = await resultPromise;
+                                this.SendResponseAsync(message, response);
                             }
                         }
                         catch (Exception exc)
                         {
-                            // the exception needs to be reported in the log or propagated back to the caller.
-                            caught = exc;
+                            this.ReportException(message, exc);
                         }
-
-                        if (caught != null)
-                            this.ReportException(message, caught);
-                        else if (message.Direction != Message.Directions.OneWay)
-                            this.SendResponseAsync(message, resultObject);
                     }
                     catch (Exception outerException)
                     {
@@ -275,7 +265,7 @@ namespace Orleans
             }
 
             [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-            private void SendResponseAsync(Message message, object resultObject)
+            private void SendResponseAsync(Message message, Response resultObject)
             {
                 if (message.IsExpired)
                 {
@@ -283,28 +273,28 @@ namespace Orleans
                     return;
                 }
 
-                object deepCopy;
+                Response deepCopy;
                 try
                 {
                     // we're expected to notify the caller if the deep copy failed.
-                    deepCopy = _manager.serializationManager.DeepCopy(resultObject);
+                    deepCopy = _manager.deepCopier.Copy(resultObject);
                 }
                 catch (Exception exc2)
                 {
-                    _manager.runtimeClient.SendResponse(message, Response.ExceptionResponse(exc2));
+                    _manager.runtimeClient.SendResponse(message, Response.FromException(exc2));
                     _manager.logger.LogWarning((int)ErrorCode.ProxyClient_OGC_SendResponseFailed, exc2, "Exception trying to send a response.");
                     return;
                 }
 
                 // the deep-copy succeeded.
-                _manager.runtimeClient.SendResponse(message, new Response(deepCopy));
+                _manager.runtimeClient.SendResponse(message, deepCopy);
                 return;
             }
 
             [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
             private void ReportException(Message message, Exception exception)
             {
-                var request = (InvokeMethodRequest)message.BodyObject;
+                var request = (IInvokable)message.BodyObject;
                 switch (message.Direction)
                 {
                     case Message.Directions.OneWay:
@@ -312,8 +302,8 @@ namespace Orleans
                             _manager.logger.LogError(
                                 (int)ErrorCode.ProxyClient_OGC_UnhandledExceptionInOneWayInvoke,
                                 exception,
-                                "Exception during invocation of notification method {MethodId}, interface {Interface}. Ignoring exception because this is a one way request.",
-                                request.MethodId,
+                                "Exception during invocation of notification {Request}, interface {Interface}. Ignoring exception because this is a one way request.",
+                                request.ToString(),
                                 message.InterfaceType);
                             break;
                         }
@@ -324,11 +314,11 @@ namespace Orleans
                             try
                             {
                                 // we're expected to notify the caller if the deep copy failed.
-                                deepCopy = (Exception)_manager.serializationManager.DeepCopy(exception);
+                                deepCopy = (Exception)_manager.deepCopier.Copy(exception);
                             }
                             catch (Exception ex2)
                             {
-                                _manager.runtimeClient.SendResponse(message, Response.ExceptionResponse(ex2));
+                                _manager.runtimeClient.SendResponse(message, Response.FromException(ex2));
                                 _manager.logger.LogWarning(
                                     (int)ErrorCode.ProxyClient_OGC_SendExceptionResponseFailed,
                                     ex2,
@@ -337,7 +327,7 @@ namespace Orleans
                             }
                              
                             // the deep-copy succeeded.
-                            var response = Response.ExceptionResponse(deepCopy);
+                            var response = Response.FromException(deepCopy);
                             _manager.runtimeClient.SendResponse(message, response);
                             break;
                         }

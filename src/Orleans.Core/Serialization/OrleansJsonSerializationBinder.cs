@@ -1,16 +1,16 @@
-﻿using System;
+using System;
 using Newtonsoft.Json.Serialization;
-using Orleans.Runtime;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Serialization
 {
     /// <inheritdoc />
     public class OrleansJsonSerializationBinder : DefaultSerializationBinder
     {
-        private readonly ITypeResolver typeResolver;
+        private readonly TypeResolver typeResolver;
 
         /// <inheritdoc />
-        public OrleansJsonSerializationBinder(ITypeResolver typeResolver)
+        public OrleansJsonSerializationBinder(TypeResolver typeResolver)
         {
             this.typeResolver = typeResolver;
         }

@@ -1,6 +1,5 @@
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
@@ -15,8 +14,9 @@ using Orleans.Configuration;
 using TestExtensions;
 using Xunit;
 using Orleans.ServiceBus.Providers.Testing;
-using Orleans.Hosting;
 using Azure.Messaging.EventHubs;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {
@@ -25,7 +25,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
     {
         private CachePressureInjectionMonitor cachePressureInjectionMonitor;
         private PurgeDecisionInjectionPredicate purgePredicate;
-        private SerializationManager serializationManager;
+        private Serializer serializer;
         private EventHubAdapterReceiver receiver1;
         private EventHubAdapterReceiver receiver2;
         private ObjectPool<FixedSizeBuffer> bufferPool;
@@ -49,9 +49,11 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.cachePressureInjectionMonitor = new CachePressureInjectionMonitor();
             this.purgePredicate = new PurgeDecisionInjectionPredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(30));
 
-            //set up serialization env
-            var environment = SerializationTestEnvironment.InitializeWithDefaults();
-            this.serializationManager = environment.SerializationManager;
+            // set up serialization env
+            var serviceProvider = new ServiceCollection()
+                .AddSerializer()
+                .BuildServiceProvider();
+            this.serializer = serviceProvider.GetRequiredService<Serializer>();
 
             //set up buffer pool, small buffer size make it easy for cache to allocate multiple buffers
             var oneKB = 1024;
@@ -258,7 +260,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.evictionStrategyList.Add(evictionStrategy);
             var cache = new EventHubQueueCacheForTesting(
                 this.bufferPool,
-                new MockEventHubCacheAdaptor(this.serializationManager),
+                new MockEventHubCacheAdaptor(this.serializer),
                 evictionStrategy,
                 checkpointer,
                 cacheLogger);

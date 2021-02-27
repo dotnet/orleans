@@ -3,18 +3,16 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal class CorrelationId : IEquatable<CorrelationId>, IComparable<CorrelationId>
+    [GenerateSerializer]
+    internal readonly struct CorrelationId : IEquatable<CorrelationId>, IComparable<CorrelationId>
     {
+        [Id(1)]
         private readonly long id;
         private static long nextToUse = 1;
 
-        internal CorrelationId(long value)
+        public CorrelationId(long value)
         {
             id = value;
-        }
-
-        internal CorrelationId() : this(0)
-        {
         }
 
         public CorrelationId(CorrelationId other)
@@ -35,32 +33,22 @@ namespace Orleans.Runtime
 
         public override bool Equals(object obj)
         {
-            if (!(obj is CorrelationId))
+            if (obj is not CorrelationId correlationId)
             {
                 return false;
             }
-            return this.Equals((CorrelationId)obj);
+
+            return this.Equals(correlationId);
         }
 
         public bool Equals(CorrelationId other)
         {
-            return !ReferenceEquals(other, null) && (id == other.id);
+            return id == other.id;
         }
 
         public static bool operator ==(CorrelationId lhs, CorrelationId rhs)
         {
-            if (ReferenceEquals(lhs, null))
-            {
-                return ReferenceEquals(rhs, null);
-            }
-            else if (ReferenceEquals(rhs, null))
-            {
-                return false;
-            }
-            else
-            {
-                return (rhs.id == lhs.id);
-            }
+            return (rhs.id == lhs.id);
         }
 
         public static bool operator !=(CorrelationId lhs, CorrelationId rhs)

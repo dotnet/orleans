@@ -1,11 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Orleans.Hosting;
-using Orleans.TestingHost;
 using Orleans.Transactions.TestKit.Consistency;
 
 namespace Orleans.Transactions.TestKit

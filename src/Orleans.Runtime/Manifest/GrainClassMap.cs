@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using Orleans.Runtime;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Metadata
 {

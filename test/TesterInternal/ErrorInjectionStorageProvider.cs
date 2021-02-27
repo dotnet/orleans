@@ -5,7 +5,6 @@ using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 
 namespace UnitTests.StorageTests
@@ -22,16 +21,22 @@ namespace UnitTests.StorageTests
     }
 
     [Serializable]
+    [GenerateSerializer]
     public struct ErrorInjectionBehavior
     {
         public static readonly ErrorInjectionBehavior None = new ErrorInjectionBehavior { ErrorInjectionPoint = ErrorInjectionPoint.None };
+
+        [Id(0)]
         public Type ExceptionType { get; set; }
+        [Id(1)]
         public ErrorInjectionPoint ErrorInjectionPoint { get; set; }
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class StorageProviderInjectedError : OrleansException
     {
+        [Id(0)]
         private readonly ErrorInjectionPoint errorInjectionPoint;
 
         public StorageProviderInjectedError(ErrorInjectionPoint errorPoint)
@@ -73,7 +78,7 @@ namespace UnitTests.StorageTests
         public ErrorInjectionStorageProvider(
             ILogger<ErrorInjectionStorageProvider> logger,
             ILoggerFactory loggerFactory,
-            SerializationManager serializationManager) : base(loggerFactory, serializationManager)
+            DeepCopier copier) : base(loggerFactory, copier)
         {
             this.logger = logger;
             SetErrorInjection(ErrorInjectionBehavior.None);

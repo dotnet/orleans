@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System;
 using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans.Providers
@@ -75,6 +71,7 @@ namespace Orleans.Providers
     }
 
     [Serializable]
+    [GenerateSerializer]
     public class ProviderStateException : OrleansException
     {
         public ProviderStateException() : base("Unexpected provider state")

@@ -7,8 +7,8 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <AssemblyName>Orleans.Memory</AssemblyName>
-    <RootNamespace>Orleans.Memory</RootNamespace>
+    <AssemblyName>Orleans.Persistence.Memory</AssemblyName>
+    <RootNamespace>Orleans.Persistence.Memory</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 

@@ -112,7 +112,8 @@ namespace DefaultCluster.Tests.StorageTests
         }
 
         [Serializable]
-        private class TestGrainState : IGrainState
+        [GenerateSerializer]
+        public class TestGrainState : IGrainState
         {
             public static IGrainState CreateRandom()
             {
@@ -132,9 +133,15 @@ namespace DefaultCluster.Tests.StorageTests
                 };
             }
 
+            [Id(0)]
             public object State { get; set; }
+
             public Type Type => typeof(int);
+
+            [Id(1)]
             public string ETag { get; set; }
+
+            [Id(2)]
             public bool RecordExists { get; set; }
         }
     }

@@ -40,6 +40,12 @@ namespace Orleans
             return default;
         }
 
+        public TTarget GetTarget<TTarget>()
+        {
+            if (this is TTarget target) return target;
+            return default;
+        }
+
         public void SetComponent<TComponent>(TComponent instance)
         {
             throw new NotSupportedException($"Cannot set components on shared client instance. Extension contract: {typeof(TComponent)}. Component: {instance} (Type: {instance?.GetType()})");

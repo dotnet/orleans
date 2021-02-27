@@ -1,15 +1,6 @@
-﻿using Orleans;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using Orleans.ServiceBus.Providers;
+﻿using Orleans.Providers.Streams.Common;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using UnitTests.GrainInterfaces;
-using UnitTests.Grains;
 
 namespace ServiceBus.Tests.MonitorTests
 {
@@ -55,14 +46,22 @@ namespace ServiceBus.Tests.MonitorTests
     }
 
     [Serializable]
+    [Orleans.GenerateSerializer]
     public class CacheMonitorCounters
     {
+        [Orleans.Id(0)]
         public int TrackCachePressureMonitorStatusChangeCallCounter;
+        [Orleans.Id(1)]
         public int ReportCacheSizeCallCounter;
+        [Orleans.Id(2)]
         public int ReportMessageStatisticsCallCounter;
+        [Orleans.Id(3)]
         public int TrackMemoryAllocatedCallCounter;
+        [Orleans.Id(4)]
         public int TrackMemoryReleasedCallCounter;
+        [Orleans.Id(5)]
         public int TrackMessageAddedCounter;
+        [Orleans.Id(6)]
         public int TrackMessagePurgedCounter;
     }
 }
