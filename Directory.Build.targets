@@ -33,6 +33,7 @@
     </ProjectReference>
   </ItemGroup>
 
+  <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator/build/Microsoft.Orleans.CodeGenerator.props" />
   <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'msbuild' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator.MSBuild/build/Microsoft.Orleans.CodeGenerator.MSBuild.targets" />
 
   <ItemGroup>
@@ -43,4 +44,5 @@
       OutputItemType="Analyzer"
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
   </ItemGroup>
+
 </Project>
