@@ -33,7 +33,7 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// This is a template to produce query parameters that are indexed.
         /// </summary>
-        private static readonly string indexedParameterTemplate = "@p{0}";
+        private const string indexedParameterTemplate = "@p{0}";
                     
         /// <summary>
         /// Executes a multi-record insert query clause with <em>SELECT UNION ALL</em>.

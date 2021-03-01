@@ -426,37 +426,6 @@ namespace Orleans.Runtime
             return this;
         }
 
-
-        // Utility function for manipulating lists of array segments
-        public static List<ArraySegment<byte>> BuildSegmentList(List<ArraySegment<byte>> buffer, int offset)
-        {
-            if (offset == 0)
-            {
-                return buffer;
-            }
-
-            var result = new List<ArraySegment<byte>>();
-            var lengthSoFar = 0;
-            foreach (var segment in buffer)
-            {
-                var bytesStillToSkip = offset - lengthSoFar;
-                lengthSoFar += segment.Count;
-                if (segment.Count <= bytesStillToSkip) // Still skipping past this buffer
-                {
-                    continue;
-                }
-                if (bytesStillToSkip > 0) // This is the first buffer, so just take part of it
-                {
-                    result.Add(new ArraySegment<byte>(segment.Array, bytesStillToSkip, segment.Count - bytesStillToSkip));
-                }
-                else // Take the whole buffer
-                {
-                    result.Add(segment);
-                }
-            }
-            return result;
-        }
-
         // Utility function for manipulating lists of array segments
         public static List<ArraySegment<byte>> BuildSegmentListWithLengthLimit(List<ArraySegment<byte>> buffer, int offset, int length)
         {

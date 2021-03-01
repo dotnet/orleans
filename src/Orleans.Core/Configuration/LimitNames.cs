@@ -1,4 +1,4 @@
-﻿namespace Orleans.Runtime.Configuration
+namespace Orleans.Runtime.Configuration
 {
 
     /// <summary>
@@ -6,7 +6,6 @@
     /// </summary>
     internal static class LimitNames
     {
-        public const string LIMIT_MAX_PENDING_ITEMS = "MaxPendingItems";
         public const string LIMIT_MAX_ENQUEUED_REQUESTS = "MaxEnqueuedRequests";
         public const string LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER = "MaxEnqueuedRequests_StatelessWorker";
     }

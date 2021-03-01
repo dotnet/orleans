@@ -65,11 +65,6 @@ namespace Orleans.CodeGeneration
         /// <summary>Invocation does not care about ordering and can consequently be optimized.</summary>
         Unordered = 0x10,
 
-
-        /// <summary>Obsolete field.</summary>
-        [Obsolete]
-        DelayForConsistency = 0x20,
-
         /// <summary>The invocation can interleave with any other request type, including write requests.</summary>
         AlwaysInterleave = 0x100,
 

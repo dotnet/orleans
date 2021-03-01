@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Orleans.Configuration
 {
@@ -20,7 +20,7 @@ namespace Orleans.Configuration
         public static TimeSpan DefaultRemoteTransactionPingFrequency = TimeSpan.FromSeconds(60);
 
         public TimeSpan ConfirmationRetryDelay { get; set; } = DefaultConfirmationRetryDelay;
-        private static TimeSpan DefaultConfirmationRetryDelay = TimeSpan.FromSeconds(30);
+        private static TimeSpan DefaultConfirmationRetryDelay => TimeSpan.FromSeconds(30);
 
         public static int ConfirmationRetryLimit { get; set; } = DefaultConfirmationRetryLimit;
         public const int DefaultConfirmationRetryLimit = 3;

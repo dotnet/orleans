@@ -341,40 +341,6 @@ namespace Orleans.Runtime.Management
             return requestsToSilos;
         }
 
-        private static void AddXPathValue(XmlNode xml, IEnumerable<string> path, string value)
-        {
-            if (path == null) return;
-
-            var first = path.FirstOrDefault();
-            if (first == null) return;
-
-            if (first.StartsWith("@", StringComparison.Ordinal))
-            {
-                first = first.Substring(1);
-                if (path.Count() != 1)
-                    throw new ArgumentException("Attribute " + first + " must be last in path");
-                var e = xml as XmlElement;
-                if (e == null)
-                    throw new ArgumentException("Attribute " + first + " must be on XML element");
-                e.SetAttribute(first, value);
-                return;
-            }
-
-            foreach (var child in xml.ChildNodes)
-            {
-                var e = child as XmlElement;
-                if (e != null && e.LocalName == first)
-                {
-                    AddXPathValue(e, path.Skip(1), value);
-                    return;
-                }
-            }
-
-            var empty = (xml as XmlDocument ?? xml.OwnerDocument).CreateElement(first);
-            xml.AppendChild(empty);
-            AddXPathValue(empty, path.Skip(1), value);
-        }
-
         private ISiloControl GetSiloControlReference(SiloAddress silo)
         {
             return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);

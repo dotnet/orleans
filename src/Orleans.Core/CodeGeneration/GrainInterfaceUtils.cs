@@ -14,29 +14,6 @@ namespace Orleans.CodeGeneration
     {
         private static readonly MethodInfoComparer MethodComparer = new MethodInfoComparer();
 
-        [Serializable]
-        internal sealed class RulesViolationException : ArgumentException
-        {
-            public RulesViolationException(string message, List<string> violations)
-                : base(message)
-            {
-                Violations = violations;
-            }
-
-            private RulesViolationException(SerializationInfo info, StreamingContext context) : base(info, context)
-            {
-                this.Violations = info.GetValue(nameof(Violations), typeof(List<string>)) as List<string>;
-            }
-
-            public override void GetObjectData(SerializationInfo info, StreamingContext context)
-            {
-                base.GetObjectData(info, context);
-                info.AddValue(nameof(Violations), this.Violations);
-            }
-
-            public List<string> Violations { get; }
-        }
-
         public static bool IsGrainInterface(Type t)
         {
             if (t.IsClass)
@@ -66,28 +43,6 @@ namespace Orleans.CodeGeneration
                     methodInfos.Add(methodInfo);
 
             return methodInfos.ToArray();
-        }
-
-        public static string GetParameterName(ParameterInfo info)
-        {
-            var n = info.Name;
-            return string.IsNullOrEmpty(n) ? "arg" + info.Position.ToString() : n;
-        }
-
-        public static bool IsTaskType(Type t)
-        {
-            if (t == typeof(Task))
-            {
-                return true;
-            }
-
-            if (t.IsGenericType)
-            {
-                var def = t.GetGenericTypeDefinition();
-                return def == typeof(Task<>) || def == typeof(ValueTask<>);
-            }
-
-            return false;
         }
 
         public static List<Type> GetRemoteInterfaces(Type type, bool checkIsGrainInterface = true)
@@ -166,120 +121,6 @@ namespace Orleans.CodeGeneration
             return GetTypeCode(grainClass);
         }
 
-        internal static void ValidateInterface(Type type)
-        {
-            if (!IsGrainInterface(type))
-                throw new ArgumentException($"{type.FullName} is not a grain interface");
-
-            var violations = new List<string>();
-            if (!ValidateInterfaceMethods(type, violations) || !ValidateInterfaceProperties(type, violations))
-            {
-                if (ConsoleText.IsConsoleAvailable)
-                {
-                    foreach (var violation in violations)
-                        ConsoleText.WriteLine("ERROR: " + violation);
-                }
-
-                throw new RulesViolationException(
-                    string.Format("{0} does not conform to the grain interface rules.", type.FullName), violations);
-            }
-        }
-
-        private static bool ValidateInterfaceMethods(Type type, List<string> violations)
-        {
-            bool success = true;
-
-            MethodInfo[] methods = type.GetMethods(BindingFlags.Instance | BindingFlags.Public);
-            foreach (MethodInfo method in methods)
-            {
-                if (method.IsSpecialName)
-                    continue;
-
-                if (IsPureObserverInterface(method.DeclaringType))
-                {
-                    if (method.ReturnType != typeof (void))
-                    {
-                        success = false;
-                        violations.Add(String.Format("Method {0}.{1} must return void because it is defined within an observer interface.",
-                            type.FullName, method.Name));
-                    }
-                }
-                else if (!IsTaskType(method.ReturnType))
-                {
-                    success = false;
-                    violations.Add(String.Format("Method {0}.{1} must return Task or Task<T> because it is defined within a grain interface.",
-                        type.FullName, method.Name));
-                }
-
-                ParameterInfo[] parameters = method.GetParameters();
-                foreach (ParameterInfo parameter in parameters)
-                {
-                    if (parameter.IsOut)
-                    {
-                        success = false;
-                        violations.Add(String.Format("Argument {0} of method {1}.{2} is an output parameter. Output parameters are not allowed in grain interfaces.",
-                            GetParameterName(parameter), type.FullName, method.Name));
-                    }
-
-                    if (parameter.ParameterType.IsByRef)
-                    {
-                        success = false;
-                        violations.Add(String.Format("Argument {0} of method {1}.{2} is an a reference parameter. Reference parameters are not allowed.",
-                            GetParameterName(parameter), type.FullName, method.Name));
-                    }
-                }
-            }
-
-            return success;
-        }
-
-        private static bool ValidateInterfaceProperties(Type type, List<string> violations)
-        {
-            bool success = true;
-
-            PropertyInfo[] properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
-            foreach (PropertyInfo property in properties)
-            {
-                success = false;
-                violations.Add(String.Format("Properties are not allowed on grain interfaces:  {0}.{1}.",
-                    type.FullName, property.Name));
-            }
-
-            return success;
-        }
-
-        /// <summary>
-        /// decide whether the class is derived from Grain
-        /// </summary>
-        private static bool IsPureObserverInterface(Type t)
-        {
-            if (!typeof (IGrainObserver).IsAssignableFrom(t))
-                return false;
-
-            if (t == typeof (IGrainObserver))
-                return true;
-
-            if (t == typeof (IAddressable))
-                return false;
-
-            bool pure = false;
-            foreach (Type iface in t.GetInterfaces())
-            {
-                if (iface == typeof (IAddressable)) // skip IAddressable that will be in the list regardless
-                    continue;
-
-                if (iface == typeof (IGrainExtension))
-                    // Skip IGrainExtension, it's just a marker that can go on observer or grain interfaces
-                    continue;
-
-                pure = IsPureObserverInterface(iface);
-                if (!pure)
-                    return false;
-            }
-
-            return pure;
-        }
-
         private sealed class MethodInfoComparer : IEqualityComparer<MethodInfo>
         {
             public bool Equals(MethodInfo x, MethodInfo y)
@@ -289,7 +130,7 @@ namespace Orleans.CodeGeneration
 
             public int GetHashCode(MethodInfo obj)
             {
-                throw new NotImplementedException();
+                return ComputeMethodId(obj);
             }
         }
 

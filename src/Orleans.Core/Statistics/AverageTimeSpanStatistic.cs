@@ -87,8 +87,7 @@ namespace Orleans.Runtime
         {
             lock (classLock)
             {
-                AverageTimeSpanStatistic stat;
-                if (registeredStatistics.TryGetValue(name.Name, out stat))
+                if (registeredStatistics.TryGetValue(name.Name, out _))
                 {
                     registeredStatistics.Remove(name.Name);
                 }

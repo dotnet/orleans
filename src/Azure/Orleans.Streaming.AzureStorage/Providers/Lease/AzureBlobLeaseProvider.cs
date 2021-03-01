@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -38,7 +39,7 @@ namespace Orleans.LeaseProviders
             }
         }
 
-        private BlobClient GetBlobClient(string category, string resourceKey) => this.container.GetBlobClient($"{category.ToLower()}-{resourceKey.ToLower()}.json");
+        private BlobClient GetBlobClient(string category, string resourceKey) => this.container.GetBlobClient($"{category.ToLowerInvariant()}-{resourceKey.ToLowerInvariant()}.json");
 
         public async Task<AcquireLeaseResult[]> Acquire(string category, LeaseRequest[] leaseRequests)
         {

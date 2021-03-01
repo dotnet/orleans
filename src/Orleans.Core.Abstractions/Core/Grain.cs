@@ -91,11 +91,6 @@ namespace Orleans
             get { return Runtime?.SiloIdentity ?? string.Empty; }
         }
 
-        internal SiloAddress SiloAddress
-        {
-            get { return Runtime?.SiloAddress ?? SiloAddress.Zero; }
-        }
-
         /// <summary>
         /// Registers a timer to send periodic callbacks to this grain.
         /// </summary>

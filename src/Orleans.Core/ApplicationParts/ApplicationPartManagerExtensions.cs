@@ -142,20 +142,6 @@ namespace Orleans
             return manager;
         }
 
-        public static IApplicationPartManager AddFromAssemblyLoadContext(this IApplicationPartManager manager, AssemblyLoadContext context)
-        {
-            if (context is null) throw new ArgumentNullException(nameof(context));
-
-            var assemblies = new HashSet<Assembly>();
-            foreach (var asm in context.Assemblies)
-            {
-                manager = manager.AddApplicationPart(asm);
-                assemblies.Add(asm);
-            }
-
-            return manager;
-        }
-
         public static IApplicationPartManager AddFromAssemblyLoadContext(this IApplicationPartManager manager, Assembly assembly = null)
         {
             assembly ??= typeof(ApplicationPartManagerExtensions).Assembly;

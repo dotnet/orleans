@@ -14,14 +14,4 @@ namespace Orleans.Runtime.Configuration
         Verbose2,
         Verbose3,
     }
-
-    /// <summary>
-    /// Statistics Configuration that are common to client and silo.
-    /// </summary>
-    public interface IStatisticsConfiguration
-    {
-        TimeSpan StatisticsPerfCountersWriteInterval { get; set; }
-        TimeSpan StatisticsLogWriteInterval { get; set; }
-        StatisticsLevel StatisticsCollectionLevel { get; set; }
-    }
 }

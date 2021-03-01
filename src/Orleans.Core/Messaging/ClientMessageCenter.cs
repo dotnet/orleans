@@ -390,18 +390,6 @@ namespace Orleans.Messaging
             get { return 0; }
         }
 
-        private SiloAddress GetLiveGatewaySiloAddress()
-        {
-            var gateway = gatewayManager.GetLiveGateway();
-
-            if (gateway == null)
-            {
-                throw new OrleansException("Not connected to a gateway");
-            }
-
-            return gateway;
-        }
-
         internal void OnGatewayConnectionOpen()
         {
             int newCount = Interlocked.Increment(ref numberOfConnectedGateways);

@@ -53,7 +53,7 @@ namespace Orleans.Configuration
                         $"{nameof(AzureQueueOptions)} on stream provider {this.name} is invalid. {nameof(AzureQueueOptions.ConnectionString)} is invalid");
             }
 
-            if (options.QueueNames == null || options.QueueNames?.Count == 0)
+            if (options.QueueNames == null || options.QueueNames.Count == 0)
                 throw new OrleansConfigurationException(
                     $"{nameof(AzureQueueOptions)} on stream provider {this.name} is invalid. {nameof(AzureQueueOptions.QueueNames)} is invalid");
         }

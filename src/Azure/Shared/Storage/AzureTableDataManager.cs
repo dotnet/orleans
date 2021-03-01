@@ -257,7 +257,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     var opResult = await Table.ExecuteAsync(TableOperation.Insert(data));
                     return (true, opResult.Etag);
                 }
-                catch (StorageException storageException) when (storageException?.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.Conflict)
+                catch (StorageException storageException) when (storageException.RequestInformation?.HttpStatusCode == (int)HttpStatusCode.Conflict)
                 {
                     return (false, null);
                 }

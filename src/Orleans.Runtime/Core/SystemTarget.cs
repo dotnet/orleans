@@ -43,8 +43,6 @@ namespace Orleans.Runtime
             set { this.runtimeClient = value; }
         }
 
-        IGrainReferenceRuntime ISystemTargetBase.GrainReferenceRuntime => this.RuntimeClient.GrainReferenceRuntime;
-
         public GrainReference GrainReference => selfReference ??= this.RuntimeClient.ServiceProvider.GetRequiredService<GrainReferenceActivator>().CreateReference(this.id.GrainId, default);
 
         GrainId IGrainContext.GrainId => this.id.GrainId;

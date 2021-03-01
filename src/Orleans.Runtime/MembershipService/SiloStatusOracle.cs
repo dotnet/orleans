@@ -113,19 +113,6 @@ namespace Orleans.Runtime.MembershipService
         public bool SubscribeToSiloStatusEvents(ISiloStatusListener listener) => this.listenerManager.Subscribe(listener);
 
         public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener listener) => this.listenerManager.Unsubscribe(listener);
-
-        public IReadOnlyList<SiloAddress> GetApproximateMultiClusterGateways() => throw new NotSupportedException();
-
-        public Task BecomeActive() => throw new NotSupportedException();
-
-        public Task KillMyself() => throw new NotSupportedException();
-
-        public Task ShutDown() => throw new NotSupportedException();
-
-        public Task Start() => throw new NotSupportedException();
-
-        public Task Stop() => throw new NotSupportedException();
-
-        public bool CheckHealth(DateTime lastCheckTime) => true;
+    
     }
 }

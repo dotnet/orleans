@@ -147,8 +147,6 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         protected ILogConsistencyProtocolServices Services { get; private set; }
 
-        private const int max_notification_batch_size = 10000;
-
         /// <summary>
         /// Construct an instance, for the given parameters.
         /// </summary>

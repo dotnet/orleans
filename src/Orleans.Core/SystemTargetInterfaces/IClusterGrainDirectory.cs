@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -56,48 +56,5 @@ namespace Orleans.SystemTargetInterfaces
             sb.Append("]");
             return sb.ToString();
         }
-    }
-
-    interface IClusterGrainDirectory : ISystemTarget
-    {
-        /// <summary>
-        /// Called on remote clusters to process a global-single-instance round
-        /// </summary>
-        /// <param name="grain">the grain to process</param>
-        /// <param name="requestClusterId">the id of the origin cluster</param>
-        /// <param name="hopCount">how many times this request has been forwarded within the cluster</param>
-        /// <returns></returns>
-        Task<RemoteClusterActivationResponse> ProcessActivationRequest(
-            GrainId grain,
-            string requestClusterId,
-            int hopCount = 0);
-
-        /// <summary>
-        /// Called on remote clusters to process a global-single-instance round
-        /// </summary>
-        /// <param name="grains">the grains to process</param>
-        /// <param name="sendingClusterId">the id of the origin cluster</param>
-        /// <returns></returns>
-        Task<RemoteClusterActivationResponse[]> ProcessActivationRequestBatch(
-            GrainId[] grains,
-            string sendingClusterId);
-
-        /// <summary>
-        /// Called on remote clusters after deactivating an owned or doubtful grain activation,
-        /// to give them the opportunity to remove the cached registration
-        /// </summary>
-        /// <param name="addresses">the list of activations</param>
-        Task ProcessDeactivations(List<ActivationAddress> addresses);
-
-        /// <summary>
-        /// Called on remote clusters when deletion of all grain registrations is asked for.
-        /// </summary>
-        /// <param name="grainId"></param>
-        Task ProcessDeletion(GrainId grainId);
-
-        /// <summary>
-        /// Called on remote clusters to ping availability of a silo and determine cluster id.
-        /// </summary>
-        Task<string> Ping();
     }
 }

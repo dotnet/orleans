@@ -13,7 +13,6 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class GrainDirectoryHandoffManager
     {
-        private const int HANDOFF_CHUNK_SIZE = 500;
         private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(250);
         private const int MAX_OPERATION_DEQUEUE = 2;
         private readonly LocalGrainDirectory localDirectory;

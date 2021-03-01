@@ -83,11 +83,5 @@ namespace Orleans.Runtime
         /// Returns <see langword="true"/> if the type is a system target, <see langword="false"/> if not.
         /// </summary>
         public static bool IsSystemTarget(this in GrainId id) => id.Type.IsSystemTarget();
-
-        /// <summary>
-        /// Returns <see langword="true"/> if the type is a legacy grain, <see langword="false"/> if not.
-        /// </summary>
-        public static bool IsLegacyGrain(this in GrainId id) => id.Type.IsLegacyGrain()
-            || LegacyGrainId.TryConvertFromGrainId(id, out var legacyId) && legacyId.IsGrain;
     }
 }

@@ -10,7 +10,6 @@ namespace Orleans.Providers
     /// <remarks>
     /// Passed to the provider during IProvider.Init call to that provider instance.
     /// </remarks>
-    /// <seealso cref="IProvider"/>
     public interface IProviderRuntime
     {
         /// <summary>

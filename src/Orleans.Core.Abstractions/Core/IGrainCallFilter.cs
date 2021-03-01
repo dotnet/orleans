@@ -16,10 +16,6 @@ namespace Orleans
         Task Invoke(IIncomingGrainCallContext context);
     }
 
-    /// <inheritdoc />
-    [Obsolete("Use " + nameof(IIncomingGrainCallFilter))]
-    public interface IGrainCallFilter : IIncomingGrainCallFilter { }
-
     /// <summary>
     /// Interface for outgoing grain call filters.
     /// </summary>

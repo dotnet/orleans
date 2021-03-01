@@ -5,6 +5,7 @@ namespace Orleans.CodeGeneration
     /// <summary>
     /// The attribute which informs the code generator that code should be generated for this type.
     /// </summary>
+    [AttributeUsage(AttributeTargets.Assembly)]
     public class ConsiderForCodeGenerationAttribute : Attribute
     {
         /// <summary>Initializes a new instance of <see cref="ConsiderForCodeGenerationAttribute"/>.</summary>

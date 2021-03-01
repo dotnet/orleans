@@ -33,7 +33,6 @@ namespace Orleans
             services.TryAddSingleton<IHostEnvironmentStatistics, NoOpHostEnvironmentStatistics>();
             services.TryAddSingleton<IAppEnvironmentStatistics, AppEnvironmentStatistics>();
             services.TryAddSingleton<ClientStatisticsManager>();
-            services.TryAddFromExisting<IStatisticsManager, ClientStatisticsManager>();
             services.TryAddSingleton<ApplicationRequestsStatisticsGroup>();
             services.TryAddSingleton<StageAnalysisStatisticsGroup>();
             services.TryAddSingleton<SchedulerStatisticsGroup>();

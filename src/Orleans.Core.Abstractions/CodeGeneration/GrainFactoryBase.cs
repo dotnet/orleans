@@ -33,17 +33,5 @@ namespace Orleans.CodeGeneration
                 throw new NotSupportedException(errMsg);
             }
         }
-
-        internal static void DisallowNullOrWhiteSpaceKeyExtensions(string keyExt)
-        {
-            if (!string.IsNullOrWhiteSpace(keyExt)) return;
-
-            if (null == keyExt)
-            {
-                throw new ArgumentNullException("keyExt"); 
-            }
-            
-            throw new ArgumentException("Key extension is empty or white space.", "keyExt");
-        }
     }
 }

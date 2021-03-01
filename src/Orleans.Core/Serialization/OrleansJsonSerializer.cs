@@ -1,17 +1,13 @@
 using System;
 using System.Net;
-using System.Reflection;
-using System.Runtime.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
+using Orleans.GrainReferences;
 
 namespace Orleans.Serialization
 {
-    using Orleans.GrainReferences;
-    using Orleans.Providers;
-
     public class OrleansJsonSerializer : IExternalSerializer
     {
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
@@ -57,21 +53,6 @@ namespace Orleans.Serialization
             settings.Converters.Add(new GrainReferenceJsonConverter(services.GetRequiredService<GrainReferenceActivator>()));
 
             return settings;
-        }
-
-        /// <summary>
-        /// Customises the given serializer settings using provider configuration.
-        /// Can be used by any provider, allowing the users to use a standard set of configuration attributes.
-        /// </summary>
-        /// <param name="settings">The settings to update.</param>
-        /// <param name="config">The provider config.</param>
-        /// <returns>The updated <see cref="JsonSerializerSettings" />.</returns>
-        public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, IProviderConfiguration config)
-        {
-            bool useFullAssemblyNames = config.GetBoolProperty(UseFullAssemblyNamesProperty, false);
-            bool indentJson = config.GetBoolProperty(IndentJsonProperty, false);
-            TypeNameHandling typeNameHandling = config.GetEnumProperty(TypeNameHandlingProperty, settings.TypeNameHandling);
-            return UpdateSerializerSettings(settings, useFullAssemblyNames, indentJson, typeNameHandling);
         }
 
         public static JsonSerializerSettings UpdateSerializerSettings(JsonSerializerSettings settings, bool useFullAssemblyNames, bool indentJson, TypeNameHandling? typeNameHandling)
@@ -288,7 +269,6 @@ namespace Orleans.Serialization
     {
         private static readonly Type AddressableType = typeof(IAddressable);
         private readonly GrainReferenceActivator referenceActivator;
-        private readonly GrainIdConverter grainIdConverter = new GrainIdConverter();
 
         public GrainReferenceJsonConverter(GrainReferenceActivator referenceActivator)
         {

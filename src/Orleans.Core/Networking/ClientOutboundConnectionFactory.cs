@@ -7,7 +7,7 @@ using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class ClientOutboundConnectionFactory : ConnectionFactory, IConnectionDirectionFeature
+    internal sealed class ClientOutboundConnectionFactory : ConnectionFactory
     {
         internal static readonly object ServicesKey = new object();
         private readonly ConnectionCommon connectionShared;
@@ -43,14 +43,6 @@ namespace Orleans.Runtime.Messaging
 
         protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
         {
-            connectionBuilder.Use(next =>
-            {
-                return async context =>
-                {
-                    context.Features.Set<IConnectionDirectionFeature>(this);
-                    await next(context);
-                };
-            });
             this.clientConnectionOptions.ConfigureConnectionBuilder(connectionBuilder);
             base.ConfigureConnectionBuilder(connectionBuilder);
         }
@@ -70,7 +62,5 @@ namespace Orleans.Runtime.Messaging
                 }
             }
         }
-
-        bool IConnectionDirectionFeature.IsOutboundConnection => true;
     }
 }

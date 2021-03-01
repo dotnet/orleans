@@ -42,10 +42,6 @@ namespace Orleans.Runtime
         {
             return statisticName + "." + "Current";
         }
-        public static string CreateDeltaName(string statisticName)
-        {
-            return statisticName + "." + "Delta";
-        }
     }
 
     internal interface ICounter<out T> : ICounter
@@ -55,30 +51,14 @@ namespace Orleans.Runtime
 
     internal class CounterStatistic : ICounter<long>
     {
-        private class ReferenceLong
-        {
-            internal long Value;
-        }
-
-        private const int BUFFER_SIZE = 100;
-
-        [ThreadStatic]
-        private static List<ReferenceLong> allStatisticsFromSpecificThread;
-        [ThreadStatic]
-        private static bool isOrleansManagedThread;
-
-        private static readonly Dictionary<string, CounterStatistic> registeredStatistics;
+        private static readonly ConcurrentDictionary<string, CounterStatistic> registeredStatistics;
         private static readonly object lockable;
-        private static int nextId;
-        private readonly ConcurrentStack<ReferenceLong> specificStatisticFromAllThreads;
         
-        private readonly int id;
         private long last;
         private bool firstStatDisplay;
         private Func<long, long> valueConverter;
-        private long nonOrleansThreadsCounter; // one for all non-Orleans threads
+        private long value;
         private readonly bool isHidden;
-        private readonly string currentName;
 
         public string Name { get; }
         public bool UseDelta { get; }
@@ -86,8 +66,7 @@ namespace Orleans.Runtime
 
         static CounterStatistic()
         {
-            registeredStatistics = new Dictionary<string, CounterStatistic>();           
-            nextId = 0;
+            registeredStatistics = new ConcurrentDictionary<string, CounterStatistic>();           
             lockable = new object();
         }
 
@@ -95,28 +74,13 @@ namespace Orleans.Runtime
         private CounterStatistic(string name, bool useDelta, CounterStorage storage, bool isHidden)
         {
             Name = name;
-            currentName = Metric.CreateCurrentName(name);
             UseDelta = useDelta;
             Storage = storage;
-            id = Interlocked.Increment(ref nextId);
             last = 0;
             firstStatDisplay = true;
             valueConverter = null;
-            nonOrleansThreadsCounter = 0;
+            value = 0;
             this.isHidden = isHidden;
-            specificStatisticFromAllThreads = new ConcurrentStack<ReferenceLong>();
-        }
-
-        internal static void SetOrleansManagedThread()
-        {
-            if (!isOrleansManagedThread)
-            {
-                lock (lockable)
-                {
-                    isOrleansManagedThread = true;
-                    allStatisticsFromSpecificThread = new List<ReferenceLong>(new ReferenceLong[BUFFER_SIZE]);                    
-                }
-            }
         }
 
         public static CounterStatistic FindOrCreate(StatisticName name)
@@ -141,27 +105,17 @@ namespace Orleans.Runtime
 
         private static CounterStatistic FindOrCreate_Impl(StatisticName name, bool useDelta, CounterStorage storage, bool isHidden)
         {
-            lock (lockable)
+            if (registeredStatistics.TryGetValue(name.Name, out var stat))
             {
-                CounterStatistic stat;
-                if (registeredStatistics.TryGetValue(name.Name, out stat))
-                {
-                    return stat;
-                }
-                var ctr = new CounterStatistic(name.Name, useDelta, storage, isHidden);
-
-                registeredStatistics[name.Name] = ctr;
-
-                return ctr;
+                return stat;
             }
+
+            return registeredStatistics.GetOrAdd(name.Name, new CounterStatistic(name.Name, useDelta, storage, isHidden));
         }
 
         public static bool Delete(string name)
         {
-            lock (lockable)
-            {
-                return registeredStatistics.Remove(name);
-            }
+            return registeredStatistics.Remove(name, out _);
         }
 
         public CounterStatistic AddValueConverter(Func<long, long> converter)
@@ -172,51 +126,17 @@ namespace Orleans.Runtime
 
         public void Increment()
         {
-            IncrementBy(1);
+            Interlocked.Increment(ref value);
         }
 
         public void DecrementBy(long n)
         {
-            IncrementBy(-n);
+            Interlocked.Add(ref value, -n);
         }
 
-        // Orleans-managed threads aggregate stats in per thread local storage list.
-        // For non Orleans-managed threads (.NET IO completion port threads, thread pool timer threads) we don't want to allocate a thread local storage,
-        // since we don't control how many of those threads are created (could lead to too much thread local storage allocated).
-        // Thus, for non Orleans-managed threads, we use a counter shared between all those threads and Interlocked.Add it (creating small contention).
         public void IncrementBy(long n)
         {
-            if (isOrleansManagedThread)
-            {
-                if (allStatisticsFromSpecificThread.Count <= id)
-                {
-                    var bufferSize = Math.Max(id - allStatisticsFromSpecificThread.Count, BUFFER_SIZE);
-
-                    allStatisticsFromSpecificThread.AddRange(new ReferenceLong[bufferSize+1]);
-                }
-
-                var orleansValue = allStatisticsFromSpecificThread[id];
-
-                if (orleansValue == null)
-                {
-                    orleansValue = new ReferenceLong();
-                    allStatisticsFromSpecificThread[id] = orleansValue;
-                    specificStatisticFromAllThreads.Push(orleansValue);
-                }
-
-                orleansValue.Value += n;
-            }
-            else
-            {
-                if (n == 1)
-                {
-                    Interlocked.Increment(ref nonOrleansThreadsCounter);
-                }
-                else
-                {
-                    Interlocked.Add(ref nonOrleansThreadsCounter, n);
-                }
-            }
+            Interlocked.Add(ref value, n);
         }
 
         /// <summary>
@@ -225,10 +145,8 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public long GetCurrentValue()
         {            
-            long val = specificStatisticFromAllThreads.Sum(a => a.Value);         
-            return val + Interlocked.Read(ref nonOrleansThreadsCounter);            
+            return Volatile.Read(ref value);            
         }
-
 
         // does not reset delta
         public long GetCurrentValueAndDelta(out long delta)
@@ -323,17 +241,14 @@ namespace Orleans.Runtime
 
         public static void AddCounters(List<ICounter> list, Func<CounterStatistic, bool> predicate)
         {
-            lock (lockable)
-            {
-                list.AddRange(registeredStatistics.Values.Where( c => !c.isHidden && predicate(c)));
-            }
+            list.AddRange(registeredStatistics.Select(c => c.Value).Where(c => !c.isHidden && predicate(c)));
         }
 
         public void TrackMetric(ITelemetryProducer telemetryProducer)
         {
             var rawValue = GetCurrentValue();
             var value = valueConverter?.Invoke(rawValue) ?? rawValue;
-            telemetryProducer.TrackMetric(currentName, value);
+            telemetryProducer.TrackMetric(Name, value);
             // TODO: track delta, when we figure out how to calculate them accurately
         }
     }
