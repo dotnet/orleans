@@ -36,6 +36,14 @@ namespace Benchmarks.GrainStorage
             this.host.Deploy();
         }
 
+        public void AdoNetSetup()
+        {
+            var builder = new TestClusterBuilder();
+            builder.AddSiloBuilderConfigurator<SiloAdoNetStorageConfigurator>();
+            this.host = builder.Build();
+            this.host.Deploy();
+        }
+
         public class SiloMemoryStorageConfigurator : ISiloConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)
@@ -60,6 +68,17 @@ namespace Benchmarks.GrainStorage
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder.AddAzureBlobGrainStorageAsDefault(options =>
+                {
+                    options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                });
+            }
+        }
+
+        public class SiloAdoNetStorageConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder.AddAdoNetGrainStorageAsDefault(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });

@@ -202,6 +202,19 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
+            ["GrainStorage.AdoNet"] = () =>
+            {
+                RunBenchmark(
+                "Running grain storage benchmark against AdoNet",
+                () =>
+                {
+                    var benchmark = new GrainStorageBenchmark();
+                    benchmark.AdoNetSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
         };
 
         // requires benchmark name or 'All' word as first parameter
