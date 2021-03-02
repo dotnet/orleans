@@ -28,6 +28,7 @@ namespace BenchmarkGrains.GrainStorage
             bool success;
             try
             {
+                await this.persistentState.ReadStateAsync();
                 this.persistentState.State = value;
                 await this.persistentState.WriteStateAsync();
                 sw.Stop();
