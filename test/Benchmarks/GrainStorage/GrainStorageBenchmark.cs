@@ -14,11 +14,13 @@ namespace Benchmarks.GrainStorage
     {
         private TestCluster host;
         private int concurrent;
+        private int payloadSize;
         private TimeSpan duration;
 
-        public GrainStorageBenchmark(int concurrent, TimeSpan duration)
+        public GrainStorageBenchmark(int concurrent, int payloadSize, TimeSpan duration)
         {
             this.concurrent = concurrent;
+            this.payloadSize = payloadSize;
             this.duration = duration;
         }
 
@@ -120,14 +122,14 @@ namespace Benchmarks.GrainStorage
         {
             var persistentGrain = this.host.Client.GetGrain<IPersistentGrain>(Guid.NewGuid());
             // activate grain
-            await persistentGrain.TrySet(0);
-            var state = instance;
+            await persistentGrain.Init(payloadSize);
+            var iteration = instance % payloadSize;
             var reports = new List<Report>(5000);
             while (running())
             {
-                var report = await persistentGrain.TrySet(state);
+                var report = await persistentGrain.TrySet(iteration);
                 reports.Add(report);
-                state++;
+                iteration = (iteration + 1) % payloadSize;
             }
 
             return reports;
