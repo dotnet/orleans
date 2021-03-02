@@ -112,7 +112,7 @@ namespace Benchmarks.GrainStorage
             var calltime = calltimes.Sum();
             var maxCalltime = calltimes.Max();
             var averageCalltime = calltimes.Average();
-            Console.WriteLine($"Performed {stored} persist operations with {failed} failures in {calltime}ms.");
+            Console.WriteLine($"Performed {stored} persist (read & write) operations with {failed} failures in {calltime}ms.");
             Console.WriteLine($"Average time in ms per call was {averageCalltime}, with longest call taking {maxCalltime}ms.");
         }
 
