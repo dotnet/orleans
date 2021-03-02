@@ -166,7 +166,7 @@ namespace Orleans.Runtime
                 var sentRejection = false;
 
                 // If the message was a one-way message, send a cache invalidation response even if the message was successfully forwarded.
-                if (message.Direction == Message.Directions.OneWay)
+                if (message.Direction == Message.Directions.OneWay && forwardingAddress is not null)
                 {
                     this.RejectMessage(
                         message,
