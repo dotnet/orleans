@@ -5,12 +5,22 @@ using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using BenchmarkGrainInterfaces.GrainStorage;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Benchmarks.GrainStorage
 {
     public class GrainStorageBenchmark : IDisposable
     {
         private TestCluster host;
+        private int concurrent;
+        private TimeSpan duration;
+
+        public GrainStorageBenchmark(int concurrent, TimeSpan duration)
+        {
+            this.concurrent = concurrent;
+            this.duration = duration;
+        }
 
         public void MemorySetup()
         {
@@ -89,7 +99,7 @@ namespace Benchmarks.GrainStorage
         {
             bool running = true;
             Func<bool> isRunning = () => running;
-            Task[] tasks = { PersistLoop(isRunning), Task.Delay(TimeSpan.FromSeconds(30)) };
+            Task[] tasks = { PersistLoop(isRunning), Task.Delay(duration) };
             await Task.WhenAny(tasks);
             running = false;
             await Task.WhenAll(tasks);
@@ -97,33 +107,25 @@ namespace Benchmarks.GrainStorage
 
         public async Task PersistLoop(Func<bool> running)
         {
-            IPersistentGrain persistentGrain = this.host.Client.GetGrain<IPersistentGrain>(Guid.NewGuid());
+            var persistentGrain = this.host.Client.GetGrain<IPersistentGrain>(Guid.NewGuid());
             // activate grain
-            await persistentGrain.Set(0);
-            int stored = 0;
-            int failed = 0;
-            TimeSpan maxCalltime = TimeSpan.MinValue;
-            Stopwatch sw = Stopwatch.StartNew();
-            Stopwatch calltime = new Stopwatch();
+            await persistentGrain.TrySet(0);
+            var state = 0;
+            var reports = new List<Report>(5000);
             while (running())
             {
-                calltime.Restart();
-                try
-                {
-                    await persistentGrain.Set(stored);
-                    stored++;
-                    calltime.Stop();
-                }
-                catch (Exception)
-                {
-                    failed++;
-                    calltime.Stop();
-                }
-                maxCalltime = maxCalltime < calltime.Elapsed ? calltime.Elapsed : maxCalltime;
+                var report = await persistentGrain.TrySet(state);
+                reports.Add(report);
+                state++;
             }
-            sw.Stop();
-            Console.WriteLine($"Performed {stored} persist operations with {failed} failures in {sw.ElapsedMilliseconds}ms.");
-            Console.WriteLine($"Average time in ms per call was {sw.ElapsedMilliseconds/stored}, with longest call taking {maxCalltime.TotalMilliseconds}ms.");
+            var stored = reports.Count(r => r.Success);
+            var failed = reports.Count(r => !r.Success);
+            var calltimes = reports.Select(r => r.Elapsed.TotalMilliseconds);
+            var calltime = calltimes.Sum();
+            var maxCalltime = calltimes.Max();
+            var averageCalltime = calltimes.Average();
+            Console.WriteLine($"Performed {stored} persist operations with {failed} failures in {calltime}ms.");
+            Console.WriteLine($"Average time in ms per call was {averageCalltime}, with longest call taking {maxCalltime}ms.");
         }
 
         public void Teardown()
