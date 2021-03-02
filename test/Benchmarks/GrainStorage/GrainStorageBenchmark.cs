@@ -99,25 +99,13 @@ namespace Benchmarks.GrainStorage
         {
             bool running = true;
             Func<bool> isRunning = () => running;
-            Task[] tasks = { PersistLoop(isRunning), Task.Delay(duration) };
-            await Task.WhenAny(tasks);
+            var runTask = Task.WhenAll(Enumerable.Range(0, concurrent).Select(i => RunAsync(i, isRunning)).ToList());
+            Task[] waitTasks = { runTask, Task.Delay(duration) };
+            await Task.WhenAny(waitTasks);
             running = false;
-            await Task.WhenAll(tasks);
-        }
+            var runResults = await runTask;
+            var reports = runResults.SelectMany(r => r).ToList();
 
-        public async Task PersistLoop(Func<bool> running)
-        {
-            var persistentGrain = this.host.Client.GetGrain<IPersistentGrain>(Guid.NewGuid());
-            // activate grain
-            await persistentGrain.TrySet(0);
-            var state = 0;
-            var reports = new List<Report>(5000);
-            while (running())
-            {
-                var report = await persistentGrain.TrySet(state);
-                reports.Add(report);
-                state++;
-            }
             var stored = reports.Count(r => r.Success);
             var failed = reports.Count(r => !r.Success);
             var calltimes = reports.Select(r => r.Elapsed.TotalMilliseconds);
@@ -126,6 +114,23 @@ namespace Benchmarks.GrainStorage
             var averageCalltime = calltimes.Average();
             Console.WriteLine($"Performed {stored} persist operations with {failed} failures in {calltime}ms.");
             Console.WriteLine($"Average time in ms per call was {averageCalltime}, with longest call taking {maxCalltime}ms.");
+        }
+
+        public async Task<List<Report>> RunAsync(int instance, Func<bool> running)
+        {
+            var persistentGrain = this.host.Client.GetGrain<IPersistentGrain>(Guid.NewGuid());
+            // activate grain
+            await persistentGrain.TrySet(0);
+            var state = instance;
+            var reports = new List<Report>(5000);
+            while (running())
+            {
+                var report = await persistentGrain.TrySet(state);
+                reports.Add(report);
+                state++;
+            }
+
+            return reports;
         }
 
         public void Teardown()

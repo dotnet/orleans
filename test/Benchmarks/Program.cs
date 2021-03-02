@@ -169,7 +169,7 @@ namespace Benchmarks
                 "Running grain storage benchmark against memory",
                 () =>
                 {
-                    var benchmark = new GrainStorageBenchmark(15000, TimeSpan.FromSeconds( 30 ));
+                    var benchmark = new GrainStorageBenchmark(10, TimeSpan.FromSeconds( 30 ));
                     benchmark.MemorySetup();
                     return benchmark;
                 },
@@ -182,7 +182,7 @@ namespace Benchmarks
                 "Running grain storage benchmark against Azure Table",
                 () =>
                 {
-                    var benchmark = new GrainStorageBenchmark(15000, TimeSpan.FromSeconds( 30 ));
+                    var benchmark = new GrainStorageBenchmark(100, TimeSpan.FromSeconds( 30 ));
                     benchmark.AzureTableSetup();
                     return benchmark;
                 },
@@ -195,7 +195,7 @@ namespace Benchmarks
                 "Running grain storage benchmark against Azure Blob",
                 () =>
                 {
-                    var benchmark = new GrainStorageBenchmark(15000, TimeSpan.FromSeconds( 30 ));
+                    var benchmark = new GrainStorageBenchmark(10, TimeSpan.FromSeconds( 30 ));
                     benchmark.AzureBlobSetup();
                     return benchmark;
                 },
@@ -208,7 +208,7 @@ namespace Benchmarks
                 "Running grain storage benchmark against AdoNet",
                 () =>
                 {
-                    var benchmark = new GrainStorageBenchmark(15000, TimeSpan.FromSeconds( 30 ));
+                    var benchmark = new GrainStorageBenchmark(100, TimeSpan.FromSeconds( 30 ));
                     benchmark.AdoNetSetup();
                     return benchmark;
                 },
