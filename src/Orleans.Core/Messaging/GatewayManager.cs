@@ -234,7 +234,7 @@ namespace Orleans.Messaging
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        public void GatewayListNotification(IEnumerable<Uri> gateways)
+        public async Task GatewayListNotification(IEnumerable<Uri> gateways)
         {
             try
             {

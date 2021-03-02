@@ -36,7 +36,7 @@ namespace Orleans.Messaging
     /// </summary>
     public interface IGatewayListListener
     {
-        void GatewayListNotification(IEnumerable<Uri> gateways);
+        Task GatewayListNotification(IEnumerable<Uri> gateways);
     }
 
     /// <summary>
