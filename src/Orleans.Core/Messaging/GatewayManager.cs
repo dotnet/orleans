@@ -238,7 +238,7 @@ namespace Orleans.Messaging
         {
             try
             {
-                UpdateLiveGatewaysSnapshot(gateways.Select(gw => gw.ToGatewayAddress()), gatewayListProvider.MaxStaleness);
+                await UpdateLiveGatewaysSnapshot(gateways.Select(gw => gw.ToGatewayAddress()), gatewayListProvider.MaxStaleness);
             }
             catch (Exception exc)
             {
