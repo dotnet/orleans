@@ -663,7 +663,7 @@ namespace Orleans.Runtime
                         }
                         else
                         {
-                            diagnostics.Add($"Message {message} was has been executing for {executionTime}.");
+                            diagnostics.Add($"Message {message} has been executing for {executionTime}.");
                         }
 
                         var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
