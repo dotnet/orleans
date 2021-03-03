@@ -99,6 +99,7 @@ namespace Benchmarks.GrainStorage
 
         public async Task RunAsync()
         {
+            Stopwatch sw = Stopwatch.StartNew();
             bool running = true;
             Func<bool> isRunning = () => running;
             var runTask = Task.WhenAll(Enumerable.Range(0, concurrent).Select(i => RunAsync(i, isRunning)).ToList());
@@ -106,6 +107,7 @@ namespace Benchmarks.GrainStorage
             await Task.WhenAny(waitTasks);
             running = false;
             var runResults = await runTask;
+            sw.Stop(); 
             var reports = runResults.SelectMany(r => r).ToList();
 
             var stored = reports.Count(r => r.Success);
@@ -114,8 +116,9 @@ namespace Benchmarks.GrainStorage
             var calltime = calltimes.Sum();
             var maxCalltime = calltimes.Max();
             var averageCalltime = calltimes.Average();
-            Console.WriteLine($"Performed {stored} persist (read & write) operations with {failed} failures in {calltime}ms.");
+            Console.WriteLine($"Performed {stored} persist (read & write) operations with {failed} failures in {sw.ElapsedMilliseconds}ms.");
             Console.WriteLine($"Average time in ms per call was {averageCalltime}, with longest call taking {maxCalltime}ms.");
+            Console.WriteLine($"Total time waiting for the persistent store was {calltime}ms.");
         }
 
         public async Task<List<Report>> RunAsync(int instance, Func<bool> running)
