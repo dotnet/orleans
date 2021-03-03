@@ -53,7 +53,7 @@ namespace Orleans.Runtime.Messaging
                 // Allow a short grace period to complete sending pending messages (eg, gossip responses)
                 await Task.Delay(TimeSpan.FromSeconds(10));
 
-                this.connectionManager.Close(silo);
+                await this.connectionManager.CloseAsync(silo);
             }
             catch (Exception exception)
             {

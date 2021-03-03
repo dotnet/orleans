@@ -171,8 +171,14 @@ namespace Orleans.Runtime.Messaging
         // There is NO need to acquire individual ClientState lock, since we only access client Id (immutable) and close an older socket.
         private void DropClient(ClientState client)
         {
-            logger.Info(ErrorCode.GatewayDroppingClient, "Dropping client {0}, {1} after disconnect with no reconnect", 
-                client.Id, DateTime.UtcNow.Subtract(client.DisconnectedSince));
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                logger.LogInformation(
+                    (int)ErrorCode.GatewayDroppingClient,
+                    "Dropping client {ClientId}, {IdleDuration} after disconnect with no reconnect",
+                    client.Id,
+                    DateTime.UtcNow.Subtract(client.DisconnectedSince));
+            }
             
             clients.TryRemove(client.Id, out _);
             clientRegistrar.ClientDropped(client.Id);
@@ -183,7 +189,8 @@ namespace Orleans.Runtime.Messaging
                 // this will not happen, since we drop only already disconnected clients, for socket is already null. But leave this code just to be sure.
                 client.RecordDisconnection();
                 clientConnections.TryRemove(oldConnection, out _);
-                oldConnection.Close();
+
+                oldConnection.CloseAsync(exception: null).Ignore();
             }
             
             MessagingStatisticsGroup.ConnectedClientCount.DecrementBy(1);
@@ -448,7 +455,7 @@ namespace Orleans.Runtime.Messaging
                 catch (Exception exception)
                 {
                     gateway.RecordClosedConnection(connection);
-                    connection.Abort(new ConnectionAbortedException("Exception posting a message to sender. See InnerException for details.", exception));
+                    connection.CloseAsync(new ConnectionAbortedException("Exception posting a message to sender. See InnerException for details.", exception)).Ignore();
                     return false;
                 }
             }

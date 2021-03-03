@@ -234,11 +234,11 @@ namespace Orleans.Messaging
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        public void GatewayListNotification(IEnumerable<Uri> gateways)
+        public async Task GatewayListNotification(IEnumerable<Uri> gateways)
         {
             try
             {
-                UpdateLiveGatewaysSnapshot(gateways.Select(gw => gw.ToGatewayAddress()), gatewayListProvider.MaxStaleness);
+                await UpdateLiveGatewaysSnapshot(gateways.Select(gw => gw.ToGatewayAddress()), gatewayListProvider.MaxStaleness);
             }
             catch (Exception exc)
             {
@@ -261,8 +261,7 @@ namespace Orleans.Messaging
                     logger.LogDebug("Discovered {GatewayCount} gateways: {Gateways}", refreshedGateways.Count, Utils.EnumerableToString(refreshedGateways));
                 }
 
-                // the next one will grab the lock.
-                UpdateLiveGatewaysSnapshot(refreshedGateways, gatewayListProvider.MaxStaleness);
+                await UpdateLiveGatewaysSnapshot(refreshedGateways, gatewayListProvider.MaxStaleness);
             }
             catch (Exception exc)
             {
@@ -271,13 +270,14 @@ namespace Orleans.Messaging
         }
 
         // This function is called asynchronously from gateway refresh timer.
-        private void UpdateLiveGatewaysSnapshot(IEnumerable<SiloAddress> refreshedGateways, TimeSpan maxStaleness)
+        private async Task UpdateLiveGatewaysSnapshot(IEnumerable<SiloAddress> refreshedGateways, TimeSpan maxStaleness)
         {
-            // this is a short lock, protecting the access to knownDead, knownMasked and cachedLiveGateways.
+            List<SiloAddress> connectionsToKeepAlive;
+
+            // This is a short lock, protecting the access to knownDead, knownMasked and cachedLiveGateways.
             lock (lockable)
             {
                 // now take whatever listProvider gave us and exclude those we think are dead.
-
                 var live = new List<SiloAddress>();
                 var now = DateTime.UtcNow;
 
@@ -340,8 +340,8 @@ namespace Orleans.Messaging
                 if (logger.IsEnabled(LogLevel.Information))
                 {
                     logger.Info(ErrorCode.GatewayManager_FoundKnownGateways,
-                            "Refreshed the live Gateway list. Found {0} gateways from Gateway listProvider: {1}. Picked only known live out of them. Now has {2} live Gateways: {3}. Previous refresh time was = {4}",
-                                knownGateways.Count,
+                            "Refreshed the live gateway list. Found {0} gateways from gateway list provider: {1}. Picked only known live out of them. Now has {2} live gateways: {3}. Previous refresh time was = {4}",
+                            knownGateways.Count,
                             Utils.EnumerableToString(knownGateways),
                             cachedLiveGateways.Count,
                             Utils.EnumerableToString(cachedLiveGateways),
@@ -351,13 +351,14 @@ namespace Orleans.Messaging
                 // Close connections to known dead connections, but keep the "masked" ones.
                 // Client will not send any new request to the "masked" connections, but might still
                 // receive responses
-                var connectionsToKeepAlive = new List<SiloAddress>(live);
+                connectionsToKeepAlive = new List<SiloAddress>(live);
                 connectionsToKeepAlive.AddRange(knownMasked.Select(e => e.Key));
-                this.CloseEvictedGatewayConnections(connectionsToKeepAlive);
             }
+
+            await this.CloseEvictedGatewayConnections(connectionsToKeepAlive);
         }
 
-        private void CloseEvictedGatewayConnections(List<SiloAddress> liveGateways)
+        private async Task CloseEvictedGatewayConnections(List<SiloAddress> liveGateways)
         {
             if (this.connectionManager == null) return;
 
@@ -381,7 +382,7 @@ namespace Orleans.Messaging
                         this.logger.LogInformation("Closing connection to {Endpoint} because it has been marked as dead", address);
                     }
 
-                    this.connectionManager.Close(address);
+                    await this.connectionManager.CloseAsync(address);
                 }
             }
         }
