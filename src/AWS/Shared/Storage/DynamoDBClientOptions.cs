@@ -43,5 +43,9 @@ namespace Orleans.Transactions.DynamoDB
         ///     If a table is uninitialized, the table will be initialized with provisioned throughput guided by <see cref="ReadCapacityUnits"/> and <see cref="WriteCapacityUnits"/>, otherwise the PayPerRequest model is used for table initialization.
         /// </summary>
         public bool UseProvisionedThroughput { get; set; } = true;
+        /// <summary>
+        ///     Returns the flag indicating if endpoint discovery should be enabled or disabled for operations that are not required to use endpoint discovery.
+        /// </summary>
+        public bool? EndpointDiscoveryEnabled { get; set; } = null;
     }
 }

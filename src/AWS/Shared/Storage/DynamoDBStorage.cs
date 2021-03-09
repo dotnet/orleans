@@ -71,23 +71,35 @@ namespace Orleans.Transactions.DynamoDB
 
         private void CreateClient()
         {
+            var ddbConfig = new AmazonDynamoDBConfig();
+
+            if (storageOptions.EndpointDiscoveryEnabled.HasValue)
+            {
+                // For backwards compatability, we shouldn't attempt to set it to a default value using .GetValueOrDefault
+                // so we take the underlying AWS SDK default behaviour, but still allow consumers to override.
+                ddbConfig.EndpointDiscoveryEnabled = storageOptions.EndpointDiscoveryEnabled.Value;
+            }
+
             if (this.storageOptions.Service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                 this.storageOptions.Service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 // Local DynamoDB instance (for testing)
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
-                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this.storageOptions.Service });
+                ddbConfig.ServiceURL = this.storageOptions.Service;
+                this.ddbClient = new AmazonDynamoDBClient(credentials, ddbConfig);
             }
             else if (!string.IsNullOrEmpty(this.storageOptions.AccessKey) && !string.IsNullOrEmpty(this.storageOptions.SecretKey))
             {
                 // AWS DynamoDB instance (auth via explicit credentials)
                 var credentials = new BasicAWSCredentials(this.storageOptions.AccessKey, this.storageOptions.SecretKey);
-                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.storageOptions.Service) });
+                ddbConfig.RegionEndpoint = AWSUtils.GetRegionEndpoint(this.storageOptions.Service);
+                this.ddbClient = new AmazonDynamoDBClient(credentials, ddbConfig);
             }
             else
             {
                 // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.storageOptions.Service) });
+                ddbConfig.RegionEndpoint = AWSUtils.GetRegionEndpoint(this.storageOptions.Service);
+                this.ddbClient = new AmazonDynamoDBClient(ddbConfig);
             }
         }
 
