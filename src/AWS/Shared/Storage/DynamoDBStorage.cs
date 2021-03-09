@@ -2,7 +2,6 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
@@ -29,46 +28,21 @@ namespace Orleans.Transactions.DynamoDB
     /// </summary>
     internal class DynamoDBStorage
     {
-        private string accessKey;
-
-        /// <summary> Secret key for this dynamoDB table </summary>
-        protected string secretKey;
-        private string service;
-        public const int DefaultReadCapacityUnits = 10;
-        public const int DefaultWriteCapacityUnits = 5;
-        private int readCapacityUnits = DefaultReadCapacityUnits;
-        private int writeCapacityUnits = DefaultWriteCapacityUnits;
-        private readonly bool useProvisionedThroughput;
+        private readonly DynamoDBClientOptions storageOptions;
+        private readonly ILogger Logger;
         private AmazonDynamoDBClient ddbClient;
-        private ILogger Logger;
 
         /// <summary>
         /// Create a DynamoDBStorage instance
         /// </summary>
         /// <param name="logger"></param>
-        /// <param name="accessKey"></param>
-        /// <param name="secretKey"></param>
-        /// <param name="service"></param>
-        /// <param name="readCapacityUnits"></param>
-        /// <param name="writeCapacityUnits"></param>
-        /// <param name="useProvisionedThroughput"></param>
-        public DynamoDBStorage(
-            ILogger logger,
-            string service,
-            string accessKey = "",
-            string secretKey = "",
-            int readCapacityUnits = DefaultReadCapacityUnits,
-            int writeCapacityUnits = DefaultWriteCapacityUnits,
-            bool useProvisionedThroughput = true)
+        /// <param name="storageOptions"></param>
+        public DynamoDBStorage(ILogger logger, DynamoDBClientOptions storageOptions)
         {
-            if (service == null) throw new ArgumentNullException(nameof(service));
-            this.accessKey = accessKey;
-            this.secretKey = secretKey;
-            this.service = service;
-            this.readCapacityUnits = readCapacityUnits;
-            this.writeCapacityUnits = writeCapacityUnits;
-            this.useProvisionedThroughput = useProvisionedThroughput;
+            // Kept as an ArgumentNullException for backwards compatability
+            if (storageOptions?.Service is null) throw new ArgumentNullException(nameof(DynamoDBClientOptions.Service));
             Logger = logger;
+            this.storageOptions = storageOptions;
             CreateClient();
         }
 
@@ -97,23 +71,23 @@ namespace Orleans.Transactions.DynamoDB
 
         private void CreateClient()
         {
-            if (this.service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                this.service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            if (this.storageOptions.Service.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                this.storageOptions.Service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 // Local DynamoDB instance (for testing)
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
-                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this.service });
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this.storageOptions.Service });
             }
-            else if (!string.IsNullOrEmpty(this.accessKey) && !string.IsNullOrEmpty(this.secretKey))
+            else if (!string.IsNullOrEmpty(this.storageOptions.AccessKey) && !string.IsNullOrEmpty(this.storageOptions.SecretKey))
             {
                 // AWS DynamoDB instance (auth via explicit credentials)
-                var credentials = new BasicAWSCredentials(this.accessKey, this.secretKey);
-                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+                var credentials = new BasicAWSCredentials(this.storageOptions.AccessKey, this.storageOptions.SecretKey);
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.storageOptions.Service) });
             }
             else
             {
                 // AWS DynamoDB instance (implicit auth - EC2 IAM Roles etc)
-                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+                this.ddbClient = new AmazonDynamoDBClient(new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.storageOptions.Service) });
             }
         }
 
@@ -139,19 +113,19 @@ namespace Orleans.Transactions.DynamoDB
                 TableName = tableName,
                 AttributeDefinitions = attributes,
                 KeySchema = keys,
-                BillingMode = this.useProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
-                ProvisionedThroughput = this.useProvisionedThroughput ? new ProvisionedThroughput
+                BillingMode = this.storageOptions.UseProvisionedThroughput ? BillingMode.PROVISIONED : BillingMode.PAY_PER_REQUEST,
+                ProvisionedThroughput = this.storageOptions.UseProvisionedThroughput ? new ProvisionedThroughput
                 {
-                    ReadCapacityUnits = readCapacityUnits,
-                    WriteCapacityUnits = writeCapacityUnits
+                    ReadCapacityUnits = storageOptions.ReadCapacityUnits,
+                    WriteCapacityUnits = storageOptions.WriteCapacityUnits
                 } : null
             };
 
             if (secondaryIndexes != null && secondaryIndexes.Count > 0)
             {
-                if (this.useProvisionedThroughput)
+                if (this.storageOptions.UseProvisionedThroughput)
                 {
-                    var indexThroughput = new ProvisionedThroughput {ReadCapacityUnits = readCapacityUnits, WriteCapacityUnits = writeCapacityUnits};
+                    var indexThroughput = new ProvisionedThroughput {ReadCapacityUnits = storageOptions.ReadCapacityUnits, WriteCapacityUnits = storageOptions.WriteCapacityUnits };
                     secondaryIndexes.ForEach(i =>
                     {
                         i.ProvisionedThroughput = indexThroughput;

@@ -39,8 +39,7 @@ namespace Orleans.Clustering.DynamoDB
 
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
-            this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
-                  this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
+            this.storage = new DynamoDBStorage(this.logger, this.options);
 
             logger.Info(ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
             await storage.InitializeTable(this.options.TableName,

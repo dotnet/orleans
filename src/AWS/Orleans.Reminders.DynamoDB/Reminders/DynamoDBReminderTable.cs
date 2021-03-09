@@ -54,8 +54,7 @@ namespace Orleans.Reminders.DynamoDB
         /// <summary>Initialize current instance with specific global configuration and logger</summary>
         public Task Init()
         {
-            this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
-                 this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
+            this.storage = new DynamoDBStorage(this.logger, this.options);
 
             this.logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 

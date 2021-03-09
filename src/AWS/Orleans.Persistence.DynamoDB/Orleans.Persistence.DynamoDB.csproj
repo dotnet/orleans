@@ -16,6 +16,7 @@
   <ItemGroup>
     <Compile Include="..\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
     <Compile Include="..\Shared\Storage\DynamoDBStorage.cs" Link="Storage\DynamoDBStorage.cs" />
+    <Compile Include="..\Shared\Storage\DynamoDBClientOptions.cs" Link="Storage\DynamoDBClientOptions.cs" />
   </ItemGroup>
 
   <ItemGroup>

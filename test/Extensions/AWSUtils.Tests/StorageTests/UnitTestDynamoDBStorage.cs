@@ -88,7 +88,7 @@ namespace AWSUtils.Tests.StorageTests
         public const string INSTANCE_TABLE_NAME = "UnitTestDDBTableData";
 
         public UnitTestDynamoDBStorage()
-            : base(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), AWSTestConstants.Service)
+            : base(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), new DynamoDBClientOptions { Service = AWSTestConstants.Service })
         {
             if (AWSTestConstants.IsDynamoDbAvailable)
             {
