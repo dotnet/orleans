@@ -12,6 +12,7 @@ using Azure.Core;
 using Azure.Core.Pipeline;
 using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 using Orleans.Runtime;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
