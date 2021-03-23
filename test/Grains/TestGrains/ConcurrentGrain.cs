@@ -55,12 +55,12 @@ namespace UnitTests.Grains
             return 1;
         }
 
-        public Task<int> B(int number)
+        public async Task<int> B(int number)
         {
             logger.Info("B(" + index + ") call " + number);
-            Thread.Sleep(100);
+            await Task.Delay(100);
             logger.Info("B(" + index + ") call " + number + " after sleep");
-            return Task.FromResult(1);
+            return 1;
         }
 
         private readonly List<int> m_list = new List<int>();
