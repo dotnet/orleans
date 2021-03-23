@@ -5,7 +5,6 @@ using Orleans;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 
 namespace UnitTests.StorageTests

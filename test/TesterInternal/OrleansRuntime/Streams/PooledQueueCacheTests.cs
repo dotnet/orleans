@@ -3,12 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
-using Orleans.TestingHost.Utils;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams

@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.ServiceFabric.Services.Communication.Runtime;
 using Newtonsoft.Json;
-using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.ServiceFabric;
 

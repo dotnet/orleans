@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers.Testing
 {

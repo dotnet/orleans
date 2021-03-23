@@ -1,7 +1,6 @@
 using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Orleans.Runtime.Host;
 using Orleans.Configuration;
 using Orleans.Streams;

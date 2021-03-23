@@ -2,7 +2,6 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.ConsistentRing;
-using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 
 namespace Orleans.Runtime.Services

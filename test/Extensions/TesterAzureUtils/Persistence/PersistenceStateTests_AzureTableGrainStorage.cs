@@ -5,7 +5,6 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.Hosting;
 using Orleans.TestingHost;
-using TestExtensions;
 
 namespace Tester.AzureUtils.Persistence
 {

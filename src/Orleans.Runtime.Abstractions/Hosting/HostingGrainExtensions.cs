@@ -1,5 +1,4 @@
 using System;
-using Orleans.CodeGeneration;
 using Orleans.Runtime;
 
 namespace Orleans.Hosting

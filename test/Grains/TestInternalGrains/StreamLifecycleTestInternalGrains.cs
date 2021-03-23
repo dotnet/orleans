@@ -1,12 +1,9 @@
 #define USE_STORAGE
 
 using System;
-using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
-using Orleans.Runtime.Providers;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 

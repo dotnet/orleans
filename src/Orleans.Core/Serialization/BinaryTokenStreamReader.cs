@@ -9,7 +9,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
 using Orleans.CodeGeneration;
-using Orleans.GrainDirectory;
 using Orleans.Runtime;
 
 namespace Orleans.Serialization

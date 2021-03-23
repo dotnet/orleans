@@ -15,7 +15,6 @@ using Orleans.Configuration;
 using TestExtensions;
 using Xunit;
 using Orleans.ServiceBus.Providers.Testing;
-using Orleans.Hosting;
 using Azure.Messaging.EventHubs;
 
 namespace ServiceBus.Tests.EvictionStrategyTests

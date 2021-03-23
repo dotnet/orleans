@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.ApplicationParts;
-using Orleans.CodeGeneration;
 using Orleans.Messaging;
 using Orleans.Runtime;
 

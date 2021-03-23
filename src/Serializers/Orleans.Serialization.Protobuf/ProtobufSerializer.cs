@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using Google.Protobuf;
-using Microsoft.Extensions.Logging;
 
 namespace Orleans.Serialization
 {

@@ -7,7 +7,6 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using Tester;
-using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;

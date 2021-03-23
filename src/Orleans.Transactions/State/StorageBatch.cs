@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions

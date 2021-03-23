@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -90,7 +89,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        // start a long tail call on the 1st grain by calling into the 2nd grain 
+        // start a long tail call on the 1st grain by calling into the 2nd grain
         public async Task<int> TailCall_Caller(IConcurrentReentrantGrain another, bool doCW)
         {
             logger.Info("TailCall_Caller");

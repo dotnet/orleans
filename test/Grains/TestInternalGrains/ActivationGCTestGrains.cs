@@ -2,7 +2,6 @@ using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
-using Orleans.Configuration;
 using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 

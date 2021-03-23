@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
-using System.Transactions;
 
 namespace Orleans.Transactions
 {

@@ -8,7 +8,6 @@ using Orleans.AzureUtils;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
-using TestExtensions;
 using Xunit;
 
 namespace Tester.AzureUtils

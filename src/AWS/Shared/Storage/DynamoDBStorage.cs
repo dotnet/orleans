@@ -2,7 +2,6 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;

@@ -4,13 +4,11 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
-using TestExtensions;
 using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
 using Orleans.Internal;
-using Orleans;
 using System.Collections.Generic;
 
 // ReSharper disable ConvertToConstant.Local

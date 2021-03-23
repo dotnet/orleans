@@ -1,11 +1,9 @@
 using Bond;
-using Orleans.Runtime.Configuration;
 using TestExtensions;
 using Xunit;
 
 namespace BondUtils.Tests.Serialization
 {
-    using System.Reflection;
     using Orleans;
     using Orleans.Configuration;
     using Orleans.Serialization;

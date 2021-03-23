@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Orleans.Serialization;
-using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
-using System.Linq;
 using Orleans.Runtime;
 
 namespace Orleans.ServiceBus.Providers

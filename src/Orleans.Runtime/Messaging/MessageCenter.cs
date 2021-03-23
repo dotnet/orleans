@@ -3,7 +3,6 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime.GrainDirectory;
 
 namespace Orleans.Runtime.Messaging
 {

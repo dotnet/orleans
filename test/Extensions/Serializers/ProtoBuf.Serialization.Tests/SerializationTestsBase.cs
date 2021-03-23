@@ -1,12 +1,7 @@
-using Orleans.Serialization.ProtobufNet;
 using System;
-using System.Reflection;
 using TestExtensions;
-using Orleans.Runtime.Configuration;
 using Xunit;
-using System.IO;
 using FluentAssertions;
-using Google.Protobuf;
 
 namespace ProtoBuf.Serialization.Tests
 {

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Core;
 using Orleans.Statistics;
 
 namespace Orleans.Runtime

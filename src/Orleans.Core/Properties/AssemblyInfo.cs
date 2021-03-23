@@ -1,5 +1,3 @@
-using Orleans;
-using Orleans.CodeGeneration;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Orleans.CodeGeneration")]

@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Storage;
-using Orleans.Utilities;
 
 namespace Orleans.Runtime
 {

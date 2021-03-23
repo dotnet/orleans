@@ -1,12 +1,10 @@
 
 using System;
 using System.Threading.Tasks;
-using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Tester;
 using TestExtensions;
 using Xunit;
 

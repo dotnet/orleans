@@ -8,8 +8,6 @@ using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Reminders.AzureStorage;
-using Orleans.Internal;
-using Orleans.Configuration;
 
 namespace Orleans.Runtime.ReminderService
 {

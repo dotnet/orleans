@@ -1,7 +1,6 @@
 using Orleans.Transactions.TestKit.xUnit;
 using Xunit.Abstractions;
 using Xunit;
-using Orleans.Transactions.Tests;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {

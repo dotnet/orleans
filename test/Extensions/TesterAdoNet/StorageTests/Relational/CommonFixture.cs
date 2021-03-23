@@ -9,15 +9,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Tests.SqlUtils;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.General;
-using Orleans.Streams;
 
 namespace UnitTests.StorageTests.Relational
 {

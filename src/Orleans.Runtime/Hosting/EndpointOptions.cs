@@ -1,6 +1,4 @@
-﻿using Orleans.Runtime.Configuration;
-using System.Net;
-using System.Net.Sockets;
+﻿using System.Net;
 
 namespace Orleans.Configuration
 {

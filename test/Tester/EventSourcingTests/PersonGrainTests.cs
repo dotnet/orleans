@@ -1,13 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
-using System.Linq;
-using Orleans;
 using TestGrainInterfaces;
 using Xunit;
 using Assert = Xunit.Assert;
-using TestExtensions;
-using Xunit.Abstractions;
-using Orleans.Runtime;
 
 namespace Tester.EventSourcingTests
 {
