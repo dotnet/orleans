@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal class Watchdog
+    internal sealed class Watchdog : IAsyncDisposable
     {
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private static readonly TimeSpan heartbeatPeriod = TimeSpan.FromMilliseconds(1000);
@@ -17,7 +18,7 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly CounterStatistic watchdogChecks;
         private CounterStatistic watchdogFailedChecks;
-        private Thread thread;
+        private Task thread;
 
         public Watchdog(TimeSpan watchdogPeriod, List<IHealthCheckParticipant> watchables, ILogger<Watchdog> logger)
         {
@@ -25,36 +26,37 @@ namespace Orleans.Runtime
             healthCheckPeriod = watchdogPeriod;
             participants = watchables;
             watchdogChecks = CounterStatistic.FindOrCreate(StatisticNames.WATCHDOG_NUM_HEALTH_CHECKS);
-        }
+            this.thread = Task.Run(Start);
 
-        public void Start()
-        {
-            logger.Info("Starting Silo Watchdog.");
-            var now = DateTime.UtcNow;
-            lastHeartbeat = now;
-            lastWatchdogCheck = now;
-            if (thread is object) throw new InvalidOperationException("Watchdog.Start may not be called more than once");
-            this.thread = new Thread(this.Run)
+            Task Start()
             {
-                IsBackground = true,
-                Name = "Orleans.Runtime.Watchdog",
-            };
-            this.thread.Start();
+                logger.Info("Starting Silo Watchdog.");
+                var now = DateTime.UtcNow;
+                lastHeartbeat = now;
+                lastWatchdogCheck = now;
+                return this.Run();
+            }
         }
 
-        public void Stop()
+        public async ValueTask DisposeAsync()
         {
             cancellation.Cancel();
+            var t = Interlocked.Exchange(ref thread, null);
+            if (t != null) await t;
         }
 
-        protected void Run()
+        private async Task Run()
         {
             while (!this.cancellation.IsCancellationRequested)
             {
                 try
                 {
                     WatchdogHeartbeatTick();
-                    Thread.Sleep(heartbeatPeriod);
+                    await Task.Delay(heartbeatPeriod);
+                }
+                catch (TaskCanceledException)
+                {
+                    // Silo is probably shutting-down, so just ignore and exit
                 }
                 catch (ThreadAbortException)
                 {
@@ -62,7 +64,8 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc)
                 {
-                    logger.LogError((int)ErrorCode.Watchdog_InternalError, exc, "Watchdog encountered an internal error");
+                    logger.LogError((int)ErrorCode.Watchdog_InternalError, exc,
+                        "Watchdog encountered an internal error");
                 }
             }
         }
@@ -77,7 +80,7 @@ namespace Orleans.Runtime
             {
                 lastHeartbeat = DateTime.UtcNow;
             }
-            
+
             var timeSinceLastWatchdogCheck = (DateTime.UtcNow - lastWatchdogCheck);
             if (timeSinceLastWatchdogCheck <= healthCheckPeriod) return;
 
@@ -101,7 +104,7 @@ namespace Orleans.Runtime
                         numFailedChecks++;
                     }
                 }
-                catch (Exception exc) 
+                catch (Exception exc)
                 {
                     logger.LogWarning(
                         (int)ErrorCode.Watchdog_ParticipantThrownException,
@@ -114,9 +117,9 @@ namespace Orleans.Runtime
             {
                 if (watchdogFailedChecks == null)
                     watchdogFailedChecks = CounterStatistic.FindOrCreate(StatisticNames.WATCHDOG_NUM_FAILED_HEALTH_CHECKS);
-                
+
                 watchdogFailedChecks.Increment();
-                logger.LogWarning((int)ErrorCode.Watchdog_HealthCheckFailure, "Watchdog had {FailedChecks} health Check failure(s) out of {ParticipantCount} health Check participants: {Reasons}", numFailedChecks, participants.Count, reasons.ToString()); 
+                logger.LogWarning((int)ErrorCode.Watchdog_HealthCheckFailure, "Watchdog had {FailedChecks} health Check failure(s) out of {ParticipantCount} health Check participants: {Reasons}", numFailedChecks, participants.Count, reasons.ToString());
             }
             lastWatchdogCheck = DateTime.UtcNow;
         }

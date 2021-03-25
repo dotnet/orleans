@@ -349,7 +349,6 @@ namespace Orleans.Runtime
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 var healthCheckParticipants = this.Services.GetService<IEnumerable<IHealthCheckParticipant>>().ToList();
                 this.platformWatchdog = new Watchdog(statisticsOptions.LogWriteInterval, healthCheckParticipants, this.loggerFactory.CreateLogger<Watchdog>());
-                this.platformWatchdog.Start();
                 if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo platform watchdog started successfully."); }
             }
             catch (Exception exc)
@@ -569,7 +568,7 @@ namespace Orleans.Runtime
             // 10, 11, 12: Write Dead in the table, Drain scheduler, Stop msg center, ...
             // timers
             if (platformWatchdog != null)
-                SafeExecute(platformWatchdog.Stop); // Silo may be dying before platformWatchdog was set up
+                await SafeAsyncExecute(async () => await platformWatchdog.DisposeAsync()); // Silo may be dying before platformWatchdog was set up
 
             if (!ct.IsCancellationRequested)
                 SafeExecute(activationDirectory.PrintActivationDirectory);
