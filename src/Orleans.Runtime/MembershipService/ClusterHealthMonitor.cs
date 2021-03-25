@@ -95,7 +95,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
-                this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
+                await this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
             }
             finally
             {
@@ -193,7 +193,7 @@ namespace Orleans.Runtime.MembershipService
                 return status == SiloStatus.Active || status == SiloStatus.ShuttingDown || status == SiloStatus.Stopping;
             }
         }
-        
+
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             var tasks = new List<Task>();

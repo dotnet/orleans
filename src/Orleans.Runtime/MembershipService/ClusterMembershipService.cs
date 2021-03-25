@@ -90,7 +90,7 @@ namespace Orleans.Runtime
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
                 this.log.LogError("Error processing membership updates: {Exception}", exception);
-                this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
+                await this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
             }
             finally
             {

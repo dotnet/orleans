@@ -4,6 +4,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -25,7 +26,7 @@ namespace Orleans.Runtime
             return !(exception is ThreadAbortException);
         }
 
-        public void OnFatalException(object sender, string context, Exception exception)
+        public async ValueTask OnFatalException(object sender, string context, Exception exception)
         {
             this.log.LogError(
                 (int)ErrorCode.Logger_ProcessCrashing,
@@ -42,7 +43,7 @@ namespace Orleans.Runtime
                 Console.Error.WriteLine(msg);
 
                 // Allow some time for loggers to flush.
-                Thread.Sleep(2000);
+                await Task.Delay(2000);
 
                 if (Debugger.IsAttached) Debugger.Break();
 

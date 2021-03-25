@@ -86,7 +86,7 @@ namespace Orleans.Runtime.MembershipService
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
                 this.log.LogError("Error updating liveness timestamp: {Exception}", exception);
-                this.fatalErrorHandler.OnFatalException(this, nameof(UpdateIAmAlive), exception);
+                await this.fatalErrorHandler.OnFatalException(this, nameof(UpdateIAmAlive), exception);
             }
             finally
             {

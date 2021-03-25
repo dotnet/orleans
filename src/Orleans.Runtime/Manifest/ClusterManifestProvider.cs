@@ -83,7 +83,7 @@ namespace Orleans.Runtime.Metadata
             }
             catch (Exception exception) when (_fatalErrorHandler.IsUnexpected(exception))
             {
-                _fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
+                await _fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
             }
             finally
             {
