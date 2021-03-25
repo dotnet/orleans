@@ -529,6 +529,7 @@ namespace Orleans.Runtime
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
                     logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
+                    // ReSharper disable once MethodSupportsCancellation
                     await Task.Delay(pause).ConfigureAwait(false);
                 }
 
@@ -592,9 +593,13 @@ namespace Orleans.Runtime
                     // Stop LocalGrainDirectory
                     await LocalScheduler.QueueActionAsync(() => localGrainDirectory.Stop(), localGrainDirectory.CacheValidator);
 
-                    SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
+                    await SafeAsyncExecute(() => catalog
+                        .DeactivateAllActivations()
+                        .WithCancellation(ct, "Deactivation of all activations failed because it was cancelled")
+                    );
 
                     // Wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
+                    // ReSharper disable once MethodSupportsCancellation
                     await Task.Delay(WaitForMessageToBeQueuedForOutbound);
                 }
             }
@@ -610,7 +615,7 @@ namespace Orleans.Runtime
             // Stop the gateway
             SafeExecute(messageCenter.StopAcceptingClientMessages);
 
-            SafeExecute(() => catalog?.Stop());
+            await SafeAsyncExecute(() => catalog?.Stop() ?? Task.CompletedTask);
         }
 
         private async Task OnActiveStop(CancellationToken ct)
