@@ -1,12 +1,14 @@
+using System.Threading.Tasks;
+
 namespace Orleans.Runtime
 {
     internal interface IMessageCenter
     {
         SiloAddress MyAddress { get; }
 
-        void Start();
-        
-        void Stop();
+        Task Start();
+
+        Task Stop();
 
         void SendMessage(Message msg);
 

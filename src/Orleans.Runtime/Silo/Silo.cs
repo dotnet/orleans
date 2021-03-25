@@ -306,7 +306,7 @@ namespace Orleans.Runtime
             //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecyce
             var stopWatch = Stopwatch.StartNew();
             // The order of these 4 is pretty much arbitrary.
-            StartTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
+            await StartAsyncTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
 
             StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
 
@@ -404,7 +404,7 @@ namespace Orleans.Runtime
             var loggingHelper = this.Services.GetService<SiloLoggingHelper>();
             foreach (var grainService in grainServices)
             {
-                loggingHelper?.RegisterGrainService(grainService); 
+                loggingHelper?.RegisterGrainService(grainService);
                 await RegisterGrainService(grainService);
             }
         }
@@ -563,7 +563,7 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        private Task OnRuntimeInitializeStop(CancellationToken ct)
+        private async Task OnRuntimeInitializeStop(CancellationToken ct)
         {
             // 10, 11, 12: Write Dead in the table, Drain scheduler, Stop msg center, ...
             // timers
@@ -573,12 +573,10 @@ namespace Orleans.Runtime
             if (!ct.IsCancellationRequested)
                 SafeExecute(activationDirectory.PrintActivationDirectory);
 
-            SafeExecute(messageCenter.Stop);
+            await SafeAsyncExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
 
             SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
-
-            return Task.CompletedTask;
         }
 
         private async Task OnBecomeActiveStop(CancellationToken ct)
@@ -653,6 +651,11 @@ namespace Orleans.Runtime
         private void SafeExecute(Action action)
         {
             Utils.SafeExecute(action, logger, "Silo.Stop");
+        }
+
+        private ValueTask SafeAsyncExecute(Func<Task> action)
+        {
+            return Utils.SafeAsyncExecute(action, logger, "Silo.Stop");
         }
 
         internal void RegisterSystemTarget(SystemTarget target) => this.catalog.RegisterSystemTarget(target);

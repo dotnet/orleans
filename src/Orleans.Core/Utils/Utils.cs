@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
@@ -24,7 +25,7 @@ namespace Orleans.Runtime
         /// <param name="putInBrackets">Puts elements within brackets</param>
         /// <returns>A string assembled by wrapping the string descriptions of the individual
         /// elements with square brackets and separating them with commas.</returns>
-        public static string EnumerableToString<T>(IEnumerable<T> collection, Func<T, string> toString = null, 
+        public static string EnumerableToString<T>(IEnumerable<T> collection, Func<T, string> toString = null,
                                                         string separator = ", ", bool putInBrackets = true)
         {
             if (collection == null)
@@ -205,6 +206,11 @@ namespace Orleans.Runtime
             SafeExecute(action, logger, (object)caller);
         }
 
+        public static ValueTask SafeAsyncExecute(Func<Task> action, ILogger logger = null, string caller = null)
+        {
+            return SafeAsyncExecute(action, logger, (object)caller);
+        }
+
         // a function to safely execute an action without any exception being thrown.
         // callerGetter function is called only in faulty case (now string is generated in the success case).
         public static void SafeExecute(Action action, ILogger logger, Func<string> callerGetter) => SafeExecute(action, logger, (object)callerGetter);
@@ -214,6 +220,50 @@ namespace Orleans.Runtime
             try
             {
                 action();
+            }
+            catch (Exception exc)
+            {
+                if (logger != null)
+                {
+                    try
+                    {
+                        string caller = null;
+                        switch (callerGetter)
+                        {
+                            case string value:
+                                caller = value;
+                                break;
+                            case Func<string> func:
+                                try
+                                {
+                                    caller = func();
+                                }
+                                catch
+                                {
+                                }
+
+                                break;
+                        }
+
+                        foreach (var e in exc.FlattenAggregate())
+                        {
+                            logger.Warn(ErrorCode.Runtime_Error_100325,
+                                $"Ignoring {e.GetType().FullName} exception thrown from an action called by {caller ?? String.Empty}.", exc);
+                        }
+                    }
+                    catch
+                    {
+                        // now really, really ignore.
+                    }
+                }
+            }
+        }
+
+        private static async ValueTask SafeAsyncExecute(Func<Task> action, ILogger logger, object callerGetter)
+        {
+            try
+            {
+                await action();
             }
             catch (Exception exc)
             {
@@ -276,7 +326,7 @@ namespace Orleans.Runtime
             foreach (var item in sequence)
             {
                 batch.Add(item);
-                // when we've accumulated enough in the batch, send it out  
+                // when we've accumulated enough in the batch, send it out
                 if (batch.Count >= batchSize)
                 {
                     yield return batch; // batch.ToArray();

@@ -15,26 +15,26 @@ namespace Orleans.Messaging
     // <summary>
     // This class is used on the client only.
     // It provides the client counterpart to the Gateway and GatewayAcceptor classes on the silo side.
-    // 
+    //
     // There is one ClientMessageCenter instance per OutsideRuntimeClient. There can be multiple ClientMessageCenter instances
     // in a single process, but because RuntimeClient keeps a static pointer to a single OutsideRuntimeClient instance, this is not
     // generally done in practice.
-    // 
+    //
     // Each ClientMessageCenter keeps a collection of GatewayConnection instances. Each of these represents a bidirectional connection
     // to a single gateway endpoint. Requests are assigned to a specific connection based on the target grain ID, so that requests to
     // the same grain will go to the same gateway, in sending order. To do this efficiently and scalably, we bucket grains together
     // based on their hash code mod a reasonably large number (currently 8192).
-    // 
+    //
     // When the first message is sent to a bucket, we assign a gateway to that bucket, selecting in round-robin fashion from the known
     // gateways. If this is the first message to be sent to the gateway, we will create a new connection for it and assign the bucket to
     // the new connection. Either way, all messages to grains in that bucket will be sent to the assigned connection as long as the
     // connection is live.
-    // 
-    // Connections stay live as long as possible. If a socket error or other communications error occurs, then the client will try to 
+    //
+    // Connections stay live as long as possible. If a socket error or other communications error occurs, then the client will try to
     // reconnect twice before giving up on the gateway. If the connection cannot be re-established, then the gateway is deemed (temporarily)
     // dead, and any buckets assigned to the connection are unassigned (so that the next message sent will cause a new gateway to be selected).
     // There is no assumption that this death is permanent; the system will try to reuse the gateway every 5 minutes.
-    // 
+    //
     // The list of known gateways is managed by the GatewayManager class. See comments there for details.
     // </summary>
     internal class ClientMessageCenter : IMessageCenter, IDisposable
@@ -107,7 +107,7 @@ namespace Orleans.Messaging
             }
         }
 
-        public void Start()
+        public Task Start()
         {
             Running = true;
             if (this.statisticsLevel.CollectQueueStats())
@@ -115,9 +115,10 @@ namespace Orleans.Messaging
                 queueTracking.OnStartExecution();
             }
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client started");
+            return Task.CompletedTask;
         }
 
-        public void Stop()
+        public Task Stop()
         {
             Running = false;
 
@@ -126,6 +127,7 @@ namespace Orleans.Messaging
                 queueTracking.OnStopExecution();
             }
             gatewayManager.Stop();
+            return Task.CompletedTask;
         }
 
         public void OnReceivedMessage(Message message)
@@ -365,7 +367,7 @@ namespace Orleans.Messaging
         public void RejectMessage(Message msg, string reason, Exception exc = null)
         {
             if (!Running) return;
-            
+
             if (msg.Direction != Message.Directions.Request)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
