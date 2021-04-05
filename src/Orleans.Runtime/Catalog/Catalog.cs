@@ -21,7 +21,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime, IHealthCheckParticipant
+    internal class Catalog : SystemTarget, ICatalog, IHealthCheckParticipant
     {
         public SiloAddress LocalSilo { get; private set; }
         internal ISiloStatusOracle SiloStatusOracle { get; set; }
@@ -46,7 +46,6 @@ namespace Orleans.Runtime
         private readonly CounterStatistic activationsFailedToActivate;
         private readonly IntValueStatistic inProcessRequests;
         private readonly CounterStatistic collectionCounter;
-        private readonly GrainContextActivator grainCreator;
         private readonly TimeSpan maxRequestProcessingTime;
         private readonly TimeSpan maxWarningRequestProcessingTime;
         private readonly SerializationManager serializationManager;
@@ -55,9 +54,7 @@ namespace Orleans.Runtime
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly IOptionsMonitor<SiloMessagingOptions> messagingOptions;
         private readonly RuntimeMessagingTrace messagingTrace;
-        private readonly PlacementStrategyResolver placementStrategyResolver;
         private readonly GrainContextActivator grainActivator;
-        private readonly GrainVersionManifest grainInterfaceVersions;
         private readonly GrainPropertiesResolver grainPropertiesResolver;
 
         public Catalog(
@@ -68,7 +65,6 @@ namespace Orleans.Runtime
             OrleansTaskScheduler scheduler,
             ActivationDirectory activationDirectory,
             ActivationCollector activationCollector,
-            GrainContextActivator grainCreator,
             MessageCenter messageCenter,
             MessageFactory messageFactory,
             SerializationManager serializationManager,
@@ -79,13 +75,13 @@ namespace Orleans.Runtime
             IOptionsMonitor<SiloMessagingOptions> messagingOptions,
             RuntimeMessagingTrace messagingTrace,
             IAsyncTimerFactory timerFactory,
-            PlacementStrategyResolver placementStrategyResolver,
-            PlacementService placementService,
             GrainContextActivator grainActivator,
             GrainVersionManifest grainInterfaceVersions,
             CompatibilityDirectorManager compatibilityDirectorManager,
             GrainPropertiesResolver grainPropertiesResolver,
-            IncomingRequestMonitor incomingRequestMonitor)
+            IncomingRequestMonitor incomingRequestMonitor,
+            ISiloStatusOracle siloStatusOracle,
+            PlacementService placementService)
             : base(Constants.CatalogType, messageCenter.MyAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
@@ -97,16 +93,13 @@ namespace Orleans.Runtime
             this.scheduler = scheduler;
             this.loggerFactory = loggerFactory;
             this.collectionNumber = 0;
-            this.grainCreator = grainCreator;
             this.serializationManager = serializationManager;
             this.versionSelectorManager = versionSelectorManager;
             this.serviceProvider = serviceProvider;
             this.collectionOptions = collectionOptions;
             this.messagingOptions = messagingOptions;
             this.messagingTrace = messagingTrace;
-            this.placementStrategyResolver = placementStrategyResolver;
             this.grainActivator = grainActivator;
-            this.grainInterfaceVersions = grainInterfaceVersions;
             this.grainPropertiesResolver = grainPropertiesResolver;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
@@ -156,49 +149,6 @@ namespace Orleans.Runtime
         public Dispatcher Dispatcher { get; }
 
         public ActivationMessageScheduler ActivationMessageScheduler { get; }
-
-        public SiloAddress[] GetCompatibleSilos(PlacementTarget target)
-        {
-            // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
-            // with the current silo
-            if (this.messagingOptions.CurrentValue.AssumeHomogenousSilosForTesting)
-                return AllActiveSilos;
-
-            var grainType = target.GrainIdentity.Type;
-            var silos = target.InterfaceVersion > 0
-                ? versionSelectorManager.GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion).SuitableSilos
-                : grainInterfaceVersions.GetSupportedSilos(grainType).Result;
-
-            var compatibleSilos = silos.Intersect(AllActiveSilos).ToArray();
-            if (compatibleSilos.Length == 0)
-            {
-                var allWithType = grainInterfaceVersions.GetSupportedSilos(grainType).Result;
-                var versions = grainInterfaceVersions.GetSupportedSilos(target.InterfaceType, target.InterfaceVersion).Result;
-                var allWithTypeString = string.Join(", ", allWithType.Select(s => s.ToString())) is string withGrain && !string.IsNullOrWhiteSpace(withGrain) ? withGrain : "none";
-                var allWithInterfaceString = string.Join(", ", versions.Select(s => s.ToString())) is string withIface && !string.IsNullOrWhiteSpace(withIface) ? withIface : "none";
-                throw new OrleansException(
-                    $"No active nodes are compatible with grain {grainType} and interface {target.InterfaceType} version {target.InterfaceVersion}. "
-                    + $"Known nodes with grain type: {allWithTypeString}. "
-                    + $"All known nodes compatible with interface version: {allWithTypeString}");
-            }
-
-            return compatibleSilos;
-        }
-
-        public IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target)
-        {
-            if (target.InterfaceVersion == 0)
-            {
-                throw new ArgumentException("Interface version not provided", nameof(target));
-            }
-
-            var grainType = target.GrainIdentity.Type;
-            var silos = versionSelectorManager
-                .GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion)
-                .SuitableSilosByVersion;
-
-            return silos;
-        }
 
         internal void Start()
         {
@@ -1079,57 +1029,15 @@ namespace Orleans.Runtime
             {
                 activation.SetState(ActivationState.Activating);
             }
+
             return scheduler.QueueTask(() => CallGrainActivate(activation, requestContextData), activation); // Target grain);
             // ActivationData will transition out of ActivationState.Activating via Dispatcher.OnActivationCompletedRequest
-        }
-
-        public bool FastLookup(GrainId grain, out List<ActivationAddress> addresses)
-        {
-            if (this.grainLocator.TryLocalLookup(grain, out var address))
-            {
-                addresses = new List<ActivationAddress>(1) { address };
-                return true;
-            }
-            else
-            {
-                addresses = null;
-                return false;
-            }
-
-            // NOTE: only check with the local directory cache.
-            // DO NOT check in the local activations TargetDirectory!!!
-            // The only source of truth about which activation should be legit to is the state of the ditributed directory.
-            // Everyone should converge to that (that is the meaning of "eventualy consistency - eventualy we converge to one truth").
-            // If we keep using the local activation, it may not be registered in th directory any more, but we will never know that and keep using it,
-            // thus volaiting the single-activation semantics and not converging even eventualy!
-        }
-
-        public Task<List<ActivationAddress>> FullLookup(GrainId grain)
-        {
-            return scheduler.RunOrQueueTask(async () =>
-            {
-                var address = await this.grainLocator.Lookup(grain);
-                return address is object ? new List<ActivationAddress>(1) { address } : new List<ActivationAddress>(0);
-            },
-            this);
         }
 
         public bool LocalLookup(GrainId grain, out List<ActivationData> addresses)
         {
             addresses = activations.FindTargets(grain);
             return addresses != null;
-        }
-
-        public SiloAddress[] AllActiveSilos
-        {
-            get
-            {
-                var result = SiloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
-                if (result.Length > 0) return result;
-
-                logger.Warn(ErrorCode.Catalog_GetApproximateSiloStatuses, "AllActiveSilos SiloStatusOracle.GetApproximateSiloStatuses empty");
-                return new SiloAddress[] { LocalSilo };
-            }
         }
 
         public SiloStatus LocalSiloStatus
