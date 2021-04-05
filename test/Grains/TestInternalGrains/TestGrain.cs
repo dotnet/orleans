@@ -209,12 +209,9 @@ namespace UnitTests.Grains
         private int count;
         private TaskCompletionSource<int> tcs = new TaskCompletionSource<int>();
         private IOneWayGrain other;
-        private Catalog catalog;
+        private GrainLocator grainLocator;
 
-        public OneWayGrain(Catalog catalog)
-        {
-            this.catalog = catalog;
-        }
+        public OneWayGrain(GrainLocator grainLocator) => this.grainLocator = grainLocator;
 
         private ILocalGrainDirectory LocalGrainDirectory => this.ServiceProvider.GetRequiredService<ILocalGrainDirectory>();
         private ILocalSiloDetails LocalSiloDetails => this.ServiceProvider.GetRequiredService<ILocalSiloDetails>();
@@ -224,7 +221,6 @@ namespace UnitTests.Grains
             this.count++;
             return Task.CompletedTask;
         }
-
 
         public Task Notify(ISimpleGrainObserver observer)
         {
@@ -281,9 +277,9 @@ namespace UnitTests.Grains
         public Task<string> GetActivationAddress(IGrain grain)
         {
             var grainId = ((GrainReference)grain).GrainId;
-            if (this.catalog.FastLookup(grainId, out var addresses))
+            if (this.grainLocator.TryLocalLookup(grainId, out var result))
             {
-                return Task.FromResult(addresses.Single().ToString());
+                return Task.FromResult(result.ToString());
             }
 
             return Task.FromResult<string>(null);

@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -11,10 +9,9 @@ namespace Orleans.Runtime.GrainDirectory
         /// The new entry will override any existing entry under the given key, 
         /// regardless of the stored version
         /// </summary>
-        /// <param name="key">key to add</param>
         /// <param name="value">value to add</param>
         /// <param name="version">version for the value</param>
-        void AddOrUpdate(GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int version);
+        void AddOrUpdate(ActivationAddress value, int version);
 
         /// <summary>
         /// Removes an entry from the cache given its key
@@ -35,12 +32,12 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="result">value if the key is found, undefined otherwise</param>
         /// <param name="version">version of cached value if the key is found, undefined otherwise</param>
         /// <returns>true if the given key is in the cache</returns>
-        bool LookUp(GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result, out int version);
+        bool LookUp(GrainId key, out ActivationAddress result, out int version);
 
         /// <summary>
         /// Returns list of key-value-version tuples stored currently in the cache.
         /// </summary>
-        IReadOnlyList<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> KeyValues { get; }
+        IEnumerable<(ActivationAddress ActivationAddress, int Version)> KeyValues { get; }
     }
 
     internal static class GrainDirectoryCacheExtensions
@@ -52,7 +49,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="key">key for the lookup</param>
         /// <param name="result">value if the key is found, undefined otherwise</param>
         /// <returns>true if the given key is in the cache</returns>
-        public static bool LookUp(this IGrainDirectoryCache cache, GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result)
+        public static bool LookUp(this IGrainDirectoryCache cache, GrainId key, out ActivationAddress result)
         {
             return cache.LookUp(key, out result, out _);
         }

@@ -345,8 +345,8 @@ namespace Orleans.Runtime
                 Grain = grain,
                 SiloAddress = LocalSilo,
                 SiloName = localSiloName,
-                LocalCacheActivationAddresses = directory.GetLocalCacheData(grain),
-                LocalDirectoryActivationAddresses = directory.GetLocalDirectoryData(grain).Addresses,
+                LocalCacheActivationAddress = directory.GetLocalCacheData(grain),
+                LocalDirectoryActivationAddress = directory.GetLocalDirectoryData(grain).Address,
                 PrimaryForGrain = directory.GetPrimaryForGrain(grain)
             };
             try
@@ -838,7 +838,7 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                this.logger.Warn(ErrorCode.Catalog_DeactivateActivation_Exception, $"Exception when trying to deactivation {activationData}", ex);
+                this.logger.Warn(ErrorCode.Catalog_DeactivateActivation_Exception, $"Exception when trying to deactivate {activationData}", ex);
             }
             finally
             {
@@ -1085,7 +1085,17 @@ namespace Orleans.Runtime
 
         public bool FastLookup(GrainId grain, out List<ActivationAddress> addresses)
         {
-            return this.grainLocator.TryLocalLookup(grain, out addresses) && addresses != null && addresses.Count > 0;
+            if (this.grainLocator.TryLocalLookup(grain, out var address))
+            {
+                addresses = new List<ActivationAddress>(1) { address };
+                return true;
+            }
+            else
+            {
+                addresses = null;
+                return false;
+            }
+
             // NOTE: only check with the local directory cache.
             // DO NOT check in the local activations TargetDirectory!!!
             // The only source of truth about which activation should be legit to is the state of the ditributed directory.
@@ -1096,7 +1106,12 @@ namespace Orleans.Runtime
 
         public Task<List<ActivationAddress>> FullLookup(GrainId grain)
         {
-            return scheduler.RunOrQueueTask(() => this.grainLocator.Lookup(grain), this);
+            return scheduler.RunOrQueueTask(async () =>
+            {
+                var address = await this.grainLocator.Lookup(grain);
+                return address is object ? new List<ActivationAddress>(1) { address } : new List<ActivationAddress>(0);
+            },
+            this);
         }
 
         public bool LocalLookup(GrainId grain, out List<ActivationData> addresses)

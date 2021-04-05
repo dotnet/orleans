@@ -30,22 +30,21 @@ namespace Orleans.Runtime.GrainDirectory
             this.grainContext = grainContext;
         }
 
-        public async Task<List<ActivationAddress>> Lookup(GrainId grainId)
-            => (await this.localGrainDirectory.LookupAsync(grainId)).Addresses;
+        public async ValueTask<ActivationAddress> Lookup(GrainId grainId) => (await this.localGrainDirectory.LookupAsync(grainId)).Address;
 
-        public bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses)
+        public bool TryLocalLookup(GrainId grainId, out ActivationAddress address)
         {
-            if (this.localGrainDirectory.LocalLookup(grainId, out var addressesAndTag))
+            if (this.localGrainDirectory.LocalLookup(grainId, out var addressAndTag))
             {
-                addresses = addressesAndTag.Addresses;
+                address = addressAndTag.Address;
                 return true;
             }
-            addresses = null;
+
+            address = null;
             return false;
         }
 
-        public async Task<ActivationAddress> Register(ActivationAddress address)
-            => (await this.localGrainDirectory.RegisterAsync(address, singleActivation: true)).Address;
+        public async Task<ActivationAddress> Register(ActivationAddress address) => (await this.localGrainDirectory.RegisterAsync(address)).Address;
 
         public Task Unregister(ActivationAddress address, UnregistrationCause cause)
         {
@@ -57,7 +56,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         public static DhtGrainLocator FromLocalGrainDirectory(LocalGrainDirectory localGrainDirectory)
-            => new DhtGrainLocator(localGrainDirectory, localGrainDirectory.Scheduler, localGrainDirectory.RemoteGrainDirectory);
+            => new(localGrainDirectory, localGrainDirectory.Scheduler, localGrainDirectory.RemoteGrainDirectory);
 
         private async Task UnregisterExecute()
         {

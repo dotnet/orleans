@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.Extensions.Logging;
 using Orleans.Metadata;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
@@ -25,6 +26,7 @@ namespace Orleans.Runtime.Management
         private readonly ClusterManifest clusterManifest;
         private readonly ILogger logger;
         private readonly Catalog catalog;
+        private readonly GrainLocator grainLocator;
 
         public ManagementGrain(
             IInternalGrainFactory internalGrainFactory,
@@ -33,7 +35,8 @@ namespace Orleans.Runtime.Management
             ILogger<ManagementGrain> logger,
             MembershipTableManager membershipTableManager,
             IClusterManifestProvider clusterManifestProvider,
-            Catalog catalog)
+            Catalog catalog,
+            GrainLocator grainLocator)
         {
             this.membershipTableManager = membershipTableManager;
             this.siloManifest = clusterManifestProvider.LocalGrainManifest;
@@ -43,6 +46,7 @@ namespace Orleans.Runtime.Management
             this.versionStore = versionStore;
             this.logger = logger;
             this.catalog = catalog;
+            this.grainLocator = grainLocator;
         }
 
         public async Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)
@@ -246,18 +250,17 @@ namespace Orleans.Runtime.Management
                 }
             }
 
-            if (this.catalog.FastLookup(grainId, out var addresses))
+            if (grainLocator.TryLocalLookup(grainId, out var result))
             {
-                var placementResult = addresses.FirstOrDefault();
-                return new ValueTask<SiloAddress>(placementResult?.Silo);
+                return new ValueTask<SiloAddress>(result?.Silo);
             }
 
-            return LookupAsync(grainId, catalog);
+            return LookupAsync(grainId, grainLocator);
 
-            async ValueTask<SiloAddress> LookupAsync(GrainId grainId, Catalog catalog)
+            static async ValueTask<SiloAddress> LookupAsync(GrainId grainId, GrainLocator grainLocator)
             {
-                var places = await catalog.FullLookup(grainId);
-                return places.FirstOrDefault()?.Silo;
+                var result = await grainLocator.Lookup(grainId);
+                return result?.Silo;
             }
         }
 
