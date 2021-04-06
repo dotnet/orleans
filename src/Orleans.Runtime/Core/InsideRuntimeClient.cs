@@ -217,7 +217,7 @@ namespace Orleans.Runtime
                 {
                     foreach (ActivationAddress address in message.CacheInvalidationHeader)
                     {
-                        this.Directory.InvalidateCacheEntry(address, message.IsReturnedFromRemoteCluster);
+                        this.Directory.InvalidateCacheEntry(address);
                     }
                 }
 

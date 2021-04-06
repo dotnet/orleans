@@ -214,9 +214,9 @@ namespace Orleans.Runtime
         /// <summary>silo on which these statistics come from</summary>
         public string SiloName { get; set; }
         /// <summary>activation addresses in the local directory cache</summary>
-        public List<ActivationAddress> LocalCacheActivationAddresses { get; set; }
+        public ActivationAddress LocalCacheActivationAddress { get; set; }
         /// <summary>activation addresses in the local directory.</summary>
-        public List<ActivationAddress> LocalDirectoryActivationAddresses { get; set; }
+        public ActivationAddress LocalDirectoryActivationAddress { get; set; }
         /// <summary>primary silo for this grain</summary>
         public SiloAddress PrimaryForGrain { get; set; }
         /// <summary>the name of the class that implements this grain.</summary>
@@ -237,8 +237,8 @@ namespace Orleans.Runtime
                     Grain.ToString(),                                   // {0}
                     SiloName,                                                   // {1}
                     SiloAddress.ToLongString(),                                 // {2}
-                    Utils.EnumerableToString(LocalCacheActivationAddresses),    // {3}
-                    Utils.EnumerableToString(LocalDirectoryActivationAddresses),// {4}
+                    LocalCacheActivationAddress,    // {3}
+                    LocalDirectoryActivationAddress,// {4}
                     PrimaryForGrain,                                            // {5}
                     GrainClassTypeName,                                         // {6}
                     Utils.EnumerableToString(LocalActivations,                  // {7}

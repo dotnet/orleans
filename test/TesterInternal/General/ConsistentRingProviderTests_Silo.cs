@@ -286,8 +286,8 @@ namespace UnitTests.General
             var tableGrainId = ((GrainReference)tableGrain).GrainId;
             SiloAddress reminderTableGrainPrimaryDirectoryAddress = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.Primary)).PrimaryForGrain;
             // ask a detailed report from the directory partition owner, and get the actionvation addresses
-            var addresses = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.GetSiloForAddress(reminderTableGrainPrimaryDirectoryAddress))).LocalDirectoryActivationAddresses;
-            ActivationAddress reminderGrainActivation = addresses.FirstOrDefault();
+            var address = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.GetSiloForAddress(reminderTableGrainPrimaryDirectoryAddress))).LocalDirectoryActivationAddress;
+            ActivationAddress reminderGrainActivation = address;
 
             SortedList<int, SiloHandle> ids = new SortedList<int, SiloHandle>();
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos())
