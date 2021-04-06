@@ -51,7 +51,7 @@ namespace Orleans.Runtime
         }
 
         private void SetTransaction(Message message, InvokeMethodOptions options)
-        { 
+        {
             // clear transaction info if transaction operation requires new transaction.
             ITransactionInfo transactionInfo = TransactionContext.GetTransactionInfo();
 
@@ -153,6 +153,9 @@ namespace Orleans.Runtime
             var response = this.CreateResponseMessage(request);
             response.Result = Message.ResponseTypes.Status;
             response.BodyObject = new StatusResponse(isExecuting, isWaiting, diagnostics);
+
+            // Clear the TTL on the diagnostics response; otherwise, it will not arrive in case the original grain call already timed out
+            response.TimeToLive = null;
 
             if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMesssage} status update with diagnostics {Diagnostics}", request, diagnostics);
 
