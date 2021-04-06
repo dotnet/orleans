@@ -45,10 +45,7 @@ namespace Orleans.Runtime
             };
         }
 
-        public ActivationAddress ToAddress(GrainId grainId)
-        {
-            return ActivationAddress.GetAddress(Silo, grainId, Activation);
-        }
+        public ActivationAddress ToAddress(GrainId grainId) => ActivationAddress.GetAddress(Silo, grainId, Activation);
 
         public override string ToString()
         {
