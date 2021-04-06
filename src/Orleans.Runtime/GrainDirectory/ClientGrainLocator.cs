@@ -23,28 +23,35 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async ValueTask<ActivationAddress> Lookup(GrainId grainId)
         {
-            if (!ClientGrainId.TryParse(grainId, out _))
+            if (!ClientGrainId.TryParse(grainId, out var clientGrainId))
             {
                 ThrowNotClientGrainId(grainId);
             }
 
-            var results = await _clientDirectory.Lookup(grainId);
-            return SelectAddress(results);
+            var results = await _clientDirectory.Lookup(clientGrainId.GrainId);
+            return SelectAddress(results, grainId);
         }
 
-        private ActivationAddress SelectAddress(List<ActivationAddress> results)
+        private ActivationAddress SelectAddress(List<ActivationAddress> results, GrainId grainId)
         {
+            ActivationAddress unadjustedResult = null;
             if (results is { Count: > 0 })
             {
                 foreach (var location in results)
                 {
                     if (location.Silo.Equals(_localSiloAddress))
                     {
-                        return location;
+                        unadjustedResult = location;
+                        break; 
                     }
                 }
 
-                return results[ThreadSafeRandom.Next(results.Count)];
+                unadjustedResult = results[ThreadSafeRandom.Next(results.Count)];
+            }
+
+            if (unadjustedResult is object)
+            {
+                return ActivationAddress.GetAddress(unadjustedResult.Silo, grainId, unadjustedResult.Activation);
             }
 
             return null;
@@ -52,14 +59,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool TryLocalLookup(GrainId grainId, out ActivationAddress address)
         {
-            if (!ClientGrainId.TryParse(grainId, out _))
+            if (!ClientGrainId.TryParse(grainId, out var clientGrainId))
             {
                 ThrowNotClientGrainId(grainId);
             }
 
-            if (_clientDirectory.TryLocalLookup(grainId, out var addresses))
+            if (_clientDirectory.TryLocalLookup(clientGrainId.GrainId, out var addresses))
             {
-                address = SelectAddress(addresses);
+                address = SelectAddress(addresses, grainId);
                 return address is object;
             }
 

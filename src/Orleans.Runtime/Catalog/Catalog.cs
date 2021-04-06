@@ -80,7 +80,6 @@ namespace Orleans.Runtime
             CompatibilityDirectorManager compatibilityDirectorManager,
             GrainPropertiesResolver grainPropertiesResolver,
             IncomingRequestMonitor incomingRequestMonitor,
-            ISiloStatusOracle siloStatusOracle,
             PlacementService placementService)
             : base(Constants.CatalogType, messageCenter.MyAddress, loggerFactory)
         {
