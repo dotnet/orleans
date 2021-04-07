@@ -25,16 +25,6 @@ namespace Orleans.Runtime
         public int RecentlyUsedActivationCount { get; internal set; }
 
         /// <summary>
-        /// The size of the sending queue.
-        /// </summary>
-        public int SendQueueLength { get; internal set; }
-
-        /// <summary>
-        /// The size of the receiving queue.
-        /// </summary>
-        public int ReceiveQueueLength { get; internal set; }
-
-        /// <summary>
         /// The CPU utilization.
         /// </summary>
         public float? CpuUsage { get; internal set; }
@@ -77,7 +67,6 @@ namespace Orleans.Runtime
         internal SiloRuntimeStatistics() { }
 
         internal SiloRuntimeStatistics(
-            IMessageCenter messageCenter,
             int activationCount,
             int recentlyUsedActivationCount,
             IAppEnvironmentStatistics appEnvironmentStatistics,
@@ -87,7 +76,6 @@ namespace Orleans.Runtime
         {
             ActivationCount = activationCount;
             RecentlyUsedActivationCount = recentlyUsedActivationCount;
-            SendQueueLength = messageCenter.SendQueueLength;
             CpuUsage = hostEnvironmentStatistics.CpuUsage;
             AvailableMemory = hostEnvironmentStatistics.AvailableMemory;
             MemoryUsage = appEnvironmentStatistics.MemoryUsage;
@@ -105,7 +93,6 @@ namespace Orleans.Runtime
                 "SiloRuntimeStatistics: "
                 + $"ActivationCount={ActivationCount} " 
                 + $"RecentlyUsedActivationCount={RecentlyUsedActivationCount} "
-                + $"SendQueueLength={SendQueueLength} "
                 + $"CpuUsage={CpuUsage} "
                 + $"AvailableMemory={AvailableMemory} "
                 + $"MemoryUsage={MemoryUsage} "

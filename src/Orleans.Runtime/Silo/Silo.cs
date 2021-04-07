@@ -157,8 +157,6 @@ namespace Orleans.Runtime
 
             // Initialize the message center
             messageCenter = Services.GetRequiredService<MessageCenter>();
-            var dispatcher = this.Services.GetRequiredService<Dispatcher>();
-            messageCenter.RerouteHandler = dispatcher.RerouteMessage;
             messageCenter.SniffIncomingMessage = runtimeClient.SniffIncomingMessage;
 
             // Now the router/directory service
@@ -307,8 +305,6 @@ namespace Orleans.Runtime
         {
             //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecyce
             var stopWatch = Stopwatch.StartNew();
-            // The order of these 4 is pretty much arbitrary.
-            StartTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
 
             StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
 
@@ -364,16 +360,6 @@ namespace Orleans.Runtime
 
         private Task OnBecomeActiveStart(CancellationToken ct)
         {
-            var stopWatch = Stopwatch.StartNew();
-            StartTaskWithPerfAnalysis("Start gateway", StartGateway, stopWatch);
-            void StartGateway()
-            {
-                // Now that we're active, we can start the gateway
-                var mc = this.messageCenter as MessageCenter;
-                mc?.StartGateway();
-                logger.Debug("Message gateway service started successfully.");
-            }
-
             this.SystemStatus = SystemStatus.Running;
             return Task.CompletedTask;
         }

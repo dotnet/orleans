@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message message)
         {
-            this.messageCenter.OnReceivedMessage(message);
+            this.messageCenter.DispatchLocalMessage(message);
         }
 
         protected override async Task RunInternal()
