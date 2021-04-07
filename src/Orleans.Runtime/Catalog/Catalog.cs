@@ -81,7 +81,7 @@ namespace Orleans.Runtime
             GrainPropertiesResolver grainPropertiesResolver,
             IncomingRequestMonitor incomingRequestMonitor,
             PlacementService placementService)
-            : base(Constants.CatalogType, messageCenter.MyAddress, loggerFactory)
+            : base(Constants.CatalogType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
             this.localSiloName = localSiloDetails.Name;
@@ -112,7 +112,9 @@ namespace Orleans.Runtime
                 messageFactory,
                 loggerFactory,
                 activationDirectory,
-                messagingTrace);
+                messagingTrace,
+                localSiloDetails);
+            messageCenter.Dispatcher = this.Dispatcher;
             this.ActivationMessageScheduler = new ActivationMessageScheduler(this, this.Dispatcher, grainInterfaceVersions, messagingTrace, activationCollector, scheduler, compatibilityDirectorManager, incomingRequestMonitor);
 
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value

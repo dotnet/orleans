@@ -443,7 +443,7 @@ namespace Orleans.Runtime.Messaging
                 // If the message was a response, propagate the exception to the intended recipient.
                 message.Result = Message.ResponseTypes.Error;
                 message.BodyObject = Response.ExceptionResponse(exception);
-                this.MessageCenter.OnReceivedMessage(message);
+                this.MessageCenter.DispatchLocalMessage(message);
             }
 
             // The exception has been handled by propagating it onwards.
@@ -469,7 +469,7 @@ namespace Orleans.Runtime.Messaging
                 response.Result = Message.ResponseTypes.Error;
                 response.BodyObject = Response.ExceptionResponse(exception);
 
-                this.MessageCenter.OnReceivedMessage(response);
+                this.MessageCenter.DispatchLocalMessage(response);
             }
             else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {

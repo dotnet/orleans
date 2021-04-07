@@ -118,7 +118,6 @@ namespace Orleans.Runtime
             var activationCount = this.activationDirectory.Count;
             var recentlyUsedActivationCount = this.activationCollector.GetNumRecentlyUsed(TimeSpan.FromMinutes(10));
             var stats = new SiloRuntimeStatistics(
-                this.messageCenter,
                 activationCount,
                 recentlyUsedActivationCount,
                 this.appEnvironmentStatistics,

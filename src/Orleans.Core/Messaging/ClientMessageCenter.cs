@@ -134,7 +134,7 @@ namespace Orleans.Messaging
             gatewayManager.Stop();
         }
 
-        public void OnReceivedMessage(Message message)
+        public void DispatchLocalMessage(Message message)
         {
             var handler = this.messageHandler;
             if (handler is null)
@@ -344,7 +344,6 @@ namespace Orleans.Messaging
                 }
             }
 
-
             static uint GetHashCodeModulo(int key, uint umod)
             {
                 int mod = (int)umod;
@@ -381,13 +380,8 @@ namespace Orleans.Messaging
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
-                OnReceivedMessage(error);
+                DispatchLocalMessage(error);
             }
-        }
-
-        public int SendQueueLength
-        {
-            get { return 0; }
         }
 
         internal void OnGatewayConnectionOpen()

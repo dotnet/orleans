@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Messaging
 {
     internal class Gateway : IConnectedClientCollection
     {
-        private readonly GatewayClientCleanupAgent dropper;
+        private readonly GatewayClientCleanupAgent clientCleanupAgent;
 
         // clients is the main authorative collection of all connected clients. 
         // Any client currently in the system appears in this collection. 
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Messaging
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
-            dropper = new GatewayClientCleanupAgent(this, loggerFactory, messagingOptions.ClientDropTimeout);
+            clientCleanupAgent = new GatewayClientCleanupAgent(this, loggerFactory, messagingOptions.ClientDropTimeout);
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
             this.gatewayAddress = siloDetails.GatewayAddress;
             this.sender = new GatewaySender(this, msgCtr, messageFactory, loggerFactory.CreateLogger<GatewaySender>());
@@ -62,7 +62,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void Start()
         {
-            dropper.Start();
+            clientCleanupAgent.Start();
         }
 
         internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory)
@@ -83,7 +83,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void Stop()
         {
-            dropper.Stop();
+            clientCleanupAgent.Stop();
         }
 
         long IConnectedClientCollection.Version => Interlocked.Read(ref clientsCollectionVersion);
