@@ -666,6 +666,10 @@ namespace Orleans.Runtime
                         {
                             await DestroyActivation(activationData, cts.Token);
                         }
+                        catch (Exception exception)
+                        {
+                            logger.LogError(exception, "Error deactivating activation {Activation}", activationData);
+                        }
                         finally
                         {
                             mtcs.SetOneResult();
@@ -712,7 +716,17 @@ namespace Orleans.Runtime
                     }
                     else // busy, so destroy later.
                     {
-                        data.AddOnInactive(() => _ = DestroyActivation(data, cts.Token));
+                        data.AddOnInactive(async () =>
+                        {
+                            try
+                            {
+                                await DestroyActivation(data, cts.Token);
+                            }
+                            catch (Exception exception)
+                            {
+                                logger.LogError(exception, "Error deactivating activation {Activation}", data);
+                            }
+                        });
                     }
                 }
                 else if (data.State == ActivationState.Create)
@@ -738,7 +752,7 @@ namespace Orleans.Runtime
             CounterStatistic.FindOrCreate(statisticName).Increment();
             if (promptly)
             {
-                _ = DestroyActivation(data, cts.Token); // Don't await or Ignore, since we are in this activation context and it may have alraedy been destroyed!
+                DestroyActivation(data, cts.Token).Ignore();
             }
         }
 
@@ -787,7 +801,7 @@ namespace Orleans.Runtime
             }
             catch (Exception ex)
             {
-                this.logger.Warn(ErrorCode.Catalog_DeactivateActivation_Exception, $"Exception when trying to deactivate {activationData}", ex);
+                this.logger.LogWarning((int)ErrorCode.Catalog_DeactivateActivation_Exception, ex, "Exception when trying to deactivate {Activation}", activationData);
             }
             finally
             {
@@ -795,11 +809,17 @@ namespace Orleans.Runtime
                 {
                     activationData.SetState(ActivationState.Invalid);
                 }
-                // Capture grainInstance since UnregisterMessageTarget will set it to null...
-                var grainInstance = activationData.GrainInstance;
-                UnregisterMessageTarget(activationData);
-                RerouteAllQueuedMessages(activationData, null, "Finished Destroy Activation");
-                await activationData.DisposeAsync();
+
+                try
+                {
+                    UnregisterMessageTarget(activationData);
+                    RerouteAllQueuedMessages(activationData, null, "Finished Destroy Activation");
+                    await activationData.DisposeAsync();
+                }
+                catch (Exception exception)
+                {
+                    this.logger.LogWarning(exception, "Exception disposing activation {Activation}", activationData);
+                }
             }
         }
 
