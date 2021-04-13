@@ -167,6 +167,8 @@ namespace Orleans.Runtime
             }
         }
 
+        public bool IsFullyAddressed => TargetSilo is object && !TargetGrain.IsDefault && TargetActivation is object;
+
         public ActivationAddress TargetAddress
         {
             get
@@ -446,15 +448,6 @@ namespace Orleans.Runtime
                 BodyObject is InvokeMethodRequest request ? $" {request.ToString()}" : string.Empty, // 7
                 Id, //8
                 ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : ""); //9
-        }
-
-        internal void SetTargetPlacement(PlacementResult value)
-        {
-            TargetActivation = value.Activation;
-            TargetSilo = value.Silo;
-
-            if (value.IsNewPlacement)
-                IsNewPlacement = true;
         }
 
         public string GetTargetHistory()

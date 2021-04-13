@@ -110,12 +110,11 @@ namespace Orleans.Runtime.GrainDirectory
                             var s = localDirectory.CalculateGrainDirectoryPartition(grain);
                             return (s != null) && !localDirectory.MyAddress.Equals(s);
                         }, false);
-                    List<ActivationAddress> splitPartListSingle = splitPart.ToListOfActivations(true);
-                    List<ActivationAddress> splitPartListMulti = splitPart.ToListOfActivations(false);
+                    List<ActivationAddress> splitPartListSingle = splitPart.ToListOfActivations();
 
                     EnqueueOperation(
                         $"{nameof(ProcessSiloAddEvent)}({addedSilo})",
-                        () => ProcessAddedSiloAsync(addedSilo, splitPartListSingle, splitPartListMulti));
+                        () => ProcessAddedSiloAsync(addedSilo, splitPartListSingle));
                 }
                 else
                 {
@@ -149,7 +148,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private async Task ProcessAddedSiloAsync(SiloAddress addedSilo, List<ActivationAddress> splitPartListSingle, List<ActivationAddress> splitPartListMulti)
+        private async Task ProcessAddedSiloAsync(SiloAddress addedSilo, List<ActivationAddress> splitPartListSingle)
         {
             if (!this.localDirectory.Running) return;
 
@@ -160,12 +159,7 @@ namespace Orleans.Runtime.GrainDirectory
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending " + splitPartListSingle.Count + " single activation entries to " + addedSilo);
                 }
 
-                if (splitPartListMulti.Count > 0)
-                {
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending " + splitPartListMulti.Count + " entries to " + addedSilo);
-                }
-
-                await localDirectory.GetDirectoryReference(addedSilo).AcceptSplitPartition(splitPartListSingle, splitPartListMulti);
+                await localDirectory.GetDirectoryReference(addedSilo).AcceptSplitPartition(splitPartListSingle);
             }
             else
             {
@@ -181,37 +175,28 @@ namespace Orleans.Runtime.GrainDirectory
                     activationAddress =>
                         localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
             }
-
-            if (splitPartListMulti.Count > 0)
-            {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Removing " + splitPartListMulti.Count + " multiple activation after partition split");
-
-                splitPartListMulti.ForEach(
-                    activationAddress =>
-                        localDirectory.DirectoryPartition.RemoveGrain(activationAddress.Grain));
-            }
         }
 
-        internal void AcceptExistingRegistrations(List<ActivationAddress> singleActivations, List<ActivationAddress> multiActivations)
+        internal void AcceptExistingRegistrations(List<ActivationAddress> singleActivations)
         {
             this.EnqueueOperation(
                 nameof(AcceptExistingRegistrations),
-                () => AcceptExistingRegistrationsAsync(singleActivations, multiActivations));
+                () => AcceptExistingRegistrationsAsync(singleActivations));
         }
 
-        private async Task AcceptExistingRegistrationsAsync(List<ActivationAddress> singleActivations, List<ActivationAddress> multiActivations)
+        private async Task AcceptExistingRegistrationsAsync(List<ActivationAddress> singleActivations)
         {
             if (!this.localDirectory.Running) return;
 
             if (this.logger.IsEnabled(LogLevel.Debug))
             {
                 this.logger.LogDebug(
-                    $"{nameof(AcceptExistingRegistrations)}: accepting {singleActivations?.Count ?? 0} single-activation registrations and {multiActivations?.Count ?? 0} multi-activation registrations.");
+                    $"{nameof(AcceptExistingRegistrations)}: accepting {singleActivations?.Count ?? 0} single-activation registrations");
             }
 
             if (singleActivations != null && singleActivations.Count > 0)
             {
-                var tasks = singleActivations.Select(addr => this.localDirectory.RegisterAsync(addr, true, 1)).ToArray();
+                var tasks = singleActivations.Select(addr => this.localDirectory.RegisterAsync(addr, 1)).ToArray();
                 try
                 {
                     await Task.WhenAll(tasks);
@@ -252,36 +237,9 @@ namespace Orleans.Runtime.GrainDirectory
                     DestroyDuplicateActivations(duplicates);
                 }
             }
-
-            // Multi-activation grains are much simpler because there is no need for duplicate activation logic.
-            if (multiActivations != null && multiActivations.Count > 0)
-            {
-                var tasks = multiActivations.Select(addr => this.localDirectory.RegisterAsync(addr, false, 1)).ToArray();
-                try
-                {
-                    await Task.WhenAll(tasks);
-                }
-                catch (Exception exception)
-                {
-                    if (this.logger.IsEnabled(LogLevel.Warning))
-                        this.logger.LogWarning($"Exception registering activations in {nameof(AcceptExistingRegistrations)}: {LogFormatter.PrintException(exception)}");
-                    throw;
-                }
-                finally
-                {
-                    for (var i = tasks.Length - 1; i >= 0; i--)
-                    {
-                        // Retry failed tasks next time.
-                        if (tasks[i].Status != TaskStatus.RanToCompletion) continue;
-
-                        // Remove tasks which completed.
-                        multiActivations.RemoveAt(i);
-                    }
-                }
-            }
         }
 
-        internal void AcceptHandoffPartition(SiloAddress source, Dictionary<GrainId, IGrainInfo> partition, bool isFullCopy)
+        internal void AcceptHandoffPartition(SiloAddress source, Dictionary<GrainId, GrainInfo> partition, bool isFullCopy)
         {
             lock (this)
             {

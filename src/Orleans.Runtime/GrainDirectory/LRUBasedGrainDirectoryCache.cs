@@ -6,38 +6,34 @@ namespace Orleans.Runtime.GrainDirectory
 {
     internal class LRUBasedGrainDirectoryCache : IGrainDirectoryCache
     {
-        private readonly LRU<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>> cache;
+        private readonly LRU<GrainId, ActivationAddress> cache;
 
         public LRUBasedGrainDirectoryCache(int maxCacheSize, TimeSpan maxEntryAge) => cache = new(maxCacheSize, maxEntryAge);
 
-        public void AddOrUpdate(GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int version)
+        public void AddOrUpdate(ActivationAddress activationAddress, int version)
         {
             // ignore the version number
-            cache.Add(key, value);
+            cache.Add(activationAddress.Grain, activationAddress);
         }
 
         public bool Remove(GrainId key) => cache.RemoveKey(key);
 
         public void Clear() => cache.Clear();
 
-        public bool LookUp(GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result, out int version)
+        public bool LookUp(GrainId key, out ActivationAddress result, out int version)
         {
-            version = default(int);
+            version = default;
             return cache.TryGetValue(key, out result);
         }
 
-        public IReadOnlyList<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> KeyValues
+        public IEnumerable<(ActivationAddress ActivationAddress, int Version)> KeyValues
         {
             get
             {
-                var result = new List<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>>();
-                var enumerator = cache.GetEnumerator();
-                while (enumerator.MoveNext())
+                foreach (var entry in cache)
                 {
-                    var current = enumerator.Current;
-                    result.Add(new(current.Key, current.Value, -1));
+                    yield return (entry.Value, -1);
                 }
-                return result;
             }
         }
     }

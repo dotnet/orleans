@@ -250,7 +250,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                var messageAddressingTask = AddressMessage(message);
+                var messageAddressingTask = placementService.AddressMessage(message);
                 if (messageAddressingTask.Status != TaskStatus.RanToCompletion)
                 {
                     return SendMessageAsync(messageAddressingTask, message, sendingActivation);
@@ -285,55 +285,6 @@ namespace Orleans.Runtime
                 this.messagingTrace.OnDispatcherSelectTargetFailed(m, activation, ex);
                 RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
             }
-        }
-
-        /// <summary>
-        /// Resolve target address for a message
-        /// </summary>
-        /// <returns>Resolve when message is addressed (modifies message fields)</returns>
-        private Task AddressMessage(Message message)
-        {
-            var targetAddress = message.TargetAddress;
-            if (targetAddress is null) throw new InvalidOperationException("Cannot address a message with a null TargetAddress");
-            if (targetAddress.IsComplete) return Task.CompletedTask;
-
-            var target = new PlacementTarget(
-                message.TargetGrain,
-                message.RequestContextData,
-                message.InterfaceType,
-                message.InterfaceVersion);
-
-            var placementTask = placementService.GetOrPlaceActivation(target, this.catalog);
-
-            if (placementTask.IsCompletedSuccessfully)
-            {
-                SetMessageTargetPlacement(message, placementTask.Result, targetAddress);
-                return Task.CompletedTask;
-            }
-
-            return AddressMessageAsync(placementTask);
-
-            async Task AddressMessageAsync(ValueTask<PlacementResult> addressTask)
-            {
-                var placementResult = await addressTask;
-                SetMessageTargetPlacement(message, placementResult, targetAddress);
-            }
-        }
-
-        private void SetMessageTargetPlacement(Message message, PlacementResult placementResult, ActivationAddress targetAddress)
-        {
-            if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient())
-            {
-                logger.Error(ErrorCode.Dispatcher_AddressMsg_UnregisteredClient, $"AddressMessage could not find target for client pseudo-grain {message}");
-                throw new KeyNotFoundException($"Attempting to send a message {message} to an unregistered client pseudo-grain {targetAddress.Grain}");
-            }
-
-            message.SetTargetPlacement(placementResult);
-            if (placementResult.IsNewPlacement)
-            {
-                CounterStatistic.FindOrCreate(StatisticNames.DISPATCHER_NEW_PLACEMENT).Increment();
-            }
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}", message);
         }
 
         internal void SendResponse(Message request, Response response)

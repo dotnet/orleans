@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -13,8 +12,8 @@ namespace Orleans.GrainDirectory
 
         Task Unregister(ActivationAddress address, UnregistrationCause cause);
 
-        Task<List<ActivationAddress>> Lookup(GrainId grainId);
+        ValueTask<ActivationAddress> Lookup(GrainId grainId);
 
-        bool TryLocalLookup(GrainId grainId, out List<ActivationAddress> addresses);
+        bool TryLocalLookup(GrainId grainId, out ActivationAddress addresses);
     }
 }
