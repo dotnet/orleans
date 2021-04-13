@@ -9,15 +9,11 @@ namespace Orleans.Runtime.GrainDirectory
     {
         internal class GrainDirectoryCacheEntry
         {
-            internal IReadOnlyList<Tuple<SiloAddress, ActivationId>> Value { get; private set; }
-
-            internal DateTime Created { get; set; }
-
+            internal ActivationAddress Address { get; }
+            internal DateTime Created { get; }
             private DateTime LastRefreshed { get; set; }
-
             internal TimeSpan ExpirationTimer { get; private set; }
-
-            internal int ETag { get; private set; }
+            internal int ETag { get; }
 
             /// <summary>
             /// flag notifying whether this cache entry was accessed lately 
@@ -25,9 +21,9 @@ namespace Orleans.Runtime.GrainDirectory
             /// </summary>
             internal int NumAccesses { get; set; }
 
-            internal GrainDirectoryCacheEntry(IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int etag, DateTime created, TimeSpan expirationTimer)
+            internal GrainDirectoryCacheEntry(ActivationAddress value, int etag, DateTime created, TimeSpan expirationTimer)
             {
-                Value = value;
+                Address = value;
                 ETag = etag;
                 ExpirationTimer = expirationTimer;
                 Created = created;
@@ -72,49 +68,47 @@ namespace Orleans.Runtime.GrainDirectory
             IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_CACHE_SIZE, () => cache.Count);
         }
 
-        public void AddOrUpdate(GrainId key, IReadOnlyList<Tuple<SiloAddress, ActivationId>> value, int version)
+        public void AddOrUpdate(ActivationAddress value, int version)
         {            
             var entry = new GrainDirectoryCacheEntry(value, version, DateTime.UtcNow, initialExpirationTimer);
 
             // Notice that LRU should know how to throw the oldest entry if the cache is full
-            cache.Add(key, entry);
+            cache.Add(value.Grain, entry);
         }
 
         public bool Remove(GrainId key) => cache.RemoveKey(key);
 
         public void Clear() => cache.Clear();
 
-        public bool LookUp(GrainId key, out IReadOnlyList<Tuple<SiloAddress, ActivationId>> result, out int version)
+        public bool LookUp(GrainId key, out ActivationAddress result, out int version)
         {
-            result = default(IReadOnlyList<Tuple<SiloAddress, ActivationId>>);
-            version = default(int);
             NumAccesses++;      // for stats
 
             // Here we do not check whether the found entry is expired. 
             // It will be done by the thread managing the cache.
             // This is to avoid situation where the entry was just expired, but the manager still have not run and have not refereshed it.
-            GrainDirectoryCacheEntry tmp;
-            if (!cache.TryGetValue(key, out tmp)) return false;
+            if (!cache.TryGetValue(key, out var tmp))
+            {
+                result = default;
+                version = default;
+                return false;
+            }
 
             NumHits++;      // for stats
             tmp.NumAccesses++;
-            result = tmp.Value;
+            result = tmp.Address;
             version = tmp.ETag;
             return true;
         }
 
-        public IReadOnlyList<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> KeyValues
+        public IEnumerable<(ActivationAddress ActivationAddress, int Version)> KeyValues
         {
             get
             {
-                var result = new List<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>>();
-                IEnumerator<KeyValuePair<GrainId, GrainDirectoryCacheEntry>> enumerator = GetStoredEntries();
-                while (enumerator.MoveNext())
+                foreach (var value in cache)
                 {
-                    var current = enumerator.Current;
-                    result.Add(new Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>(current.Key, current.Value.Value, current.Value.ETag));
+                    yield return (value.Value.Address, value.Value.ETag);
                 }
-                return result;
             }
         }
 
@@ -133,7 +127,6 @@ namespace Orleans.Runtime.GrainDirectory
         {
             return cache.Get(key);
         }
-
 
         internal IEnumerator<KeyValuePair<GrainId, GrainDirectoryCacheEntry>> GetStoredEntries()
         {

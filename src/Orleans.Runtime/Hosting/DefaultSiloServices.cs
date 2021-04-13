@@ -210,10 +210,6 @@ namespace Orleans.Hosting
             services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
             services.AddPlacementDirector<ClientObserversPlacement, ClientObserversPlacementDirector>();
 
-            // Activation selectors
-            services.AddSingletonKeyedService<Type, IActivationSelector, RandomPlacementDirector>(typeof(RandomPlacement));
-            services.AddSingletonKeyedService<Type, IActivationSelector, StatelessWorkerDirector>(typeof(StatelessWorkerPlacement));
-
             // Versioning
             services.TryAddSingleton<VersionSelectorManager>();
             services.TryAddSingleton<CachedVersionSelectorManager>();
@@ -246,6 +242,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<Factory<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
 
             // Grain activation
+            services.TryAddSingleton<PlacementService>();
             services.TryAddSingleton<Catalog>();
             services.AddFromExisting<IHealthCheckParticipant, Catalog>();
             services.TryAddSingleton<GrainContextActivator>();

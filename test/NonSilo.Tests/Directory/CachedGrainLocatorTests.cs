@@ -73,9 +73,9 @@ namespace UnitTests.Directory
             await this.grainDirectory.Received(1).Register(grainAddress);
 
             // Now should be in cache
-            Assert.True(this.grainLocator.TryLocalLookup(expected.Grain, out var results));
-            Assert.Single(results);
-            Assert.Equal(expected, results[0]);
+            Assert.True(this.grainLocator.TryLocalLookup(expected.Grain, out var result));
+            Assert.NotNull(result);
+            Assert.Equal(expected, result);
         }
 
         [Fact]
@@ -93,9 +93,9 @@ namespace UnitTests.Directory
             await this.grainDirectory.Received(1).Register(otherGrainAddr);
 
             // Now should be in cache
-            Assert.True(this.grainLocator.TryLocalLookup(expectedAddr.Grain, out var results));
-            Assert.Single(results);
-            Assert.Equal(expectedAddr, results[0]);
+            Assert.True(this.grainLocator.TryLocalLookup(expectedAddr.Grain, out var result));
+            Assert.NotNull(result);
+            Assert.Equal(expectedAddr, result);
         }
 
         [Fact]
@@ -121,9 +121,9 @@ namespace UnitTests.Directory
             await this.grainDirectory.Received(1).Unregister(outdatedGrainAddr);
 
             // Now should be in cache
-            Assert.True(this.grainLocator.TryLocalLookup(expectedAddr.Grain, out var results));
-            Assert.Single(results);
-            Assert.Equal(expectedAddr, results[0]);
+            Assert.True(this.grainLocator.TryLocalLookup(expectedAddr.Grain, out var result));
+            Assert.NotNull(result);
+            Assert.Equal(expectedAddr, result);
 
             await this.lifecycle.OnStop();
         }
@@ -140,14 +140,14 @@ namespace UnitTests.Directory
             Assert.False(this.grainLocator.TryLocalLookup(expected.Grain, out _));
 
             // Do a remote lookup
-            var results = await this.grainLocator.Lookup(expected.Grain);
-            Assert.Single(results);
-            Assert.Equal(expected, results[0]);
+            var result = await this.grainLocator.Lookup(expected.Grain);
+            Assert.NotNull(result);
+            Assert.Equal(expected, result);
 
             // Now cache should be populated
-            Assert.True(this.grainLocator.TryLocalLookup(expected.Grain, out var cachedValues));
-            Assert.Single(cachedValues);
-            Assert.Equal(expected, cachedValues[0]);
+            Assert.True(this.grainLocator.TryLocalLookup(expected.Grain, out var cachedValue));
+            Assert.NotNull(cachedValue);
+            Assert.Equal(expected, cachedValue);
         }
 
         [Fact]
@@ -164,7 +164,7 @@ namespace UnitTests.Directory
             this.grainDirectory.Lookup(outdatedGrainAddr.GrainId).Returns(outdatedGrainAddr);
 
             var actual = await this.grainLocator.Lookup(outdatedAddr.Grain);
-            Assert.Empty(actual);
+            Assert.Null(actual);
 
             await this.grainDirectory.Received(1).Lookup(outdatedGrainAddr.GrainId);
             await this.grainDirectory.Received(1).Unregister(outdatedGrainAddr);
@@ -230,9 +230,9 @@ namespace UnitTests.Directory
             Assert.False(this.grainLocator.TryLocalLookup(outdatedAddr.Grain, out var unused1));
             Assert.True(this.grainLocator.TryLocalLookup(expectedAddr.Grain, out var unused2));
 
-            var results = await this.grainLocator.Lookup(expectedAddr.Grain);
-            Assert.Single(results);
-            Assert.Equal(expectedAddr, results[0]);
+            var result = await this.grainLocator.Lookup(expectedAddr.Grain);
+            Assert.NotNull(result);
+            Assert.Equal(expectedAddr, result);
 
             await this.lifecycle.OnStop();
         }
