@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -47,12 +48,23 @@ namespace Orleans.Runtime
 
         private async Task Run()
         {
+            // Work around multithreading not being implemented by WebAssembly in some browsers
+            var platformSupportsThreading = DoesPlatformSupportThreading();
+
             while (!this.cancellation.IsCancellationRequested)
             {
                 try
                 {
                     WatchdogHeartbeatTick();
-                    await Task.Delay(heartbeatPeriod);
+
+                    if (platformSupportsThreading)
+                    {
+                        Thread.Sleep(heartbeatPeriod);
+                    }
+                    else
+                    {
+                        await Task.Delay(heartbeatPeriod);
+                    }
                 }
                 catch (TaskCanceledException)
                 {
@@ -66,6 +78,23 @@ namespace Orleans.Runtime
                 {
                     logger.LogError((int)ErrorCode.Watchdog_InternalError, exc,
                         "Watchdog encountered an internal error");
+                }
+            }
+
+            static bool DoesPlatformSupportThreading()
+            {
+                switch (RuntimeInformation.ProcessArchitecture)
+                {
+                    // Could make it as simple as Architecture.Wasm,
+                    // but this enum member does not exist in some frameworks,
+                    // hence I have to inverse the check.
+                    case Architecture.X86:
+                    case Architecture.X64:
+                    case Architecture.Arm:
+                    case Architecture.Arm64:
+                        return true;
+                    default:
+                        return false;
                 }
             }
         }
