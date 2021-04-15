@@ -412,7 +412,7 @@ namespace Orleans.Streams
             if (queueCache != null)
             {
                 IList<IBatchContainer> purgedItems;
-                if (queueCache.TryPurgeFromCache(out purgedItems))
+                 if (queueCache.TryPurgeFromCache(out purgedItems))
                 {
                     try
                     {
