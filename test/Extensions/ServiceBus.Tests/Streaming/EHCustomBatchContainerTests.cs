@@ -54,6 +54,7 @@ namespace ServiceBus.Tests.StreamingTests
                         {
                             options.DataMaxAgeInCache = TimeSpan.FromSeconds(5);
                             options.DataMinTimeInCache = TimeSpan.FromSeconds(0);
+                            options.MetadataMinTimeInCache = TimeSpan.FromMinutes(1);
                         }));
                         b.ConfigureEventHub(ob => ob.Configure(options =>
                         {
