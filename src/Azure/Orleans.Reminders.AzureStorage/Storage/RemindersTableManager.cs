@@ -200,7 +200,7 @@ namespace Orleans.Runtime.ReminderService
                 string restStatus;
                 if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
                 {
-                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("UpsertRow failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("UpsertRow failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                     if (AzureTableUtils.IsContentionError(httpStatusCode)) return null; // false;
                 }
                 throw;
@@ -220,7 +220,7 @@ namespace Orleans.Runtime.ReminderService
                 string restStatus;
                 if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus))
                 {
-                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("DeleteReminderEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                    if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("DeleteReminderEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                     if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
                 }
                 throw;

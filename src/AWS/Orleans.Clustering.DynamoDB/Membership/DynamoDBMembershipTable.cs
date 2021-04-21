@@ -174,7 +174,7 @@ namespace Orleans.Clustering.DynamoDB
                     new[] {siloEntryKeys, versionEntryKeys}, fields => new SiloInstanceRecord(fields));
 
                 MembershipTableData data = Convert(entries.ToList());
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Read my entry {0} Table=" + Environment.NewLine + "{1}", siloAddress.ToLongString(), data.ToString());
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Read my entry {0} Table=" + Environment.NewLine + "{1}", siloAddress.ToLongString(), data.ToString());
                 return data;
             }
             catch (Exception exc)
@@ -213,7 +213,7 @@ namespace Orleans.Clustering.DynamoDB
                 }
 
                 MembershipTableData data = Convert(records);
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
 
                 return data;
             }

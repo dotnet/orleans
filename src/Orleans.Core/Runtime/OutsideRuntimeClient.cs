@@ -283,7 +283,7 @@ namespace Orleans
                 callbacks.TryAdd(message.Id, callbackData);
             }
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Send {0}", message);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Send {0}", message);
             MessageCenter.SendMessage(message);
         }
 
@@ -291,7 +291,7 @@ namespace Orleans
         {
             OrleansOutsideRuntimeClientEvent.Log.ReceiveResponse(response);
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Received {0}", response);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Received {0}", response);
 
             // ignore duplicate requests
             if (response.Result == Message.ResponseTypes.Rejection

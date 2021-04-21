@@ -24,7 +24,7 @@ namespace Orleans.Runtime.Counters
             {
                 try
                 {
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.PerfCounterWriting, "Writing counter {0}", counter.Name);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.PerfCounterWriting, "Writing counter {0}", counter.Name);
 
                     counter.TrackMetric(telemetryProducer);
                 }

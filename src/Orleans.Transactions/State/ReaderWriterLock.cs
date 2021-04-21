@@ -116,7 +116,7 @@ namespace Orleans.Transactions.State
                     group.Deadline = DateTime.UtcNow + this.options.LockTimeout;
 
                     if (logger.IsEnabled(LogLevel.Trace))
-                        logger.Trace("set lock expiration at {Deadline}", group.Deadline.Value.ToString("o"));
+                        logger.LogTrace("set lock expiration at {Deadline}", group.Deadline.Value.ToString("o"));
                 }
 
                 // create a new record for this transaction
@@ -133,9 +133,9 @@ namespace Orleans.Transactions.State
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
                     if (group == currentGroup)
-                        logger.Trace($"enter-lock {transactionId} fc={group.FillCount}");
+                        logger.LogTrace($"enter-lock {transactionId} fc={group.FillCount}");
                     else
-                        logger.Trace($"enter-lock-queue {transactionId} fc={group.FillCount}");
+                        logger.LogTrace($"enter-lock-queue {transactionId} fc={group.FillCount}");
                 }
             }
 
@@ -232,7 +232,7 @@ namespace Orleans.Transactions.State
         private Task BreakLock(Guid transactionId, TransactionRecord<TState> entry, Exception exception)
         {
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace("Break-lock for transaction {TransactionId}", transactionId);
+                logger.LogTrace("Break-lock for transaction {TransactionId}", transactionId);
 
             return this.queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock, exception);
         }
@@ -320,7 +320,7 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 if (logger.IsEnabled(LogLevel.Trace))
-                                    logger.Trace("recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
+                                    logger.LogTrace("recheck lock expiration at {Deadline}", currentGroup.Deadline.Value.ToString("o"));
 
                                 // check again when the group expires
                                 lockWorker.Notify(currentGroup.Deadline.Value);
@@ -355,7 +355,7 @@ namespace Orleans.Transactions.State
                                     expiredWaiters.Add(kvp.Key);
 
                                     if (logger.IsEnabled(LogLevel.Trace))
-                                        logger.Trace($"expire-lock-waiter {kvp.Key}");
+                                        logger.LogTrace($"expire-lock-waiter {kvp.Key}");
                                 }
                             }
 
@@ -369,9 +369,9 @@ namespace Orleans.Transactions.State
 
                             if (logger.IsEnabled(LogLevel.Trace))
                             {
-                                logger.Trace($"lock groupsize={currentGroup.Count} deadline={currentGroup.Deadline:o}");
+                                logger.LogTrace($"lock groupsize={currentGroup.Count} deadline={currentGroup.Deadline:o}");
                                 foreach (var kvp in currentGroup)
-                                    logger.Trace($"enter-lock {kvp.Key}");
+                                    logger.LogTrace($"enter-lock {kvp.Key}");
                             }
 
                             // execute all the read and update tasks

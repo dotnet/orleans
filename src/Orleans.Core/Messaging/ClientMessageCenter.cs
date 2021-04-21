@@ -167,8 +167,8 @@ namespace Orleans.Messaging
 
                 if (this.logger.IsEnabled(LogLevel.Trace))
                 {
-                    this.logger.Trace(
-                        ErrorCode.ProxyClient_QueueRequest,
+                    this.logger.LogTrace(
+                        (int)ErrorCode.ProxyClient_QueueRequest,
                         "Sending message {0} via gateway {1}",
                         msg,
                         connection.RemoteEndPoint);
@@ -191,8 +191,8 @@ namespace Orleans.Messaging
 
                         if (this.logger.IsEnabled(LogLevel.Trace))
                         {
-                            this.logger.Trace(
-                                ErrorCode.ProxyClient_QueueRequest,
+                            this.logger.LogTrace(
+                                (int)ErrorCode.ProxyClient_QueueRequest,
                                 "Sending message {0} via gateway {1}",
                                 message,
                                 connection.RemoteEndPoint);
@@ -284,7 +284,7 @@ namespace Orleans.Messaging
                 logger.Warn(ErrorCode.ProxyClient_CannotSend_NoGateway, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
                 return new ValueTask<Connection>(default(Connection));
             }
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(
                 (int)ErrorCode.ProxyClient_CreatedGatewayToGrain,

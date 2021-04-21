@@ -185,7 +185,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <returns>The registered ActivationAddress and version associated with this directory mapping</returns>
         internal virtual AddressAndTag AddSingleActivation(ActivationAddress address)
         {
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Adding single activation for grain {0}{1}{2}", address.Silo, address.Grain, address.Activation);
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Adding single activation for grain {0}{1}{2}", address.Silo, address.Grain, address.Activation);
 
             AddressAndTag result = new AddressAndTag();
 
@@ -229,7 +229,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Removing activation for grain {0} cause={1} was_removed={2}", grain.ToString(), cause, wasRemoved);
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Removing activation for grain {0} cause={1} was_removed={2}", grain.ToString(), cause, wasRemoved);
         }
 
    
@@ -243,7 +243,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 partitionData.Remove(grain);
             }
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Removing grain {0}", grain.ToString());
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Removing grain {0}", grain.ToString());
         }
 
         internal AddressAndTag LookUpActivation(GrainId grain)

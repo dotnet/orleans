@@ -163,7 +163,7 @@ namespace Orleans.Storage
             var baseGrainType = ExtractBaseClass(grainType);
             if(logger.IsEnabled(LogLevel.Trace))
             {
-                logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderClearing, LogString("Clearing grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
+                logger.LogTrace((int)RelationalStorageProviderCodes.RelationalProviderClearing, LogString("Clearing grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
             }
 
             string storageVersion = null;
@@ -202,7 +202,7 @@ namespace Orleans.Storage
             grainState.RecordExists = false;
             if(logger.IsEnabled(LogLevel.Trace))
             {
-                logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderCleared, LogString("Cleared grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
+                logger.LogTrace((int)RelationalStorageProviderCodes.RelationalProviderCleared, LogString("Cleared grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
             }
         }
 
@@ -217,7 +217,7 @@ namespace Orleans.Storage
             var baseGrainType = ExtractBaseClass(grainType);
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderReading, LogString("Reading grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
+                logger.LogTrace((int)RelationalStorageProviderCodes.RelationalProviderReading, LogString("Reading grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
             }
 
             try
@@ -322,7 +322,7 @@ namespace Orleans.Storage
                 grainState.RecordExists = recordExists;
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderRead, LogString("Read grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
+                    logger.LogTrace((int)RelationalStorageProviderCodes.RelationalProviderRead, LogString("Read grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
                 }
             }
             catch(Exception ex)
@@ -344,7 +344,7 @@ namespace Orleans.Storage
             var baseGrainType = ExtractBaseClass(grainType);
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderWriting, LogString("Writing grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
+                logger.LogTrace((int)RelationalStorageProviderCodes.RelationalProviderWriting, LogString("Writing grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
             }
 
             string storageVersion = null;
@@ -390,7 +390,7 @@ namespace Orleans.Storage
 
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.Trace((int)RelationalStorageProviderCodes.RelationalProviderWrote, LogString("Wrote grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
+                logger.LogTrace((int)RelationalStorageProviderCodes.RelationalProviderWrote, LogString("Wrote grain state", serviceId, this.name, grainState.ETag, baseGrainType, grainId.ToString()));
             }
         }
 

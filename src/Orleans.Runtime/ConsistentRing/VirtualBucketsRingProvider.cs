@@ -292,7 +292,7 @@ namespace Orleans.Runtime.ConsistentRing
                     s = snapshotBucketsList.Length > 1 ? snapshotBucketsList[1] : default;
                 }
             }
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Calculated ring partition owner silo {0} for key {1}: {2} --> {3}", s.SiloAddress, hash, hash, s.Hash);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Calculated ring partition owner silo {0} for key {1}: {2} --> {3}", s.SiloAddress, hash, hash, s.Hash);
             return s.SiloAddress;
         }
     }

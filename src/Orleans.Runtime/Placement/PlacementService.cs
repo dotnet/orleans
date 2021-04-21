@@ -119,7 +119,7 @@ namespace Orleans.Runtime.Placement
                 CounterStatistic.FindOrCreate(StatisticNames.DISPATCHER_NEW_PLACEMENT).Increment();
             }
 #if DEBUG
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace(ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}", message);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace((int)ErrorCode.Dispatcher_AddressMsg_SelectTarget, "AddressMessage Placement SelectTarget {0}", message);
 #endif
         }
 

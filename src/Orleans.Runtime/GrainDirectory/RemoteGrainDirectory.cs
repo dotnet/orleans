@@ -36,7 +36,7 @@ namespace Orleans.Runtime.GrainDirectory
             // validate that this request arrived correctly
             //logger.Assert(ErrorCode.Runtime_Error_100140, silo.Matches(router.MyAddress), "destination address != my address");
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("RegisterMany Count={0}", addresses.Count);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("RegisterMany Count={0}", addresses.Count);
 
 
             return Task.WhenAll(addresses.Select(addr => router.RegisterAsync(addr, 1)));
@@ -65,7 +65,7 @@ namespace Orleans.Runtime.GrainDirectory
         public Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList)
         {
             router.CacheValidationsReceived.Increment();
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("LookUpMany for {0} entries", grainAndETagList.Count);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("LookUpMany for {0} entries", grainAndETagList.Count);
 
             var result = new List<AddressAndTag>();
 

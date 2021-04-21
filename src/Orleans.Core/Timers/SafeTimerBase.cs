@@ -213,9 +213,9 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerBeforeCallback, "About to make sync timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerBeforeCallback, "About to make sync timer callback for timer {0}", GetFullName());
                 syncCallbackFunc(state);
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed sync timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerAfterCallback, "Completed sync timer callback for timer {0}", GetFullName());
             }
             catch (Exception exc)
             {
@@ -244,9 +244,9 @@ namespace Orleans.Runtime
 
             try
             {
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerBeforeCallback, "About to make async task timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerBeforeCallback, "About to make async task timer callback for timer {0}", GetFullName());
                 await asyncTaskCallback(state);
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed async task timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerAfterCallback, "Completed async task timer callback for timer {0}", GetFullName());
             }
             catch (Exception exc)
             {
@@ -269,20 +269,20 @@ namespace Orleans.Runtime
 
                 totalNumTicks++;
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerChanging, "About to QueueNextTimerTick for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerChanging, "About to QueueNextTimerTick for timer {0}", GetFullName());
 
                 if (timerFrequency == Constants.INFINITE_TIMESPAN)
                 {
                     //timer.Change(Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
                     DisposeTimer();
 
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerStopped, "Timer {0} is now stopped and disposed", GetFullName());
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerStopped, "Timer {0} is now stopped and disposed", GetFullName());
                 }
                 else
                 {
                     timer.Change(timerFrequency, Constants.INFINITE_TIMESPAN);
 
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerNextTick, "Queued next tick for timer {0} in {1}", GetFullName(), timerFrequency);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerNextTick, "Queued next tick for timer {0} in {1}", GetFullName(), timerFrequency);
                 }
             }
             catch (ObjectDisposedException ode)

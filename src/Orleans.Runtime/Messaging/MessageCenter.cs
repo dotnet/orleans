@@ -56,11 +56,11 @@ namespace Orleans.Runtime.Messaging
             this.messageFactory = messageFactory;
             this.MyAddress = siloDetails.SiloAddress;
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Starting initialization.");
 
             OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager, siloStatusOracle, this.messagingTrace);
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Completed initialization.");
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Completed initialization.");
 
             if (siloDetails.GatewayAddress != null)
             {
@@ -192,7 +192,7 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Message has been looped back to this silo: {0}", message);
+            if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Message has been looped back to this silo: {0}", message);
             MessagingStatisticsGroup.LocalMessagesSent.Increment();
             this.OnReceivedMessage(message);
 

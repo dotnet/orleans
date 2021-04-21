@@ -264,7 +264,7 @@ namespace Orleans.Serialization
                         }
                     }
 
-                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Registered type {0} as {1}", t, name);
+                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Registered type {0} as {1}", t, name);
                 }
             }
 
@@ -305,7 +305,7 @@ namespace Orleans.Serialization
                 registeredTypes.Add(t);
                 types[name] = t;
             }
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Registered type {0} as {1}", t, name);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Registered type {0} as {1}", t, name);
 
             // Register any interfaces this type implements, in order to support passing values that are statically of the interface type
             // but dynamically of this (implementation) type
@@ -406,7 +406,7 @@ namespace Orleans.Serialization
             }
 
             if (this.logger.IsEnabled(LogLevel.Trace))
-                this.logger.Trace(
+                this.logger.LogTrace(
                     "Loaded serialization info for type {0} from assembly {1}",
                     type.Name,
                     serializerType.Assembly.GetName().Name);

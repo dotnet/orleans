@@ -116,7 +116,7 @@ namespace Orleans.AzureUtils
         public async Task DeleteQueue()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Deleting queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Deleting queue: {0}", QueueName);
             try
             {
                 // that way we don't have first to create the queue to be able later to delete it.
@@ -141,7 +141,7 @@ namespace Orleans.AzureUtils
         public async Task ClearQueue()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Clearing a queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Clearing a queue: {0}", QueueName);
             try
             {
                 // that way we don't have first to create the queue to be able later to delete it.
@@ -172,7 +172,7 @@ namespace Orleans.AzureUtils
         public async Task AddQueueMessage(string message)
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Adding message {0} to queue: {1}", message, QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Adding message {0} to queue: {1}", message, QueueName);
             try
             {
                 await queueClient.SendMessageAsync(message);
@@ -193,7 +193,7 @@ namespace Orleans.AzureUtils
         public async Task<PeekedMessage> PeekQueueMessage()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Peeking a message from queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Peeking a message from queue: {0}", QueueName);
             try
             {
                 var messages = await queueClient.PeekMessagesAsync(maxMessages: 1);
@@ -218,7 +218,7 @@ namespace Orleans.AzureUtils
         public async Task<QueueMessage> GetQueueMessage()
         {
                var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Getting a message from queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Getting a message from queue: {0}", QueueName);
             try
             {
                 //BeginGetMessage and EndGetMessage is not supported in netstandard, may be use GetMessageAsync
@@ -250,7 +250,7 @@ namespace Orleans.AzureUtils
                 count = null;
             }
 
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Getting up to {0} messages from queue: {1}", count, QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Getting up to {0} messages from queue: {1}", count, QueueName);
             try
             {
                 var messages = await queueClient.ReceiveMessagesAsync(count, messageVisibilityTimeout);
@@ -274,7 +274,7 @@ namespace Orleans.AzureUtils
         public async Task DeleteQueueMessage(QueueMessage message)
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Deleting a message from queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Deleting a message from queue: {0}", QueueName);
             try
             {
                 await queueClient.DeleteMessageAsync(message.MessageId, message.PopReceipt);
@@ -302,7 +302,7 @@ namespace Orleans.AzureUtils
         public async Task<int> GetApproximateMessageCount()
         {
             var startTime = DateTime.UtcNow;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("GetApproximateMessageCount a message from queue: {0}", QueueName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("GetApproximateMessageCount a message from queue: {0}", QueueName);
             try
             {
                 var properties = await queueClient.GetPropertiesAsync();

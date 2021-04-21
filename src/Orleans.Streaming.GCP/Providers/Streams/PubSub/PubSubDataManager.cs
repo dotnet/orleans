@@ -123,7 +123,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             var count = messages.Count();
             if (count < 1) return;
 
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Publishing {0} message to topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Publishing {0} message to topic {1}", count, TopicName.TopicId);
 
             try
             {
@@ -137,7 +137,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
         public async Task<IEnumerable<ReceivedMessage>> GetMessages(int count = 1)
         {
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Getting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Getting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
 
             PullResponse response = null;
             try
@@ -152,11 +152,11 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             if (_logger.IsEnabled(LogLevel.Trace))
             {
-                _logger.Trace("Received {0} message(s) from Google PubSub topic {1}", response.ReceivedMessages.Count, TopicName.TopicId);
+                _logger.LogTrace("Received {0} message(s) from Google PubSub topic {1}", response.ReceivedMessages.Count, TopicName.TopicId);
 
                 foreach (var received in response.ReceivedMessages)
                 {
-                    _logger.Trace("Received message {0} published {1} from Google PubSub topic {2}", received.Message.MessageId,
+                    _logger.LogTrace("Received message {0} published {1} from Google PubSub topic {2}", received.Message.MessageId,
                             received.Message.PublishTime.ToDateTime(), TopicName.TopicId);
                 }
             }
@@ -169,7 +169,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             var count = messages.Count();
             if (count < 1) return;
 
-            if (_logger.IsEnabled(LogLevel.Trace)) _logger.Trace("Deleting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
+            if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Deleting {0} message(s) from Google PubSub topic {1}", count, TopicName.TopicId);
 
             try
             {

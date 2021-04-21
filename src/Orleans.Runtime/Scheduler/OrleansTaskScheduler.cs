@@ -147,7 +147,7 @@ namespace Orleans.Runtime.Scheduler
         public void QueueWorkItem(IWorkItem workItem)
         {
 #if DEBUG
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("QueueWorkItem " + workItem);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("QueueWorkItem " + workItem);
 #endif
             var workItemGroup = GetWorkItemGroup(workItem.GrainContext);
             if (applicationTurnsStopped && (workItemGroup != null) && !workItemGroup.IsSystemGroup)

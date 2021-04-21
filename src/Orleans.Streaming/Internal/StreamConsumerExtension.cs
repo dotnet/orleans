@@ -89,7 +89,7 @@ namespace Orleans.Streams
             {
                 var itemString = item.ToString();
                 itemString = (itemString.Length > MAXIMUM_ITEM_STRING_LOG_LENGTH) ? itemString.Substring(0, MAXIMUM_ITEM_STRING_LOG_LENGTH) + "..." : itemString;
-                logger.Trace("DeliverItem {0} for subscription {1}", itemString, subscriptionId);
+                logger.LogTrace("DeliverItem {0} for subscription {1}", itemString, subscriptionId);
             }
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
@@ -120,7 +120,7 @@ namespace Orleans.Streams
 
         public async Task<StreamHandshakeToken> DeliverBatch(GuidId subscriptionId, InternalStreamId streamId, Immutable<IBatchContainer> batch, StreamHandshakeToken handshakeToken)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("DeliverBatch {0} for subscription {1}", batch.Value, subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("DeliverBatch {0} for subscription {1}", batch.Value, subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
@@ -151,7 +151,7 @@ namespace Orleans.Streams
 
         public Task CompleteStream(GuidId subscriptionId)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("CompleteStream for subscription {0}", subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("CompleteStream for subscription {0}", subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))
@@ -166,7 +166,7 @@ namespace Orleans.Streams
 
         public Task ErrorInStream(GuidId subscriptionId, Exception exc)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("ErrorInStream {0} for subscription {1}", exc, subscriptionId);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("ErrorInStream {0} for subscription {1}", exc, subscriptionId);
 
             IStreamSubscriptionHandle observer;
             if (allStreamObservers.TryGetValue(subscriptionId, out observer))

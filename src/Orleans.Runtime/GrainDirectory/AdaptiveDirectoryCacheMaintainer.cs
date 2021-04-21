@@ -116,7 +116,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} self-owned (and removed) {1}, kept {2}, removed {3} and tries to refresh {4} grains", router.MyAddress, cnt1, cnt2, cnt3, cnt4);
+                if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("Silo {0} self-owned (and removed) {1}, kept {2}, removed {3} and tries to refresh {4} grains", router.MyAddress, cnt1, cnt2, cnt3, cnt4);
 
                 // send batch requests
                 SendBatchCacheRefreshRequests(fetchInBatchList);
@@ -146,7 +146,7 @@ namespace Orleans.Runtime.GrainDirectory
                     ProcessCacheRefreshResponse(silo, response);
                 }, router.CacheValidator).Ignore();
 
-                if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} is sending request to silo {1} with {2} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);
+                if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("Silo {0} is sending request to silo {1} with {2} entries", router.MyAddress, silo, cachedGrainAndETagList.Count);
             }
         }
 
@@ -154,7 +154,7 @@ namespace Orleans.Runtime.GrainDirectory
             SiloAddress silo,
             List<AddressAndTag> refreshResponse)
         {
-            if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} received ProcessCacheRefreshResponse. #Response entries {1}.", router.MyAddress, refreshResponse.Count);
+            if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("Silo {0} received ProcessCacheRefreshResponse. #Response entries {1}.", router.MyAddress, refreshResponse.Count);
 
             int cnt1 = 0, cnt2 = 0, cnt3 = 0;
 
@@ -186,7 +186,7 @@ namespace Orleans.Runtime.GrainDirectory
                     cnt3++;
                 }
             }
-            if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Silo {0} processed refresh response from {1} with {2} updated, {3} removed, {4} unchanged grains", router.MyAddress, silo, cnt1, cnt2, cnt3);
+            if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("Silo {0} processed refresh response from {1} with {2} updated, {3} removed, {4} unchanged grains", router.MyAddress, silo, cnt1, cnt2, cnt3);
         }
 
         /// <summary>
@@ -230,7 +230,7 @@ namespace Orleans.Runtime.GrainDirectory
             long numAccesses = curNumAccesses - lastNumAccesses;
             long numHits = curNumHits - lastNumHits;
 
-            if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("#accesses: {0}, hit-ratio: {1}%", numAccesses, (numHits / Math.Max(numAccesses, 0.00001)) * 100);
+            if (Log.IsEnabled(LogLevel.Trace)) Log.LogTrace("#accesses: {0}, hit-ratio: {1}%", numAccesses, (numHits / Math.Max(numAccesses, 0.00001)) * 100);
 
             lastNumAccesses = curNumAccesses;
             lastNumHits = curNumHits;

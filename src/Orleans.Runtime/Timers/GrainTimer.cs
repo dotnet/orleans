@@ -95,7 +95,7 @@ namespace Orleans.Runtime
             totalNumTicks++;
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace(ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {0}", GetFullName());
+                logger.LogTrace((int)ErrorCode.TimerBeforeCallback, "About to make timer callback for timer {0}", GetFullName());
 
             try
             {
@@ -103,7 +103,7 @@ namespace Orleans.Runtime
                 currentlyExecutingTickTask = callback(state);
                 await currentlyExecutingTickTask;
                 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.TimerAfterCallback, "Completed timer callback for timer {0}", GetFullName());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.TimerAfterCallback, "Completed timer callback for timer {0}", GetFullName());
             }
             catch (Exception exc)
             {

@@ -29,14 +29,14 @@ namespace Orleans.Runtime
 
         internal void IncrementGrainCounter(string grainTypeName)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Increment Grain Counter {0}", grainTypeName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Increment Grain Counter {0}", grainTypeName);
             CounterStatistic ctr = FindGrainCounter(grainTypeName);
             ctr.Increment();
         }
 
         internal void DecrementGrainCounter(string grainTypeName)
         {
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Decrement Grain Counter {0}", grainTypeName);
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Decrement Grain Counter {0}", grainTypeName);
             CounterStatistic ctr = FindGrainCounter(grainTypeName);
             ctr.DecrementBy(1);
         }

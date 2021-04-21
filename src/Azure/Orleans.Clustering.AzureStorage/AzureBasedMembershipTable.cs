@@ -87,7 +87,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var entries = await tableManager.FindAllSiloEntries();
                 MembershipTableData data = Convert(entries);
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("ReadAll Table=" + Environment.NewLine + "{0}", data.ToString());
 
                 return data;
             }

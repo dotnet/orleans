@@ -411,7 +411,7 @@ namespace Orleans.Runtime.Messaging
                     {
                         if (msg == null) return;
 
-                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Queued message {0} for client {1}", msg, msg.TargetGrain);
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Queued message {0} for client {1}", msg, msg.TargetGrain);
                         clientState.PendingToSend.Enqueue(msg);
                         return;
                     }
@@ -433,12 +433,12 @@ namespace Orleans.Runtime.Messaging
 
                     if (!Send(msg, clientState))
                     {
-                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Queued message {0} for client {1}", msg, msg.TargetGrain);
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Queued message {0} for client {1}", msg, msg.TargetGrain);
                         clientState.PendingToSend.Enqueue(msg);
                     }
                     else
                     {
-                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Sent message {0} to client {1}", msg, msg.TargetGrain);
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Sent message {0} to client {1}", msg, msg.TargetGrain);
                     }
                 }
             }
@@ -452,7 +452,7 @@ namespace Orleans.Runtime.Messaging
                         var m = clientState.PendingToSend.Peek();
                         if (Send(m, clientState))
                         {
-                            if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Sent queued message {0} to client {1}", m, clientState.Id);
+                            if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Sent queued message {0} to client {1}", m, clientState.Id);
                             clientState.PendingToSend.Dequeue();
                         }
                         else

@@ -219,7 +219,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task PutEntryAsync(string tableName, Dictionary<string, AttributeValue> fields, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Creating {0} table entry: {1}", tableName, Utils.DictionaryToString(fields));
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Creating {0} table entry: {1}", tableName, Utils.DictionaryToString(fields));
 
             try
             {
@@ -255,7 +255,7 @@ namespace Orleans.Transactions.DynamoDB
             string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null, string extraExpression = "",
             Dictionary<string, AttributeValue> extraExpressionValues = null)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Upserting entry {0} with key(s) {1} into table {2}", Utils.DictionaryToString(fields), Utils.DictionaryToString(keys), tableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Upserting entry {0} with key(s) {1} into table {2}", Utils.DictionaryToString(fields), Utils.DictionaryToString(keys), tableName);
 
             try
             {
@@ -347,7 +347,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue> conditionValues = null)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Deleting table {0}  entry with key(s) {1}", tableName, Utils.DictionaryToString(keys));
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Deleting table {0}  entry with key(s) {1}", tableName, Utils.DictionaryToString(keys));
 
             try
             {
@@ -381,7 +381,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Deleting {0} table entries", tableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Deleting {0} table entries", tableName);
 
             if (toDelete == null) throw new ArgumentNullException("collection");
 
@@ -602,7 +602,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <returns></returns>
         public Task PutEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toCreate)
         {
-            if (Logger.IsEnabled(LogLevel.Trace)) Logger.Trace("Put entries {0} table", tableName);
+            if (Logger.IsEnabled(LogLevel.Trace)) Logger.LogTrace("Put entries {0} table", tableName);
 
             if (toCreate == null) throw new ArgumentNullException("collection");
 

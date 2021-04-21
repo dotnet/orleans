@@ -175,7 +175,7 @@ namespace Orleans.Runtime.ReminderService
 
             // try to retrieve reminders from all my subranges
             var rangeSerialNumberCopy = RangeSerialNumber;
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace($"My range= {RingRange}, RangeSerialNumber {RangeSerialNumber}. Local reminders count {localReminders.Count}");
+            if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace($"My range= {RingRange}, RangeSerialNumber {RangeSerialNumber}. Local reminders count {localReminders.Count}");
             var acks = new List<Task>();
             foreach (var range in RangeFactory.GetSubRanges(RingRange))
             {
@@ -193,7 +193,7 @@ namespace Orleans.Runtime.ReminderService
             foreach (var reminder in remindersOutOfRange)
             {
                 if (logger.IsEnabled(LogLevel.Trace))
-                    logger.Trace("Not in my range anymore, so removing. {0}", reminder);
+                    logger.LogTrace("Not in my range anymore, so removing. {0}", reminder);
                 // remove locally
                 reminder.StopReminder();
                 localReminders.Remove(reminder.Identity);
@@ -315,13 +315,13 @@ namespace Orleans.Runtime.ReminderService
                         {
                             if (localRem.IsRunning) // if ticking
                             {
-                                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("In table, In local, Old, & Ticking {0}", localRem);
+                                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("In table, In local, Old, & Ticking {0}", localRem);
                                 // it might happen that our local reminder is different than the one in the table, i.e., eTag is different
                                 // if so, stop the local timer for the old reminder, and start again with new info
                                 if (!localRem.ETag.Equals(entry.ETag))
                                 // this reminder needs a restart
                                 {
-                                    if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("{0} Needs a restart", localRem);
+                                    if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("{0} Needs a restart", localRem);
                                     localRem.StopReminder();
                                     localReminders.Remove(localRem.Identity);
                                     StartAndAddTimer(entry);
@@ -330,7 +330,7 @@ namespace Orleans.Runtime.ReminderService
                             else // if not ticking
                             {
                                 // no-op
-                                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("In table, In local, Old, & Not Ticking {0}", localRem);
+                                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("In table, In local, Old, & Not Ticking {0}", localRem);
                             }
                         }
                         else // cachedSequence < localRem.LocalSequenceNumber ... // info read from table is older than local info
@@ -338,18 +338,18 @@ namespace Orleans.Runtime.ReminderService
                             if (localRem.IsRunning) // if ticking
                             {
                                 // no-op
-                                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("In table, In local, Newer, & Ticking {0}", localRem);
+                                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("In table, In local, Newer, & Ticking {0}", localRem);
                             }
                             else // if not ticking
                             {
                                 // no-op
-                                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("In table, In local, Newer, & Not Ticking {0}", localRem);
+                                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("In table, In local, Newer, & Not Ticking {0}", localRem);
                             }
                         }
                     }
                     else // exists in table, but not locally
                     {
-                        if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("In table, Not in local, {0}", entry);
+                        if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("In table, Not in local, {0}", entry);
                         // create and start the reminder
                         StartAndAddTimer(entry);
                     }
@@ -365,11 +365,11 @@ namespace Orleans.Runtime.ReminderService
                     if (cachedSequence < reminder.LocalSequenceNumber)
                     {
                         // no-op
-                        if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Not in table, In local, Newer, {0}", reminder);
+                        if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Not in table, In local, Newer, {0}", reminder);
                     }
                     else // cachedSequence > reminder.LocalSequenceNumber
                     {
-                        if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Not in table, In local, Old, so removing. {0}", reminder);
+                        if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Not in table, In local, Old, so removing. {0}", reminder);
                         // remove locally
                         reminder.StopReminder();
                         localReminders.Remove(reminder.Identity);
@@ -481,7 +481,7 @@ namespace Orleans.Runtime.ReminderService
 
             var str = String.Format("{0}{1}{2}", (msg ?? "Current list of reminders:"), Environment.NewLine,
                 Utils.EnumerableToString(localReminders, null, Environment.NewLine));
-            logger.Trace(str);
+            logger.LogTrace(str);
         }
 
         private class LocalReminderData
@@ -595,7 +595,7 @@ namespace Orleans.Runtime.ReminderService
                 var logger = this.reminderService.logger;
                 if (logger.IsEnabled(LogLevel.Trace))
                 {
-                    logger.Trace("Triggering tick for {0}, status {1}, now {2}", this.ToString(), status, before);
+                    logger.LogTrace("Triggering tick for {0}, status {1}, now {2}", this.ToString(), status, before);
                 }
 
                 try
@@ -614,7 +614,7 @@ namespace Orleans.Runtime.ReminderService
                     var after = DateTime.UtcNow;
                     if (logger.IsEnabled(LogLevel.Trace))
                     {
-                        logger.Trace("Tick triggered for {0}, dt {1} sec, next@~ {2}", this.ToString(), (after - before).TotalSeconds,
+                        logger.LogTrace("Tick triggered for {0}, dt {1} sec, next@~ {2}", this.ToString(), (after - before).TotalSeconds,
                               // the next tick isn't actually scheduled until we return control to
                               // AsyncSafeTimer but we can approximate it by adding the period of the reminder
                               // to the after time.

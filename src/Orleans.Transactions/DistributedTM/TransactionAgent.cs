@@ -40,7 +40,7 @@ namespace Orleans.Transactions
             DateTime ts = this.clock.UtcNow();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} start transaction {guid} at {ts:o}");
+                logger.LogTrace($"{stopwatch.Elapsed.TotalMilliseconds:f2} start transaction {guid} at {ts:o}");
             this.statistics.TrackTransactionStarted();
             return Task.FromResult<ITransactionInfo>(new TransactionInfo(guid, ts, ts));
         }
@@ -52,7 +52,7 @@ namespace Orleans.Transactions
             transactionInfo.TimeStamp = this.clock.MergeUtcNow(transactionInfo.TimeStamp);
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} prepare {transactionInfo}");
+                logger.LogTrace($"{stopwatch.Elapsed.TotalMilliseconds:f2} prepare {transactionInfo}");
 
             if (transactionInfo.Participants.Count == 0)
             {
@@ -146,7 +146,7 @@ namespace Orleans.Transactions
             }
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish (reads only) {transactionInfo.TransactionId}");
+                logger.LogTrace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish (reads only) {transactionInfo.TransactionId}");
 
             return (status, exception);
         }
@@ -214,7 +214,7 @@ namespace Orleans.Transactions
             }
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish {transactionInfo.TransactionId}");
+                logger.LogTrace($"{stopwatch.Elapsed.TotalMilliseconds:f2} finish {transactionInfo.TransactionId}");
 
             return (status, exception);
         }
@@ -227,7 +227,7 @@ namespace Orleans.Transactions
             List<ParticipantId> participants = transactionInfo.Participants.Keys.ToList();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"abort {transactionInfo} {string.Join(",", participants.Select(p => p.ToString()))}");
+                logger.LogTrace($"abort {transactionInfo} {string.Join(",", participants.Select(p => p.ToString()))}");
 
             // send one-way abort messages to release the locks and roll back any updates
             await Task.WhenAll(participants.Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()

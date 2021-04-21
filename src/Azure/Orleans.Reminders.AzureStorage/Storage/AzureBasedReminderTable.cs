@@ -127,7 +127,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 var entries = await this.remTableManager.FindReminderEntries(key);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Read for grain {0} Table=" + Environment.NewLine + "{1}", key, data.ToString());
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Read for grain {0} Table=" + Environment.NewLine + "{1}", key, data.ToString());
                 return data;
             }
             catch (Exception exc)
@@ -144,7 +144,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 var entries = await this.remTableManager.FindReminderEntries(begin, end);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Read in {0} Table=" + Environment.NewLine + "{1}", RangeFactory.CreateRange(begin, end), data);
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("Read in {0} Table=" + Environment.NewLine + "{1}", RangeFactory.CreateRange(begin, end), data);
                 return data;
             }
             catch (Exception exc)
@@ -204,7 +204,7 @@ namespace Orleans.Runtime.ReminderService
             };
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("RemoveRow entry = {0}", entry.ToString());
+                if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("RemoveRow entry = {0}", entry.ToString());
 
                 bool result = await this.remTableManager.DeleteReminderEntryConditionally(entry, eTag);
                 if (result == false)

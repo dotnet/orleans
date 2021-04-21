@@ -281,7 +281,7 @@ namespace Orleans.AzureUtils
                 string restStatus;
                 if (!AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                 if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
 
                 throw;
@@ -307,7 +307,7 @@ namespace Orleans.AzureUtils
                 string restStatus;
                 if (!AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("InsertSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                 if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
 
                 throw;
@@ -335,7 +335,7 @@ namespace Orleans.AzureUtils
                 string restStatus;
                 if (!AzureTableUtils.EvaluateException(exc, out httpStatusCode, out restStatus)) throw;
 
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("UpdateSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
+                if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("UpdateSiloEntryConditionally failed with httpStatusCode={0}, restStatus={1}", httpStatusCode, restStatus);
                 if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
 
                 throw;
