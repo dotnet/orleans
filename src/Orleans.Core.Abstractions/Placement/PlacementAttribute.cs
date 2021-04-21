@@ -70,7 +70,7 @@ namespace Orleans.Placement
     }
 
     /// <summary>
-    /// Marks a grain class as using the <c>HashBasedPlacement</c> policy.
+    /// Marks a grain class as using the <c>SiloRoleBasedPlacement</c> policy.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class SiloRoleBasedPlacementAttribute : PlacementAttribute
