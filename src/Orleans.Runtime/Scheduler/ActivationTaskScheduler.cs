@@ -41,7 +41,7 @@ namespace Orleans.Runtime.Scheduler
             RuntimeContext.SetExecutionContext(workerGroup.GrainContext);
             bool done = TryExecuteTask(task);
             if (!done)
-                logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete4, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
+                logger.LogWarning((int)ErrorCode.SchedulerTaskExecuteIncomplete4, "RunTask: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
                     task.Id, task.Status);
             
             //  Consider adding ResetExecutionContext() or even better:
@@ -103,7 +103,7 @@ namespace Orleans.Runtime.Scheduler
             bool done = TryExecuteTask(task);
             if (!done)
             {
-                logger.Warn(ErrorCode.SchedulerTaskExecuteIncomplete3, "TryExecuteTaskInline: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
+                logger.LogWarning((int)ErrorCode.SchedulerTaskExecuteIncomplete3, "TryExecuteTaskInline: Incomplete base.TryExecuteTask for Task Id={0} with Status={1}",
                     task.Id, task.Status);
             }
 #if DEBUG

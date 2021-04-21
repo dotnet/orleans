@@ -181,7 +181,7 @@ namespace Orleans.Runtime.Host
             if (assembly == null)
             {
                 const string msg1 = "Microsoft.WindowsAzure.ServiceRuntime is not loaded. Trying to load it with Assembly.LoadWithPartialName().";
-                logger.Warn(ErrorCode.AzureServiceRuntime_NotLoaded, msg1);
+                logger.LogWarning((int)ErrorCode.AzureServiceRuntime_NotLoaded, msg1);
 
                 // Microsoft.WindowsAzure.ServiceRuntime isn't loaded. We may be running within a web role or not in Azure.
 #pragma warning disable 618

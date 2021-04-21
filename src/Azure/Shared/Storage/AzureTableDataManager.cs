@@ -228,8 +228,8 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_06,
-                        $"Intermediate error upserting entry {(data == null ? "null" : data.ToString())} to the table {TableName}", exc);
+                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_06, exc,
+                        $"Intermediate error upserting entry {(data == null ? "null" : data.ToString())} to the table {TableName}");
                     throw;
                 }
             }
@@ -263,8 +263,8 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_06,
-                        $"Intermediate error inserting entry {(data == null ? "null" : data.ToString())} to the table {TableName}", exc);
+                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_06, exc,
+                        $"Intermediate error inserting entry {(data == null ? "null" : data.ToString())} to the table {TableName}");
                     throw;
                 }
             }
@@ -303,8 +303,8 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_07,
-                        $"Intermediate error merging entry {(data == null ? "null" : data.ToString())} to the table {TableName}", exc);
+                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_07, exc,
+                        $"Intermediate error merging entry {(data == null ? "null" : data.ToString())} to the table {TableName}");
                     throw;
                 }
             }
@@ -373,8 +373,8 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_08,
-                        $"Intermediate error deleting entry {data} from the table {TableName}.", exc);
+                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_08, exc,
+                        $"Intermediate error deleting entry {data} from the table {TableName}.");
                     throw;
                 }
             }
@@ -490,8 +490,8 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_08,
-                        $"Intermediate error deleting entries {Utils.EnumerableToString(collection)} from the table {TableName}.", exc);
+                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_08, exc,
+                        $"Intermediate error deleting entries {Utils.EnumerableToString(collection)} from the table {TableName}.");
                     throw;
                 }
             }
@@ -555,7 +555,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     var errorMsg = $"Failed to read Azure storage table {TableName}: {exc.Message}";
                     if (!AzureTableUtils.TableStorageDataNotFound(exc))
                     {
-                        Logger.Warn((int)Utilities.ErrorCode.AzureTable_09, errorMsg, exc);
+                        Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_09, exc, errorMsg);
                     }
                     throw new OrleansException(errorMsg, exc);
                 }
@@ -613,8 +613,8 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 catch (Exception exc)
                 {
-                    Logger.Warn((int)Utilities.ErrorCode.AzureTable_37,
-                        $"Intermediate error bulk inserting {collection.Count} entries in the table {TableName}", exc);
+                    Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_37, exc,
+                        $"Intermediate error bulk inserting {collection.Count} entries in the table {TableName}");
                 }
             }
             finally
@@ -843,7 +843,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             var timeSpan = DateTime.UtcNow - startOperation;
             if (timeSpan > this.StoragePolicyOptions.OperationTimeout)
             {
-                Logger.Warn((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {0} for {1}, which took {2}.", TableName, operation, timeSpan);
+                Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_15, "Slow access to Azure Table {0} for {1}, which took {2}.", TableName, operation, timeSpan);
             }
         }
 

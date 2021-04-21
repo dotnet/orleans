@@ -196,7 +196,7 @@ namespace Orleans.Streams
 
         private void RemoveProducer(PubSubPublisherState producer)
         {
-            logger.Warn(ErrorCode.Stream_ProducerIsDead,
+            logger.LogWarning((int)ErrorCode.Stream_ProducerIsDead,
                 "Producer {0} on stream {1} is no longer active - permanently removing producer.",
                 producer, producer.Stream);
 

@@ -108,8 +108,8 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.ReminderServiceBase,
-                    $"Intermediate error reading reminder entry {Utils.DictionaryToString(keys)} from table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.ReminderServiceBase, exc,
+                    $"Intermediate error reading reminder entry {Utils.DictionaryToString(keys)} from table {this.options.TableName}.");
                 throw;
             }
         }
@@ -136,8 +136,8 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.ReminderServiceBase,
-                    $"Intermediate error reading reminder entry {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.ReminderServiceBase, exc,
+                    $"Intermediate error reading reminder entry {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.");
                 throw;
             }
         }
@@ -175,8 +175,8 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.ReminderServiceBase,
-                    $"Intermediate error reading reminder entry {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.ReminderServiceBase, exc,
+                    $"Intermediate error reading reminder entry {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.");
                 throw;
             }
         }
@@ -261,8 +261,8 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.ReminderServiceBase,
-                    $"Intermediate error removing reminder entries {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.ReminderServiceBase, exc,
+                    $"Intermediate error removing reminder entries {Utils.DictionaryToString(expressionValues)} from table {this.options.TableName}.");
                 throw;
             }
         }
@@ -299,8 +299,8 @@ namespace Orleans.Reminders.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.ReminderServiceBase,
-                    $"Intermediate error updating entry {entry.ToString()} to the table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.ReminderServiceBase, exc,
+                    $"Intermediate error updating entry {entry.ToString()} to the table {this.options.TableName}.");
                 throw;
             }
         }

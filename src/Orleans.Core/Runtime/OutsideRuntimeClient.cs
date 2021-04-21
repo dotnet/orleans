@@ -344,7 +344,7 @@ namespace Orleans
             }
             else
             {
-                logger.Warn(ErrorCode.Runtime_Error_100011, "No callback for response message: " + response);
+                logger.LogWarning((int)ErrorCode.Runtime_Error_100011, "No callback for response message: " + response);
             }
         }
 

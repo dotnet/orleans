@@ -109,7 +109,7 @@ namespace Orleans.Runtime
                     }
                     catch (Exception)
                     {
-                        logger.Warn(ErrorCode.Placement_RuntimeStatisticsUpdateFailure_1,
+                        logger.LogWarning((int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_1,
                             String.Format("An unexpected exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignored."));
                     }
                 }
@@ -117,8 +117,8 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.Placement_RuntimeStatisticsUpdateFailure_2,
-                    String.Format("An exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignoring."), exc);
+                logger.LogWarning((int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_2, exc,
+                    "An exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignoring.");
             }
         }
 
@@ -159,9 +159,8 @@ namespace Orleans.Runtime
                                         }
                                         else
                                         {
-                                            logger.Warn(ErrorCode.Placement_RuntimeStatisticsUpdateFailure_3,
-                                                String.Format("An unexpected exception was thrown from RefreshStatistics by ISiloControl.GetRuntimeStatistics({0}). Will keep using stale statistics.", capture),
-                                                statsTask.Exception);
+                                            logger.LogWarning((int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_3, statsTask.Exception,
+                                                "An unexpected exception was thrown from RefreshStatistics by ISiloControl.GetRuntimeStatistics({0}). Will keep using stale statistics.", capture);
                                         }
                                     });
                         tasks.Add(task);

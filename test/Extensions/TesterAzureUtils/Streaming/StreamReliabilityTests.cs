@@ -988,7 +988,7 @@ namespace UnitTests.Streaming.Reliability
             if (restart)    action = kill ? "Kill+Restart" : "Stop+Restart";
             else            action = kill ? "Kill" : "Stop";
 
-            logger.Warn(2, "{0} {1} silo {2}", action, siloType, oldSilo);
+            logger.LogWarning(2, "{0} {1} silo {2}", action, siloType, oldSilo);
 
             if (restart)
             {

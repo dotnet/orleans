@@ -72,7 +72,7 @@ namespace Orleans.Runtime.Counters
 
                 if (numErrors > 0)
                 {
-                    logger.Warn(ErrorCode.PerfCounterWriteErrors,
+                    logger.LogWarning((int)ErrorCode.PerfCounterWriteErrors,
                                 "Completed writing Windows perf counters with {0} errors", numErrors);
                 }
                 else if (logger.IsEnabled(LogLevel.Trace))

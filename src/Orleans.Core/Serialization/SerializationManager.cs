@@ -338,8 +338,8 @@ namespace Orleans.Serialization
             if (serializer == null && deserializer == null && copier == null)
             {
                 var msg = $"No serialization methods found on type {serializerType.GetParseableName(TypeFormattingOptions.LogFormat)}.";
-                logger.Warn(
-                    ErrorCode.SerMgr_SerializationMethodsMissing,
+                logger.LogWarning(
+                    (int)ErrorCode.SerMgr_SerializationMethodsMissing,
                     msg);
                 throw new ArgumentException(msg);
             }
@@ -350,8 +350,8 @@ namespace Orleans.Serialization
                     $"Inconsistency between serializer and deserializer methods on type {serializerType.GetParseableName(TypeFormattingOptions.LogFormat)}."
                     + " Either both must be specified or both must be null. "
                     + $"Instead, serializer = {serializer?.ToString() ?? "null"} and deserializer = {deserializer?.ToString() ?? "null"}";
-                logger.Warn(
-                    ErrorCode.SerMgr_SerializationMethodsMissing,
+                logger.LogWarning(
+                    (int)ErrorCode.SerMgr_SerializationMethodsMissing,
                     msg);
                 throw new ArgumentException(msg);
             }
@@ -398,8 +398,8 @@ namespace Orleans.Serialization
             }
             catch (ArgumentException)
             {
-                logger.Warn(
-                    ErrorCode.SerMgr_ErrorBindingMethods,
+                logger.LogWarning(
+                    (int)ErrorCode.SerMgr_ErrorBindingMethods,
                     "Error binding serialization methods for type {0}",
                     type.GetParseableName());
                 throw;

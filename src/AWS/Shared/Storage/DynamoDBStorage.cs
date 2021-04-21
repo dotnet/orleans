@@ -288,8 +288,8 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error upserting to the table {tableName}", exc);
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc,
+                    $"Intermediate error upserting to the table {tableName}");
                 throw;
             }
         }
@@ -367,8 +367,8 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error deleting entry from the table {tableName}.", exc);
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc,
+                    $"Intermediate error deleting entry from the table {tableName}.");
                 throw;
             }
         }
@@ -406,8 +406,8 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error deleting entries from the table {tableName}.", exc);
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc,
+                    $"Intermediate error deleting entries from the table {tableName}.");
                 throw;
             }
         }
@@ -589,7 +589,7 @@ namespace Orleans.Transactions.DynamoDB
             catch (Exception exc)
             {
                 var errorMsg = $"Failed to read table {tableName}: {exc.Message}";
-                Logger.Warn(ErrorCode.StorageProviderBase, errorMsg, exc);
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc, errorMsg);
                 throw new OrleansException(errorMsg, exc);
             }
         }
@@ -627,8 +627,8 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Warn(ErrorCode.StorageProviderBase,
-                    $"Intermediate error bulk inserting entries to table {tableName}.", exc);
+                Logger.LogWarning((int)ErrorCode.StorageProviderBase, exc,
+                    $"Intermediate error bulk inserting entries to table {tableName}.");
                 throw;
             }
         }

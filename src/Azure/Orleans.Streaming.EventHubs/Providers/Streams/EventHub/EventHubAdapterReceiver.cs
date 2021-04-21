@@ -136,7 +136,7 @@ namespace Orleans.ServiceBus.Providers
             // if receiver initialization failed, retry
             if (this.receiver == null)
             {
-                this.logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead,
+                this.logger.LogWarning((int) OrleansServiceBusErrorCode.FailedPartitionRead,
                     "Retrying initialization of EventHub partition {0}-{1}.", this.settings.Hub.Path, this.settings.Partition);
                 await Initialize();
                 if (this.receiver == null)
@@ -159,7 +159,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 watch.Stop();
                 this.monitor?.TrackRead(false, watch.Elapsed, ex);
-                this.logger.Warn(OrleansServiceBusErrorCode.FailedPartitionRead,
+                this.logger.LogWarning((int) OrleansServiceBusErrorCode.FailedPartitionRead,
                     "Failed to read from EventHub partition {0}-{1}. : Exception: {2}.", this.settings.Hub.Path,
                     this.settings.Partition, ex);
                 throw;

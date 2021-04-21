@@ -112,7 +112,7 @@ namespace Orleans.Runtime.MembershipService
                 if (localSiloEntry.Status == SiloStatus.Dead && this.CurrentStatus != SiloStatus.Dead)
                 {
                     var msg = $"I should be Dead according to membership table (in RefreshFromSnapshot). Local entry: {(localSiloEntry.ToFullString(full: true))}.";
-                    this.log.Warn(ErrorCode.MembershipFoundMyselfDead1, msg);
+                    this.log.LogWarning((int)ErrorCode.MembershipFoundMyselfDead1, msg);
                     this.KillMyselfLocally(msg);
                 }
 
@@ -220,13 +220,13 @@ namespace Orleans.Runtime.MembershipService
                 {
                     string error = string.Format("Silo {0} migrated from host {1} silo address {2} to host {3} silo address {4}.",
                         mySiloName, myHostname, myAddress, mostRecentPreviousEntry.HostName, mostRecentPreviousEntry.SiloAddress);
-                    log.Warn(ErrorCode.MembershipNodeMigrated, error);
+                    log.LogWarning((int)ErrorCode.MembershipNodeMigrated, error);
                 }
                 else
                 {
                     string error = string.Format("Silo {0} restarted on same host {1} New silo address = {2} Previous silo address = {3}",
                         mySiloName, myHostname, myAddress, mostRecentPreviousEntry.SiloAddress);
-                    log.Warn(ErrorCode.MembershipNodeRestarted, error);
+                    log.LogWarning((int)ErrorCode.MembershipNodeRestarted, error);
                 }
             }
         }
@@ -390,7 +390,7 @@ namespace Orleans.Runtime.MembershipService
             if (myEntry.Status == SiloStatus.Dead && myEntry.Status != newStatus)
             {
                 var msg = string.Format("I should be Dead according to membership table (in TryUpdateMyStatusGlobalOnce): myEntry = {0}.", myEntry.ToFullString(full: true));
-                this.log.Warn(ErrorCode.MembershipFoundMyselfDead1, msg);
+                this.log.LogWarning((int)ErrorCode.MembershipFoundMyselfDead1, msg);
                 this.KillMyselfLocally(msg);
                 return true;
             }
@@ -490,8 +490,8 @@ namespace Orleans.Runtime.MembershipService
                 var missedSince = entry.HasMissedIAmAlivesSince(this.clusterMembershipOptions, now);
                 if (missedSince != null)
                 {
-                    log.Warn(
-                    ErrorCode.MembershipMissedIAmAliveTableUpdate,
+                    log.LogWarning(
+                    (int)ErrorCode.MembershipMissedIAmAliveTableUpdate,
                     $"Noticed that silo {entry.SiloAddress} has not updated it's IAmAliveTime table column recently."
                     + $" Last update was at {missedSince}, now is {now}, no update for {now - missedSince}, which is more than {this.clusterMembershipOptions.AllowedIAmAliveMissPeriod}.");
                 }
@@ -514,7 +514,7 @@ namespace Orleans.Runtime.MembershipService
                     if (entry.Status == SiloStatus.Dead)
                     {
                         var msg = string.Format("I should be Dead according to membership table (in CleanupTableEntries): entry = {0}.", entry.ToFullString(full: true));
-                        log.Warn(ErrorCode.MembershipFoundMyselfDead2, msg);
+                        log.LogWarning((int)ErrorCode.MembershipFoundMyselfDead2, msg);
                         KillMyselfLocally(msg);
                     }
                     continue;
@@ -532,7 +532,7 @@ namespace Orleans.Runtime.MembershipService
                 // Temporal paradox - There is an older clone of this silo in the membership table
                 if (siloAddress.Generation < myAddress.Generation)
                 {
-                    log.Warn(ErrorCode.MembershipDetectedOlder, "Detected older version of myself - Marking other older clone as Dead -- Current Me={0} Older Me={1}, Old entry= {2}",
+                    log.LogWarning((int)ErrorCode.MembershipDetectedOlder, "Detected older version of myself - Marking other older clone as Dead -- Current Me={0} Older Me={1}, Old entry= {2}",
                         myAddress, siloAddress, entry.ToFullString());
                     // Declare older clone of me as Dead.
                     silosToDeclareDead.Add(tuple);   //return DeclareDead(entry, eTag, tableVersion);
@@ -542,7 +542,7 @@ namespace Orleans.Runtime.MembershipService
                     // I am the older clone - Newer version of me should survive - I need to kill myself
                     var msg = string.Format("Detected newer version of myself - I am the older clone so I will stop -- Current Me={0} Newer Me={1}, Current entry= {2}",
                         myAddress, siloAddress, entry.ToFullString());
-                    log.Warn(ErrorCode.MembershipDetectedNewer, msg);
+                    log.LogWarning((int)ErrorCode.MembershipDetectedNewer, msg);
                     await this.UpdateStatus(SiloStatus.Dead);
                     KillMyselfLocally(msg);
                     return true; // No point continuing!
@@ -679,7 +679,7 @@ namespace Orleans.Runtime.MembershipService
             if (localSiloEntry.Status == SiloStatus.Dead)
             {
                 var msg = string.Format("I should be Dead according to membership table (in TryToSuspectOrKill): entry = {0}.", localSiloEntry.ToFullString(full: true));
-                log.Warn(ErrorCode.MembershipFoundMyselfDead3, msg);
+                log.LogWarning((int)ErrorCode.MembershipFoundMyselfDead3, msg);
                 KillMyselfLocally(msg);
                 return true;
             }

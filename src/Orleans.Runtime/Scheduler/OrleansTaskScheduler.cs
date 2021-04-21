@@ -154,7 +154,7 @@ namespace Orleans.Runtime.Scheduler
             {
                 // Drop the task on the floor if it's an application work item and application turns are stopped
                 var msg = $"Dropping work item {workItem} because application turns are stopped";
-                logger.Warn(ErrorCode.SchedulerAppTurnsStopped_1, msg);
+                logger.LogWarning((int)ErrorCode.SchedulerAppTurnsStopped_1, msg);
                 return;
             }
 

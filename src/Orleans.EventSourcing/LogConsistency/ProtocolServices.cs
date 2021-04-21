@@ -63,11 +63,11 @@ namespace Orleans.Runtime.LogConsistency
 
         public void CaughtUserCodeException(string callback, string where, Exception e)
         {
-            log?.Warn((int)ErrorCode.LogConsistency_UserCodeException,
-                string.Format("{0} Exception caught in user code for {1}, called from {2}",
+            log?.LogWarning((int)ErrorCode.LogConsistency_UserCodeException, e,
+                "{0} Exception caught in user code for {1}, called from {2}",
                    grain.GrainReference,
                    callback,
-                   where), e);
+                   where);
         }
 
         public void Log(LogLevel level, string format, params object[] args)

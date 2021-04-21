@@ -209,8 +209,8 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.PersistentStreamPullingAgent_08,
-                    "Failed to unregister myself as stream producer to some streams that used to be in my responsibility.", exc);
+                logger.LogWarning((int)ErrorCode.PersistentStreamPullingAgent_08, exc,
+                    "Failed to unregister myself as stream producer to some streams that used to be in my responsibility.");
             }
             pubSubCache.Clear();
             IntValueStatistic.Delete(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, StatisticUniquePostfix));
@@ -380,7 +380,7 @@ namespace Orleans.Streams
 
         private bool ReadLoopRetryExceptionFilter(Exception e, int retryCounter)
         {
-            this.logger.Warn(ErrorCode.PersistentStreamPullingAgent_12, $"Exception while retrying the {retryCounter}th time reading from queue {this.QueueId}", e);
+            this.logger.LogWarning((int)ErrorCode.PersistentStreamPullingAgent_12, e, $"Exception while retrying the {retryCounter}th time reading from queue {this.QueueId}");
             return !IsShutdown;
         }
 
@@ -418,8 +418,8 @@ namespace Orleans.Streams
                     }
                     catch (Exception exc)
                     {
-                        logger.Warn(ErrorCode.PersistentStreamPullingAgent_27,
-                            $"Exception calling MessagesDeliveredAsync on queue {myQueueId}. Ignoring.", exc);
+                        logger.LogWarning((int)ErrorCode.PersistentStreamPullingAgent_27, exc,
+                            $"Exception calling MessagesDeliveredAsync on queue {myQueueId}. Ignoring.");
                     }
                 }
             }
@@ -706,7 +706,7 @@ namespace Orleans.Streams
             // for loss of client, we just remove the subscription
             if (exceptionOccured is ClientNotAvailableException)
             {
-                logger.Warn(ErrorCode.Stream_ConsumerIsDead,
+                logger.LogWarning((int)ErrorCode.Stream_ConsumerIsDead,
                     "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", consumerData.StreamConsumer, consumerData.StreamId);
                 pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId).Ignore();
                 return true;
@@ -817,7 +817,7 @@ namespace Orleans.Streams
             catch (Exception exc)
             {
                 var message = $"Ignoring exception while trying to evaluate subscription filter '{this.streamFilter.GetType().Name}' with data '{filterData}' on stream {streamId}";
-                logger.Warn((int)ErrorCode.PersistentStreamPullingAgent_13, message, exc);
+                logger.LogWarning((int)ErrorCode.PersistentStreamPullingAgent_13, exc, message);
             }
             return true;
         }

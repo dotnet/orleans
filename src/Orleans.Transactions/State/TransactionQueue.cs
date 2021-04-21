@@ -576,7 +576,7 @@ namespace Orleans.Transactions.State
                         }
                         catch (Exception exception)
                         {
-                            logger.Warn(888, $"Storage exception in storageWorker.", exception);
+                            logger.LogWarning(888, exception, "Storage exception in storageWorker.");
                             await AbortAndRestore(TransactionalStatus.UnknownException, exception);
                             return;
                         }

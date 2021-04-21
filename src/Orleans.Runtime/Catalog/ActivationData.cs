@@ -356,13 +356,13 @@ namespace Orleans.Runtime
             {
                 if (State == ActivationState.Invalid)
                 {
-                    logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
+                    logger.LogWarning((int)ErrorCode.Dispatcher_InvalidActivation,
                         "Cannot enqueue message to invalid activation {0} : {1}", this.ToDetailedString(), message);
                     return EnqueueMessageResult.ErrorInvalidActivation;
                 }
                 if (State == ActivationState.FailedToActivate)
                 {
-                    logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
+                    logger.LogWarning((int)ErrorCode.Dispatcher_InvalidActivation,
                         "Cannot enqueue message to activation that failed in OnActivate {0} : {1}", this.ToDetailedString(), message);
                     return EnqueueMessageResult.ErrorActivateFailed;
                 }
@@ -388,7 +388,7 @@ namespace Orleans.Runtime
                     // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
                     else if (currentRequestActiveTime > maxWarningRequestProcessingTime)
                     {
-                        logger.Warn(ErrorCode.Dispatcher_ExtendedMessageProcessing,
+                        logger.LogWarning((int)ErrorCode.Dispatcher_ExtendedMessageProcessing,
                              "Current request has been active for {0} for activation {1}. Currently executing {2}. Trying  to enqueue {3}.",
                              currentRequestActiveTime, this.ToDetailedString(), this.Blocking, message);
                     }

@@ -236,9 +236,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 isLastErrorRetriable = true;
                 var statusCode = we.Status;
-                logger.Warn((int)Utilities.ErrorCode.AzureTable_10,
-                    $"Intermediate issue reading Azure storage table {tableName}: HTTP status code={statusCode} Exception Type={exc.GetType().FullName} Message='{exc.Message}'",
-                    exc);
+                logger.LogWarning((int)Utilities.ErrorCode.AzureTable_10, exc,
+                    $"Intermediate issue reading Azure storage table {tableName}: HTTP status code={statusCode} Exception Type={exc.GetType().FullName} Message='{exc.Message}'");
             }
             else
             {
@@ -262,9 +261,8 @@ namespace Orleans.GrainDirectory.AzureStorage
                     {
                         isLastErrorRetriable = IsRetriableHttpError(httpStatusCode, restStatus);
 
-                        logger.Warn((int)Utilities.ErrorCode.AzureTable_11,
-                            $"Intermediate issue reading Azure storage table {tableName}:{(iteration == 0 ? "" : (" Repeat=" + iteration))} IsRetriable={isLastErrorRetriable} HTTP status code={httpStatusCode} REST status code={restStatus} Exception Type={exc.GetType().FullName} Message='{exc.Message}'",
-                                exc);
+                        logger.LogWarning((int)Utilities.ErrorCode.AzureTable_11, exc,
+                            $"Intermediate issue reading Azure storage table {tableName}:{(iteration == 0 ? "" : (" Repeat=" + iteration))} IsRetriable={isLastErrorRetriable} HTTP status code={httpStatusCode} REST status code={restStatus} Exception Type={exc.GetType().FullName} Message='{exc.Message}'");
                     }
                 }
                 else

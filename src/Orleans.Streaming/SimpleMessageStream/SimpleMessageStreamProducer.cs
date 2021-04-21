@@ -160,8 +160,8 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 }
                 catch (Exception exc)
                 {
-                    logger.Warn((int) ErrorCode.StreamProvider_ProducerFailedToUnregister,
-                        "Ignoring unhandled exception during PubSub.UnregisterProducer", exc);
+                    logger.LogWarning((int) ErrorCode.StreamProvider_ProducerFailedToUnregister, exc,
+                        "Ignoring unhandled exception during PubSub.UnregisterProducer");
                 }
             }
             isDisposed = true;

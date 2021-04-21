@@ -179,8 +179,8 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.MembershipBase,
-                    $"Intermediate error reading silo entry for key {siloAddress.ToLongString()} from the table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.MembershipBase, exc,
+                    $"Intermediate error reading silo entry for key {siloAddress.ToLongString()} from the table {this.options.TableName}.");
                 throw;
             }
         }
@@ -207,7 +207,7 @@ namespace Orleans.Clustering.DynamoDB
 
                 if (records.Any(record => record.MembershipVersion > versionRow.MembershipVersion))
                 {
-                    this.logger.Warn(ErrorCode.MembershipBase, "Found an inconsistency while reading all silo entries");
+                    this.logger.LogWarning((int)ErrorCode.MembershipBase, "Found an inconsistency while reading all silo entries");
                     //not expecting this to hit often, but if it does, should put in a limit
                     return await this.ReadAll();
                 }
@@ -219,8 +219,8 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.MembershipBase,
-                    $"Intermediate error reading all silo entries {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.MembershipBase, exc,
+                    $"Intermediate error reading all silo entries {this.options.TableName}.");
                 throw;
             }
         }
@@ -234,7 +234,7 @@ namespace Orleans.Clustering.DynamoDB
 
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
                 {
-                    this.logger.Warn(ErrorCode.MembershipBase,
+                    this.logger.LogWarning((int)ErrorCode.MembershipBase,
                         $"Insert failed. Invalid ETag value. Will retry. Entry {entry.ToFullString()}, eTag {tableVersion.VersionEtag}");
                     return false;
                 }
@@ -274,7 +274,7 @@ namespace Orleans.Clustering.DynamoDB
                     if (canceledException.Message.Contains("ConditionalCheckFailed")) //not a good way to check for this currently
                     {
                         result = false;
-                        this.logger.Warn(ErrorCode.MembershipBase,
+                        this.logger.LogWarning((int)ErrorCode.MembershipBase,
                             $"Insert failed due to contention on the table. Will retry. Entry {entry.ToFullString()}");
                     }
                     else
@@ -287,8 +287,8 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.MembershipBase,
-                    $"Intermediate error inserting entry {entry.ToFullString()} to the table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.MembershipBase, exc,
+                    $"Intermediate error inserting entry {entry.ToFullString()} to the table {this.options.TableName}.");
                 throw;
             }
         }
@@ -301,7 +301,7 @@ namespace Orleans.Clustering.DynamoDB
                 var siloEntry = Convert(entry, tableVersion);
                 if (!int.TryParse(etag, out var currentEtag))
                 {
-                    this.logger.Warn(ErrorCode.MembershipBase,
+                    this.logger.LogWarning((int)ErrorCode.MembershipBase,
                         $"Update failed. Invalid ETag value. Will retry. Entry {entry.ToFullString()}, eTag {etag}");
                     return false;
                 }
@@ -310,7 +310,7 @@ namespace Orleans.Clustering.DynamoDB
 
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
                 {
-                    this.logger.Warn(ErrorCode.MembershipBase,
+                    this.logger.LogWarning((int)ErrorCode.MembershipBase,
                         $"Update failed. Invalid ETag value. Will retry. Entry {entry.ToFullString()}, eTag {tableVersion.VersionEtag}");
                     return false;
                 }
@@ -352,7 +352,7 @@ namespace Orleans.Clustering.DynamoDB
                     if (canceledException.Message.Contains("ConditionalCheckFailed")) //not a good way to check for this currently
                     {
                         result = false;
-                        this.logger.Warn(ErrorCode.MembershipBase,
+                        this.logger.LogWarning((int)ErrorCode.MembershipBase,
                             $"Update failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, eTag {etag}");
                     }
                     else
@@ -365,8 +365,8 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.MembershipBase,
-                    $"Intermediate error updating entry {entry.ToFullString()} to the table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.MembershipBase, exc,
+                    $"Intermediate error updating entry {entry.ToFullString()} to the table {this.options.TableName}.");
                 throw;
             }
         }
@@ -383,8 +383,8 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Warn(ErrorCode.MembershipBase,
-                    $"Intermediate error updating IAmAlive field for entry {entry.ToFullString()} to the table {this.options.TableName}.", exc);
+                this.logger.LogWarning((int)ErrorCode.MembershipBase, exc,
+                    $"Intermediate error updating IAmAlive field for entry {entry.ToFullString()} to the table {this.options.TableName}.");
                 throw;
             }
         }

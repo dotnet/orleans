@@ -263,10 +263,9 @@ namespace Orleans.Runtime.ReminderService
 
                 if (initialReadCallCount <= InitialReadRetryCountBeforeFastFailForUpdates)
                 {
-                    logger.Warn(
-                        ErrorCode.RS_ServiceInitialLoadFailing,
-                        string.Format("ReminderService failed initial load of reminders and will retry. Attempt #{0}", this.initialReadCallCount),
-                        ex);
+                    logger.LogWarning(
+                        (int)ErrorCode.RS_ServiceInitialLoadFailing, ex,
+                        "ReminderService failed initial load of reminders and will retry. Attempt #{0}", this.initialReadCallCount);
                 }
                 else
                 {
@@ -466,7 +465,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (!RingRange.InRange(grainRef))
                 {
-                    logger.Warn(ErrorCode.RS_NotResponsible, "I shouldn't have received request '{0}' for {1}. It is not in my responsibility range: {2}",
+                    logger.LogWarning((int)ErrorCode.RS_NotResponsible, "I shouldn't have received request '{0}' for {1}. It is not in my responsibility range: {2}",
                         debugInfo, grainRef.ToString(), RingRange);
                     // For now, we still let the caller proceed without throwing an exception... the periodical mechanism will take care of reminders being registered at the wrong silo
                     // otherwise, we can either reject the request, or re-route the request

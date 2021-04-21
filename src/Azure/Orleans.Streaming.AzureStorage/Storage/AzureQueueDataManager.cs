@@ -325,7 +325,7 @@ namespace Orleans.AzureUtils
             var timeSpan = DateTime.UtcNow - startOperation;
             if (timeSpan > AzureQueueDefaultPolicies.QueueOperationTimeout)
             {
-                logger.Warn((int)AzureQueueErrorCode.AzureQueue_13, "Slow access to Azure queue {0} for {1}, which took {2}.", QueueName, operation, timeSpan);
+                logger.LogWarning((int)AzureQueueErrorCode.AzureQueue_13, "Slow access to Azure queue {0} for {1}, which took {2}.", QueueName, operation, timeSpan);
             }
         }
 

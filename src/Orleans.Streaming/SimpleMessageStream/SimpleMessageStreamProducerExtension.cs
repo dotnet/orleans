@@ -228,7 +228,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                     if (consumers.TryRemove(subscriptionId, out _))
                     {
                         streamPubSub.UnregisterConsumer(subscriptionId, streamId).Ignore();
-                        logger.Warn(ErrorCode.Stream_ConsumerIsDead,
+                        logger.LogWarning((int)ErrorCode.Stream_ConsumerIsDead,
                             "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", remoteConsumer, streamId);
                     }
                 }

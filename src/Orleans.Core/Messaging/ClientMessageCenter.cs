@@ -247,7 +247,7 @@ namespace Orleans.Messaging
                 if (numGateways == 0)
                 {
                     RejectMessage(msg, "No gateways available");
-                    logger.Warn(ErrorCode.ProxyClient_CannotSend, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
+                    logger.LogWarning((int)ErrorCode.ProxyClient_CannotSend, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
                     return new ValueTask<Connection>(default(Connection));
                 }
 
@@ -281,7 +281,7 @@ namespace Orleans.Messaging
             if (addr == null)
             {
                 RejectMessage(msg, "No gateways available");
-                logger.Warn(ErrorCode.ProxyClient_CannotSend_NoGateway, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
+                logger.LogWarning((int)ErrorCode.ProxyClient_CannotSend_NoGateway, "Unable to send message {0}; gateway manager state is {1}", msg, gatewayManager);
                 return new ValueTask<Connection>(default(Connection));
             }
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);

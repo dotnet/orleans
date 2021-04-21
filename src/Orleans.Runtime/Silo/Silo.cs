@@ -118,8 +118,8 @@ namespace Orleans.Runtime
             logger.LogInformation((int)ErrorCode.SiloGcSetting, "Silo starting with GC settings: ServerGC={0} GCLatencyMode={1}", GCSettings.IsServerGC, Enum.GetName(typeof(GCLatencyMode), GCSettings.LatencyMode));
             if (!GCSettings.IsServerGC)
             {
-                logger.Warn(ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\">");
-                logger.Warn(ErrorCode.SiloGcWarning, "Note: ServerGC only kicks in on multi-core systems (settings enabling ServerGC have no effect on single-core machines).");
+                logger.LogWarning((int)ErrorCode.SiloGcWarning, "Note: Silo not running with ServerGC turned on - recommend checking app config : <configuration>-<runtime>-<gcServer enabled=\"true\">");
+                logger.LogWarning((int)ErrorCode.SiloGcWarning, "Note: ServerGC only kicks in on multi-core systems (settings enabling ServerGC have no effect on single-core machines).");
             }
 
             if (logger.IsEnabled(LogLevel.Debug))
@@ -452,7 +452,7 @@ namespace Orleans.Runtime
                     }
                     else
                     {
-                        logger.Warn(ErrorCode.SiloFailedToConfigureThreadPool,
+                        logger.LogWarning((int)ErrorCode.SiloFailedToConfigureThreadPool,
                                     "Failed to configure ThreadPool.SetMinThreads(). Tried to set values to: {0},{1}. Previous values are: {2},{3}.",
                                     newWorkerThreads, newCompletionPortThreads, workerThreads, completionPortThreads);
                     }

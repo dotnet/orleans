@@ -36,7 +36,7 @@ namespace StatelessCalculatorService
                         }
                         catch (Exception exception)
                         {
-                            logger.Warn(exception.HResult, "Exception in bootstrap provider. Ignoring.", exception);
+                            logger.LogWarning(exception.HResult, "Exception in bootstrap provider. Ignoring.", exception);
                         }
                     }
                 }).Ignore();

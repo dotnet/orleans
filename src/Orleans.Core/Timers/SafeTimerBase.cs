@@ -107,8 +107,8 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc)
                 {
-                    logger.Warn(ErrorCode.TimerDisposeError,
-                        string.Format("Ignored error disposing timer {0}", GetFullName()), exc);
+                    logger.LogWarning((int)ErrorCode.TimerDisposeError, exc,
+                        "Ignored error disposing timer {0}", GetFullName());
                 }
             }
         }
@@ -159,7 +159,7 @@ namespace Orleans.Runtime
                 logger.Error(errorCode, errMsg);
             }else
             {
-                logger.Warn(errorCode, errMsg);
+                logger.LogWarning((int)errorCode, errMsg);
             }
             return false;
         }
@@ -188,8 +188,8 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.TimerChangeError,
-                    string.Format("Error changing timer period - timer {0} not changed", GetFullName()), exc);
+                logger.LogWarning((int)ErrorCode.TimerChangeError, exc,
+                    "Error changing timer period - timer {0} not changed", GetFullName());
                 return false;
             }
         }
@@ -219,7 +219,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.TimerCallbackError, string.Format("Ignored exception {0} during sync timer callback {1}", exc.Message, GetFullName()), exc);
+                logger.LogWarning((int)ErrorCode.TimerCallbackError, exc, "Ignored exception {0} during sync timer callback {1}", exc.Message, GetFullName());
             }
             finally
             {
@@ -250,7 +250,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Warn(ErrorCode.TimerCallbackError, string.Format("Ignored exception {0} during async task timer callback {1}", exc.Message, GetFullName()), exc);
+                logger.LogWarning((int)ErrorCode.TimerCallbackError, exc, "Ignored exception {0} during async task timer callback {1}", exc.Message, GetFullName());
             }
             finally
             {
@@ -287,8 +287,8 @@ namespace Orleans.Runtime
             }
             catch (ObjectDisposedException ode)
             {
-                logger.Warn(ErrorCode.TimerDisposeError,
-                    string.Format("Timer {0} already disposed - will not queue next timer tick", GetFullName()), ode);
+                logger.LogWarning((int)ErrorCode.TimerDisposeError, ode,
+                    "Timer {0} already disposed - will not queue next timer tick", GetFullName());
             }
             catch (Exception exc)
             {

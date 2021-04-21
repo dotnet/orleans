@@ -75,8 +75,8 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Warn((int)TableStorageErrorCode.AzureTable_20,
-                    $"Intermediate error reading silo entry for key {key.ToLongString()} from the table {tableManager.TableName}.", exc);
+                logger.LogWarning((int)TableStorageErrorCode.AzureTable_20, exc,
+                    $"Intermediate error reading silo entry for key {key.ToLongString()} from the table {tableManager.TableName}.");
                 throw;
             }
         }
@@ -93,8 +93,8 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Warn((int)TableStorageErrorCode.AzureTable_21,
-                    $"Intermediate error reading all silo entries {tableManager.TableName}.", exc);
+                logger.LogWarning((int)TableStorageErrorCode.AzureTable_21, exc,
+                    $"Intermediate error reading all silo entries {tableManager.TableName}.");
                 throw;
             }
         }
@@ -111,14 +111,14 @@ namespace Orleans.Runtime.MembershipService
                     tableEntry, versionEntry, tableVersion.VersionEtag);
 
                 if (result == false)
-                    logger.Warn((int)TableStorageErrorCode.AzureTable_22,
+                    logger.LogWarning((int)TableStorageErrorCode.AzureTable_22,
                         $"Insert failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, table version = {tableVersion}");
                 return result;
             }
             catch (Exception exc)
             {
-                logger.Warn((int)TableStorageErrorCode.AzureTable_23,
-                    $"Intermediate error inserting entry {entry.ToFullString()} tableVersion {(tableVersion == null ? "null" : tableVersion.ToString())} to the table {tableManager.TableName}.", exc);
+                logger.LogWarning((int)TableStorageErrorCode.AzureTable_23, exc,
+                    $"Intermediate error inserting entry {entry.ToFullString()} tableVersion {(tableVersion == null ? "null" : tableVersion.ToString())} to the table {tableManager.TableName}.");
                 throw;
             }
         }
@@ -133,14 +133,14 @@ namespace Orleans.Runtime.MembershipService
 
                 bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag);
                 if (result == false)
-                    logger.Warn((int)TableStorageErrorCode.AzureTable_24,
+                    logger.LogWarning((int)TableStorageErrorCode.AzureTable_24,
                         $"Update failed due to contention on the table. Will retry. Entry {entry.ToFullString()}, eTag {etag}, table version = {tableVersion} ");
                 return result;
             }
             catch (Exception exc)
             {
-                logger.Warn((int)TableStorageErrorCode.AzureTable_25,
-                    $"Intermediate error updating entry {entry.ToFullString()} tableVersion {(tableVersion == null ? "null" : tableVersion.ToString())} to the table {tableManager.TableName}.", exc);
+                logger.LogWarning((int)TableStorageErrorCode.AzureTable_25, exc,
+                    $"Intermediate error updating entry {entry.ToFullString()} tableVersion {(tableVersion == null ? "null" : tableVersion.ToString())} to the table {tableManager.TableName}.");
                 throw;
             }
         }
@@ -155,8 +155,8 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Warn((int)TableStorageErrorCode.AzureTable_26,
-                    $"Intermediate error updating IAmAlive field for entry {entry.ToFullString()} to the table {tableManager.TableName}.", exc);
+                logger.LogWarning((int)TableStorageErrorCode.AzureTable_26, exc,
+                    $"Intermediate error updating IAmAlive field for entry {entry.ToFullString()} to the table {tableManager.TableName}.");
                 throw;
             }
         }

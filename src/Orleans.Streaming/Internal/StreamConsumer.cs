@@ -207,8 +207,8 @@ namespace Orleans.Streams
 
             } catch (Exception exc)
             {
-                logger.Warn(ErrorCode.StreamProvider_ConsumerFailedToUnregister,
-                    "Ignoring unhandled exception during PubSub.UnregisterConsumer", exc);
+                logger.LogWarning((int)ErrorCode.StreamProvider_ConsumerFailedToUnregister, exc,
+                    "Ignoring unhandled exception during PubSub.UnregisterConsumer");
             }
             myExtension = null;
         }

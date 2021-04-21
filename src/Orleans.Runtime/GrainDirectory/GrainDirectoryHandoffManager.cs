@@ -123,7 +123,7 @@ namespace Orleans.Runtime.GrainDirectory
                     if (!directoryPartitionsMap.TryGetValue(predecessorOfNewSilo, out var predecessorPartition))
                     {
                         // we should have the partition of the predcessor of our new successor
-                        logger.Warn(ErrorCode.DirectoryPartitionPredecessorExpected, "This silo is expected to hold directory partition of " + predecessorOfNewSilo);
+                        logger.LogWarning((int)ErrorCode.DirectoryPartitionPredecessorExpected, "This silo is expected to hold directory partition of " + predecessorOfNewSilo);
                     }
                     else
                     {
@@ -249,7 +249,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (!isFullCopy)
                     {
-                        logger.Warn(ErrorCode.DirectoryUnexpectedDelta,
+                        logger.LogWarning((int)ErrorCode.DirectoryUnexpectedDelta,
                             String.Format("Got delta of the directory partition from silo {0} (Membership status {1}) while not holding a full copy. Membership active cluster size is {2}",
                                 source, this.siloStatusOracle.GetApproximateSiloStatus(source),
                                 this.siloStatusOracle.GetApproximateSiloStatuses(true).Count));

@@ -299,8 +299,8 @@ namespace Orleans.Messaging
 
                 if (live.Count == 0)
                 {
-                    logger.Warn(
-                        ErrorCode.GatewayManager_AllGatewaysDead,
+                    logger.LogWarning(
+                        (int)ErrorCode.GatewayManager_AllGatewaysDead,
                         "All gateways have previously been marked as dead. Clearing the list of dead gateways to expedite reconnection.");
                     live.AddRange(knownGateways);
                     knownDead.Clear();

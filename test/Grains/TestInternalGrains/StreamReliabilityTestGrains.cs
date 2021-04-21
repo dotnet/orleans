@@ -336,7 +336,7 @@ namespace UnitTests.Grains
     //    public Task OnErrorAsync(Exception ex)
     //    {
     //        NumErrors++;
-    //        logger.Warn(1, "Received OnErrorAsync - Exception={0} - Total Items={1} Errors={2}", ex, NumItems, NumErrors);
+    //        logger.LogWarning(1, "Received OnErrorAsync - Exception={0} - Total Items={1} Errors={2}", ex, NumItems, NumErrors);
     //        return Task.CompletedTask;
     //    }
     //}

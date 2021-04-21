@@ -455,7 +455,7 @@ namespace Orleans.Runtime
             {
                 if (failedActivations.TryGetValue(address, out var ex))
                 {
-                    logger.Warn(ErrorCode.Catalog_ActivationException, "Call to an activation that failed during OnActivateAsync()");
+                    logger.LogWarning((int)ErrorCode.Catalog_ActivationException, "Call to an activation that failed during OnActivateAsync()");
                     ex.Throw();
                 }
 
@@ -606,10 +606,9 @@ namespace Orleans.Runtime
                     }
                     catch (Exception ex)
                     {
-                        logger.Warn(
-                            ErrorCode.Catalog_UnregisterAsync,
-                            $"Failed to unregister activation {activation} after {initStage} stage failed",
-                            ex);
+                        logger.LogWarning(
+                            (int)ErrorCode.Catalog_UnregisterAsync, ex,
+                            $"Failed to unregister activation {activation} after {initStage} stage failed");
                     }
                 }
                 lock (activation)
@@ -619,7 +618,7 @@ namespace Orleans.Runtime
                     {
                         failedActivations.Add(activation.Address, ExceptionDispatchInfo.Capture(exception));
                         activation.SetState(ActivationState.FailedToActivate);
-                        logger.Warn(ErrorCode.Catalog_Failed_InvokeActivate, string.Format("Failed to InvokeActivate for {0}.", activation), exception);
+                        logger.LogWarning((int)ErrorCode.Catalog_Failed_InvokeActivate, exception, "Failed to InvokeActivate for {Activation}", activation);
                         // Reject all of the messages queued for this activation.
                         var activationFailedMsg = nameof(Grain.OnActivateAsync) + " failed";
                         RejectAllQueuedMessages(activation, activationFailedMsg, exception);
@@ -627,7 +626,7 @@ namespace Orleans.Runtime
                     else
                     {
                         activation.SetState(ActivationState.Invalid);
-                        logger.Warn(ErrorCode.Runtime_Error_100064, $"Failed to RegisterActivationInGrainDirectory for {activation}.", exception);
+                        logger.LogWarning((int)ErrorCode.Runtime_Error_100064, exception, "Failed to RegisterActivationInGrainDirectory for {Activation}", activation);
                         RerouteAllQueuedMessages(activation, null, "Failed RegisterActivationInGrainDirectory", exception);
                     }
                 }
