@@ -28,14 +28,14 @@ namespace UnitTests.Grains
                 throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             label = this.GetPrimaryKeyLong().ToString();
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             return base.OnActivateAsync();
         }
 
         public override Task OnDeactivateAsync()
         {
-            logger.Info("!!! OnDeactivateAsync");
+            logger.LogInformation("!!! OnDeactivateAsync");
             return base.OnDeactivateAsync();
         }
 
@@ -51,20 +51,20 @@ namespace UnitTests.Grains
 
         public async Task DoLongAction(TimeSpan timespan, string str)
         {
-            logger.Info("DoLongAction {0} received", str);
+            logger.LogInformation("DoLongAction {0} received", str);
             await Task.Delay(timespan);
         }
 
         public Task SetLabel(string label)
         {
             this.label = label;
-            logger.Info("SetLabel {0} received", label);
+            logger.LogInformation("SetLabel {0} received", label);
             return Task.CompletedTask;
         }
 
         public Task StartTimer()
         {
-            logger.Info("StartTimer.");
+            logger.LogInformation("StartTimer.");
             timer = base.RegisterTimer(TimerTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
             
             return Task.CompletedTask;
@@ -72,7 +72,7 @@ namespace UnitTests.Grains
 
         private Task TimerTick(object data)
         {
-            logger.Info("TimerTick.");
+            logger.LogInformation("TimerTick.");
             return Task.CompletedTask;
         }
 
@@ -84,14 +84,14 @@ namespace UnitTests.Grains
             var task = Task.Factory.StartNew(() =>
             {
                 bar1 = (string) RequestContext.Get("jarjar");
-                logger.Info("bar = {0}.", bar1);
+                logger.LogInformation("bar = {0}.", bar1);
             });
 
             string bar2 = null;
             var ac = Task.Factory.StartNew(() =>
             {
                 bar2 = (string) RequestContext.Get("jarjar");
-                logger.Info("bar = {0}.", bar2);
+                logger.LogInformation("bar = {0}.", bar2);
             });
 
             await Task.WhenAll(task, ac);
@@ -172,7 +172,7 @@ namespace UnitTests.Grains
             //    throw new ArgumentException("Primary key cannot be -2 for this test case");
 
             label = this.GetPrimaryKey().ToString();
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             return Task.CompletedTask;
         }

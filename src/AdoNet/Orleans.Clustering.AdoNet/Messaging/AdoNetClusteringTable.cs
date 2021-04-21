@@ -43,7 +43,7 @@ namespace Orleans.Runtime.MembershipService
                 var wasCreated = await InitTableAsync();
                 if(wasCreated)
                 {
-                    logger.Info("Created new table version row.");
+                    logger.LogInformation("Created new table version row.");
                 }
             }
         }

@@ -45,8 +45,7 @@ namespace BenchmarkGrains.GrainStorage
                 this.persistentState.State.Payload[index] = (byte)(this.persistentState.State.Payload[index] + 1);
                 await this.persistentState.WriteStateAsync();
                 sw.Stop();
-                object[] args = { this.GetPrimaryKey(), sw.ElapsedMilliseconds };
-                logger.LogInformation("Grain {GrainId} took {WriteTimeMs}ms to set state.", args);
+                logger.LogInformation("Grain {GrainId} took {WriteTimeMs}ms to set state.", this.GetPrimaryKey(), sw.ElapsedMilliseconds);
                 success = true;
             } catch(Exception ex)
             {

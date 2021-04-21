@@ -78,7 +78,7 @@ namespace UnitTests.Grains
                 _streamId, item.Data, _itemsConsumed, token != null ? ", token = " + token : "");
             if (ProducerObserver.DEBUG_STREAMING_GRAINS)
             {
-                _logger.Info(str);
+                _logger.LogInformation(str);
             }
             else
             {
@@ -89,19 +89,19 @@ namespace UnitTests.Grains
 
         public Task OnCompletedAsync()
         {            
-            _logger.Info("ConsumerObserver.OnCompletedAsync");
+            _logger.LogInformation("ConsumerObserver.OnCompletedAsync");
             return Task.CompletedTask;
         }
 
         public Task OnErrorAsync(Exception ex)
         {            
-            _logger.Info("ConsumerObserver.OnErrorAsync: ex={0}", ex);
+            _logger.LogInformation("ConsumerObserver.OnErrorAsync: ex={0}", ex);
             return Task.CompletedTask;
         }
 
         public async Task BecomeConsumer(Guid streamId, IStreamProvider streamProvider, string streamNamespace)
         {
-            _logger.Info("BecomeConsumer");
+            _logger.LogInformation("BecomeConsumer");
             if (ProviderName != null)
                 throw new InvalidOperationException("redundant call to BecomeConsumer");
             _streamId = streamId;
@@ -115,14 +115,14 @@ namespace UnitTests.Grains
         public async Task RenewConsumer(ILogger logger, IStreamProvider streamProvider)
         {
             _logger = logger;
-            _logger.Info("RenewConsumer");
+            _logger.LogInformation("RenewConsumer");
             IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(_streamId, _streamNamespace);
             _subscription = await stream.SubscribeAsync(this);
         }
 
         public async Task StopBeingConsumer(IStreamProvider streamProvider)
         {
-            _logger.Info("StopBeingConsumer");
+            _logger.LogInformation("StopBeingConsumer");
             if (_subscription != null)
             {
                 await _subscription.UnsubscribeAsync();
@@ -188,19 +188,19 @@ namespace UnitTests.Grains
         {
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
-            _logger.Info("BecomeProducer");
+            _logger.LogInformation("BecomeProducer");
             IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(streamId, streamNamespace);
             _observer = stream;
             var observerAsSMSProducer = _observer as SimpleMessageStreamProducer<StreamItem>;
             // only SimpleMessageStreamProducer implements IDisposable and a means to verify it was cleaned up.
             if (null == observerAsSMSProducer)
             {
-                _logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
+                _logger.LogInformation("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
                 _observerDisposedYet = true;
             }
             else
             {
-                _logger.Info("ProducerObserver.BecomeProducer: producer performs disposal during finalization.");
+                _logger.LogInformation("ProducerObserver.BecomeProducer: producer performs disposal during finalization.");
                 observerAsSMSProducer.OnDisposeTestHook += 
                     () => 
                         _observerDisposedYet = true;
@@ -215,19 +215,19 @@ namespace UnitTests.Grains
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
             _logger = logger;
-            _logger.Info("RenewProducer");
+            _logger.LogInformation("RenewProducer");
             IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(_streamId, _streamNamespace);
             _observer = stream;
             var observerAsSMSProducer = _observer as SimpleMessageStreamProducer<StreamItem>;
             // only SimpleMessageStreamProducer implements IDisposable and a means to verify it was cleaned up.
             if (null == observerAsSMSProducer)
             {
-                //_logger.Info("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
+                //_logger.LogInformation("ProducerObserver.BecomeProducer: producer requires no disposal; test short-circuited.");
                 _observerDisposedYet = true;
             }
             else
             {
-                //_logger.Info("ProducerObserver.BecomeProducer: producer performs disposal during finalization.");
+                //_logger.LogInformation("ProducerObserver.BecomeProducer: producer performs disposal during finalization.");
                 observerAsSMSProducer.OnDisposeTestHook +=
                     () =>
                         _observerDisposedYet = true;
@@ -245,7 +245,7 @@ namespace UnitTests.Grains
             string str = String.Format("ProducerObserver.ProduceItem: streamId={0}, data={1}, numProduced so far={2}.", _streamId, data, _itemsProduced);
             if (DEBUG_STREAMING_GRAINS)
             {
-                _logger.Info(str);
+                _logger.LogInformation(str);
             }
             else
             {
@@ -261,7 +261,7 @@ namespace UnitTests.Grains
             if (0 >= count)
                 throw new ArgumentOutOfRangeException("count", "The count must be greater than zero.");
             _expectedItemsProduced += count;
-            _logger.Info("ProducerObserver.ProduceSequentialSeries: streamId={0}, num items to produce={1}.", _streamId, count);
+            _logger.LogInformation("ProducerObserver.ProduceSequentialSeries: streamId={0}, num items to produce={1}.", _streamId, count);
             for (var i = 1; i <= count; ++i)
                 await ProduceItem(String.Format("sequential#{0}", i));
         }
@@ -272,7 +272,7 @@ namespace UnitTests.Grains
 
             if (0 >= count)
                 throw new ArgumentOutOfRangeException("count", "The count must be greater than zero.");
-            _logger.Info("ProducerObserver.ProduceParallelSeries: streamId={0}, num items to produce={1}.", _streamId, count);
+            _logger.LogInformation("ProducerObserver.ProduceParallelSeries: streamId={0}, num items to produce={1}.", _streamId, count);
             _expectedItemsProduced += count;
             var tasks = new Task<bool>[count];
             for (var i = 1; i <= count; ++i)
@@ -301,7 +301,7 @@ namespace UnitTests.Grains
         {
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
-            _logger.Info("ProducerObserver.ProducePeriodicSeries: streamId={0}, num items to produce={1}.", _streamId, count);
+            _logger.LogInformation("ProducerObserver.ProducePeriodicSeries: streamId={0}, num items to produce={1}.", _streamId, count);
             var timer = TimerState.NewTimer(createTimerFunc, ProduceItem, RemoveTimer, count);
             // we can't pass the TimerState object in as the argument-- it might be prematurely collected, so we root
             // it to this object via the _timers dictionary.
@@ -313,7 +313,7 @@ namespace UnitTests.Grains
 
         private void RemoveTimer(IDisposable handle)
         {
-            _logger.Info("ProducerObserver.RemoveTimer: streamId={0}.", _streamId);
+            _logger.LogInformation("ProducerObserver.RemoveTimer: streamId={0}.", _streamId);
             if (handle == null)
                 throw new ArgumentNullException("handle");
             if (!_timers.Remove(handle))
@@ -360,7 +360,7 @@ namespace UnitTests.Grains
 
         public Task StopBeingProducer()
         {
-            _logger.Info("StopBeingProducer");
+            _logger.LogInformation("StopBeingProducer");
             if (!_cleanedUpFlag.TrySet())
                 return Task.CompletedTask;
 
@@ -385,14 +385,14 @@ namespace UnitTests.Grains
 
         public async Task VerifyFinished()
         {
-            _logger.Info("ProducerObserver.VerifyFinished: waiting for observer disposal; streamId={0}", _streamId);
+            _logger.LogInformation("ProducerObserver.VerifyFinished: waiting for observer disposal; streamId={0}", _streamId);
             while (!_observerDisposedYet)
             {
                 await Task.Delay(1000);
                 GC.Collect();
                 GC.WaitForPendingFinalizers(); 
             }
-            _logger.Info("ProducerObserver.VerifyFinished: observer disposed; streamId={0}", _streamId);
+            _logger.LogInformation("ProducerObserver.VerifyFinished: observer disposed; streamId={0}", _streamId);
         }
 
         private class TimerState : IDisposable
@@ -476,7 +476,7 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ProducerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
-            _logger.Info("OnActivateAsync");
+            _logger.LogInformation("OnActivateAsync");
              _producers = new List<IProducerObserver>();
             _cleanedUpFlag = new InterlockedFlag();
             return Task.CompletedTask;
@@ -484,7 +484,7 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync()
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
@@ -573,7 +573,7 @@ namespace UnitTests.Grains
 
         public virtual Task DeactivateProducerOnIdle()
         {
-            _logger.Info("DeactivateProducerOnIdle");
+            _logger.LogInformation("DeactivateProducerOnIdle");
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
@@ -588,7 +588,7 @@ namespace UnitTests.Grains
         {
             await base.OnActivateAsync();
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.PersistentStreaming_ProducerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
-            _logger.Info("OnActivateAsync");
+            _logger.LogInformation("OnActivateAsync");
             if (State.Producers == null)
             {
                 State.Producers = new List<IProducerObserver>();
@@ -606,7 +606,7 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync()
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             return base.OnDeactivateAsync();
         }
 
@@ -655,14 +655,14 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
-            _logger.Info("OnActivateAsync");    
+            _logger.LogInformation("OnActivateAsync");    
             _observers = new List<IConsumerObserver>();
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
@@ -697,9 +697,9 @@ namespace UnitTests.Grains
 
         public virtual Task DeactivateConsumerOnIdle()
         {
-            _logger.Info("DeactivateConsumerOnIdle");
+            _logger.LogInformation("DeactivateConsumerOnIdle");
 
-            Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(task => { _logger.Info("DeactivateConsumerOnIdle ContinueWith fired."); }).Ignore(); // .WithTimeout(TimeSpan.FromSeconds(2));
+            Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(task => { _logger.LogInformation("DeactivateConsumerOnIdle ContinueWith fired."); }).Ignore(); // .WithTimeout(TimeSpan.FromSeconds(2));
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
@@ -714,7 +714,7 @@ namespace UnitTests.Grains
         {
             await base.OnActivateAsync();
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.PersistentStreaming_ConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
-            _logger.Info("OnActivateAsync");
+            _logger.LogInformation("OnActivateAsync");
 
             if (State.Consumers == null)
             {
@@ -733,7 +733,7 @@ namespace UnitTests.Grains
 
         public override async Task OnDeactivateAsync()
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             await base.OnDeactivateAsync();
         }
 
@@ -761,7 +761,7 @@ namespace UnitTests.Grains
         public override async Task OnActivateAsync()
         {
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_Reentrant_ProducerConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId) ;
-            _logger.Info("OnActivateAsync");
+            _logger.LogInformation("OnActivateAsync");
             await base.OnActivateAsync();
         }
     }
@@ -776,12 +776,12 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ProducerConsumerGrain " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
-            _logger.Info("OnActivateAsync");
+            _logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
         public override Task OnDeactivateAsync()
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
@@ -872,7 +872,7 @@ namespace UnitTests.Grains
 
         public Task DeactivateProducerOnIdle()
         {
-            _logger.Info("DeactivateProducerOnIdle");
+            _logger.LogInformation("DeactivateProducerOnIdle");
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
@@ -886,7 +886,7 @@ namespace UnitTests.Grains
         public override async Task OnActivateAsync()
         {
             _logger = this.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Test.Streaming_ImplicitConsumerGrain1 " + RuntimeIdentity + "/" + IdentityString + "/" + Data.ActivationId);
-            _logger.Info("{0}.OnActivateAsync", GetType().FullName);    
+            _logger.LogInformation("{0}.OnActivateAsync", GetType().FullName);    
             _observers = new Dictionary<string, IConsumerObserver>();
             // discuss: Note that we need to know the provider that will be used in advance. I think it would be beneficial if we specified the provider as an argument to ImplicitConsumerActivationAttribute.
 
@@ -899,7 +899,7 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync()
         {
-            _logger.Info("OnDeactivateAsync");
+            _logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
@@ -954,9 +954,9 @@ namespace UnitTests.Grains
 
         public Task DeactivateConsumerOnIdle()
         {
-            _logger.Info("DeactivateConsumerOnIdle");
+            _logger.LogInformation("DeactivateConsumerOnIdle");
 
-            Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(task => { _logger.Info("DeactivateConsumerOnIdle ContinueWith fired."); }).Ignore(); // .WithTimeout(TimeSpan.FromSeconds(2));
+            Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(task => { _logger.LogInformation("DeactivateConsumerOnIdle ContinueWith fired."); }).Ignore(); // .WithTimeout(TimeSpan.FromSeconds(2));
             DeactivateOnIdle();
             return Task.CompletedTask;
         }

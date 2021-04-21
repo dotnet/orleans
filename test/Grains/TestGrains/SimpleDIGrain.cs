@@ -132,7 +132,7 @@ namespace UnitTests.Grains
 
         public void Dispose()
         {
-            logger?.Info($"Disposed instance {this.instanceValue}");
+            logger?.LogInformation($"Disposed instance {this.instanceValue}");
         }
 
     }
@@ -154,7 +154,7 @@ namespace UnitTests.Grains
 
         public void Dispose()
         {
-            logger.Info($"Disposed instance {this.instanceValue}");
+            logger.LogInformation($"Disposed instance {this.instanceValue}");
         }
 
         public string GetInstanceValue() =>  this.instanceValue;

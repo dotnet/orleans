@@ -57,7 +57,7 @@ namespace Orleans.Runtime.Management
 
         public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
         {
-            logger.Info("GetDetailedHosts onlyActive={0}", onlyActive);
+            logger.LogInformation("GetDetailedHosts onlyActive={0}", onlyActive);
 
             await this.membershipTableManager.Refresh();
 
@@ -84,7 +84,7 @@ namespace Orleans.Runtime.Management
         public Task ForceGarbageCollection(SiloAddress[] siloAddresses)
         {
             var silos = GetSiloAddresses(siloAddresses);
-            logger.Info("Forcing garbage collection on {0}", Utils.EnumerableToString(silos));
+            logger.LogInformation("Forcing garbage collection on {0}", Utils.EnumerableToString(silos));
             List<Task> actionPromises = PerformPerSiloAction(silos,
                 s => GetSiloControlReference(s).ForceGarbageCollection());
             return Task.WhenAll(actionPromises);
@@ -107,7 +107,7 @@ namespace Orleans.Runtime.Management
         public Task ForceRuntimeStatisticsCollection(SiloAddress[] siloAddresses)
         {
             var silos = GetSiloAddresses(siloAddresses);
-            logger.Info("Forcing runtime statistics collection on {0}", Utils.EnumerableToString(silos));
+            logger.LogInformation("Forcing runtime statistics collection on {0}", Utils.EnumerableToString(silos));
             List<Task> actionPromises = PerformPerSiloAction(
                 silos,
                 s => GetSiloControlReference(s).ForceRuntimeStatisticsCollection());

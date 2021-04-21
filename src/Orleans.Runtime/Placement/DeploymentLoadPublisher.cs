@@ -69,7 +69,7 @@ namespace Orleans.Runtime
 
         public async Task Start()
         {
-            logger.Info("Starting DeploymentLoadPublisher.");
+            logger.LogInformation("Starting DeploymentLoadPublisher.");
             if (statisticsRefreshTime > TimeSpan.Zero)
             {
                 // Randomize PublishStatistics timer,
@@ -79,7 +79,7 @@ namespace Orleans.Runtime
             }
             await RefreshStatistics();
             await PublishStatistics(null);
-            logger.Info("Started DeploymentLoadPublisher.");
+            logger.LogInformation("Started DeploymentLoadPublisher.");
         }
 
         private async Task PublishStatistics(object _)

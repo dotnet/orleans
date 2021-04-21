@@ -50,7 +50,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
                 bool created = await tableManager.TryCreateTableVersionEntryAsync();
-                if(created) logger.Info("Created new table version row.");
+                if(created) logger.LogInformation("Created new table version row.");
             }
         }
 

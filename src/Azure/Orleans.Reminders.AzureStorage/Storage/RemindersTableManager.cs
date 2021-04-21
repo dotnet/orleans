@@ -90,7 +90,7 @@ namespace Orleans.Runtime.ReminderService
             var singleton = new RemindersTableManager(serviceId, clusterId, options, loggerFactory);
             try
             {
-                singleton.Logger.Info("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
+                singleton.Logger.LogInformation("Creating RemindersTableManager for service id {0} and clusterId {1}.", serviceId, clusterId);
                 await singleton.InitTableAsync();
             }
             catch (Exception ex)

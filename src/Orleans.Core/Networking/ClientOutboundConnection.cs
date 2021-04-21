@@ -141,7 +141,7 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
-                this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Client is dropping message: {<essage}. Reason = {Reason}", msg, reason);
+                this.Log.LogInformation((int)ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Client is dropping message: {Message}. Reason = {Reason}", msg, reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }

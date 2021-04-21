@@ -89,7 +89,7 @@ namespace Orleans.ServiceBus.Providers
 
         public Task Initialize(TimeSpan timeout)
         {
-            this.logger.Info("Initializing EventHub partition {0}-{1}.", this.settings.Hub.Path, this.settings.Partition);
+            this.logger.LogInformation("Initializing EventHub partition {0}-{1}.", this.settings.Hub.Path, this.settings.Partition);
             // if receiver was already running, do nothing
             return ReceiverRunning == Interlocked.Exchange(ref this.receiverState, ReceiverRunning)
                 ? Task.CompletedTask
@@ -236,7 +236,7 @@ namespace Orleans.ServiceBus.Providers
                     return;
                 }
 
-                this.logger.Info("Stopping reading from EventHub partition {0}-{1}", this.settings.Hub.Path, this.settings.Partition);
+                this.logger.LogInformation("Stopping reading from EventHub partition {0}-{1}", this.settings.Hub.Path, this.settings.Partition);
 
                 // clear cache and receiver
                 IEventHubQueueCache localCache = Interlocked.Exchange(ref this.cache, null);

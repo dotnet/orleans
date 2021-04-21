@@ -199,7 +199,7 @@ namespace Orleans.Runtime.ReminderService
                 localReminders.Remove(reminder.Identity);
             }
 
-            if (logger.IsEnabled(LogLevel.Information) && remindersOutOfRange.Length > 0) logger.Info($"Removed {remindersOutOfRange.Length} local reminders that are now out of my range.");
+            if (logger.IsEnabled(LogLevel.Information) && remindersOutOfRange.Length > 0) logger.LogInformation($"Removed {remindersOutOfRange.Length} local reminders that are now out of my range.");
         }
 
         public override Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)

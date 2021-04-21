@@ -83,7 +83,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_SimpleNotification_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            this.Logger.Info("Invoking ObserverTest_SimpleNotification_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
+            this.Logger.LogInformation("Invoking ObserverTest_SimpleNotification_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
 
             if (a == 3 && b == 0)
                 callbacksReceived[0] = true;
@@ -130,7 +130,7 @@ namespace DefaultCluster.Tests.General
             catch (Exception exc)
             {
                 Exception baseException = exc.GetBaseException();
-                this.Logger.Info("Received exception: {0}", baseException);
+                this.Logger.LogInformation("Received exception: {0}", baseException);
                 Assert.IsAssignableFrom<OrleansException>(baseException);
                 if (!baseException.Message.StartsWith("Cannot subscribe already subscribed observer"))
                 {
@@ -148,7 +148,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_DoubleSubscriptionSameReference_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            this.Logger.Info("Invoking ObserverTest_DoubleSubscriptionSameReference_Callback for {0} time with a={1} and b={2}", this.callbackCounter, a, b);
+            this.Logger.LogInformation("Invoking ObserverTest_DoubleSubscriptionSameReference_Callback for {0} time with a={1} and b={2}", this.callbackCounter, a, b);
             Assert.True(callbackCounter <= 2, "Callback has been called more times than was expected " + callbackCounter);
             if (callbackCounter == 2)
             {
@@ -180,7 +180,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_SubscribeUnsubscribe_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            this.Logger.Info("Invoking ObserverTest_SubscribeUnsubscribe_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
+            this.Logger.LogInformation("Invoking ObserverTest_SubscribeUnsubscribe_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
             Assert.True(callbackCounter < 2, "Callback has been called more times than was expected.");
 
             Assert.Equal(5, a);
@@ -239,7 +239,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_DoubleSubscriptionDifferentReferences_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            this.Logger.Info("Invoking ObserverTest_DoubleSubscriptionDifferentReferences_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
+            this.Logger.LogInformation("Invoking ObserverTest_DoubleSubscriptionDifferentReferences_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
             Assert.True(callbackCounter < 3, "Callback has been called more times than was expected.");
 
             Assert.Equal(6, a);
@@ -270,7 +270,7 @@ namespace DefaultCluster.Tests.General
         void ObserverTest_DeleteObject_Callback(int a, int b, AsyncResultHandle result)
         {
             callbackCounter++;
-            this.Logger.Info("Invoking ObserverTest_DeleteObject_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
+            this.Logger.LogInformation("Invoking ObserverTest_DeleteObject_Callback for {0} time with a = {1} and b = {2}", this.callbackCounter, a, b);
             Assert.True(callbackCounter < 2, "Callback has been called more times than was expected.");
 
             Assert.Equal(5, a);

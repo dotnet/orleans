@@ -56,15 +56,15 @@ namespace Tester.AzureUtils
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
             var outMessage1 = await manager.PeekQueueMessage();
-            logger.Info("PeekQueueMessage 1: {0}", PrintQueueMessage(outMessage1));
+            logger.LogInformation("PeekQueueMessage 1: {0}", PrintQueueMessage(outMessage1));
             Assert.Equal(inMessage, outMessage1.MessageText);
 
             var outMessage2 = await manager.PeekQueueMessage();
-            logger.Info("PeekQueueMessage 2: {0}", PrintQueueMessage(outMessage2));
+            logger.LogInformation("PeekQueueMessage 2: {0}", PrintQueueMessage(outMessage2));
             Assert.Equal(inMessage, outMessage2.MessageText);
 
             QueueMessage outMessage3 = await manager.GetQueueMessage();
-            logger.Info("GetQueueMessage 3: {0}", PrintQueueMessage(outMessage3));
+            logger.LogInformation("GetQueueMessage 3: {0}", PrintQueueMessage(outMessage3));
             Assert.Equal(inMessage, outMessage3.MessageText);
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
@@ -141,7 +141,7 @@ namespace Tester.AzureUtils
             Assert.Equal(1, await manager.GetApproximateMessageCount());
 
             QueueMessage outMessage = await manager.GetQueueMessage();
-            logger.Info("GetQueueMessage: {0}", PrintQueueMessage(outMessage));
+            logger.LogInformation("GetQueueMessage: {0}", PrintQueueMessage(outMessage));
             Assert.Equal(inMessage, outMessage.MessageText);
 
             await Task.Delay(visibilityTimeout);

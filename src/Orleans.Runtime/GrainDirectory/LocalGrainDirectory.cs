@@ -194,7 +194,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void Start()
         {
-            log.Info("Start");
+            log.LogInformation("Start");
             Running = true;
             if (maintainer != null)
             {

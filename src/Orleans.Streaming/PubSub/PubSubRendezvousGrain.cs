@@ -270,7 +270,7 @@ namespace Orleans.Streams
                     numConsumers = State.Consumers.Count;
 
                 string when = args != null && args.Length != 0 ? string.Format(fmt, args) : fmt;
-                logger.Info("{0}. Now have total of {1} producers and {2} consumers. All Consumers = {3}, All Producers = {4}",
+                logger.LogInformation("{0}. Now have total of {1} producers and {2} consumers. All Consumers = {3}, All Producers = {4}",
                     when, numProducers, numConsumers, Utils.EnumerableToString(State?.Consumers), Utils.EnumerableToString(State?.Producers));
             }
         }

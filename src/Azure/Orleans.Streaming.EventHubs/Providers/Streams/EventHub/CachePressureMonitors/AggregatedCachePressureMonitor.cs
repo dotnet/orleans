@@ -64,7 +64,7 @@ namespace Orleans.ServiceBus.Providers
             {
                 this.isUnderPressure = underPressure;
                 this.CacheMonitor?.TrackCachePressureMonitorStatusChange(this.GetType().Name, this.isUnderPressure, null, null, null);
-                logger.Info(this.isUnderPressure
+                logger.LogInformation(this.isUnderPressure
                     ? $"Ingesting messages too fast. Throttling message reading."
                     : $"Message ingestion is healthy.");
             }

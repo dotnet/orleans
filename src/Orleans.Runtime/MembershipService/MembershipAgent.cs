@@ -276,7 +276,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeJoining()
         {
-            this.log.Info(ErrorCode.MembershipJoining, "-Joining");
+            this.log.LogInformation((int)ErrorCode.MembershipJoining, "-Joining");
             try
             {
                 await this.UpdateStatus(SiloStatus.Joining);
@@ -290,7 +290,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeShuttingDown()
         {
-            this.log.Info(ErrorCode.MembershipShutDown, "-Shutdown");
+            this.log.LogInformation((int)ErrorCode.MembershipShutDown, "-Shutdown");
             try
             {
                 await this.UpdateStatus(SiloStatus.ShuttingDown);
@@ -304,7 +304,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeStopping()
         {
-            log.Info(ErrorCode.MembershipStop, "-Stop");
+            log.LogInformation((int)ErrorCode.MembershipStop, "-Stop");
             try
             {
                 await this.UpdateStatus(SiloStatus.Stopping);

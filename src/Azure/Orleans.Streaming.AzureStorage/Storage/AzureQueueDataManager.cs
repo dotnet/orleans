@@ -98,7 +98,7 @@ namespace Orleans.AzureUtils
             {
                 // Create the queue if it doesn't already exist.
                 var response = await queueClient.CreateIfNotExistsAsync();
-                logger.Info((int)AzureQueueErrorCode.AzureQueue_01, "Connected to Azure storage queue {0}", QueueName);
+                logger.LogInformation((int)AzureQueueErrorCode.AzureQueue_01, "Connected to Azure storage queue {0}", QueueName);
             }
             catch (Exception exc)
             {
@@ -122,7 +122,7 @@ namespace Orleans.AzureUtils
                 // that way we don't have first to create the queue to be able later to delete it.
                 if (await queueClient.DeleteIfExistsAsync())
                 {
-                    logger.Info((int)AzureQueueErrorCode.AzureQueue_03, "Deleted Azure Queue {0}", QueueName);
+                    logger.LogInformation((int)AzureQueueErrorCode.AzureQueue_03, "Deleted Azure Queue {0}", QueueName);
                 }
             }
             catch (Exception exc)
@@ -146,7 +146,7 @@ namespace Orleans.AzureUtils
             {
                 // that way we don't have first to create the queue to be able later to delete it.
                 await queueClient.ClearMessagesAsync();
-                logger.Info((int)AzureQueueErrorCode.AzureQueue_05, "Cleared Azure Queue {0}", QueueName);
+                logger.LogInformation((int)AzureQueueErrorCode.AzureQueue_05, "Cleared Azure Queue {0}", QueueName);
             }
             catch (RequestFailedException exc)
             {

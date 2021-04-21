@@ -83,7 +83,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
                 _topic = await _publisher.GetTopicAsync(TopicName);
             }
 
-            _logger.Info((int)GoogleErrorCode.Initializing, "{0} Google PubSub Topic {1}", (didCreate ? "Created" : "Attached to"), TopicName.TopicId);
+            _logger.LogInformation((int)GoogleErrorCode.Initializing, "{0} Google PubSub Topic {1}", (didCreate ? "Created" : "Attached to"), TopicName.TopicId);
 
             didCreate = false;
 
@@ -101,7 +101,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
                 _subscription = await _subscriber.GetSubscriptionAsync(SubscriptionName);
             }
-            _logger.Info((int)GoogleErrorCode.Initializing, "{0} Google PubSub Subscription {1} to Topic {2}", (didCreate ? "Created" : "Attached to"), SubscriptionName.SubscriptionId, TopicName.TopicId);
+            _logger.LogInformation((int)GoogleErrorCode.Initializing, "{0} Google PubSub Subscription {1} to Topic {2}", (didCreate ? "Created" : "Attached to"), SubscriptionName.SubscriptionId, TopicName.TopicId);
         }
 
         public async Task DeleteTopic()
@@ -110,7 +110,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             try
             {
                 await _publisher?.DeleteTopicAsync(TopicName);
-                _logger.Info((int)GoogleErrorCode.Initializing, "Deleted Google PubSub topic {0}", TopicName.TopicId);
+                _logger.LogInformation((int)GoogleErrorCode.Initializing, "Deleted Google PubSub topic {0}", TopicName.TopicId);
             }
             catch (Exception exc)
             {

@@ -117,7 +117,7 @@ namespace Orleans.Runtime.Membership
             }
             catch (Exception ex)
             {
-                _logger.Info("ConsulMembershipProvider failed to insert registration for silo {0}; {1}.", entry.SiloAddress, ex);
+                _logger.LogInformation(ex, "ConsulMembershipProvider failed to insert registration for silo {Silo}", entry.SiloAddress);
                 throw;
             }
         }
@@ -144,7 +144,7 @@ namespace Orleans.Runtime.Membership
             }
             catch (Exception ex)
             {
-                _logger.Info("ConsulMembershipProvider failed to update the registration for silo {0}: {1}.", entry.SiloAddress, ex);
+                _logger.LogInformation(ex, "ConsulMembershipProvider failed to update the registration for silo {0}", entry.SiloAddress);
                 throw;
             }
         }

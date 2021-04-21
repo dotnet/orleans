@@ -47,7 +47,7 @@ namespace UnitTestGrains
         private Task Tick(object data)
         {
             counter++;
-            logger.Info(data.ToString() + " Tick # " + counter + " RuntimeContext = " + RuntimeContext.Current?.ToString());
+            logger.LogInformation(data.ToString() + " Tick # " + counter + " RuntimeContext = " + RuntimeContext.Current?.ToString());
 
             // make sure we run in the right activation context.
             if(!Equals(context, RuntimeContext.CurrentGrainContext))
@@ -157,7 +157,7 @@ namespace UnitTestGrains
 
         public Task StartTimer(string name, TimeSpan delay)
         {
-            logger.Info("StartTimer Name={0} Delay={1}", name, delay);
+            logger.LogInformation("StartTimer Name={0} Delay={1}", name, delay);
             this.timerName = name;
             this.timer = base.RegisterTimer(TimerTick, name, delay, Constants.INFINITE_TIMESPAN); // One shot timer
             return Task.CompletedTask;
@@ -165,7 +165,7 @@ namespace UnitTestGrains
 
         public Task StopTimer(string name)
         {
-            logger.Info("StopTimer Name={0}", name);
+            logger.LogInformation("StopTimer Name={0}", name);
             if (name != this.timerName)
             {
                 throw new ArgumentException(string.Format("Wrong timer name: Expected={0} Actual={1}", this.timerName, name));
@@ -252,7 +252,7 @@ namespace UnitTestGrains
 
         private void LogStatus(string what)
         {
-            logger.Info("{0} Tick # {1} - {2} - RuntimeContext.Current={3} TaskScheduler.Current={4} CurrentWorkerThread={5}",
+            logger.LogInformation("{0} Tick # {1} - {2} - RuntimeContext.Current={3} TaskScheduler.Current={4} CurrentWorkerThread={5}",
                         timerName, tickCount, what, RuntimeContext.Current, TaskScheduler.Current,
                         Thread.CurrentThread.Name);
         }

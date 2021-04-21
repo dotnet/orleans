@@ -336,7 +336,7 @@ namespace Orleans.Runtime
                         // Mark the exception so that it doesn't deactivate any other activations.
                         ise.IsSourceActivation = false;
 
-                        this.invokeExceptionLogger.Info($"Deactivating {target} due to inconsistent state.");
+                        this.invokeExceptionLogger.LogInformation($"Deactivating {target} due to inconsistent state.");
                         this.DeactivateOnIdle(target.ActivationId);
                     }
 
@@ -656,7 +656,7 @@ namespace Orleans.Runtime
             this.disposables.Add(this.callbackTimer);
 
             stopWatch.Stop();
-            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
+            this.logger.LogInformation((int)ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
             return Task.CompletedTask;
         }
 

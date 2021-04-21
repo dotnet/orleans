@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -52,42 +53,42 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSMultipleSubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ SMSMultipleSubscriptionTest *********************************");
+            this.fixture.Logger.LogInformation("************************ SMSMultipleSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSAddAndRemoveSubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ SMSAddAndRemoveSubscriptionTest *********************************");
+            this.fixture.Logger.LogInformation("************************ SMSAddAndRemoveSubscriptionTest *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSResubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ SMSResubscriptionTest *********************************");
+            this.fixture.Logger.LogInformation("************************ SMSResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSResubscriptionAfterDeactivationTest()
         {
-            this.fixture.Logger.Info("************************ ResubscriptionAfterDeactivationTest *********************************");
+            this.fixture.Logger.LogInformation("************************ ResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSActiveSubscriptionTest()
         {
-            this.fixture.Logger.Info("************************ SMSActiveSubscriptionTest *********************************");
+            this.fixture.Logger.LogInformation("************************ SMSActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task SMSSubscribeFromClientTest()
         {
-            this.fixture.Logger.Info("************************ SMSSubscribeFromClientTest *********************************");
+            this.fixture.Logger.LogInformation("************************ SMSSubscribeFromClientTest *********************************");
             await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
         }
     }

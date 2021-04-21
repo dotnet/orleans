@@ -53,7 +53,7 @@ namespace UnitTests.MembershipTests
 
             this.clusterId = "test-" + Guid.NewGuid();
 
-            logger.Info("ClusterId={0}", this.clusterId);
+            logger.LogInformation("ClusterId={0}", this.clusterId);
 
             fixture.InitializeConnectionStringAccessor(GetConnectionString);
             this.connectionString = fixture.ConnectionString;
@@ -130,7 +130,7 @@ namespace UnitTests.MembershipTests
             var data = await membershipTable.ReadAll();
             Assert.NotNull(data);
 
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+            logger.LogInformation("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.Equal(0, data.Members.Count);
             Assert.NotNull(data.Version.VersionEtag);
@@ -162,7 +162,7 @@ namespace UnitTests.MembershipTests
         {
             MembershipTableData data = await membershipTable.ReadAll();
 
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+            logger.LogInformation("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.Equal(0, data.Members.Count);
 
@@ -200,7 +200,7 @@ namespace UnitTests.MembershipTests
             if (extendedProtocol)
                 Assert.Equal(newTableVersion.Version, data.Version.Version);
 
-            logger.Info("Membership.ReadRow returned VableVersion={0} Data={1}", data.Version, data);
+            logger.LogInformation("Membership.ReadRow returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.Equal(1, data.Members.Count);
             Assert.NotNull(data.Version.VersionEtag);
@@ -211,7 +211,7 @@ namespace UnitTests.MembershipTests
             }
             var membershipEntry = data.Members[0].Item1;
             string eTag = data.Members[0].Item2;
-            logger.Info("Membership.ReadRow returned MembershipEntry ETag={0} Entry={1}", eTag, membershipEntry);
+            logger.LogInformation("Membership.ReadRow returned MembershipEntry ETag={0} Entry={1}", eTag, membershipEntry);
 
             Assert.NotNull(eTag);
             Assert.NotNull(membershipEntry);
@@ -220,7 +220,7 @@ namespace UnitTests.MembershipTests
         protected async Task MembershipTable_ReadAll_Insert_ReadAll(bool extendedProtocol = true)
         {
             MembershipTableData data = await membershipTable.ReadAll();
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+            logger.LogInformation("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.Equal(0, data.Members.Count);
 
@@ -232,7 +232,7 @@ namespace UnitTests.MembershipTests
             Assert.True(ok, "InsertRow failed");
 
             data = await membershipTable.ReadAll();
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+            logger.LogInformation("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.Equal(1, data.Members.Count);
             Assert.NotNull(data.Version.VersionEtag);
@@ -245,7 +245,7 @@ namespace UnitTests.MembershipTests
 
             var membershipEntry = data.Members[0].Item1;
             string eTag = data.Members[0].Item2;
-            logger.Info("Membership.ReadAll returned MembershipEntry ETag={0} Entry={1}", eTag, membershipEntry);
+            logger.LogInformation("Membership.ReadAll returned MembershipEntry ETag={0} Entry={1}", eTag, membershipEntry);
 
             Assert.NotNull(eTag);
             Assert.NotNull(membershipEntry);
@@ -272,7 +272,7 @@ namespace UnitTests.MembershipTests
 
                 TableVersion tableVersion = tableData.Version.Next();
 
-                logger.Info("Calling InsertRow with Entry = {0} TableVersion = {1}", siloEntry, tableVersion);
+                logger.LogInformation("Calling InsertRow with Entry = {0} TableVersion = {1}", siloEntry, tableVersion);
                 bool ok = await membershipTable.InsertRow(siloEntry, tableVersion);
 
                 Assert.True(ok, "InsertRow failed");
@@ -285,7 +285,7 @@ namespace UnitTests.MembershipTests
 
                 if (extendedProtocol)
                 {
-                    logger.Info("Calling UpdateRow with Entry = {0} correct eTag = {1} old version={2}", siloEntry,
+                    logger.LogInformation("Calling UpdateRow with Entry = {0} correct eTag = {1} old version={2}", siloEntry,
                                 etagBefore, tableVersion != null ? tableVersion.ToString() : "null");
                     ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
                     Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
@@ -294,14 +294,14 @@ namespace UnitTests.MembershipTests
 
                 tableVersion = tableData.Version.Next();
 
-                logger.Info("Calling UpdateRow with Entry = {0} correct eTag = {1} correct version={2}", siloEntry,
+                logger.LogInformation("Calling UpdateRow with Entry = {0} correct eTag = {1} correct version={2}", siloEntry,
                     etagBefore, tableVersion != null ? tableVersion.ToString() : "null");
 
                 ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
 
                 Assert.True(ok, $"UpdateRow failed - Table Data = {tableData}");
 
-                logger.Info("Calling UpdateRow with Entry = {0} old eTag = {1} old version={2}", siloEntry,
+                logger.LogInformation("Calling UpdateRow with Entry = {0} old eTag = {1} old version={2}", siloEntry,
                     etagBefore, tableVersion != null ? tableVersion.ToString() : "null");
                 ok = await membershipTable.UpdateRow(siloEntry, etagBefore, tableVersion);
                 Assert.False(ok, $"row update should have failed - Table Data = {tableData}");
@@ -316,7 +316,7 @@ namespace UnitTests.MembershipTests
 
                 if (extendedProtocol)
                 {
-                    logger.Info("Calling UpdateRow with Entry = {0} correct eTag = {1} old version={2}", siloEntry,
+                    logger.LogInformation("Calling UpdateRow with Entry = {0} correct eTag = {1} old version={2}", siloEntry,
                                 etagAfter, tableVersion != null ? tableVersion.ToString() : "null");
 
                     ok = await membershipTable.UpdateRow(siloEntry, etagAfter, tableVersion);
@@ -407,7 +407,7 @@ namespace UnitTests.MembershipTests
         protected async Task MembershipTable_CleanupDefunctSiloEntries(bool extendedProtocol = true)
         {
             MembershipTableData data = await membershipTable.ReadAll();
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+            logger.LogInformation("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.Equal(0, data.Members.Count);
 
@@ -439,7 +439,7 @@ namespace UnitTests.MembershipTests
             Assert.True(ok, "InsertRow failed");
 
             data = await membershipTable.ReadAll();
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+            logger.LogInformation("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.Equal(3, data.Members.Count);
 
@@ -447,7 +447,7 @@ namespace UnitTests.MembershipTests
             await membershipTable.CleanupDefunctSiloEntries(oldEntryDead.IAmAliveTime.AddDays(3));
 
             data = await membershipTable.ReadAll();
-            logger.Info("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
+            logger.LogInformation("Membership.ReadAll returned VableVersion={0} Data={1}", data.Version, data);
 
             Assert.Equal(1, data.Members.Count);
         }

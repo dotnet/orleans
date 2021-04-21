@@ -95,7 +95,7 @@ namespace Orleans.Runtime
             if (counterData == null)
             {
                 // Flush remaining data
-                logger.Info(ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
+                logger.LogInformation((int)ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
                 logMsgBuilder.Clear();
                 return;
             }
@@ -107,7 +107,7 @@ namespace Orleans.Runtime
             {
                 // Flush pending data and start over
                 logMsgBuilder.AppendLine(STATS_LOG_POSTFIX);
-                logger.Info(ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
+                logger.LogInformation((int)ErrorCode.PerfCounterDumpAll, logMsgBuilder.ToString());
                 logMsgBuilder.Clear();
             }
 

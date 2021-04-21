@@ -98,7 +98,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 bool didCreate = await tableRef.CreateIfNotExistsAsync();
 
 
-                Logger.Info((int)Utilities.ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
+                Logger.LogInformation((int)Utilities.ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
 
                 CloudTableClient tableOperationsClient = await GetCloudTableOperationsClientAsync();
                 Table = tableOperationsClient.GetTableReference(TableName);
@@ -138,7 +138,7 @@ namespace Orleans.GrainDirectory.AzureStorage
 
                 if (didDelete)
                 {
-                    Logger.Info((int)Utilities.ErrorCode.AzureTable_03, "Deleted Azure storage table {0}", TableName);
+                    Logger.LogInformation((int)Utilities.ErrorCode.AzureTable_03, "Deleted Azure storage table {0}", TableName);
                 }
             }
             catch (Exception exc)

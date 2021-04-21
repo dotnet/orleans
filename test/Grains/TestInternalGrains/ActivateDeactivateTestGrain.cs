@@ -25,7 +25,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync()
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Not doing Deactivate yet");
@@ -37,7 +37,7 @@ namespace UnitTests.Grains
 
         public override async Task OnDeactivateAsync()
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingDeactivate = true;
@@ -48,7 +48,7 @@ namespace UnitTests.Grains
 
         public Task<string> DoSomething()
         {
-            logger.Info("DoSomething");
+            logger.LogInformation("DoSomething");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             return Task.FromResult(Data.ActivationId.ToString());
@@ -56,7 +56,7 @@ namespace UnitTests.Grains
 
         public Task DoDeactivate()
         {
-            logger.Info("DoDeactivate");
+            logger.LogInformation("DoDeactivate");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
@@ -80,7 +80,7 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Not doing Deactivate yet");
@@ -96,7 +96,7 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync()
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingDeactivate = true;
@@ -111,7 +111,7 @@ namespace UnitTests.Grains
 
         public Task<string> DoSomething()
         {
-            logger.Info("DoSomething");
+            logger.LogInformation("DoSomething");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             return Task.FromResult(Data.ActivationId.ToString());
@@ -119,7 +119,7 @@ namespace UnitTests.Grains
 
         public Task DoDeactivate()
         {
-            logger.Info("DoDeactivate");
+            logger.LogInformation("DoDeactivate");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
@@ -149,54 +149,54 @@ namespace UnitTests.Grains
             Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingActivate = true;
 
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             // Spawn Task to run on default .NET thread pool
             var task = Task.Factory.StartNew(() =>
             {
-                logger.Info("Started-OnActivateAsync-SubTask");
+                logger.LogInformation("Started-OnActivateAsync-SubTask");
                 Assert.True(TaskScheduler.Current == TaskScheduler.Default,
                     "Running under default .NET Task scheduler");
                 Assert.True(doingActivate, "Still doing Activate in Sub-Task");
-                logger.Info("Finished-OnActivateAsync-SubTask");
+                logger.LogInformation("Finished-OnActivateAsync-SubTask");
             }, CancellationToken.None, TaskCreationOptions.None, TaskScheduler.Default);
             await task;
 
-            logger.Info("Started-OnActivateAsync");
+            logger.LogInformation("Started-OnActivateAsync");
 
             await watcher.RecordActivateCall(Data.ActivationId.ToString());
             Assert.True(doingActivate, "Doing Activate");
 
-            logger.Info("OnActivateAsync-Sleep");
+            logger.LogInformation("OnActivateAsync-Sleep");
             Thread.Sleep(TimeSpan.FromSeconds(1));
             Assert.True(doingActivate, "Still doing Activate after Sleep");
 
-            logger.Info("Finished-OnActivateAsync");
+            logger.LogInformation("Finished-OnActivateAsync");
             doingActivate = false;
         }
 
         public override async Task OnDeactivateAsync()
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
 
             Assert.False(doingActivate, "Not doing Activate yet");
             Assert.False(doingDeactivate, "Not doing Deactivate yet");
             doingDeactivate = true;
 
-            logger.Info("Started-OnDeactivateAsync");
+            logger.LogInformation("Started-OnDeactivateAsync");
 
             await watcher.RecordDeactivateCall(Data.ActivationId.ToString());
             Assert.True(doingDeactivate, "Doing Deactivate");
 
-            logger.Info("OnDeactivateAsync-Sleep");
+            logger.LogInformation("OnDeactivateAsync-Sleep");
             Thread.Sleep(TimeSpan.FromSeconds(1));
-            logger.Info("Finished-OnDeactivateAsync");
+            logger.LogInformation("Finished-OnDeactivateAsync");
             doingDeactivate = false;
         }
 
         public Task<string> DoSomething()
         {
-            logger.Info("DoSomething");
+            logger.LogInformation("DoSomething");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             return Task.FromResult(Data.ActivationId.ToString());
@@ -204,7 +204,7 @@ namespace UnitTests.Grains
 
         public Task DoDeactivate()
         {
-            logger.Info("DoDeactivate");
+            logger.LogInformation("DoDeactivate");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
@@ -236,7 +236,7 @@ namespace UnitTests.Grains
                     {
                         Assert.NotNull(TaskScheduler.Current);
                         Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
-                        logger.Info("OnActivateAsync");
+                        logger.LogInformation("OnActivateAsync");
 
                         watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
 
@@ -251,16 +251,16 @@ namespace UnitTests.Grains
                 {
                     Assert.NotNull(TaskScheduler.Current);
                     Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
-                    logger.Info("Started-OnActivateAsync");
+                    logger.LogInformation("Started-OnActivateAsync");
 
                     Assert.True(doingActivate, "Doing Activate 1");
                     Assert.False(doingDeactivate, "Not doing Deactivate");
 
                     try
                     {
-                        logger.Info("Calling RecordActivateCall");
+                        logger.LogInformation("Calling RecordActivateCall");
                         await watcher.RecordActivateCall(Data.ActivationId.ToString());
-                        logger.Info("Returned from calling RecordActivateCall");
+                        logger.LogInformation("Returned from calling RecordActivateCall");
                     }
                     catch (Exception exc)
                     {
@@ -276,7 +276,7 @@ namespace UnitTests.Grains
 
                     doingActivate = false;
 
-                    logger.Info("Finished-OnActivateAsync");
+                    logger.LogInformation("Finished-OnActivateAsync");
                 };
             var awaitMe = startMe.ContinueWith(_ => asyncCont()).Unwrap();
             startMe.Start();
@@ -285,13 +285,13 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync()
         {
-            Task.Factory.StartNew(() => logger.Info("OnDeactivateAsync"));
+            Task.Factory.StartNew(() => logger.LogInformation("OnDeactivateAsync"));
 
             Assert.False(doingActivate, "Not doing Activate");
             Assert.False(doingDeactivate, "Not doing Deactivate");
             doingDeactivate = true;
 
-            logger.Info("Started-OnDeactivateAsync");
+            logger.LogInformation("Started-OnDeactivateAsync");
             return watcher.RecordDeactivateCall(Data.ActivationId.ToString())
                 .ContinueWith((Task t) =>
                 {
@@ -300,13 +300,13 @@ namespace UnitTests.Grains
                     Thread.Sleep(TimeSpan.FromSeconds(1));
                     doingDeactivate = false;
                 })
-                .ContinueWith((Task t) => logger.Info("Finished-OnDeactivateAsync"),
+                .ContinueWith((Task t) => logger.LogInformation("Finished-OnDeactivateAsync"),
                     TaskContinuationOptions.ExecuteSynchronously);
         }
 
         public Task<string> DoSomething()
         {
-            logger.Info("DoSomething");
+            logger.LogInformation("DoSomething");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             return Task.FromResult(Data.ActivationId.ToString());
@@ -314,7 +314,7 @@ namespace UnitTests.Grains
 
         public Task DoDeactivate()
         {
-            logger.Info("DoDeactivate");
+            logger.LogInformation("DoDeactivate");
             Assert.False(doingActivate, "Activate method should have finished");
             Assert.False(doingDeactivate, "Deactivate method should not be running yet");
             DeactivateOnIdle();
@@ -333,25 +333,25 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             throw new ApplicationException("Thrown from Application-OnActivateAsync");
         }
 
         public override Task OnDeactivateAsync()
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             throw new ApplicationException("Thrown from Application-OnDeactivateAsync");
         }
 
         public Task ThrowSomething()
         {
-            logger.Info("ThrowSomething");
+            logger.LogInformation("ThrowSomething");
             throw new InvalidOperationException("Exception should have been thrown from Activate");
         }
 
         public Task<long> GetKey()
         {
-            logger.Info("GetKey");
+            logger.LogInformation("GetKey");
             //return this.GetPrimaryKeyLong();
             throw new InvalidOperationException("Exception should have been thrown from Activate");
         }
@@ -391,20 +391,20 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             this.DeactivateOnIdle();
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync()
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
         public Task<string> DoSomething()
         {
-            logger.Info("DoSomething");
+            logger.LogInformation("DoSomething");
             throw new NotImplementedException("DoSomething should not have been called");
         }
     }
@@ -424,14 +424,14 @@ namespace UnitTests.Grains
         public override Task OnActivateAsync()
         {
             grain = GrainFactory.GetGrain<ITestGrain>(1);
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             grain = GrainFactory.GetGrain<ITestGrain>(1);
             return Task.CompletedTask;
         }
 
         public async Task<string> DoSomething()
         {
-            logger.Info("DoSomething");
+            logger.LogInformation("DoSomething");
             var guid = Guid.NewGuid();
             await grain.SetLabel(guid.ToString());
             var label = await grain.GetLabel();
@@ -445,7 +445,7 @@ namespace UnitTests.Grains
 
         public async Task ForwardCall(IBadActivateDeactivateTestGrain otherGrain)
         {
-            logger.Info("ForwardCall to " + otherGrain);
+            logger.LogInformation("ForwardCall to " + otherGrain);
             await otherGrain.ThrowSomething();
         }
     }

@@ -282,7 +282,7 @@ namespace Orleans.Runtime.Scheduler
             {
                 var stats = Utils.EnumerableToString(all.Select(i => i.Value).OrderBy(wg => wg.Name), wg => string.Format("--{0}", wg.DumpStatus()), Environment.NewLine);
                 if (stats.Length > 0)
-                    logger.Info(ErrorCode.SchedulerStatistics,
+                    logger.LogInformation((int)ErrorCode.SchedulerStatistics,
                         "OrleansTaskScheduler.PrintStatistics(): WorkItems={0}, Directory:" + Environment.NewLine + "{1}", all.Count, stats);
             }
 
@@ -301,7 +301,7 @@ namespace Orleans.Runtime.Scheduler
             foreach (var workgroup in all)
                 sb.AppendLine(workgroup.Value.DumpStatus());
             
-            logger.Info(ErrorCode.SchedulerStatus, sb.ToString());
+            logger.LogInformation((int)ErrorCode.SchedulerStatus, sb.ToString());
         }
     }
 }

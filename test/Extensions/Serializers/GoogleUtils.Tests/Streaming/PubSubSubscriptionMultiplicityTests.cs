@@ -7,6 +7,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
@@ -70,56 +71,56 @@ namespace GoogleUtils.Tests.Streaming
         [SkippableFact]
         public async Task GPS_MultipleParallelSubscriptionTest()
         {
-            logger.Info("************************ GPS_MultipleParallelSubscriptionTest *********************************");
+            logger.LogInformation("************************ GPS_MultipleParallelSubscriptionTest *********************************");
             await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), STREAM_NAMESPACE);
         }
 
         [SkippableFact]
         public async Task GPS_MultipleLinearSubscriptionTest()
         {
-            logger.Info("************************ GPS_MultipleLinearSubscriptionTest *********************************");
+            logger.LogInformation("************************ GPS_MultipleLinearSubscriptionTest *********************************");
             await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), STREAM_NAMESPACE);
         }
 
         [SkippableFact]
         public async Task GPS_MultipleSubscriptionTest_AddRemove()
         {
-            logger.Info("************************ GPS_MultipleSubscriptionTest_AddRemove *********************************");
+            logger.LogInformation("************************ GPS_MultipleSubscriptionTest_AddRemove *********************************");
             await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), STREAM_NAMESPACE);
         }
 
         [SkippableFact]
         public async Task GPS_ResubscriptionTest()
         {
-            logger.Info("************************ GPS_ResubscriptionTest *********************************");
+            logger.LogInformation("************************ GPS_ResubscriptionTest *********************************");
             await runner.ResubscriptionTest(Guid.NewGuid(), STREAM_NAMESPACE);
         }
 
         [SkippableFact]
         public async Task GPS_ResubscriptionAfterDeactivationTest()
         {
-            logger.Info("************************ ResubscriptionAfterDeactivationTest *********************************");
+            logger.LogInformation("************************ ResubscriptionAfterDeactivationTest *********************************");
             await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), STREAM_NAMESPACE);
         }
 
         [SkippableFact]
         public async Task GPS_ActiveSubscriptionTest()
         {
-            logger.Info("************************ GPS_ActiveSubscriptionTest *********************************");
+            logger.LogInformation("************************ GPS_ActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), STREAM_NAMESPACE);
         }
 
         [SkippableFact]
         public async Task GPS_TwoIntermitentStreamTest()
         {
-            logger.Info("************************ GPS_TwoIntermitentStreamTest *********************************");
+            logger.LogInformation("************************ GPS_TwoIntermitentStreamTest *********************************");
             await runner.TwoIntermitentStreamTest(Guid.NewGuid());
         }
 
         [SkippableFact]
         public async Task GPS_SubscribeFromClientTest()
         {
-            logger.Info("************************ GPS_SubscribeFromClientTest *********************************");
+            logger.LogInformation("************************ GPS_SubscribeFromClientTest *********************************");
             await runner.SubscribeFromClientTest(Guid.NewGuid(), STREAM_NAMESPACE);
         }
     }

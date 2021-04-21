@@ -88,21 +88,21 @@ namespace Orleans.Runtime
 
         public Task Ping(string message)
         {
-            logger.Info("Ping");
+            logger.LogInformation("Ping");
             return Task.CompletedTask;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
         public Task ForceGarbageCollection()
         {
-            logger.Info("ForceGarbageCollection");
+            logger.LogInformation("ForceGarbageCollection");
             GC.Collect();
             return Task.CompletedTask;
         }
 
         public Task ForceActivationCollection(TimeSpan ageLimit)
         {
-            logger.Info("ForceActivationCollection");
+            logger.LogInformation("ForceActivationCollection");
             return this.catalog.CollectActivations(ageLimit);
         }
 
@@ -130,7 +130,7 @@ namespace Orleans.Runtime
 
         public Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics()
         {
-            logger.Info("GetGrainStatistics");
+            logger.LogInformation("GetGrainStatistics");
             return Task.FromResult(this.catalog.GetGrainStatistics());
         }
 
@@ -142,14 +142,14 @@ namespace Orleans.Runtime
 
         public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
         {
-            logger.Info("GetSimpleGrainStatistics");
+            logger.LogInformation("GetSimpleGrainStatistics");
             return Task.FromResult( this.catalog.GetSimpleGrainStatistics().Select(p =>
                 new SimpleGrainStatistic { SiloAddress = this.localSiloDetails.SiloAddress, GrainType = p.Key, ActivationCount = (int)p.Value }).ToArray());
         }
 
         public Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId)
         {
-            logger.Info("DetailedGrainReport for grain id {0}", grainId);
+            logger.LogInformation("DetailedGrainReport for grain id {0}", grainId);
             return Task.FromResult( this.catalog.GetDetailedGrainReport(grainId));
         }
 

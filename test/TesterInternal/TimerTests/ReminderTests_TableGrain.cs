@@ -58,7 +58,7 @@ namespace UnitTests.TimerTests
         [Fact]
         public async Task Rem_Grain_MultipleReminders()
         {
-            //log.Info(TestContext.TestName);
+            //log.LogInformation(TestContext.TestName);
             IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             await PerGrainMultiReminderTest(grain);
         }

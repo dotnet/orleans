@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -64,10 +65,10 @@ namespace UnitTests.General
         {
             ISimpleGrain grain = this.fixture.GrainFactory.GetGrain<ISimpleGrain>(random.Next(), SimpleGrain.SimpleGrainNamePrefix);
 
-            this.fixture.Logger.Info("Acquired grain reference");
+            this.fixture.Logger.LogInformation("Acquired grain reference");
 
             await grain.SetA(1);
-            this.fixture.Logger.Info("First set succeeded");
+            this.fixture.Logger.LogInformation("First set succeeded");
 
             var latchPeriod = TimeSpan.FromSeconds(1);
             await this.HostedCluster.Client.GetTestHooks(this.HostedCluster.Primary).LatchIsOverloaded(true, latchPeriod);
@@ -78,13 +79,13 @@ namespace UnitTests.General
 
             await Task.Delay(latchPeriod.Multiply(1.1)); // wait for latch to reset
 
-            this.fixture.Logger.Info("Second set was shed");
+            this.fixture.Logger.LogInformation("Second set was shed");
 
             await this.HostedCluster.Client.GetTestHooks(this.HostedCluster.Primary).LatchIsOverloaded(false, latchPeriod);
 
             // Simple request after overload is cleared should succeed
             await grain.SetA(4);
-            this.fixture.Logger.Info("Third set succeeded");
+            this.fixture.Logger.LogInformation("Third set succeeded");
             await Task.Delay(latchPeriod.Multiply(1.1)); // wait for latch to reset
         }
     }

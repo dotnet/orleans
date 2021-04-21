@@ -651,7 +651,7 @@ namespace Orleans.Runtime
             var cts = new CancellationTokenSource(this.collectionOptions.Value.DeactivationTimeout);
             var mtcs = new MultiTaskCompletionSource(list.Count);
 
-            logger.Info(ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {0} to promptly Destroy.", list.Count);
+            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_1, "DeactivateActivationsFromCollector: total {0} to promptly Destroy.", list.Count);
             CounterStatistic.FindOrCreate(StatisticNames.CATALOG_ACTIVATION_SHUTDOWN_VIA_COLLECTION).IncrementBy(list.Count);
 
             for (var i = 0; i < list.Count; i++)
@@ -746,7 +746,7 @@ namespace Orleans.Runtime
                     alreadBeingDestroyed = true;
                 }
             }
-            logger.Info(ErrorCode.Catalog_ShutdownActivations_2,
+            logger.LogInformation((int)ErrorCode.Catalog_ShutdownActivations_2,
                 "DeactivateActivationOnIdle: {0} {1}.", data.ToString(), promptly ? "promptly" : (alreadBeingDestroyed ? "already being destroyed or invalid" : "later when become idle"));
 
             CounterStatistic.FindOrCreate(statisticName).Increment();
@@ -841,7 +841,7 @@ namespace Orleans.Runtime
 
         public Task DeactivateAllActivations()
         {
-            logger.Info(ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
+            logger.LogInformation((int)ErrorCode.Catalog_DeactivateAllActivations, "DeactivateAllActivations.");
             var activationsToShutdown = activations.Where(kv => !kv.Value.IsExemptFromCollection).Select(kv => kv.Value).ToList();
             return DeactivateActivations(activationsToShutdown);
         }
@@ -1135,7 +1135,7 @@ namespace Orleans.Runtime
                         }
                     }
                 }
-                logger.Info(ErrorCode.Catalog_SiloStatusChangeNotification,
+                logger.LogInformation((int)ErrorCode.Catalog_SiloStatusChangeNotification,
                     String.Format("Catalog is deactivating {0} activations due to a failure of silo {1}, since it is a primary directory partition to these grain ids.",
                         activationsToShutdown.Count, updatedSilo.ToStringWithHashCode()));
             }

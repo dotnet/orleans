@@ -20,7 +20,7 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync()
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             var streamProvider = this.GetStreamProvider("SMSProvider");
 
             var streamIdentity = this.GetImplicitStreamIdentity();
@@ -28,7 +28,7 @@ namespace UnitTests.Grains
             await stream.SubscribeAsync(
                 (e, t) =>
                 {
-                    logger.Info($"Received a {streamIdentity.Namespace} event {e}");
+                    logger.LogInformation($"Received a {streamIdentity.Namespace} event {e}");
                     ++counter;
                     return Task.CompletedTask;
                 });

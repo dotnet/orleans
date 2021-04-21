@@ -744,7 +744,7 @@ namespace Orleans.Runtime.MembershipService
             if (declareDead)
             {
                 // kick this silo off
-                log.Info(ErrorCode.MembershipMarkingAsDead, 
+                log.LogInformation((int)ErrorCode.MembershipMarkingAsDead, 
                     "-Going to mark silo {0} as DEAD in the table #1. I am the last voter: #freshVotes={1}, myVoteIndex = {2}, NumVotesForDeathDeclaration={3} , #activeSilos={4}, suspect list={5}",
                             entry.SiloAddress, 
                             freshVotes.Count, 
@@ -784,7 +784,7 @@ namespace Orleans.Runtime.MembershipService
                 var newEntry = new Tuple<SiloAddress, DateTime>(myAddress, now);
                 entry.SuspectTimes[indexToWrite] = newEntry;
             }
-            log.Info(ErrorCode.MembershipVotingForKill,
+            log.LogInformation((int)ErrorCode.MembershipVotingForKill,
                 "-Putting my vote to mark silo {0} as DEAD #2. Previous suspect list is {1}, trying to update to {2}, eTag={3}, freshVotes is {4}",
                 entry.SiloAddress, 
                 PrintSuspectList(prevList), 
@@ -834,11 +834,11 @@ namespace Orleans.Runtime.MembershipService
                     return true;
                 }
                 
-                log.Info(ErrorCode.MembershipMarkDeadWriteFailed, "-Failed to update {0} status to Dead in the Membership table, due to write conflicts. Will retry.", entry.SiloAddress);
+                log.LogInformation((int)ErrorCode.MembershipMarkDeadWriteFailed, "-Failed to update {0} status to Dead in the Membership table, due to write conflicts. Will retry.", entry.SiloAddress);
                 return false;
             }
             
-            log.Info(ErrorCode.MembershipCantWriteLivenessDisabled, "-Want to mark silo {0} as DEAD, but will ignore because Liveness is Disabled.", entry.SiloAddress);
+            log.LogInformation((int)ErrorCode.MembershipCantWriteLivenessDisabled, "-Want to mark silo {0} as DEAD, but will ignore because Liveness is Disabled.", entry.SiloAddress);
             return true;
         }
 

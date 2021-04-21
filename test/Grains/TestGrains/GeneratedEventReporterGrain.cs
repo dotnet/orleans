@@ -21,7 +21,7 @@ namespace TestGrains
 
         public override Task OnActivateAsync()
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
             return base.OnActivateAsync();
@@ -36,7 +36,7 @@ namespace TestGrains
                 counts = new Dictionary<Guid, int>();
                 reports[key] = counts;
             }
-            logger.Info("ReportResult. StreamProvider: {0}, StreamNamespace: {1}, StreamGuid: {2}, Count: {3}", streamProvider, streamNamespace, streamGuid, count);
+            logger.LogInformation("ReportResult. StreamProvider: {0}, StreamNamespace: {1}, StreamGuid: {2}, Count: {3}", streamProvider, streamNamespace, streamGuid, count);
             counts[streamGuid] = count;
             return Task.CompletedTask;
         }

@@ -155,7 +155,7 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
-                this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {siloAddress} is dropping message: {message}. Reason = {reason}", this.myAddress, msg, reason);
+                this.Log.LogInformation((int)ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {siloAddress} is dropping message: {message}. Reason = {reason}", this.myAddress, msg, reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }

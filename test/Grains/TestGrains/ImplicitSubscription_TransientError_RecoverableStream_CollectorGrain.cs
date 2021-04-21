@@ -81,7 +81,7 @@ namespace TestGrains
 
         public override async Task OnActivateAsync()
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
 
             Faults.onActivateFault.TryFire(InjectFault);
             await ReadStateAsync();
@@ -108,11 +108,11 @@ namespace TestGrains
             // ignore duplicates
             if (State.IsDuplicate(sequenceToken))
             {
-                logger.Info("Received duplicate event.  StreamGuid: {0}, SequenceToken: {1}", State.StreamGuid, sequenceToken);
+                logger.LogInformation("Received duplicate event.  StreamGuid: {0}, SequenceToken: {1}", State.StreamGuid, sequenceToken);
                 return;
             }
 
-            logger.Info("Received event.  StreamGuid: {0}, SequenceToken: {1}", State.StreamGuid, sequenceToken);
+            logger.LogInformation("Received event.  StreamGuid: {0}, SequenceToken: {1}", State.StreamGuid, sequenceToken);
 
             // We will only update the start token if this is the first event we're processed
             // In that case, we'll want to save the start token in case something goes wrong.
@@ -130,12 +130,12 @@ namespace TestGrains
                 Faults.on33rdMessageFault.TryFire(InjectFault);
                 // every 10 events, checkpoint our grain state
                 if (State.Accumulator%10 != 0) return;
-                logger.Info("Checkpointing: StreamGuid: {0}, StreamNamespace: {1}, SequenceToken: {2}, Accumulator: {3}.", State.StreamGuid, State.StreamNamespace, sequenceToken, State.Accumulator);
+                logger.LogInformation("Checkpointing: StreamGuid: {0}, StreamNamespace: {1}, SequenceToken: {2}, Accumulator: {3}.", State.StreamGuid, State.StreamNamespace, sequenceToken, State.Accumulator);
                 await WriteStateAsync();
                 return;
             }
             Faults.onLastMessageFault.TryFire(InjectFault);
-            logger.Info("Final checkpointing: StreamGuid: {0}, StreamNamespace: {1}, SequenceToken: {2}, Accumulator: {3}.", State.StreamGuid, State.StreamNamespace, sequenceToken, State.Accumulator);
+            logger.LogInformation("Final checkpointing: StreamGuid: {0}, StreamNamespace: {1}, SequenceToken: {2}, Accumulator: {3}.", State.StreamGuid, State.StreamNamespace, sequenceToken, State.Accumulator);
             await WriteStateAsync();
             var reporter = GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
             await reporter.ReportResult(this.GetPrimaryKey(), GeneratedStreamTestConstants.StreamProviderName, StreamNamespace, State.Accumulator);
@@ -143,13 +143,13 @@ namespace TestGrains
 
         private Task OnErrorAsync(Exception ex)
         {
-            logger.Info("Received an error on stream. StreamGuid: {0}, StreamNamespace: {1}, Exception: {2}.", State.StreamGuid, State.StreamNamespace, ex);
+            logger.LogInformation("Received an error on stream. StreamGuid: {0}, StreamNamespace: {1}, Exception: {2}.", State.StreamGuid, State.StreamNamespace, ex);
             return Task.CompletedTask;
         }
 
         private void InjectFault()
         {
-            logger.Info("InjectingFault: StreamGuid: {0}, StreamNamespace: {1}, SequenceToken: {2}, Accumulator: {3}.", State.StreamGuid, State.StreamNamespace, State.RecoveryToken, State.Accumulator);
+            logger.LogInformation("InjectingFault: StreamGuid: {0}, StreamNamespace: {1}, SequenceToken: {2}, Accumulator: {3}.", State.StreamGuid, State.StreamNamespace, State.RecoveryToken, State.Accumulator);
             DeactivateOnIdle(); // kill grain and reaload from checkpoint
             throw new ApplicationException("Injecting Fault");
         }

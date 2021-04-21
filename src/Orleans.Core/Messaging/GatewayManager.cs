@@ -314,7 +314,7 @@ namespace Orleans.Messaging
                 lastRefreshTime = now;
                 if (logger.IsEnabled(LogLevel.Information))
                 {
-                    logger.Info(ErrorCode.GatewayManager_FoundKnownGateways,
+                    logger.LogInformation((int)ErrorCode.GatewayManager_FoundKnownGateways,
                             "Refreshed the live gateway list. Found {0} gateways from gateway list provider: {1}. Picked only known live out of them. Now has {2} live gateways: {3}. Previous refresh time was = {4}",
                             knownGateways.Count,
                             Utils.EnumerableToString(knownGateways),

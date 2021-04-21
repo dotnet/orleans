@@ -385,7 +385,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (msg == null) return;
 
-                    this.log.Info(ErrorCode.GatewayTryingToSendToUnrecognizedClient, "Trying to send a message {0} to an unrecognized client {1}", msg.ToString(), msg.TargetGrain);
+                    this.log.LogInformation((int)ErrorCode.GatewayTryingToSendToUnrecognizedClient, "Trying to send a message {0} to an unrecognized client {1}", msg.ToString(), msg.TargetGrain);
                     MessagingStatisticsGroup.OnFailedSentMessage(msg);
                     // Message for unrecognized client -- reject it
                     if (msg.Direction == Message.Directions.Request)

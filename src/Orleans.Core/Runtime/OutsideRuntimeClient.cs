@@ -139,12 +139,12 @@ namespace Orleans
                 this.localAddress = this.clientMessagingOptions.LocalAddress ?? ConfigUtilities.GetLocalIPAddress(this.clientMessagingOptions.PreferredFamily, this.clientMessagingOptions.NetworkInterfaceName);
 
                 // Client init / sign-on message
-                logger.Info(ErrorCode.ClientInitializing, string.Format(
+                logger.LogInformation((int)ErrorCode.ClientInitializing, string.Format(
                     "{0} Initializing OutsideRuntimeClient on {1} at {2} Client Id = {3} {0}",
                     BARS, Dns.GetHostName(), localAddress,  clientId));
                 string startMsg = string.Format("{0} Starting OutsideRuntimeClient with runtime Version='{1}' in AppDomain={2}",
                     BARS, RuntimeVersion.Current, PrintAppDomainDetails());
-                logger.Info(ErrorCode.ClientStarting, startMsg);
+                logger.LogInformation((int)ErrorCode.ClientStarting, startMsg);
 
                 if (TestOnlyThrowExceptionDuringInit)
                 {
@@ -173,7 +173,7 @@ namespace Orleans
             // This helps to avoid any issues (such as deadlocks) caused by executing with the client's synchronization context/scheduler.
             await Task.Run(() => this.StartInternal(retryFilter)).ConfigureAwait(false);
 
-            logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client ID: " + clientId);
+            logger.LogInformation((int)ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client ID: " + clientId);
         }
         
         // used for testing to (carefully!) allow two clients in the same process
@@ -359,7 +359,7 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.Reset(): client Id " + clientId);
+                    logger.LogInformation("OutsideRuntimeClient.Reset(): client Id " + clientId);
                 }
             }, this.logger);
 
@@ -391,7 +391,7 @@ namespace Orleans
             {
                 if (logger != null)
                 {
-                    logger.Info("OutsideRuntimeClient.ConstructorReset(): client Id " + clientId);
+                    logger.LogInformation("OutsideRuntimeClient.ConstructorReset(): client Id " + clientId);
                 }
             });
             

@@ -405,7 +405,7 @@ namespace Orleans.Streams
 
         private void Log(ErrorCode logCode, string format, params object[] args)
         {
-            logger.Info(logCode, format, args);
+            logger.LogInformation((int) logCode, format, args);
         }
     }
 }

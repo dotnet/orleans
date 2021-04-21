@@ -42,7 +42,7 @@ namespace Orleans.Clustering.DynamoDB
             this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
                   this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
 
-            logger.Info(ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
+            logger.LogInformation((int)ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
             await storage.InitializeTable(this.options.TableName,
                 new List<KeySchemaElement>
                 {
@@ -62,7 +62,7 @@ namespace Orleans.Clustering.DynamoDB
             {
                 // ignore return value, since we don't care if I inserted it or not, as long as it is in there.
                 bool created = await TryCreateTableVersionEntryAsync();
-                if(created) logger.Info("Created new table version row.");
+                if(created) logger.LogInformation("Created new table version row.");
             }
         }
 

@@ -85,7 +85,7 @@ namespace Orleans.Runtime.Membership
                     await zk.createAsync(this.clusterPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                     await zk.sync(this.clusterPath);
                     //if we got here we know that we've just created the deployment path with version=0
-                    this.logger.Info("Created new deployment path: " + this.clusterPath);
+                    this.logger.LogInformation("Created new deployment path: " + this.clusterPath);
                 }
                 catch (KeeperException.NodeExistsException)
                 {

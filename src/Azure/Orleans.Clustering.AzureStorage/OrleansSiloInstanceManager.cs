@@ -75,20 +75,20 @@ namespace Orleans.AzureUtils
         public void RegisterSiloInstance(SiloInstanceTableEntry entry)
         {
             entry.Status = INSTANCE_STATUS_CREATED;
-            logger.Info(ErrorCode.Runtime_Error_100270, "Registering silo instance: {0}", entry.ToString());
+            logger.LogInformation((int)ErrorCode.Runtime_Error_100270, "Registering silo instance: {0}", entry.ToString());
             Task.WaitAll(new Task[] { storage.UpsertTableEntryAsync(entry) });
         }
 
         public Task<string> UnregisterSiloInstance(SiloInstanceTableEntry entry)
         {
             entry.Status = INSTANCE_STATUS_DEAD;
-            logger.Info(ErrorCode.Runtime_Error_100271, "Unregistering silo instance: {0}", entry.ToString());
+            logger.LogInformation((int)ErrorCode.Runtime_Error_100271, "Unregistering silo instance: {0}", entry.ToString());
             return storage.UpsertTableEntryAsync(entry);
         }
 
         public Task<string> ActivateSiloInstance(SiloInstanceTableEntry entry)
         {
-            logger.Info(ErrorCode.Runtime_Error_100272, "Activating silo instance: {0}", entry.ToString());
+            logger.LogInformation((int)ErrorCode.Runtime_Error_100272, "Activating silo instance: {0}", entry.ToString());
             entry.Status = INSTANCE_STATUS_ACTIVE;
             return storage.UpsertTableEntryAsync(entry);
         }
@@ -129,7 +129,7 @@ namespace Orleans.AzureUtils
 
                 var gatewaySiloInstances = queryResults.Select(entity => ConvertToGatewayUri(entity.Item1)).ToList();
 
-                logger.Info(ErrorCode.Runtime_Error_100278, "Found {0} active Gateway Silos for deployment {1}.", gatewaySiloInstances.Count, this.DeploymentId);
+                logger.LogInformation((int)ErrorCode.Runtime_Error_100278, "Found {0} active Gateway Silos for deployment {1}.", gatewaySiloInstances.Count, this.DeploymentId);
                 return gatewaySiloInstances;
             }catch(Exception exc)
             {

@@ -634,7 +634,7 @@ namespace Orleans.Serialization
                     var source = (byte[])original;
                     if (source.Length > this.LargeObjectSizeThreshold)
                     {
-                        logger.Info(ErrorCode.Ser_LargeObjectAllocated,
+                        logger.LogInformation((int)ErrorCode.Ser_LargeObjectAllocated,
                             "Large byte array of size {0} is being copied. This will result in an allocation on the large object heap. " +
                             "Frequent allocations to the large object heap can result in frequent gen2 garbage collections and poor system performance. " +
                             "Please consider using Immutable<byte[]> instead.", source.Length);
@@ -650,7 +650,7 @@ namespace Orleans.Serialization
                     // Only check the size for primitive types because otherwise Buffer.ByteLength throws
                     if (et.IsPrimitive && Buffer.ByteLength(originalArray) > this.LargeObjectSizeThreshold)
                     {
-                        logger.Info(ErrorCode.Ser_LargeObjectAllocated,
+                        logger.LogInformation((int)ErrorCode.Ser_LargeObjectAllocated,
                             $"Large {t.OrleansTypeName()} array of total byte size {Buffer.ByteLength(originalArray)} is being copied. This will result in an allocation on the large object heap. " +
                             "Frequent allocations to the large object heap can result in frequent gen2 garbage collections and poor system performance. " +
                             $"Please consider using Immutable<{t.OrleansTypeName()}> instead.");

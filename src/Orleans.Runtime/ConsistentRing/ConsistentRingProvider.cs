@@ -104,7 +104,7 @@ namespace Orleans.Runtime.ConsistentRing
                     NotifyLocalRangeSubscribers(oldRange, myRange, false);
                 }
 
-                log.Info("Added Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
+                log.LogInformation("Added Server {0}. Current view: {1}", silo.ToStringWithHashCode(), this.ToString());
             }
         }
 
@@ -163,7 +163,7 @@ namespace Orleans.Runtime.ConsistentRing
                         NotifyLocalRangeSubscribers(oldRange, myRange, true);
                     }
                 }
-                log.Info("Removed Server {0} hash {1}. Current view {2}", silo, silo.GetConsistentHashCode(), this.ToString());
+                log.LogInformation("Removed Server {0} hash {1}. Current view {2}", silo, silo.GetConsistentHashCode(), this.ToString());
             }
         }
 
@@ -188,7 +188,7 @@ namespace Orleans.Runtime.ConsistentRing
 
         private void NotifyLocalRangeSubscribers(IRingRange old, IRingRange now, bool increased)
         {
-            log.Info("-NotifyLocalRangeSubscribers about old {0} new {1} increased? {2}", old, now, increased);
+            log.LogInformation("-NotifyLocalRangeSubscribers about old {0} new {1} increased? {2}", old, now, increased);
             IRingRangeListener[] copy;
             lock (statusListeners)
             {

@@ -39,13 +39,13 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync()
         {
-            logger.Info("OnActivateAsync");
+            logger.LogInformation("OnActivateAsync");
             return Task.CompletedTask;
         }
 
         public async Task<StreamSubscriptionHandle<int>> BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
         {
-            logger.Info("BecomeConsumer");
+            logger.LogInformation("BecomeConsumer");
 
             // new counter for this subscription
             var count = new Counter();
@@ -71,7 +71,7 @@ namespace UnitTests.Grains
 
         public async Task<StreamSubscriptionHandle<int>> Resume(StreamSubscriptionHandle<int> handle)
         {
-            logger.Info("Resume");
+            logger.LogInformation("Resume");
             if(handle == null)
                 throw new ArgumentNullException("handle");
 
@@ -99,7 +99,7 @@ namespace UnitTests.Grains
 
         public async Task StopConsuming(StreamSubscriptionHandle<int> handle)
         {
-            logger.Info("StopConsuming");
+            logger.LogInformation("StopConsuming");
             // unsubscribe
             await handle.UnsubscribeAsync();
 
@@ -109,7 +109,7 @@ namespace UnitTests.Grains
 
         public Task<IList<StreamSubscriptionHandle<int>>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse)
         {
-            logger.Info("GetAllSubscriptionHandles");
+            logger.LogInformation("GetAllSubscriptionHandles");
 
             // get stream
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
@@ -121,7 +121,7 @@ namespace UnitTests.Grains
 
         public Task<Dictionary<StreamSubscriptionHandle<int>, Tuple<int,int>>> GetNumberConsumed()
         {
-            logger.Info(String.Format("ConsumedMessageCounts = \n{0}", 
+            logger.LogInformation(String.Format("ConsumedMessageCounts = \n{0}", 
                 Utils.EnumerableToString(consumedMessageCounts, kvp => String.Format("Consumer: {0} -> count: {1}", kvp.Key.HandleId.ToString(), kvp.Value.ToString()))));
 
             return Task.FromResult(consumedMessageCounts.ToDictionary(kvp => kvp.Key, kvp => Tuple.Create(kvp.Value.Item1.Value, kvp.Value.Item2.Value)));
@@ -129,7 +129,7 @@ namespace UnitTests.Grains
 
         public Task ClearNumberConsumed()
         {
-            logger.Info("ClearNumberConsumed");
+            logger.LogInformation("ClearNumberConsumed");
             foreach (var counters in consumedMessageCounts.Values)
             {
                 counters.Item1.Clear();
@@ -146,7 +146,7 @@ namespace UnitTests.Grains
 
         public override Task OnDeactivateAsync()
         {
-            logger.Info("OnDeactivateAsync");
+            logger.LogInformation("OnDeactivateAsync");
             return Task.CompletedTask;
         }
 
@@ -154,7 +154,7 @@ namespace UnitTests.Grains
         {
             foreach(SequentialItem<int> item in items)
             {
-                logger.Info("Got next event {0} on handle {1}", item.Item, countCapture);
+                logger.LogInformation("Got next event {0} on handle {1}", item.Item, countCapture);
                 var contextValue = RequestContext.Get(SampleStreaming_ProducerGrain.RequestContextKey) as string;
                 if (!String.Equals(contextValue, SampleStreaming_ProducerGrain.RequestContextValue))
                 {
@@ -167,7 +167,7 @@ namespace UnitTests.Grains
 
         private Task OnError(Exception e, int countCapture, Counter error)
         {
-            logger.Info("Got exception {0} on handle {1}", e.ToString(), countCapture);
+            logger.LogInformation("Got exception {0} on handle {1}", e.ToString(), countCapture);
             error.Increment();
             return Task.CompletedTask;
         }
