@@ -148,7 +148,7 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.MembershipBase, string.Format("Unable to delete membership records on table {0} for clusterId {1}: Exception={2}",
+                this.logger.LogError((int)ErrorCode.MembershipBase, string.Format("Unable to delete membership records on table {0} for clusterId {1}: Exception={2}",
                     this.options.TableName, clusterId, exc));
                 throw;
             }
@@ -411,9 +411,8 @@ namespace Orleans.Clustering.DynamoDB
                         }
                         catch (Exception exc)
                         {
-                            this.logger.Error(ErrorCode.MembershipBase,
-                                $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {tableEntry}. Ignoring this entry.",
-                                exc);
+                            this.logger.LogError((int)ErrorCode.MembershipBase,
+                                exc, $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {tableEntry}. Ignoring this entry.");
                         }
                     }
                 }
@@ -422,8 +421,7 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.MembershipBase,
-                    $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Utils.EnumerableToString(entries, e => e.ToString())}.", exc);
+                this.logger.LogError((int)ErrorCode.MembershipBase, exc, $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Utils.EnumerableToString(entries, e => e.ToString())}.");
                 throw;
             }
         }
@@ -558,7 +556,7 @@ namespace Orleans.Clustering.DynamoDB
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.MembershipBase, $"Unable to clean up defunct membership records on table {this.options.TableName} for clusterId {this.clusterId}", exc);
+                this.logger.LogError((int)ErrorCode.MembershipBase, exc, $"Unable to clean up defunct membership records on table {this.options.TableName} for clusterId {this.clusterId}");
                 throw;
             }
         }

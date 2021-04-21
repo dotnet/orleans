@@ -94,7 +94,7 @@ namespace Orleans.Runtime
                         }
                         catch (Exception exc)
                         {
-                            this.Log.Error(ErrorCode.Runtime_Error_100027, "Unable to restart AsynchAgent", exc);
+                            this.Log.LogError((int)ErrorCode.Runtime_Error_100027, exc, "Unable to restart AsynchAgent");
                             this.State = AgentState.Stopped;
                         }
                     }
@@ -183,7 +183,7 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc)
                 {
-                    Log.Error(ErrorCode.Runtime_Error_100027, "Unable to restart AsynchAgent", exc);
+                    Log.LogError((int)ErrorCode.Runtime_Error_100027, exc, "Unable to restart AsynchAgent");
                     State = AgentState.Stopped;
                 }
             }
@@ -197,10 +197,10 @@ namespace Orleans.Runtime
             switch (OnFault)
             {
                 case FaultBehavior.IgnoreFault:
-                    Log.Error(ErrorCode.Runtime_Error_100025, $"{logMessagePrefix} The executor will exit.", exc);
+                    Log.LogError((int)ErrorCode.Runtime_Error_100025, exc, $"{logMessagePrefix} The executor will exit.");
                     break;
                 case FaultBehavior.RestartOnFault:
-                    Log.Error(ErrorCode.Runtime_Error_100026, $"{logMessagePrefix} The Stage will be restarted.", exc);
+                    Log.LogError((int)ErrorCode.Runtime_Error_100026, exc, $"{logMessagePrefix} The Stage will be restarted.");
                     break;
                 default:
                     throw new NotImplementedException();

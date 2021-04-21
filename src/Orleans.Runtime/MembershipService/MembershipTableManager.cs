@@ -356,7 +356,7 @@ namespace Orleans.Runtime.MembershipService
                 else
                 {
                     errorString = $"-Silo {myAddress} failed to update its status to {status} in the Membership table due to write contention on the table after {numCalls} attempts.";
-                    log.Error(ErrorCode.MembershipFailedToWriteConditional, errorString);
+                    log.LogError((int)ErrorCode.MembershipFailedToWriteConditional, errorString);
                     throw new OrleansException(errorString);
                 }
             }
@@ -365,7 +365,7 @@ namespace Orleans.Runtime.MembershipService
                 if (errorString == null)
                 {
                     errorString = $"-Silo {this.myAddress} failed to update its status to {status} in the table due to failures (socket failures or table read/write failures) after {numCalls} attempts: {exc.Message}";
-                    log.Error(ErrorCode.MembershipFailedToWrite, errorString);
+                    log.LogError((int)ErrorCode.MembershipFailedToWrite, errorString);
                     throw new OrleansException(errorString, exc);
                 }
 
@@ -572,7 +572,7 @@ namespace Orleans.Runtime.MembershipService
         private void KillMyselfLocally(string reason)
         {
             var msg = "I have been told I am dead, so this silo will stop! " + reason;
-            log.Error(ErrorCode.MembershipKillMyselfLocally, msg);
+            log.LogError((int)ErrorCode.MembershipKillMyselfLocally, msg);
             this.CurrentStatus = SiloStatus.Dead;
             this.fatalErrorHandler.OnFatalException(this, msg, null);
         }
@@ -688,7 +688,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 // this should not happen ...
                 var str = string.Format("-Could not find silo entry for silo {0} in the table.", silo);
-                log.Error(ErrorCode.MembershipFailedToReadSilo, str);
+                log.LogError((int)ErrorCode.MembershipFailedToReadSilo, str);
                 throw new KeyNotFoundException(str);
             }
 
@@ -719,7 +719,7 @@ namespace Orleans.Runtime.MembershipService
                 // this should not happen ...
                 var str = string.Format("-Silo {0} is suspected by {1} which is more or equal than {2}, but is not marked as dead. This is a bug!!!",
                     entry.SiloAddress, freshVotes.Count.ToString(), this.clusterMembershipOptions.NumVotesForDeathDeclaration.ToString());
-                log.Error(ErrorCode.Runtime_Error_100053, str);
+                log.LogError((int)ErrorCode.Runtime_Error_100053, str);
                 KillMyselfLocally("Found a bug! Will stop.");
                 return false;
             }

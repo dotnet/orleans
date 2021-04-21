@@ -267,9 +267,8 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 else
                 {
-                    logger.Error((int)Utilities.ErrorCode.AzureTable_12,
-                        $"Unexpected issue reading Azure storage table {tableName}: Exception Type={exc.GetType().FullName} Message='{exc.Message}'",
-                                 exc);
+                    logger.LogError((int)Utilities.ErrorCode.AzureTable_12,
+                                 exc, $"Unexpected issue reading Azure storage table {tableName}: Exception Type={exc.GetType().FullName} Message='{exc.Message}'");
                     isLastErrorRetriable = false;
                 }
             }

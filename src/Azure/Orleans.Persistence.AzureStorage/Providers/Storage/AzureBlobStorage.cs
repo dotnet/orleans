@@ -102,9 +102,8 @@ namespace Orleans.Storage
             }
             catch (Exception ex)
             {
-                logger.Error((int)AzureProviderErrorCode.AzureBlobProvider_ReadError,
-                    string.Format("Error reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message),
-                    ex);
+                logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_ReadError,
+                    ex, string.Format("Error reading: GrainType={0} Grainid={1} ETag={2} from BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message));
 
                 throw;
             }
@@ -134,9 +133,8 @@ namespace Orleans.Storage
             }
             catch (Exception ex)
             {
-                logger.Error((int)AzureProviderErrorCode.AzureBlobProvider_WriteError,
-                    string.Format("Error writing: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message),
-                    ex);
+                logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_WriteError,
+                    ex, string.Format("Error writing: GrainType={0} Grainid={1} ETag={2} to BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message));
 
                 throw;
             }
@@ -167,9 +165,8 @@ namespace Orleans.Storage
             }
             catch (Exception ex)
             {
-                logger.Error((int)AzureProviderErrorCode.AzureBlobProvider_ClearError,
-                  string.Format("Error clearing: GrainType={0} Grainid={1} ETag={2} BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message),
-                  ex);
+                logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_ClearError,
+                  ex, string.Format("Error clearing: GrainType={0} Grainid={1} ETag={2} BlobName={3} in Container={4} Exception={5}", grainType, grainId, grainState.ETag, blobName, container.Name, ex.Message));
 
                 throw;
             }
@@ -237,7 +234,7 @@ namespace Orleans.Storage
             catch (Exception ex)
             {
                 stopWatch.Stop();
-                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, ex, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.");
                 throw;
             }
         }

@@ -75,7 +75,7 @@ namespace Orleans.Runtime.ReminderService
             {
                 var error =
                     $"Failed to parse ReminderTableEntry: {tableEntry}. This entry is corrupt, going to ignore it.";
-                this.logger.Error((int)AzureReminderErrorCode.AzureTable_49, error, exc);
+                this.logger.LogError((int)AzureReminderErrorCode.AzureTable_49, exc, error);
                 throw;
             }
             finally

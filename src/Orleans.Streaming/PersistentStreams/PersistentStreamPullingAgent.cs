@@ -108,7 +108,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.PersistentStreamPullingAgent_02, "Exception while calling IQueueAdapter.CreateNewReceiver.", exc);
+                logger.LogError((int)ErrorCode.PersistentStreamPullingAgent_02, exc, "Exception while calling IQueueAdapter.CreateNewReceiver.");
                 throw;
             }
 
@@ -121,7 +121,7 @@ namespace Orleans.Streams
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.PersistentStreamPullingAgent_23, "Exception while calling IQueueAdapterCache.CreateQueueCache.", exc);
+                logger.LogError((int)ErrorCode.PersistentStreamPullingAgent_23, exc, "Exception while calling IQueueAdapterCache.CreateQueueCache.");
                 throw;
             }
 
@@ -374,7 +374,7 @@ namespace Orleans.Streams
             catch (Exception exc)
             {
                 receiverInitTask = null;
-                logger.Error(ErrorCode.PersistentStreamPullingAgent_12, $"Giving up reading from queue {queueId} after retry attempts {ReadLoopRetryMax}", exc);
+                logger.LogError((int)ErrorCode.PersistentStreamPullingAgent_12, exc, $"Giving up reading from queue {queueId} after retry attempts {ReadLoopRetryMax}");
             }
         }
 
@@ -581,7 +581,7 @@ namespace Orleans.Streams
                         consumerData.Cursor?.RecordDeliveryFailure();
                         var message =
                             $"Exception while trying to deliver msgs to stream {consumerData.StreamId} in PersistentStreamPullingAgentGrain.RunConsumerCursor";
-                        logger.Error(ErrorCode.PersistentStreamPullingAgent_14, message, exc);
+                        logger.LogError((int)ErrorCode.PersistentStreamPullingAgent_14, exc, message);
                         exceptionOccured = exc is ClientNotAvailableException
                             ? exc
                             : new StreamEventDeliveryFailureException(consumerData.StreamId);
@@ -598,7 +598,7 @@ namespace Orleans.Streams
             catch (Exception exc)
             {
                 // RunConsumerCursor is fired with .Ignore so we should log if anything goes wrong, because there is no one to catch the exception
-                logger.Error(ErrorCode.PersistentStreamPullingAgent_15, "Ignored RunConsumerCursor Error", exc);
+                logger.LogError((int)ErrorCode.PersistentStreamPullingAgent_15, exc, "Ignored RunConsumerCursor Error");
                 consumerData.State = StreamConsumerDataState.Inactive;
                 throw;
             }
@@ -761,7 +761,7 @@ namespace Orleans.Streams
             }
             catch (Exception e)
             {
-                logger.Error(ErrorCode.PersistentStreamPullingAgent_17, $"RegisterAsStreamProducer failed due to {e}", e);
+                logger.LogError((int)ErrorCode.PersistentStreamPullingAgent_17, e, $"RegisterAsStreamProducer failed due to {e}");
                 throw;
             }
         }
@@ -795,7 +795,7 @@ namespace Orleans.Streams
             catch (Exception exc)
             {
                 // RegisterAsStreamProducer is fired with .Ignore so we should log if anything goes wrong, because there is no one to catch the exception
-                logger.Error(ErrorCode.PersistentStreamPullingAgent_17, "Ignored RegisterAsStreamProducer Error", exc);
+                logger.LogError((int)ErrorCode.PersistentStreamPullingAgent_17, exc, "Ignored RegisterAsStreamProducer Error");
                 throw;
             }
         }

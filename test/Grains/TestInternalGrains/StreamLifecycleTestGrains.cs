@@ -337,7 +337,7 @@ namespace UnitTests.Grains
             }
             catch (Exception exc)
             {
-                logger.Error(0, "Error from SendItem " + item, exc);
+                logger.LogError(0, exc, "Error from SendItem " + item);
                 State.NumErrors++;
                 error = exc;
             }

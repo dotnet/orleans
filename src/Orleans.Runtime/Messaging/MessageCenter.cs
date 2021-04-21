@@ -106,7 +106,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exc)
             {
-                log.Error(ErrorCode.Runtime_Error_100110, "Stop failed.", exc);
+                log.LogError((int)ErrorCode.Runtime_Error_100110, exc, "Stop failed.");
             }
         }
 
@@ -119,7 +119,7 @@ namespace Orleans.Runtime.Messaging
             {
                 Gateway.Stop();
             }
-            catch (Exception exc) { log.Error(ErrorCode.Runtime_Error_100109, "Stop failed.", exc); }
+            catch (Exception exc) { log.LogError((int)ErrorCode.Runtime_Error_100109, exc, "Stop failed."); }
             Gateway = null;
         }
 

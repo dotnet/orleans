@@ -96,7 +96,7 @@ namespace Orleans.Runtime.ReminderService
             catch (Exception ex)
             {
                 string errorMsg = $"Exception trying to create or connect to the Azure table: {ex.Message}";
-                singleton.Logger.Error((int)AzureReminderErrorCode.AzureTable_39, errorMsg, ex);
+                singleton.Logger.LogError((int)AzureReminderErrorCode.AzureTable_39, ex, errorMsg);
                 throw new OrleansException(errorMsg, ex);
             }
             return singleton;

@@ -265,7 +265,7 @@ namespace UnitTests.Grains
                     catch (Exception exc)
                     {
                         var msg = "RecordActivateCall failed with error " + exc;
-                        logger.Error(0, msg);
+                        logger.LogError(0, msg);
                         Assert.True(false, msg);
                     }
 

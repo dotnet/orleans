@@ -97,9 +97,8 @@ namespace Orleans.Runtime.ConsistentRing
                     }
                     catch (OverflowException exc)
                     {
-                        log.Error(ErrorCode.ConsistentRingProviderBase + 5,
-                            String.Format("OverflowException: hash as int= x{0, 8:X8}, hash as uint= x{1, 8:X8}, myKey as int x{2, 8:X8}, myKey as uint x{3, 8:X8}.",
-                            hash, (uint)hash, myKey, (uint)myKey), exc);
+                        log.LogError((int)ErrorCode.ConsistentRingProviderBase + 5, exc, String.Format("OverflowException: hash as int= x{0, 8:X8}, hash as uint= x{1, 8:X8}, myKey as int x{2, 8:X8}, myKey as uint x{3, 8:X8}.",
+                            hash, (uint)hash, myKey, (uint)myKey));
                     }
                     NotifyLocalRangeSubscribers(oldRange, myRange, false);
                 }
@@ -202,9 +201,8 @@ namespace Orleans.Runtime.ConsistentRing
                 }
                 catch (Exception exc)
                 {
-                    log.Error(ErrorCode.CRP_Local_Subscriber_Exception,
-                        String.Format("Local IRangeChangeListener {0} has thrown an exception when was notified about RangeChangeNotification about old {1} new {2} increased? {3}",
-                        listener.GetType().FullName, old, now, increased), exc);
+                    log.LogError((int)ErrorCode.CRP_Local_Subscriber_Exception, exc, String.Format("Local IRangeChangeListener {0} has thrown an exception when was notified about RangeChangeNotification about old {1} new {2} increased? {3}",
+                        listener.GetType().FullName, old, now, increased));
                 }
             }
         }

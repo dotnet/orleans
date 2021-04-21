@@ -230,7 +230,7 @@ namespace Orleans.Streams
                 }
                 catch (Exception exc)
                 {
-                    logger.Error(ErrorCode.PersistentStreamPullingManager_07, "Exception while creating PersistentStreamPullingAgent.", exc);
+                    logger.LogError((int)ErrorCode.PersistentStreamPullingManager_07, exc, "Exception while creating PersistentStreamPullingAgent.");
                     // What should we do? This error is not recoverable and considered a bug. But we don't want to bring the silo down.
                     // If this is when silo is starting and agent is initializing, fail the silo startup. Otherwise, just swallow to limit impact on other receivers.
                     if (failOnInit) throw;

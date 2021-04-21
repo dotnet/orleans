@@ -51,7 +51,7 @@ namespace UnitTestGrains
 
             // make sure we run in the right activation context.
             if(!Equals(context, RuntimeContext.CurrentGrainContext))
-                logger.Error((int)ErrorCode.Runtime_Error_100146, "grain not running in the right activation context");
+                logger.LogError((int)ErrorCode.Runtime_Error_100146, "grain not running in the right activation context");
 
             string name = (string)data;
             IDisposable timer;
@@ -64,7 +64,7 @@ namespace UnitTestGrains
                 timer = allTimers[(string)data];
             }
             if(timer == null)
-                logger.Error((int)ErrorCode.Runtime_Error_100146, "Timer is null");
+                logger.LogError((int)ErrorCode.Runtime_Error_100146, "Timer is null");
             if (timer != null && counter > 10000)
             {
                 // do not let orphan timers ticking for long periods

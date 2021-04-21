@@ -55,7 +55,7 @@ namespace Orleans.AzureUtils
             catch (Exception ex)
             {
                 string errorMsg = string.Format("Exception trying to create or connect to the Azure table: {0}", ex.Message);
-                instance.logger.Error((int)TableStorageErrorCode.AzureTable_33, errorMsg, ex);
+                instance.logger.LogError((int)TableStorageErrorCode.AzureTable_33, ex, errorMsg);
                 throw new OrleansException(errorMsg, ex);
             }
             return instance;
@@ -133,7 +133,7 @@ namespace Orleans.AzureUtils
                 return gatewaySiloInstances;
             }catch(Exception exc)
             {
-                logger.Error(ErrorCode.Runtime_Error_100331, string.Format("Error searching for active gateway silos for deployment {0} ", this.DeploymentId), exc);
+                logger.LogError((int)ErrorCode.Runtime_Error_100331, exc, string.Format("Error searching for active gateway silos for deployment {0} ", this.DeploymentId));
                 throw;
             }
         }

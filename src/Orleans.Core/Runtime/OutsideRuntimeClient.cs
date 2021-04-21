@@ -159,7 +159,7 @@ namespace Orleans
             }
             catch (Exception exc)
             {
-                if (logger != null) logger.Error(ErrorCode.Runtime_Error_100319, "OutsideRuntimeClient constructor failed.", exc);
+                if (logger != null) logger.LogError((int)ErrorCode.Runtime_Error_100319, exc, "OutsideRuntimeClient constructor failed.");
                 ConstructorReset();
                 throw;
             }
@@ -231,7 +231,7 @@ namespace Orleans
                         break;
                     }
                 default:
-                    logger.Error(ErrorCode.Runtime_Error_100327, $"Message not supported: {message}.");
+                    logger.LogError((int)ErrorCode.Runtime_Error_100327, $"Message not supported: {message}.");
                     break;
             }
         }
@@ -489,7 +489,7 @@ namespace Orleans
             }
             catch (Exception ex)
             {
-                this.logger.Error(ErrorCode.ClientError, "Error when sending cluster disconnection notification", ex);
+                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending cluster disconnection notification");
             }
         }
 
@@ -502,7 +502,7 @@ namespace Orleans
             }
             catch (Exception ex)
             {
-                this.logger.Error(ErrorCode.ClientError, "Error when sending gateway count changed notification", ex);
+                this.logger.LogError((int)ErrorCode.ClientError, ex, "Error when sending gateway count changed notification");
             }
         }
 

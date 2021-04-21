@@ -254,7 +254,7 @@ namespace Orleans.Runtime.Scheduler
         private void ThrowNoWorkItemGroup(IGrainContext context)
         {
             var error = $"QueueWorkItem was called on a non-null context {context} but there is no valid WorkItemGroup for it.";
-            logger.Error(ErrorCode.SchedulerQueueWorkItemWrongContext, error);
+            logger.LogError((int)ErrorCode.SchedulerQueueWorkItemWrongContext, error);
             throw new InvalidSchedulingContextException(error);
         }
 

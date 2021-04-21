@@ -90,7 +90,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Could not initialize connection to storage table {tableName}", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, $"Could not initialize connection to storage table {tableName}");
                 throw;
             }
         }
@@ -186,7 +186,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Could not create table {tableName}", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, $"Could not create table {tableName}");
                 throw;
             }
         }
@@ -204,7 +204,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Could not delete table {tableName}", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, $"Could not delete table {tableName}");
                 throw;
             }
         }
@@ -234,7 +234,7 @@ namespace Orleans.Transactions.DynamoDB
             }
             catch (Exception exc)
             {
-                Logger.Error(ErrorCode.StorageProviderBase, $"Unable to create item to table '{tableName}'", exc);
+                Logger.LogError((int)ErrorCode.StorageProviderBase, exc, $"Unable to create item to table '{tableName}'");
                 throw;
             }
         }

@@ -79,9 +79,8 @@ namespace Orleans.Runtime
             }
             catch (InvalidSchedulingContextException exc)
             {
-                logger.Error(ErrorCode.Timer_InvalidContext,
-                    string.Format("Caught an InvalidSchedulingContextException on timer {0}, context is {1}. Going to dispose this timer!",
-                        GetFullName(), context), exc);
+                logger.LogError((int)ErrorCode.Timer_InvalidContext, exc, string.Format("Caught an InvalidSchedulingContextException on timer {0}, context is {1}. Going to dispose this timer!",
+                    GetFullName(), context));
                 DisposeTimer();
             }
         }
@@ -107,13 +106,12 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Error( 
-                    ErrorCode.Timer_GrainTimerCallbackError,
-                    string.Format( "Caught and ignored exception: {0} with message: {1} thrown from timer callback {2}",
+                logger.LogError( 
+                    (int)ErrorCode.Timer_GrainTimerCallbackError,
+                    exc, string.Format( "Caught and ignored exception: {0} with message: {1} thrown from timer callback {2}",
                         exc.GetType(),
                         exc.Message,
-                        GetFullName()),
-                    exc);       
+                        GetFullName()));       
             }
             finally
             {

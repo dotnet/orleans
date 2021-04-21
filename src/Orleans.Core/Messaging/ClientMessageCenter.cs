@@ -153,7 +153,7 @@ namespace Orleans.Messaging
         {
             if (!Running)
             {
-                this.logger.Error(ErrorCode.ProxyClient_MsgCtrNotRunning, $"Ignoring {msg} because the Client message center is not running");
+                this.logger.LogError((int)ErrorCode.ProxyClient_MsgCtrNotRunning, $"Ignoring {msg} because the Client message center is not running");
                 return;
             }
 

@@ -110,7 +110,7 @@ namespace UnitTests.StorageTests
             }
             catch (Exception exc)
             {
-                logger.Error(0, "Unexpected error during Close", exc);
+                logger.LogError(0, exc, "Unexpected error during Close");
                 throw;
             }
         }

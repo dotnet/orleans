@@ -826,7 +826,7 @@ namespace UnitTests.Grains
                 var errorMsg = "Found out that this grain is already in the middle of execution."
                                + " Single threaded-ness violation!\n" +
                                TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
-                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                this.logger.LogError(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 throw new Exception(errorMsg);
                 //Environment.Exit(1);
             }
@@ -834,7 +834,7 @@ namespace UnitTests.Grains
             if (RuntimeContext.CurrentGrainContext == null)
             {
                 var errorMsg = "Found RuntimeContext.Current == null.\n" + TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
-                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                this.logger.LogError(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 throw new Exception(errorMsg);
                 //Environment.Exit(1);
             }
@@ -990,7 +990,7 @@ namespace UnitTests.Grains
                     this._id,
                     TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment(),
                     callStack);
-                this.logger.Error(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
+                this.logger.LogError(1, "\n\n\n\n" + errorMsg + "\n\n\n\n");
                 this.scheduler.DumpSchedulerStatus();
                 //Environment.Exit(1);
                 throw new Exception(errorMsg);

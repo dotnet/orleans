@@ -905,8 +905,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Catalog_ErrorCallingActivate,
-                    string.Format("Error calling grain's OnActivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
+                logger.LogError((int)ErrorCode.Catalog_ErrorCallingActivate, exc, string.Format("Error calling grain's OnActivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName));
 
                 activationsFailedToActivate.Increment();
 
@@ -949,13 +948,12 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc)
                 {
-                    logger.Error(ErrorCode.Catalog_ErrorCallingDeactivate,
-                        string.Format("Error calling grain's OnDeactivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName), exc);
+                    logger.LogError((int)ErrorCode.Catalog_ErrorCallingDeactivate, exc, string.Format("Error calling grain's OnDeactivateAsync() method - Grain type = {1} Activation = {0}", activation, grainTypeName));
                 }
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception, String.Format("CallGrainDeactivateAndCleanupStreams Activation = {0} failed.", activation), exc);
+                logger.LogError((int)ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception, exc, String.Format("CallGrainDeactivateAndCleanupStreams Activation = {0} failed.", activation));
             }
             return activation;
         }
@@ -1129,8 +1127,7 @@ namespace Orleans.Runtime
                         }
                         catch (Exception exc)
                         {
-                            logger.Error(ErrorCode.Catalog_SiloStatusChangeNotification_Exception,
-                                String.Format("Catalog has thrown an exception while executing OnSiloStatusChange of silo {0}.", updatedSilo.ToStringWithHashCode()), exc);
+                            logger.LogError((int)ErrorCode.Catalog_SiloStatusChangeNotification_Exception, exc, String.Format("Catalog has thrown an exception while executing OnSiloStatusChange of silo {0}.", updatedSilo.ToStringWithHashCode()));
                         }
                     }
                 }

@@ -111,8 +111,7 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                logger.Error((int)AzureProviderErrorCode.AzureTableProvider_WriteError,
-                    $"Error Writing: GrainType={grainType} GrainId={grainReference.GrainId} ETag={grainState.ETag} to Table={this.options.TableName} Exception={exc.Message}", exc);
+                logger.LogError((int)AzureProviderErrorCode.AzureTableProvider_WriteError, exc, $"Error Writing: GrainType={grainType} GrainId={grainReference.GrainId} ETag={grainState.ETag} to Table={this.options.TableName} Exception={exc.Message}");
                 throw;
             }
         }
@@ -151,8 +150,8 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                logger.Error((int)AzureProviderErrorCode.AzureTableProvider_DeleteError, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
-                    operation, grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
+                logger.LogError((int)AzureProviderErrorCode.AzureTableProvider_DeleteError, exc, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
+                    operation, grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message));
                 throw;
             }
         }
@@ -228,7 +227,7 @@ namespace Orleans.Storage
             if (dataSize > maxDataSize)
             {
                 var msg = string.Format("Data too large to write to Azure table. Size={0} MaxSize={1}", dataSize, maxDataSize);
-                logger.Error(0, msg);
+                logger.LogError(0, msg);
                 throw new ArgumentOutOfRangeException("GrainState.Size", msg);
             }
         }
@@ -377,7 +376,7 @@ namespace Orleans.Storage
                     sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
                 }
 
-                logger.Error(0, sb.ToString(), exc);
+                logger.LogError(0, exc, sb.ToString());
                 throw new AggregateException(sb.ToString(), exc);
             }
 
@@ -490,7 +489,7 @@ namespace Orleans.Storage
             catch (Exception ex)
             {
                 stopWatch.Stop();
-                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
+                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, ex, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.");
                 throw;
             }
         }

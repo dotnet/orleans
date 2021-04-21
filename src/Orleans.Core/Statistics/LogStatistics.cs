@@ -43,7 +43,7 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 var e = exc.GetBaseException();
-                this.logger.Error(ErrorCode.Runtime_Error_100101, "Exception occurred during LogStatistics reporter.", e);
+                this.logger.LogError((int)ErrorCode.Runtime_Error_100101, e, "Exception occurred during LogStatistics reporter.");
             }
 
             return Task.CompletedTask;

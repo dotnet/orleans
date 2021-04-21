@@ -31,7 +31,7 @@ namespace Orleans.Runtime.Counters
                 catch (Exception ex)
                 {
                     numWriteErrors++;
-                    logger.Error(ErrorCode.PerfCounterUnableToWrite, $"Unable to write to counter '{counter.Name}'", ex);
+                    logger.LogError((int)ErrorCode.PerfCounterUnableToWrite, ex, $"Unable to write to counter '{counter.Name}'");
                 }
             }
             return numWriteErrors;

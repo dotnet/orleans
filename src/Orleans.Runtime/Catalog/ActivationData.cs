@@ -371,7 +371,7 @@ namespace Orleans.Runtime
                     var deactivatingTime = DateTime.UtcNow - deactivationStartTime;
                     if (deactivatingTime > maxRequestProcessingTime)
                     {
-                        logger.Error(ErrorCode.Dispatcher_StuckActivation,
+                        logger.LogError((int)ErrorCode.Dispatcher_StuckActivation,
                             $"Current activation {ToDetailedString()} marked as Deactivating for {deactivatingTime}. Trying to enqueue {message}.");
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }
@@ -381,7 +381,7 @@ namespace Orleans.Runtime
                     var currentRequestActiveTime = DateTime.UtcNow - currentRequestStartTime;
                     if (currentRequestActiveTime > maxRequestProcessingTime)
                     {
-                        logger.Error(ErrorCode.Dispatcher_StuckActivation,
+                        logger.LogError((int)ErrorCode.Dispatcher_StuckActivation,
                             $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {this.Blocking}. Trying to enqueue {message}.");
                         return EnqueueMessageResult.ErrorStuckActivation;
                     }

@@ -106,12 +106,12 @@ namespace Orleans.GrainDirectory.AzureStorage
             catch (TimeoutException te)
             {
                 var errorMsg = $"Unable to create or connect to the Azure table in {this.StoragePolicyOptions.CreationTimeout}";
-                this.Logger.Error((int)Utilities.ErrorCode.AzureTable_TableNotCreated, errorMsg, te);
+                this.Logger.LogError((int)Utilities.ErrorCode.AzureTable_TableNotCreated, te, errorMsg);
                 throw new OrleansException(errorMsg, te);
             }
             catch (Exception exc)
             {
-                Logger.Error((int)Utilities.ErrorCode.AzureTable_02, $"Could not initialize connection to storage table {TableName}", exc);
+                Logger.LogError((int)Utilities.ErrorCode.AzureTable_02, exc, $"Could not initialize connection to storage table {TableName}");
                 throw;
             }
             finally
@@ -143,7 +143,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
             catch (Exception exc)
             {
-                Logger.Error((int)Utilities.ErrorCode.AzureTable_04, "Could not delete storage table {0}", exc);
+                Logger.LogError((int)Utilities.ErrorCode.AzureTable_04, exc, "Could not delete storage table {0}");
                 throw;
             }
             finally
@@ -735,7 +735,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
             catch (Exception exc)
             {
-                Logger.Error((int)Utilities.ErrorCode.AzureTable_17, "Error creating CloudTableOperationsClient.", exc);
+                Logger.LogError((int)Utilities.ErrorCode.AzureTable_17, exc, "Error creating CloudTableOperationsClient.");
                 throw;
             }
         }
@@ -753,7 +753,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
             catch (Exception exc)
             {
-                Logger.Error((int)Utilities.ErrorCode.AzureTable_18, "Error creating CloudTableCreationClient.", exc);
+                Logger.LogError((int)Utilities.ErrorCode.AzureTable_18, exc, "Error creating CloudTableCreationClient.");
                 throw;
             }
         }
@@ -812,7 +812,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
             catch (Exception exc)
             {
-                Logger.Error((int)Utilities.ErrorCode.AzureTable_19, $"Unable to retrieve table keys for resource {options.TableResourceId}", exc);
+                Logger.LogError((int)Utilities.ErrorCode.AzureTable_19, exc, $"Unable to retrieve table keys for resource {options.TableResourceId}");
                 throw;
             }
             finally
@@ -833,8 +833,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
             else
             {
-                Logger.Error((int)Utilities.ErrorCode.AzureTable_14,
-                    $"Azure table access write error {operation} to table {TableName} entry {data1}", exc);
+                Logger.LogError((int)Utilities.ErrorCode.AzureTable_14, exc, $"Azure table access write error {operation} to table {TableName} entry {data1}");
             }
         }
 

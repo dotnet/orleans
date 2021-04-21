@@ -69,7 +69,7 @@ namespace UnitTests.Grains
                 string excStr = String.Format("ConsumerObserver.OnNextAsync: received an item from the wrong stream." + 
                         " Got item {0} from stream = {1}, expecting stream = {2}, numConsumed={3}", 
                         item, item.StreamId, _streamId, _itemsConsumed);
-                _logger.Error(0, excStr);
+                _logger.LogError(0, excStr);
                 throw new ArgumentException(excStr);
             }
             ++_itemsConsumed;
@@ -374,7 +374,7 @@ namespace UnitTests.Grains
                     }
                     catch (Exception exc)
                     {
-                        _logger.Error(1, "StopBeingProducer: Timer Dispose() has thrown", exc);
+                        _logger.LogError(1, exc, "StopBeingProducer: Timer Dispose() has thrown");
                     }
                 }
                 _timers = null;

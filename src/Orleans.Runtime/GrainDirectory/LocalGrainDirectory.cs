@@ -280,8 +280,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
                 catch (Exception exc)
                 {
-                    log.Error(ErrorCode.Directory_SiloStatusChangeNotification_Exception,
-                        String.Format("CatalogSiloStatusListener.SiloStatusChangeNotification has thrown an exception when notified about removed silo {0}.", silo.ToStringWithHashCode()), exc);
+                    log.LogError((int)ErrorCode.Directory_SiloStatusChangeNotification_Exception, exc, String.Format("CatalogSiloStatusListener.SiloStatusChangeNotification has thrown an exception when notified about removed silo {0}.", silo.ToStringWithHashCode()));
                 }
 
                 var existing = this.directoryMembership;

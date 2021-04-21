@@ -83,7 +83,7 @@ namespace Orleans.Runtime.Counters
 
                 if (numErrors > ERROR_THRESHOLD)
                 {
-                    logger.Error(ErrorCode.PerfCounterWriteTooManyErrors,
+                    logger.LogError((int)ErrorCode.PerfCounterWriteTooManyErrors,
                                 "Too many errors writing Windows perf counters -- disconnecting counters");
                     shouldWritePerfCounters = false;
                 }

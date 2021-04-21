@@ -1732,7 +1732,7 @@ namespace Orleans.Serialization
                     }
                     catch (Exception exception)
                     {
-                        logger.Error(ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, "Failed to create instance of type: " + type.FullName, exception);
+                        logger.LogError((int)ErrorCode.SerMgr_ErrorLoadingAssemblyTypes, exception, "Failed to create instance of type: " + type.FullName);
                     }
                 });
 

@@ -184,8 +184,7 @@ namespace Orleans.Runtime.MembershipService
                         }
                         catch (Exception exc)
                         {
-                            logger.Error((int)TableStorageErrorCode.AzureTable_61,
-                                $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {tableEntry}. Ignoring this entry.", exc);
+                            logger.LogError((int)TableStorageErrorCode.AzureTable_61, exc, $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {tableEntry}. Ignoring this entry.");
                         }
                     }
                 }
@@ -194,8 +193,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                logger.Error((int)TableStorageErrorCode.AzureTable_60,
-                    $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Utils.EnumerableToString(entries, tuple => tuple.Item1.ToString())}.", exc);
+                logger.LogError((int)TableStorageErrorCode.AzureTable_60, exc, $"Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Utils.EnumerableToString(entries, tuple => tuple.Item1.ToString())}.");
                 throw;
             }
         }

@@ -132,7 +132,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 // this should not happen ...
                 var error = string.Format("This silo {0} status {1} is not in its own local silo list! This is a bug!", self.SiloAddress.ToLongString(), self.Status);
-                log.Error(ErrorCode.Runtime_Error_100305, error);
+                log.LogError((int)ErrorCode.Runtime_Error_100305, error);
                 throw new OrleansMissingMembershipEntryException(error);
             }
 

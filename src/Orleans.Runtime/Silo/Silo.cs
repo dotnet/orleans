@@ -143,7 +143,7 @@ namespace Orleans.Runtime
             }
             catch (InvalidOperationException exc)
             {
-                logger.Error(ErrorCode.SiloStartError, "Exception during Silo.Start, GrainFactory was not registered in Dependency Injection container", exc);
+                logger.LogError((int)ErrorCode.SiloStartError, exc, "Exception during Silo.Start, GrainFactory was not registered in Dependency Injection container");
                 throw;
             }
 
@@ -216,7 +216,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.SiloStartError, "Exception during Silo.Start", exc);
+                logger.LogError((int)ErrorCode.SiloStartError, exc, "Exception during Silo.Start");
                 throw;
             }
         }
@@ -356,7 +356,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                this.SafeExecute(() => this.logger.Error(ErrorCode.Runtime_Error_100330, String.Format("Error starting silo {0}. Going to FastKill().", this.SiloAddress), exc));
+                this.SafeExecute(() => this.logger.LogError((int)ErrorCode.Runtime_Error_100330, exc, String.Format("Error starting silo {0}. Going to FastKill().", this.SiloAddress)));
                 throw;
             }
             if (logger.IsEnabled(LogLevel.Debug)) { logger.LogDebug("Silo.Start complete: System status = {0}", this.SystemStatus); }

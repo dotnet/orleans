@@ -156,7 +156,7 @@ namespace Orleans.Runtime
 
             if(freezeCheck)
             {
-                logger.Error(errorCode, errMsg);
+                logger.LogError((int)errorCode, errMsg);
             }else
             {
                 logger.LogWarning((int)errorCode, errMsg);
@@ -292,8 +292,7 @@ namespace Orleans.Runtime
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.TimerQueueTickError,
-                    string.Format("Error queueing next timer tick - WARNING: timer {0} is now stopped", GetFullName()), exc);
+                logger.LogError((int)ErrorCode.TimerQueueTickError, exc, "Error queueing next timer tick - WARNING: timer {0} is now stopped", GetFullName());
             }
         }
     }

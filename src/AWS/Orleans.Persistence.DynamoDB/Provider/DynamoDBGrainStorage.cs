@@ -107,7 +107,7 @@ namespace Orleans.Storage
             catch (Exception exc)
             {
                 stopWatch.Stop();
-                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", exc);
+                this.logger.LogError((int)ErrorCode.Provider_ErrorFromInit, exc, $"Initialization failed for provider {this.name} of type {this.GetType().Name} in stage {this.options.InitStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.");
                 throw;
             }
         }
@@ -179,9 +179,8 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.StorageProviderBase,
-                    string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
-                    grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
+                this.logger.LogError((int)ErrorCode.StorageProviderBase, exc, string.Format("Error Writing: GrainType={0} Grainid={1} ETag={2} to Table={3} Exception={4}",
+                    grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message));
                 throw;
             }
         }
@@ -287,8 +286,8 @@ namespace Orleans.Storage
             }
             catch (Exception exc)
             {
-                this.logger.Error(ErrorCode.StorageProviderBase, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
-                    operation, grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message), exc);
+                this.logger.LogError((int)ErrorCode.StorageProviderBase, exc, string.Format("Error {0}: GrainType={1} Grainid={2} ETag={3} from Table={4} Exception={5}",
+                    operation, grainType, grainReference, grainState.ETag, this.options.TableName, exc.Message));
                 throw;
             }
         }
@@ -344,7 +343,7 @@ namespace Orleans.Storage
                     sb.AppendFormat("Data Value={0} Type={1}", dataValue, dataValue.GetType());
                 }
 
-                this.logger.Error(0, sb.ToString(), exc);
+                this.logger.LogError(0, exc, sb.ToString());
                 throw new AggregateException(sb.ToString(), exc);
             }
 

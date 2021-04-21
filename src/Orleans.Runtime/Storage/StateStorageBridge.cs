@@ -70,7 +70,7 @@ namespace Orleans.Core
                 StorageStatisticsGroup.OnStorageReadError(name, grainRef);
 
                 string errMsg = MakeErrorMsg(what, exc);
-                this.logger.Error((int)ErrorCode.StorageProvider_ReadFailed, errMsg, exc);
+                this.logger.LogError((int)ErrorCode.StorageProvider_ReadFailed, exc, errMsg);
                 if (!(exc is OrleansException))
                 {
                     throw new OrleansException(errMsg, exc);
@@ -102,7 +102,7 @@ namespace Orleans.Core
             {
                 StorageStatisticsGroup.OnStorageWriteError(name, grainRef);
                 string errMsgToLog = MakeErrorMsg(what, exc);
-                this.logger.Error((int)ErrorCode.StorageProvider_WriteFailed, errMsgToLog, exc);
+                this.logger.LogError((int)ErrorCode.StorageProvider_WriteFailed, exc, errMsgToLog);
                 // If error is not specialization of OrleansException, wrap it
                 if (!(exc is OrleansException))
                 {
@@ -138,7 +138,7 @@ namespace Orleans.Core
                 StorageStatisticsGroup.OnStorageDeleteError(name, grainRef);
 
                 string errMsg = MakeErrorMsg(what, exc);
-                this.logger.Error((int)ErrorCode.StorageProvider_DeleteFailed, errMsg, exc);
+                this.logger.LogError((int)ErrorCode.StorageProvider_DeleteFailed, exc, errMsg);
                 if (!(exc is OrleansException))
                 {
                     throw new OrleansException(errMsg, exc);

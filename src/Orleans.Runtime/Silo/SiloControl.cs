@@ -164,7 +164,7 @@ namespace Orleans.Runtime
             if(!this.controllables.TryGetValue(Tuple.Create(providerTypeFullName, providerName), out controllable))
             {
                 string error = $"Could not find a controllable service for type {providerTypeFullName} and name {providerName}.";
-                logger.Error(ErrorCode.Provider_ProviderNotFound, error);
+                logger.LogError((int)ErrorCode.Provider_ProviderNotFound, error);
                 throw new ArgumentException(error);
             }
 

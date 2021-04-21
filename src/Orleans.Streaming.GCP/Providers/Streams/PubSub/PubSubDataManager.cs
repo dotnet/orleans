@@ -186,7 +186,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             var errMsg = String.Format(
                 "Error doing {0} for Google Project {1} at PubSub Topic {2} " + Environment.NewLine
                 + "Exception = {3}", operation, TopicName.ProjectId, TopicName.TopicId, exc);
-            _logger.Error((int)errorCode, errMsg, exc);
+            _logger.LogError((int)errorCode, exc, errMsg);
             throw new AggregateException(errMsg, exc);
         }
     }

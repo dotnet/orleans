@@ -334,7 +334,7 @@ namespace Orleans.AzureUtils
             var errMsg = String.Format(
                 "Error doing {0} for Azure storage queue {1} " + Environment.NewLine
                 + "Exception = {2}", operation, QueueName, exc);
-            logger.Error((int)errorCode, errMsg, exc);
+            logger.LogError((int)errorCode, exc, errMsg);
             throw new AggregateException(errMsg, exc);
         }
 
@@ -360,7 +360,7 @@ namespace Orleans.AzureUtils
             }
             catch (Exception exc)
             {
-                logger.Error((int)AzureQueueErrorCode.AzureQueue_14, String.Format("Error creating GetCloudQueueOperationsClient."), exc);
+                logger.LogError((int)AzureQueueErrorCode.AzureQueue_14, exc, String.Format("Error creating GetCloudQueueOperationsClient."));
                 throw;
             }
         }

@@ -283,7 +283,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                this.log.Error(ErrorCode.MembershipFailedToJoin, "Error updating status to Joining", exc);
+                this.log.LogError((int)ErrorCode.MembershipFailedToJoin, exc, "Error updating status to Joining");
                 throw;
             }
         }
@@ -297,7 +297,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                this.log.Error(ErrorCode.MembershipFailedToShutdown, "Error updating status to ShuttingDown", exc);
+                this.log.LogError((int)ErrorCode.MembershipFailedToShutdown, exc, "Error updating status to ShuttingDown");
                 throw;
             }
         }
@@ -311,7 +311,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (Exception exc)
             {
-                log.Error(ErrorCode.MembershipFailedToStop, "Error updating status to Stopping", exc);
+                log.LogError((int)ErrorCode.MembershipFailedToStop, exc, "Error updating status to Stopping");
                 throw;
             }
         }

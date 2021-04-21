@@ -103,7 +103,7 @@ namespace Orleans.Runtime.ReminderService
             }
 
             var msg = string.Format("Could not register reminder {0} to reminder table due to a race. Please try again later.", entry);
-            logger.Error(ErrorCode.RS_Register_TableError, msg);
+            logger.LogError((int)ErrorCode.RS_Register_TableError, msg);
             throw new ReminderException(msg);
         }
 
@@ -145,7 +145,7 @@ namespace Orleans.Runtime.ReminderService
             else
             {
                 var msg = string.Format("Could not unregister reminder {0} from the reminder table, due to tag mismatch. You can retry.", reminder);
-                logger.Error(ErrorCode.RS_Unregister_TableError, msg);
+                logger.LogError((int)ErrorCode.RS_Unregister_TableError, msg);
                 throw new ReminderException(msg);
             }
         }
@@ -270,8 +270,7 @@ namespace Orleans.Runtime.ReminderService
                 else
                 {
                     const string baseErrorMsg = "ReminderService failed initial load of reminders and cannot guarantee that the service will be eventually start without manual intervention or restarting the silo.";
-                    var logErrorMessage = string.Format(baseErrorMsg + " Attempt #{0}", this.initialReadCallCount);
-                    logger.Error(ErrorCode.RS_ServiceInitialLoadFailed, logErrorMessage, ex);
+                    logger.LogError((int)ErrorCode.RS_ServiceInitialLoadFailed, ex, baseErrorMsg + " Attempt #{0}", this.initialReadCallCount);
                     startedTask.TrySetException(new OrleansException(baseErrorMsg, ex));
                 }
             }
@@ -378,7 +377,7 @@ namespace Orleans.Runtime.ReminderService
             }
             catch (Exception exc)
             {
-                logger.Error(ErrorCode.RS_FailedToReadTableAndStartTimer, "Failed to read rows from table.", exc);
+                logger.LogError((int)ErrorCode.RS_FailedToReadTableAndStartTimer, exc, "Failed to read rows from table.");
                 throw;
             }
         }
@@ -623,10 +622,9 @@ namespace Orleans.Runtime.ReminderService
                 catch (Exception exc)
                 {
                     var after = DateTime.UtcNow;
-                    logger.Error(
-                        ErrorCode.RS_Tick_Delivery_Error,
-                        string.Format("Could not deliver reminder tick for {0}, next {1}.",  this.ToString(), after + this.period),
-                            exc);
+                    logger.LogError(
+                        (int)ErrorCode.RS_Tick_Delivery_Error,
+                            exc, string.Format("Could not deliver reminder tick for {0}, next {1}.",  this.ToString(), after + this.period));
                     // What to do with repeated failures to deliver a reminder's ticks?
                 }
             }

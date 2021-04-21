@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using Orleans;
@@ -50,8 +50,7 @@ namespace BenchmarkGrains.GrainStorage
             } catch(Exception ex)
             {
                 sw.Stop();
-                object[] args = { this.GetPrimaryKey(), sw.ElapsedMilliseconds };
-                this.logger.LogError(ex, "Grain {GrainId} failed to set state in {WriteTimeMs}ms to set state.", args);
+                this.logger.LogError(ex, "Grain {GrainId} failed to set state in {WriteTimeMs}ms to set state.", this.GetPrimaryKey(), sw.ElapsedMilliseconds);
                 success = false;
             }
 
