@@ -146,7 +146,7 @@ namespace Orleans.Runtime.ConsistentRing
                 bool wasMyPred = ((myNewIndex == indexOfFailedSilo) || (myNewIndex == 0 && indexOfFailedSilo == membershipRingList.Count)); // no need for '- 1'
                 if (wasMyPred) // failed node was our predecessor
                 {
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("Failed server was my pred? {0}, updated view {1}", wasMyPred, this.ToString());
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Failed server was my pred? {0}, updated view {1}", wasMyPred, this.ToString());
 
                     IRingRange oldRange = myRange;
                     if (membershipRingList.Count == 1) // i'm the only one left

@@ -114,7 +114,7 @@ namespace Orleans.AzureUtils
 
         public async Task<IList<Uri>> FindAllGatewayProxyEndpoints()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0}.", this.DeploymentId);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.Runtime_Error_100277, "Searching for active gateway silos for deployment {0}.", this.DeploymentId);
             const string zeroPort = "0";
 
             try

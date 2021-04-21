@@ -86,7 +86,7 @@ namespace Orleans.Runtime.Scheduler
         public void StopApplicationTurns()
         {
 #if DEBUG
-            logger.Debug("StopApplicationTurns");
+            logger.LogDebug("StopApplicationTurns");
 #endif
             // Do not RunDown the application run queue, since it is still used by low priority system targets.
 

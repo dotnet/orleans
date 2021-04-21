@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Scheduler
 #if EXTRA_STATS
             turnsExecutedStatistic = CounterStatistic.FindOrCreate(name + ".TasksExecuted");
 #endif
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Created {0} with GrainContext={1}", this, workerGroup.GrainContext);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Created {0} with GrainContext={1}", this, workerGroup.GrainContext);
         }
 
         /// <summary>Gets an enumerable of the tasks currently scheduled on this scheduler.</summary>

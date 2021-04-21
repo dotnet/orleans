@@ -145,7 +145,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         public async Task Cleanup()
         {
-            if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("Cleanup() called");
+            if(logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Cleanup() called");
 
             myExtension.RemoveStream(stream.InternalStreamId);
 

@@ -229,7 +229,7 @@ namespace Orleans.Clustering.DynamoDB
         {
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("InsertRow entry = {0}", entry.ToFullString());
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("InsertRow entry = {0}", entry.ToFullString());
                 var tableEntry = Convert(entry, tableVersion);
 
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
@@ -297,7 +297,7 @@ namespace Orleans.Clustering.DynamoDB
         {
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("UpdateRow entry = {0}, etag = {1}", entry.ToFullString(), etag);
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpdateRow entry = {0}, etag = {1}", entry.ToFullString(), etag);
                 var siloEntry = Convert(entry, tableVersion);
                 if (!int.TryParse(etag, out var currentEtag))
                 {
@@ -375,7 +375,7 @@ namespace Orleans.Clustering.DynamoDB
         {
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Merge entry = {0}", entry.ToFullString());
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Merge entry = {0}", entry.ToFullString());
                 var siloEntry = ConvertPartial(entry);
                 var fields = new Dictionary<string, AttributeValue> { { SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(siloEntry.IAmAliveTime) } };
                 var expression = $"attribute_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";

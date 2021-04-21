@@ -159,7 +159,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("ReadRow grainRef = {0} reminderName = {1}", grainRef, reminderName);
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("ReadRow grainRef = {0} reminderName = {1}", grainRef, reminderName);
                 var result = await this.remTableManager.FindReminderEntry(grainRef, reminderName);
                 return result == null ? null : ConvertFromTableEntry(result.Item1, result.Item2);
             }
@@ -175,7 +175,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("UpsertRow entry = {0}", entry.ToString());
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("UpsertRow entry = {0}", entry.ToString());
                 ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.remTableManager.ServiceId, this.remTableManager.ClusterId);
 
                 string result = await this.remTableManager.UpsertRow(remTableEntry);

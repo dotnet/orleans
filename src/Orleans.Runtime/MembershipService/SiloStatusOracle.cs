@@ -39,7 +39,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (this.CurrentStatus == SiloStatus.Active && this.log.IsEnabled(LogLevel.Debug))
                 {
-                    this.log.Debug(ErrorCode.Runtime_Error_100209, "-The given siloAddress {0} is not registered in this MembershipOracle.", silo);
+                    this.log.LogDebug((int)ErrorCode.Runtime_Error_100209, "-The given siloAddress {0} is not registered in this MembershipOracle.", silo);
                 }
             }
 

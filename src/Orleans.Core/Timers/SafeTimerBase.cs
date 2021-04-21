@@ -71,7 +71,7 @@ namespace Orleans.Runtime
             this.dueTime = due;
             totalNumTicks = 0;
             this.logger = logger;
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.TimerChanging, "Creating timer {0} with dueTime={1} period={2}", GetFullName(), due, period);
 
             timer = NonCapturingTimer.Create(HandleTimerCallback, state, Constants.INFINITE_TIMESPAN, Constants.INFINITE_TIMESPAN);
         }
@@ -101,7 +101,7 @@ namespace Orleans.Runtime
                 {
                     var t = timer;
                     timer = null;
-                    if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerDisposing, "Disposing timer {0}", GetFullName());
+                    if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.TimerDisposing, "Disposing timer {0}", GetFullName());
                     t.Dispose();
 
                 }
@@ -179,7 +179,7 @@ namespace Orleans.Runtime
 
             timerFrequency = period;
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.TimerChanging, "Changing timer {0} to dueTime={1} period={2}", GetFullName(), newDueTime, period);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)ErrorCode.TimerChanging, "Changing timer {0} to dueTime={1} period={2}", GetFullName(), newDueTime, period);
 
             try
             {

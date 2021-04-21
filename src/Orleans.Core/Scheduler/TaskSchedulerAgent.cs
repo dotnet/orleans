@@ -66,7 +66,7 @@ namespace Orleans.Runtime
 
             Task.Run(() => this.StartAsync()).Ignore();
 
-            if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Started asynch agent " + this.Name);
+            if (Log.IsEnabled(LogLevel.Debug)) Log.LogDebug("Started asynch agent " + this.Name);
         }
 
         private async Task StartAsync()
@@ -89,7 +89,7 @@ namespace Orleans.Runtime
                     {
                         try
                         {
-                            if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Run completed on agent " + this.Name + " - restarting");
+                            if (Log.IsEnabled(LogLevel.Debug)) Log.LogDebug("Run completed on agent " + this.Name + " - restarting");
                             this.Start();
                         }
                         catch (Exception exc)
@@ -123,9 +123,9 @@ namespace Orleans.Runtime
             catch (Exception exc)
             {
                 // ignore. Just make sure stop does not throw.
-                Log.Debug("Ignoring error during Stop: {0}", exc);
+                Log.LogDebug(exc, "Ignoring error during Stop");
             }
-            Log.Debug("Stopped agent");
+            Log.LogDebug("Stopped agent");
         }
 
         public void Dispose()

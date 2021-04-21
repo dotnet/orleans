@@ -413,7 +413,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 }
                 //The ETag of data is needed in further operations.
                 if (retrievedResult != null) return new Tuple<T, string>(retrievedResult, retrievedResult.ETag);
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug("Could not find table entry for PartitionKey={0} RowKey={1}", partitionKey, rowKey);
                 return null;  // No data
             }
             finally
@@ -827,8 +827,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             if (AzureTableUtils.EvaluateException(exc, out httpStatusCode, out _) && AzureTableUtils.IsContentionError(httpStatusCode))
             {
                 // log at Verbose, since failure on conditional is not not an error. Will analyze and warn later, if required.
-                if (Logger.IsEnabled(LogLevel.Debug)) Logger.Debug((int)Utilities.ErrorCode.AzureTable_13,
-                     $"Intermediate Azure table write error {operation} to table {TableName} data1 {(data1 ?? "null")} data2 {(data2 ?? "null")}", exc);
+                if (Logger.IsEnabled(LogLevel.Debug)) Logger.LogDebug((int)Utilities.ErrorCode.AzureTable_13, exc,
+                     $"Intermediate Azure table write error {operation} to table {TableName} data1 {(data1 ?? "null")} data2 {(data2 ?? "null")}");
 
             }
             else

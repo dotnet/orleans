@@ -157,7 +157,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InsertRow entry = {0}, table version = {1}", entry.ToFullString(), tableVersion);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InsertRow entry = {0}, table version = {1}", entry.ToFullString(), tableVersion);
             bool result = table.Insert(entry, tableVersion);
             if (result == false)
                 logger.Info(ErrorCode.MembershipGrainBasedTable2,
@@ -169,7 +169,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateRow entry = {0}, etag = {1}, table version = {2}", entry.ToFullString(), etag, tableVersion);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateRow entry = {0}, etag = {1}, table version = {2}", entry.ToFullString(), etag, tableVersion);
             bool result = table.Update(entry, etag, tableVersion);
             if (result == false)
                 logger.Info(ErrorCode.MembershipGrainBasedTable3,
@@ -181,7 +181,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task UpdateIAmAlive(MembershipEntry entry)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateIAmAlive entry = {0}", entry.ToFullString());
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateIAmAlive entry = {0}", entry.ToFullString());
             table.UpdateIAmAlive(entry);
             return Task.CompletedTask;
         }

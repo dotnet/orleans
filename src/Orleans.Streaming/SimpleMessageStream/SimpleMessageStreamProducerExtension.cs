@@ -57,7 +57,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         internal void AddSubscribers(InternalStreamId streamId, ICollection<PubSubSubscriptionState> newSubscribers)
         {
             if (logger.IsEnabled(LogLevel.Debug))
-                logger.Debug("{0} AddSubscribers {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), Utils.EnumerableToString(newSubscribers), streamId);
+                logger.LogDebug("{0} AddSubscribers {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), Utils.EnumerableToString(newSubscribers), streamId);
             
             StreamConsumerExtensionCollection consumers;
             if (remoteConsumers.TryGetValue(streamId, out consumers))
@@ -129,7 +129,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.Debug("{0} AddSubscriber {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), streamConsumer, streamId);
+                logger.LogDebug("{0} AddSubscriber {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), streamConsumer, streamId);
             }
 
             StreamConsumerExtensionCollection consumers;
@@ -149,7 +149,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.Debug("{0} RemoveSubscription {1}", providerRuntime.ExecutingEntityIdentity(),
+                logger.LogDebug("{0} RemoveSubscription {1}", providerRuntime.ExecutingEntityIdentity(),
                     subscriptionId);
             }
 

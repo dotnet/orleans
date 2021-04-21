@@ -58,7 +58,7 @@ namespace Orleans.Streams
 
             try
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream.InternalStreamId);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
                 var handle = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, batchObserver, stream, token, filterData);

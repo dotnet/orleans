@@ -9,7 +9,7 @@ namespace Orleans.Runtime.Counters
     {
         public static int WriteCounters(ITelemetryProducer telemetryProducer, ILogger logger)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Writing counters.");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Writing counters.");
 
             int numWriteErrors = 0;
 

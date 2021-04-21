@@ -497,7 +497,7 @@ namespace Orleans.Transactions.State
                     currentGroup.Remove(single.TransactionId);
 
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"exit-lock {single.TransactionId} {single.Timestamp:o}");
+                        logger.LogDebug($"exit-lock {single.TransactionId} {single.Timestamp:o}");
 
                     return true;
                 }
@@ -553,7 +553,7 @@ namespace Orleans.Transactions.State
                         currentGroup.Remove(multiple[i].TransactionId);
 
                         if (logger.IsEnabled(LogLevel.Debug))
-                            logger.Debug($"exit-lock ({i}/{multiple.Count}) {multiple[i].TransactionId} {multiple[i].Timestamp:o}");
+                            logger.LogDebug($"exit-lock ({i}/{multiple.Count}) {multiple[i].TransactionId} {multiple[i].Timestamp:o}");
                     }
 
                     return true;

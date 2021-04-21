@@ -93,7 +93,7 @@ namespace Orleans.Transactions
                     }
 
                     if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"update-lock write v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
+                        logger.LogDebug($"update-lock write v{record.SequenceNumber} {record.TransactionId} {record.Timestamp:o}");
 
                     // record this write in the transaction info data structure
                     info.RecordWrite(this.participantId, record.Timestamp);

@@ -309,8 +309,8 @@ namespace Orleans.Runtime
                     }
                     else if (invokeExceptionLogger.IsEnabled(LogLevel.Debug))
                     {
-                        this.invokeExceptionLogger.Debug(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(exc1), exc1);
+                        this.invokeExceptionLogger.LogDebug((int)ErrorCode.GrainInvokeException, exc1,
+                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(exc1));
                     }
 
                     if (transactionInfo != null)
@@ -505,7 +505,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (logger.IsEnabled(LogLevel.Debug)) this.logger.Debug(ErrorCode.Dispatcher_HandleMsg, "HandleMessage {0}", message);
+                if (logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug((int)ErrorCode.Dispatcher_HandleMsg, "HandleMessage {0}", message);
                 switch (message.RejectionType)
                 {
                     case Message.RejectionTypes.DuplicateRequest:
@@ -582,7 +582,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                if (logger.IsEnabled(LogLevel.Debug)) this.logger.Debug(ErrorCode.Dispatcher_NoCallbackForResp,
+                if (logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug((int)ErrorCode.Dispatcher_NoCallbackForResp,
                     "No callback for response message: " + message);
             }
         }

@@ -70,7 +70,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var entries = await tableManager.FindSiloEntryAndTableVersionRow(key);
                 MembershipTableData data = Convert(entries);
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Read my entry {0} Table=" + Environment.NewLine + "{1}", key.ToLongString(), data.ToString());
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Read my entry {0} Table=" + Environment.NewLine + "{1}", key.ToLongString(), data.ToString());
                 return data;
             }
             catch (Exception exc)
@@ -103,7 +103,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("InsertRow entry = {0}, table version = {1}", entry.ToFullString(), tableVersion);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("InsertRow entry = {0}, table version = {1}", entry.ToFullString(), tableVersion);
                 var tableEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
@@ -127,7 +127,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateRow entry = {0}, etag = {1}, table version = {2}", entry.ToFullString(), etag, tableVersion);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateRow entry = {0}, etag = {1}, table version = {2}", entry.ToFullString(), etag, tableVersion);
                 var siloEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
@@ -149,7 +149,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merge entry = {0}", entry.ToFullString());
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Merge entry = {0}", entry.ToFullString());
                 var siloEntry = ConvertPartial(entry, tableManager.DeploymentId);
                 await tableManager.MergeTableEntryAsync(siloEntry);
             }

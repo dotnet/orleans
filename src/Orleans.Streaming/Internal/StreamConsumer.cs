@@ -85,10 +85,10 @@ namespace Orleans.Streams
             if (batchObserver is GrainReference)
                 throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", nameof(batchObserver));
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Subscribe Token={Token}", token);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Subscribe Token={Token}", token);
             await BindExtensionLazy();
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Subscribe - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Subscribe - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
                 pubSub, myGrainReference, token);
 
             GuidId subscriptionId = pubSub.CreateSubscriptionId(stream.InternalStreamId, myGrainReference);
@@ -146,10 +146,10 @@ namespace Orleans.Streams
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resume Token={Token}", token);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Resume Token={Token}", token);
             await BindExtensionLazy();
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resume - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Resume - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
                 pubSub, myGrainReference, token);
 
             StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, batchObserver, token, null);
@@ -166,12 +166,12 @@ namespace Orleans.Streams
 
             StreamSubscriptionHandleImpl<T> handleImpl = CheckHandleValidity(handle);
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Unsubscribe StreamSubscriptionHandle={0}", handle);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Unsubscribe StreamSubscriptionHandle={0}", handle);
 
             myExtension.RemoveObserver(handleImpl.SubscriptionId);
             // UnregisterConsumer from pubsub even if does not have this handle localy, to allow UnsubscribeAsync retries.
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Unsubscribe - Disconnecting from Rendezvous {0} My GrainRef={1}",
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Unsubscribe - Disconnecting from Rendezvous {0} My GrainRef={1}",
                 pubSub, myGrainReference);
 
             await pubSub.UnregisterConsumer(handleImpl.SubscriptionId, stream.InternalStreamId);
@@ -190,7 +190,7 @@ namespace Orleans.Streams
 
         public async Task Cleanup()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Cleanup() called");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Cleanup() called");
             if (myExtension == null)
                 return;
 
@@ -232,9 +232,9 @@ namespace Orleans.Streams
                 {
                     if (myExtension == null)
                     {
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("BindExtensionLazy - Binding local extension to stream runtime={0}", providerRuntime);
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BindExtensionLazy - Binding local extension to stream runtime={0}", providerRuntime);
                         (myExtension, myGrainReference) = providerRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(() => new StreamConsumerExtension(providerRuntime));
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("BindExtensionLazy - Connected Extension={0} GrainRef={1}", myExtension, myGrainReference);                        
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("BindExtensionLazy - Connected Extension={0} GrainRef={1}", myExtension, myGrainReference);                        
                     }
                 }
             }

@@ -82,7 +82,7 @@ namespace UnitTests.Grains
             }
             else
             {
-                _logger.Debug(str);
+                _logger.LogDebug(str);
             }
             return Task.CompletedTask;
         }
@@ -249,7 +249,7 @@ namespace UnitTests.Grains
             }
             else
             {
-                _logger.Debug(str);
+                _logger.LogDebug(str);
             }
             return true;
         }

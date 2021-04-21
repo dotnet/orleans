@@ -86,7 +86,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("PublishStatistics.");
+                if(logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("PublishStatistics.");
                 var members = this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
                 var tasks = new List<Task>();
                 var activationCount = this.activationDirectory.Count;
@@ -125,7 +125,7 @@ namespace Orleans.Runtime
 
         public Task UpdateRuntimeStatistics(SiloAddress siloAddress, SiloRuntimeStatistics siloStats)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateRuntimeStatistics from {0}", siloAddress);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("UpdateRuntimeStatistics from {0}", siloAddress);
             if (this.siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
                 return Task.CompletedTask;
 
@@ -141,7 +141,7 @@ namespace Orleans.Runtime
 
         internal async Task<ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>> RefreshStatistics()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("RefreshStatistics.");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("RefreshStatistics.");
             await this.scheduler.RunOrQueueTask(() =>
                 {
                     var tasks = new List<Task>();

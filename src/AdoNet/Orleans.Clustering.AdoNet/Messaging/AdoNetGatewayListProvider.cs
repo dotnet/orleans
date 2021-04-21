@@ -56,7 +56,7 @@ namespace Orleans.Runtime.Membership
             }
             catch (Exception ex)
             {
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("AdoNetClusteringTable.Gateways failed {0}", ex);
+                if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug(ex, "AdoNetClusteringTable.Gateways failed");
                 throw;
             }
         }

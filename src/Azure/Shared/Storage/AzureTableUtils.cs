@@ -248,7 +248,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 {
                     if (StorageErrorCodeStrings.ResourceNotFound.Equals(restStatus))
                     {
-                        if (logger.IsEnabled(LogLevel.Debug)) logger.Debug((int)Utilities.ErrorCode.AzureTable_DataNotFound,
+                        if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug((int)Utilities.ErrorCode.AzureTable_DataNotFound,
                             "DataNotFound reading Azure storage table {0}:{1} HTTP status code={2} REST status code={3} Exception={4}",
                             tableName,
                             iteration == 0 ? "" : (" Repeat=" + iteration),

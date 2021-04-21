@@ -306,7 +306,7 @@ namespace Orleans.Runtime.MembershipService
                 Func<int, Task<bool>> updateMyStatusTask = async counter =>
                 {
                     numCalls++;
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Going to try to TryUpdateMyStatusGlobalOnce #{0}", counter);
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("-Going to try to TryUpdateMyStatusGlobalOnce #{0}", counter);
                     return await TryUpdateMyStatusGlobalOnce(status);  // function to retry
                 };
                 
@@ -330,7 +330,7 @@ namespace Orleans.Runtime.MembershipService
 
                 if (ok)
                 {
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Silo {0} Successfully updated my Status in the Membership table to {1}", myAddress, status);
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("-Silo {0} Successfully updated my Status in the Membership table to {1}", myAddress, status);
 
                     var gossipTask = this.GossipToOthers(this.myAddress, status);
                     gossipTask.Ignore();
@@ -383,7 +383,7 @@ namespace Orleans.Runtime.MembershipService
         {
             var table = await membershipTableProvider.ReadAll();
 
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("-TryUpdateMyStatusGlobalOnce: Read{0} Membership table {1}", (newStatus.Equals(SiloStatus.Active) ? "All" : " my entry from"), table.ToString());
+            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("-TryUpdateMyStatusGlobalOnce: Read{0} Membership table {1}", (newStatus.Equals(SiloStatus.Active) ? "All" : " my entry from"), table.ToString());
             LogMissedIAmAlives(table);
             var (myEntry, myEtag) = this.GetOrCreateLocalSiloEntry(table, newStatus);
 
@@ -526,7 +526,7 @@ namespace Orleans.Runtime.MembershipService
                     continue;
                 }
 
-                if (log.IsEnabled(LogLevel.Debug)) log.Debug("Temporal anomaly detected in membership table -- Me={0} Other me={1}",
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Temporal anomaly detected in membership table -- Me={0} Other me={1}",
                     myAddress, siloAddress);
 
                 // Temporal paradox - There is an older clone of this silo in the membership table
@@ -551,7 +551,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (silosToDeclareDead.Count == 0) return true;
 
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("CleanupTableEntries: About to DeclareDead {0} outdated silos in the table: {1}", silosToDeclareDead.Count,
+            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("CleanupTableEntries: About to DeclareDead {0} outdated silos in the table: {1}", silosToDeclareDead.Count,
                 Utils.EnumerableToString(silosToDeclareDead.Select(tuple => tuple.Item1), entry => entry.ToString()));
 
             var result = true;
@@ -664,7 +664,7 @@ namespace Orleans.Runtime.MembershipService
         {
             var table = await membershipTableProvider.ReadAll();
 
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("-TryToSuspectOrKill: Read Membership table {0}", table.ToString());
+            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("-TryToSuspectOrKill: Read Membership table {0}", table.ToString());
 
             if (this.IsStopping)
             {
@@ -695,7 +695,7 @@ namespace Orleans.Runtime.MembershipService
             var tuple = table.Get(silo);
             var entry = tuple.Item1.Copy();
             string eTag = tuple.Item2;
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("-TryToSuspectOrKill {siloAddress}: The current status of {siloAddress} in the table is {status}, its entry is {entry}",
+            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("-TryToSuspectOrKill {siloAddress}: The current status of {siloAddress} in the table is {status}, its entry is {entry}",
                 entry.SiloAddress, // First
                 entry.SiloAddress, // Second
                 entry.Status, 
@@ -821,12 +821,12 @@ namespace Orleans.Runtime.MembershipService
                 // add the killer (myself) to the suspect list, for easier diagnosis later on.
                 entry.AddSuspector(myAddress, DateTime.UtcNow);
 
-                if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Going to DeclareDead silo {0} in the table. About to write entry {1}.", entry.SiloAddress, entry.ToFullString());
+                if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("-Going to DeclareDead silo {0} in the table. About to write entry {1}.", entry.SiloAddress, entry.ToFullString());
                 entry.Status = SiloStatus.Dead;
                 bool ok = await membershipTableProvider.UpdateRow(entry, etag, tableVersion.Next());
                 if (ok)
                 {
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Successfully updated {0} status to Dead in the Membership table.", entry.SiloAddress);
+                    if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("-Successfully updated {0} status to Dead in the Membership table.", entry.SiloAddress);
 
                     var table = await membershipTableProvider.ReadAll();
                     this.ProcessTableUpdate(table, "DeclareDead");

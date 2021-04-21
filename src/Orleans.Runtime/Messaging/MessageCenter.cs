@@ -112,7 +112,7 @@ namespace Orleans.Runtime.Messaging
 
         public void StopAcceptingClientMessages()
         {
-            if (log.IsEnabled(LogLevel.Debug)) log.Debug("StopClientMessages");
+            if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("StopClientMessages");
             if (Gateway == null) return;
 
             try
@@ -207,7 +207,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Do not send reject a rejection locally, it will create a stack overflow
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
-                if (this.log.IsEnabled(LogLevel.Debug)) log.Debug("Dropping rejection {msg}", msg);
+                if (this.log.IsEnabled(LogLevel.Debug)) log.LogDebug("Dropping rejection {msg}", msg);
             }
             else
             {
@@ -240,7 +240,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         public void BlockApplicationMessages()
         {
-            if(log.IsEnabled(LogLevel.Debug)) log.Debug("BlockApplicationMessages");
+            if(log.IsEnabled(LogLevel.Debug)) log.LogDebug("BlockApplicationMessages");
             IsBlockingApplicationMessages = true;
         }
     }

@@ -336,7 +336,7 @@ namespace DefaultCluster.Tests.General
 
             public void StateChanged(int a, int b)
             {
-                this.logger.Debug("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
+                this.logger.LogDebug("SimpleGrainObserver.StateChanged a={0} b={1}", a, b);
                 action?.Invoke(a, b, result);
             }
         }

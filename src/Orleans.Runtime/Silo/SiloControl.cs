@@ -108,13 +108,13 @@ namespace Orleans.Runtime
 
         public Task ForceRuntimeStatisticsCollection()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("ForceRuntimeStatisticsCollection");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("ForceRuntimeStatisticsCollection");
             return this.deploymentLoadPublisher.RefreshStatistics();
         }
 
         public Task<SiloRuntimeStatistics> GetRuntimeStatistics()
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("GetRuntimeStatistics");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetRuntimeStatistics");
             var activationCount = this.activationDirectory.Count;
             var recentlyUsedActivationCount = this.activationCollector.GetNumRecentlyUsed(TimeSpan.FromMinutes(10));
             var stats = new SiloRuntimeStatistics(
@@ -136,7 +136,7 @@ namespace Orleans.Runtime
 
         public Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[] types=null)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("GetDetailedGrainStatistics");
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("GetDetailedGrainStatistics");
             return Task.FromResult(this.catalog.GetDetailedGrainStatistics(types));
         }
 

@@ -209,7 +209,7 @@ namespace Orleans.Runtime
 
         private void ResendMessageImpl(Message message, ActivationAddress forwardingAddress = null)
         {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resend {0}", message);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Resend {0}", message);
             message.TargetHistory = message.GetTargetHistory();
 
             if (message.TargetGrain.IsSystemTarget())
