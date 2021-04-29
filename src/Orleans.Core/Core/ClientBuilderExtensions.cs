@@ -135,10 +135,12 @@ namespace Orleans
         public static IClientBuilder AddActivityPropagation(this IClientBuilder builder)
         {
             if (Activity.DefaultIdFormat != ActivityIdFormat.W3C)
+            {
                 throw new InvalidOperationException("Activity propagation available only for Activities in W3C format. Set Activity.DefaultIdFormat into ActivityIdFormat.W3C.");
+            }
 
             return builder
-                .AddOutgoingGrainCallFilter<ActivityPropagationGrainCallFilter.ActivityPropagationOutgoingGrainCallFilter>();
+                .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>();
         }
 
         /// <summary>

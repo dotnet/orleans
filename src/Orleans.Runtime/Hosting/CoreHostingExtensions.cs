@@ -30,11 +30,13 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddActivityPropagation(this ISiloBuilder builder)
         {
             if (Activity.DefaultIdFormat != ActivityIdFormat.W3C)
+            {
                 throw new InvalidOperationException("Activity propagation available only for Activities in W3C format. Set Activity.DefaultIdFormat into ActivityIdFormat.W3C.");
+            }
 
             return builder
-            .AddOutgoingGrainCallFilter<ActivityPropagationGrainCallFilter.ActivityPropagationOutgoingGrainCallFilter>()
-            .AddIncomingGrainCallFilter<ActivityPropagationGrainCallFilter.ActivityPropagationIncomingGrainCallFilter>();
+            .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>()
+            .AddIncomingGrainCallFilter<ActivityPropagationIncomingGrainCallFilter>();
         }
 
         /// <param name="builder">The silo builder.</param>
