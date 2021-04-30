@@ -41,6 +41,10 @@ namespace Orleans.Runtime
             try
             {
                 await context.Invoke();
+                if (activity is not null && activity.IsAllDataRequested)
+                {
+                    activity.SetTag("status", "Ok");
+                }
             }
             catch (Exception e)
             {
@@ -51,6 +55,7 @@ namespace Orleans.Runtime
                     activity.SetTag("exception.message", e.Message);
                     activity.SetTag("exception.stacktrace", e.StackTrace);
                     activity.SetTag("exception.escaped", true);
+                    activity.SetTag("status", "Error");
                 }
                 throw;
             }
