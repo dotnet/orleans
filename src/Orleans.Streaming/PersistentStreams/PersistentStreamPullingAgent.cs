@@ -274,7 +274,7 @@ namespace Orleans.Streams
                     requestedHandshakeToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                          i => consumerData.StreamConsumer.GetSequenceToken(consumerData.SubscriptionId),
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
-                         (exception, i) => !(exception is ClientNotAvailableException),
+                         (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                          this.options.MaxEventDeliveryTime,
                          DeliveryBackoffProvider);
 
