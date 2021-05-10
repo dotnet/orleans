@@ -210,9 +210,11 @@ namespace UnitTests.GrainInterfaces
         Task<T> GetLastValue();
     }
 
+    [WellKnownAlias("IGenericGrainWithConstraints`3")]
     public interface IGenericGrainWithConstraints<A, B, C> : IGrainWithStringKey
         where A : ICollection<B>, new() where B : struct where C : class
     {
+        [WellKnownAlias("IGenericGrainWithConstraints_GetCount`3")]
         Task<int> GetCount();
 
         Task Add(B item);

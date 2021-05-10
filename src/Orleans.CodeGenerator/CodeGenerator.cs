@@ -52,6 +52,17 @@ namespace Orleans.CodeGenerator
                     metadataModel.SerializableTypes.Add(generatedInvokerDescription);
                     metadataModel.GeneratedInvokables[method] = generatedInvokerDescription;
                     AddMember(ns, invokable);
+
+                    var methodSymbol = method.Method;
+                    if (GetWellKnownTypeId(methodSymbol) is uint wellKnownTypeId)
+                    {
+                        metadataModel.WellKnownTypeIds.Add((generatedInvokerDescription.OpenTypeSyntax, wellKnownTypeId));
+                    }
+
+                    if (GetTypeAlias(methodSymbol) is string typeAlias)
+                    {
+                        metadataModel.TypeAliases.Add((generatedInvokerDescription.OpenTypeSyntax, typeAlias));
+                    }
                 }
 
                 var (proxy, generatedProxyDescription) = ProxyGenerator.Generate(LibraryTypes, type, metadataModel);
@@ -172,12 +183,12 @@ namespace Orleans.CodeGenerator
 
                     if (GetWellKnownTypeId(symbol) is uint wellKnownTypeId)
                     {
-                        metadataModel.WellKnownTypeIds.Add((symbol, wellKnownTypeId));
+                        metadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
                     }
 
                     if (GetTypeAlias(symbol) is string typeAlias)
                     {
-                        metadataModel.TypeAliases.Add((symbol, typeAlias));
+                        metadataModel.TypeAliases.Add((symbol.ToOpenTypeSyntax(), typeAlias));
                     }
 
                     if (FSharpUtilities.IsUnionCase(LibraryTypes, symbol, out var sumType) && ShouldGenerateSerializer(sumType))
@@ -474,9 +485,9 @@ namespace Orleans.CodeGenerator
             return id;
         }
 
-        private uint? GetWellKnownTypeId(INamedTypeSymbol typeSymbol)
+        private uint? GetWellKnownTypeId(ISymbol symbol)
         {
-            var attr = typeSymbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.WellKnownIdAttribute, attr.AttributeClass));
+            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.WellKnownIdAttribute, attr.AttributeClass));
             if (attr is null)
             {
                 return null;
@@ -486,9 +497,9 @@ namespace Orleans.CodeGenerator
             return id;
         }
 
-        private string GetTypeAlias(INamedTypeSymbol typeSymbol)
+        private string GetTypeAlias(ISymbol symbol)
         {
-            var attr = typeSymbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.WellKnownAliasAttribute, attr.AttributeClass));
+            var attr = symbol.GetAttributes().FirstOrDefault(attr => SymbolEqualityComparer.Default.Equals(LibraryTypes.WellKnownAliasAttribute, attr.AttributeClass));
             if (attr is null)
             {
                 return null;

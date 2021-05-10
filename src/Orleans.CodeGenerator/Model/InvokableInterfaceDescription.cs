@@ -26,6 +26,13 @@ namespace Orleans.CodeGenerator
             ProxyBaseType = proxyBaseType;
             IsExtension = isExtension;
             Name = name;
+
+            // If the name is a user-defined name which specified a generic arity, strip the arity backtick now
+            if (Name.Contains("`"))
+            {
+                Name = Name.Replace('`', '_');
+            }
+
             GeneratedNamespace = InterfaceType.GetNamespaceAndNesting() switch
             {
                 { Length: > 0 } ns => $"{CodeGenerator.CodeGeneratorName}.{ns}",

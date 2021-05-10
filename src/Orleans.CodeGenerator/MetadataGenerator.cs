@@ -123,7 +123,7 @@ namespace Orleans.CodeGenerator
                                     new[]
                                     {
                                         Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id))),
-                                        Argument(TypeOfExpression(type.Type.ToOpenTypeSyntax()))
+                                        Argument(TypeOfExpression(type.Type))
                                     }))))
                 ));
             
@@ -138,7 +138,7 @@ namespace Orleans.CodeGenerator
                                     new[]
                                     {
                                         Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Alias))),
-                                        Argument(TypeOfExpression(type.Type.ToOpenTypeSyntax()))
+                                        Argument(TypeOfExpression(type.Type))
                                     }))))
                 ));
 

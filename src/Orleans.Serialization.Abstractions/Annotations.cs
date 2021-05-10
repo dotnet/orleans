@@ -165,6 +165,7 @@ namespace Orleans
 
     [AttributeUsage(
         AttributeTargets.Class
+        | AttributeTargets.Interface
         | AttributeTargets.Struct
         | AttributeTargets.Enum
         | AttributeTargets.Method)]
@@ -180,6 +181,7 @@ namespace Orleans
 
     [AttributeUsage(
         AttributeTargets.Class
+        | AttributeTargets.Interface
         | AttributeTargets.Struct
         | AttributeTargets.Enum
         | AttributeTargets.Method)]

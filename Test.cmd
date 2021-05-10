@@ -32,9 +32,7 @@ set TESTS=^
 %CMDHOME%\test\DefaultCluster.Tests,^
 %CMDHOME%\test\NonSilo.Tests,^
 %CMDHOME%\test\Extensions\AWSUtils.Tests,^
-%CMDHOME%\test\Extensions\Serializers\BondUtils.Tests,^
 %CMDHOME%\test\Extensions\Consul.Tests,^
-%CMDHOME%\test\Extensions\Serializers\GoogleUtils.Tests,^
 %CMDHOME%\test\Extensions\ServiceBus.Tests,^
 %CMDHOME%\test\Extensions\TestServiceFabric,^
 %CMDHOME%\test\Extensions\TesterAdoNet,^

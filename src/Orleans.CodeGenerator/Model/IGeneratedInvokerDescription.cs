@@ -11,6 +11,7 @@ namespace Orleans.CodeGenerator
     internal class GeneratedInvokerDescription : ISerializableTypeDescription
     {
         private readonly MethodDescription _methodDescription;
+        private TypeSyntax _openTypeSyntax;
         private TypeSyntax _typeSyntax;
         private TypeSyntax _baseTypeSyntax;
 
@@ -37,6 +38,7 @@ namespace Orleans.CodeGenerator
 
         public Accessibility Accessibility { get; }
         public TypeSyntax TypeSyntax => _typeSyntax ??= CreateTypeSyntax();
+        public TypeSyntax OpenTypeSyntax => _openTypeSyntax ??= CreateOpenTypeSyntax();
         public bool HasComplexBaseType => BaseType is not null;
         public INamedTypeSymbol BaseType { get; }
         public TypeSyntax BaseTypeSyntax => _baseTypeSyntax ??= BaseType.ToTypeSyntax(_methodDescription.TypeParameterSubstitutions);
@@ -74,6 +76,17 @@ namespace Orleans.CodeGenerator
                 _ => IdentifierName(simpleName),
             };
         }
-    }
 
+        private TypeSyntax CreateOpenTypeSyntax()
+        {
+            var simpleName = InvokableGenerator.GetSimpleClassName(InterfaceDescription, _methodDescription);
+            return (TypeParameters, Namespace) switch
+            {
+                ({ Count: > 0 }, { Length: > 0 }) => QualifiedName(ParseName(Namespace), GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => OmittedTypeArgument()))))),
+                ({ Count: > 0 }, _) => GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => OmittedTypeArgument())))),
+                (_, { Length: > 0 }) => QualifiedName(ParseName(Namespace), IdentifierName(simpleName)),
+                _ => IdentifierName(simpleName),
+            };
+        }
+    }
 }

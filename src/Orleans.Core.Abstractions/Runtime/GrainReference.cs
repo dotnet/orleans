@@ -124,12 +124,16 @@ namespace Orleans.Runtime
         public override void ConvertToSurrogate(T value, ref GrainReferenceSurrogate surrogate)
         {
             // Check that the typical case is false before performing the more expensive interface check
-            if (value is not GrainReference and IGrainObserver observer)
+            if (value is not GrainReference refValue)
             {
-                GrainReferenceCodecProvider.ThrowGrainObserverInvalidException(observer);
+                if (value is IGrainObserver observer)
+                {
+                    GrainReferenceCodecProvider.ThrowGrainObserverInvalidException(observer);
+                }
+
+                refValue = (GrainReference)(object)value.AsReference<T>();
             }
 
-            var refValue = (GrainReference)(object)value.AsReference<T>();
             surrogate = new GrainReferenceSurrogate
             {
                 GrainId = refValue.GrainId,

@@ -724,6 +724,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
+        [WellKnownAlias("GenericGrainWithConstraints.GetCount")]
         public Task<int> GetCount() { return Task.FromResult(collection.Count); }
 
         public Task Add(B item)
