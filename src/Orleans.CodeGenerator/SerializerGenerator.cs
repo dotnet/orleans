@@ -1220,7 +1220,7 @@ namespace Orleans.CodeGenerator
             /// <summary>
             /// Gets a value indicating whether or not this field represents a property with an accessible, non-obsolete setter. 
             /// </summary>
-            private bool IsSettableProperty => Property?.SetMethod != null && _model.IsAccessible(0, Property.SetMethod) && !IsObsolete;
+            private bool IsSettableProperty => Property?.SetMethod is { } setMethod && _model.IsAccessible(0, setMethod) && !setMethod.IsInitOnly && !IsObsolete;
 
             /// <summary>
             /// Gets syntax representing the type of this field.

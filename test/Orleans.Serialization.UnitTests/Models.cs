@@ -1,13 +1,24 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using Orleans;
 
-[Orleans.GenerateSerializer]
+[GenerateSerializer]
+public record Person([property: Id(0)] int Age, [property: Id(1)] string Name)
+{
+    [Id(2)]
+    public string FavouriteColor { get; init; }
+
+    [Id(3)]
+    public string StarSign { get; init; }
+}
+
+[GenerateSerializer]
 public class SomeClassWithSerializers
 {
-    [Orleans.Id(0)]
+    [Id(0)]
     public int IntProperty { get; set; }
 
-    [Orleans.Id(1)] public int IntField;
+    [Id(1)] public int IntField;
 
     public int UnmarkedField;
 
