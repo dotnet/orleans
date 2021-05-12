@@ -146,27 +146,6 @@ namespace Orleans.Runtime.Messaging
                 SerializeFast(ref headerWriter, message.Headers);
                 headerWriter.Commit();
 
-#if DUMP_MESSAGES
-                {
-                    var array = _headersSerializer.SerializeToArray(message.Headers);
-                    using var formatterSession = _sessionPool.GetSession();
-                    var formatterReader = Reader.Create(array, formatterSession);
-                    var formatted = BitStreamFormatter.Format(ref formatterReader);
-                    Console.WriteLine("Headers:");
-                    Console.WriteLine(formatted);
-                    Console.WriteLine();
-
-                    var bodyArray = _bodySerializer.SerializeToArray(message.BodyObject);
-                    using var formatterSession2 = _sessionPool.GetSession();
-                    var formatterReader2 = Reader.Create(bodyArray, formatterSession2);
-                    var formatted2 = BitStreamFormatter.Format(ref formatterReader2);
-                    Console.WriteLine("Body:");
-                    Console.WriteLine(formatted2);
-                    Console.WriteLine();
-                    Console.WriteLine();
-                }
-#endif
-
                 var headerLength = bufferWriter.CommittedBytes;
 
                 _serializationSession.PartialReset();
