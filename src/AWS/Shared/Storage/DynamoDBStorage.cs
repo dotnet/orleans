@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Amazon.Runtime.CredentialManagement;
 
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB
@@ -33,6 +34,9 @@ namespace Orleans.Transactions.DynamoDB
 
         /// <summary> Secret key for this dynamoDB table </summary>
         protected string secretKey;
+
+        private readonly string token;
+        private readonly string profileName;
         private string service;
         public const int DefaultReadCapacityUnits = 10;
         public const int DefaultWriteCapacityUnits = 5;
@@ -48,6 +52,8 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="logger"></param>
         /// <param name="accessKey"></param>
         /// <param name="secretKey"></param>
+        /// <param name="token"></param>
+        /// <param name="profileName"></param>
         /// <param name="service"></param>
         /// <param name="readCapacityUnits"></param>
         /// <param name="writeCapacityUnits"></param>
@@ -57,6 +63,8 @@ namespace Orleans.Transactions.DynamoDB
             string service,
             string accessKey = "",
             string secretKey = "",
+            string token = "",
+            string profileName = "",
             int readCapacityUnits = DefaultReadCapacityUnits,
             int writeCapacityUnits = DefaultWriteCapacityUnits,
             bool useProvisionedThroughput = true)
@@ -64,6 +72,8 @@ namespace Orleans.Transactions.DynamoDB
             if (service == null) throw new ArgumentNullException(nameof(service));
             this.accessKey = accessKey;
             this.secretKey = secretKey;
+            this.token = token;
+            this.profileName = profileName;
             this.service = service;
             this.readCapacityUnits = readCapacityUnits;
             this.writeCapacityUnits = writeCapacityUnits;
@@ -104,11 +114,33 @@ namespace Orleans.Transactions.DynamoDB
                 var credentials = new BasicAWSCredentials("dummy", "dummyKey");
                 this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig { ServiceURL = this.service });
             }
+            else if (!string.IsNullOrEmpty(this.accessKey) && !string.IsNullOrEmpty(this.secretKey) && !string.IsNullOrEmpty(this.token))
+            {
+                // AWS DynamoDB instance (auth via explicit credentials and token)
+                var credentials = new SessionAWSCredentials(this.accessKey, this.secretKey, this.token);
+                this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+            }
             else if (!string.IsNullOrEmpty(this.accessKey) && !string.IsNullOrEmpty(this.secretKey))
             {
                 // AWS DynamoDB instance (auth via explicit credentials)
                 var credentials = new BasicAWSCredentials(this.accessKey, this.secretKey);
                 this.ddbClient = new AmazonDynamoDBClient(credentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+            }
+            else if (!string.IsNullOrEmpty(this.profileName))
+            {
+                // AWS DynamoDB instance (auth via explicit credentials and token found in a named profile)
+                var chain = new CredentialProfileStoreChain();
+                if (chain.TryGetAWSCredentials(this.profileName, out var credentials))
+                {
+                    var immutableCredentials = credentials.GetCredentials();
+                    var sessionCredentials = new SessionAWSCredentials(immutableCredentials.AccessKey, immutableCredentials.SecretKey, immutableCredentials.Token);
+                    this.ddbClient = new AmazonDynamoDBClient(sessionCredentials, new AmazonDynamoDBConfig {RegionEndpoint = AWSUtils.GetRegionEndpoint(this.service)});
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"AWS named profile '{this.profileName}' provided, but credentials could not be retrieved");
+                }
             }
             else
             {
