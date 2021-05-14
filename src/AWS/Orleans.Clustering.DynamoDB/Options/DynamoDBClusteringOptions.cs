@@ -2,25 +2,8 @@
 
 namespace Orleans.Configuration
 {
-    public class DynamoDBClusteringOptions
+    public class DynamoDBClusteringOptions : DynamoDBClientOptions
     {
-        /// <summary>
-        /// AccessKey string for DynamoDB Storage
-        /// </summary>
-        [Redact]
-        public string AccessKey { get; set; }
-
-        /// <summary>
-        /// Secret key for DynamoDB storage
-        /// </summary>
-        [Redact]
-        public string SecretKey { get; set; }
-
-        /// <summary>
-        /// DynamoDB Service name 
-        /// </summary>
-        public string Service { get; set; }
-
         /// <summary>
         /// Read capacity unit for DynamoDB storage
         /// </summary>

@@ -5,29 +5,12 @@ using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
-    public class DynamoDBStorageOptions
+    public class DynamoDBStorageOptions : DynamoDBClientOptions
     {
         /// <summary>
         /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment.
         /// </summary>
         public string ServiceId { get; set; } = string.Empty;
-
-        /// <summary>
-        /// AccessKey string for DynamoDB Storage
-        /// </summary>
-        [Redact]
-        public string AccessKey { get; set; }
-
-        /// <summary>
-        /// Secret key for DynamoDB storage
-        /// </summary>
-        [Redact]
-        public string SecretKey { get; set; }
-
-        /// <summary>
-        /// DynamoDB Service name
-        /// </summary>
-        public string Service { get; set; }
 
         /// <summary>
         /// Use Provisioned Throughput for tables
