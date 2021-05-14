@@ -84,7 +84,7 @@ namespace Tester.AzureUtils
             AzureQueueDataManager manager = await GetTableManager(queueName);
 
             IEnumerable<QueueMessage> msgs = await manager.GetQueueMessages();
-            Assert.True(msgs == null || msgs.Count() == 0);
+            Assert.True(msgs == null || !msgs.Any());
 
             int numMsgs = 10;
             List<Task> promises = new List<Task>();
