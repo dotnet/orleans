@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="$(SourceRoot)src\AWS\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
     <Compile Include="$(SourceRoot)src\AWS\Shared\Storage\DynamoDBStorage.cs" Link="Storage\DynamoDBStorage.cs" />
+    <Compile Include="$(SourceRoot)src\AWS\Shared\Storage\DynamoDBClientOptions.cs" Link="Storage\DynamoDBClientOptions.cs" />
   </ItemGroup>
 
   <ItemGroup>
