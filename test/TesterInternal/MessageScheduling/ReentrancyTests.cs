@@ -3,15 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Orleans.Hosting;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
-using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Configuration;
 
 namespace UnitTests
 {

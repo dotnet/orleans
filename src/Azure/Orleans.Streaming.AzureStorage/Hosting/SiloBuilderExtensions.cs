@@ -4,7 +4,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.LeaseProviders;
-using Orleans.Streams;
 
 namespace Orleans.Hosting
 {

@@ -1,9 +1,7 @@
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using TestExtensions;
 using Xunit;
 

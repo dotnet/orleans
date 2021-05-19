@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Runtime;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +13,6 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Counters;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
-using Orleans.Runtime.Providers;
 using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
@@ -308,7 +306,7 @@ namespace Orleans.Runtime
             //TODO: Setup all (or as many as possible) of the class started in this call to work directly with lifecyce
             var stopWatch = Stopwatch.StartNew();
             // The order of these 4 is pretty much arbitrary.
-            StartTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
+            await StartAsyncTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
 
             StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
 
@@ -351,7 +349,6 @@ namespace Orleans.Runtime
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 var healthCheckParticipants = this.Services.GetService<IEnumerable<IHealthCheckParticipant>>().ToList();
                 this.platformWatchdog = new Watchdog(statisticsOptions.LogWriteInterval, healthCheckParticipants, this.loggerFactory.CreateLogger<Watchdog>());
-                this.platformWatchdog.Start();
                 if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo platform watchdog started successfully."); }
             }
             catch (Exception exc)
@@ -406,7 +403,7 @@ namespace Orleans.Runtime
             var loggingHelper = this.Services.GetService<SiloLoggingHelper>();
             foreach (var grainService in grainServices)
             {
-                loggingHelper?.RegisterGrainService(grainService); 
+                loggingHelper?.RegisterGrainService(grainService);
                 await RegisterGrainService(grainService);
             }
         }
@@ -531,6 +528,7 @@ namespace Orleans.Runtime
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
                     logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
+                    // ReSharper disable once MethodSupportsCancellation
                     await Task.Delay(pause).ConfigureAwait(false);
                 }
 
@@ -565,22 +563,20 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        private Task OnRuntimeInitializeStop(CancellationToken ct)
+        private async Task OnRuntimeInitializeStop(CancellationToken ct)
         {
             // 10, 11, 12: Write Dead in the table, Drain scheduler, Stop msg center, ...
             // timers
             if (platformWatchdog != null)
-                SafeExecute(platformWatchdog.Stop); // Silo may be dying before platformWatchdog was set up
+                await SafeAsyncExecute(async () => await platformWatchdog.DisposeAsync()); // Silo may be dying before platformWatchdog was set up
 
             if (!ct.IsCancellationRequested)
                 SafeExecute(activationDirectory.PrintActivationDirectory);
 
-            SafeExecute(messageCenter.Stop);
+            await SafeAsyncExecute(messageCenter.Stop);
             SafeExecute(siloStatistics.Stop);
 
             SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
-
-            return Task.CompletedTask;
         }
 
         private async Task OnBecomeActiveStop(CancellationToken ct)
@@ -596,9 +592,13 @@ namespace Orleans.Runtime
                     // Stop LocalGrainDirectory
                     await LocalScheduler.QueueActionAsync(() => localGrainDirectory.Stop(), localGrainDirectory.CacheValidator);
 
-                    SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
+                    await SafeAsyncExecute(() => catalog
+                        .DeactivateAllActivations()
+                        .WithCancellation(ct, "Deactivation of all activations failed because it was cancelled")
+                    );
 
                     // Wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
+                    // ReSharper disable once MethodSupportsCancellation
                     await Task.Delay(WaitForMessageToBeQueuedForOutbound);
                 }
             }
@@ -614,7 +614,7 @@ namespace Orleans.Runtime
             // Stop the gateway
             SafeExecute(messageCenter.StopAcceptingClientMessages);
 
-            SafeExecute(() => catalog?.Stop());
+            await SafeAsyncExecute(() => catalog?.Stop() ?? Task.CompletedTask);
         }
 
         private async Task OnActiveStop(CancellationToken ct)
@@ -655,6 +655,11 @@ namespace Orleans.Runtime
         private void SafeExecute(Action action)
         {
             Utils.SafeExecute(action, logger, "Silo.Stop");
+        }
+
+        private ValueTask SafeAsyncExecute(Func<Task> action)
+        {
+            return Utils.SafeAsyncExecute(action, logger, "Silo.Stop");
         }
 
         internal void RegisterSystemTarget(SystemTarget target) => this.catalog.RegisterSystemTarget(target);

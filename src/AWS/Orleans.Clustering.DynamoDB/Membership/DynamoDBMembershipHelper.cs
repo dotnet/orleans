@@ -1,9 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Runtime.MembershipService;
 using System;
 using System.Linq;
-using Orleans.Hosting;
 
 namespace Orleans.Clustering.DynamoDB
 {

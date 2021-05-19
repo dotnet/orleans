@@ -1,5 +1,4 @@
 using Orleans.Runtime;
-using Orleans.Streams;
 using System.Collections.Generic;
 
 namespace Orleans.ServiceBus.Providers.Testing

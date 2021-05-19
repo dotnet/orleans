@@ -1,9 +1,8 @@
 using System;
-using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime.GrainDirectory;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -34,7 +33,7 @@ namespace Orleans.Runtime.Messaging
             if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)) return true;
             return this.hostedClient is HostedClient client && client.TryDispatchToClient(msg);
         }
-        
+
         // This is determined by the IMA but needed by the OMS, and so is kept here in the message center itself.
         public SiloAddress MyAddress { get; private set; }
 
@@ -68,10 +67,11 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void Start()
+        public Task Start()
         {
             IsBlockingApplicationMessages = false;
             OutboundQueue.Start();
+            return Task.CompletedTask;
         }
 
         public void StartGateway()
@@ -80,7 +80,7 @@ namespace Orleans.Runtime.Messaging
                 Gateway.Start();
         }
 
-        private void WaitToRerouteAllQueuedMessages()
+        private async ValueTask WaitToRerouteAllQueuedMessages()
         {
             DateTime maxWaitTime = DateTime.UtcNow + this.messagingOptions.ShutdownRerouteTimeout;
             while (DateTime.UtcNow < maxWaitTime)
@@ -88,20 +88,19 @@ namespace Orleans.Runtime.Messaging
                 var applicationMessageQueueLength = this.OutboundQueue.GetApplicationMessageCount();
                 if (applicationMessageQueueLength == 0)
                     break;
-                Thread.Sleep(100);
+                await Task.Delay(100);
             }
-            
         }
 
-        public void Stop()
+        public async Task Stop()
         {
             IsBlockingApplicationMessages = true;
-            
+
             StopAcceptingClientMessages();
 
             try
             {
-                WaitToRerouteAllQueuedMessages();
+                await WaitToRerouteAllQueuedMessages();
                 OutboundQueue.Stop();
             }
             catch (Exception exc)

@@ -10,7 +10,6 @@ using org.apache.zookeeper.data;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Host;
 
 namespace Orleans.Runtime.Membership

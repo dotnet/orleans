@@ -14,8 +14,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
-using Microsoft.Extensions.DependencyModel;
-using Roslyn.Utilities;
 using Xunit;
 
 namespace Analyzers.Tests

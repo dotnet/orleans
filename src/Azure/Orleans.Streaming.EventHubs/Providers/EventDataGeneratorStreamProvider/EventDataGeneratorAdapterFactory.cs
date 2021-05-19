@@ -9,7 +9,6 @@ using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Streams;
 
 namespace Orleans.ServiceBus.Providers.Testing
 {

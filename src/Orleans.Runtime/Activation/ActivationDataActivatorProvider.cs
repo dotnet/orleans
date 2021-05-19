@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainReferences;
-using Orleans.Internal;
 using Orleans.Metadata;
 using Orleans.Runtime.Placement;
 

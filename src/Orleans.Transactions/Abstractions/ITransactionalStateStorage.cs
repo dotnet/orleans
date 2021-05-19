@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Concurrency;
-using Orleans.Runtime;
 
 [assembly: GenerateSerializer(typeof(Orleans.Transactions.Abstractions.PendingTransactionState<>))]
 [assembly: GenerateSerializer(typeof(Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<>))]

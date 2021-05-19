@@ -12,7 +12,6 @@ using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Configuration;
-using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;

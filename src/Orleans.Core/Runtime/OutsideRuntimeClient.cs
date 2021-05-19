@@ -37,7 +37,7 @@ namespace Orleans
         private ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
         private const string BARS = "----------";
-        
+
         public IInternalGrainFactory InternalGrainFactory { get; private set; }
 
         private MessageFactory messageFactory;
@@ -68,7 +68,7 @@ namespace Orleans
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(
-            ILoggerFactory loggerFactory, 
+            ILoggerFactory loggerFactory,
             IOptions<ClientMessagingOptions> clientMessagingOptions,
             IOptions<StatisticsOptions> statisticsOptions,
             ApplicationRequestsStatisticsGroup appRequestStatistics,
@@ -129,7 +129,7 @@ namespace Orleans
                 var minTicks = Math.Min(this.clientMessagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
                 var period = TimeSpan.FromTicks(minTicks);
                 this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
-                
+
                 this.GrainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
 
                 BufferPool.InitGlobalBufferPool(this.clientMessagingOptions);
@@ -175,7 +175,7 @@ namespace Orleans
 
             logger.Info(ErrorCode.ProxyClient_StartDone, "{0} Started OutsideRuntimeClient with Global Client ID: {1}", BARS, CurrentActivationAddress.ToString() + ", client ID: " + clientId);
         }
-        
+
         // used for testing to (carefully!) allow two clients in the same process
         private async Task StartInternal(Func<Exception, Task<bool>> retryFilter)
         {
@@ -185,7 +185,7 @@ namespace Orleans
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
             MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, clientId);
             MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
-            MessageCenter.Start();
+            await MessageCenter.Start();
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(MessageCenter.MyAddress, clientId.GrainId);
 
             this.gatewayObserver = new ClientGatewayObserver(gatewayManager);
@@ -332,7 +332,7 @@ namespace Orleans
 
                 return;
             }
-            
+
             CallbackData callbackData;
             var found = callbacks.TryRemove(response.Id, out callbackData);
             if (found)
@@ -394,7 +394,7 @@ namespace Orleans
                     logger.Info("OutsideRuntimeClient.ConstructorReset(): client Id " + clientId);
                 }
             });
-            
+
             Utils.SafeExecute(() => this.Dispose());
         }
 
@@ -452,9 +452,9 @@ namespace Orleans
         {
             if (this.disposing) return;
             this.disposing = true;
-            
+
             Utils.SafeExecute(() => this.callbackTimer?.Dispose());
-            
+
             Utils.SafeExecute(() => MessageCenter?.Dispose());
 
             this.ClusterConnectionLost = null;
@@ -473,7 +473,7 @@ namespace Orleans
                 }
             }
         }
-        
+
         /// <inheritdoc />
         public event ConnectionToClusterLostHandler ClusterConnectionLost;
 

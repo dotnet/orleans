@@ -5,7 +5,6 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
-using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
 using TestExtensions;

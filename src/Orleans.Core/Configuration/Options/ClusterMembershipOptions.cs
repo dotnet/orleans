@@ -1,6 +1,5 @@
 
 using System;
-using Orleans.Internal;
 
 namespace Orleans.Configuration
 {

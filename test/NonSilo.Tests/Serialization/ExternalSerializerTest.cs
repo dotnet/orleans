@@ -1,7 +1,5 @@
-using System.Reflection;
 using Orleans;
 using Orleans.Configuration;
-using Orleans.Runtime.Configuration;
 using Tester.Serialization;
 using TestExtensions;
 using Xunit;

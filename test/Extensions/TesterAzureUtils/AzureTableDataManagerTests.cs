@@ -4,10 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Azure.Cosmos.Table.Protocol;
 using Microsoft.Azure.Cosmos.Tables.SharedFiles;
-using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Clustering.AzureStorage;
 using Orleans.TestingHost.Utils;
-using TestExtensions;
 using Xunit;
 
 namespace Tester.AzureUtils

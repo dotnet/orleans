@@ -1,6 +1,5 @@
 using Orleans.ApplicationParts;
 using Orleans.Metadata;
-using Orleans.Runtime;
 
 namespace Orleans
 {

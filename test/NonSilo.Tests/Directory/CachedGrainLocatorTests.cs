@@ -11,11 +11,7 @@ using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Scheduler;
-using Orleans.Runtime.Utilities;
 using TestExtensions;
-using UnitTests.SchedulerTests;
-using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 

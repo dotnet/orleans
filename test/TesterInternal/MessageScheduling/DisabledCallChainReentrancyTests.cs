@@ -1,9 +1,6 @@
-using Orleans.Hosting;
-using Orleans;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
-using Orleans.Configuration;
 
 namespace UnitTests
 {

@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Collections.Immutable;
-using Orleans.Runtime.Utilities;
 using Orleans.Internal;
 
 namespace Orleans.Runtime.MembershipService
@@ -90,7 +89,7 @@ namespace Orleans.Runtime.MembershipService
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
                 this.log.LogError("Error processing membership updates: {Exception}", exception);
-                this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
+                await this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
             }
             finally
             {

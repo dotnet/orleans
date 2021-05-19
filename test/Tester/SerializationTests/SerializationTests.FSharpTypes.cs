@@ -1,6 +1,5 @@
 using Microsoft.FSharp.Core;
 using Microsoft.FSharp.Collections;
-using Orleans.Serialization;
 using TestExtensions;
 using UnitTests.FSharpTypes;
 using Xunit;

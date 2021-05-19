@@ -9,7 +9,6 @@ using Microsoft.Azure.Cosmos.Table;
 using Microsoft.Extensions.Logging;
 using Orleans.Clustering.AzureStorage;
 using Orleans.Clustering.AzureStorage.Utilities;
-using Orleans.Internal;
 using Orleans.Runtime;
 
 namespace Orleans.AzureUtils

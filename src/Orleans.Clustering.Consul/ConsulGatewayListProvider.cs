@@ -5,7 +5,6 @@ using System.Net;
 using System.Threading.Tasks;
 using Consul;
 using Orleans.Messaging;
-using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;

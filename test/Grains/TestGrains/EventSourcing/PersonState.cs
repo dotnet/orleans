@@ -1,6 +1,4 @@
 using System;
-using Orleans;
-using Orleans.EventSourcing;
 using TestGrainInterfaces;
 
 namespace TestGrains

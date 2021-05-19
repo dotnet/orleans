@@ -1,6 +1,5 @@
 using System;
 using NodaTime;
-using Orleans.Serialization;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;

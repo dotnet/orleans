@@ -84,13 +84,14 @@ namespace Orleans
                     return;
 
                 // first null it, next Release, so even if Release throws, we don't hold the reference any more.
-                AsyncLock tmp = target;
-                target = null;
                 try
                 {
-                    tmp.semaphore.Release();
+                    Interlocked
+                        .Exchange(ref target, null)
+                        ?.semaphore
+                        .Release();
                 }
-                catch (Exception) { } // just ignore the Exception
+                catch { } // just ignore the Exception
             }
         }
     }

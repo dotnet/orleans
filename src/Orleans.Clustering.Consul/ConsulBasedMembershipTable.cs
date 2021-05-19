@@ -2,13 +2,11 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Consul;
-using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Host;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Globalization;
 

@@ -4,8 +4,6 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Messaging;
-using Orleans.Runtime;
-using Orleans.Runtime.Host;
 using Orleans.Runtime.Membership;
 using Orleans.Configuration;
 using TestExtensions;

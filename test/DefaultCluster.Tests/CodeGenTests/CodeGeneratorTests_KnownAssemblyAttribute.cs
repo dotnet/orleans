@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.FSharp.Core;
-using Orleans.Serialization;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;

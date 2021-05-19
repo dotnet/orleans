@@ -1,10 +1,7 @@
 using System;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.Configuration.Validators;
-using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Runtime.Configuration
 {

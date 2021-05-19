@@ -2,12 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Internal;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.TestingHost.Utils;
 using Xunit;
 using Xunit.Abstractions;
 

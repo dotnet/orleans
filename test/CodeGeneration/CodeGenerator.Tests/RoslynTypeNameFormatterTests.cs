@@ -16,8 +16,6 @@ using Orleans.Runtime;
 using Orleans.Utilities;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.CodeGenerator.Model;
-using System.Text;
 using Orleans.Serialization;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("Microsoft")]

@@ -1,8 +1,6 @@
-using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.CodeGeneration;
-using Orleans.GrainDirectory;
 using UnitTests.GrainInterfaces.Directories;
 
 namespace UnitTests.Grains.Directories

@@ -1,9 +1,5 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans;
-using Orleans.Configuration;
-using Orleans.Hosting;
-using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;

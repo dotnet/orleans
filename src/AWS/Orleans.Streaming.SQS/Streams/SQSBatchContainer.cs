@@ -8,7 +8,6 @@ using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using SQSMessage = Amazon.SQS.Model.Message;
 
 namespace OrleansAWSUtils.Streams

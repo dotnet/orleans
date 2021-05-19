@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
 using Xunit;
-using Orleans.Runtime;
 
 namespace Tester
 {

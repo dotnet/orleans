@@ -3,7 +3,6 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using System;
 using System.Threading.Tasks;

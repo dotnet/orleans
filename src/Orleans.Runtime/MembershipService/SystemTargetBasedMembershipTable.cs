@@ -7,7 +7,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Internal;
-using Orleans.Runtime.Providers;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime.MembershipService

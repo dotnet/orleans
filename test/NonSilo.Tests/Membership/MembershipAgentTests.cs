@@ -237,12 +237,12 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(3, updateCounter);
 
             // When something goes horribly awry (eg, the timer throws an exception), the silo should fault.
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             while (!this.timerCalls["UpdateIAmAlive"].TryDequeue(out timer)) await Task.Delay(1);
             timer.Completion.TrySetException(new Exception("no"));
             Assert.False(timer.DelayOverride.HasValue);
             await Until(() => this.fatalErrorHandler.ReceivedCalls().Any());
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             // Stop & cancel all timers.
             await StopLifecycle();
@@ -288,7 +288,7 @@ namespace NonSilo.Tests.Membership
             var started = this.lifecycle.OnStart();
 
             await Until(() => remoteSiloProber.ReceivedCalls().Count() < otherSilos.Length);
-            
+
 
             await Until(() => started.IsCompleted);
             await started;

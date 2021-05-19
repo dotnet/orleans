@@ -9,7 +9,6 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
-using Tester;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;

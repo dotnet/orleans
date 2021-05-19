@@ -187,7 +187,7 @@ namespace NonSilo.Tests.Membership
 
             await stopped;
             Assert.Equal(1, timers.First().DisposedCounter);
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
         }
 
         /// <summary>
@@ -251,7 +251,7 @@ namespace NonSilo.Tests.Membership
             Assert.True(calls.Count >= 2);
             Assert.Equal(nameof(IMembershipTable.InitializeMembershipTable), calls[0].Method);
             Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
-            
+
             // During initialization, a first read from the table will be performed, transitioning
             // membership to a valid version.Assert.True(membershipUpdates.MoveNextAsync().Result);
             Assert.True(membershipUpdates.MoveNextAsync().Result);
@@ -283,7 +283,7 @@ namespace NonSilo.Tests.Membership
             Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
 
             await this.lifecycle.OnStop();
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
         }
 
         /// <summary>
@@ -323,7 +323,7 @@ namespace NonSilo.Tests.Membership
             // Silo should kill itself during the joining phase
             await manager.UpdateStatus(SiloStatus.Joining);
 
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             await this.lifecycle.OnStop();
         }
@@ -364,7 +364,7 @@ namespace NonSilo.Tests.Membership
             // Silo should kill itself during the joining phase
             await manager.UpdateStatus(SiloStatus.Joining);
 
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             var cts = new CancellationTokenSource();
             cts.Cancel();
@@ -399,7 +399,7 @@ namespace NonSilo.Tests.Membership
             // Silo should kill itself during the joining phase
             await manager.UpdateStatus(SiloStatus.Joining);
 
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             // Mark the silo as dead
             while (true)
@@ -412,7 +412,7 @@ namespace NonSilo.Tests.Membership
 
             // Refresh silo status and check that it determines it's dead.
             await manager.Refresh();
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             await this.lifecycle.OnStop();
         }
@@ -451,9 +451,9 @@ namespace NonSilo.Tests.Membership
                 if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
             }
 
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             await manager.TryToSuspectOrKill(otherSilos.First().SiloAddress);
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
         }
 
         /// <summary>
@@ -588,9 +588,9 @@ namespace NonSilo.Tests.Membership
                 if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
             }
 
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             await manager.TryToSuspectOrKill(victim);
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             // We killed ourselves and should not have marked the other silo as dead.
             await manager.Refresh();
@@ -636,14 +636,14 @@ namespace NonSilo.Tests.Membership
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
-            
+
             // Test that retries occur after an exception.
             (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default);
             while (!timerCalls.TryDequeue(out timer)) await Task.Delay(1);
             var counter = 0;
             membershipTable.OnReadAll = () => { if (counter++ == 0) throw new Exception("no"); };
             timer.Completion.TrySetResult(true);
-            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             // A shorter delay should be provided after a transient failure.
             while (!timerCalls.TryDequeue(out timer)) await Task.Delay(10);
@@ -659,7 +659,7 @@ namespace NonSilo.Tests.Membership
             // If for some reason the timer itself fails (or something else), the silo should crash
             while (!timerCalls.TryDequeue(out timer)) await Task.Delay(10);
             timer.Completion.TrySetException(new Exception("no again"));
-            this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
+            await this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
             Assert.False(timerCalls.TryDequeue(out timer));
             await this.lifecycle.OnStop();
         }

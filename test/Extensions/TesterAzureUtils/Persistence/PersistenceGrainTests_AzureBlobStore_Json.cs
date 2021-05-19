@@ -2,7 +2,6 @@ using System.Threading.Tasks;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.TestingHost;
-using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 

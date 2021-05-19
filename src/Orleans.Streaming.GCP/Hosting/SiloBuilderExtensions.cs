@@ -1,7 +1,6 @@
 using System;
 using Orleans.Configuration;
 using Orleans.Providers.GCP.Streams.PubSub;
-using Orleans.Streams;
 
 namespace Orleans.Hosting
 {

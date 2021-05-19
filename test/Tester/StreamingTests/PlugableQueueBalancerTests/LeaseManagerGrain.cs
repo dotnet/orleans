@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using System;
 using System.Collections.Generic;

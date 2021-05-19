@@ -10,7 +10,6 @@ using Orleans.Transactions;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using System.Collections.Generic;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using System.Text;
 

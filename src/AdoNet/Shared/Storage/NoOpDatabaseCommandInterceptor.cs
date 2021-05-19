@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Text;
+﻿using System.Data;
 
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage

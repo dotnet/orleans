@@ -237,7 +237,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var targetMilliseconds = (int)this.clusterMembershipOptions.TableRefreshTimeout.TotalMilliseconds;
-                
+
                 TimeSpan? onceOffDelay = ThreadSafeRandom.NextTimeSpan(this.clusterMembershipOptions.TableRefreshTimeout);
                 while (await this.membershipUpdateTimer.NextTick(onceOffDelay))
                 {
@@ -264,7 +264,7 @@ namespace Orleans.Runtime.MembershipService
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
                 this.log.LogError("Error refreshing membership table: {Exception}", exception);
-                this.fatalErrorHandler.OnFatalException(this, nameof(PeriodicallyRefreshMembershipTable), exception);
+                await this.fatalErrorHandler.OnFatalException(this, nameof(PeriodicallyRefreshMembershipTable), exception);
             }
             finally
             {
@@ -288,8 +288,8 @@ namespace Orleans.Runtime.MembershipService
                     taskFunction,
                     NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS,
                     NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS,
-                    retryValueFilter,   // if failed to Update on contention - retry   
-                    (exc, i) => true,            // Retry on errors.          
+                    retryValueFilter,   // if failed to Update on contention - retry
+                    (exc, i) => true,            // Retry on errors.
                     timeout,
                     new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
                     new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
@@ -300,7 +300,7 @@ namespace Orleans.Runtime.MembershipService
         {
             string errorString = null;
             int numCalls = 0;
-            
+
             try
             {
                 Func<int, Task<bool>> updateMyStatusTask = async counter =>
@@ -309,7 +309,7 @@ namespace Orleans.Runtime.MembershipService
                     if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Going to try to TryUpdateMyStatusGlobalOnce #{0}", counter);
                     return await TryUpdateMyStatusGlobalOnce(status);  // function to retry
                 };
-                
+
                 if (status == SiloStatus.Dead && this.membershipTableProvider is SystemTargetBasedMembershipTable)
                 {
                     // SystemTarget-based membership may not be accessible at this stage, so allow for one quick attempt to update
@@ -360,7 +360,7 @@ namespace Orleans.Runtime.MembershipService
                     throw new OrleansException(errorString);
                 }
             }
-            catch (Exception exc) 
+            catch (Exception exc)
             {
                 if (errorString == null)
                 {
@@ -508,7 +508,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var entry = tuple.Item1;
                 var siloAddress = entry.SiloAddress;
-                
+
                 if (siloAddress.Generation.Equals(myAddress.Generation))
                 {
                     if (entry.Status == SiloStatus.Dead)
@@ -519,7 +519,7 @@ namespace Orleans.Runtime.MembershipService
                     }
                     continue;
                 }
-                
+
                 if (entry.Status == SiloStatus.Dead)
                 {
                     if (log.IsEnabled(LogLevel.Trace)) log.Trace("Skipping my previous old Dead entry in membership table: {0}", entry.ToFullString(full: true));
@@ -698,7 +698,7 @@ namespace Orleans.Runtime.MembershipService
             if (log.IsEnabled(LogLevel.Debug)) log.Debug("-TryToSuspectOrKill {siloAddress}: The current status of {siloAddress} in the table is {status}, its entry is {entry}",
                 entry.SiloAddress, // First
                 entry.SiloAddress, // Second
-                entry.Status, 
+                entry.Status,
                 entry.ToFullString());
             // check if the table already knows that this silo is dead
             if (entry.Status == SiloStatus.Dead)
@@ -737,25 +737,25 @@ namespace Orleans.Runtime.MembershipService
 
             if (freshVotes.Count + myAdditionalVote >= this.clusterMembershipOptions.NumVotesForDeathDeclaration)
                 declareDead = true;
-            
+
             if (freshVotes.Count + myAdditionalVote >= (activeSilos + 1) / 2)
                 declareDead = true;
-            
+
             if (declareDead)
             {
                 // kick this silo off
-                log.Info(ErrorCode.MembershipMarkingAsDead, 
+                log.Info(ErrorCode.MembershipMarkingAsDead,
                     "-Going to mark silo {0} as DEAD in the table #1. I am the last voter: #freshVotes={1}, myVoteIndex = {2}, NumVotesForDeathDeclaration={3} , #activeSilos={4}, suspect list={5}",
-                            entry.SiloAddress, 
-                            freshVotes.Count, 
+                            entry.SiloAddress,
+                            freshVotes.Count,
                             myVoteIndex,
-                            this.clusterMembershipOptions.NumVotesForDeathDeclaration, 
-                            activeSilos, 
+                            this.clusterMembershipOptions.NumVotesForDeathDeclaration,
+                            activeSilos,
                             PrintSuspectList(allVotes));
                 return await DeclareDead(entry, eTag, table.Version);
             }
 
-            // we still do not have enough votes - need to vote                             
+            // we still do not have enough votes - need to vote
             // find voting place:
             //      update my vote, if I voted previously
             //      OR if the list is not full - just add a new vote
@@ -786,8 +786,8 @@ namespace Orleans.Runtime.MembershipService
             }
             log.Info(ErrorCode.MembershipVotingForKill,
                 "-Putting my vote to mark silo {0} as DEAD #2. Previous suspect list is {1}, trying to update to {2}, eTag={3}, freshVotes is {4}",
-                entry.SiloAddress, 
-                PrintSuspectList(prevList), 
+                entry.SiloAddress,
+                PrintSuspectList(prevList),
                 PrintSuspectList(entry.SuspectTimes),
                 eTag,
                 PrintSuspectList(freshVotes));
@@ -833,11 +833,11 @@ namespace Orleans.Runtime.MembershipService
                     GossipToOthers(entry.SiloAddress, entry.Status).Ignore();
                     return true;
                 }
-                
+
                 log.Info(ErrorCode.MembershipMarkDeadWriteFailed, "-Failed to update {0} status to Dead in the Membership table, due to write conflicts. Will retry.", entry.SiloAddress);
                 return false;
             }
-            
+
             log.Info(ErrorCode.MembershipCantWriteLivenessDisabled, "-Want to mark silo {0} as DEAD, but will ignore because Liveness is Disabled.", entry.SiloAddress);
             return true;
         }

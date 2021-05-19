@@ -13,8 +13,6 @@ using Xunit.Abstractions;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.TestingHost;
-using Orleans.Providers;
-using Orleans.Internal;
 using TestExtensions;
 using TestExtensions.Runners;
 using UnitTests.GrainInterfaces;

@@ -5,9 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Internal;
 using Orleans.Metadata;
-using Orleans.Runtime.Providers;
 using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime.Metadata
@@ -85,7 +83,7 @@ namespace Orleans.Runtime.Metadata
             }
             catch (Exception exception) when (_fatalErrorHandler.IsUnexpected(exception))
             {
-                _fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
+                await _fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
             }
             finally
             {

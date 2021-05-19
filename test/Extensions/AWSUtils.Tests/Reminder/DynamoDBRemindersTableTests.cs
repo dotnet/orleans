@@ -6,7 +6,6 @@ using Microsoft.Extensions.Options;
 
 using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Reminders.DynamoDB;
 using Orleans.Runtime;
 using TestExtensions;

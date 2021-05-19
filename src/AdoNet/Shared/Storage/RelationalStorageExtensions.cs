@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Reflection;
 
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage

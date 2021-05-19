@@ -1,6 +1,4 @@
-﻿using Orleans.Serialization;
-
-namespace TestExtensions
+﻿namespace TestExtensions
 {
     public class TestEnvironmentFixture : SerializationTestEnvironment
     {

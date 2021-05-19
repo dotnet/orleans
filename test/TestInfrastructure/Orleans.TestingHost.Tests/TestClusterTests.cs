@@ -1,8 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Tests.Grains;
 using TestExtensions;
 using Xunit;

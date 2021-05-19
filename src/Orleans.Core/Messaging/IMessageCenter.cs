@@ -1,5 +1,4 @@
-using System;
-using System.Threading.Channels;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -7,9 +6,9 @@ namespace Orleans.Runtime
     {
         SiloAddress MyAddress { get; }
 
-        void Start();
-        
-        void Stop();
+        Task Start();
+
+        Task Stop();
 
         void SendMessage(Message msg);
 

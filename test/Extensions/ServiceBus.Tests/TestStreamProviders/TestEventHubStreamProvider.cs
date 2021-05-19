@@ -6,7 +6,6 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
-using Tester.TestStreamProviders;
 using Orleans;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.Serialization;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 

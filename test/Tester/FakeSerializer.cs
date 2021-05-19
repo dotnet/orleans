@@ -1,5 +1,4 @@
 ﻿using System;
-using Orleans.Runtime;
 using Orleans.Serialization;
 
 namespace Tester.Serialization
