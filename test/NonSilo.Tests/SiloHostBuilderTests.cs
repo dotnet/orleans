@@ -144,6 +144,29 @@ namespace NonSilo.Tests
         }
 
         /// <summary>
+        /// Host shutdown timeout must be <= GrainCollectionOptions.DeactivationTimeout.
+        /// </summary>
+        [Fact]
+        public void SiloHostBuilder_HostOptionsShutdownTimeoutTest()
+        {
+            Func<double, double, ISiloHost> buildWithTimeout = (double shutdown, double deactiveation) => new SiloHostBuilder()
+                .Configure<ClusterOptions>(options => { options.ClusterId = "GrainCollectionClusterId"; options.ServiceId = "GrainCollectionServiceId"; })
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureServices(services => services.AddSingleton<IMembershipTable, NoOpMembershipTable>())
+                .Configure<HostOptions>(x => x.ShutdownTimeout = TimeSpan.FromSeconds(shutdown))
+                .Configure<GrainCollectionOptions>(x => x.DeactivationTimeout = TimeSpan.FromSeconds(deactiveation))
+                .Build();
+
+            Assert.Throws<OrleansConfigurationException>(() => buildWithTimeout(60, 30));
+
+            using var silo1 = buildWithTimeout(60, 60);
+            Assert.NotNull(silo1);
+            
+            using var silo2 = buildWithTimeout(51, 81);
+            Assert.NotNull(silo2);
+        }
+
+        /// <summary>
         /// Tests that a silo can be created without specifying configuration.
         /// </summary>
         [Fact]
@@ -303,7 +326,7 @@ namespace NonSilo.Tests
                     {
                         svcCollection.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
                     })
-                    .Build()); 
+                    .Build());
         }
 
         /// <summary>

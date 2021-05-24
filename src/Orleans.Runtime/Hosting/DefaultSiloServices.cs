@@ -339,6 +339,7 @@ namespace Orleans.Hosting
             // so move it in the end so other validator are called first
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
+            services.AddTransient<IConfigurationValidator, HostOptionsValidator>();
             services.AddTransient<IConfigurationValidator, DevelopmentClusterMembershipOptionsValidator>();
 
             // Enable hosted client.
