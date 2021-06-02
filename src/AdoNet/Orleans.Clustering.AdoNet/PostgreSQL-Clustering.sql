@@ -49,6 +49,14 @@ BEGIN
 END
 $func$ LANGUAGE plpgsql;
 
+-- Predefined Orleans queries.
+CREATE TABLE OrleansQuery
+(
+    QueryKey varchar(50) NOT NULL,
+    QueryText varchar NOT NULL,
+    CONSTRAINT PK_OrleansQuery_QueryKey PRIMARY KEY(QueryKey)
+);
+
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
