@@ -1,15 +1,20 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27130.2027
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31320.298
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdventureGrainInterfaces", "AdventureGrainInterfaces\AdventureGrainInterfaces.csproj", "{982F8517-3A69-4D2C-BAEE-325F88543CC6}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdventureGrains", "AdventureGrains\AdventureGrains.csproj", "{47DC1063-B200-4383-B4AF-70BC35BF206C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdventureSetup", "AdventureSetup\AdventureSetup.csproj", "{B2766B42-9FF5-46A4-B5AA-ED32A3D88990}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdventureServer", "AdventureServer\AdventureServer.csproj", "{B2766B42-9FF5-46A4-B5AA-ED32A3D88990}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdventureClient", "AdventureClient\AdventureClient.csproj", "{20932297-7E65-458A-BC6A-67D0C98E5B89}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B8608571-15E5-4A31-9D06-A1D8D08D2970}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
