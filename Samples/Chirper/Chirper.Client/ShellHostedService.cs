@@ -8,38 +8,25 @@ using Orleans;
 
 namespace Chirper.Client
 {
-    public class ShellHostedService : IHostedService
+    public class ShellHostedService : BackgroundService
     {
         private readonly IClusterClient _client;
-        private readonly IHost _host;
-        private IChirperViewer _viewer;
+        private readonly IHostApplicationLifetime _applicationLifetime;
+        private ChirperConsoleViewer _viewer;
+        private IChirperViewer _viewerRef;
         private IChirperAccount _account;
-        private Task _execution;
 
-        public ShellHostedService(IClusterClient client, IHost host)
+        public ShellHostedService(IClusterClient client, IHost host, IHostApplicationLifetime applicationLifetime)
         {
             _client = client;
-            _host = host;
+            _applicationLifetime = applicationLifetime;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
-        {
-            _execution = RunAsync();
-            return Task.CompletedTask;
-        }
-
-        public Task StopAsync(CancellationToken cancellationToken)
-        {
-            // as we cannot stop the console by graceful means, there is nothing to do
-            // the host itself will stop the console when it terminates the application
-            return Task.CompletedTask;
-        }
-
-        public async Task RunAsync()
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             ShowHelp(true);
 
-            while (true)
+            while (!stoppingToken.IsCancellationRequested)
             {
                 var command = Console.ReadLine();
                 if (command == "/help")
@@ -48,7 +35,8 @@ namespace Chirper.Client
                 }
                 else if (command == "/quit")
                 {
-                    await _host.StopAsync();
+                    _applicationLifetime.StopApplication();
+                    return;
                 }
                 else if (command.StartsWith("/user "))
                 {
@@ -104,12 +92,13 @@ namespace Chirper.Client
                 {
                     if (EnsureActiveAccount())
                     {
-                        if (_viewer == null)
+                        if (_viewerRef == null)
                         {
-                            _viewer = await _client.CreateObjectReference<IChirperViewer>(new ChirperConsoleViewer(_account.GetPrimaryKeyString()));
+                            _viewer = new ChirperConsoleViewer(_account.GetPrimaryKeyString());
+                            _viewerRef = await _client.CreateObjectReference<IChirperViewer>(_viewer);
                         }
 
-                        await _account.SubscribeAsync(_viewer);
+                        await _account.SubscribeAsync(_viewerRef);
 
                         Console.WriteLine($"Now observing [{_account.GetPrimaryKeyString()}]");
                     }
@@ -175,10 +164,11 @@ namespace Chirper.Client
 
         private async Task Unobserve()
         {
-            if (_viewer != null)
+            if (_viewerRef != null)
             {
-                await _account.UnsubscribeAsync(_viewer);
+                await _account.UnsubscribeAsync(_viewerRef);
 
+                _viewerRef = null;
                 _viewer = null;
 
                 Console.WriteLine($"No longer observing [{_account.GetPrimaryKeyString()}]");

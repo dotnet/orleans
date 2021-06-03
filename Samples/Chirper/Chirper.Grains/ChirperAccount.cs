@@ -10,6 +10,7 @@ using Orleans.Concurrency;
 
 namespace Chirper.Grains
 {
+    [Serializable]
     public class ChirperAccountState
     {
         /// <summary>

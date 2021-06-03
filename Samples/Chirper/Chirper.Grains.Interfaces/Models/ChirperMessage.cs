@@ -5,6 +5,7 @@ namespace Chirper.Grains.Models
     /// <summary>
     /// Data object representing one Chirp message entry
     /// </summary>
+    [Serializable]
     public class ChirperMessage
     {
         /// <summary>

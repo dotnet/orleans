@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Chirper.Grains;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -16,6 +17,7 @@ namespace Chirper.Client
             _logger = logger;
             Client = new ClientBuilder()
                 .UseLocalhostClustering()
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IChirperAccount).Assembly))
                 .Build();
         }
 
@@ -51,12 +53,11 @@ namespace Chirper.Client
             _logger.LogInformation("Connected.");
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
-            var cancellation = new TaskCompletionSource<bool>();
-            cancellationToken.Register(() => cancellation.TrySetCanceled(cancellationToken));
-
-            return Task.WhenAny(Client.Close(), cancellation.Task);
+            var cancellation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var _ = cancellationToken.Register(() => cancellation.TrySetCanceled(cancellationToken));
+            await Task.WhenAny(Client.Close(), cancellation.Task);
         }
 
         public IClusterClient Client { get; }
