@@ -1,2 +1,0 @@
-<!-- Note that this file is only necessary in this sample project because of how the root Directory.Build.* files interact with the .sfproj -->
-<Project />
