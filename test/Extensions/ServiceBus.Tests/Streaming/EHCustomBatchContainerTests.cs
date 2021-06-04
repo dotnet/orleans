@@ -102,8 +102,6 @@ namespace ServiceBus.Tests.StreamingTests
 
             protected override IBatchContainer GetBatchContainer(EventHubMessage eventHubMessage)
                 => new CustomBatchContainer(base.GetBatchContainer(eventHubMessage));
-
-            //public override string GetPartitionKey(Guid streamGuid, string streamNamespace) => Guid.Empty.ToString();
         }
 
         #endregion

@@ -33,6 +33,7 @@ namespace Orleans.Configuration
         /// Set to null to disable this tracking.
         /// </summary>
         public TimeSpan? MetadataMinTimeInCache { get; set; } = DefaultMetadataMinTimeInCache;
+
         /// <summary>
         /// Default MetadataMinTimeInCache
         /// </summary>
