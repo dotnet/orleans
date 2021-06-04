@@ -9,10 +9,12 @@ namespace Presence.Grains.Models
     /// This class is immutable.
     /// Operations on this class always return a new copy.
     /// </summary>
+    [Serializable]
     [Immutable]
     public class GameStatus
     {
         public ImmutableHashSet<Guid> PlayerKeys { get; }
+
         public string Score { get; }
 
         public GameStatus(ImmutableHashSet<Guid> playerKeys, string score)

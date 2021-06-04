@@ -10,6 +10,7 @@ namespace Presence.Grains.Models
     /// This class is immutable.
     /// Operations on this class always return a new copy.
     /// </summary>
+    [Serializable]
     [Immutable]
     public class HeartbeatData
     {

@@ -4,36 +4,29 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Presence.Grains;
 using Presence.Shared;
 
-namespace Presence.PlayerWatcher
+namespace Presence.LoadGenerator
 {
     public class Program
     {
-        public static Task Main()
+        public static Task Main(string[] args)
         {
-            Console.Title = nameof(PlayerWatcher);
+            Console.Title = nameof(LoadGenerator);
 
             return new HostBuilder()
                 .ConfigureServices(services =>
                 {
-                    // add regular services
-                    services.AddTransient<IGameObserver, LoggerGameObserver>();
-
                     // this hosted service connects and disconnects from the cluster along with the host
                     // it also exposes the cluster client to other services that request it
                     services.AddSingleton<ClusterClientHostedService>();
                     services.AddSingleton<IHostedService>(_ => _.GetService<ClusterClientHostedService>());
                     services.AddSingleton(_ => _.GetService<ClusterClientHostedService>().Client);
 
-                    // this hosted service runs the sample logic
-                    services.AddSingleton<IHostedService, PlayerWatcherHostedService>();
+                    // this hosted service run the load generation using the available cluster client
+                    services.AddSingleton<IHostedService, LoadGeneratorHostedService>();
                 })
-                .ConfigureLogging(builder =>
-                {
-                    builder.AddConsole();
-                })
+                .ConfigureLogging(builder => builder.AddConsole())
                 .RunConsoleAsync();
         }
     }

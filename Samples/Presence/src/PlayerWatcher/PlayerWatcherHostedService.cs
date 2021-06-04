@@ -33,7 +33,7 @@ namespace Presence.PlayerWatcher
             // poll for this player to join a game
             while (_game == null)
             {
-                _logger.LogInformation("Getting current game for player {@PlayerId}...",
+                _logger.LogInformation("Getting current game for player {PlayerId}...",
                     playerId);
 
                 try
@@ -43,7 +43,7 @@ namespace Presence.PlayerWatcher
                 catch (Exception error)
                 {
                     _logger.LogError(error,
-                        "Error while requesting current game for player {@PlayerId}",
+                        "Error while requesting current game for player {PlayerId}",
                         playerId);
                 }
 
@@ -60,15 +60,13 @@ namespace Presence.PlayerWatcher
                 }
             }
 
-            _logger.LogInformation("Observing updates for game {@GameKey}",
-                _game.GetPrimaryKey());
+            _logger.LogInformation("Observing updates for game {GameKey}", _game.GetPrimaryKey());
 
             // subscribe for updates
             var reference = await _client.CreateObjectReference<IGameObserver>(_observer);
             await _game.ObserveGameUpdatesAsync(reference);
 
-            _logger.LogInformation("Subscribed successfully to game {@GameKey}",
-                _game.GetPrimaryKey());
+            _logger.LogInformation("Subscribed successfully to game {GameKey}", _game.GetPrimaryKey());
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)

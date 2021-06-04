@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -8,18 +9,20 @@ using Orleans.Runtime;
 
 namespace Presence.Shared
 {
-    public class ClusterClientHostedService : IHostedService
+    public sealed class ClusterClientHostedService : IHostedService, IAsyncDisposable, IDisposable
     {
         private readonly ILogger<ClusterClientHostedService> _logger;
 
-        public ClusterClientHostedService(ILogger<ClusterClientHostedService> logger)
+        public ClusterClientHostedService(ILoggerFactory loggerFactory)
         {
-            _logger = logger;
+            _logger = loggerFactory.CreateLogger<ClusterClientHostedService>();
             Client = new ClientBuilder()
                 .UseLocalhostClustering()
-                .ConfigureLogging(_ =>
+                .ConfigureServices(services =>
                 {
-                    _.AddConsole();
+                    // Add logging from the host's container.
+                    services.AddSingleton(loggerFactory);
+                    services.AddSingleton(typeof(ILogger<>), typeof(Logger<>));
                 })
                 .Build();
         }
@@ -38,9 +41,7 @@ namespace Presence.Shared
 
                 if (++attempt < maxAttempts)
                 {
-                    _logger.LogWarning(error,
-                        "Failed to connect to Orleans cluster on attempt {@Attempt} of {@MaxAttempts}.",
-                        attempt, maxAttempts);
+                    _logger.LogWarning(error, "Failed to connect to Orleans cluster on attempt {Attempt} of {MaxAttempts}.", attempt, maxAttempts);
 
                     try
                     {
@@ -55,10 +56,7 @@ namespace Presence.Shared
                 }
                 else
                 {
-                    _logger.LogError(error,
-                        "Failed to connect to Orleans cluster on attempt {@Attempt} of {@MaxAttempts}.",
-                        attempt, maxAttempts);
-
+                    _logger.LogError(error, "Failed to connect to Orleans cluster on attempt {Attempt} of {MaxAttempts}.", attempt, maxAttempts); 
                     return false;
                 }
             });
@@ -75,6 +73,10 @@ namespace Presence.Shared
                 _logger.LogWarning(error, "Error while gracefully disconnecting from Orleans cluster. Will ignore and continue to shutdown.");
             }
         }
+
+        public void Dispose() => Client?.Dispose();
+
+        public ValueTask DisposeAsync() => Client?.DisposeAsync() ?? default;
 
         public IClusterClient Client { get; }
     }

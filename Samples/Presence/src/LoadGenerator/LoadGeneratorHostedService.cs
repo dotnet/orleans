@@ -11,13 +11,10 @@ using Presence.Grains.Models;
 
 namespace Presence.LoadGenerator
 {
-    public class LoadGeneratorHostedService : IHostedService
+    public class LoadGeneratorHostedService : BackgroundService
     {
         private readonly ILogger<LoadGeneratorHostedService> _logger;
         private readonly IClusterClient _client;
-        private readonly CancellationTokenSource _executionCancellation = new CancellationTokenSource();
-
-        private Task _execution;
 
         public LoadGeneratorHostedService(ILogger<LoadGeneratorHostedService> logger, IClusterClient client)
         {
@@ -25,24 +22,7 @@ namespace Presence.LoadGenerator
             _client = client;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
-        {
-            // start the load generation on the background
-            _execution = RunAsync();
-            return Task.CompletedTask;
-        }
-
-        public Task StopAsync(CancellationToken cancellationToken)
-        {
-            // request cancellation of the background load generation
-            _executionCancellation.Cancel();
-
-            // wait until load generation gracefully completes
-            // or the caller forces shutdown
-            return Task.WhenAny(_execution, cancellationToken.GetCompletionTask());
-        }
-
-        private async Task RunAsync()
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             // number of games to simulate
             var nGames = 10;
@@ -74,7 +54,7 @@ namespace Presence.LoadGenerator
             var presence = _client.GetGrain<IPresenceGrain>(0);
             var promises = new Task[nGames];
 
-            while (++iteration < nIterations)
+            while (!stoppingToken.IsCancellationRequested && ++iteration < nIterations)
             {
                 _logger.LogInformation("Sending heartbeat series #{@Iteration}", iteration);
 
@@ -94,10 +74,6 @@ namespace Presence.LoadGenerator
 
                     // Wait for all calls to finish.
                     await Task.WhenAll(promises);
-
-                    // check for cancellation request
-                    if (_executionCancellation.IsCancellationRequested)
-                        return;
                 }
                 catch (Exception error)
                 {
@@ -106,9 +82,9 @@ namespace Presence.LoadGenerator
 
                 try
                 {
-                    await Task.Delay(sendInterval, _executionCancellation.Token);
+                    await Task.Delay(sendInterval, stoppingToken);
                 }
-                catch (OperationCanceledException)
+                catch when (stoppingToken.IsCancellationRequested)
                 {
                     return;
                 }

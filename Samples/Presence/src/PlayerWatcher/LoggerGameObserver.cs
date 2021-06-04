@@ -17,7 +17,7 @@ namespace Presence.PlayerWatcher
 
         public void UpdateGameScore(string score)
         {
-            logger.LogInformation("New game score: {@GameScore}", score);
+            logger.LogInformation("New game score: {GameScore}", score);
         }
     }
 }

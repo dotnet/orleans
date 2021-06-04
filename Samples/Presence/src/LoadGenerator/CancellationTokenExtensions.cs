@@ -13,8 +13,8 @@ namespace Presence.LoadGenerator
         /// </summary>
         public static Task GetCompletionTask(this CancellationToken token)
         {
-            var completion = new TaskCompletionSource<bool>();
-            token.Register(() => completion.TrySetResult(true));
+            var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _ = token.Register(() => completion.TrySetResult(true));
             return completion.Task;
         }
     }
