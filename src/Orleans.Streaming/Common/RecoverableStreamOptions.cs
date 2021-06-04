@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using Orleans.Streams;
 
 namespace Orleans.Configuration
 {
@@ -21,6 +22,18 @@ namespace Orleans.Configuration
         /// Default DataMaxAgeInCache
         /// </summary>
         public static readonly TimeSpan DefaultDataMaxAgeInCache = TimeSpan.FromMinutes(30);
+
+        /// <summary>
+        /// Minimum time message metadata (<see cref="StreamSequenceToken"/>) will stay in cache before it is available for time based purge.
+        /// Used to avoid cache miss if the full message was purged.
+        /// Set to null to disable this tracking.
+        /// </summary>
+        public TimeSpan? MetadataMinTimeInCache { get; set; } = DefaultMetadataMinTimeInCache;
+
+        /// <summary>
+        /// Default MetadataMinTimeInCache
+        /// </summary>
+        public static readonly TimeSpan DefaultMetadataMinTimeInCache = DefaultDataMinTimeInCache.Multiply(2);
     }
 
     public class StreamStatisticOptions

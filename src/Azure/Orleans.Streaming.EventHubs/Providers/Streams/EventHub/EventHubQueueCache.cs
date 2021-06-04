@@ -31,7 +31,6 @@ namespace Orleans.ServiceBus.Providers
         private readonly ILogger logger;
         private readonly AggregatedCachePressureMonitor cachePressureMonitor;
         private readonly ICacheMonitor cacheMonitor;
-
         private FixedSizeBuffer currentBuffer;
 
         /// <summary>
@@ -46,6 +45,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="logger"></param>
         /// <param name="cacheMonitor"></param>
         /// <param name="cacheMonitorWriteInterval"></param>
+        /// <param name="metadataMinTimeInCache"></param>
         public EventHubQueueCache(
             string partition,
             int defaultMaxAddCount,
@@ -55,14 +55,15 @@ namespace Orleans.ServiceBus.Providers
             IStreamQueueCheckpointer<string> checkpointer,
             ILogger logger,
             ICacheMonitor cacheMonitor,
-            TimeSpan? cacheMonitorWriteInterval)
+            TimeSpan? cacheMonitorWriteInterval,
+            TimeSpan? metadataMinTimeInCache)
         {
             this.Partition = partition;
             this.defaultMaxAddCount = defaultMaxAddCount;
             this.bufferPool = bufferPool;
             this.dataAdapter = dataAdapter;
             this.checkpointer = checkpointer;
-            this.cache = new PooledQueueCache(dataAdapter, logger, cacheMonitor, cacheMonitorWriteInterval);
+            this.cache = new PooledQueueCache(dataAdapter, logger, cacheMonitor, cacheMonitorWriteInterval, metadataMinTimeInCache);
             this.cacheMonitor = cacheMonitor;
             this.evictionStrategy = evictionStrategy;
             this.evictionStrategy.OnPurged = this.OnPurge;
