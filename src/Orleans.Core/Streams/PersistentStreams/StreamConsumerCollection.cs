@@ -11,6 +11,7 @@ namespace Orleans.Streams
     {
         private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one stream: from Guid ConsumerId to StreamConsumerData
         private DateTime lastActivityTime;
+
         public bool StreamRegistered { get; set; }
 
         public StreamConsumerCollection(DateTime now)
