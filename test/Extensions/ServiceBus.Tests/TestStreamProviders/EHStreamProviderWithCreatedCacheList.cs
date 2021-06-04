@@ -66,7 +66,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             }
 
             private const int DefaultMaxAddCount = 10;
-            protected override IEventHubQueueCache CreateCache(string partition, IEventHubDataAdapter dataAdatper, StreamStatisticOptions options, IStreamQueueCheckpointer<string> checkpointer,
+            protected override IEventHubQueueCache CreateCache(string partition, IEventHubDataAdapter dataAdatper, StreamStatisticOptions options, StreamCacheEvictionOptions evictionOptions, IStreamQueueCheckpointer<string> checkpointer,
                 ILoggerFactory loggerFactory, IObjectPool<FixedSizeBuffer> bufferPool, string blockPoolId,  TimePurgePredicate timePurge,
                 SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions, ITelemetryProducer telemetryProducer)
             {
@@ -88,7 +88,7 @@ namespace ServiceBus.Tests.TestStreamProviders
 
             public QueueCacheForTesting(int defaultMaxAddCount, IObjectPool<FixedSizeBuffer> bufferPool, IEventHubDataAdapter dataAdapter, IEvictionStrategy evictionStrategy, IStreamQueueCheckpointer<string> checkpointer, ILogger logger,
                 ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
-                : base("test", defaultMaxAddCount, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, cacheMonitor, cacheMonitorWriteInterval)
+                : base("test", defaultMaxAddCount, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, cacheMonitor, cacheMonitorWriteInterval, null)
             {
             }
 

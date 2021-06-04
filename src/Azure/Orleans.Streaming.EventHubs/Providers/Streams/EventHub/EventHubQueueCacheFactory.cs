@@ -15,6 +15,7 @@ namespace Orleans.ServiceBus.Providers
     public class EventHubQueueCacheFactory : IEventHubQueueCacheFactory
     {
         private readonly EventHubStreamCachePressureOptions cacheOptions;
+        private readonly StreamCacheEvictionOptions evictionOptions;
         private readonly StreamStatisticOptions statisticOptions;
         private readonly IEventHubDataAdapter dataAdater;
         private readonly SerializationManager serializationManager;
@@ -48,6 +49,7 @@ namespace Orleans.ServiceBus.Providers
             Func<EventHubBlockPoolMonitorDimensions, ILoggerFactory, ITelemetryProducer, IBlockPoolMonitor> blockPoolMonitorFactory = null)
         {
             this.cacheOptions = cacheOptions;
+            this.evictionOptions = evictionOptions;
             this.statisticOptions = statisticOptions;
             this.dataAdater = dataAdater;
             this.serializationManager = serializationManager;
@@ -66,7 +68,7 @@ namespace Orleans.ServiceBus.Providers
         {
             string blockPoolId;
             var blockPool = CreateBufferPool(this.statisticOptions, loggerFactory, this.sharedDimensions, telemetryProducer, out blockPoolId);
-            var cache = CreateCache(partition, dataAdater, this.statisticOptions, checkpointer, loggerFactory, blockPool, blockPoolId, this.timePurge, this.serializationManager, this.sharedDimensions, telemetryProducer);
+            var cache = CreateCache(partition, dataAdater, this.statisticOptions, this.evictionOptions, checkpointer, loggerFactory, blockPool, blockPoolId, this.timePurge, this.serializationManager, this.sharedDimensions, telemetryProducer);
             AddCachePressureMonitors(cache, this.cacheOptions, loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{this.sharedDimensions.EventHubPath}.{partition}"));
             return cache;
         }
@@ -127,16 +129,26 @@ namespace Orleans.ServiceBus.Providers
         /// Default function to be called to create an EventhubQueueCache in IEventHubQueueCacheFactory.CreateCache method. User can 
         /// override this method to add more customization.
         /// </summary>
-        protected virtual IEventHubQueueCache CreateCache(string partition, IEventHubDataAdapter dataAdatper, StreamStatisticOptions statisticOptions, IStreamQueueCheckpointer<string> checkpointer,
-            ILoggerFactory loggerFactory, IObjectPool<FixedSizeBuffer> bufferPool, string blockPoolId, TimePurgePredicate timePurge,
-            SerializationManager serializationManager, EventHubMonitorAggregationDimensions sharedDimensions, ITelemetryProducer telemetryProducer)
+        protected virtual IEventHubQueueCache CreateCache(
+            string partition,
+            IEventHubDataAdapter dataAdatper,
+            StreamStatisticOptions statisticOptions,
+            StreamCacheEvictionOptions streamCacheEvictionOptions,
+            IStreamQueueCheckpointer<string> checkpointer,
+            ILoggerFactory loggerFactory,
+            IObjectPool<FixedSizeBuffer> bufferPool,
+            string blockPoolId,
+            TimePurgePredicate timePurge,
+            SerializationManager serializationManager,
+            EventHubMonitorAggregationDimensions sharedDimensions,
+            ITelemetryProducer telemetryProducer)
         {
             var cacheMonitorDimensions = new EventHubCacheMonitorDimensions(sharedDimensions, partition, blockPoolId);
             var cacheMonitor = this.CacheMonitorFactory(cacheMonitorDimensions, loggerFactory, telemetryProducer);
             var logger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{sharedDimensions.EventHubPath}.{partition}");
             var evictionStrategy = new ChronologicalEvictionStrategy(logger, timePurge, cacheMonitor, statisticOptions.StatisticMonitorWriteInterval);
             return new EventHubQueueCache(partition, EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdatper, evictionStrategy, checkpointer, logger,  
-                cacheMonitor, statisticOptions.StatisticMonitorWriteInterval);
+                cacheMonitor, statisticOptions.StatisticMonitorWriteInterval, streamCacheEvictionOptions.MetadataMinTimeInCache);
         }
     }
 }
