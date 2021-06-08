@@ -31,7 +31,7 @@ namespace Orleans.GrainDirectory.Redis
             this.clusterOptions = clusterOptions.Value;
         }
 
-        public async Task<GrainAddress> Lookup(string grainId)
+        public async Task<GrainAddress> Lookup(GrainId grainId)
         {
             try
             {
@@ -154,7 +154,7 @@ end
             }
         }
 
-        private string GetKey(string grainId) => $"{this.clusterOptions.ClusterId}-{grainId}";
+        private string GetKey(GrainId grainId) => $"{this.clusterOptions.ClusterId}-{grainId}";
 
         #region Logging
         private void LogConnectionRestored(object sender, ConnectionFailedEventArgs e)

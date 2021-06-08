@@ -29,7 +29,7 @@ namespace Orleans.GrainDirectory
         /// </summary>
         /// <param name="grainId">The Grain ID to lookup</param>
         /// <returns>The <see cref="GrainAddress"/> entry found in the directory, if any</returns>
-        Task<GrainAddress> Lookup(string grainId);
+        Task<GrainAddress> Lookup(GrainId grainId);
 
         /// <summary>
         /// Unregister from the directory all entries that point to one of the silo in argument.
@@ -47,7 +47,7 @@ namespace Orleans.GrainDirectory
         /// <summary>
         /// Identifier of the Grain
         /// </summary>
-        public string GrainId { get; set; }
+        public GrainId GrainId { get; set; }
 
         /// <summary>
         /// Id of the specific Grain activation

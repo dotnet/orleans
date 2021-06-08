@@ -54,7 +54,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return cachedResult;
             }
 
-            var entry = await GetGrainDirectory(grainId.Type).Lookup(grainId.ToString());
+            var entry = await GetGrainDirectory(grainId.Type).Lookup(grainId);
 
             // Nothing found
             if (entry is null)
@@ -214,7 +214,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             return ActivationAddress.GetAddress(
                     SiloAddress.FromParsableString(addr.SiloAddress),
-                    GrainId.Parse(addr.GrainId),
+                    addr.GrainId,
                     ActivationId.GetActivationId(UniqueKey.Parse(addr.ActivationId.AsSpan())));
         }
 
@@ -223,7 +223,7 @@ namespace Orleans.Runtime.GrainDirectory
             return new GrainAddress
             {
                 SiloAddress = addr.Silo.ToParsableString(),
-                GrainId = addr.Grain.ToString(),
+                GrainId = addr.Grain,
                 ActivationId = (addr.Activation.Key.ToHexString())
             };
         }
