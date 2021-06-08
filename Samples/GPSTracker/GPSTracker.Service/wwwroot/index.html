@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Orleans GPS Tracker</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.5.0/css/ol.css" type="text/css">
+    <style type="text/css">
+        html, body, #map {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #text {
+            position: absolute;
+            bottom: 1em;
+            left: 1em;
+            width: 512px;
+            z-index: 20000;
+            background-color: white;
+            padding: 0 0.5em 0.5em 0.5em;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.5.0/build/ol.js"></script>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha256-3edrmyuQ0w65f8gfBsqowzjJe2iM6n0nKciPUp8y+7E=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/5.0.7/signalr.min.js"></script>
+</head>
+<body>
+    <div id="map" class="map"></div>
+    <script type="text/javascript">
+      var devices = [];
+      var vectorSource = new ol.source.Vector({
+        features: []
+      });
+      var vectorLayer = new ol.layer.Vector({
+        source: vectorSource,
+      });
+      window.map = new ol.Map({
+        target: 'map',
+        layers: [
+          new ol.layer.Tile({
+            source: new ol.source.OSM()
+          }),
+          vectorLayer
+        ],
+        view: new ol.View({ 
+          center: ol.proj.fromLonLat([-122.45, 37.75]),
+          zoom: 13
+        })
+      });
+
+      var dotStyle = new ol.style.Style({
+        fill: new ol.style.Fill({
+          color: 'rgba(0, 0, 255, 0.2)'
+        }),
+        image: new ol.style.Icon({
+          anchor: [0.5, 0.5],
+          anchorXUnits: 'fraction',
+          anchorYUnits: 'fraction',
+          src: './img/dot.png'
+        })
+      });
+      vectorLayer.setStyle(dotStyle);
+
+      $(function () {
+        const connection = new signalR.HubConnectionBuilder()
+                   .withUrl("./locationHub")
+                   .build();
+    
+        connection.start().catch(err => console.error);
+        connection.on('locationUpdates', data => {
+          data.messages.forEach(m =>
+          {
+            var loc = new ol.geom.Point(ol.proj.fromLonLat([m.longitude, m.latitude]));
+            var dev = devices[m.deviceId];
+            if (dev) {
+              // Ignore old messages unless we have skipped several already (which would indicate that the device gateway was restarted).
+              if (dev.messageId < m.messageId || dev.skipped >= 5) {
+                dev.feature.setGeometry(loc);
+                dev.messageId = m.messageId;
+                dev.skipped = 0;
+              }
+              else {
+                dev.skipped++;
+              }
+            }
+            else {
+              devices[m.deviceId] = {
+                feature: new ol.Feature({ geometry: loc }),
+                messageId: m.messageId,
+                skipped: 0
+              };
+              devices[m.deviceId].feature.setStyle(dotStyle);
+              vectorSource.addFeature(devices[m.deviceId].feature);
+            }
+          });
+        });
+    });
+    </script>
+</body>
+</html>
