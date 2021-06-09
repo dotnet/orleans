@@ -1,0 +1,174 @@
+@model TicTacToe.Controllers.ViewModel
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet">
+        <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js" type="text/javascript"></script>
+        <script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/1.0.0/handlebars.min.js" type="text/javascript"></script>
+        <script src="./app.js" type="text/javascript"></script>
+        <script src="//netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+        <title>Tic-Tac-Toe</title>
+        <style>
+            .container {
+                width: 970px;
+            }
+            .cell{
+                width:100px;
+                height:100px;
+                text-align:center;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container jumbotron">
+            <h1>Tic-Tac-Toe</h1>
+        </div>
+        <div class="container">
+
+        </div>
+        <div id="games-placeholder" class="container">
+
+        </div>
+        <div id="board-placeholder" class="container" style="display:none">
+
+        </div>
+
+        <script id="board-template" type="text/x-handlebars-template">
+            <a href="javascript:void(0);" style="margin-top:8px;margin-bottom:8px" onclick="oxo.controllers.showGames();">&larr; Back to game list</a>
+            <h3>
+                {{summary.name}}
+                {{#if summary.yourMove}}
+                &nbsp;<small><label class="label label-danger">Your Move</label></small>
+                {{/if}}
+            </h3>
+            <p>You are <strong>{{#if summary.gameStarter}}O{{else}}X{{/if}}</strong></p>
+            <p>Playing against <strong>{{#each summary.usernames}}{{this}}{{/each}}</strong></p>
+            <p><strong>{{summary.numMoves}}</strong> moves made</p><br />
+            <table class="table-bordered">
+                <tr><td class="cell">{{{board.x0y0}}}</td><td class="cell">{{{board.x1y0}}}</td><td class="cell">{{{board.x2y0}}}</td></tr>
+                <tr><td class="cell">{{{board.x0y1}}}</td><td class="cell">{{{board.x1y1}}}</td><td class="cell">{{{board.x2y1}}}</td></tr>
+                <tr><td class="cell">{{{board.x0y2}}}</td><td class="cell">{{{board.x1y2}}}</td><td class="cell">{{{board.x2y2}}}</td></tr>
+            </table>
+        </script>
+
+        <script id="games-template" type="text/x-handlebars-template">
+            <h3>Your Games</h3>
+            <ul style="margin-bottom:25px">
+                {{#each currentGames}}
+                    <li>
+
+                        {{#if waiting}}
+                            <h4>
+                               {{name}}
+                            </h4>
+                            <strong>Waiting for another player</strong><br />
+                            <a class="btn btn-default" onclick="oxo.controllers.showInvite('{{gameId}}')" href="javascript:void(0);">Invite a friend</a>
+                        {{else}}
+                            <h4>
+                                <a href="javascript:void(0);" onclick="oxo.controllers.play('{{gameId}}')">
+                                    {{name}}
+                                </a>
+                                {{#if yourMove}}
+                                &nbsp;<small><label class="label label-danger">Your Move</label></small>
+                                {{/if}}
+                            </h4>
+                            Playing against <strong>{{#each usernames}}{{this}}{{/each}}</strong><br />
+                            <strong>{{numMoves}}</strong> moves made
+                        {{/if}}
+
+                    </li>
+                {{else}}
+                <li><i>No games available</i></li>
+                {{/each}}
+
+            </ul>
+
+            <h3>Available Games</h3>
+            <ul style="margin-bottom:25px">
+                {{#each availableGames}}
+                <li>
+                    <h4>
+                        {{name}}
+                    </h4>
+                    <strong>Waiting for another player</strong><br />
+                    <a class="btn btn-default" onclick="oxo.controllers.joinThisGame('{{gameId}}')" href="javascript:void(0);">Join</a>
+                </li>
+                {{else}}
+                    <li><i>No games available</i></li>
+                {{/each}}
+
+            </ul>
+
+            <a id="startNewBtn" class="btn btn-primary" href="javascript:void(0);" onclick="oxo.controllers.createGame();">Start a new Game</a>
+            <a id="joinBtn" class="btn btn-success" href="javascript:void(0);" onclick="oxo.controllers.showJoinDialog();">Join a Game</a>
+        </script>
+
+        <div class="modal fade" id="enter-name-modal">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title">Hi! Please enter your name</h4>
+                    </div>
+                    <div class="modal-body">
+                        <p>
+                            <label for="enter-name-input">Your name</label>
+                            <input type="text" class="form-control" id="enter-name-input" placeholder="Enter your name"/>
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" id="enterNameOk">OK</button>
+                    </div>
+                </div><!-- /.modal-content -->
+            </div><!-- /.modal-dialog -->
+        </div><!-- /.modal -->
+
+        <div class="modal fade" id="join-game-modal">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                        <h4 class="modal-title">Join a game</h4>
+                    </div>
+                    <div class="modal-body">
+                        <p>
+                            <label for="join-game-input">Game Id</label>
+                            <input type="text" class="form-control" id="join-game-input" placeholder="Enter game id">
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-success" id="joinConfirmButton">Join</button>
+                    </div>
+                </div><!-- /.modal-content -->
+            </div><!-- /.modal-dialog -->
+        </div><!-- /.modal -->
+
+        <div class="modal fade" id="invite-game-modal">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                        <h4 class="modal-title">Invite a friend to a game</h4>
+                    </div>
+                    <div class="modal-body">
+                        <p>
+                            <label for="invite-game-id">Send this game id to a friend</label>
+                            <input type="text" class="form-control" id="invite-game-id" />
+                            <label for="invite-game-link">Or given them this link</label>
+                            <input type="text" class="form-control" id="invite-game-link" />
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-success" data-dismiss="modal">OK</button>
+                    </div>
+                </div><!-- /.modal-content -->
+            </div><!-- /.modal-dialog -->
+        </div><!-- /.modal -->
+    </body>
+</html>
