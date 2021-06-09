@@ -5,25 +5,8 @@ namespace Orleans.Configuration
     /// <summary>
     /// Configuration for Amazon DynamoDB reminder storage.
     /// </summary>
-    public class DynamoDBReminderStorageOptions
+    public class DynamoDBReminderStorageOptions : DynamoDBClientOptions
     {
-        /// <summary>
-        /// AccessKey string for DynamoDB Storage
-        /// </summary>
-        [Redact]
-        public string AccessKey { get; set; }
-
-        /// <summary>
-        /// Secret key for DynamoDB storage
-        /// </summary>
-        [Redact]
-        public string SecretKey { get; set; }
-
-        /// <summary>
-        /// DynamoDB Service name 
-        /// </summary>
-        public string Service { get; set; }
-
         /// <summary>
         /// Read capacity unit for DynamoDB storage
         /// </summary>
