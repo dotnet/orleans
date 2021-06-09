@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -10,6 +12,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Immutable]
     [Serializable]
+    [JsonConverter(typeof(GrainIdJsonConverter))]
     [StructLayout(LayoutKind.Auto)]
     [GenerateSerializer]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
@@ -178,5 +181,13 @@ namespace Orleans.Runtime
             /// <inheritdoc/>
             public int GetHashCode(GrainId obj) => obj.GetHashCode();
         }
+    }
+
+    // Serialize to string
+    public class GrainIdJsonConverter : JsonConverter<GrainId>
+    {
+        public override GrainId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => GrainId.Parse(reader.GetString());
+
+        public override void Write(Utf8JsonWriter writer, GrainId value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToString());
     }
 }

@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using StackExchange.Redis;
@@ -43,7 +43,7 @@ namespace Orleans.GrainDirectory.Redis
                 if (string.IsNullOrWhiteSpace(result))
                     return default;
 
-                return JsonConvert.DeserializeObject<GrainAddress>(result);
+                return JsonSerializer.Deserialize<GrainAddress>(result);
             }
             catch (Exception ex)
             {
@@ -58,7 +58,7 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task<GrainAddress> Register(GrainAddress address)
         {
-            var value = JsonConvert.SerializeObject(address);
+            var value = JsonSerializer.Serialize(address);
 
             try
             {
@@ -89,11 +89,11 @@ namespace Orleans.GrainDirectory.Redis
 
         public async Task Unregister(GrainAddress address)
         {
-            var value = JsonConvert.SerializeObject(address);
+            var value = JsonSerializer.Serialize(address);
 
             try
             {
-                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = JsonConvert.SerializeObject(address) });
+                var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = JsonSerializer.Serialize(address) });
 
                 if (this.logger.IsEnabled(LogLevel.Debug))
                     this.logger.LogDebug("Unregister {GrainId} ({Address}): {Result}", address.GrainId, value, (result != 0) ? "OK" : "Conflict");
