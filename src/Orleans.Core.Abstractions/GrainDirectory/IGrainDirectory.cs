@@ -60,6 +60,11 @@ namespace Orleans.GrainDirectory
         /// </summary>
         public string SiloAddress { get; set; }
 
+        /// <summary>
+        /// MembershipVersion at the time of registration
+        /// </summary>
+        public MembershipVersion MembershipVersion { get; set; } = MembershipVersion.MinValue;
+
         public override bool Equals(object obj)
         {
             return obj is GrainAddress address &&

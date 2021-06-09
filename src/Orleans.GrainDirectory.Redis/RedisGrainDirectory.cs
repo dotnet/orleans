@@ -93,6 +93,19 @@ namespace Orleans.GrainDirectory.Redis
 
             try
             {
+                if (address.MembershipVersion == MembershipVersion.MinValue)
+                {
+                    var fullAddress = await Lookup(address.GrainId);
+                    if (!fullAddress.Equals(address))
+                    {
+                        if (this.logger.IsEnabled(LogLevel.Debug))
+                            this.logger.LogDebug("Unregister {GrainId} ({Address}): Not found in storage", address.GrainId, value);
+
+                        return;
+                    }
+                    address = fullAddress;
+                }
+
                 var result = (int) await this.database.ScriptEvaluateAsync(this.deleteScript, new { key = GetKey(address.GrainId), val = JsonSerializer.Serialize(address) });
 
                 if (this.logger.IsEnabled(LogLevel.Debug))

@@ -1,9 +1,12 @@
 using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Orleans.Runtime
 {
     [Serializable]
     [GenerateSerializer]
+    [JsonConverter(typeof(MembershipVersionConverter))]
     public struct MembershipVersion : IComparable<MembershipVersion>, IEquatable<MembershipVersion>
     {
         public MembershipVersion(long version)
@@ -32,5 +35,12 @@ namespace Orleans.Runtime
         public static bool operator <=(MembershipVersion left, MembershipVersion right) => left.Value <= right.Value;
         public static bool operator >(MembershipVersion left, MembershipVersion right) => left.Value > right.Value;
         public static bool operator <(MembershipVersion left, MembershipVersion right) => left.Value < right.Value;
+    }
+
+    public class MembershipVersionConverter : JsonConverter<MembershipVersion>
+    {
+        public override MembershipVersion Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => new(reader.GetInt64());
+
+        public override void Write(Utf8JsonWriter writer, MembershipVersion value, JsonSerializerOptions options) => writer.WriteNumberValue(value.Value);
     }
 }

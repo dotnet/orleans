@@ -66,6 +66,11 @@ namespace UnitTests.Directory
             var expected = GenerateActivationAddress();
             var grainAddress = expected.ToGrainAddress();
 
+            // Setup membership service
+            this.mockMembershipService.UpdateSiloStatus(expected.Silo, SiloStatus.Active, "exp");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
+
             this.grainDirectory.Register(grainAddress).Returns(grainAddress);
 
             var actual = await this.grainLocator.Register(expected);
@@ -85,6 +90,11 @@ namespace UnitTests.Directory
             var expectedGrainAddr = expectedAddr.ToGrainAddress();
             var otherAddr = GenerateActivationAddress();
             var otherGrainAddr = otherAddr.ToGrainAddress();
+
+            // Setup membership service
+            this.mockMembershipService.UpdateSiloStatus(expectedAddr.Silo, SiloStatus.Active, "exp");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
 
             this.grainDirectory.Register(otherGrainAddr).Returns(expectedGrainAddr);
 
@@ -133,6 +143,11 @@ namespace UnitTests.Directory
         {
             var expected = GenerateActivationAddress();
             var grainAddress = expected.ToGrainAddress();
+
+            // Setup membership service
+            this.mockMembershipService.UpdateSiloStatus(expected.Silo, SiloStatus.Active, "exp");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
 
             this.grainDirectory.Lookup(grainAddress.GrainId).Returns(grainAddress);
 
@@ -242,6 +257,11 @@ namespace UnitTests.Directory
         {
             var expectedAddr = GenerateActivationAddress();
             var expectedGrainAddr = expectedAddr.ToGrainAddress();
+
+            // Setup membership service
+            this.mockMembershipService.UpdateSiloStatus(expectedAddr.Silo, SiloStatus.Active, "exp");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
 
             this.grainDirectory.Register(expectedGrainAddr).Returns(expectedGrainAddr);
 
