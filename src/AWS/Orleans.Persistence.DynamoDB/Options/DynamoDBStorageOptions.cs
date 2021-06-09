@@ -24,6 +24,10 @@ namespace Orleans.Configuration
         [Redact]
         public string SecretKey { get; set; }
 
+        public string Token { get; set; }
+
+        public string ProfileName { get; set; }
+
         /// <summary>
         /// DynamoDB Service name
         /// </summary>
