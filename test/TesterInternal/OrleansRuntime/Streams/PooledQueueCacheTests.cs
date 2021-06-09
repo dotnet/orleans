@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
@@ -167,6 +168,124 @@ namespace UnitTests.OrleansRuntime.Streams
             int startSequenceNuber = 222;
             startSequenceNuber = RunGoldenPath(cache, converter, startSequenceNuber);
             RunGoldenPath(cache, converter, startSequenceNuber);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void AvoidCacheMissNotEmptyCache()
+        {
+            AvoidCacheMiss(false);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void AvoidCacheMissEmptyCache()
+        {
+            AvoidCacheMiss(true);
+        }
+
+        private void AvoidCacheMiss(bool emptyCache)
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, TimeSpan.FromSeconds(30));
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)), null, null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+
+            var seqNumber = 123;
+            var stream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+
+            // Enqueue a message for stream
+            var firstSequenceNumber = EnqueueMessage(stream);
+
+            // Consume first event
+            var cursor = cache.GetCursor(stream, new EventSequenceTokenV2(firstSequenceNumber));
+            Assert.True(cache.TryGetNextMessage(cursor, out var firstContainer));
+            Assert.Equal(stream, firstContainer.StreamId);
+            Assert.Equal(firstSequenceNumber, firstContainer.SequenceToken.SequenceNumber);
+
+            // Remove first message, that was consumed
+            cache.RemoveOldestMessage();
+
+            if (!emptyCache)
+            {
+                // Enqueue something not related to the stream
+                // so the cache isn't empty
+                EnqueueMessage(StreamId.Create(TestStreamNamespace, Guid.NewGuid()));
+                EnqueueMessage(StreamId.Create(TestStreamNamespace, Guid.NewGuid()));
+                EnqueueMessage(StreamId.Create(TestStreamNamespace, Guid.NewGuid()));
+                EnqueueMessage(StreamId.Create(TestStreamNamespace, Guid.NewGuid()));
+                EnqueueMessage(StreamId.Create(TestStreamNamespace, Guid.NewGuid()));
+                EnqueueMessage(StreamId.Create(TestStreamNamespace, Guid.NewGuid()));
+            }
+
+            // Enqueue another message for stream
+            var lastSequenceNumber = EnqueueMessage(stream);
+
+            // Should be able to consume the event just pushed
+            Assert.True(cache.TryGetNextMessage(cursor, out var lastContainer));
+            Assert.Equal(stream, lastContainer.StreamId);
+            Assert.Equal(lastSequenceNumber, lastContainer.SequenceToken.SequenceNumber);
+
+            long EnqueueMessage(StreamId streamId)
+            {
+                var now = DateTime.UtcNow;
+                var msg = new TestQueueMessage
+                {
+                    StreamId = streamId,
+                    SequenceNumber = seqNumber,
+                };
+                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+                seqNumber++;
+                return msg.SequenceNumber;
+            }
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void SimpleCacheMiss()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, TimeSpan.FromSeconds(10));
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)), null, null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+
+            int idx;
+            var seqNumber = 123;
+            var stream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+
+            // First and last messages destined for stream, following messages
+            // destined for other streams
+            for (idx = 0; idx < 20; idx++)
+            {
+                var now = DateTime.UtcNow;
+                var msg = new TestQueueMessage
+                {
+                    StreamId = (idx == 0) ? stream : StreamId.Create(TestStreamNamespace, Guid.NewGuid()),
+                    SequenceNumber = seqNumber + idx,
+                };
+                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+            }
+
+            var cursor = cache.GetCursor(stream, new EventSequenceTokenV2(seqNumber));
+
+            // Remove first message
+            cache.RemoveOldestMessage();
+
+            // Enqueue a new message for stream
+            {
+                idx++;
+                var now = DateTime.UtcNow;
+                var msg = new TestQueueMessage
+                {
+                    StreamId = stream,
+                    SequenceNumber = seqNumber + idx,
+                };
+                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+            }
+
+            // Should throw since we missed the first message
+            Assert.Throws<QueueCacheMissException>(() => cache.TryGetNextMessage(cursor, out _));
         }
 
         private int RunGoldenPath(PooledQueueCache cache, CachedMessageConverter converter, int startOfCache)
