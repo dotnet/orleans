@@ -26,5 +26,10 @@ namespace Orleans.Reminders.DynamoDB
         /// DynamoDB Service name
         /// </summary>
         public string Service { get; set; }
+
+        /// <summary>
+        /// Token for DynamoDB storage
+        /// </summary>
+        public string Token { get; set; }
     }
 }

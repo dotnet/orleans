@@ -15,7 +15,7 @@ namespace Orleans.Reminders.DynamoDB
     /// Implementation for IReminderTable using DynamoDB as underlying storage.
     /// </summary>
     internal class DynamoDBReminderTable : IReminderTable
-    {   
+    {
         private const string GRAIN_REFERENCE_PROPERTY_NAME = "GrainReference";
         private const string REMINDER_NAME_PROPERTY_NAME = "ReminderName";
         private const string SERVICE_ID_PROPERTY_NAME = "ServiceId";
@@ -40,9 +40,9 @@ namespace Orleans.Reminders.DynamoDB
         /// <param name="clusterOptions"></param>
         /// <param name="storageOptions"></param>
         public DynamoDBReminderTable(
-            GrainReferenceKeyStringConverter grainReferenceConverter, 
-            ILoggerFactory loggerFactory, 
-            IOptions<ClusterOptions> clusterOptions, 
+            GrainReferenceKeyStringConverter grainReferenceConverter,
+            ILoggerFactory loggerFactory,
+            IOptions<ClusterOptions> clusterOptions,
             IOptions<DynamoDBReminderStorageOptions> storageOptions)
         {
             this.grainReferenceConverter = grainReferenceConverter;
@@ -55,7 +55,7 @@ namespace Orleans.Reminders.DynamoDB
         public Task Init()
         {
             this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
-                 this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
+                this.options.Token, this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
 
             this.logger.Info(ErrorCode.ReminderServiceBase, "Initializing AWS DynamoDB Reminders Table");
 
@@ -194,7 +194,7 @@ namespace Orleans.Reminders.DynamoDB
         }
 
         /// <summary>
-        /// Remove one row from the reminder table 
+        /// Remove one row from the reminder table
         /// </summary>
         /// <param name="grainRef"> specific grain ref to locate the row </param>
         /// <param name="reminderName"> reminder name to locate the row </param>
@@ -293,7 +293,7 @@ namespace Orleans.Reminders.DynamoDB
                 if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("UpsertRow entry = {0}, etag = {1}", entry.ToString(), entry.ETag);
 
                 await this.storage.PutEntryAsync(this.options.TableName, fields);
-                
+
                 entry.ETag = fields[ETAG_PROPERTY_NAME].N;
                 return entry.ETag;
             }

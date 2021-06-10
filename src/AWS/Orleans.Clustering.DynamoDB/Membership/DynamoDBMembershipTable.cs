@@ -40,7 +40,7 @@ namespace Orleans.Clustering.DynamoDB
         public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
             this.storage = new DynamoDBStorage(this.logger, this.options.Service, this.options.AccessKey, this.options.SecretKey,
-                  this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
+                this.options.Token, this.options.ReadCapacityUnits, this.options.WriteCapacityUnits);
 
             logger.Info(ErrorCode.MembershipBase, "Initializing AWS DynamoDB Membership Table");
             await storage.InitializeTable(this.options.TableName,
@@ -545,7 +545,7 @@ namespace Orleans.Clustering.DynamoDB
                     { $":{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
                 };
                 var filter = $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}";
-                
+
                 var records = await this.storage.QueryAllAsync(this.options.TableName, keys, filter, item => new SiloInstanceRecord(item));
                 var defunctRecordKeys = records.Where(r => SiloIsDefunct(r, beforeDate)).Select(r => r.GetKeys());
 
