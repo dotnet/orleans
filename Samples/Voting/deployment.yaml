@@ -1,0 +1,152 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: mcr.microsoft.com/oss/bitnami/redis:6.0.8
+        env:
+        - name: ALLOW_EMPTY_PASSWORD
+          value: "yes"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        ports:
+        - containerPort: 6379
+          name: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: votingapp
+  labels:
+    app: votingapp
+spec:
+  selector:
+    matchLabels:
+      app: votingapp
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: votingapp
+
+        # The serviceId label is used to identify the service to Orleans
+        orleans/serviceId: votingapp
+
+        # The clusterId label is used to identify an instance of a cluster to Orleans.
+        # Typically, this will be the same value as serviceId or any fixed value.
+        # In cases where you are not using rolling deployments (for example, blue/green deployments),
+        # this value can allow for distinct clusters which do not communicate directly with each others,
+        # but which still share the same storage and other resources.
+        orleans/clusterId: votingapp
+    spec:
+      containers:
+        - name: main
+          image: votingapp2acr.azurecr.io/votingapp
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 80
+          - containerPort: 443
+          - containerPort: 11111
+          - containerPort: 8888
+          env:
+          # Configure settings to let Orleans know which cluster it belongs to and which pod it is running in
+          - name: ORLEANS_SERVICE_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['orleans/serviceId']
+          - name: ORLEANS_CLUSTER_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['orleans/clusterId']
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: DOTNET_SHUTDOWNTIMEOUTSECONDS
+            value: "120"
+          - name: REDIS
+            value: "redis" # The name of the redis service
+      terminationGracePeriodSeconds: 180
+      imagePullSecrets:
+        - name: votingapp2acr
+  minReadySeconds: 60
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+---
+# In order to be able to access the service from outside the cluster, we will need to add a Service object
+apiVersion: v1
+kind: Service
+metadata:
+  name: votingapp
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+  - name: https
+    port: 433
+  - name: orleans-dashboard
+    port: 8888
+  selector:
+    app: votingapp
+
+# For RBAC-enabled clusters, the Kubernetes service account for the pods may also need to be granted the required access:
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: pod-reader
+rules:
+- apiGroups: [ "" ]
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: pod-reader-binding
+subjects:
+- kind: ServiceAccount
+  name: default
+  apiGroup: ''
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: ''

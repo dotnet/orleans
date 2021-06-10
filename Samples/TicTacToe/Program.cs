@@ -31,14 +31,10 @@ await Host.CreateDefaultBuilder(args)
 
 public class Startup
 {
-    public Startup(IConfiguration configuration)
+    public void ConfigureServices(IServiceCollection services)
     {
-        Configuration = configuration;
+        services.AddControllersWithViews();
     }
-
-    public IConfiguration Configuration { get; }
-
-    public void ConfigureServices(IServiceCollection services) => services.AddControllersWithViews();
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
     {
@@ -57,7 +53,6 @@ public class Startup
         app.UseEndpoints(endpoints =>
         {
             endpoints.MapDefaultControllerRoute();
-            endpoints.MapControllers();
         });
     }
 }
