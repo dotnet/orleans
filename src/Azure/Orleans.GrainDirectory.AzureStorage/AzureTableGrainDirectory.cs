@@ -29,7 +29,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 return new GrainAddress
                 {
                     GrainId = RowKeyToGrainId(this.RowKey),
-                    SiloAddress = this.SiloAddress,
+                    SiloAddress = Orleans.Runtime.SiloAddress.FromParsableString(this.SiloAddress),
                     ActivationId = this.ActivationId,
                 };
             }
@@ -40,7 +40,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 {
                     PartitionKey = clusterId,
                     RowKey = GrainIdToRowKey(address.GrainId),
-                    SiloAddress = address.SiloAddress,
+                    SiloAddress = address.SiloAddress.ToParsableString(),
                     ActivationId = address.ActivationId,
                 };
             }
@@ -110,7 +110,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
-        public Task UnregisterSilos(List<string> siloAddresses)
+        public Task UnregisterSilos(List<SiloAddress> siloAddresses)
         {
             // Too costly to implement using Azure Table
             return Task.CompletedTask;

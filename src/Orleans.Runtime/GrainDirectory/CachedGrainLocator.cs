@@ -178,7 +178,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var changes = snapshot.CreateUpdate(previousSnapshot).Changes;
                 var deadSilos = changes
                     .Where(member => member.Status.IsTerminating())
-                    .Select(member => member.SiloAddress.ToParsableString())
+                    .Select(member => member.SiloAddress)
                     .ToList();
 
                 if (deadSilos.Count > 0)
@@ -196,7 +196,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         private bool IsPointingToDeadSilo(GrainAddress grainAddress)
-            => IsPointingToDeadSilo(SiloAddress.FromParsableString(grainAddress.SiloAddress), grainAddress.MembershipVersion);
+            => IsPointingToDeadSilo(grainAddress.SiloAddress, grainAddress.MembershipVersion);
 
         private bool IsPointingToDeadSilo(SiloAddress siloAddress, MembershipVersion membershipVersion)
         {
@@ -222,7 +222,7 @@ namespace Orleans.Runtime.GrainDirectory
         public static ActivationAddress ToActivationAddress(this GrainAddress addr)
         {
             return ActivationAddress.GetAddress(
-                    SiloAddress.FromParsableString(addr.SiloAddress),
+                    addr.SiloAddress,
                     addr.GrainId,
                     ActivationId.GetActivationId(UniqueKey.Parse(addr.ActivationId.AsSpan())));
         }
@@ -231,7 +231,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             return new GrainAddress
             {
-                SiloAddress = addr.Silo.ToParsableString(),
+                SiloAddress = addr.Silo,
                 GrainId = addr.Grain,
                 ActivationId = (addr.Activation.Key.ToHexString())
             };

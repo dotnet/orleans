@@ -37,7 +37,7 @@ namespace Orleans.GrainDirectory
         /// Can be a NO-OP depending on the implementation.
         /// </summary>
         /// <param name="siloAddresses">The silos to be removed from the directory</param>
-        Task UnregisterSilos(List<string> siloAddresses);
+        Task UnregisterSilos(List<SiloAddress> siloAddresses);
     }
 
     /// <summary>
@@ -58,7 +58,7 @@ namespace Orleans.GrainDirectory
         /// <summary>
         /// Address of the silo where the grain activation lives
         /// </summary>
-        public string SiloAddress { get; set; }
+        public SiloAddress SiloAddress { get; set; }
 
         /// <summary>
         /// MembershipVersion at the time of registration

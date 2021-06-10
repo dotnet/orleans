@@ -31,7 +31,7 @@ namespace Tester.Directories
             {
                 ActivationId = Guid.NewGuid().ToString("N"),
                 GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
-                SiloAddress = "10.0.23.12:1000@5678"
+                SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
             };
 
             Assert.Equal(expected, await this.grainDirectory.Register(expected));
@@ -50,21 +50,21 @@ namespace Tester.Directories
             {
                 ActivationId = Guid.NewGuid().ToString("N"),
                 GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
-                SiloAddress = "10.0.23.12:1000@5678"
+                SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
             };
 
             var differentActivation = new GrainAddress
             {
                 ActivationId = Guid.NewGuid().ToString("N"),
                 GrainId = expected.GrainId,
-                SiloAddress = "10.0.23.12:1000@5678"
+                SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
             };
 
             var differentSilo = new GrainAddress
             {
                 ActivationId = expected.ActivationId,
                 GrainId = expected.GrainId,
-                SiloAddress = "10.0.23.14:1000@4583"
+                SiloAddress = SiloAddress.FromParsableString("10.0.23.14:1000@4583")
             };
 
             Assert.Equal(expected, await this.grainDirectory.Register(expected));
@@ -81,14 +81,14 @@ namespace Tester.Directories
             {
                 ActivationId = Guid.NewGuid().ToString("N"),
                 GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
-                SiloAddress = "10.0.23.12:1000@5678"
+                SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
             };
 
             var otherEntry = new GrainAddress
             {
                 ActivationId = Guid.NewGuid().ToString("N"),
                 GrainId = expected.GrainId,
-                SiloAddress = "10.0.23.12:1000@5678"
+                SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
             };
 
             Assert.Equal(expected, await this.grainDirectory.Register(expected));

@@ -239,7 +239,7 @@ namespace UnitTests.Directory
             // Cleanup function from grain directory should have been called
             await this.grainDirectory
                 .Received(1)
-                .UnregisterSilos(Arg.Is<List<string>>(list => list.Count == 1 && list.Contains(outdatedGrainAddr.SiloAddress)));
+                .UnregisterSilos(Arg.Is<List<SiloAddress>>(list => list.Count == 1 && list.Contains(outdatedGrainAddr.SiloAddress)));
 
             // Cache should have been cleaned
             Assert.False(this.grainLocator.TryLocalLookup(outdatedAddr.Grain, out var unused1));

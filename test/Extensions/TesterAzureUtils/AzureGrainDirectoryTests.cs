@@ -55,7 +55,7 @@ namespace Tester.AzureUtils
                 {
                     ActivationId = Guid.NewGuid().ToString("N"),
                     GrainId = GrainId.Parse("user/someraondomuser_" + Guid.NewGuid().ToString("N")),
-                    SiloAddress = "10.0.23.12:1000@5678"
+                    SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678")
                 };
                 addresses.Add(addr);
                 await this.grainDirectory.Register(addr);
