@@ -1,8 +1,10 @@
 # TicTacToe - Web-based game
 
-This sample demonstrates a Web-based [Tic-tac-toe](https://en.wikipedia.org/wiki/Tic-tac-toe) game.
+<p align="center">
+    <img src="logo.png"/>
+</p>
 
-![A picture of a completed tic-tac-toe board, showing a winner](logo.png)
+This sample demonstrates a Web-based [Tic-tac-toe](https://en.wikipedia.org/wiki/Tic-tac-toe) game.
 
 The game is implemented as a single project, `TicTacToe.csproj`, which uses the [.NET Generic Host](https://docs.microsoft.com/dotnet/core/extensions/generic-host) to host an ASP.NET Core MVC application alongside Orleans.
 

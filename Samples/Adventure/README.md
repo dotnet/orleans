@@ -1,8 +1,10 @@
-# Adventure - text adventure game
+# Adventure - Text Adventure Game
 
 This sample demonstrates a short text adventure game built using Orleans in the style of [Colossal Cave Adventure](https://en.wikipedia.org/wiki/Colossal_Cave_Adventure), [Zork](https://en.wikipedia.org/wiki/Zork), and [Microsoft Adventure](https://en.wikipedia.org/wiki/Microsoft_Adventure):
 
-![Microsoft Adventure Box Art](./assets/BoxArt.jpg)
+<p align="center">
+    <img src="./assets/BoxArt.jpg" />
+</p>
 
 The system consists of two parts: a server executable called *AdventureServer* and a client executable called *AdventureClient*.
 The server reads a game data file, `AdventureMap.json` by default, and initializes `RoomGrain` instances with that game data.

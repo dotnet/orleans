@@ -2,7 +2,9 @@
 
 This sample demonstrates a service for tracking GPS-equipped IoT devices on a map. Device locations are updated in near-real-time using SignalR and hence this sample demonstrates one approach to integrating Orleans with SignalR. The device updates originate from a *device gateway*, which is implemented using a separate process which connects to the main service and simulates a number of devices moving in a pseudorandom fashion around an area of San Francisco.
 
-![Screenshot of the Web application with markers representing devices on a map](./screenshot.jpeg)
+<p align="center">
+    <img src="./screenshot.jpeg" />
+</p>
 
 Data flows around the system as follows:
 

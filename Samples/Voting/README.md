@@ -1,6 +1,6 @@
-# Voting - Orleans Kubernetes sample
+# Voting - Orleans on Kubernetes
 
-This is an [Orleans](https://github.com/dotnet/orleans) sample application which demonstrates deployment to Kubernetes. The application is a very simplistic Web app for voting on a custom set of options.
+This is an [Orleans](https://github.com/dotnet/orleans) sample application which demonstrates deployment to Kubernetes. The application is a simplistic Web app for voting on a custom set of options.
 
 ![A screenshot of the application](./screenshot.png)
 

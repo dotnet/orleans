@@ -1,4 +1,4 @@
-# Stocks - stock symbol ticker
+# Stocks
 
 This sample demonstrates setup of an Orleans application which fetches stock prices from a remote service using `HttpClient`.
 A [`BackgroundService`](https://docs.microsoft.com/aspnet/core/fundamentals/host/hosted-services#backgroundservice-base-class) periodically requests the stock price for a variety of stocks from corresponding `StockGrain` instances.
