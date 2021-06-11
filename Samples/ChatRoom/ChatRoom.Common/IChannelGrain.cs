@@ -1,11 +1,10 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
-using GrainInterfaces.Model;
 using Orleans;
 
-namespace GrainInterfaces
+namespace ChatRoom
 {
-	public interface IChannel : IGrainWithStringKey
+	public interface IChannelGrain : IGrainWithStringKey
 	{
 	    Task<Guid> Join(string nickname);
 	    Task<Guid> Leave(string nickname);

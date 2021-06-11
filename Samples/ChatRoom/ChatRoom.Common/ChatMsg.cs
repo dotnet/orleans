@@ -1,6 +1,6 @@
-﻿using System;
+using System;
 
-namespace GrainInterfaces.Model
+namespace ChatRoom
 {
 	[Serializable]
 	public class ChatMsg
