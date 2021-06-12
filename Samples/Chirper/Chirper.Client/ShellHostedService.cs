@@ -1,10 +1,12 @@
 using System;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Chirper.Grains;
 using Microsoft.Extensions.Hosting;
 using Orleans;
+using Spectre.Console;
 
 namespace Chirper.Client
 {
@@ -16,7 +18,7 @@ namespace Chirper.Client
         private IChirperViewer _viewerRef;
         private IChirperAccount _account;
 
-        public ShellHostedService(IClusterClient client, IHost host, IHostApplicationLifetime applicationLifetime)
+        public ShellHostedService(IClusterClient client, IHostApplicationLifetime applicationLifetime)
         {
             _client = client;
             _applicationLifetime = applicationLifetime;
@@ -33,7 +35,7 @@ namespace Chirper.Client
                 {
                     ShowHelp();
                 }
-                else if (command == "/quit")
+                else if (command is null || command == "/quit")
                 {
                     _applicationLifetime.StopApplication();
                     return;
@@ -47,11 +49,11 @@ namespace Chirper.Client
                         var username = match.Groups["username"].Value;
                         _account = _client.GetGrain<IChirperAccount>(username);
 
-                        Console.WriteLine($"The current user is now [{username}]");
+                        AnsiConsole.MarkupLine("[bold grey][[[/][bold lime]✓[/][bold grey]]][/] The current user is now [navy]{0}[/]", username);
                     }
                     else
                     {
-                        Console.WriteLine("Invalid username. Try again or type /help for a list of commands.");
+                        AnsiConsole.MarkupLine("[bold red]Invalid username[/][red].[/] Try again or type [bold fuchsia]/help[/] for a list of commands.");
                     }
                 }
                 else if (command.StartsWith("/follow "))
@@ -63,12 +65,10 @@ namespace Chirper.Client
                         {
                             var targetName = match.Groups["username"].Value;
                             await _account.FollowUserIdAsync(targetName);
-
-                            Console.WriteLine($"[{_account.GetPrimaryKeyString()}] is now following [{targetName}]");
                         }
                         else
                         {
-                            Console.WriteLine("Invalid target username. Try again or type /help for a list of commands.");
+                            AnsiConsole.MarkupLine("[bold grey][[[/][bold red]✗[/][bold grey]]][/] [red underline]Invalid target username[/][red].[/] Try again or type [bold fuchsia]/help[/] for a list of commands.");
                         }
                     }
                 }
@@ -76,16 +76,46 @@ namespace Chirper.Client
                 {
                     if (EnsureActiveAccount())
                     {
-                        (await _account.GetFollowingListAsync())
-                            .ForEach(_ => Console.WriteLine(_));
+                        var following = await _account.GetFollowingListAsync();
+                        AnsiConsole.Render(new Rule($"{_account.GetPrimaryKeyString()}'s followed accounts")
+                        {
+                            Alignment = Justify.Center,
+                            Style = Style.Parse("blue")
+                        });
+
+                        foreach (var account in following)
+                        {
+                            AnsiConsole.MarkupLine("[bold yellow]{0}[/]", account);
+                        }
+
+                        AnsiConsole.Render(new Rule()
+                        {
+                            Alignment = Justify.Center,
+                            Style = Style.Parse("blue")
+                        });
                     }
                 }
                 else if (command == "/followers")
                 {
                     if (EnsureActiveAccount())
                     {
-                        (await _account.GetFollowersListAsync())
-                            .ForEach(_ => Console.WriteLine(_));
+                        var followers = await _account.GetFollowersListAsync();
+                        AnsiConsole.Render(new Rule($"{_account.GetPrimaryKeyString()}'s followers")
+                        {
+                            Alignment = Justify.Center,
+                            Style = Style.Parse("blue")
+                        });
+
+                        foreach (var account in followers)
+                        {
+                            AnsiConsole.MarkupLine("[bold yellow]{0}[/]", account);
+                        }
+
+                        AnsiConsole.Render(new Rule()
+                        {
+                            Alignment = Justify.Center,
+                            Style = Style.Parse("blue")
+                        });
                     }
                 }
                 else if (command == "/observe")
@@ -100,7 +130,7 @@ namespace Chirper.Client
 
                         await _account.SubscribeAsync(_viewerRef);
 
-                        Console.WriteLine($"Now observing [{_account.GetPrimaryKeyString()}]");
+                        AnsiConsole.MarkupLine("[bold grey][[[/][bold lime]✓[/][bold grey]]][/] [bold olive]Now observing[/] [navy]{0}[/]", _account.GetPrimaryKeyString());
                     }
                 }
                 else if (command == "/unobserve")
@@ -108,6 +138,7 @@ namespace Chirper.Client
                     if (EnsureActiveAccount())
                     {
                         await Unobserve();
+                        AnsiConsole.MarkupLine("[bold grey][[[/][bold lime]✓[/][bold grey]]][/] [bold olive]No longer observing[/] [navy]{0}[/]", _account.GetPrimaryKeyString());
                     }
                 }
                 else if (command.StartsWith("/unfollow "))
@@ -119,12 +150,10 @@ namespace Chirper.Client
                         {
                             var targetName = match.Groups["username"].Value;
                             await _account.UnfollowUserIdAsync(targetName);
-
-                            Console.WriteLine($"[{_account.GetPrimaryKeyString()}] is no longer following [{targetName}]");
                         }
                         else
                         {
-                            Console.WriteLine("Invalid target username. Try again or type /help for a list of commands.");
+                            AnsiConsole.MarkupLine("[bold grey][[[/][bold red]✗[/][bold grey]]][/] [red underline]Invalid target username[/][red].[/] Try again or type [bold fuchsia]/help[/] for a list of commands.");
                         }
                     }
                 }
@@ -137,17 +166,17 @@ namespace Chirper.Client
                         {
                             var message = match.Groups["message"].Value;
                             await _account.PublishMessageAsync(message);
-                            Console.WriteLine("Published the new message!");
+                            AnsiConsole.MarkupLine("[bold grey][[[/][bold lime]✓[/][bold grey]]][/] Published a new message!");
                         }
                         else
                         {
-                            Console.WriteLine("Invalid chirp. Try again or type /help for a list of commands.");
+                            AnsiConsole.MarkupLine("[bold grey][[[/][bold red]✗[/][bold grey]]][/] [red underline]Invalid chirp[/][red].[/] Try again or type [bold fuchsia]/help[/] for a list of commands.");
                         }
                     }
                 }
                 else
                 {
-                    Console.WriteLine("Unknown command. Type /help for list of commands.");
+                    AnsiConsole.MarkupLine("[bold grey][[[/][bold red]✗[/][bold grey]]][/] [red underline]Unknown command[/][red].[/] Type [bold fuchsia]/help[/] for a list of commands.");
                 }
             }
         }
@@ -156,7 +185,8 @@ namespace Chirper.Client
         {
             if (_account == null)
             {
-                Console.WriteLine("This command requires an active user. Try again or type /help for a list of commands.");
+                AnsiConsole.MarkupLine("[bold grey][[[/][bold red]✗[/][bold grey]]][/] This command requires an [red underline]active user[/][red].[/]"
+                    + " Set an active user using [bold fuchsia]/fuchsia[/] [aqua]username[/] or type [bold fuchisa]/help] for a list of commands.");
                 return false;
             }
             return true;
@@ -170,31 +200,60 @@ namespace Chirper.Client
 
                 _viewerRef = null;
                 _viewer = null;
-
-                Console.WriteLine($"No longer observing [{_account.GetPrimaryKeyString()}]");
             }
         }
 
         private void ShowHelp(bool title = false)
         {
+            var markup = new Markup(
+                "[bold fuchsia]/help[/]: Shows this [underline green]help[/] text.\n"
+                + "[bold fuchsia]/user[/] [aqua]<username>[/]: Switches to the specified [underline green]user[/] account.\n"
+                + "[bold fuchsia]/chirp[/] [aqua]<message>[/]: [underline green]Chirps[/] a [aqua]message[/] from the active account.\n"
+                + "[bold fuchsia]/follow[/] [aqua]<username>[/]: [underline green]Follows[/] the account with the specified [aqua]username[/].\n"
+                + "[bold fuchsia]/unfollow[/] [aqua]<username>[/]: [underline green]Unfollows[/] the account with the specified [aqua]username[/].\n"
+                + "[bold fuchsia]/following[/]: Lists the accounts that the active account is [underline green]following[/].\n"
+                + "[bold fuchsia]/followers[/]: Lists the accounts [underline green]followers[/] the active account.\n"
+                + "[bold fuchsia]/observe[/]: [underline green]Start observing[/] the active account.\n"
+                + "[bold fuchsia]/unobserve[/]: [underline green]Stop observing[/] the active account.\n"
+                + "[bold fuchsia]/quit[/]: Closes this client.\n");
             if (title)
             {
-                Console.WriteLine();
-                Console.WriteLine("Welcome to the Chirper Sample!");
-                Console.WriteLine("These are the available commands:");
-            }
+                // Add some flair for the title screen
+                using var logoStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Chirper.Client.logo.png");
+                var logo = new CanvasImage(logoStream)
+                {
+                    MaxWidth = 25
+                };
 
-            Console.WriteLine("/help: Shows this list.");
-            Console.WriteLine("/user <username>: Acts as the given account.");
-            Console.WriteLine("/chirp <message>: Publishes a message to the active account.");
-            Console.WriteLine("/follow <username>: Makes the active account follows the given account.");
-            Console.WriteLine("/unfollow <username>: Makes the active account unfollow the given accout.");
-            Console.WriteLine("/following: Lists the accounts that the active account is following.");
-            Console.WriteLine("/followers: Lists the accounts that follow the active account.");
-            Console.WriteLine("/observe: Start receiving real-time activity updates from the active account.");
-            Console.WriteLine("/unobserve: Stop receiving real-time activity updates from the active account.");
-            Console.WriteLine("/quit: Closes this client.");
-            Console.WriteLine();
+                var table = new Table()
+                {
+                    Border = TableBorder.None,
+                    Expand = true,
+                }.HideHeaders();
+                table.AddColumn(new TableColumn("One"));
+
+                var header = new FigletText("Orleans")
+                {
+                    Color = Color.Fuchsia
+                };
+                var header2 = new FigletText("Chirper")
+                {
+                    Color = Color.Aqua
+                };
+
+                table.AddColumn(new TableColumn("Two"));
+                var rightTable = new Table().HideHeaders().Border(TableBorder.None).AddColumn(new TableColumn("Content"));
+                rightTable.AddRow(header).AddRow(header2).AddEmptyRow().AddEmptyRow().AddRow(markup);
+                table.AddRow(logo, rightTable);
+
+                AnsiConsole.WriteLine();
+                AnsiConsole.Render(table);
+                AnsiConsole.WriteLine();
+            }
+            else
+            {
+                AnsiConsole.Render(markup);
+            }
         }
     }
 }

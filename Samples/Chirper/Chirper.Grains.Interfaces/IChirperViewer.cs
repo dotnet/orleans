@@ -23,5 +23,7 @@ namespace Chirper.Grains
         /// Notifies that the account has removed a subscription.
         /// </summary>
         void SubscriptionRemoved(string username);
+
+        void NewFollower(string username);
     }
 }

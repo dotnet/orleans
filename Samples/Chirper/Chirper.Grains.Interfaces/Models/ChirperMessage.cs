@@ -11,12 +11,12 @@ namespace Chirper.Grains.Models
         /// <summary>
         /// Creates a new message.
         /// </summary>
-        public ChirperMessage(string message, DateTime timestamp, string publisherUserName)
+        public ChirperMessage(string message, DateTimeOffset timestamp, string publisherUserName)
         {
-            this.MessageId = Guid.NewGuid();
-            this.Message = message;
-            this.Timestamp = timestamp;
-            this.PublisherUserName = publisherUserName;
+            MessageId = Guid.NewGuid();
+            Message = message;
+            Timestamp = timestamp;
+            PublisherUserName = publisherUserName;
         }
 
         /// <summary>
@@ -32,7 +32,7 @@ namespace Chirper.Grains.Models
         /// <summary>
         /// The timestamp of when this chirp message entry was originally republished.
         /// </summary>
-        public DateTime Timestamp { get; }
+        public DateTimeOffset Timestamp { get; }
 
         /// <summary>
         /// The user name of the publisher of this chirp message.
@@ -42,6 +42,6 @@ namespace Chirper.Grains.Models
         /// <summary>
         /// Returns a string representation of this message.
         /// </summary>
-        public override string ToString() => $"Chirp: '{this.Message}' from @{this.PublisherUserName} at {this.Timestamp}";
+        public override string ToString() => $"Chirp: '{Message}' from @{PublisherUserName} at {Timestamp}";
     }
 }

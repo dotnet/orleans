@@ -12,8 +12,7 @@ await Host.CreateDefaultBuilder()
     {
         builder
             .UseLocalhostClustering()
-            .AddMemoryGrainStorageAsDefault()
-            .AddMemoryGrainStorage("PubSubStore")
+            .AddMemoryGrainStorage("AccountState")
             .ConfigureApplicationParts(parts => parts
                 .AddApplicationPart(typeof(ChirperAccount).Assembly)
                 .AddApplicationPart(typeof(IChirperAccount).Assembly))

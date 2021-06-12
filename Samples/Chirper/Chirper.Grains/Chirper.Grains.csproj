@@ -11,6 +11,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Orleans.Core" Version="3.4.2" />
     <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="3.4.2" />
+    <PackageReference Include="Microsoft.Orleans.Runtime.Abstractions" Version="3.4.2" />
   </ItemGroup>
 
   <ItemGroup>
