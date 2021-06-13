@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading.Tasks;
@@ -20,5 +20,8 @@ namespace UnitTests.Grains
             var result = new List<ImmutableList<HashSet<Tuple<int, string>>>>();
             return Task.FromResult((object)result);
         }
+
+        // test record support
+        public Task<RetVal> GetRetValForParamVal(ParamVal param) => Task.FromResult(new RetVal(param.Value));
     }
 }
