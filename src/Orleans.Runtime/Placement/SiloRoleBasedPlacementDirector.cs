@@ -24,6 +24,7 @@ namespace Orleans.Runtime.Placement
             List<SiloAddress> siloAddressesSameRole = membershipTableManager.MembershipTableSnapshot.Entries
                 .Where(s => s.Value.Status == SiloStatus.Active && s.Value.RoleName == siloRole)
                 .Select(s => s.Key)
+                .Intersect(context.GetCompatibleSilos(target))
                 .ToList();
 
             if (siloAddressesSameRole == null || siloAddressesSameRole.Count == 0)
